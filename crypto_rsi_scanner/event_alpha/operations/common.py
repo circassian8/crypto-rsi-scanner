@@ -42,6 +42,9 @@ AUTH_BEARER_RE = re.compile(r"\bAuthorization\s*:\s*Bearer\s+(?P<value>[A-Za-z0-
 X_API_KEY_RE = re.compile(r"\bX-API-Key\s*:\s*(?P<value>[A-Za-z0-9._-]+)", re.IGNORECASE)
 OPENAI_KEY_RE = re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{12,}\b")
 PROVIDER_TOKEN_VALUE_RE = re.compile(r"\b(?:ghp|gho|ghu|github_pat|xoxb|xoxp)_[A-Za-z0-9_]{16,}\b", re.IGNORECASE)
+TELEGRAM_BOT_TOKEN_VALUE_RE = re.compile(
+    r"(?<![A-Za-z0-9])\d{6,12}:[A-Za-z0-9_-]{30,64}(?![A-Za-z0-9_-])"
+)
 ABSOLUTE_ARTIFACT_PATH_RE = re.compile(
     r"(?P<prefix>(?:/mnt/data|/tmp|/private/tmp)/[^\s`'\"<>]*|/Users/[^\s`'\"<>]+/[^\s`'\"<>]*)"
     r"(?P<artifact>event_fade_cache/[^\s`'\"<>]*)"
@@ -398,6 +401,7 @@ def scrub_operator_text(text: str, *, root: str | Path | None = None) -> tuple[s
         (X_API_KEY_RE, "X-API-Key: <redacted>"),
         (OPENAI_KEY_RE, "sk-<redacted>"),
         (PROVIDER_TOKEN_VALUE_RE, "<redacted-provider-token>"),
+        (TELEGRAM_BOT_TOKEN_VALUE_RE, "<redacted-telegram-bot-token>"),
     ):
         clean, count = pattern.subn(repl, clean)
         redactions += count
@@ -437,7 +441,11 @@ def _secret_value_matches(line: str) -> list[tuple[str, str, str]]:
             label = match.groupdict().get("label") or ("authorization" if pattern is AUTH_BEARER_RE else "x-api-key")
             value = match.groupdict().get("value") or ""
             matches.append((label, value, match.group(0)))
-    for pattern, label in ((OPENAI_KEY_RE, "openai_key"), (PROVIDER_TOKEN_VALUE_RE, "provider_token")):
+    for pattern, label in (
+        (OPENAI_KEY_RE, "openai_key"),
+        (PROVIDER_TOKEN_VALUE_RE, "provider_token"),
+        (TELEGRAM_BOT_TOKEN_VALUE_RE, "telegram_bot_token"),
+    ):
         for match in pattern.finditer(line):
             token = match.group(0)
             if _natural_language_sk_phrase(token):
@@ -463,6 +471,9 @@ def _redacted_secret_excerpt(text: str) -> str:
     clean = X_API_KEY_RE.sub("X-API-Key: <redacted>", clean)
     clean = OPENAI_KEY_RE.sub("sk-<redacted>", clean)
     clean = PROVIDER_TOKEN_VALUE_RE.sub("<redacted-provider-token>", clean)
+    clean = TELEGRAM_BOT_TOKEN_VALUE_RE.sub(
+        "<redacted-telegram-bot-token>", clean
+    )
     return clean
 
 

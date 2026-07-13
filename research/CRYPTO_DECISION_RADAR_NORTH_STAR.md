@@ -172,6 +172,26 @@ time certainty, importance, timezone, forecast, previous, actual, and surprise
 when available. The canonical projection retains enough information to resolve
 every reference. `calendar_risk` without real attached evidence is invalid.
 
+Live/no-send market generations accept calendar input only from the explicit
+`RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` boundary. Readiness inspects that
+bounded local JSON snapshot without a provider call or write and reports
+`not_configured`, `healthy_empty`, `healthy_nonempty`, `stale`, `unavailable`,
+or `fixture_rejected_live`. An accepted non-fixture snapshot is copied and
+fingerprinted inside the exact generation after projecting it to a closed,
+allowlisted, secret-safe source-row shape; scheduled/unlock adaptation and
+canonical unified-calendar normalization then feed the integrated cycle. Live
+operational input requires the versioned container, explicit snapshot time, and explicit
+current-source/acquisition provenance; a renamed fixture, bare list, or mtime-
+only freshness cannot qualify. Row-level source/provider provenance is checked
+as well, and supplied `research_only`, `no_send`, or `no_send_rehearsal` fields
+must be exactly true. Unsupported provider fields, secret-like keys, and
+credential-bearing URLs fail closed before any copy. Fixture, test, mock, and
+replay markers are rejected from container/nested provenance and event-row
+`provider`, `source`, and `source_class`.
+A missing source is shown as `not_configured`; it is never silently treated
+as a quiet calendar and never replaced by fixture/test/mock/replay data in a live
+generation.
+
 RSI is a read-only supporting adapter. Its context and artifact references stay
 in the canonical projection and may transparently adjust an existing idea, but
 RSI context cannot create a Decision idea by itself and cannot write RSI rows,
@@ -199,6 +219,31 @@ stale/fixture/live badges, exact run/revision/doctor status, and bounded local
 sparklines may use only the already-authorized read model. Stale or untrusted
 data is never displayed as currently actionable.
 
+A clean zero-idea generation remains informative. The dashboard renders the
+exact fingerprint-bound market observations and anomaly artifacts that were
+evaluated, reports each source pack as healthy-nonempty, healthy-empty,
+unconfigured, or degraded/unavailable, and distinguishes normalization
+rejections from a valid empty source. Namespace-local Decision outcomes stay
+separate from the shared cumulative campaign outcome ledger, which is labeled
+historical and non-authoritative for the current generation.
+
+One descriptor-anchored namespace is held through the entire dashboard load;
+directory replacement fails closed, and operator semantic counts must reconcile
+with exact market snapshot/anomaly rows. Raw anomaly scanner outputs appear as a
+separate scan-evidence table, never as synthetic Decision candidates or routes.
+
+Artifact presence alone is not evidence of healthy-empty acquisition. A
+provider/layer may receive that status only from its exact current producer
+completion contract with matching lineage and counts; operator publication then
+fingerprints the exact artifacts. Otherwise an empty artifact is shown as
+unconfigured or unavailable. This prevents an empty unlock or derivatives file
+from impersonating successful provider coverage.
+A same-cycle zero-anomaly result is healthy-empty only when its completion
+receipt reconciles the exact run, namespace device/inode, paths, content hashes,
+row semantics/lineage, and snapshot/anomaly/search-queue counts. All four scan
+outputs are preflighted and atomically replaced through one held no-follow
+namespace bundle. Empty anomaly artifacts without that receipt remain unavailable.
+
 ## Guarded Real/No-Send Market Generation
 
 The supported operator flow is:
@@ -216,6 +261,18 @@ anomalies, creates canonical Decision ideas, then builds cards, preview,
 outcomes, operator state, the dashboard read model, and a credential-free JSON
 plus Markdown pilot audit. The defaults remain research-only and no-send, with
 zero trades, paper trades, normal RSI writes, or `TRIGGERED_FADE` creation.
+
+When `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` is already configured, the
+same generation validates and copies that local no-network calendar snapshot,
+preserves only the closed secret-safe allowlisted source-row projection, and
+separately adapts it to scheduled-catalyst input. Publication deterministically recomputes
+the scheduled, unlock, and unified rows from the accepted source copy and
+compares their exact canonical forms from the same read-once hashed buffers, so
+rewritten digests, duplicate keys, in-place mutation, or split reads cannot
+conceal a semantic change. Scheduled/unlock JSONL and report outputs are one
+descriptor-anchored no-follow bundle. Snapshot absence or rejection does not block the
+market observation, but its coverage status and normalization counters remain
+explicit in readiness, manifests, operator state, and the dashboard.
 
 `radar_market_history_cache/event_market_history.jsonl` is the bounded mutable
 live/no-send research cache. Every generation copies an exact fingerprinted
@@ -281,7 +338,9 @@ contract v1 is distinct from market provenance contract v2. The audit records
 the exact namespace/run/revision, canonical pointer binding, request/source/
 history fingerprints, full-universe cold/warming/warm counts and observations
 per asset, direct/proxy feature bases, spread coverage, routes/scores/outcomes,
-doctor and dashboard status, and zero-side-effect counters. It separately names
+doctor and dashboard status, and zero-side-effect counters. Market-quality
+counts are derived from the complete exact snapshot universe, not merely the
+subset promoted into candidates. It separately names
 `provider_adapter_invoked`, `network_call_attempted`, and
 `provider_request_succeeded`; mock adapter invocation is never presented as a
 network call. Campaign-level evidence is tracked in

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from crypto_rsi_scanner.event_alpha.namespace import lifecycle
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
@@ -14,6 +16,463 @@ globals().update({
     for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
+
+
+def test_integrated_input_manifest_distinguishes_unverified_empty_from_not_configured(
+    tmp_path,
+):
+    import json
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+
+    namespace_dir = tmp_path / "coverage_contract"
+    namespace_dir.mkdir()
+    (namespace_dir / "event_market_state_snapshots.jsonl").write_text(
+        json.dumps(
+            {
+                "row_type": "market_state_snapshot",
+                "symbol": "TEST",
+                "run_id": "coverage-contract-run",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (namespace_dir / "event_market_anomalies.jsonl").write_text("", encoding="utf-8")
+    (namespace_dir / "event_market_anomaly_catalyst_search_queue.jsonl").write_text(
+        "", encoding="utf-8"
+    )
+    (namespace_dir / "event_scheduled_catalysts.jsonl").write_text("", encoding="utf-8")
+
+    _sidecars, manifest = event_integrated_radar._run_or_load_sidecars(
+        namespace_dir=namespace_dir,
+        fixture=False,
+        observed_at=datetime(2026, 7, 13, 19, tzinfo=timezone.utc),
+        profile="no_key_live",
+        artifact_namespace=namespace_dir.name,
+        run_mode="no_key_live",
+        run_id="coverage-contract-run",
+        input_mode=event_integrated_radar.INPUT_MODE_LOAD_EXISTING,
+        coinalyze_namespace=None,
+    )
+    by_name = {row["sidecar_name"]: row for row in manifest}
+
+    assert by_name["market_anomaly"]["mode"] == "loaded_existing_empty_unverified"
+    assert by_name["market_anomaly"]["coverage_status"] == "unavailable"
+    assert by_name["market_anomaly"]["configured"] is True
+    assert by_name["market_anomaly"]["artifact_set_complete"] is True
+    assert "producer completion receipt" in by_name["market_anomaly"]["warnings"][0]
+    assert by_name["scheduled_catalyst"]["mode"] == "loaded_existing_empty_unverified"
+    assert by_name["scheduled_catalyst"]["coverage_status"] == "unavailable"
+    assert "producer completion receipt" in by_name["scheduled_catalyst"]["warnings"][0]
+    assert by_name["unlock"]["mode"] == "skipped_missing_config"
+    assert by_name["unlock"]["coverage_status"] == "not_configured"
+    assert by_name["unlock"]["artifact_set_complete"] is False
+    assert "missing_sidecar_artifact" in by_name["unlock"]["warnings"]
+
+    _sidecars, accepted_empty_manifest = event_integrated_radar._run_or_load_sidecars(
+        namespace_dir=namespace_dir,
+        fixture=False,
+        observed_at=datetime(2026, 7, 13, 19, tzinfo=timezone.utc),
+        profile="no_key_live",
+        artifact_namespace=namespace_dir.name,
+        run_mode="no_key_live",
+        run_id="coverage-contract-run",
+        input_mode=event_integrated_radar.INPUT_MODE_LOAD_EXISTING,
+        coinalyze_namespace=None,
+        calendar_source_injected=True,
+    )
+    accepted_by_name = {
+        row["sidecar_name"]: row for row in accepted_empty_manifest
+    }
+    assert accepted_by_name["scheduled_catalyst"]["mode"] == "completed_empty"
+    assert accepted_by_name["scheduled_catalyst"]["coverage_status"] == "healthy_empty"
+    assert accepted_by_name["unlock"]["coverage_status"] == "not_configured"
+
+
+def test_market_no_send_zero_anomaly_receipt_marks_verified_healthy_empty(
+    tmp_path,
+    monkeypatch,
+):
+    import json
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_calendar
+
+    for name in (
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "RSI_EVENT_ALPHA_RUN_MODE",
+        market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV,
+    ):
+        monkeypatch.delenv(name, raising=False)
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace="verified_empty_anomaly",
+        profile="fixture",
+        run_mode="fixture",
+        top_n=5,
+        provider=lambda _limit: market_no_send._smoke_rows()[:2],
+        observed_at=datetime(2026, 7, 13, 19, tzinfo=timezone.utc),
+        environ={},
+        fixture_dir=None,
+        data_mode="mock",
+        allow_non_live=True,
+    )
+    payload = json.loads(
+        (result.namespace_dir / "event_integrated_radar_input_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    market = next(
+        row for row in payload["sidecars"] if row["sidecar_name"] == "market_anomaly"
+    )
+
+    snapshots = result.namespace_dir / "event_market_state_snapshots.jsonl"
+    assert len([line for line in snapshots.read_text().splitlines() if line]) == 2
+    assert result.market_anomalies == 0
+    assert market["mode"] == "completed_empty"
+    assert market["coverage_status"] == "healthy_empty"
+    assert market["configured"] is True
+    assert market["artifact_set_complete"] is True
+    assert len(market["artifact_paths"]) == 3
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ("run_id", "namespace", "count", "path", "missing", "symlink"),
+)
+def test_market_anomaly_completion_receipt_mismatch_fails_closed(
+    tmp_path,
+    mismatch,
+):
+    from dataclasses import replace
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send
+    from crypto_rsi_scanner.event_alpha.radar import integrated_radar
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    namespace_dir = tmp_path / f"receipt_{mismatch}"
+    observed = datetime(2026, 7, 13, 19, tzinfo=timezone.utc)
+    run_id = "market-anomaly-receipt-run"
+    receipt = market_anomaly_scanner.run_market_anomaly_scan(
+        market_rows=market_no_send._smoke_rows()[:2],
+        namespace_dir=namespace_dir,
+        observed_at=observed,
+        profile="no_key_live",
+        artifact_namespace=namespace_dir.name,
+        run_mode="no_key_live",
+        run_id=run_id,
+    )
+    if mismatch == "run_id":
+        receipt = replace(receipt, run_id="wrong-run")
+    elif mismatch == "namespace":
+        receipt = replace(receipt, artifact_namespace="wrong-namespace")
+    elif mismatch == "count":
+        receipt = replace(receipt, snapshot_count=receipt.snapshot_count + 1)
+    elif mismatch == "path":
+        receipt = replace(receipt, snapshots_path=namespace_dir / "wrong.jsonl")
+    elif mismatch == "missing":
+        receipt.catalyst_search_queue_path.unlink()
+    elif mismatch == "symlink":
+        outside = tmp_path / "outside-anomalies.jsonl"
+        outside.write_bytes(receipt.anomalies_path.read_bytes())
+        receipt.anomalies_path.unlink()
+        receipt.anomalies_path.symlink_to(outside)
+
+    with pytest.raises(
+        RuntimeError,
+        match="market_anomaly_completion_receipt_invalid",
+    ):
+        integrated_radar._run_or_load_sidecars(
+            namespace_dir=namespace_dir,
+            fixture=False,
+            observed_at=observed,
+            profile="no_key_live",
+            artifact_namespace=namespace_dir.name,
+            run_mode="no_key_live",
+            run_id=run_id,
+            input_mode=integrated_radar.INPUT_MODE_LOAD_EXISTING,
+            coinalyze_namespace=None,
+            market_anomaly_scan_result=receipt,
+        )
+
+
+def test_market_anomaly_completion_receipt_rejects_replaced_namespace_with_identical_artifacts(
+    tmp_path,
+):
+    import shutil
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send
+    from crypto_rsi_scanner.event_alpha.radar import integrated_radar
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    namespace_dir = tmp_path / "receipt_replaced_namespace"
+    observed = datetime(2026, 7, 13, 19, tzinfo=timezone.utc)
+    run_id = "market-anomaly-replaced-namespace-run"
+    receipt = market_anomaly_scanner.run_market_anomaly_scan(
+        market_rows=market_no_send._smoke_rows()[:2],
+        namespace_dir=namespace_dir,
+        observed_at=observed,
+        profile="no_key_live",
+        artifact_namespace=namespace_dir.name,
+        run_mode="no_key_live",
+        run_id=run_id,
+    )
+    retired_dir = tmp_path / "retired_receipt_namespace"
+    namespace_dir.rename(retired_dir)
+    namespace_dir.mkdir()
+    for source in retired_dir.iterdir():
+        shutil.copyfile(source, namespace_dir / source.name)
+
+    with pytest.raises(
+        RuntimeError,
+        match="market_anomaly_completion_receipt_invalid:namespace_identity",
+    ):
+        integrated_radar._run_or_load_sidecars(
+            namespace_dir=namespace_dir,
+            fixture=False,
+            observed_at=observed,
+            profile="no_key_live",
+            artifact_namespace=namespace_dir.name,
+            run_mode="no_key_live",
+            run_id=run_id,
+            input_mode=integrated_radar.INPUT_MODE_LOAD_EXISTING,
+            coinalyze_namespace=None,
+            market_anomaly_scan_result=receipt,
+        )
+
+
+@pytest.mark.parametrize(
+    ("filename", "digest_field", "rebind_digest", "expected_reason"),
+    (
+        (
+            "event_market_anomalies.jsonl",
+            "anomalies_sha256",
+            False,
+            "artifact_digest",
+        ),
+        (
+            "event_market_anomalies.jsonl",
+            "anomalies_sha256",
+            True,
+            "artifact_semantics",
+        ),
+        (
+            "event_market_anomaly_catalyst_search_queue.jsonl",
+            "catalyst_search_queue_sha256",
+            True,
+            "artifact_semantics",
+        ),
+    ),
+)
+def test_market_anomaly_completion_receipt_rejects_same_count_content_forgery(
+    tmp_path,
+    filename,
+    digest_field,
+    rebind_digest,
+    expected_reason,
+):
+    import hashlib
+    import json
+    from dataclasses import replace
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send
+    from crypto_rsi_scanner.event_alpha.radar import integrated_radar
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    namespace_dir = tmp_path / f"receipt_forged_{digest_field}"
+    observed = datetime(2026, 7, 13, 19, tzinfo=timezone.utc)
+    run_id = "market-anomaly-semantic-forgery-run"
+    receipt = market_anomaly_scanner.run_market_anomaly_scan(
+        market_rows=market_no_send._smoke_rows(),
+        namespace_dir=namespace_dir,
+        observed_at=observed,
+        profile="no_key_live",
+        artifact_namespace=namespace_dir.name,
+        run_mode="no_key_live",
+        run_id=run_id,
+    )
+    artifact_path = namespace_dir / filename
+    rows = [
+        json.loads(line)
+        for line in artifact_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert rows
+    rows[0]["priority"] = float(rows[0].get("priority") or 0.0) + 0.125
+    artifact_path.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n"
+            for row in rows
+        ),
+        encoding="utf-8",
+    )
+    if rebind_digest:
+        receipt = replace(
+            receipt,
+            **{digest_field: hashlib.sha256(artifact_path.read_bytes()).hexdigest()},
+        )
+
+    with pytest.raises(
+        RuntimeError,
+        match=f"market_anomaly_completion_receipt_invalid:{expected_reason}",
+    ):
+        integrated_radar._run_or_load_sidecars(
+            namespace_dir=namespace_dir,
+            fixture=False,
+            observed_at=observed,
+            profile="no_key_live",
+            artifact_namespace=namespace_dir.name,
+            run_mode="no_key_live",
+            run_id=run_id,
+            input_mode=integrated_radar.INPUT_MODE_LOAD_EXISTING,
+            coinalyze_namespace=None,
+            market_anomaly_scan_result=receipt,
+        )
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "event_market_state_snapshots.jsonl",
+        "event_market_anomalies.jsonl",
+        "event_market_anomaly_catalyst_search_queue.jsonl",
+        "event_market_anomaly_report.md",
+    ),
+)
+def test_market_anomaly_scan_rejects_symlink_leaf_without_touching_outside(
+    tmp_path,
+    filename,
+):
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    namespace_dir = tmp_path / "unsafe_market_anomaly_leaf"
+    namespace_dir.mkdir()
+    outside = tmp_path / f"outside-{filename}"
+    outside.write_text("outside-sentinel\n", encoding="utf-8")
+    unsafe_leaf = namespace_dir / filename
+    unsafe_leaf.symlink_to(outside)
+
+    with pytest.raises(
+        RuntimeError,
+        match="market_anomaly_completion_receipt_invalid:artifact_not_regular",
+    ):
+        market_anomaly_scanner.run_market_anomaly_scan(
+            market_rows=(),
+            namespace_dir=namespace_dir,
+            artifact_namespace=namespace_dir.name,
+            run_id="unsafe-leaf-run",
+        )
+
+    assert outside.read_text(encoding="utf-8") == "outside-sentinel\n"
+    assert unsafe_leaf.is_symlink()
+
+
+def test_market_anomaly_scan_rejects_symlink_namespace_without_writing_target(
+    tmp_path,
+):
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    outside_dir = tmp_path / "outside-market-anomaly-namespace"
+    outside_dir.mkdir()
+    sentinel = outside_dir / "sentinel.txt"
+    sentinel.write_text("outside-sentinel\n", encoding="utf-8")
+    namespace_dir = tmp_path / "unsafe-market-anomaly-namespace"
+    namespace_dir.symlink_to(outside_dir, target_is_directory=True)
+
+    with pytest.raises(
+        RuntimeError,
+        match="market_anomaly_completion_receipt_invalid:namespace_not_directory",
+    ):
+        market_anomaly_scanner.run_market_anomaly_scan(
+            market_rows=(),
+            namespace_dir=namespace_dir,
+            artifact_namespace=namespace_dir.name,
+            run_id="unsafe-namespace-run",
+        )
+
+    assert sentinel.read_text(encoding="utf-8") == "outside-sentinel\n"
+    assert tuple(outside_dir.iterdir()) == (sentinel,)
+
+
+def test_market_anomaly_scan_fails_closed_on_namespace_swap_during_write(
+    tmp_path,
+    monkeypatch,
+):
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_receipt
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    namespace_dir = tmp_path / "market-anomaly-write-race"
+    namespace_dir.mkdir()
+    retired_dir = tmp_path / "retired-market-anomaly-write-race"
+    real_rename = market_anomaly_receipt.os.rename
+    swapped = False
+
+    def swap_namespace_before_artifact_replace(source, target, *args, **kwargs):
+        nonlocal swapped
+        if not swapped and kwargs.get("src_dir_fd") is not None:
+            swapped = True
+            real_rename(namespace_dir, retired_dir)
+            namespace_dir.mkdir()
+        return real_rename(source, target, *args, **kwargs)
+
+    monkeypatch.setattr(
+        market_anomaly_receipt.os,
+        "rename",
+        swap_namespace_before_artifact_replace,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="market_anomaly_completion_receipt_invalid:namespace_identity",
+    ):
+        market_anomaly_scanner.run_market_anomaly_scan(
+            market_rows=(),
+            namespace_dir=namespace_dir,
+            artifact_namespace=namespace_dir.name,
+            run_id="namespace-write-race-run",
+        )
+
+    assert swapped is True
+    assert list(namespace_dir.iterdir()) == []
+
+
+def test_integrated_input_manifest_marks_corrupt_rsi_context_unavailable(
+    tmp_path,
+    monkeypatch,
+):
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts.cycle as cycle
+    import crypto_rsi_scanner.event_alpha.radar.integrated_radar as event_integrated_radar
+
+    namespace_dir = tmp_path / "rsi_coverage_contract"
+    namespace_dir.mkdir()
+    corrupt = tmp_path / "rsi-corrupt.json"
+    corrupt.write_text("{not-json", encoding="utf-8")
+    monkeypatch.setattr(cycle.config, "EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH", corrupt)
+
+    _sidecars, manifest = event_integrated_radar._run_or_load_sidecars(
+        namespace_dir=namespace_dir,
+        fixture=False,
+        observed_at=datetime(2026, 7, 13, 19, tzinfo=timezone.utc),
+        profile="no_key_live",
+        artifact_namespace=namespace_dir.name,
+        run_mode="no_key_live",
+        run_id="rsi-coverage-contract-run",
+        input_mode=event_integrated_radar.INPUT_MODE_LOAD_EXISTING,
+        coinalyze_namespace=None,
+    )
+    rsi = next(row for row in manifest if row["sidecar_name"] == "rsi_signal_context")
+    assert rsi["mode"] == "local_read_error"
+    assert rsi["configured"] is True
+    assert rsi["coverage_status"] == "unavailable"
+    assert "missing or unreadable" in rsi["warnings"][0]
 
 
 def test_integrated_calendar_normalization_is_single_pass_exact_and_scope_neutral():

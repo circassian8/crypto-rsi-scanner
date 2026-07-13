@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import html
 import math
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Iterable, Mapping
 from urllib.parse import quote, urlsplit
 
 from ..operations import market_provenance
+from .health_render import render_health as _health
+from .layer_diagnostics import (
+    render_layer_status as _layer_status,
+    render_market_anomaly_evidence_table as _market_anomaly_evidence_table,
+    render_market_observation_summary as _market_observation_summary,
+    render_market_observation_table as _market_observation_table,
+)
 from .loader import candidate_identifier
 from .models import DashboardResponse, DashboardSnapshot
 
@@ -168,7 +175,11 @@ def _today(
             '<p class="muted">Diagnostics are hidden by default. '
             '<a href="/?include_diagnostics=1">Show current-generation diagnostics</a>.</p>'
         )
-    return _candidate_controls(query) + "".join(sections)
+    return (
+        _layer_status(snapshot, "today", len(snapshot.visible_current_candidates))
+        + _candidate_controls(query)
+        + "".join(sections)
+    )
 
 
 def _anomalies(
@@ -211,7 +222,27 @@ def _anomalies(
         "Market-led rows may be actionable without a known catalyst when identity, freshness, liquidity, "
         "spread, turnover, and manipulation-risk gates pass. Unknown catalyst remains a warning, not a trade instruction."
     )
-    return _candidate_controls(query) + f"<p>{_h(text)}</p>" + _candidate_table(rows, query=query)
+    return (
+        _layer_status(
+            snapshot,
+            "anomalies",
+            len(rows) + len(snapshot.current_market_anomalies),
+        )
+        + _candidate_controls(query)
+        + f"<p>{_h(text)}</p>"
+        + _candidate_table(rows, query=query)
+        + _section(
+            "Exact anomaly scan evidence (non-actionable)",
+            '<p class="muted">These fingerprint-bound scanner rows show what was evaluated. '
+            "They are research-only evidence, not Decision candidates or trade instructions.</p>"
+            + _market_anomaly_evidence_table(snapshot.current_market_anomalies),
+        )
+        + _section(
+            "Current market observation scan",
+            _market_observation_summary(snapshot)
+            + _market_observation_table(snapshot.current_market_observations),
+        )
+    )
 
 
 def _catalysts(
@@ -228,7 +259,11 @@ def _catalysts(
         and (include_diagnostics or row.get("_dashboard_route") != "diagnostic")
         and row.get("_decision_model_status") == "v2"
     )
-    return _candidate_controls(query) + _candidate_table(rows, query=query)
+    return (
+        _layer_status(snapshot, "catalysts", len(rows))
+        + _candidate_controls(query)
+        + _candidate_table(rows, query=query)
+    )
 
 
 def _fade_risk(
@@ -252,7 +287,8 @@ def _fade_risk(
         and row.get("_decision_model_status") == "v2"
     )
     return (
-        "<p>Fade and risk rows are manual research reviews after a completed or scheduled risk condition. "
+        _layer_status(snapshot, "fade_risk", len(rows))
+        + "<p>Fade and risk rows are manual research reviews after a completed or scheduled risk condition. "
         "They never create <code>TRIGGERED_FADE</code>.</p>"
         + _candidate_controls(query)
         + _candidate_table(rows, query=query)
@@ -296,70 +332,13 @@ def _calendar(snapshot: DashboardSnapshot) -> str:
             )
         )
     intro = (
-        "<p>Fixture-first unified calendar. Dates may be exact, estimated, or bounded windows; "
+        "<p>Unified calendar for this exact operator generation. Dates may be exact, estimated, or bounded windows; "
         "reminders are display metadata only and do not send notifications.</p>"
     )
-    return intro + _table(headers, body_rows, empty="No current-generation calendar rows.")
-
-
-def _health(snapshot: DashboardSnapshot) -> str:
-    doctor_verified = snapshot.doctor_verified_revision
-    doctor_revision = "none" if doctor_verified is None else str(doctor_verified)
-    summary = _definition_list(
-        (
-            ("Run", snapshot.run_id),
-            ("Operator revision", snapshot.revision),
-            ("Manifest", snapshot.manifest_status),
-            ("Doctor", snapshot.doctor_status),
-            ("Doctor verified revision", doctor_revision),
-            ("Generation authority", snapshot.generation_authority_status),
-            ("Authority checked at", snapshot.generation_authority_checked_at),
-            ("Operator-state SHA-256", snapshot.operator_state_sha256),
-            (
-                "Authority reasons",
-                "; ".join(snapshot.generation_authority_reasons) or "none",
-            ),
-            ("Research only", snapshot.operator_state.get("research_only")),
-            ("Send attempted", snapshot.operator_state.get("send_attempted")),
-            ("Trades / paper / RSI / triggered fade", "0 / 0 / 0 / 0"),
-        )
-    )
-    artifacts = snapshot.operator_state.get("artifacts")
-    artifact_rows = []
-    if isinstance(artifacts, Mapping):
-        for name, entry in sorted(artifacts.items()):
-            if not isinstance(entry, Mapping):
-                continue
-            artifact_rows.append(
-                (
-                    _h(name),
-                    _h(entry.get("status") or "unknown"),
-                    _h(entry.get("path") or "not written"),
-                    _h(entry.get("reason") or ""),
-                )
-            )
-    current_providers = _provider_rows(snapshot.provider_readiness)
-    cumulative_providers = _provider_rows(snapshot.provider_health)
-    cumulative_health_metadata = _definition_list(
-        (
-            ("Authority", "cumulative / non-authoritative"),
-            ("Read at", snapshot.provider_health_read_at or "not read"),
-            ("SHA-256", snapshot.provider_health_sha256 or "unavailable"),
-            ("Read error", snapshot.provider_health_error or "none"),
-        )
-    )
     return (
-        _section("Current operator generation", summary)
-        + _section("Artifact manifest", _table(("Artifact", "Status", "Path", "Reason"), artifact_rows))
-        + _section(
-            "Exact-generation provider readiness",
-            _table(("Provider", "Status", "Detail"), current_providers),
-        )
-        + _section(
-            "Cumulative provider health (non-authoritative)",
-            cumulative_health_metadata
-            + _table(("Provider", "Status", "Detail"), cumulative_providers),
-        )
+        _layer_status(snapshot, "calendar", len(body_rows))
+        + intro
+        + _table(headers, body_rows, empty="No exact-generation calendar rows.")
     )
 
 
@@ -385,6 +364,18 @@ def _feedback_outcomes(snapshot: DashboardSnapshot) -> str:
                 _h(row.get("actionability_score") if row.get("actionability_score") is not None else "n/a"),
             )
         )
+    campaign_outcome_rows = []
+    for row in snapshot.campaign_outcomes:
+        campaign_outcome_rows.append(
+            (
+                _h(row.get("core_opportunity_id") or row.get("candidate_id") or "unknown"),
+                _h(row.get("symbol") or row.get("coin_id") or "unknown"),
+                _h(row.get("outcome_status") or row.get("maturation_state") or "unknown"),
+                _h(row.get("radar_route") or row.get("route") or "unclassified"),
+                _h(row.get("confidence_band") or "unclassified"),
+                _h(row.get("artifact_namespace") or "unknown origin"),
+            )
+        )
     history_rows = []
     for artifact_name, metadata in sorted(snapshot.cumulative_history_metadata.items()):
         history_rows.append(
@@ -397,8 +388,9 @@ def _feedback_outcomes(snapshot: DashboardSnapshot) -> str:
             )
         )
     return (
-        '<p class="scope"><strong>Cumulative research history.</strong> These rows are intentionally not '
-        "presented as current-generation candidate counts.</p>"
+        '<p class="scope"><strong>Historical research reads.</strong> Namespace-local and shared '
+        "campaign rows are intentionally separated and are never presented as current-generation "
+        "candidate counts.</p>"
         + _section(
             "Cumulative artifact reads (non-authoritative)",
             _table(("Artifact", "Authority", "Read at", "SHA-256", "Read error"), history_rows),
@@ -408,8 +400,16 @@ def _feedback_outcomes(snapshot: DashboardSnapshot) -> str:
             _table(("Target", "Label", "Thesis origin", "Catalyst status"), feedback_rows),
         )
         + _section(
-            f"Outcome rows ({len(outcome_rows)})",
+            f"Namespace-local outcome rows ({len(outcome_rows)})",
             _table(("Target", "State", "Thesis origin", "Confidence", "Actionability"), outcome_rows),
+        )
+        + _section(
+            f"Decision campaign outcomes ({len(campaign_outcome_rows)}, shared / non-authoritative)",
+            _table(
+                ("Target", "Asset", "State", "Route", "Confidence", "Origin namespace"),
+                campaign_outcome_rows,
+                empty="No rows in the shared Decision campaign outcome ledger.",
+            ),
         )
     )
 
@@ -887,27 +887,6 @@ def _higher_manipulation_risk(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _provider_rows(*payloads: Mapping[str, Any]) -> list[tuple[str, str, str]]:
-    out: list[tuple[str, str, str]] = []
-    for payload in payloads:
-        raw = payload.get("providers") if isinstance(payload, Mapping) else None
-        if isinstance(raw, Mapping):
-            values = [dict(value, provider=key) if isinstance(value, Mapping) else {"provider": key, "status": value} for key, value in raw.items()]
-        elif isinstance(raw, Iterable) and not isinstance(raw, (str, bytes, Mapping)):
-            values = [item for item in raw if isinstance(item, Mapping)]
-        else:
-            values = []
-        for item in values:
-            out.append(
-                (
-                    _h(item.get("provider") or item.get("name") or item.get("provider_key") or "unknown"),
-                    _h(item.get("status") or item.get("readiness_status") or item.get("health_status") or "unknown"),
-                    _h(item.get("reason") or item.get("status_detail") or item.get("skip_reason") or ""),
-                )
-            )
-    return out
-
-
 def _ok(snapshot: DashboardSnapshot, title: str, body: str) -> DashboardResponse:
     return DashboardResponse(200, "OK", _layout(snapshot, title, body))
 
@@ -926,7 +905,7 @@ def _layout(snapshot: DashboardSnapshot, title: str, body: str) -> str:
     )
     scope = (
         f"Current generation: {_h(snapshot.run_id)} · revision {snapshot.revision} · "
-        f"current candidates {current_count} · cumulative core history {cumulative_count}"
+        f"current candidates {current_count} · namespace-local core store rows {cumulative_count}"
     )
     badges = _generation_badges(snapshot)
     authority_banner = ""

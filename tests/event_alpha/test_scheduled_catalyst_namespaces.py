@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from crypto_rsi_scanner.event_alpha.namespace import lifecycle
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
@@ -14,6 +16,121 @@ globals().update({
     for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "event_scheduled_catalysts.jsonl",
+        "event_unlock_candidates.jsonl",
+        "event_scheduled_catalyst_report.md",
+        "event_unlock_risk_report.md",
+    ),
+)
+def test_scheduled_catalyst_outputs_refuse_symlink_leaves(tmp_path, filename):
+    import crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts as scheduled
+
+    namespace_dir = tmp_path / "artifacts" / "scheduled_symlink_leaf"
+    namespace_dir.mkdir(parents=True)
+    outside = tmp_path / "outside.txt"
+    marker = b"outside-must-not-change\n"
+    outside.write_bytes(marker)
+    (namespace_dir / filename).symlink_to(outside)
+
+    with pytest.raises(RuntimeError, match="artifact_not_regular"):
+        scheduled.run_scheduled_catalyst_scan(
+            namespace_dir=namespace_dir,
+            provider_paths={},
+            profile="fixture",
+            artifact_namespace=namespace_dir.name,
+            run_mode="fixture",
+            run_id="run-symlink-leaf",
+            observed_at="2026-07-14T00:00:00Z",
+            calendar_rows=(),
+        )
+
+    assert outside.read_bytes() == marker
+
+
+def test_scheduled_catalyst_outputs_refuse_symlink_namespace(tmp_path):
+    import crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts as scheduled
+
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    namespace_dir = base / "scheduled_symlink_namespace"
+    namespace_dir.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(RuntimeError, match="namespace_not_directory"):
+        scheduled.run_scheduled_catalyst_scan(
+            namespace_dir=namespace_dir,
+            provider_paths={},
+            profile="fixture",
+            artifact_namespace=namespace_dir.name,
+            run_mode="fixture",
+            run_id="run-symlink-namespace",
+            observed_at="2026-07-14T00:00:00Z",
+            calendar_rows=(),
+        )
+
+    assert tuple(outside.iterdir()) == ()
+
+
+def test_scheduled_catalyst_bundle_rejects_namespace_replacement_between_renames(
+    tmp_path,
+    monkeypatch,
+):
+    import crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts as scheduled
+
+    base = tmp_path / "artifacts"
+    namespace_dir = base / "scheduled_bundle_swap"
+    namespace_dir.mkdir(parents=True)
+    displaced = base / "scheduled_bundle_swap.displaced"
+    replacement = base / "scheduled_bundle_swap.replacement"
+    replacement.mkdir()
+    outside = tmp_path / "outside.txt"
+    marker = b"outside-must-not-change\n"
+    outside.write_bytes(marker)
+    for filename in (
+        scheduled.SCHEDULED_CATALYSTS_FILENAME,
+        scheduled.UNLOCK_CANDIDATES_FILENAME,
+        scheduled.SCHEDULED_CATALYST_REPORT_FILENAME,
+        scheduled.UNLOCK_RISK_REPORT_FILENAME,
+    ):
+        (replacement / filename).symlink_to(outside)
+    original_rename = scheduled.market_anomaly_receipt.os.rename
+    swapped = False
+
+    def swapping_rename(source, target, *args, **kwargs):
+        nonlocal swapped
+        result = original_rename(source, target, *args, **kwargs)
+        if kwargs.get("src_dir_fd") is not None and not swapped:
+            original_rename(namespace_dir, displaced)
+            original_rename(replacement, namespace_dir)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(
+        scheduled.market_anomaly_receipt.os,
+        "rename",
+        swapping_rename,
+    )
+
+    with pytest.raises(RuntimeError, match="namespace_identity"):
+        scheduled.run_scheduled_catalyst_scan(
+            namespace_dir=namespace_dir,
+            provider_paths={},
+            profile="fixture",
+            artifact_namespace=namespace_dir.name,
+            run_mode="fixture",
+            run_id="run-bundle-swap",
+            observed_at="2026-07-14T00:00:00Z",
+            calendar_rows=(),
+        )
+
+    assert swapped is True
+    assert outside.read_bytes() == marker
 
 
 def test_market_reaction_unlock_structured_source_risk_or_fade_depends_on_market():

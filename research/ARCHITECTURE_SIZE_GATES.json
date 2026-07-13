@@ -228,7 +228,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 74,
+      "max_class_line_count": 72,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -1469,15 +1469,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1500,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-      "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1457,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -1532,6 +1523,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1285,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+      "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1275,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
@@ -1568,7 +1568,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1227,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
       "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
@@ -1698,7 +1698,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 837,
+  "file_count": 849,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1706,16 +1706,10 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-13T19:11:46.676131+00:00",
+  "generated_at": "2026-07-13T22:41:56.801374+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
-    {
-      "limit": 1500,
-      "line_count": 1500,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "source_kind": "production"
-    },
     {
       "limit": 1500,
       "line_count": 1457,
@@ -1754,6 +1748,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1285,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1275,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "source_kind": "production"
@@ -1778,7 +1778,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1227,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
@@ -1802,8 +1802,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 1199,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1198,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1198,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py",
       "source_kind": "production"
     },
     {
@@ -1814,26 +1826,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1188,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1187,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1187,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1182,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py",
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/loader.py",
       "source_kind": "production"
     },
     {
@@ -1862,6 +1862,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1175,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1171,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
       "source_kind": "production"
@@ -1870,6 +1876,12 @@
       "limit": 1500,
       "line_count": 1168,
       "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1167,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
       "source_kind": "production"
     },
     {
@@ -1904,6 +1916,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1126,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1120,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/feedback_eligibility.py",
       "source_kind": "production"
@@ -1931,24 +1949,6 @@
       "line_count": 1090,
       "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
       "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1078,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/reports.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1078,
-      "path": "crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1070,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
-      "source_kind": "production"
     }
   ],
   "largest_test_files": [
@@ -1972,8 +1972,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 1485,
+      "path": "tests/event_alpha/test_radar_dashboard.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1483,
       "path": "tests/event_alpha/test_market_surfaces.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1475,
+      "path": "tests/event_alpha/test_market_no_send.py",
       "source_kind": "test"
     },
     {
@@ -1992,6 +2004,12 @@
       "limit": 1500,
       "line_count": 1427,
       "path": "tests/event_alpha/test_artifact_schema.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1421,
+      "path": "tests/event_alpha/test_namespace_integrations.py",
       "source_kind": "test"
     },
     {
@@ -2046,12 +2064,6 @@
       "limit": 1500,
       "line_count": 1127,
       "path": "tests/event_alpha/test_catalyst_frames.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1114,
-      "path": "tests/event_alpha/test_market_no_send.py",
       "source_kind": "test"
     },
     {
@@ -2112,18 +2124,6 @@
       "limit": 1500,
       "line_count": 979,
       "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 962,
-      "path": "tests/event_alpha/test_namespace_integrations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 951,
-      "path": "tests/event_alpha/test_radar_dashboard.py",
       "source_kind": "test"
     },
     {
@@ -2382,7 +2382,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 74,
+      "max_class_line_count": 72,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -3645,13 +3645,6 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
-      "line_count": 1500,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1457,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3753,12 +3746,6 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
-      "line_count": 1500,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1457,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "source_kind": "production"
@@ -3795,6 +3782,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1285,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1275,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "source_kind": "production"
@@ -3819,7 +3812,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1227,
+      "line_count": 1231,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     }
@@ -4073,15 +4066,6 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1500,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
           "line_count": 1457,
           "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
           "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -4136,6 +4120,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1285,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1275,
           "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
           "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
@@ -4172,7 +4165,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1227,
+          "line_count": 1231,
           "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
           "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
           "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
@@ -4221,11 +4214,6 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1500,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1457,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
@@ -4256,6 +4244,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1285,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1275,
         "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
         "threshold": 1200
@@ -4276,7 +4269,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1227,
+        "line_count": 1231,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
         "threshold": 1200
       }
@@ -4343,15 +4336,6 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1500,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
             "line_count": 1457,
             "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
             "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -4406,6 +4390,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1285,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1275,
             "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
             "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
@@ -4442,7 +4435,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1227,
+            "line_count": 1231,
             "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
             "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
             "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",

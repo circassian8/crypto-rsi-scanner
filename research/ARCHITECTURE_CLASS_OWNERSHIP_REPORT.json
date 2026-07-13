@@ -228,7 +228,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 74,
+      "max_class_line_count": 72,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 577,
+  "class_count": 583,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 7314,
+  "function_count": 7504,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-13T19:11:48.042754+00:00",
+  "generated_at": "2026-07-13T22:41:58.274856+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1726,7 +1726,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 74,
+      "max_class_line_count": 72,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -2989,13 +2989,6 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
-      "line_count": 1500,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1457,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3209,7 +3202,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 453,
+  "public_class_count": 455,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3241,6 +3234,7 @@
     "crypto_rsi_scanner.event_alpha.dashboard.app": 1,
     "crypto_rsi_scanner.event_alpha.dashboard.models": 4,
     "crypto_rsi_scanner.event_alpha.dashboard.readiness": 1,
+    "crypto_rsi_scanner.event_alpha.dashboard.secure_reader": 1,
     "crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts.result_models": 1,
     "crypto_rsi_scanner.event_alpha.doctor.check_registry": 1,
     "crypto_rsi_scanner.event_alpha.doctor.consistency_doctor": 1,
@@ -3271,6 +3265,7 @@
     "crypto_rsi_scanner.event_alpha.notifications.slo": 1,
     "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor": 2,
     "crypto_rsi_scanner.event_alpha.operations.daily_burn_in_plan": 1,
+    "crypto_rsi_scanner.event_alpha.operations.market_no_send_calendar": 1,
     "crypto_rsi_scanner.event_alpha.operations.market_no_send_campaign_guard": 1,
     "crypto_rsi_scanner.event_alpha.operations.market_no_send_models": 7,
     "crypto_rsi_scanner.event_alpha.operations.market_no_send_publication": 1,
@@ -3457,14 +3452,6 @@
       "rows": [
         {
           "accepted": true,
-          "line_count": 1500,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
           "line_count": 1457,
           "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
           "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -3513,6 +3500,14 @@
         },
         {
           "accepted": true,
+          "line_count": 1285,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1275,
           "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
           "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
@@ -3545,7 +3540,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1227,
+          "line_count": 1231,
           "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
           "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
           "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
@@ -3594,11 +3589,6 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 1500,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1457,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
@@ -3629,6 +3619,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1285,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1275,
         "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
         "threshold": 1200
@@ -3649,7 +3644,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1227,
+        "line_count": 1231,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
         "threshold": 1200
       }
@@ -3670,14 +3665,6 @@
         "count": 12,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
-          {
-            "accepted": true,
-            "line_count": 1500,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-            "threshold": 1200
-          },
           {
             "accepted": true,
             "line_count": 1457,
@@ -3728,6 +3715,14 @@
           },
           {
             "accepted": true,
+            "line_count": 1285,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1275,
             "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
             "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
@@ -3760,7 +3755,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1227,
+            "line_count": 1231,
             "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
             "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
             "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",

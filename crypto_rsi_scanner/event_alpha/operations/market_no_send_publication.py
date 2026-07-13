@@ -15,6 +15,7 @@ from ..dashboard.readiness import (
     DashboardReadinessError,
     read_current_namespace_pointer,
 )
+from . import market_no_send_calendar_publication
 from .market_no_send_io import read_json_object, read_jsonl, read_regular_bytes
 from .market_no_send_models import MarketNoSendError
 from .market_provenance import DECISION_RADAR_MEASUREMENT_PROGRAM
@@ -269,6 +270,12 @@ def validate_countable_campaign_generation(
                 run_id=run_id,
                 legacy_adapter=False,
             )
+            _validate_optional_calendar_snapshot(
+                manifest,
+                namespace_dir=namespace_dir,
+                run_id=run_id,
+                safety_counters=safety_counters,
+            )
         candidate_count = _validate_candidate_count(
             manifest,
             namespace_dir=namespace_dir,
@@ -403,6 +410,21 @@ def _validate_observation_clock(value: Any, *, checked_at: datetime) -> None:
     max_age = max(0.25, float(config.EVENT_ALPHA_MAX_RUN_AGE_HOURS))
     if checked_at - observed > timedelta(hours=max_age):
         raise MarketNoSendError("market generation provenance is stale")
+
+
+def _validate_optional_calendar_snapshot(
+    manifest: Mapping[str, Any],
+    *,
+    namespace_dir: Path,
+    run_id: str,
+    safety_counters: Mapping[str, int],
+) -> None:
+    market_no_send_calendar_publication.validate_optional_calendar_snapshot(
+        manifest,
+        namespace_dir=namespace_dir,
+        run_id=run_id,
+        safety_counters=safety_counters,
+    )
 
 
 def _validate_source_cache(

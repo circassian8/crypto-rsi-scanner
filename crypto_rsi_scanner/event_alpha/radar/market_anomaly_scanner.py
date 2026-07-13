@@ -10,13 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable as IterableABC
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ..artifacts import schema_v1
 from . import asset_registry as event_asset_registry
+from . import market_anomaly_receipt
 from . import market_state as event_market_state
 
 
@@ -24,6 +25,12 @@ MARKET_STATE_SNAPSHOT_FILENAME = "event_market_state_snapshots.jsonl"
 MARKET_ANOMALY_FILENAME = "event_market_anomalies.jsonl"
 MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME = "event_market_anomaly_catalyst_search_queue.jsonl"
 MARKET_ANOMALY_REPORT_FILENAME = "event_market_anomaly_report.md"
+_RECEIPT_ARTIFACT_FILENAMES = (
+    MARKET_STATE_SNAPSHOT_FILENAME,
+    MARKET_ANOMALY_FILENAME,
+    MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME,
+    MARKET_ANOMALY_REPORT_FILENAME,
+)
 
 NO_REACTION = "no_reaction"
 STEALTH_ACCUMULATION = "stealth_accumulation"
@@ -67,6 +74,10 @@ class MarketAnomalyScannerConfig:
 @dataclass(frozen=True)
 class MarketAnomalyScanResult:
     namespace_dir: Path
+    artifact_namespace: str | None
+    run_id: str | None
+    namespace_device: int
+    namespace_inode: int
     snapshots_path: Path
     anomalies_path: Path
     catalyst_search_queue_path: Path
@@ -76,6 +87,10 @@ class MarketAnomalyScanResult:
     catalyst_search_queue_count: int
     anomalies: tuple[dict[str, Any], ...]
     catalyst_search_queue: tuple[dict[str, Any], ...]
+    snapshots_sha256: str
+    anomalies_sha256: str
+    catalyst_search_queue_sha256: str
+    report_sha256: str
     warnings: tuple[str, ...] = ()
 
 
@@ -266,7 +281,6 @@ def run_market_anomaly_scan(
 ) -> MarketAnomalyScanResult:
     """Scan rows and write research-only market anomaly artifacts."""
     directory = Path(namespace_dir).expanduser()
-    directory.mkdir(parents=True, exist_ok=True)
     snapshots, anomalies = scan_market_rows(
         market_rows,
         cfg=cfg,
@@ -291,9 +305,6 @@ def run_market_anomaly_scan(
     anomalies_path = directory / MARKET_ANOMALY_FILENAME
     catalyst_search_queue_path = directory / MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME
     report_path = directory / MARKET_ANOMALY_REPORT_FILENAME
-    _write_jsonl(snapshots_path, snapshots)
-    _write_jsonl(anomalies_path, anomalies)
-    _write_jsonl(catalyst_search_queue_path, catalyst_search_queue)
     report = format_market_anomaly_report(
         anomalies,
         catalyst_search_queue=catalyst_search_queue,
@@ -301,9 +312,44 @@ def run_market_anomaly_scan(
         profile=profile,
         artifact_namespace=artifact_namespace,
     )
-    report_path.write_text(report, encoding="utf-8")
+    namespace_device, namespace_inode = market_anomaly_receipt.write_artifacts_atomic(
+        directory,
+        payloads={
+            MARKET_STATE_SNAPSHOT_FILENAME: _jsonl_payload(snapshots_path, snapshots),
+            MARKET_ANOMALY_FILENAME: _jsonl_payload(anomalies_path, anomalies),
+            MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME: _jsonl_payload(
+                catalyst_search_queue_path,
+                catalyst_search_queue,
+            ),
+            MARKET_ANOMALY_REPORT_FILENAME: report.encode("utf-8"),
+        },
+        expected_names=_RECEIPT_ARTIFACT_FILENAMES,
+    )
+    payloads = market_anomaly_receipt.artifact_payloads(
+        directory,
+        namespace_identity=(namespace_device, namespace_inode),
+        paths=(
+            snapshots_path,
+            anomalies_path,
+            catalyst_search_queue_path,
+            report_path,
+        ),
+        expected_names=_RECEIPT_ARTIFACT_FILENAMES,
+    )
+    bound_anomalies = market_anomaly_receipt.strict_jsonl(
+        payloads[MARKET_ANOMALY_FILENAME],
+        row_type="event_market_anomaly",
+    )
+    bound_queue = market_anomaly_receipt.strict_jsonl(
+        payloads[MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME],
+        row_type="event_market_anomaly_catalyst_search_queue",
+    )
     return MarketAnomalyScanResult(
         namespace_dir=directory,
+        artifact_namespace=artifact_namespace,
+        run_id=run_id,
+        namespace_device=namespace_device,
+        namespace_inode=namespace_inode,
         snapshots_path=snapshots_path,
         anomalies_path=anomalies_path,
         catalyst_search_queue_path=catalyst_search_queue_path,
@@ -311,8 +357,62 @@ def run_market_anomaly_scan(
         snapshot_count=len(snapshots),
         anomaly_count=len(anomalies),
         catalyst_search_queue_count=len(catalyst_search_queue),
-        anomalies=tuple(anomalies),
-        catalyst_search_queue=tuple(catalyst_search_queue),
+        anomalies=bound_anomalies,
+        catalyst_search_queue=bound_queue,
+        snapshots_sha256=market_anomaly_receipt.sha256(payloads[MARKET_STATE_SNAPSHOT_FILENAME]),
+        anomalies_sha256=market_anomaly_receipt.sha256(payloads[MARKET_ANOMALY_FILENAME]),
+        catalyst_search_queue_sha256=market_anomaly_receipt.sha256(
+            payloads[MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME]
+        ),
+        report_sha256=market_anomaly_receipt.sha256(payloads[MARKET_ANOMALY_REPORT_FILENAME]),
+    )
+
+
+def refresh_market_anomaly_scan_result(
+    result: MarketAnomalyScanResult,
+) -> MarketAnomalyScanResult:
+    """Rebind exact bytes after one trusted same-namespace artifact enrichment."""
+
+    identity = (result.namespace_device, result.namespace_inode)
+    payloads = market_anomaly_receipt.artifact_payloads(
+        result.namespace_dir,
+        namespace_identity=identity,
+        paths=(
+            result.snapshots_path,
+            result.anomalies_path,
+            result.catalyst_search_queue_path,
+            result.report_path,
+        ),
+        expected_names=_RECEIPT_ARTIFACT_FILENAMES,
+    )
+    snapshots = market_anomaly_receipt.strict_jsonl(
+        payloads[MARKET_STATE_SNAPSHOT_FILENAME],
+        row_type="event_market_state_snapshot",
+    )
+    anomalies = market_anomaly_receipt.strict_jsonl(
+        payloads[MARKET_ANOMALY_FILENAME],
+        row_type="event_market_anomaly",
+    )
+    queue = market_anomaly_receipt.strict_jsonl(
+        payloads[MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME],
+        row_type="event_market_anomaly_catalyst_search_queue",
+    )
+    if (len(snapshots), len(anomalies), len(queue)) != (
+        result.snapshot_count,
+        result.anomaly_count,
+        result.catalyst_search_queue_count,
+    ):
+        raise RuntimeError("market_anomaly_completion_receipt_invalid:count")
+    return replace(
+        result,
+        anomalies=anomalies,
+        catalyst_search_queue=queue,
+        snapshots_sha256=market_anomaly_receipt.sha256(payloads[MARKET_STATE_SNAPSHOT_FILENAME]),
+        anomalies_sha256=market_anomaly_receipt.sha256(payloads[MARKET_ANOMALY_FILENAME]),
+        catalyst_search_queue_sha256=market_anomaly_receipt.sha256(
+            payloads[MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME]
+        ),
+        report_sha256=market_anomaly_receipt.sha256(payloads[MARKET_ANOMALY_REPORT_FILENAME]),
     )
 
 
@@ -984,12 +1084,17 @@ def _is_sector_or_theme(snapshot: Mapping[str, Any]) -> bool:
     return symbol == "SECTOR" or coin_id.startswith("sector:") or coin_id.endswith("_proxy")
 
 
-def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
-        for row in rows:
-            stamped = schema_v1.stamp_artifact_row(row, path=path)
-            fh.write(json.dumps(stamped, sort_keys=True, default=str, separators=(",", ":")) + "\n")
+def _jsonl_payload(path: Path, rows: Iterable[Mapping[str, Any]]) -> bytes:
+    lines = [
+        json.dumps(
+            schema_v1.stamp_artifact_row(row, path=path),
+            sort_keys=True,
+            default=str,
+            separators=(",", ":"),
+        )
+        for row in rows
+    ]
+    return (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
 
 
 def _market_anomaly_id(*, symbol: str, coin_id: str, anomaly_type: str, observed_at: str) -> str:

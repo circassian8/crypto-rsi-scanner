@@ -89,6 +89,85 @@ def _refresh_fingerprint(namespace_dir: Path, state: dict[str, object], artifact
     entry.update(fingerprints.fingerprint_path(artifact_path, kind=kind))
 
 
+def _add_current_artifact(
+    namespace_dir: Path,
+    state: dict[str, object],
+    artifact_name: str,
+    path: Path,
+    *,
+    kind: str,
+    count: int,
+) -> None:
+    state["artifacts"][artifact_name] = {
+        "status": "current",
+        "run_id": state["run_id"],
+        "path": path.name,
+        "reason": None,
+        "generated_at": state["generated_at"],
+        "count": count,
+        **fingerprints.fingerprint_path(path, kind=kind),
+    }
+
+
+def _add_exact_market_jsonl_artifacts(
+    namespace_dir: Path,
+    state: dict[str, object],
+) -> None:
+    identity = {
+        "run_id": state["run_id"],
+        "profile": state["profile"],
+        "artifact_namespace": state["artifact_namespace"],
+    }
+    snapshots_path = namespace_dir / "event_market_state_snapshots.jsonl"
+    snapshots_path.write_text(
+        json.dumps(
+            {
+                **identity,
+                "row_type": "event_market_state_snapshot",
+                "symbol": "SNAP",
+                "coin_id": "snapshot-asset",
+                "observed_at": "2026-07-12T06:01:30+00:00",
+                "return_24h": 7.5,
+                "return_unit": "percent_points",
+                "research_only": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _add_current_artifact(
+        namespace_dir,
+        state,
+        "market_state_snapshots",
+        snapshots_path,
+        kind="jsonl_lines",
+        count=1,
+    )
+    anomalies_path = namespace_dir / "event_market_anomalies.jsonl"
+    anomalies_path.write_text(
+        json.dumps(
+            {
+                **identity,
+                "row_type": "event_market_anomaly",
+                "market_anomaly_id": "market-anomaly:fixture",
+                "symbol": "ANOM",
+                "market_state_class": "rapid_move",
+                "research_only": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _add_current_artifact(
+        namespace_dir,
+        state,
+        "market_anomalies",
+        anomalies_path,
+        kind="jsonl_lines",
+        count=1,
+    )
+
+
 def _fixture_hashes() -> dict[str, str]:
     return {
         path.relative_to(_FIXTURE_BASE).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -308,6 +387,201 @@ def test_market_anomaly_page_uses_only_manifest_scoped_v2_core_rows():
     assert "SUSP" not in diagnostics.body
 
 
+def test_dashboard_renders_exact_fingerprinted_market_source_rows_and_coverage(tmp_path):
+    target = _copy_namespace(tmp_path)
+    state = _read_state(target)
+    identity = {
+        "run_id": state["run_id"],
+        "profile": state["profile"],
+        "artifact_namespace": state["artifact_namespace"],
+    }
+    rows = [
+        {
+            "symbol": "BTC",
+            "coin_id": "bitcoin",
+            "observed_at": "2026-07-12T06:01:30+00:00",
+            "price": 60_000.0,
+            "return_1h": 0.01,
+            "return_4h": 0.03,
+            "return_24h": 0.10,
+            "return_unit": "fraction",
+            "volume_zscore_24h": 1.25,
+            "liquidity_usd": 30_000_000_000.0,
+            "temporal_baseline_status": "warming",
+            "spread_status": "unavailable",
+            "freshness_status": "fresh",
+            "provider": "coingecko",
+        },
+        {
+            "symbol": "ETH",
+            "coin_id": "ethereum",
+            "observed_at": "2026-07-12T06:01:30+00:00",
+            "price": 2_000.0,
+            "return_1h": -1.0,
+            "return_4h": -2.0,
+            "return_24h": -4.0,
+            "return_unit": "percent_points",
+            "volume_zscore_24h": -0.2,
+            "liquidity_usd": 8_000_000_000.0,
+            "temporal_baseline_status": "warm",
+            "spread_status": "verified",
+            "freshness_status": "fresh",
+            "provider": "coingecko",
+        },
+    ]
+    source_path = target / "event_market_no_send_market_rows.json"
+    source_path.write_text(
+        json.dumps({**identity, "selected_market_row_count": len(rows), "rows": rows}) + "\n",
+        encoding="utf-8",
+    )
+    _add_current_artifact(
+        target,
+        state,
+        "market_no_send_source_cache",
+        source_path,
+        kind="file_bytes",
+        count=1,
+    )
+    coverage_path = target / state["artifacts"]["source_coverage_json"]["path"]
+    coverage = json.loads(coverage_path.read_text())
+    coverage["packs"] = [
+        {
+            "source_pack": "market_anomaly_pack",
+            "provider_coverage_status": "partial",
+            "accepted_evidence_count": 0,
+            "configured_providers": ["coingecko"],
+            "healthy_providers": ["coingecko"],
+            "missing_providers": ["gdelt"],
+            "coverage_gap_reason": "gdelt_not_observed",
+        }
+    ]
+    coverage_path.write_text(json.dumps(coverage, sort_keys=True) + "\n", encoding="utf-8")
+    _refresh_fingerprint(target, state, "source_coverage_json")
+    _write_state(target, state)
+
+    snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
+    page = render_dashboard_page(snapshot, "/anomalies")
+    health = render_dashboard_page(snapshot, "/health")
+
+    assert snapshot.generation_authoritative is True
+    assert len(snapshot.current_market_observations) == 2
+    assert snapshot.source_coverage["packs"][0]["provider_coverage_status"] == "partial"
+    assert "Current market observation scan" in page.body
+    assert "Exact market observations" in page.body
+    assert "+10.00%" in page.body
+    assert "-4.00%" in page.body
+    assert "warming=1" in page.body
+    assert "warm=1" in page.body
+    assert "Execution spread confirmed" in page.body
+    assert "1 / 2" in page.body
+    assert "Exact-generation source-pack coverage" in health.body
+    assert "gdelt_not_observed" in health.body
+
+
+def test_dashboard_prefers_exact_market_snapshots_and_anomalies_when_manifested(tmp_path):
+    target = _copy_namespace(tmp_path)
+    state = _read_state(target)
+    identity = {
+        "run_id": state["run_id"],
+        "profile": state["profile"],
+        "artifact_namespace": state["artifact_namespace"],
+    }
+    source_path = target / "event_market_no_send_market_rows.json"
+    source_path.write_text(
+        json.dumps(
+            {
+                **identity,
+                "selected_market_row_count": 1,
+                "rows": [{"symbol": "SOURCE_ONLY", "return_24h": 0.5, "return_unit": "fraction"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _add_current_artifact(
+        target,
+        state,
+        "market_no_send_source_cache",
+        source_path,
+        kind="file_bytes",
+        count=1,
+    )
+    _add_exact_market_jsonl_artifacts(target, state)
+    _write_state(target, state)
+
+    snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
+    default_page = render_dashboard_page(snapshot, "/anomalies")
+    page = render_dashboard_page(snapshot, "/anomalies", include_diagnostics=True)
+
+    assert snapshot.generation_authoritative is True
+    assert [row["symbol"] for row in snapshot.current_market_observations] == ["SNAP"]
+    assert [row["symbol"] for row in snapshot.current_market_anomalies] == ["ANOM"]
+    assert "SOURCE_ONLY" not in page.body
+    assert "SNAP" in page.body
+    assert "ANOM" in page.body
+    assert "ANOM" in default_page.body
+    assert "rapid_move" in default_page.body
+    assert "scan evidence" in default_page.body.casefold()
+    assert "SOURCE_ONLY" not in default_page.body
+
+
+@pytest.mark.parametrize(
+    "artifact_name",
+    ("market_state_snapshots", "market_anomalies"),
+)
+def test_dashboard_market_jsonl_count_mismatch_fails_authority(
+    tmp_path,
+    artifact_name,
+):
+    target = _copy_namespace(tmp_path)
+    state = _read_state(target)
+    _add_exact_market_jsonl_artifacts(target, state)
+    state["artifacts"][artifact_name]["count"] = 2
+    _write_state(target, state)
+
+    snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
+
+    assert snapshot.generation_authoritative is False
+    assert f"{artifact_name}:current_count_mismatch" in (
+        snapshot.generation_authority_reasons
+    )
+
+
+def test_dashboard_market_source_count_mismatch_fails_current_authority(tmp_path):
+    target = _copy_namespace(tmp_path)
+    state = _read_state(target)
+    source_path = target / "event_market_no_send_market_rows.json"
+    source_path.write_text(
+        json.dumps(
+            {
+                "run_id": state["run_id"],
+                "profile": state["profile"],
+                "artifact_namespace": state["artifact_namespace"],
+                "selected_market_row_count": 2,
+                "rows": [{"symbol": "BTC"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _add_current_artifact(
+        target,
+        state,
+        "market_no_send_source_cache",
+        source_path,
+        kind="file_bytes",
+        count=1,
+    )
+    _write_state(target, state)
+
+    snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
+
+    assert snapshot.generation_authoritative is False
+    assert "market_no_send_source_cache:selected_count_mismatch" in (
+        snapshot.generation_authority_reasons
+    )
+
+
 def test_candidate_detail_renders_v2_explanations_components_and_safe_source_url():
     page = render_dashboard_page(_snapshot(), "/candidate/core:alpha")
 
@@ -385,7 +659,121 @@ def test_dashboard_calendar_renders_uncertain_window_and_current_scope_labels():
     assert "(window)" in page.body
     assert "needs_confirmation" in page.body
     assert "Current generation:" in page.body
-    assert "cumulative core history 5" in page.body
+    assert "namespace-local core store rows 5" in page.body
+
+
+def test_dashboard_calendar_prefers_exact_generation_snapshot_status_for_empty_layer():
+    snapshot = replace(
+        _snapshot(),
+        current_calendar_events=(),
+        market_generation={
+            "calendar_snapshot": {
+                "status": "skipped_missing_config",
+                "configured": False,
+                "counts": {"scheduled": 0, "unlocks": 0},
+                "error": None,
+            }
+        },
+    )
+
+    page = render_dashboard_page(snapshot, "/calendar")
+
+    assert "Calendar acquisition was not configured" in page.body
+    assert "not evidence that no scheduled events exist" in page.body
+    assert "status=skipped_missing_config" in page.body
+    assert "scheduled=0" in page.body
+
+
+def test_dashboard_calendar_distinguishes_healthy_empty_from_normalization_rejection():
+    healthy = replace(
+        _snapshot(),
+        current_calendar_events=(),
+        market_generation={
+            "calendar_snapshot": {
+                "status": "healthy_empty",
+                "configured": True,
+                "retained_row_count": 0,
+                "unified_calendar_count": 0,
+                "normalization_rejected_count": 0,
+                "normalization_status": "healthy_empty",
+            }
+        },
+    )
+    rejected = replace(
+        healthy,
+        market_generation={
+            "calendar_snapshot": {
+                "status": "healthy_nonempty",
+                "configured": True,
+                "retained_row_count": 1,
+                "unified_calendar_count": 0,
+                "normalization_rejected_count": 1,
+                "normalization_status": "normalization_rejected",
+            }
+        },
+    )
+
+    healthy_page = render_dashboard_page(healthy, "/calendar")
+    rejected_page = render_dashboard_page(rejected, "/calendar")
+
+    assert "calendar snapshot was observed" in healthy_page.body
+    assert "healthy_empty" in healthy_page.body
+    assert "failed unified-calendar normalization" in rejected_page.body
+    assert "normalization_rejected_count=1" in rejected_page.body
+
+
+@pytest.mark.parametrize(
+    ("status", "error_class", "expected"),
+    (
+        ("unavailable", "snapshot_unreadable", "failed or was unavailable"),
+        ("stale", "snapshot_too_old", "calendar snapshot was stale"),
+        ("fixture_rejected_live", "fixture_provenance", "calendar provenance was rejected"),
+    ),
+)
+def test_dashboard_calendar_does_not_label_failed_stale_or_rejected_input_unconfigured(
+    status,
+    error_class,
+    expected,
+):
+    snapshot = replace(
+        _snapshot(),
+        current_calendar_events=(),
+        market_generation={
+            "calendar_snapshot": {
+                "status": status,
+                "configured": True,
+                "error_class": error_class,
+                "retained_row_count": 0,
+            }
+        },
+    )
+
+    page = render_dashboard_page(snapshot, "/calendar")
+
+    assert expected in page.body
+    assert error_class in page.body
+    assert "Calendar acquisition was not configured" not in page.body
+
+
+def test_dashboard_empty_calendar_uses_source_pack_coverage_for_legacy_generation():
+    snapshot = replace(
+        _snapshot(),
+        current_calendar_events=(),
+        market_generation={},
+        source_coverage={
+            "packs": [
+                {
+                    "source_pack": "unlock_supply_pack",
+                    "provider_coverage_status": "not_configured",
+                }
+            ]
+        },
+    )
+
+    page = render_dashboard_page(snapshot, "/calendar")
+
+    assert "Relevant source packs were not configured" in page.body
+    assert "not evidence that no relevant events exist" in page.body
 
 
 def test_dashboard_is_get_head_only_and_never_mutates_fixture_artifacts():
@@ -444,7 +832,7 @@ def test_dashboard_marks_generation_untrusted_when_current_core_count_does_not_m
     assert "Current-generation research content is unavailable" in page.body
     assert "Fresh high-liquidity breakout" not in page.body
     assert "current candidates suppressed (untrusted)" in page.body
-    assert "cumulative core history 5" not in page.body
+    assert "namespace-local core store rows 5" not in page.body
 
 
 def test_dashboard_marks_generation_untrusted_when_manifest_calendar_changes_without_revision(tmp_path):
@@ -493,15 +881,15 @@ def test_dashboard_reads_each_current_file_once_and_parses_verified_bytes(monkey
         and entry.get("fingerprint_kind") in {"file_bytes", "jsonl_lines"}
     }
     read_counts = {path: 0 for path in current_paths}
-    original = dashboard_loader._read_regular_file_once
+    original = dashboard_loader.AnchoredNamespaceReader.read_bytes
 
-    def counted(path):
-        resolved = path.resolve()
+    def counted(reader, relative):
+        resolved = (reader.namespace_dir / relative).resolve()
         if resolved in read_counts:
             read_counts[resolved] += 1
-        return original(path)
+        return original(reader, relative)
 
-    monkeypatch.setattr(dashboard_loader, "_read_regular_file_once", counted)
+    monkeypatch.setattr(dashboard_loader.AnchoredNamespaceReader, "read_bytes", counted)
     snapshot = _snapshot()
 
     assert snapshot.generation_authoritative is True
@@ -511,25 +899,73 @@ def test_dashboard_reads_each_current_file_once_and_parses_verified_bytes(monkey
 def test_dashboard_file_swap_after_read_cannot_change_the_parsed_calendar(tmp_path, monkeypatch):
     target = _copy_namespace(tmp_path)
     calendar_path = target / "event_unified_calendar_events.jsonl"
-    original = dashboard_loader._read_regular_file_once
+    original = dashboard_loader.AnchoredNamespaceReader.read_bytes
     calendar_reads = 0
 
-    def swap_after_read(path):
+    def swap_after_read(reader, relative):
         nonlocal calendar_reads
-        data, error = original(path)
+        data, error = original(reader, relative)
+        path = reader.namespace_dir / relative
         if path == calendar_path:
             calendar_reads += 1
             if calendar_reads == 1 and data is not None:
                 calendar_path.write_bytes(data + b'\n{"title":"SWAPPED CONTENT"}\n')
         return data, error
 
-    monkeypatch.setattr(dashboard_loader, "_read_regular_file_once", swap_after_read)
+    monkeypatch.setattr(
+        dashboard_loader.AnchoredNamespaceReader,
+        "read_bytes",
+        swap_after_read,
+    )
     snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
 
     assert calendar_reads == 1
     assert snapshot.generation_authoritative is True
     assert "SWAPPED CONTENT" not in json.dumps(snapshot.current_calendar_events)
     assert "Expected regulatory decision window" in json.dumps(snapshot.current_calendar_events)
+
+
+def test_dashboard_rejects_namespace_directory_swap_mid_load(tmp_path):
+    base = tmp_path / "base"
+    base.mkdir()
+    target = _copy_namespace(base)
+    outside = tmp_path / "outside"
+    shutil.copytree(_FIXTURE_BASE / _FIXTURE_NAMESPACE, outside)
+    state = _read_state(target)
+    outside_core = outside / state["artifacts"]["core_opportunities"]["path"]
+    outside_core.write_text(
+        outside_core.read_text(encoding="utf-8").replace(
+            '"symbol":"ALPHA"',
+            '"symbol":"EXTERNAL_ONLY"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+    _refresh_fingerprint(outside, state, "core_opportunities")
+    _write_state(target, state)
+    _write_state(outside, state)
+    held = base / "held-current"
+    real_loader = dashboard_loader._load_dashboard_operator_state
+    calls = 0
+
+    def swap_after_first_state_read(path):
+        nonlocal calls
+        result = real_loader(path)
+        calls += 1
+        if calls == 1:
+            target.rename(held)
+            target.symlink_to(outside, target_is_directory=True)
+        return result
+
+    with pytest.raises(DashboardLoadError, match="namespace changed or is unsafe"):
+        load_dashboard_snapshot(
+            base,
+            "current",
+            state_loader=swap_after_first_state_read,
+            max_attempts=1,
+            now=_TEST_NOW,
+        )
+    assert calls == 1
 
 
 def test_dashboard_missing_fingerprint_is_untrusted_health_only(tmp_path):
@@ -743,6 +1179,104 @@ def test_dashboard_fail_soft_provider_health_is_separate_from_exact_readiness(tm
     assert "Exact-generation provider readiness" in page.body
     assert "Cumulative provider health (non-authoritative)" in page.body
     assert "invalid_json" in page.body
+
+
+def test_dashboard_provider_rows_render_activation_preflight_health_and_live_fields():
+    snapshot = replace(
+        _snapshot(),
+        provider_readiness={
+            "providers": [
+                {
+                    "provider": "cryptopanic",
+                    "configured": True,
+                    "live_call_allowed": False,
+                    "activation_phase": "config_ready_no_live",
+                    "preflight_status": "disabled",
+                    "latest_provider_health_status": "not_observed",
+                    "latest_rehearsal_status": "not_run",
+                }
+            ]
+        },
+        provider_health={
+            "providers": {
+                "coingecko": {
+                    "last_success_at": "2026-07-12T06:00:00+00:00",
+                    "request_http_status": 200,
+                    "result_count": 80,
+                    "consecutive_failures": 0,
+                }
+            }
+        },
+    )
+
+    page = render_dashboard_page(snapshot, "/health")
+
+    assert "config_ready_no_live" in page.body
+    assert "configured=true" in page.body
+    assert "live_call_allowed=false" in page.body
+    assert "preflight=disabled" in page.body
+    assert "latest_health=not_observed" in page.body
+    assert "observed_healthy" in page.body
+    assert "HTTP=200" in page.body
+    assert "result_count=80" in page.body
+
+
+def test_dashboard_reads_shared_campaign_outcomes_separately_and_non_authoritatively(tmp_path):
+    _copy_namespace(tmp_path)
+    history_dir = tmp_path / "radar_market_history_cache"
+    history_dir.mkdir()
+    ledger = history_dir / "event_decision_radar_campaign_outcomes.jsonl"
+    ledger.write_text(
+        json.dumps(
+            {
+                "core_opportunity_id": "agg:dexe",
+                "symbol": "DEXE",
+                "outcome_status": "pending",
+                "radar_route": "diagnostic",
+                "confidence_band": "diagnostic",
+                "artifact_namespace": "radar_market_no_send_previous",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
+    page = render_dashboard_page(snapshot, "/feedback-outcomes")
+
+    assert snapshot.generation_authoritative is True
+    assert len(snapshot.campaign_outcomes) == 1
+    assert len(snapshot.cumulative_outcomes) == 2
+    assert "Namespace-local outcome rows (2)" in page.body
+    assert "Decision campaign outcomes (1, shared / non-authoritative)" in page.body
+    assert "DEXE" in page.body
+    assert "radar_market_no_send_previous" in page.body
+    metadata = snapshot.cumulative_history_metadata[
+        "radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl"
+    ]
+    assert metadata["authority"] == "shared_campaign_non_authoritative"
+
+
+def test_dashboard_shared_campaign_outcome_parent_symlink_is_fail_soft(tmp_path):
+    _copy_namespace(tmp_path)
+    outside = tmp_path / "outside-history"
+    outside.mkdir()
+    (outside / "event_decision_radar_campaign_outcomes.jsonl").write_text(
+        '{"symbol":"OUTSIDE"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "radar_market_history_cache").symlink_to(outside, target_is_directory=True)
+
+    snapshot = load_dashboard_snapshot(tmp_path, "current", now=_TEST_NOW)
+    page = render_dashboard_page(snapshot, "/feedback-outcomes")
+
+    assert snapshot.generation_authoritative is True
+    assert snapshot.campaign_outcomes == ()
+    assert "OUTSIDE" not in page.body
+    metadata = snapshot.cumulative_history_metadata[
+        "radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl"
+    ]
+    assert metadata["error"] == "artifact_symlink_not_allowed"
 
 
 @pytest.mark.parametrize(

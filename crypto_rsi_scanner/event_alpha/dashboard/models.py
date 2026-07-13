@@ -28,9 +28,13 @@ class DashboardSnapshot:
     operator_state: Mapping[str, Any]
     current_candidates: tuple[dict[str, Any], ...] = ()
     current_market_anomalies: tuple[dict[str, Any], ...] = ()
+    current_market_observations: tuple[dict[str, Any], ...] = ()
     current_calendar_events: tuple[dict[str, Any], ...] = ()
+    source_coverage: Mapping[str, Any] = field(default_factory=dict)
+    market_generation: Mapping[str, Any] = field(default_factory=dict)
     cumulative_feedback: tuple[dict[str, Any], ...] = ()
     cumulative_outcomes: tuple[dict[str, Any], ...] = ()
+    campaign_outcomes: tuple[dict[str, Any], ...] = ()
     cumulative_history_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     provider_readiness: Mapping[str, Any] = field(default_factory=dict)
     provider_health: Mapping[str, Any] = field(default_factory=dict)
@@ -79,13 +83,19 @@ class DashboardSnapshot:
     def expired_current_candidates(self) -> tuple[dict[str, Any], ...]:
         """Canonical ideas suppressed from current actionability at read time."""
 
-        if not self.generation_authoritative:
-            return ()
-        return tuple(
-            row
-            for row in self.current_candidates
-            if row.get("_decision_expired_at_read_time") is True
-        )
+        return _expired_current_candidates(self)
+
+
+def _expired_current_candidates(
+    snapshot: DashboardSnapshot,
+) -> tuple[dict[str, Any], ...]:
+    if not snapshot.generation_authoritative:
+        return ()
+    return tuple(
+        row
+        for row in snapshot.current_candidates
+        if row.get("_decision_expired_at_read_time") is True
+    )
 
 
 @dataclass(frozen=True)

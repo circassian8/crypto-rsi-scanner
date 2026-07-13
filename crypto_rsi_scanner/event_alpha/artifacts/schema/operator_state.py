@@ -26,6 +26,9 @@ _JSONL_ARTIFACTS = {
     "core_opportunities",
     "unified_calendar",
     "market_history",
+    "market_state_snapshots",
+    "market_anomalies",
+    "market_anomaly_catalyst_search_queue",
     "integrated_candidates",
     "integrated_outcomes",
 }

@@ -24,7 +24,15 @@ from ..artifacts import schema_v1
 from ..radar.calendar import CalendarValidationError, UnifiedCalendarEvent
 from ..radar.decision_model import DECISION_MODEL_VERSION
 from ..radar.decision_model_surfaces import decision_model_values
+from .history import load_dashboard_history, read_unverified_json_object_bytes
 from .models import DashboardLoadError, DashboardSnapshot
+from .secure_reader import (
+    AnchoredNamespaceReader,
+    _DashboardNamespaceReadError,
+    compare_fingerprint_values,
+    open_anchored_namespace,
+    verify_run_ledger_bytes,
+)
 
 
 _NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -65,6 +73,17 @@ def _load_dashboard_operator_state(
 
     path = event_alpha_operator_state.operator_state_path(namespace_dir)
     data, read_error = _read_regular_file_once(path)
+    return _operator_state_from_bytes(path, data=data, read_error=read_error)
+
+
+def _operator_state_from_bytes(
+    path: Path,
+    *,
+    data: bytes | None,
+    read_error: str | None,
+) -> event_alpha_operator_state.EventAlphaOperatorStateReadResult:
+    """Parse one already-read operator-state buffer."""
+
     if read_error == "artifact_missing":
         return event_alpha_operator_state.EventAlphaOperatorStateReadResult(
             path=path,
@@ -119,6 +138,23 @@ def _load_dashboard_operator_state(
     )
 
 
+def _read_operator_state(
+    reader: AnchoredNamespaceReader,
+    *,
+    state_loader: StateLoader,
+) -> event_alpha_operator_state.EventAlphaOperatorStateReadResult:
+    """Read production state through the namespace fd; keep test loaders injectable."""
+
+    if state_loader is _load_dashboard_operator_state:
+        path = event_alpha_operator_state.operator_state_path(reader.namespace_dir)
+        data, read_error = reader.read_bytes(path.name)
+        return _operator_state_from_bytes(path, data=data, read_error=read_error)
+    reader.assert_current()
+    result = state_loader(reader.namespace_dir)
+    reader.assert_current()
+    return result
+
+
 def load_dashboard_snapshot(
     artifact_base_dir: str | Path,
     artifact_namespace: str,
@@ -147,103 +183,87 @@ def load_dashboard_snapshot(
     last_error = "operator generation changed while dashboard artifacts were read"
     for _attempt in range(attempts):
         try:
-            return _load_once(
-                namespace_dir,
-                state_loader=state_loader,
-                now=checked_at,
-                max_generation_age_hours=generation_age_limit,
-                max_doctor_age_hours=doctor_age_limit,
-            )
+            with open_anchored_namespace(namespace_dir) as reader:
+                return _load_once(
+                    namespace_dir,
+                    reader=reader,
+                    state_loader=state_loader,
+                    now=checked_at,
+                    max_generation_age_hours=generation_age_limit,
+                    max_doctor_age_hours=doctor_age_limit,
+                )
         except _GenerationChanged as exc:
             last_error = str(exc)
+        except _DashboardNamespaceReadError as exc:
+            raise DashboardLoadError(str(exc)) from exc
     raise DashboardLoadError(last_error)
 
 
 def _load_once(
     namespace_dir: Path,
     *,
+    reader: AnchoredNamespaceReader,
     state_loader: StateLoader,
     now: datetime,
     max_generation_age_hours: float,
     max_doctor_age_hours: float,
 ) -> DashboardSnapshot:
-    before = state_loader(namespace_dir)
+    before = _read_operator_state(reader, state_loader=state_loader)
     state = _require_valid_state(before)
     run_id, profile, namespace, revision = _state_identity(state, namespace_dir)
     _require_zero_side_effects(state)
     state_digest = _operator_state_digest(state)
-    blobs, manifest_reasons = _read_current_manifest_once(state, namespace_dir)
+    blobs, manifest_reasons = _read_current_manifest_once(
+        state,
+        namespace_dir,
+        reader=reader,
+    )
     authority_reasons = [*_manifest_structure_reasons(state), *manifest_reasons]
 
-    current_candidates = _current_core_rows(
-        blobs.get("core_opportunities"),
-        run_id=run_id,
-        profile=profile,
-        namespace=namespace,
+    current_rows = _load_current_rows(
+        state,
+        blobs=blobs,
+        identity=(run_id, profile, namespace),
         read_at=now,
         authority_reasons=authority_reasons,
     )
-    expected_core_count = _expected_current_core_count(state)
-    if expected_core_count is not None and len(current_candidates) != expected_core_count:
-        authority_reasons.append("core_opportunities:current_count_mismatch")
+    current_candidates, current_anomalies, current_market_observations, current_calendar = (
+        current_rows
+    )
 
-    current_anomalies: tuple[dict[str, Any], ...] = ()
-    current_calendar = _current_calendar_rows(
-        blobs.get("unified_calendar"),
+    integrated_outcomes_blob = blobs.get("integrated_outcomes")
+    history = load_dashboard_history(
+        namespace_dir,
+        integrated_outcomes_data=(
+            integrated_outcomes_blob.data
+            if integrated_outcomes_blob is not None
+            else None
+        ),
+        now=now,
+        namespace_reader=lambda path: _read_namespace_path(
+            path,
+            namespace_dir=namespace_dir,
+            reader=reader,
+            blobs=blobs,
+        ),
+    )
+
+    source_coverage = _current_manifest_json(
+        blobs.get("source_coverage_json"),
+        "source_coverage_json",
         run_id=run_id,
         profile=profile,
         namespace=namespace,
         authority_reasons=authority_reasons,
     )
-    expected_calendar_count = _manifest_count(state, "unified_calendar")
-    if expected_calendar_count is not None and len(current_calendar) != expected_calendar_count:
-        authority_reasons.append("unified_calendar:current_count_mismatch")
-
-    feedback_path = namespace_dir / "event_alpha_feedback.jsonl"
-    integrated_outcomes_path = namespace_dir / "event_integrated_radar_outcomes.jsonl"
-    legacy_outcomes_path = namespace_dir / "event_alpha_outcomes.jsonl"
-    cumulative_feedback, feedback_digest, feedback_error = _read_unverified_jsonl(feedback_path)
-    integrated_outcomes_blob = blobs.get("integrated_outcomes")
-    if integrated_outcomes_blob is not None:
-        try:
-            integrated_outcomes = _jsonl_rows_from_blob(integrated_outcomes_blob)
-            integrated_outcomes_digest = hashlib.sha256(
-                integrated_outcomes_blob.data
-            ).hexdigest()
-            integrated_outcomes_error = None
-            integrated_outcomes_authority = "current_generation_fingerprint_verified"
-        except DashboardLoadError:
-            integrated_outcomes = ()
-            integrated_outcomes_digest = None
-            integrated_outcomes_error = "invalid_verified_jsonl"
-            integrated_outcomes_authority = "current_generation_invalid"
-    else:
-        integrated_outcomes, integrated_outcomes_digest, integrated_outcomes_error = (
-            _read_unverified_jsonl(integrated_outcomes_path)
-        )
-        integrated_outcomes_authority = "cumulative_non_authoritative"
-    legacy_outcomes, legacy_outcomes_digest, legacy_outcomes_error = _read_unverified_jsonl(
-        legacy_outcomes_path
+    market_generation = _current_manifest_json(
+        blobs.get("market_no_send_generation"),
+        "market_no_send_generation",
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        authority_reasons=authority_reasons,
     )
-    cumulative_outcomes = (*integrated_outcomes, *legacy_outcomes)
-    cumulative_history_metadata = {
-        feedback_path.name: _unverified_history_metadata(
-            now,
-            feedback_digest,
-            feedback_error,
-        ),
-        integrated_outcomes_path.name: _unverified_history_metadata(
-            now,
-            integrated_outcomes_digest,
-            integrated_outcomes_error,
-            authority=integrated_outcomes_authority,
-        ),
-        legacy_outcomes_path.name: _unverified_history_metadata(
-            now,
-            legacy_outcomes_digest,
-            legacy_outcomes_error,
-        ),
-    }
     provider_readiness = _current_manifest_json(
         blobs.get("provider_readiness_json"),
         "provider_readiness_json",
@@ -252,17 +272,25 @@ def _load_once(
         namespace=namespace,
         authority_reasons=authority_reasons,
     )
-    provider_health, provider_health_digest, provider_health_error = _read_unverified_json_object(
-        namespace_dir / "event_provider_health.json"
+    provider_health_data, provider_health_read_error = _read_namespace_path(
+        namespace_dir / "event_provider_health.json",
+        namespace_dir=namespace_dir,
+        reader=reader,
+        blobs=blobs,
+    )
+    provider_health, provider_health_digest, provider_health_error = (
+        read_unverified_json_object_bytes(
+            provider_health_data,
+            read_error=provider_health_read_error,
+        )
     )
 
-    after = state_loader(namespace_dir)
+    after = _read_operator_state(reader, state_loader=state_loader)
     after_state = _require_valid_state(after)
     _state_identity(after_state, namespace_dir)
     if state_digest != _operator_state_digest(after_state):
         raise _GenerationChanged("operator state changed while dashboard artifacts were read")
 
-    doctor = state.get("doctor") if isinstance(state.get("doctor"), Mapping) else {}
     authority_reasons.extend(
         _generation_authority_reasons(
             state,
@@ -274,7 +302,170 @@ def _load_once(
         )
     )
     authority_reasons = list(dict.fromkeys(authority_reasons))
-    authority_status = "authoritative" if not authority_reasons else "untrusted"
+    return _build_dashboard_snapshot(
+        namespace_dir,
+        identity=(run_id, profile, namespace, revision),
+        state=state,
+        state_digest=state_digest,
+        now=now,
+        authority_reasons=authority_reasons,
+        current_rows=current_rows,
+        current_metadata=(source_coverage, market_generation, provider_readiness),
+        history=history,
+        provider_health=(provider_health, provider_health_digest, provider_health_error),
+    )
+
+
+def _load_current_rows(
+    state: Mapping[str, Any],
+    *,
+    blobs: Mapping[str, _VerifiedArtifactBlob],
+    identity: tuple[str, str, str],
+    read_at: datetime,
+    authority_reasons: list[str],
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+]:
+    """Load and count-check the exact current trader-facing row artifacts."""
+
+    run_id, profile, namespace = identity
+    candidates = _current_core_rows(
+        blobs.get("core_opportunities"),
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        read_at=read_at,
+        authority_reasons=authority_reasons,
+    )
+    expected_core = _expected_current_core_count(state)
+    if expected_core is not None and len(candidates) != expected_core:
+        authority_reasons.append("core_opportunities:current_count_mismatch")
+    anomalies = _current_generation_jsonl_rows(
+        blobs.get("market_anomalies"),
+        "market_anomalies",
+        row_type="event_market_anomaly",
+        schema_name="market_anomaly_v1",
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        authority_reasons=authority_reasons,
+    )
+    _check_optional_artifact_count(
+        state,
+        blobs=blobs,
+        artifact_name="market_anomalies",
+        actual=len(anomalies),
+        authority_reasons=authority_reasons,
+    )
+    source_cache = _current_manifest_json(
+        blobs.get("market_no_send_source_cache"),
+        "market_no_send_source_cache",
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        authority_reasons=authority_reasons,
+    )
+    snapshot_blob = blobs.get("market_state_snapshots")
+    observations = (
+        _current_generation_jsonl_rows(
+            snapshot_blob,
+            "market_state_snapshots",
+            row_type="event_market_state_snapshot",
+            schema_name="market_state_snapshot_v1",
+            run_id=run_id,
+            profile=profile,
+            namespace=namespace,
+            authority_reasons=authority_reasons,
+        )
+        if snapshot_blob is not None
+        else _current_market_observation_rows(
+            source_cache,
+            authority_reasons=authority_reasons,
+        )
+    )
+    _check_optional_artifact_count(
+        state,
+        blobs=blobs,
+        artifact_name="market_state_snapshots",
+        actual=len(observations),
+        authority_reasons=authority_reasons,
+    )
+    calendar = _current_calendar_rows(
+        blobs.get("unified_calendar"),
+        run_id=run_id,
+        profile=profile,
+        namespace=namespace,
+        authority_reasons=authority_reasons,
+    )
+    expected_calendar = _manifest_count(state, "unified_calendar")
+    if expected_calendar is not None and len(calendar) != expected_calendar:
+        authority_reasons.append("unified_calendar:current_count_mismatch")
+    return candidates, anomalies, observations, calendar
+
+
+def _check_optional_artifact_count(
+    state: Mapping[str, Any],
+    *,
+    blobs: Mapping[str, _VerifiedArtifactBlob],
+    artifact_name: str,
+    actual: int,
+    authority_reasons: list[str],
+) -> None:
+    if blobs.get(artifact_name) is None:
+        return
+    expected = _manifest_count(state, artifact_name)
+    if expected is not None and actual != expected:
+        authority_reasons.append(f"{artifact_name}:current_count_mismatch")
+
+
+def _read_namespace_path(
+    path: Path,
+    *,
+    namespace_dir: Path,
+    reader: AnchoredNamespaceReader,
+    blobs: Mapping[str, _VerifiedArtifactBlob],
+) -> tuple[bytes | None, str | None]:
+    """Reuse a verified buffer or read one non-manifest namespace file safely."""
+
+    for blob in blobs.values():
+        if blob.path == path:
+            return blob.data, None
+    try:
+        relative = path.relative_to(namespace_dir)
+    except ValueError:
+        return None, "artifact_path_escape"
+    data, error = reader.read_bytes(relative)
+    if error == "artifact_symlink_not_allowed":
+        return None, "artifact_unreadable_or_symlink"
+    return data, error
+
+
+def _build_dashboard_snapshot(
+    namespace_dir: Path,
+    *,
+    identity: tuple[str, str, str, int],
+    state: Mapping[str, Any],
+    state_digest: str,
+    now: datetime,
+    authority_reasons: list[str],
+    current_rows: tuple[
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+    ],
+    current_metadata: tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
+    history: Mapping[str, Any],
+    provider_health: tuple[Mapping[str, Any], str | None, str | None],
+) -> DashboardSnapshot:
+    run_id, profile, namespace, revision = identity
+    current_candidates, current_anomalies, current_observations, current_calendar = current_rows
+    source_coverage, market_generation, provider_readiness = current_metadata
+    health_values, health_digest, health_error = provider_health
+    doctor = state.get("doctor") if isinstance(state.get("doctor"), Mapping) else {}
     return DashboardSnapshot(
         namespace_dir=namespace_dir,
         run_id=run_id,
@@ -284,22 +475,26 @@ def _load_once(
         manifest_status=str(state.get("manifest_status") or "unknown"),
         doctor_status=str(doctor.get("status") or "not_run"),
         doctor_verified_revision=_optional_int(doctor.get("verified_revision")),
-        generation_authority_status=authority_status,
+        generation_authority_status=("authoritative" if not authority_reasons else "untrusted"),
         generation_authority_reasons=tuple(authority_reasons),
         generation_authority_checked_at=now.isoformat(),
         operator_state_sha256=state_digest,
         operator_state=state,
         current_candidates=current_candidates,
         current_market_anomalies=current_anomalies,
+        current_market_observations=current_observations,
         current_calendar_events=tuple(dict(row) for row in current_calendar),
-        cumulative_feedback=tuple(dict(row) for row in cumulative_feedback),
-        cumulative_outcomes=tuple(dict(row) for row in cumulative_outcomes),
-        cumulative_history_metadata=cumulative_history_metadata,
+        source_coverage=source_coverage,
+        market_generation=market_generation,
+        cumulative_feedback=history["feedback"],
+        cumulative_outcomes=history["outcomes"],
+        campaign_outcomes=history["campaign_outcomes"],
+        cumulative_history_metadata=history["metadata"],
         provider_readiness=provider_readiness,
-        provider_health=provider_health,
-        provider_health_read_at=now.isoformat() if provider_health_digest else None,
-        provider_health_sha256=provider_health_digest,
-        provider_health_error=provider_health_error,
+        provider_health=health_values,
+        provider_health_read_at=now.isoformat() if health_digest else None,
+        provider_health_sha256=health_digest,
+        provider_health_error=health_error,
     )
 
 
@@ -308,12 +503,7 @@ def _namespace_dir(artifact_base_dir: str | Path, artifact_namespace: str) -> Pa
     if not _NAMESPACE_RE.fullmatch(namespace) or namespace in {".", ".."}:
         raise DashboardLoadError("invalid dashboard artifact namespace")
     base = Path(artifact_base_dir).expanduser().resolve()
-    candidate = (base / namespace).resolve()
-    try:
-        candidate.relative_to(base)
-    except ValueError as exc:
-        raise DashboardLoadError("dashboard namespace escapes artifact base") from exc
-    return candidate
+    return base / namespace
 
 
 def _require_valid_state(
@@ -350,6 +540,8 @@ def _require_zero_side_effects(state: Mapping[str, Any]) -> None:
 def _read_current_manifest_once(
     state: Mapping[str, Any],
     namespace_dir: Path,
+    *,
+    reader: AnchoredNamespaceReader,
 ) -> tuple[dict[str, _VerifiedArtifactBlob], tuple[str, ...]]:
     artifacts = state.get("artifacts")
     if not isinstance(artifacts, Mapping):
@@ -381,9 +573,10 @@ def _read_current_manifest_once(
         if path_error:
             reasons.append(f"{name}:{path_error}")
             continue
-        if target is None or not target.exists():
+        if target is None:
             reasons.append(f"{name}:artifact_missing")
             continue
+        relative = target.relative_to(namespace_dir)
         kind = str(entry.get("fingerprint_kind") or "")
         expected_kind = _expected_fingerprint_kind(name)
         if kind != expected_kind:
@@ -402,40 +595,29 @@ def _read_current_manifest_once(
             if run_identity != expected_run_identity:
                 reasons.append(f"{name}:run_row_identity_mismatch")
                 continue
-            if not target.is_file():
-                reasons.append(f"{name}:artifact_kind_mismatch")
-            else:
-                valid, reason = event_alpha_fingerprints.verify_run_ledger_row_fingerprint(
-                    target,
-                    entry,
-                )
-                if not valid:
-                    reasons.append(f"{name}:{reason or 'fingerprint_mismatch'}")
-                elif post_error := _path_symlink_error(namespace_dir, target):
-                    reasons.append(f"{name}:{post_error}")
+            data, read_error = reader.read_bytes(relative)
+            if read_error or data is None:
+                reasons.append(f"{name}:{read_error or 'artifact_unreadable'}")
+                continue
+            valid, reason = verify_run_ledger_bytes(data, entry)
+            if not valid:
+                reasons.append(f"{name}:{reason or 'fingerprint_mismatch'}")
             continue
         if kind == "directory_tree_v1":
-            if not target.is_dir():
-                reasons.append(f"{name}:artifact_kind_mismatch")
-            else:
-                valid, reason = event_alpha_fingerprints.verify_path_fingerprint(target, entry)
-                if not valid:
-                    reasons.append(f"{name}:{reason or 'fingerprint_mismatch'}")
-                elif post_error := _path_symlink_error(namespace_dir, target):
-                    reasons.append(f"{name}:{post_error}")
+            actual, read_error = reader.fingerprint_directory(relative)
+            if read_error or actual is None:
+                reasons.append(f"{name}:{read_error or 'artifact_unreadable'}")
+                continue
+            valid, reason = compare_fingerprint_values(actual, entry)
+            if not valid:
+                reasons.append(f"{name}:{reason or 'fingerprint_mismatch'}")
             continue
         if kind not in {"file_bytes", "jsonl_lines"}:
             reasons.append(f"{name}:fingerprint_kind_unsupported")
             continue
-        if not target.is_file():
-            reasons.append(f"{name}:artifact_kind_mismatch")
-            continue
-        data, read_error = _read_regular_file_once(target)
+        data, read_error = reader.read_bytes(relative)
         if read_error or data is None:
             reasons.append(f"{name}:{read_error or 'artifact_unreadable'}")
-            continue
-        if post_error := _path_symlink_error(namespace_dir, target):
-            reasons.append(f"{name}:{post_error}")
             continue
         valid, reason = event_alpha_fingerprints.verify_bytes_fingerprint(data, entry)
         if not valid:
@@ -459,6 +641,9 @@ def _expected_fingerprint_kind(artifact_name: str) -> str:
         "core_opportunities",
         "unified_calendar",
         "market_history",
+        "market_state_snapshots",
+        "market_anomalies",
+        "market_anomaly_catalyst_search_queue",
         "integrated_candidates",
         "integrated_outcomes",
     }:
@@ -526,27 +711,7 @@ def _manifest_target(
     if any(part == ".." for part in raw_path.parts):
         raise DashboardLoadError(f"operator artifact escapes namespace: {artifact_name}")
     target = namespace_dir.joinpath(*raw_path.parts)
-    symlink_error = _path_symlink_error(namespace_dir, target)
-    return target, symlink_error
-
-
-def _path_symlink_error(namespace_dir: Path, target: Path) -> str | None:
-    try:
-        relative = target.relative_to(namespace_dir)
-    except ValueError:
-        return "artifact_path_escape"
-    current = namespace_dir
-    for part in relative.parts:
-        current /= part
-        try:
-            info = current.lstat()
-        except FileNotFoundError:
-            return None
-        except OSError:
-            return "artifact_path_unreadable"
-        if stat.S_ISLNK(info.st_mode):
-            return "artifact_symlink_not_allowed"
-    return None
+    return target, None
 
 
 def _read_regular_file_once(path: Path) -> tuple[bytes | None, str | None]:
@@ -653,6 +818,66 @@ def _current_manifest_json(
     return payload
 
 
+def _current_market_observation_rows(
+    payload: Mapping[str, Any],
+    *,
+    authority_reasons: list[str],
+) -> tuple[dict[str, Any], ...]:
+    """Return exact-generation market rows from the fingerprinted source cache."""
+
+    if not payload:
+        return ()
+    raw_rows = payload.get("rows")
+    if not isinstance(raw_rows, list):
+        authority_reasons.append("market_no_send_source_cache:rows_invalid")
+        return ()
+    if any(not isinstance(row, Mapping) for row in raw_rows):
+        authority_reasons.append("market_no_send_source_cache:row_not_object")
+        return ()
+    rows = tuple(dict(row) for row in raw_rows)
+    expected = _optional_int(payload.get("selected_market_row_count"))
+    if expected is None or expected < 0:
+        authority_reasons.append("market_no_send_source_cache:selected_count_invalid")
+    elif expected != len(rows):
+        authority_reasons.append("market_no_send_source_cache:selected_count_mismatch")
+    return rows
+
+
+def _current_generation_jsonl_rows(
+    blob: _VerifiedArtifactBlob | None,
+    artifact_name: str,
+    *,
+    row_type: str,
+    schema_name: str,
+    run_id: str,
+    profile: str,
+    namespace: str,
+    authority_reasons: list[str],
+) -> tuple[dict[str, Any], ...]:
+    """Return one exact, schema-valid generation from a fingerprinted JSONL artifact."""
+
+    if blob is None:
+        return ()
+    try:
+        rows = _jsonl_rows_from_blob(blob)
+    except DashboardLoadError:
+        authority_reasons.append(f"{artifact_name}:invalid_jsonl")
+        return ()
+    if any(str(row.get("row_type") or "") != row_type for row in rows):
+        authority_reasons.append(f"{artifact_name}:row_type_mismatch")
+        return ()
+    if any(
+        not _matches_generation(row, run_id=run_id, profile=profile, namespace=namespace)
+        for row in rows
+    ):
+        authority_reasons.append(f"{artifact_name}:generation_lineage_mismatch")
+        return ()
+    if any(schema_v1.validate_row_against_schema(row, schema_name) for row in rows):
+        authority_reasons.append(f"{artifact_name}:schema_validation_failed")
+        return ()
+    return tuple(dict(row) for row in rows)
+
+
 def _current_core_rows(
     blob: _VerifiedArtifactBlob | None,
     *,
@@ -730,66 +955,6 @@ def _jsonl_rows_from_blob(blob: _VerifiedArtifactBlob) -> tuple[dict[str, Any], 
             raise DashboardLoadError(f"non-object JSONL row in {blob.path.name}:{line_number}")
         rows.append(dict(payload))
     return tuple(rows)
-
-
-def _read_unverified_json_object(
-    path: Path,
-) -> tuple[Mapping[str, Any], str | None, str | None]:
-    data, read_error = _read_regular_file_once(path)
-    if read_error == "artifact_missing":
-        return {}, None, None
-    if read_error or data is None:
-        return {}, None, read_error or "unreadable"
-    digest = hashlib.sha256(data).hexdigest()
-    try:
-        payload = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return {}, digest, "invalid_json"
-    if not isinstance(payload, Mapping):
-        return {}, digest, "json_not_object"
-    return dict(payload), digest, None
-
-
-def _read_unverified_jsonl(
-    path: Path,
-) -> tuple[tuple[dict[str, Any], ...], str | None, str | None]:
-    rows: list[dict[str, Any]] = []
-    data, read_error = _read_regular_file_once(path)
-    if read_error == "artifact_missing":
-        return (), None, None
-    if read_error or data is None:
-        return (), None, read_error or "unreadable"
-    digest = hashlib.sha256(data).hexdigest()
-    try:
-        lines = data.decode("utf-8").splitlines()
-    except UnicodeDecodeError:
-        return (), digest, "invalid_utf8"
-    for line_number, line in enumerate(lines, 1):
-        if not line.strip():
-            continue
-        try:
-            payload = json.loads(line)
-        except json.JSONDecodeError:
-            return (), digest, f"invalid_jsonl:{line_number}"
-        if not isinstance(payload, Mapping):
-            return (), digest, f"non_object_jsonl:{line_number}"
-        rows.append(dict(payload))
-    return tuple(rows), digest, None
-
-
-def _unverified_history_metadata(
-    now: datetime,
-    digest: str | None,
-    error: str | None,
-    *,
-    authority: str = "cumulative_non_authoritative",
-) -> dict[str, Any]:
-    return {
-        "authority": authority,
-        "read_at": now.isoformat() if digest else None,
-        "sha256": digest,
-        "error": error,
-    }
 
 
 def _matches_generation(

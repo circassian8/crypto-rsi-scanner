@@ -71,6 +71,48 @@
     "calendar": {
       "calendar_alone_creates_directional_bias": false,
       "calendar_risk_requires_attached_evidence": true,
+      "live_snapshot_input": {
+        "accepted_provenance": "current non-fixture local snapshot",
+        "arbitrary_provider_fields_exported": false,
+        "source_row_projection": "closed_allowlisted_secret_safe_fields",
+        "configured_by": "RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH",
+        "credential_bearing_urls_allowed": false,
+        "derived_rows_recomputed_from_source_copy": true,
+        "derived_semantic_bindings": [
+          "scheduled_catalyst",
+          "unlock_candidate",
+          "unified_calendar"
+        ],
+        "empty_unlock_without_source": "not_configured_and_artifact_absent",
+        "fixture_test_mock_or_replay_allowed_for_live": false,
+        "generation_copy_is_fingerprinted": true,
+        "live_container_requires_explicit_observed_time": true,
+        "live_container_requires_explicit_source_provenance": true,
+        "live_container_versioned": true,
+        "missing_source_behavior": "visible not_configured coverage; no fixture fallback",
+        "provider_calls": 0,
+        "readiness_writes": 0,
+        "row_fixture_provenance_allowed_for_live": false,
+        "row_provenance_fields_checked": [
+          "provider",
+          "source",
+          "source_class",
+          "nested_provenance"
+        ],
+        "supplied_row_safety_flags_must_be_true": [
+          "research_only",
+          "no_send",
+          "no_send_rehearsal"
+        ],
+        "statuses": [
+          "not_configured",
+          "healthy_empty",
+          "healthy_nonempty",
+          "stale",
+          "unavailable",
+          "fixture_rejected_live"
+        ]
+      },
       "preserved_fields": [
         "calendar_event_id",
         "category",
@@ -93,7 +135,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-13T17:17:38+00:00",
+  "generated_at": "2026-07-13T22:47:55+00:00",
   "market_provenance_contract": {
     "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
@@ -217,6 +259,7 @@
       "canonical provenance v2 and distinct request/source lineage",
       "bounded per-asset temporal history and warmup evidence",
       "market anomalies and observations",
+      "optional explicit local calendar snapshot and canonical copy",
       "canonical Decision v2 projections",
       "cards and Decision preview",
       "pending outcomes and shared campaign-outcome refresh",
@@ -255,6 +298,7 @@
     "pilot_audit_contract": {
       "contract_version": 1,
       "final_after_doctor": true,
+      "market_quality_scope": "complete exact market snapshot universe",
       "network_fields": [
         "provider_adapter_invoked",
         "network_call_attempted",
@@ -486,6 +530,30 @@
     ],
     "dashboard_get_head_side_effects": [],
     "dashboard_is_primary": true,
+    "dashboard_zero_idea_contract": {
+      "artifact_presence_alone_proves_healthy_empty": false,
+      "descriptor_anchored_namespace_load": true,
+      "exact_market_anomalies_remain_visible_as_scan_evidence": true,
+      "exact_market_observations_remain_visible": true,
+      "healthy_empty_requires_verified_producer_completion": true,
+      "market_anomaly_receipt_binds_namespace_identity_hashes_and_semantics": true,
+      "market_artifact_semantic_counts_reconciled": true,
+      "normalization_rejection_is_distinct_from_healthy_empty": true,
+      "operator_publication_fingerprints_exact_artifacts": true,
+      "raw_anomalies_rendered_as_scan_evidence_not_decisions": true,
+      "same_cycle_zero_anomaly_requires_completion_receipt": true,
+      "scanner_outputs_use_one_descriptor_anchored_bundle": true,
+      "shared_campaign_outcomes_are_historical_non_authoritative": true,
+      "source_states": [
+        "healthy_nonempty",
+        "healthy_empty",
+        "not_configured",
+        "degraded_or_unavailable",
+        "stale",
+        "fixture_rejected_live",
+        "normalization_rejected"
+      ]
+    },
     "decision_preview_sections": [
       "High-Confidence Ideas",
       "Actionable Ideas",

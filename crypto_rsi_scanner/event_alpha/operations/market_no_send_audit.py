@@ -11,7 +11,11 @@ from typing import Any, Iterable, Mapping
 from ..artifacts import operator_state
 from ..dashboard.readiness import DashboardReadinessError, read_current_namespace_pointer
 from ..radar.integrated import api as integrated_radar
-from .market_no_send_features import finite_float, market_quality_counts
+from .market_no_send_features import (
+    finite_float,
+    market_quality_counts,
+    market_quality_counts_from_rows,
+)
 from .market_no_send_io import (
     read_json_object,
     read_jsonl,
@@ -231,28 +235,15 @@ def _build_audit(
     safety_counters: Mapping[str, int],
 ) -> dict[str, Any]:
     result_payload = result.to_dict() if result is not None else {}
-    doctor = operator.get("doctor") if isinstance(operator.get("doctor"), Mapping) else {}
-    status = str(manifest.get("status") or result_payload.get("status") or "blocked")
-    operator_digest = _operator_digest(operator)
-    points_to_attempt = bool(
-        pointer.get("artifact_namespace") == namespace
-        and pointer.get("run_id") == manifest.get("run_id")
-        and pointer.get("revision") == operator.get("revision")
-        and pointer.get("operator_state_sha256") == operator_digest
-    )
-    publishable = bool(
-        status == "complete"
-        and manifest.get("candidate_source_mode") == "live_no_send"
-        and manifest.get("provenance_contract_valid") is True
-        and manifest.get("decision_radar_campaign_counted") is True
-        and doctor.get("authoritative") is True
-        and doctor.get("blocker_count") == 0
-    )
-    publication_status, publication_reason = _publication_state(
-        points_to_attempt=points_to_attempt,
-        publishable=publishable,
-        authorized=readiness.live_provider_authorized,
-        has_manifest=bool(manifest),
+    status, doctor, points_to_attempt, publishable, publication = (
+        _audit_publication_state(
+            namespace=namespace,
+            readiness=readiness,
+            manifest=manifest,
+            result_payload=result_payload,
+            operator=operator,
+            pointer=pointer,
+        )
     )
     candidate_path = (
         namespace_dir / integrated_radar.INTEGRATED_CANDIDATES_FILENAME
@@ -260,7 +251,18 @@ def _build_audit(
     )
     universe_audit = manifest.get("universe_audit")
     universe_audit = dict(universe_audit) if isinstance(universe_audit, Mapping) else {}
-    idea_quality = market_quality_counts(candidate_path) if candidate_path is not None else _empty_quality()
+    snapshot_rows = (
+        read_jsonl(namespace_dir / "event_market_state_snapshots.jsonl")
+        if namespace_dir is not None
+        else []
+    )
+    idea_quality = (
+        market_quality_counts_from_rows(snapshot_rows)
+        if snapshot_rows
+        else market_quality_counts(candidate_path)
+        if candidate_path is not None
+        else _empty_quality()
+    )
     provenance = (
         manifest.get("market_provenance")
         if isinstance(manifest.get("market_provenance"), Mapping)
@@ -332,7 +334,13 @@ def _build_audit(
         "universe": universe_audit,
         "baseline": quality,
         "feature_basis": dict(provenance.get("feature_basis") or {}),
+        "market_observation_quality": idea_quality,
+        "market_observation_quality_scope": "exact_generation_market_state_snapshots",
+        "market_observation_quality_source_artifact": manifest.get(
+            "market_quality_source_artifact"
+        ),
         "idea_quality": idea_quality,
+        "idea_quality_compatibility_alias_scope": "market_observations_not_only_promoted_ideas",
         "market_anomaly_count": int(manifest.get("market_anomaly_count") or 0),
         "candidate_count": len(candidates),
         "outcome_placeholder_count": len(outcomes),
@@ -342,8 +350,8 @@ def _build_audit(
         "visible_ideas": _visible_ideas(candidates),
         "doctor": dict(doctor),
         "publication": {
-            "status": publication_status,
-            "reason": publication_reason,
+            "status": publication[0],
+            "reason": publication[1],
             "pointer_namespace": pointer.get("artifact_namespace"),
             "pointer_run_id": pointer.get("run_id"),
             "pointer_revision": pointer.get("revision"),
@@ -359,6 +367,46 @@ def _build_audit(
         "safety": {**dict(safety_counters), "no_send": True, "research_only": True},
         "next_safe_command": "make radar-dashboard" if points_to_attempt else readiness.next_safe_command,
     }
+
+
+def _audit_publication_state(
+    *,
+    namespace: str,
+    readiness: MarketNoSendReadiness,
+    manifest: Mapping[str, Any],
+    result_payload: Mapping[str, Any],
+    operator: Mapping[str, Any],
+    pointer: Mapping[str, Any],
+) -> tuple[str, Mapping[str, Any], bool, bool, tuple[str, str]]:
+    doctor = (
+        operator.get("doctor")
+        if isinstance(operator.get("doctor"), Mapping)
+        else {}
+    )
+    status = str(
+        manifest.get("status") or result_payload.get("status") or "blocked"
+    )
+    points_to_attempt = bool(
+        pointer.get("artifact_namespace") == namespace
+        and pointer.get("run_id") == manifest.get("run_id")
+        and pointer.get("revision") == operator.get("revision")
+        and pointer.get("operator_state_sha256") == _operator_digest(operator)
+    )
+    publishable = bool(
+        status == "complete"
+        and manifest.get("candidate_source_mode") == "live_no_send"
+        and manifest.get("provenance_contract_valid") is True
+        and manifest.get("decision_radar_campaign_counted") is True
+        and doctor.get("authoritative") is True
+        and doctor.get("blocker_count") == 0
+    )
+    publication = _publication_state(
+        points_to_attempt=points_to_attempt,
+        publishable=publishable,
+        authorized=readiness.live_provider_authorized,
+        has_manifest=bool(manifest),
+    )
+    return status, doctor, points_to_attempt, publishable, publication
 
 
 def _publication_state(

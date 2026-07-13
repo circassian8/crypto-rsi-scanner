@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import *
+from .sidecars import _sidecar_coverage_state
 from ...decision_model_surfaces import (
     PREVIEW_LANE_ORDER,
     PREVIEW_LANE_TITLES,
@@ -1080,10 +1081,23 @@ def _manifest_item(
 ) -> dict[str, Any]:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
     artifact_paths = _sidecar_artifact_paths(namespace_dir, sidecar_name)
-    missing = [event_artifact_paths.artifact_display_path(path) for path in artifact_paths if not path.exists()]
-    freshness = "fresh" if materialized else "missing"
+    missing = [
+        event_artifact_paths.artifact_display_path(path)
+        for path in artifact_paths
+        if not path.is_file() or path.is_symlink()
+    ]
+    layer_status, healthy_empty = _sidecar_coverage_state(
+        materialized, mode=mode, configured=configured,
+    )
+    freshness = (
+        "fresh"
+        if layer_status in {"healthy_nonempty", "healthy_empty"}
+        else "missing"
+        if layer_status == "not_configured"
+        else "unknown"
+    )
     item_warnings = [str(warning) for warning in warnings if str(warning)]
-    if missing and not materialized:
+    if missing and not materialized and not healthy_empty:
         item_warnings.append("missing_sidecar_artifact")
     return {
         "sidecar_name": sidecar_name,
@@ -1092,6 +1106,8 @@ def _manifest_item(
         "artifact_relpaths": [event_artifact_paths.artifact_relpath(path) for path in artifact_paths],
         "row_counts": {"rows": len(materialized)},
         "provider_status": "configured" if configured else "not_configured",
+        "coverage_status": layer_status,
+        "artifact_set_complete": not missing if artifact_paths else None,
         "configured": bool(configured),
         "freshness_status": freshness,
         "warnings": tuple(dict.fromkeys(item_warnings)),

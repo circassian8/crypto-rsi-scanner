@@ -17,6 +17,69 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-14 — Make sparse Decision Radar coverage truthful · Codex
+**Why:** The clean live dashboard authority had zero qualified ideas, but its 30
+fresh market observations, incomplete source coverage, and one historical
+campaign outcome were hidden. An unconfigured calendar therefore looked like a
+successfully observed empty calendar, making a healthy but sparse run appear
+broken.
+**Changes:**
+- Added exact-generation market observation/anomaly loading, explicit per-layer
+  coverage states, provider/readiness detail, and separately labeled shared
+  campaign outcomes to the read-only dashboard. Current namespace counts remain
+  distinct from cumulative research history.
+- Anchored each dashboard load to one no-follow namespace descriptor, rejected
+  namespace replacement and snapshot/anomaly semantic-count drift, and rendered
+  raw anomalies in a separate non-actionable scan-evidence block instead of
+  hiding them or inventing Decision routes.
+- Made healthy non-empty, healthy empty, unconfigured, unavailable/degraded,
+  skipped, and normalization-rejected states explicit across market, calendar,
+  derivatives, unlock, scheduled-catalyst, and RSI sidecars. Empty files without
+  a producer completion receipt can no longer impersonate successful coverage.
+- Added a same-cycle anomaly completion receipt that binds the exact namespace,
+  run, artifact paths, identities, content, row lineage, and counts. A verified
+  zero-anomaly scan is healthy-empty; generic empty files and replaced/forged
+  same-count artifacts fail closed.
+- Added a bounded, descriptor-anchored, no-network calendar snapshot boundary
+  through `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH`. Live input requires a
+  versioned current non-fixture container, closed secret-safe fields, explicit
+  provenance and observation time, and safe URLs; scheduled, unlock, and unified
+  rows are recomputed from the accepted source copy before publication.
+- Rejected fixture/test/mock/replay markers at both container and event-row
+  provenance, false row-level research/no-send flags, secret-shaped raw values
+  including Telegram bot tokens, and stale/unavailable/rejected input without
+  mislabeling it as merely unconfigured.
+- Made anomaly and scheduled/unlock output sets one descriptor-anchored atomic
+  no-follow bundle, and made calendar publication hash, parse, count, and
+  semantically validate the same unchanged bytes. Symlink leaves, namespace
+  swaps, same-count forgery, duplicate keys, split reads, and in-place mutation
+  now fail closed without touching outside targets.
+- Bound the optional market/calendar artifacts into operator authority, used the
+  full evaluated snapshot for market-quality audit counts, split enlarged
+  implementation modules below the architecture size gate, and updated the
+  operating contract, North Star, roadmap, and durable decision.
+- Restarted `com.nasrenkaraf.crypto-radar-dashboard`. The current authority
+  remains `radar_market_no_send_20260713t190728z`: zero Decision ideas is genuine,
+  while the dashboard now shows 30 fresh CoinGecko observations, explicit
+  `not_configured` calendar/source coverage, detailed layer gaps, and one shared
+  non-authoritative pending DEXE `risk_watch` campaign outcome.
+**Verify:** Export parent-symlink regression 1/1; consolidated focused market/
+calendar/publication/namespace/dashboard/surface suite 286/286; independent
+adversarial final audit clean with no remaining P0-P2 in scope after exact token,
+same-count forgery, symlink escape, namespace replacement, split-read, in-place
+mutation, and cross-bundle attack replays. Compileall, North Star JSON validation,
+and `git diff --check` passed. Market-no-send, dashboard, and calendar smokes
+passed; architecture cleanliness reports zero new size violations. `make
+verify-fast PYTHON=.venv/bin/python` passed 1,537 pytest checks plus offline
+smokes. Final `make verify PYTHON=.venv/bin/python` passed 1,358/1,358 standalone
+and 1,537/1,537 pytest checks plus alert, fixture-backtest, and paper-scoreboard
+gates. Dashboard readiness is READY; `/`, `/anomalies`, `/calendar`, `/health`,
+and `/feedback-outcomes` return HTTP 200 on PID 36188.
+**Notes/risks:** No live provider call, send, trade, paper trade, normal RSI
+write, or `TRIGGERED_FADE` creation occurred. Calendar rows will remain correctly
+`not_configured` until a fresh non-fixture snapshot is supplied or a future
+provider is separately authorized and implemented.
+
 ## 2026-07-13 — Operationalize Decision Radar Observation Campaign v2 · Codex
 **Why:** The first real market pilot proved the product path but also showed
 that rapid snapshots could overstate warmup, strict-doctor clocks could disturb

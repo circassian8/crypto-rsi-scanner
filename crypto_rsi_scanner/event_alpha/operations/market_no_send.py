@@ -15,7 +15,6 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from ... import config, universe
 from ..artifacts import context as artifact_context
-from ..artifacts import operator_state
 from ..artifacts import run_ledger
 from ..dashboard.readiness import (
     DashboardReadinessError,
@@ -33,18 +32,19 @@ from .market_no_send_models import (
 from .market_no_send_io import (
     ensure_safe_namespace_dir as _ensure_safe_namespace_dir,
     read_json_object as _read_json_object,
-    read_jsonl as _read_jsonl,
     read_regular_bytes as _read_regular_bytes,
     safe_existing_namespace_dir as _safe_existing_namespace_dir,
     write_json_atomic as _write_json_atomic,
-    write_jsonl as _write_jsonl,
 )
 from . import (
     market_no_send_audit,
     market_no_send_attempt,
+    market_no_send_authority,
     market_no_send_campaign_guard,
     market_no_send_campaign_provider,
+    market_no_send_calendar,
     market_no_send_features,
+    market_no_send_generation,
     market_no_send_history_cache,
     market_no_send_provider,
     market_no_send_publication,
@@ -104,6 +104,12 @@ def build_market_no_send_readiness(
     if namespace_blocker:
         reasons.append(namespace_blocker)
     evaluated_at = _as_utc(_parse_time(now) or datetime.now(timezone.utc))
+    calendar_snapshot = market_no_send_calendar.load_market_no_send_calendar_snapshot(
+        environ=env,
+        now=evaluated_at,
+        data_mode="live",
+        run_mode="operational",
+    )
     history_config, history_config_error = _market_history_config()
     if history_config_error: reasons.append(history_config_error)
     baseline = market_no_send_history_cache.cache_readiness(
@@ -147,6 +153,10 @@ def build_market_no_send_readiness(
         candidate_source_mode="live_no_send" if not reasons else "preflight_only",
         **baseline,
         spread_data_status="unavailable_from_coingecko_market_endpoint",
+        calendar_snapshot_status=calendar_snapshot.status,
+        calendar_snapshot_configured=calendar_snapshot.configured,
+        calendar_snapshot_retained_rows=calendar_snapshot.retained_row_count,
+        calendar_snapshot_source_mode=calendar_snapshot.source_mode,
         measurement_program=market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM,
         decision_radar_campaign_eligible=not reasons,
         burn_in_eligible=False,
@@ -166,6 +176,7 @@ def build_market_no_send_readiness(
             HISTORY_FILENAME,
             market_no_send_provider.PROVIDER_HEALTH_FILENAME,
             RUN_MANIFEST_FILENAME,
+            market_no_send_calendar.CALENDAR_SOURCE_COPY_FILENAME,
             PILOT_AUDIT_JSON_FILENAME,
             PILOT_AUDIT_MD_FILENAME,
         ),
@@ -293,6 +304,7 @@ def run_market_no_send_generation(
                 provider_name=provider_name, data_mode=mode, readiness=readiness,
                 top_n=bounded_top_n, fetch_limit=bounded_fetch,
                 request_telemetry=request_telemetry, campaign_reservation=reservation,
+                calendar_environ=None if mode == "live" else environ,
             )
     except market_no_send_campaign_guard.CampaignReservationBusy:
         return market_no_send_campaign_guard.blocked_generation_result(
@@ -422,6 +434,7 @@ def _build_market_generation_from_rows(
     fetch_limit: int,
     request_telemetry: Mapping[str, Any],
     campaign_reservation: market_no_send_campaign_guard.CampaignReservation | None,
+    calendar_environ: Mapping[str, str] | None,
 ) -> MarketNoSendGenerationResult:
     source_mode = "live_no_send" if data_mode == "live" else "mocked_fixture"
     acquisition_mode = "live_provider" if data_mode == "live" else "mocked_fixture"
@@ -444,6 +457,12 @@ def _build_market_generation_from_rows(
         )
     )
     run_id = run_ledger.run_id_for(observed, context.profile)
+    calendar_snapshot = market_no_send_calendar.load_market_no_send_calendar_snapshot(
+        environ=calendar_environ,
+        now=observed,
+        data_mode=data_mode,
+        run_mode=context.run_mode,
+    )
     request_path, source_sha256, request_ledger_path, request_ledger_sha256 = (
         _write_market_request_artifacts(
             context=context,
@@ -462,13 +481,16 @@ def _build_market_generation_from_rows(
             request_telemetry=request_telemetry,
         )
     )
-    provenance = _closed_market_provenance(
+    provenance = market_no_send_authority.closed_market_provenance(
+        contract_version=CONTRACT_VERSION,
         data_mode=data_mode,
         provider=provider_name,
         observed_at=observed,
         run_id=run_id,
         readiness=readiness,
+        source_artifact=REQUEST_CACHE_FILENAME,
         source_artifact_sha256=source_sha256,
+        request_ledger_artifact=REQUEST_LEDGER_FILENAME,
         request_ledger_sha256=request_ledger_sha256,
         feature_basis=market_no_send_features.generation_feature_basis(normalized_rows),
         data_quality=market_no_send_features.generation_data_quality(
@@ -477,35 +499,31 @@ def _build_market_generation_from_rows(
             history_filename=HISTORY_FILENAME,
         ),
     )
-    manifest_path = context.namespace_dir / RUN_MANIFEST_FILENAME
-    manifest = _base_manifest(
-        context=context,
-        observed=observed,
-        data_mode=data_mode,
-        provider=provider_name,
-        authorized=readiness.live_provider_authorized,
-        fixture_mode=readiness.fixture_mode,
-        top_n=top_n,
-        fetch_limit=fetch_limit,
-        status="building",
+    manifest_path, manifest = market_no_send_generation.start_generation_manifest(
+        context=context, observed=observed, data_mode=data_mode,
+        provider_name=provider_name, readiness=readiness, top_n=top_n,
+        fetch_limit=fetch_limit, contract_version=CONTRACT_VERSION,
+        safety_counters=_SAFETY_COUNTERS, run_id=run_id,
+        raw_row_count=len(raw_rows), selected_row_count=len(normalized_rows),
+        request_cache_filename=REQUEST_CACHE_FILENAME,
+        request_cache_sha256=source_sha256,
+        request_ledger_filename=REQUEST_LEDGER_FILENAME,
+        request_ledger_sha256=request_ledger_sha256, provenance=provenance,
+        history_filename=HISTORY_FILENAME, history_sha256=history_sha256,
+        campaign_counted=decision_radar_campaign_counted,
+        calendar_snapshot=calendar_snapshot.to_dict(),
+        manifest_filename=RUN_MANIFEST_FILENAME,
     )
-    manifest.update({
-        "run_id": run_id,
-        "provider_call_attempted": True,
-        "provider_request_succeeded": True,
-        "raw_market_row_count": len(raw_rows),
-        "selected_market_row_count": len(normalized_rows),
-        "request_cache_artifact": REQUEST_CACHE_FILENAME,
-        "request_cache_sha256": source_sha256,
-        "request_ledger_artifact": REQUEST_LEDGER_FILENAME,
-        "request_ledger_sha256": request_ledger_sha256,
-        "market_provenance": provenance,
-        "market_history_artifact": HISTORY_FILENAME,
-        "market_history_sha256": history_sha256,
-        "contract_counted_status": "pending" if decision_radar_campaign_counted else "not_counted",
-    })
-    _write_json_atomic(manifest_path, manifest)
     try:
+        calendar_source_rows = market_no_send_calendar.materialize_market_calendar_snapshot(
+            context,
+            calendar_snapshot=calendar_snapshot,
+            observed=observed,
+            run_id=run_id,
+            manifest=manifest,
+            safety_counters=_SAFETY_COUNTERS,
+        )
+        _write_json_atomic(manifest_path, manifest)
         anomaly_result = market_anomaly_scanner.run_market_anomaly_scan(
             market_rows=normalized_rows,
             namespace_dir=context.namespace_dir,
@@ -517,8 +535,9 @@ def _build_market_generation_from_rows(
             run_mode=context.run_mode,
             run_id=run_id,
         )
-        _attach_market_no_send_lineage(
+        anomaly_result = market_no_send_authority.attach_market_no_send_lineage(
             context.namespace_dir,
+            scan_result=anomaly_result,
             normalized_rows=normalized_rows,
             provider=provider_name,
             data_mode=data_mode,
@@ -526,6 +545,7 @@ def _build_market_generation_from_rows(
             request_ledger_artifact=REQUEST_LEDGER_FILENAME,
             run_id=run_id,
             provenance=provenance,
+            safety_counters=_SAFETY_COUNTERS,
         )
         return _finish_market_generation(
             context=context,
@@ -543,15 +563,12 @@ def _build_market_generation_from_rows(
             anomaly_result=anomaly_result,
             provenance=provenance,
             universe_audit=universe_audit,
+            calendar_source_rows=calendar_source_rows,
         )
     except Exception as exc:
-        manifest.update({
-            "status": "failed",
-            "contract_counted_status": "not_counted",
-            "failure_class": type(exc).__name__,
-            "failed_at": datetime.now(timezone.utc).isoformat(),
-        })
-        _write_json_atomic(manifest_path, manifest)
+        market_no_send_generation.mark_generation_failed(
+            manifest_path, manifest, exc
+        )
         raise
 
 def _prepare_normalized_market_rows(
@@ -810,12 +827,15 @@ def _finish_market_generation(
     anomaly_result: Any,
     provenance: Mapping[str, Any],
     universe_audit: Mapping[str, Any],
+    calendar_source_rows: tuple[dict[str, Any], ...] | None,
 ) -> MarketNoSendGenerationResult:
     integrated_result = _run_integrated_without_extra_providers(
         context,
         observed_at=observed,
+        calendar_source_rows=calendar_source_rows,
+        market_anomaly_scan_result=anomaly_result,
     )
-    _initialize_exact_operator_state(
+    market_no_send_authority.initialize_exact_operator_state(
         context,
         run_id=run_id,
         provenance=provenance,
@@ -831,10 +851,20 @@ def _finish_market_generation(
     route_counts = market_no_send_features.decision_route_counts(
         integrated_result.integrated_candidates_path
     )
+    # Quality describes the bounded market observation campaign, not only the
+    # anomaly subset that happened to become candidates in this cycle.  Reading
+    # the exact scanner snapshot also preserves useful maturity telemetry when
+    # a valid live cycle produces zero ideas.
     quality_counts = market_no_send_features.market_quality_counts(
-        integrated_result.integrated_candidates_path
+        anomaly_result.snapshots_path
     )
     core_path, outcomes_path = Path(integrated_result.core_opportunity_store_path), context.namespace_dir / integrated_radar.INTEGRATED_OUTCOMES_FILENAME
+    calendar_metadata = market_no_send_generation.calendar_completion_metadata(
+        manifest.get("calendar_snapshot") or {},
+        namespace_dir=context.namespace_dir,
+        unified_calendar_rows=int(integrated_result.unified_calendar_rows or 0),
+        normalization=dict(integrated_result.unified_calendar_normalization or {}),
+    )
     manifest.update({
         "status": "complete",
         "market_snapshot_count": anomaly_result.snapshot_count, "market_anomaly_count": anomaly_result.anomaly_count,
@@ -844,6 +874,8 @@ def _finish_market_generation(
         **market_no_send_publication.supporting_jsonl_artifact_bindings(core_path, outcomes_path),
         "card_count": len(integrated_result.research_card_paths),
         "decision_route_counts": dict(route_counts),
+        "market_quality_source_artifact": anomaly_result.snapshots_path.name,
+        "calendar_snapshot": calendar_metadata,
         "universe_audit": dict(universe_audit),
         **quality_counts,
         "provenance_contract_valid": provenance.get("provenance_contract_valid") is True,
@@ -879,7 +911,7 @@ def _finish_market_generation(
         except (OSError, ValueError, MarketNoSendError) as exc:
             manifest["campaign_outcome_refresh_failure_class"] = type(exc).__name__
         _write_json_atomic(manifest_path, manifest)
-    _record_market_authority_artifacts(
+    market_no_send_authority.record_market_authority_artifacts(
         context,
         run_id=run_id,
         request_path=request_path,
@@ -887,6 +919,7 @@ def _finish_market_generation(
         manifest_path=manifest_path,
         candidates_path=Path(integrated_result.integrated_candidates_path),
         outcomes_path=outcomes_path,
+        history_filename=HISTORY_FILENAME,
     )
     return MarketNoSendGenerationResult(
         status="complete",
@@ -1059,7 +1092,13 @@ def _fetch_live_coingecko_rows(fetch_limit: int) -> market_no_send_provider.Mark
     )
 
 
-def _run_integrated_without_extra_providers(context: Any, *, observed_at: datetime) -> Any:
+def _run_integrated_without_extra_providers(
+    context: Any,
+    *,
+    observed_at: datetime,
+    calendar_source_rows: tuple[dict[str, Any], ...] | None = None,
+    market_anomaly_scan_result: Any | None = None,
+) -> Any:
     previous_refresh = config.EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED
     try:
         config.EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED = False
@@ -1070,265 +1109,11 @@ def _run_integrated_without_extra_providers(context: Any, *, observed_at: dateti
             input_mode=integrated_radar.INPUT_MODE_LOAD_EXISTING,
             coinalyze_namespace=context.artifact_namespace,
             targeted_market_provider=None,
+            calendar_source_rows=calendar_source_rows,
+            market_anomaly_scan_result=market_anomaly_scan_result,
         )
     finally:
         config.EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED = previous_refresh
-
-
-def _initialize_exact_operator_state(
-    context: Any,
-    *,
-    run_id: str,
-    provenance: Mapping[str, Any],
-) -> None:
-    """Restore in-namespace absolute paths for the operator-state constructor.
-
-    Persisted run ledgers deliberately expose only portable paths, retaining the
-    exact local values under ``*_abs_debug``.  An artifact base outside the repo
-    cannot resolve a bare portable filename from the process cwd, so build the
-    state from the already-persisted exact debug paths and let operator-state
-    fingerprinting immediately convert them back to namespace-relative paths.
-    """
-
-    rows = run_ledger.load_run_records(context.run_ledger_path, limit=20).rows
-    matching = [
-        dict(row)
-        for row in rows
-        if str(row.get("run_id") or "") == run_id
-        and str(row.get("profile") or "default") == context.profile
-        and str(row.get("artifact_namespace") or "") == context.artifact_namespace
-    ]
-    if len(matching) != 1:
-        raise MarketNoSendError("market generation has no unique persisted run-ledger authority")
-    exact = matching[0]
-    for key, value in tuple(exact.items()):
-        if key.endswith("_abs_debug") and value not in (None, "", [], {}):
-            exact[key[: -len("_abs_debug")]] = value
-    if exact.get("integrated_source_coverage_json_path_abs_debug"):
-        exact["source_coverage_json_path_rel"] = exact[
-            "integrated_source_coverage_json_path_abs_debug"
-        ]
-    if exact.get("source_coverage_path_abs_debug"):
-        exact["source_coverage_md_path_rel"] = exact[
-            "source_coverage_path_abs_debug"
-        ]
-    operator_state.begin_run(
-        context.namespace_dir,
-        exact,
-        run_ledger_path=context.run_ledger_path,
-        updated_at=datetime.now(timezone.utc),
-    )
-    _record_market_no_send_operator_provenance(
-        context,
-        run_id=run_id,
-        provenance=provenance,
-    )
-
-
-def _record_market_no_send_operator_provenance(
-    context: Any,
-    *,
-    run_id: str,
-    provenance: Mapping[str, Any],
-) -> None:
-    """Attach bounded generation provenance to the exact operator state."""
-
-    with operator_state._state_lock(context.namespace_dir):  # noqa: SLF001 - exact atomic state extension
-        loaded = operator_state.load_operator_state(context.namespace_dir)
-        state = dict(loaded.state or {}) if loaded.valid else {}
-        if not operator_state.state_matches_run(
-            state,
-            {"run_id": run_id, "profile": context.profile, "artifact_namespace": context.artifact_namespace},
-            profile=context.profile,
-            artifact_namespace=context.artifact_namespace,
-        ):
-            raise MarketNoSendError("market provenance has no matching operator generation")
-        state["market_no_send_provenance"] = dict(provenance)
-        state["revision"] = int(state.get("revision") or 0) + 1
-        state["updated_at"] = datetime.now(timezone.utc).isoformat()
-        state["doctor"] = {
-            "status": "not_run",
-            "run_id": run_id,
-            "authoritative": False,
-            "strict": False,
-            "schema_only": False,
-            "skip_api_checks": False,
-            "verified_at": None,
-            "verified_revision": None,
-            "blocker_count": 0,
-            "warning_count": 0,
-        }
-        operator_state.write_json_atomic(
-            operator_state.operator_state_path(context.namespace_dir),
-            state,
-        )
-
-
-def _attach_market_no_send_lineage(
-    namespace_dir: Path,
-    *,
-    normalized_rows: Iterable[Mapping[str, Any]],
-    provider: str,
-    data_mode: str,
-    request_cache_artifact: str,
-    request_ledger_artifact: str,
-    run_id: str,
-    provenance: Mapping[str, Any],
-) -> None:
-    by_coin = {
-        str(row.get("coin_id") or ""): dict(row)
-        for row in normalized_rows
-        if str(row.get("coin_id") or "")
-    }
-    snapshot_path = namespace_dir / market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME
-    anomaly_path = namespace_dir / market_anomaly_scanner.MARKET_ANOMALY_FILENAME
-    snapshot_rows = _read_jsonl(snapshot_path)
-    anomaly_rows = _read_jsonl(anomaly_path)
-    lineage = {
-        "candidate_provenance": "market_anomaly",
-        "provider": provider,
-        "source_provider": provider,
-        "latest_source": provider,
-        "source_class": "market_data",
-        "source_pack": "market_anomaly_pack",
-        "data_mode": data_mode,
-        "data_acquisition_mode": provenance.get("data_acquisition_mode"),
-        "candidate_source_mode": provenance.get("candidate_source_mode"),
-        "provider_request_succeeded": True,
-        "provider_source_artifact": request_cache_artifact,
-        "provider_source_artifact_sha256": provenance.get("provider_source_artifact_sha256"),
-        "request_ledger_path": request_ledger_artifact,
-        "request_ledger_sha256": provenance.get("request_ledger_sha256"),
-        "provenance_contract_valid": provenance.get("provenance_contract_valid") is True,
-        "measurement_program": provenance.get("measurement_program"),
-        "decision_radar_campaign_eligible": provenance.get("decision_radar_campaign_eligible") is True,
-        "decision_radar_campaign_counted": provenance.get("decision_radar_campaign_counted") is True,
-        "decision_radar_campaign_reason": provenance.get("decision_radar_campaign_reason"),
-        "burn_in_eligible": provenance.get("burn_in_eligible") is True,
-        "burn_in_counted": provenance.get("burn_in_counted") is True,
-        "contract_counted_candidate": provenance.get("decision_radar_campaign_counted") is True,
-        "burn_in_reason": provenance.get("burn_in_reason"),
-        "contract_counted_status": (
-            "counted" if provenance.get("decision_radar_campaign_counted") is True else "not_counted"
-        ),
-        "market_provenance": dict(provenance),
-        "no_send_status": "enforced",
-        "no_send": True,
-        "research_only": True,
-        **_SAFETY_COUNTERS,
-    }
-    for row in snapshot_rows:
-        source = by_coin.get(str(row.get("coin_id") or ""), {})
-        row.update(lineage)
-        for key in (
-            "liquidity_basis", "volume_zscore_basis", "spread_status",
-            "market_feature_basis", "market_data_quality",
-            "direct_market_feature_count", "proxy_market_feature_count",
-            "market_snapshot_id", "market_history_observation_id",
-        ):
-            if source.get(key) is not None:
-                row[key] = source[key]
-    for row in anomaly_rows:
-        source = by_coin.get(str(row.get("coin_id") or ""), {})
-        row.update(lineage)
-        row["provider_generation_id"] = run_id
-        snapshot = row.get("market_state_snapshot")
-        if isinstance(snapshot, Mapping):
-            attached = dict(snapshot)
-            attached.update(lineage)
-            for key in (
-                "liquidity_basis", "volume_zscore_basis", "spread_status",
-                "market_feature_basis", "market_data_quality",
-                "direct_market_feature_count", "proxy_market_feature_count",
-                "market_snapshot_id", "market_history_observation_id",
-            ):
-                if source.get(key) is not None:
-                    attached[key] = source[key]
-            row["market_state_snapshot"] = attached
-    _write_jsonl(snapshot_path, snapshot_rows)
-    _write_jsonl(anomaly_path, anomaly_rows)
-
-
-def _closed_market_provenance(
-    *,
-    data_mode: str,
-    provider: str,
-    observed_at: datetime,
-    run_id: str,
-    readiness: MarketNoSendReadiness,
-    source_artifact_sha256: str,
-    request_ledger_sha256: str,
-    feature_basis: Mapping[str, Any],
-    data_quality: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Return the exact, fail-closed market lineage shared by all surfaces."""
-
-    live = data_mode == "live"
-    raw = {
-        "schema_version": market_provenance.MARKET_PROVENANCE_SCHEMA_VERSION,
-        "contract_version": CONTRACT_VERSION,
-        "data_mode": data_mode,
-        "data_acquisition_mode": "live_provider" if live else "mocked_fixture",
-        "candidate_source_mode": "live_no_send" if live else "mocked_fixture",
-        "provider": provider,
-        "measurement_program": market_provenance.DECISION_RADAR_MEASUREMENT_PROGRAM,
-        "provider_generation_id": run_id,
-        "live_provider_authorized": readiness.live_provider_authorized,
-        "fixture_mode": readiness.fixture_mode,
-        "provider_call_attempted": True,
-        "provider_call_succeeded": True,
-        "provider_source_artifact": REQUEST_CACHE_FILENAME,
-        "provider_source_artifact_sha256": source_artifact_sha256,
-        "request_ledger_path": REQUEST_LEDGER_FILENAME,
-        "request_ledger_sha256": request_ledger_sha256,
-        "cache_status": "write_through",
-        "feature_basis": dict(feature_basis),
-        "data_quality": {
-            **dict(data_quality),
-            "observed_at": observed_at.isoformat(),
-            "no_send": True,
-            "research_only": True,
-        },
-    }
-    return market_provenance.normalize_market_provenance(raw)
-
-
-def _record_market_authority_artifacts(
-    context: Any,
-    *,
-    run_id: str,
-    request_path: Path,
-    request_ledger_path: Path,
-    manifest_path: Path,
-    candidates_path: Path,
-    outcomes_path: Path,
-) -> None:
-    """Bind every mutable pilot product input to exact operator authority."""
-
-    entries = (
-        ("market_no_send_source_cache", request_path, 1),
-        ("market_no_send_request_ledger", request_ledger_path, 1),
-        ("market_no_send_generation", manifest_path, 1),
-        ("integrated_candidates", candidates_path, len(_read_jsonl(candidates_path))),
-        ("integrated_outcomes", outcomes_path, len(_read_jsonl(outcomes_path))),
-    )
-    history_path = context.namespace_dir / HISTORY_FILENAME
-    materialized = list(entries)
-    if history_path.exists():
-        materialized.append(("market_history", history_path, len(_read_jsonl(history_path))))
-    provider_health_path = context.namespace_dir / market_no_send_provider.PROVIDER_HEALTH_FILENAME
-    if provider_health_path.exists():
-        materialized.append(("provider_health", provider_health_path, 1))
-    for name, path, count in materialized:
-        operator_state.record_artifact(
-            context.namespace_dir,
-            run_id=run_id,
-            profile=context.profile,
-            artifact_namespace=context.artifact_namespace,
-            name=name,
-            path=path,
-            count=count,
-        )
 
 
 def _base_manifest(

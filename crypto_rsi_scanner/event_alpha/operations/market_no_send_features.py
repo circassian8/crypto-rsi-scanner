@@ -264,7 +264,13 @@ def _normalization_audit(
 
 
 def market_quality_counts(path: str | Path) -> dict[str, Any]:
-    rows = read_jsonl(Path(path))
+    return market_quality_counts_from_rows(read_jsonl(Path(path)))
+
+
+def market_quality_counts_from_rows(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    rows = [dict(row) for row in rows if isinstance(row, Mapping)]
     direct = 0
     proxy = 0
     warm = 0

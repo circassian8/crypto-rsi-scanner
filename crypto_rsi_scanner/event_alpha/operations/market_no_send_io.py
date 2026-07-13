@@ -171,16 +171,31 @@ def read_regular_bytes(path: Path, *, missing_ok: bool = False) -> bytes | None:
             flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
             descriptor = os.open(leaf, flags, dir_fd=namespace_fd)
             opened = os.fstat(descriptor)
-            if not stat.S_ISREG(opened.st_mode) or not _same_identity(before, opened):
+            if not stat.S_ISREG(opened.st_mode) or not _same_file_snapshot(
+                before, opened
+            ):
                 raise OSError(
                     _IDENTITY_CHANGED_ERRNO,
                     "market provenance artifact changed during validation",
                 )
-            with os.fdopen(descriptor, "rb") as handle:
-                descriptor = None
+            handle = os.fdopen(descriptor, "rb")
+            descriptor = None
+            with handle:
                 data = handle.read()
+                read_complete = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(read_complete.st_mode)
+                or not _same_file_snapshot(opened, read_complete)
+                or len(data) != read_complete.st_size
+            ):
+                raise OSError(
+                    _IDENTITY_CHANGED_ERRNO,
+                    "market provenance artifact changed during read",
+                )
             after = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
-            if not stat.S_ISREG(after.st_mode) or not _same_identity(opened, after):
+            if not stat.S_ISREG(after.st_mode) or not _same_file_snapshot(
+                read_complete, after
+            ):
                 raise OSError(
                     _IDENTITY_CHANGED_ERRNO,
                     "market provenance artifact changed during read",
@@ -198,11 +213,36 @@ def read_regular_bytes(path: Path, *, missing_ok: bool = False) -> bytes | None:
             os.close(descriptor)
 
 
-def read_json_object(path: Path) -> dict[str, Any]:
+def remove_regular_artifact(path: Path, *, missing_ok: bool = False) -> None:
+    """Remove one namespace-local regular leaf through a verified directory fd."""
+
+    _require_descriptor_directory_support(mutation=True)
+    namespace_dir, leaf = _safe_leaf_name(path)
     try:
-        raw = read_regular_bytes(path)
-        if raw is None:
-            raise ValueError("missing market provenance artifact")
+        with _open_verified_namespace_dir(namespace_dir) as anchored:
+            base_fd, namespace_fd, namespace, namespace_identity = anchored
+            try:
+                before = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                if missing_ok:
+                    return
+                raise
+            if not stat.S_ISREG(before.st_mode):
+                raise MarketNoSendError("market artifact removal target is not regular")
+            _assert_namespace_identity(base_fd, namespace, namespace_identity)
+            os.unlink(leaf, dir_fd=namespace_fd)
+            _assert_namespace_identity(base_fd, namespace, namespace_identity)
+            os.fsync(namespace_fd)
+    except MarketNoSendError:
+        raise
+    except OSError as exc:
+        raise MarketNoSendError("market artifact removal failed") from exc
+
+
+def parse_json_object_bytes(raw: bytes) -> dict[str, Any]:
+    """Parse one exact JSON buffer while rejecting duplicate object keys."""
+
+    try:
         parsed = json.loads(raw, object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise MarketNoSendError("market provenance artifact is invalid JSON") from exc
@@ -211,18 +251,36 @@ def read_json_object(path: Path) -> dict[str, Any]:
     return dict(parsed)
 
 
+def parse_jsonl_bytes(raw: bytes) -> list[dict[str, Any]]:
+    """Parse one exact JSONL buffer with strict object and key validation."""
+
+    rows: list[dict[str, Any]] = []
+    try:
+        lines = raw.decode("utf-8").splitlines()
+        for line in lines:
+            if not line.strip():
+                continue
+            value = json.loads(line, object_pairs_hook=_unique_object)
+            if not isinstance(value, Mapping):
+                raise ValueError("JSONL row is not an object")
+            rows.append(dict(value))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise MarketNoSendError("market provenance artifact is invalid JSONL") from exc
+    return rows
+
+
+def read_json_object(path: Path) -> dict[str, Any]:
+    raw = read_regular_bytes(path)
+    if raw is None:
+        raise MarketNoSendError("market provenance artifact is missing")
+    return parse_json_object_bytes(raw)
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     raw = read_regular_bytes(path, missing_ok=True)
     if raw is None:
         return []
-    rows: list[dict[str, Any]] = []
-    for line in raw.decode("utf-8").splitlines():
-        if not line.strip():
-            continue
-        value = json.loads(line, object_pairs_hook=_unique_object)
-        if isinstance(value, Mapping):
-            rows.append(dict(value))
-    return rows
+    return parse_jsonl_bytes(raw)
 
 
 def _require_descriptor_directory_support(*, mutation: bool) -> None:
@@ -248,6 +306,15 @@ def _require_descriptor_directory_support(*, mutation: bool) -> None:
 
 def _same_identity(left: os.stat_result, right: os.stat_result) -> bool:
     return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
+def _same_file_snapshot(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        _same_identity(left, right)
+        and left.st_size == right.st_size
+        and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
+    )
 
 
 def _directory_open_flags() -> int:
@@ -346,9 +413,12 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 __all__ = [
     "ensure_safe_namespace_dir",
+    "parse_json_object_bytes",
+    "parse_jsonl_bytes",
     "read_json_object",
     "read_jsonl",
     "read_regular_bytes",
+    "remove_regular_artifact",
     "safe_existing_namespace_dir",
     "write_bytes_atomic",
     "write_json_atomic",

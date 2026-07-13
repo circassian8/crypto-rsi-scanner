@@ -19,6 +19,7 @@ from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.radar.market_reaction as event_market_reaction
 from ..artifacts import schema_v1
 from ...event_providers.manual_json import parse_datetime
+from . import market_anomaly_receipt
 
 
 SCHEDULED_CATALYSTS_FILENAME = "event_scheduled_catalysts.jsonl"
@@ -73,6 +74,8 @@ def run_scheduled_catalyst_scan(
     run_mode: str | None = None,
     run_id: str | None = None,
     observed_at: datetime | str | None = None,
+    calendar_provider_name: str = "coinmarketcal",
+    calendar_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> ScheduledCatalystScanResult:
     """Normalize configured scheduled catalyst fixtures and write artifacts."""
     directory = Path(namespace_dir).expanduser()
@@ -126,53 +129,64 @@ def run_scheduled_catalyst_scan(
             scheduled_rows.append(event)
             unlock_rows.append(_unlock_candidate_for_event(event, item))
 
+    calendar_provider = _provider_name(calendar_provider_name)
     calendar_path = provider_paths.get("coinmarketcal")
-    if calendar_path is None:
-        warnings.append("coinmarketcal:not_configured")
+    if calendar_rows is not None:
+        calendar_items = tuple(
+            dict(item) for item in calendar_rows if isinstance(item, Mapping)
+        )
+    elif calendar_path is None:
+        calendar_items = None
+        warnings.append(f"{calendar_provider}:not_configured")
     else:
         calendar_items = _load_calendar_items(calendar_path)
+    if calendar_items is not None:
         if not calendar_items:
-            warnings.append("coinmarketcal:no_fixture_rows")
-        for item in calendar_items:
-            event_type = _calendar_event_type(item)
-            event = normalize_scheduled_catalyst_event(
-                item,
-                provider="coinmarketcal",
-                observed_at=observed,
-                profile=profile,
-                artifact_namespace=artifact_namespace,
-                run_mode=run_mode,
-                run_id=run_id,
-                forced_event_type=event_type,
-                forced_source_class=str(item.get("source_class") or "structured_calendar"),
-            )
-            scheduled_rows.append(event)
-            if event_type == "token_unlock":
-                unlock_rows.append(_unlock_candidate_for_event(event, item))
+            warnings.append(f"{calendar_provider}:no_rows")
+        calendar_scheduled, calendar_unlocks = normalize_calendar_catalyst_rows(
+            calendar_items,
+            provider=calendar_provider,
+            observed_at=observed,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            run_mode=run_mode,
+            run_id=run_id,
+        )
+        scheduled_rows.extend(calendar_scheduled)
+        unlock_rows.extend(calendar_unlocks)
 
     scheduled_path = directory / SCHEDULED_CATALYSTS_FILENAME
     unlock_path = directory / UNLOCK_CANDIDATES_FILENAME
     scheduled_report_path = directory / SCHEDULED_CATALYST_REPORT_FILENAME
     unlock_report_path = directory / UNLOCK_RISK_REPORT_FILENAME
-    _write_jsonl(scheduled_path, scheduled_rows)
-    _write_jsonl(unlock_path, unlock_rows)
-    scheduled_report_path.write_text(
-        format_scheduled_catalyst_report(
-            scheduled_rows,
-            profile=profile,
-            artifact_namespace=artifact_namespace,
-            warnings=warnings,
-        ),
-        encoding="utf-8",
+    artifact_names = (
+        SCHEDULED_CATALYSTS_FILENAME,
+        UNLOCK_CANDIDATES_FILENAME,
+        SCHEDULED_CATALYST_REPORT_FILENAME,
+        UNLOCK_RISK_REPORT_FILENAME,
     )
-    unlock_report_path.write_text(
-        format_unlock_risk_report(
-            unlock_rows,
-            profile=profile,
-            artifact_namespace=artifact_namespace,
-            warnings=warnings,
-        ),
-        encoding="utf-8",
+    market_anomaly_receipt.write_artifacts_atomic(
+        directory,
+        payloads={
+            SCHEDULED_CATALYSTS_FILENAME: _jsonl_bytes(
+                scheduled_path,
+                scheduled_rows,
+            ),
+            UNLOCK_CANDIDATES_FILENAME: _jsonl_bytes(unlock_path, unlock_rows),
+            SCHEDULED_CATALYST_REPORT_FILENAME: format_scheduled_catalyst_report(
+                scheduled_rows,
+                profile=profile,
+                artifact_namespace=artifact_namespace,
+                warnings=warnings,
+            ).encode("utf-8"),
+            UNLOCK_RISK_REPORT_FILENAME: format_unlock_risk_report(
+                unlock_rows,
+                profile=profile,
+                artifact_namespace=artifact_namespace,
+                warnings=warnings,
+            ).encode("utf-8"),
+        },
+        expected_names=artifact_names,
     )
     return ScheduledCatalystScanResult(
         namespace_dir=directory,
@@ -186,6 +200,52 @@ def run_scheduled_catalyst_scan(
         unlock_candidates=tuple(unlock_rows),
         warnings=tuple(warnings),
     )
+
+
+def normalize_calendar_catalyst_rows(
+    calendar_rows: Iterable[Mapping[str, Any]],
+    *,
+    provider: str,
+    observed_at: datetime | str | None = None,
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+    run_mode: str | None = None,
+    run_id: str | None = None,
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+    """Purely derive scheduled and unlock rows from one calendar row stream."""
+
+    provider_name = _provider_name(provider)
+    scheduled_rows: list[dict[str, Any]] = []
+    unlock_rows: list[dict[str, Any]] = []
+    for raw_item in calendar_rows:
+        if not isinstance(raw_item, Mapping):
+            continue
+        item = dict(raw_item)
+        event_type = _calendar_event_type(item)
+        event = normalize_scheduled_catalyst_event(
+            item,
+            provider=provider_name,
+            observed_at=observed_at,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            run_mode=run_mode,
+            run_id=run_id,
+            forced_event_type=event_type,
+            forced_source_class=str(
+                item.get("source_class") or "structured_calendar"
+            ),
+        )
+        scheduled_rows.append(event)
+        if event_type == "token_unlock":
+            unlock_rows.append(_unlock_candidate_for_event(event, item))
+    return tuple(scheduled_rows), tuple(unlock_rows)
+
+
+def _provider_name(value: object) -> str:
+    text = str(value or "").strip().casefold().replace("-", "_")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_]{0,63}", text):
+        raise ValueError("calendar provider name is invalid")
+    return text
 
 
 def normalize_scheduled_catalyst_event(
@@ -600,12 +660,19 @@ def _load_rows(path: str | Path | None, filename: str, row_type: str) -> list[di
     return out
 
 
-def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
-        for row in rows:
-            stamped = schema_v1.stamp_artifact_row(row, path=path)
-            fh.write(json.dumps(_json_ready(stamped), sort_keys=True, separators=(",", ":"), default=str) + "\n")
+def _jsonl_bytes(path: Path, rows: Iterable[Mapping[str, Any]]) -> bytes:
+    lines = []
+    for row in rows:
+        stamped = schema_v1.stamp_artifact_row(row, path=path)
+        lines.append(
+            json.dumps(
+                _json_ready(stamped),
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+        )
+    return (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
 
 
 def _json_ready(value: Any) -> Any:

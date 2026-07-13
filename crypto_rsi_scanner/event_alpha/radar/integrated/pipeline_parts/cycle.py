@@ -5,8 +5,7 @@ from __future__ import annotations
 from ... import decision_model as event_radar_decision_model
 from ...decision_model_surfaces import decision_model_values
 from .runtime import *
-from .sidecars import _load_rsi_signal_context_rows
-
+from .sidecars import _loaded_sidecar_manifest_state, _load_rsi_signal_context_result, _market_anomaly_receipt_manifest_state, _rsi_sidecar_manifest_state
 
 @dataclass(frozen=True)
 class _IntegratedCycleStart:
@@ -16,14 +15,12 @@ class _IntegratedCycleStart:
     mode: str
     run_id: str
 
-
 @dataclass(frozen=True)
 class _IntegratedCycleInputs:
     sidecars: dict[str, tuple[dict[str, Any], ...]]
     input_manifest: tuple[dict[str, Any], ...]
     asset_registry: tuple[event_asset_registry.CanonicalAsset, ...]
     sidecar_resolution_rows: tuple[dict[str, Any], ...]
-
 
 @dataclass(frozen=True)
 class _IntegratedCandidateArtifacts:
@@ -37,7 +34,6 @@ class _IntegratedCandidateArtifacts:
     asset_resolution_report_path: Path
     targeted_market_refresh_result: Any | None
     calendar_normalization: event_unified_calendar.UnifiedCalendarNormalizationResult
-
 
 @dataclass(frozen=True)
 class _IntegratedOperatorArtifacts:
@@ -60,14 +56,12 @@ class _IntegratedOperatorArtifacts:
     unified_calendar_rows: tuple[dict[str, Any], ...]
     unified_calendar_normalization: Mapping[str, Any]
 
-
 @dataclass(frozen=True)
 class _IntegratedCalendarArtifacts:
     path: Path
     preview_path: Path
     rows: tuple[dict[str, Any], ...]
     normalization: Mapping[str, Any]
-
 
 @dataclass(frozen=True)
 class _IntegratedCoverageArtifacts:
@@ -77,7 +71,6 @@ class _IntegratedCoverageArtifacts:
     source_coverage_json_path: Path
     source_coverage_report: Any
 
-
 @dataclass(frozen=True)
 class _IntegratedPresentationArtifacts:
     delivery_path: Path
@@ -85,7 +78,6 @@ class _IntegratedPresentationArtifacts:
     daily_brief_path: Path
     preview_path: Path
     decision_v2_preview_path: Path
-
 
 def run_integrated_radar_cycle(
     *,
@@ -95,6 +87,8 @@ def run_integrated_radar_cycle(
     input_mode: str = INPUT_MODE_AUTO,
     coinalyze_namespace: str | None = None,
     targeted_market_provider: object | None = None,
+    calendar_source_rows: Iterable[Mapping[str, Any]] | None = None,
+    market_anomaly_scan_result: event_market_anomaly_scanner.MarketAnomalyScanResult | None = None,
 ) -> EventIntegratedRadarResult:
     """Run one integrated research-only radar cycle and write artifacts."""
     with event_alpha_locks.artifact_mutation_guard(
@@ -112,8 +106,17 @@ def run_integrated_radar_cycle(
             input_mode=input_mode,
             coinalyze_namespace=coinalyze_namespace,
             targeted_market_provider=targeted_market_provider,
+            market_anomaly_scan_result=market_anomaly_scan_result,
+            calendar_source_rows=(
+                None
+                if calendar_source_rows is None
+                else tuple(
+                    dict(row)
+                    for row in calendar_source_rows
+                    if isinstance(row, Mapping)
+                )
+            ),
         )
-
 
 def _run_integrated_radar_cycle_locked(
     *,
@@ -123,6 +126,8 @@ def _run_integrated_radar_cycle_locked(
     input_mode: str,
     coinalyze_namespace: str | None,
     targeted_market_provider: object | None,
+    market_anomaly_scan_result: event_market_anomaly_scanner.MarketAnomalyScanResult | None,
+    calendar_source_rows: tuple[dict[str, Any], ...] | None,
 ) -> EventIntegratedRadarResult:
     start = _integrated_cycle_start(
         context=context,
@@ -135,6 +140,8 @@ def _run_integrated_radar_cycle_locked(
         context=context,
         fixture=fixture,
         coinalyze_namespace=coinalyze_namespace,
+        market_anomaly_scan_result=market_anomaly_scan_result,
+        calendar_source_rows=calendar_source_rows,
     )
     candidate_artifacts = _write_integrated_candidate_artifacts(
         start,
@@ -142,6 +149,7 @@ def _run_integrated_radar_cycle_locked(
         context=context,
         fixture=fixture,
         targeted_market_provider=targeted_market_provider,
+        calendar_source_rows=calendar_source_rows,
     )
     operator_artifacts = _write_integrated_operator_artifacts(
         start,
@@ -172,7 +180,6 @@ def _run_integrated_radar_cycle_locked(
     )
     return result
 
-
 def _integrated_cycle_start(
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext,
@@ -196,13 +203,14 @@ def _integrated_cycle_start(
         run_id=event_alpha_run_ledger.run_id_for(research_observed_at, context.profile),
     )
 
-
 def _integrated_cycle_inputs(
     start: _IntegratedCycleStart,
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     fixture: bool,
     coinalyze_namespace: str | None,
+    market_anomaly_scan_result: event_market_anomaly_scanner.MarketAnomalyScanResult | None,
+    calendar_source_rows: tuple[dict[str, Any], ...] | None,
 ) -> _IntegratedCycleInputs:
     sidecars, input_manifest = _run_or_load_sidecars(
         namespace_dir=start.namespace_dir,
@@ -214,6 +222,8 @@ def _integrated_cycle_inputs(
         run_id=start.run_id,
         input_mode=start.mode,
         coinalyze_namespace=coinalyze_namespace,
+        calendar_source_injected=calendar_source_rows is not None,
+        market_anomaly_scan_result=market_anomaly_scan_result,
     )
     asset_registry = _build_integrated_asset_registry(sidecars)
     sidecars, sidecar_resolution_rows = event_instrument_resolver.resolve_sidecar_mapping(
@@ -228,7 +238,6 @@ def _integrated_cycle_inputs(
         sidecar_resolution_rows=sidecar_resolution_rows,
     )
 
-
 def _write_integrated_candidate_artifacts(
     start: _IntegratedCycleStart,
     inputs: _IntegratedCycleInputs,
@@ -236,6 +245,7 @@ def _write_integrated_candidate_artifacts(
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     fixture: bool,
     targeted_market_provider: object | None,
+    calendar_source_rows: tuple[dict[str, Any], ...] | None,
 ) -> _IntegratedCandidateArtifacts:
     manifest_path = start.namespace_dir / INPUT_MANIFEST_FILENAME
     _write_json(manifest_path, _input_manifest_document(
@@ -306,10 +316,8 @@ def _write_integrated_candidate_artifacts(
         generated_at=start.research_observed_at,
     )
     calendar_context = _integrated_unified_calendar_normalization(
-        start,
-        inputs,
-        context=context,
-        fixture=fixture,
+        start, inputs, context=context, fixture=fixture,
+        calendar_source_rows=calendar_source_rows,
     )
     candidates = event_unified_calendar.overlay_calendar_context_rows(
         candidates,
@@ -363,10 +371,9 @@ def _write_integrated_candidate_artifacts(
         run_id=start.run_id,
     )
     report_path = start.namespace_dir / INTEGRATED_REPORT_FILENAME
-    report_path.write_text(
-        format_integrated_radar_report(candidates, context=context, input_manifest=inputs.input_manifest),
-        encoding="utf-8",
-    )
+    report_path.write_text(format_integrated_radar_report(
+        candidates, context=context, input_manifest=inputs.input_manifest,
+    ), encoding="utf-8")
     return _IntegratedCandidateArtifacts(
         candidates=candidates,
         resolution_rows=resolution_rows,
@@ -379,7 +386,6 @@ def _write_integrated_candidate_artifacts(
         targeted_market_refresh_result=refresh_result,
         calendar_normalization=calendar_context,
     )
-
 
 def _write_integrated_operator_artifacts(
     start: _IntegratedCycleStart,
@@ -443,7 +449,6 @@ def _write_integrated_operator_artifacts(
         unified_calendar_normalization=calendar.normalization,
     )
 
-
 def _write_integrated_core_store(
     start: _IntegratedCycleStart,
     candidates: tuple[dict[str, Any], ...],
@@ -468,7 +473,6 @@ def _write_integrated_core_store(
     )
     return core_result, core_read
 
-
 def _write_integrated_calendar_artifacts(
     start: _IntegratedCycleStart,
     normalization: event_unified_calendar.UnifiedCalendarNormalizationResult,
@@ -489,7 +493,6 @@ def _write_integrated_calendar_artifacts(
         rows=rows,
         normalization=normalization.telemetry.to_dict(),
     )
-
 
 def _write_integrated_research_cards(
     start: _IntegratedCycleStart,
@@ -522,7 +525,6 @@ def _write_integrated_research_cards(
         include_api=True,
     )
     return card_result, core_read
-
 
 def _write_integrated_coverage_artifacts(
     start: _IntegratedCycleStart,
@@ -667,8 +669,13 @@ def _integrated_unified_calendar_normalization(
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     fixture: bool,
+    calendar_source_rows: tuple[dict[str, Any], ...] | None = None,
 ) -> event_unified_calendar.UnifiedCalendarNormalizationResult:
-    source_rows: list[Any] = list(inputs.sidecars.get("scheduled_catalyst", ()))
+    source_rows: list[Any] = list(
+        inputs.sidecars.get("scheduled_catalyst", ())
+        if calendar_source_rows is None
+        else calendar_source_rows
+    )
     if fixture and config.EVENT_ALPHA_UNIFIED_CALENDAR_FIXTURE_PATH.exists():
         source_rows.extend(
             event_unified_calendar.load_unified_calendar_fixture_raw_rows(
@@ -1059,7 +1066,15 @@ def _run_or_load_sidecars(
     run_id: str,
     input_mode: str,
     coinalyze_namespace: str | None,
+    calendar_source_injected: bool = False,
+    market_anomaly_scan_result: event_market_anomaly_scanner.MarketAnomalyScanResult | None = None,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], tuple[dict[str, Any], ...]]:
+    if market_anomaly_scan_result is not None and (fixture or input_mode == INPUT_MODE_RUN_SIDECARS):
+        raise RuntimeError("market_anomaly_completion_receipt_invalid:input_mode")
+    rsi_path = config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
+    rsi_rows, rsi_valid = _load_rsi_signal_context_result(rsi_path)
+    rsi_mode, rsi_configured, rsi_warnings = _rsi_sidecar_manifest_state(
+        rsi_rows, path=rsi_path, parse_valid=rsi_valid)
     if fixture:
         rows = _run_fixture_sidecars(
             namespace_dir=namespace_dir,
@@ -1069,23 +1084,18 @@ def _run_or_load_sidecars(
             run_mode=run_mode,
             run_id=run_id,
         )
-        rows["rsi_signal_context"] = _load_rsi_signal_context_rows(
-            config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
-        )
+        rows["rsi_signal_context"] = rsi_rows
         manifest = tuple(
             _manifest_item(
                 sidecar_name=name,
-                mode=(
-                    "loaded_local_read_only" if value else "skipped_missing_config"
-                ) if name == "rsi_signal_context" else "ran_fixture",
+                mode=rsi_mode if name == "rsi_signal_context" else "ran_fixture",
                 namespace_dir=namespace_dir,
                 rows=value,
-                configured=(
-                    config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH is not None
-                ) if name == "rsi_signal_context" else True,
+                configured=rsi_configured if name == "rsi_signal_context" else True,
                 sidecar_research_observed_at=observed_at,
                 wall_started_at=datetime.now(timezone.utc),
                 wall_finished_at=datetime.now(timezone.utc),
+                warnings=rsi_warnings if name == "rsi_signal_context" else (),
             )
             for name, value in rows.items()
         )
@@ -1106,27 +1116,19 @@ def _run_or_load_sidecars(
             "dex_pool_state": (),
             "dex_pool_anomaly": (),
             "protocol_fundamentals": (),
-            "rsi_signal_context": _load_rsi_signal_context_rows(
-                config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
-            ),
+            "rsi_signal_context": rsi_rows,
         }
         manifest = tuple(
             _manifest_item(
                 sidecar_name=name,
-                mode=(
-                    "loaded_local_read_only" if value else "skipped_missing_config"
-                ) if name == "rsi_signal_context" else "skipped_provider_unavailable",
+                mode=rsi_mode if name == "rsi_signal_context" else "skipped_provider_unavailable",
                 namespace_dir=namespace_dir,
                 rows=value,
-                configured=(
-                    config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH is not None
-                ) if name == "rsi_signal_context" else False,
+                configured=rsi_configured if name == "rsi_signal_context" else False,
                 sidecar_research_observed_at=observed_at,
                 wall_started_at=datetime.now(timezone.utc),
                 wall_finished_at=datetime.now(timezone.utc),
-                warnings=(
-                    () if value else ("local RSI signal context path missing or unreadable",)
-                ) if name == "rsi_signal_context" else (
+                warnings=rsi_warnings if name == "rsi_signal_context" else (
                     "configured sidecar execution is not enabled in this research-only integrated path",
                 ),
             )
@@ -1139,8 +1141,6 @@ def _run_or_load_sidecars(
             coinalyze_namespace=coinalyze_namespace,
             observed_at=observed_at,
         )
-    derivatives_rows = tuple(event_derivatives_crowding.load_derivatives_candidates(namespace_dir))
-    derivatives_mode, derivatives_configured, derivatives_warnings = _derivatives_manifest_mode(namespace_dir, derivatives_rows)
     rows = {
         "market_anomaly": tuple(event_market_anomaly_scanner.load_market_anomaly_rows(namespace_dir)),
         "official_exchange": _official_exchange_integration_rows(
@@ -1149,34 +1149,46 @@ def _run_or_load_sidecars(
         ),
         "scheduled_catalyst": tuple(event_scheduled_catalysts.load_scheduled_catalysts(namespace_dir)),
         "unlock": tuple(event_scheduled_catalysts.load_unlock_candidates(namespace_dir)),
-        "derivatives": derivatives_rows,
+        "derivatives": tuple(event_derivatives_crowding.load_derivatives_candidates(namespace_dir)),
         "dex_pool_state": tuple(event_dex_onchain_readiness.load_dex_pool_state(namespace_dir)),
         "dex_pool_anomaly": tuple(event_dex_onchain_readiness.load_dex_pool_anomalies(namespace_dir)),
         "protocol_fundamentals": tuple(event_dex_onchain_readiness.load_protocol_fundamentals(namespace_dir)),
-        "rsi_signal_context": _load_rsi_signal_context_rows(
-            config.EVENT_ALPHA_RSI_SIGNAL_CONTEXT_PATH
-        ),
+        "rsi_signal_context": rsi_rows,
     }
-    manifest = tuple(
-        _manifest_item(
-            sidecar_name=name,
-            mode=derivatives_mode if name == "derivatives" else "loaded_existing" if value else "skipped_missing_config",
-            namespace_dir=namespace_dir,
-            rows=value,
-            configured=derivatives_configured if name == "derivatives" else bool(value),
-            sidecar_research_observed_at=observed_at,
-            wall_started_at=datetime.now(timezone.utc),
-            wall_finished_at=datetime.now(timezone.utc),
-            warnings=derivatives_warnings if name == "derivatives" else () if value else (f"{name} sidecar artifact missing or empty",),
+    manifest_rows: list[dict[str, Any]] = []
+    for name, value in rows.items():
+        if name == "market_anomaly" and market_anomaly_scan_result is not None:
+            mode, configured, warnings = _market_anomaly_receipt_manifest_state(
+                namespace_dir,
+                value,
+                receipt=market_anomaly_scan_result,
+                expected_namespace=artifact_namespace,
+                expected_run_id=run_id,
+            )
+        elif name == "scheduled_catalyst" and calendar_source_injected:
+            mode, configured, warnings = (
+                "loaded_existing" if value else "completed_empty", True, ())
+        else:
+            mode, configured, warnings = _loaded_sidecar_manifest_state(
+                namespace_dir, name, value, rsi_context_path=rsi_path,
+                rsi_context_valid=rsi_valid,
+            )
+        manifest_rows.append(
+            _manifest_item(
+                sidecar_name=name,
+                mode=mode,
+                namespace_dir=namespace_dir,
+                rows=value,
+                configured=configured,
+                sidecar_research_observed_at=observed_at,
+                wall_started_at=datetime.now(timezone.utc),
+                wall_finished_at=datetime.now(timezone.utc),
+                warnings=warnings,
+            )
         )
-        for name, value in rows.items()
-    )
     return _with_coinalyze_sidecar(
-        rows,
-        manifest,
-        namespace_dir=namespace_dir,
-        coinalyze_namespace=coinalyze_namespace,
-        observed_at=observed_at,
+        rows, tuple(manifest_rows), namespace_dir=namespace_dir,
+        coinalyze_namespace=coinalyze_namespace, observed_at=observed_at,
     )
 
 __all__ = (

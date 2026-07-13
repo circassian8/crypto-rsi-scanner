@@ -155,7 +155,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   radar-dashboard-smoke` renders all fixture pages without starting a server,
   calling providers, sending, or writing artifacts. The loopback WSGI serving
   layer handles clients concurrently so one incomplete local connection cannot
-  block every later GET/HEAD request.
+  block every later GET/HEAD request. A trusted zero-idea generation still
+  renders its exact market-observation scan and per-source coverage state;
+  healthy-empty, unconfigured, and degraded layers are never collapsed into the
+  same empty message. Shared campaign outcomes are labeled historical and
+  non-authoritative rather than mixed into the current namespace's counts. One
+  descriptor-anchored namespace is held for the complete load, manifest counts
+  are reconciled to the exact snapshot/anomaly rows, and raw anomaly scan
+  evidence remains visibly separate from canonical Decision candidates.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,
@@ -178,6 +185,26 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   the live target also refreshes it after every success or failure. Decision
   campaign generations, candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
+  An optional current calendar snapshot is accepted only through the explicit
+  `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` environment setting. Readiness
+  inspects it without network or writes; live generations reject fixture/test/
+  mock/replay provenance and require the versioned current-source container.
+  Container provenance plus event-row `provider`, `source`, and `source_class`
+  (including nested provenance) are checked. Only the closed, secret-safe
+  allowlisted source-row projection is copied into the exact
+  namespace and bound into operator authority; arbitrary provider payload keys
+  are never exported. Publication recomputes scheduled, unlock, and unified
+  calendar rows from the same read-once hashed buffers, so rewritten artifact
+  digests, duplicate keys, or split reads cannot conceal semantic drift. The
+  scheduled/unlock JSONL and reports are written as one descriptor-anchored
+  no-follow bundle. Absence remains visibly `not_configured`; the
+  application never guesses a file, enables a provider, or falls back to a
+  fixture for a live generation.
+  A same-cycle market-anomaly scan may report healthy-empty only through its
+  exact completion receipt with matching run/namespace device and inode, paths,
+  content hashes, row semantics/lineage, and snapshot/anomaly/queue counts. Its
+  four outputs are likewise one anchored atomic bundle. Generic empty sidecar
+  files remain unavailable.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.
   Integrated cycles normalize raw scheduled/fixture rows exactly once and bind

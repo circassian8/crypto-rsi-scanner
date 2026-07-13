@@ -2,15 +2,28 @@
 
 from __future__ import annotations
 
+import os
+
 from .runtime import *
+from ... import market_anomaly_receipt as event_market_anomaly_receipt
 
 
 def _load_rsi_signal_context_rows(path: Path | None) -> tuple[dict[str, Any], ...]:
     """Read an explicitly configured local RSI export without touching SQLite."""
 
+    return _load_rsi_signal_context_result(path)[0]
+
+
+def _load_rsi_signal_context_result(
+    path: Path | None,
+) -> tuple[tuple[dict[str, Any], ...], bool]:
+    """Return rows plus explicit parse success for truthful empty-state coverage."""
+
     if path is None:
-        return ()
+        return (), False
     target = Path(path).expanduser()
+    if target.is_symlink() or not target.is_file():
+        return (), False
     try:
         if target.suffix.casefold() == ".jsonl":
             rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -29,12 +42,15 @@ def _load_rsi_signal_context_rows(path: Path | None) -> tuple[dict[str, Any], ..
             else:
                 rows = payload
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return ()
-    if not isinstance(rows, list):
-        return ()
-    return tuple(dict(row) for row in rows[:500] if isinstance(row, Mapping))
+        return (), False
+    if not isinstance(rows, list) or any(not isinstance(row, Mapping) for row in rows):
+        return (), False
+    return tuple(dict(row) for row in rows[:500]), True
 
-def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict[str, Any], ...]) -> tuple[str, bool, tuple[str, ...]]:
+def _derivatives_manifest_mode(
+    namespace_dir: Path,
+    derivatives_rows: tuple[dict[str, Any], ...],
+) -> tuple[str, bool, tuple[str, ...]]:
     from ....providers import coinalyze_preflight as event_coinalyze_preflight
 
     rehearsal_path = namespace_dir / event_coinalyze_preflight.REHEARSAL_JSON
@@ -55,6 +71,280 @@ def _derivatives_manifest_mode(namespace_dir: Path, derivatives_rows: tuple[dict
     if state_path.exists():
         return "loaded_existing", True, (f"coinalyze rehearsal status={status}",)
     return "skipped_missing_config", False, (f"coinalyze rehearsal status={status} without derivatives state",)
+
+
+def _existing_sidecar_manifest_state(
+    namespace_dir: Path,
+    sidecar_name: str,
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[str, bool, tuple[str, ...]]:
+    """Distinguish a successful zero-row sidecar from an absent sidecar.
+
+    A complete regular artifact set proves only that files exist. Empty files
+    remain unverified/unavailable unless a producer completion receipt is
+    explicitly reconciled by the caller.
+    """
+
+    materialized = tuple(row for row in rows if isinstance(row, Mapping))
+    if materialized:
+        return "loaded_existing", True, ()
+    artifact_paths = _sidecar_artifact_paths(namespace_dir, sidecar_name)
+    complete = bool(
+        artifact_paths
+        and all(path.is_file() and not path.is_symlink() for path in artifact_paths)
+    )
+    if complete:
+        return (
+            "loaded_existing_empty_unverified",
+            True,
+            (f"{sidecar_name} empty artifacts lack a producer completion receipt",),
+        )
+    return (
+        "skipped_missing_config",
+        False,
+        (f"{sidecar_name} sidecar artifact missing",),
+    )
+
+
+def _market_anomaly_receipt_manifest_state(
+    namespace_dir: Path,
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    receipt: Any,
+    expected_namespace: str,
+    expected_run_id: str,
+) -> tuple[str, bool, tuple[str, ...]]:
+    """Reconcile one same-cycle scanner completion receipt, or fail closed."""
+
+    if not isinstance(receipt, event_market_anomaly_scanner.MarketAnomalyScanResult):
+        _raise_market_anomaly_receipt_error("type")
+    expected_dir = _absolute_path(namespace_dir)
+    if any(
+        (
+            _absolute_path(receipt.namespace_dir) != expected_dir,
+            receipt.artifact_namespace != expected_namespace,
+            receipt.run_id != expected_run_id,
+        )
+    ):
+        _raise_market_anomaly_receipt_error("identity")
+    namespace_identity = _receipt_namespace_identity(receipt)
+    materialized_rows = tuple(
+        dict(row) for row in rows if isinstance(row, Mapping)
+    )
+    counts = {
+        "snapshot": _receipt_count(receipt.snapshot_count, field="snapshot_count"),
+        "anomaly": _receipt_count(receipt.anomaly_count, field="anomaly_count"),
+        "queue": _receipt_count(
+            receipt.catalyst_search_queue_count,
+            field="catalyst_search_queue_count",
+        ),
+    }
+    if any(
+        (
+            counts["anomaly"] > counts["snapshot"],
+            counts["queue"] > counts["anomaly"],
+            len(receipt.anomalies) != counts["anomaly"],
+            len(receipt.catalyst_search_queue) != counts["queue"],
+            len(materialized_rows) != counts["anomaly"],
+        )
+    ):
+        _raise_market_anomaly_receipt_error("count")
+    artifacts = (
+        (
+            receipt.snapshots_path,
+            event_market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME,
+            "event_market_state_snapshot",
+            counts["snapshot"],
+            _receipt_sha256(receipt.snapshots_sha256, field="snapshots_sha256"),
+        ),
+        (
+            receipt.anomalies_path,
+            event_market_anomaly_scanner.MARKET_ANOMALY_FILENAME,
+            "event_market_anomaly",
+            counts["anomaly"],
+            _receipt_sha256(receipt.anomalies_sha256, field="anomalies_sha256"),
+        ),
+        (
+            receipt.catalyst_search_queue_path,
+            event_market_anomaly_scanner.MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME,
+            "event_market_anomaly_catalyst_search_queue",
+            counts["queue"],
+            _receipt_sha256(
+                receipt.catalyst_search_queue_sha256,
+                field="catalyst_search_queue_sha256",
+            ),
+        ),
+    )
+    report_path = Path(receipt.report_path).expanduser()
+    if _absolute_path(report_path) != _absolute_path(
+        namespace_dir / event_market_anomaly_scanner.MARKET_ANOMALY_REPORT_FILENAME
+    ):
+        _raise_market_anomaly_receipt_error("path")
+    paths = tuple(Path(item[0]).expanduser() for item in artifacts) + (report_path,)
+    filenames = tuple(item[1] for item in artifacts) + (
+        event_market_anomaly_scanner.MARKET_ANOMALY_REPORT_FILENAME,
+    )
+    for path, filename in zip(paths, filenames, strict=True):
+        if _absolute_path(path) != _absolute_path(namespace_dir / filename):
+            _raise_market_anomaly_receipt_error("path")
+    payloads = event_market_anomaly_receipt.artifact_payloads(
+        namespace_dir,
+        namespace_identity=namespace_identity,
+        paths=paths,
+        expected_names=filenames,
+    )
+    parsed_artifacts: dict[str, tuple[dict[str, Any], ...]] = {}
+    for _path, filename, row_type, expected_count, expected_digest in artifacts:
+        payload = payloads[filename]
+        if event_market_anomaly_receipt.sha256(payload) != expected_digest:
+            _raise_market_anomaly_receipt_error("artifact_digest")
+        artifact_rows = event_market_anomaly_receipt.strict_jsonl(
+            payload,
+            row_type=row_type,
+        )
+        if len(artifact_rows) != expected_count:
+            _raise_market_anomaly_receipt_error("count")
+        if any(
+            row.get("row_type") != row_type
+            or row.get("run_id") != expected_run_id
+            or row.get("artifact_namespace") != expected_namespace
+            for row in artifact_rows
+        ):
+            _raise_market_anomaly_receipt_error("row_identity")
+        parsed_artifacts[filename] = artifact_rows
+    if event_market_anomaly_receipt.sha256(
+        payloads[event_market_anomaly_scanner.MARKET_ANOMALY_REPORT_FILENAME]
+    ) != _receipt_sha256(receipt.report_sha256, field="report_sha256"):
+        _raise_market_anomaly_receipt_error("artifact_digest")
+    if any(
+        (
+            materialized_rows != receipt.anomalies,
+            parsed_artifacts[event_market_anomaly_scanner.MARKET_ANOMALY_FILENAME]
+            != receipt.anomalies,
+            parsed_artifacts[
+                event_market_anomaly_scanner.MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME
+            ]
+            != receipt.catalyst_search_queue,
+        )
+    ):
+        _raise_market_anomaly_receipt_error("artifact_semantics")
+    return (
+        "loaded_existing" if counts["anomaly"] else "completed_empty",
+        True,
+        (),
+    )
+
+
+def _receipt_namespace_identity(receipt: Any) -> tuple[int, int]:
+    device = receipt.namespace_device
+    inode = receipt.namespace_inode
+    if any(
+        isinstance(value, bool) or not isinstance(value, int)
+        for value in (device, inode)
+    ) or device < 0 or inode <= 0:
+        _raise_market_anomaly_receipt_error("namespace_identity")
+    return device, inode
+
+
+def _receipt_sha256(value: Any, *, field: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        _raise_market_anomaly_receipt_error(field)
+    return value
+
+
+def _absolute_path(value: Any) -> Path:
+    try:
+        return Path(os.path.abspath(os.fspath(Path(value).expanduser())))
+    except (TypeError, ValueError, OSError):
+        _raise_market_anomaly_receipt_error("path")
+
+
+def _receipt_count(value: Any, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        _raise_market_anomaly_receipt_error(field)
+    return value
+
+
+def _raise_market_anomaly_receipt_error(reason: str) -> None:
+    raise RuntimeError(f"market_anomaly_completion_receipt_invalid:{reason}")
+
+
+def _sidecar_coverage_state(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    mode: str,
+    configured: bool,
+) -> tuple[str, bool]:
+    """Classify coverage without treating an unverified empty file as success."""
+
+    healthy_empty = not rows and mode in {
+        "loaded_existing_empty",
+        "loaded_local_read_only_empty",
+        "completed_empty",
+        "ran_fixture",
+        "ran_fixture_empty",
+    }
+    if rows:
+        return "healthy_nonempty", False
+    if healthy_empty:
+        return "healthy_empty", True
+    if not configured or mode == "skipped_missing_config":
+        return "not_configured", False
+    return "unavailable", False
+
+
+def _loaded_sidecar_manifest_state(
+    namespace_dir: Path,
+    sidecar_name: str,
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    rsi_context_path: Path | None,
+    rsi_context_valid: bool,
+) -> tuple[str, bool, tuple[str, ...]]:
+    """Return truthful coverage state for one load-existing sidecar."""
+
+    materialized = tuple(row for row in rows if isinstance(row, Mapping))
+    if sidecar_name == "derivatives":
+        return _derivatives_manifest_mode(namespace_dir, materialized)
+    if sidecar_name != "rsi_signal_context":
+        return _existing_sidecar_manifest_state(
+            namespace_dir,
+            sidecar_name,
+            materialized,
+        )
+    return _rsi_sidecar_manifest_state(
+        materialized,
+        path=rsi_context_path,
+        parse_valid=rsi_context_valid,
+    )
+
+
+def _rsi_sidecar_manifest_state(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    path: Path | None,
+    parse_valid: bool,
+) -> tuple[str, bool, tuple[str, ...]]:
+    """Distinguish a valid empty RSI export from missing or corrupt input."""
+
+    materialized = tuple(row for row in rows if isinstance(row, Mapping))
+    configured = path is not None
+    empty_loaded = configured and parse_valid
+    mode = (
+        "loaded_local_read_only"
+        if materialized
+        else "loaded_local_read_only_empty"
+        if empty_loaded
+        else "local_read_error"
+        if configured
+        else "skipped_missing_config"
+    )
+    warnings = (
+        ()
+        if materialized or empty_loaded
+        else ("local RSI signal context path missing or unreadable",)
+    )
+    return mode, configured, warnings
 
 def _with_coinalyze_sidecar(
     rows: Mapping[str, tuple[dict[str, Any], ...]],
@@ -623,7 +913,11 @@ def _clear_namespace(namespace_dir: Path) -> None:
 
 def _sidecar_artifact_paths(namespace_dir: Path, sidecar_name: str) -> tuple[Path, ...]:
     mapping = {
-        "market_anomaly": ("event_market_state_snapshots.jsonl", "event_market_anomalies.jsonl"),
+        "market_anomaly": (
+            event_market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME,
+            event_market_anomaly_scanner.MARKET_ANOMALY_FILENAME,
+            event_market_anomaly_scanner.MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME,
+        ),
         "official_exchange": ("event_official_exchange_events.jsonl", "event_official_listing_candidates.jsonl"),
         "scheduled_catalyst": ("event_scheduled_catalysts.jsonl",),
         "unlock": ("event_unlock_candidates.jsonl",),
@@ -717,6 +1011,12 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 __all__ = (
     '_derivatives_manifest_mode',
+    '_existing_sidecar_manifest_state',
+    '_market_anomaly_receipt_manifest_state',
+    '_sidecar_coverage_state',
+    '_loaded_sidecar_manifest_state',
+    '_load_rsi_signal_context_result',
+    '_rsi_sidecar_manifest_state',
     '_with_coinalyze_sidecar',
     '_load_external_coinalyze_artifacts',
     '_select_coinalyze_namespace',

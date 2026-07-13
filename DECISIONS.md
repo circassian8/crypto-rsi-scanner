@@ -16,6 +16,63 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-14 - Distinguish an empty decision set from missing product coverage
+**Status:** accepted
+**Decision:** A trusted zero-idea Decision Radar generation must still expose
+the exact fingerprint-bound market observations and anomaly rows it evaluated.
+Every supporting layer must distinguish healthy non-empty, healthy empty,
+unconfigured, degraded/unavailable, and normalization-rejected states; strict
+doctor coherence alone does not imply that every product source was covered.
+Dashboard current counts remain namespace-local, while the shared Decision
+campaign outcome ledger is shown separately as cumulative historical evidence.
+An empty artifact without an exact producer completion contract, lineage,
+counts, and digests is unavailable—not healthy empty. In particular, empty
+unlock or derivatives outputs cannot imply that their providers were observed.
+A same-cycle anomaly scanner completion receipt must bind the exact run,
+namespace device/inode, paths, content hashes, row semantics/lineage, and
+snapshot/anomaly/search-queue counts before a zero-anomaly result becomes
+healthy empty; a generic empty anomaly file remains unavailable. All scanner
+outputs must be preflighted and written through one held descriptor-anchored
+bundle so leaf or namespace replacement cannot split or redirect the generation.
+
+The dashboard holds one descriptor-anchored namespace for its entire load and
+fails closed if the configured namespace is replaced. Operator semantic counts
+must match exact snapshot and anomaly artifacts, not only their byte digests.
+Raw anomaly scanner outputs are rendered as observed scan evidence, separately
+from canonical Decision candidates; they are never assigned an invented route
+or made actionable by the dashboard.
+
+Live/no-send calendar input is allowed only through the already-configured
+`RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH`. Readiness performs a bounded,
+descriptor-anchored, no-network/no-write inspection. Live generations reject
+fixture, test, mock, and replay provenance; copy and fingerprint accepted source rows in
+the exact namespace only after projecting them into a closed, allowlisted,
+secret-safe source-row shape; preserve supported unified-calendar values; and adapt a
+separate scheduled-catalyst view without loss. Publication must recompute and
+exactly compare scheduled, unlock, and unified rows from that accepted copy;
+counts and rewritten digests alone are not semantic authority. Live input
+requires a versioned container with explicit observed time and current-source/
+acquisition provenance. Unknown provider payload fields do not enter artifacts,
+and secret-like keys or credential-bearing URLs fail closed. Missing or rejected
+calendar input remains explicit coverage telemetry and never triggers a guessed
+path, fixture fallback, provider call, authorization change, or fabricated event.
+Container and nested provenance plus row-level `provider`, `source`, and
+`source_class` must also be non-fixture/test/mock/replay, and any supplied
+`research_only`, `no_send`, or `no_send_rehearsal` value must be exactly true.
+Publication hashes and parses one unchanged buffer per calendar artifact,
+rejects duplicate keys and in-place mutation, and writes the complete scheduled/
+unlock JSONL-plus-report set through one held no-follow namespace bundle.
+Market-quality audit counts likewise use the complete exact snapshot universe,
+not only promoted candidates.
+**Why:** The first clean real zero-idea authority was internally coherent but
+looked broken because thirty evaluated market rows, source-pack status, and one
+historical campaign outcome were hidden, while an unconfigured calendar looked
+like a genuinely quiet one. The closed layer contract makes sparse evidence
+useful without weakening freshness, provenance, publication, or safety gates.
+**Revisit when:** A versioned, explicitly authorized calendar provider replaces
+the local snapshot boundary with equal or stronger no-send, provenance,
+freshness, identity, normalization, fingerprint, and coverage guarantees.
+
 ## 2026-07-13 - Measure live market evidence in a separate Decision Radar campaign
 **Status:** accepted
 **Decision:** `decision_radar_live_observation_campaign_v2` is the sole

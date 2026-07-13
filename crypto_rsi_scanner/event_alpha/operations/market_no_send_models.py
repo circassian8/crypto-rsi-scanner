@@ -86,6 +86,10 @@ class MarketNoSendReadiness:
     cache_status: str = "missing"
     cache_error: str | None = None
     spread_data_status: str = "not_evaluated"
+    calendar_snapshot_status: str = "not_configured"
+    calendar_snapshot_configured: bool = False
+    calendar_snapshot_retained_rows: int = 0
+    calendar_snapshot_source_mode: str = "not_configured"
     market_feature_policy: str = "temporal_when_warm; provider_price_volume_market_cap; explicit_proxies_otherwise"
     measurement_program: str = "decision_radar_live_observation_campaign_v2"
     decision_radar_campaign_eligible: bool = False

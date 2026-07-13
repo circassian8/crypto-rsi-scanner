@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -20,6 +22,7 @@ from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
 from crypto_rsi_scanner.event_alpha.dashboard.loader import load_dashboard_snapshot
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 from crypto_rsi_scanner.event_alpha.operations import market_no_send
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_calendar
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_cli
@@ -34,6 +37,7 @@ def _clear_context_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
         "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
         "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
         "RSI_EVENT_ALPHA_RUN_MODE",
+        market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV,
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -430,6 +434,124 @@ def test_mocked_fresh_market_data_builds_market_led_ideas_and_blocks_low_liquidi
     assert audit["provider_adapter_invoked"] is True
     assert audit["network_call_attempted"] is False
     assert audit["baseline"]["baseline_observations_per_asset"]
+    assert audit["market_observation_quality_scope"] == (
+        "exact_generation_market_state_snapshots"
+    )
+    assert audit["market_observation_quality"] == audit["idea_quality"]
+    assert audit["market_observation_quality_source_artifact"] == (
+        "event_market_state_snapshots.jsonl"
+    )
+
+
+def test_mock_market_generation_preserves_explicit_calendar_snapshot_end_to_end(
+    tmp_path,
+    monkeypatch,
+):
+    _clear_context_overrides(monkeypatch)
+    calendar_path = tmp_path / "calendar-current.json"
+    calendar_path.write_text(
+        json.dumps(
+            {
+                "contract_version": 1,
+                "observed_at": _OBSERVED,
+                "source_mode": "operator_verified_calendar_snapshot",
+                "data_acquisition_mode": "operator_verified_export",
+                "source_provider": "operator_calendar",
+                "events": [
+                    {
+                        "id": "macro-release-1",
+                        "title": "Macro liquidity release",
+                        "event_kind": "macro",
+                        "scheduled_at": "2026-07-20T12:00:00Z",
+                        "time_certainty": "exact",
+                        "importance": "critical",
+                        "affected_assets": ["MKTFLOW"],
+                        "source": "operator_calendar",
+                        "source_url": "https://example.com/calendar/macro-release-1",
+                        "timezone": "UTC",
+                        "forecast": 2.5,
+                        "previous": 2.2,
+                        "impact_window_before": "24h",
+                        "impact_window_after": "4h",
+                        "research_only": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace="market_calendar_mock",
+        profile="fixture",
+        run_mode="fixture",
+        top_n=5,
+        provider=lambda _limit: market_no_send._smoke_rows(),
+        observed_at=_OBSERVED,
+        environ={market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV: str(calendar_path)},
+        fixture_dir=None,
+        data_mode="mock",
+        allow_non_live=True,
+    )
+
+    assert result.complete is True
+    namespace_dir = tmp_path / "market_calendar_mock"
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    calendar_status = manifest["calendar_snapshot"]
+    assert calendar_status["status"] == "healthy_nonempty"
+    assert calendar_status["retained_row_count"] == 1
+    assert calendar_status["scheduled_catalyst_count"] == 1
+    assert calendar_status["scheduled_catalyst_artifact_sha256"]
+    assert calendar_status["unlock_candidate_count"] == 0
+    assert calendar_status["unlock_source_status"] == "not_configured"
+    assert calendar_status["normalization_input_count"] == 1
+    assert calendar_status["normalization_valid_input_count"] == 1
+    assert calendar_status["normalization_rejected_count"] == 0
+    assert calendar_status["unified_calendar_artifact_row_count"] == 1
+    assert calendar_status["unified_calendar_artifact_sha256"]
+    assert calendar_status["copy_artifact_sha256"]
+    copied = json.loads(
+        (
+            namespace_dir / market_no_send_calendar.CALENDAR_SOURCE_COPY_FILENAME
+        ).read_text(encoding="utf-8")
+    )
+    assert copied["events"][0]["id"] == "macro-release-1"
+    assert copied["canonical_rows_sha256"] == calendar_status["canonical_rows_sha256"]
+    assert not (namespace_dir / "event_unlock_candidates.jsonl").exists()
+    assert not (namespace_dir / "event_unlock_risk_report.md").exists()
+
+    calendar_rows = _jsonl(namespace_dir / "event_unified_calendar_events.jsonl")
+    assert len(calendar_rows) == 1
+    calendar_row = calendar_rows[0]
+    assert calendar_row["calendar_event_id"] == "macro-release-1"
+    assert calendar_row["time_certainty"] == "exact"
+    assert calendar_row["importance"] == "critical"
+    assert calendar_row["affected_assets"] == ["MKTFLOW"]
+    assert calendar_row["forecast_value"] == 2.5
+    assert calendar_row["previous_value"] == 2.2
+
+    input_manifest = json.loads(
+        (namespace_dir / "event_integrated_radar_input_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    scheduled = next(
+        row
+        for row in input_manifest["sidecars"]
+        if row["sidecar_name"] == "scheduled_catalyst"
+    )
+    assert scheduled["coverage_status"] == "healthy_nonempty"
+    assert scheduled["row_counts"] == {"rows": 1}
+    unlock = next(
+        row
+        for row in input_manifest["sidecars"]
+        if row["sidecar_name"] == "unlock"
+    )
+    assert unlock["coverage_status"] == "not_configured"
+    operator_state = json.loads(
+        (namespace_dir / "event_alpha_operator_state.json").read_text(encoding="utf-8")
+    )
+    assert operator_state["artifacts"]["market_no_send_calendar_source"]["status"] == "current"
 
 
 def test_provider_failure_is_fail_soft_and_preserves_dashboard_pointer(
@@ -535,6 +657,9 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     )
     snapshots = _jsonl(namespace_dir / "event_market_state_snapshots.jsonl")
     anomalies = _jsonl(namespace_dir / "event_market_anomalies.jsonl")
+    catalyst_queue = _jsonl(
+        namespace_dir / "event_market_anomaly_catalyst_search_queue.jsonl"
+    )
     candidates = _jsonl(namespace_dir / "event_integrated_radar_candidates.jsonl")
     core_rows = _jsonl(namespace_dir / "event_core_opportunities.jsonl")
     outcomes = _jsonl(namespace_dir / "event_integrated_radar_outcomes.jsonl")
@@ -576,6 +701,19 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     assert len(core_rows) == result.core_rows
     assert len(outcomes) == len(candidates)
     assert len(cards) == result.cards
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["calendar_snapshot"]["status"] == "not_configured"
+    assert manifest["calendar_snapshot"]["configured"] is False
+    assert manifest["market_quality_source_artifact"] == "event_market_state_snapshots.jsonl"
+    assert sum(manifest["baseline_status_counts"].values()) == len(snapshots)
+    assert manifest["direct_feature_count"] == sum(
+        int(row["market_data_quality"]["direct_feature_count"])
+        for row in snapshots
+    )
+    assert manifest["proxy_feature_count"] == sum(
+        int(row["market_data_quality"]["proxy_feature_count"])
+        for row in snapshots
+    )
     assert "Crypto Radar Decision v2 Preview" in preview
     assert "live_provider / live_no_send / coingecko" in preview
     assert "Decision Radar campaign eligible / counted: true / true" in preview
@@ -652,6 +790,15 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     assert operator_state["doctor"]["authoritative"] is True
     assert operator_state["market_no_send_provenance"]["decision_radar_campaign_counted"] is True
     assert operator_state["market_no_send_provenance"]["burn_in_counted"] is False
+    for artifact_name, expected_count in (
+        ("market_state_snapshots", len(snapshots)),
+        ("market_anomalies", len(anomalies)),
+        ("market_anomaly_catalyst_search_queue", len(catalyst_queue)),
+    ):
+        artifact = operator_state["artifacts"][artifact_name]
+        assert artifact["status"] == "current"
+        assert artifact["count"] == expected_count
+        assert artifact["sha256"]
 
     checked_at = datetime.now(timezone.utc)
     published = market_no_send.publish_market_no_send_generation(
@@ -1072,6 +1219,44 @@ def test_market_reader_namespace_parent_symlink_swap_does_not_read_outside(
     assert swapped is True
 
 
+def test_market_reader_rejects_same_inode_mutation_during_read(
+    tmp_path,
+    monkeypatch,
+):
+    namespace_dir = tmp_path / "market_in_place_read_race"
+    namespace_dir.mkdir()
+    target = namespace_dir / market_no_send.RUN_MANIFEST_FILENAME
+    target.write_bytes(b'{"status":"safe"}\n')
+    replacement = b'{"status":"evil"}\n'
+    original_fstat = market_no_send_io.os.fstat
+    regular_fstat_calls = 0
+
+    def mutating_fstat(descriptor):
+        nonlocal regular_fstat_calls
+        info = original_fstat(descriptor)
+        if stat.S_ISREG(info.st_mode):
+            regular_fstat_calls += 1
+            if regular_fstat_calls == 2:
+                target.write_bytes(replacement)
+                os.utime(
+                    target,
+                    ns=(info.st_atime_ns, info.st_mtime_ns + 1_000_000_000),
+                )
+                info = original_fstat(descriptor)
+        return info
+
+    monkeypatch.setattr(market_no_send_io.os, "fstat", mutating_fstat)
+
+    with pytest.raises(
+        market_no_send.MarketNoSendError,
+        match="missing or unreadable",
+    ):
+        market_no_send_io.read_regular_bytes(target)
+
+    assert regular_fstat_calls == 2
+    assert target.read_bytes() == replacement
+
+
 def test_market_artifact_io_fails_closed_without_descriptor_features(
     tmp_path,
     monkeypatch,
@@ -1112,3 +1297,179 @@ def test_market_quality_counts_use_populated_snapshot_and_treat_cold_as_warming(
     assert counts["baseline_warming_assets"] == 1
     assert counts["direct_feature_count"] == 4
     assert counts["proxy_feature_count"] == 2
+
+
+def test_calendar_snapshot_copy_drift_blocks_campaign_publication_validation(
+    tmp_path,
+    monkeypatch,
+):
+    _clear_context_overrides(monkeypatch)
+    calendar_path = tmp_path / "calendar-current.json"
+    calendar_path.write_text(
+        json.dumps(
+            {
+                "contract_version": 1,
+                "observed_at": _OBSERVED,
+                "source_mode": "operator_verified_calendar_snapshot",
+                "data_acquisition_mode": "operator_verified_export",
+                "source_provider": "operator_calendar",
+                "events": [
+                    {
+                        "id": "calendar-1",
+                        "title": "Calendar publication binding",
+                        "event_kind": "protocol",
+                        "scheduled_at": "2026-07-20T12:00:00Z",
+                        "time_certainty": "exact",
+                        "importance": "high",
+                        "affected_assets": ["MKTFLOW"],
+                        "source": "operator_calendar",
+                        "source_url": "https://example.com/calendar/calendar-1",
+                        "research_only": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace="calendar_binding",
+        profile="fixture",
+        run_mode="fixture",
+        top_n=5,
+        provider=lambda _limit: market_no_send._smoke_rows(),
+        observed_at=_OBSERVED,
+        environ={market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV: str(calendar_path)},
+        fixture_dir=None,
+        data_mode="mock",
+        allow_non_live=True,
+    )
+    namespace_dir = result.namespace_dir
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    path = namespace_dir / market_no_send_calendar.CALENDAR_SOURCE_COPY_FILENAME
+
+    market_no_send.market_no_send_publication._validate_optional_calendar_snapshot(
+        manifest,
+        namespace_dir=namespace_dir,
+        run_id=result.run_id,
+        safety_counters=market_no_send._SAFETY_COUNTERS,
+    )
+    scheduled_path = namespace_dir / "event_scheduled_catalysts.jsonl"
+    scheduled_original = scheduled_path.read_bytes()
+    scheduled_rows = _jsonl(scheduled_path)
+    scheduled_rows[0]["title"] = "Tampered scheduled meaning"
+    scheduled_path.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n"
+            for row in scheduled_rows
+        ),
+        encoding="utf-8",
+    )
+    scheduled_drift = json.loads(json.dumps(manifest))
+    scheduled_drift["calendar_snapshot"][
+        "scheduled_catalyst_artifact_sha256"
+    ] = hashlib.sha256(scheduled_path.read_bytes()).hexdigest()
+    with pytest.raises(
+        market_no_send.MarketNoSendError,
+        match="scheduled_semantics_mismatch",
+    ):
+        market_no_send.market_no_send_publication._validate_optional_calendar_snapshot(
+            scheduled_drift,
+            namespace_dir=namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
+    scheduled_path.write_bytes(scheduled_original)
+
+    unified_path = namespace_dir / "event_unified_calendar_events.jsonl"
+    unified_original = unified_path.read_bytes()
+    unified_rows = _jsonl(unified_path)
+    unified_rows[0]["calendar_event_id"] = "calendar:tampered"
+    unified_path.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n"
+            for row in unified_rows
+        ),
+        encoding="utf-8",
+    )
+    unified_drift = json.loads(json.dumps(manifest))
+    unified_drift["calendar_snapshot"][
+        "unified_calendar_artifact_sha256"
+    ] = hashlib.sha256(unified_path.read_bytes()).hexdigest()
+    with pytest.raises(
+        market_no_send.MarketNoSendError,
+        match="unified_semantics_mismatch",
+    ):
+        market_no_send.market_no_send_publication._validate_optional_calendar_snapshot(
+            unified_drift,
+            namespace_dir=namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
+    unified_path.write_bytes(unified_original)
+
+    count_drift = json.loads(json.dumps(manifest))
+    count_drift["calendar_snapshot"]["normalization_input_count"] = 2
+    with pytest.raises(
+        market_no_send.MarketNoSendError,
+        match="normalization_count_mismatch",
+    ):
+        market_no_send.market_no_send_publication._validate_optional_calendar_snapshot(
+            count_drift,
+            namespace_dir=namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
+    status_drift = json.loads(json.dumps(manifest))
+    status_drift["calendar_snapshot"]["status"] = "healthy_empty"
+    with pytest.raises(market_no_send.MarketNoSendError, match="status_count_mismatch"):
+        market_no_send.market_no_send_publication._validate_optional_calendar_snapshot(
+            status_drift,
+            namespace_dir=namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["events"][0]["id"] = "drifted"
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(market_no_send.MarketNoSendError, match="binding_mismatch"):
+        market_no_send.market_no_send_publication._validate_optional_calendar_snapshot(
+            manifest,
+            namespace_dir=namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
+
+
+def test_unusable_calendar_status_forbids_derived_source_copy(tmp_path):
+    metadata = market_no_send_calendar.MarketNoSendCalendarSnapshot(
+        status="not_configured"
+    ).to_dict()
+    manifest = {
+        "artifact_namespace": tmp_path.name,
+        "calendar_snapshot": metadata,
+    }
+    validate = market_no_send.market_no_send_publication._validate_optional_calendar_snapshot
+
+    validate(
+        manifest,
+        namespace_dir=tmp_path,
+        run_id="run-no-calendar",
+        safety_counters=market_no_send._SAFETY_COUNTERS,
+    )
+    market_no_send_io.write_json_atomic(
+        tmp_path / market_no_send_calendar.CALENDAR_SOURCE_COPY_FILENAME,
+        {"unexpected": "derived calendar source"},
+    )
+
+    with pytest.raises(
+        market_no_send.MarketNoSendError,
+        match="unusable_copy_present",
+    ):
+        validate(
+            manifest,
+            namespace_dir=tmp_path,
+            run_id="run-no-calendar",
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
