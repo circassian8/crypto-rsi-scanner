@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
@@ -77,6 +78,26 @@ _INTEGRATED_SCALAR_TRUTH_FIELDS = (
     "latest_source_url",
     "latest_source_title",
     "source_class",
+    "market_provenance_schema_version",
+    "market_provenance_contract_version",
+    "data_acquisition_mode",
+    "candidate_source_mode",
+    "provider",
+    "provider_call_attempted",
+    "provider_call_succeeded",
+    "provider_request_succeeded",
+    "live_provider_authorized",
+    "request_ledger_path",
+    "request_ledger_sha256",
+    "provider_source_artifact",
+    "provider_source_artifact_sha256",
+    "provider_generation_id",
+    "cache_status",
+    "provenance_contract_valid",
+    "burn_in_eligible",
+    "burn_in_counted",
+    "burn_in_reason",
+    "contract_counted_candidate",
     "supporting_evidence_quotes",
     "research_only",
     *DECISION_MODEL_FIELD_NAMES,
@@ -119,6 +140,9 @@ _INTEGRATED_MAPPING_TRUTH_FIELDS = (
     "rsi_context",
     "rsi_context_adjustment",
     "rsi_context_safety",
+    "market_provenance",
+    "feature_basis",
+    "data_quality",
 )
 
 
@@ -253,6 +277,10 @@ def _apply_integrated_candidate_truth(
         value = integrated.get(key)
         if isinstance(value, Mapping) and value:
             row[key] = dict(value)
+    market_provenance = event_market_provenance.market_provenance_values(integrated)
+    if market_provenance:
+        row["market_provenance"] = market_provenance
+        row.update(event_market_provenance.market_provenance_flat_fields(market_provenance))
     official = row.get("official_exchange_event") if isinstance(row.get("official_exchange_event"), Mapping) else {}
     if official:
         row["official_exchange_provider"] = _mapping_text(official, ("provider",)) or row.get("official_exchange_provider")

@@ -62,7 +62,17 @@ KNOWN_ARTIFACTS = (
     "provider_readiness_json",
     "provider_readiness_md",
 )
-OPTIONAL_ARTIFACTS = ("unified_calendar", "decision_v2_notification_preview")
+OPTIONAL_ARTIFACTS = (
+    "unified_calendar",
+    "decision_v2_notification_preview",
+    "market_no_send_source_cache",
+    "market_no_send_request_ledger",
+    "market_no_send_generation",
+    "market_history",
+    "integrated_candidates",
+    "integrated_outcomes",
+    "provider_health",
+)
 
 _RUN_PATH_FIELDS: Mapping[str, tuple[str, ...]] = {
     "core_opportunities": ("core_opportunity_store_path",),

@@ -34,8 +34,18 @@ def _lineage_lines(
     provider_generation_id = _lineage_value("provider_generation_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     provider_source_artifact = _lineage_value("provider_source_artifact", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     request_ledger_path = _lineage_value("request_ledger_path", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    data_acquisition_mode = _lineage_value("data_acquisition_mode", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     candidate_source_mode = _lineage_value("candidate_source_mode", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     contract_counted = _lineage_value("contract_counted_candidate", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    provenance_valid = _lineage_value("provenance_contract_valid", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    burn_in_eligible = _lineage_value("burn_in_eligible", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    burn_in_reason = _lineage_value("burn_in_reason", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    provider_call_attempted = _lineage_value("provider_call_attempted", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    provider_call_succeeded = _lineage_value("provider_call_succeeded", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    live_provider_authorized = _lineage_value("live_provider_authorized", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    cache_status = _lineage_value("cache_status", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    request_ledger_sha256 = _lineage_value("request_ledger_sha256", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    source_artifact_sha256 = _lineage_value("provider_source_artifact_sha256", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     market_refresh_artifact = _lineage_value("market_refresh_artifact", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     feedback_target, feedback_target_type = _feedback_target_for_card(
         core_id=core_id,
@@ -66,7 +76,22 @@ def _lineage_lines(
         f"- Provider generation ID: {provider_generation_id or 'none'}",
         f"- Provider source artifact: {provider_source_artifact or 'none'}",
         f"- Request ledger: {request_ledger_path or 'none'}",
+        f"- Data acquisition mode: {data_acquisition_mode or 'legacy_unclassified'}",
         f"- Candidate source mode: {candidate_source_mode or 'not_contract_counted'}",
+        f"- Market provenance contract valid: {str(provenance_valid or 'false').lower()}",
+        (
+            "- Provider call attempted / succeeded / authorized: "
+            f"{str(provider_call_attempted or 'false').lower()} / "
+            f"{str(provider_call_succeeded or 'false').lower()} / "
+            f"{str(live_provider_authorized or 'false').lower()}"
+        ),
+        f"- Cache status: {cache_status or 'unknown'}",
+        (
+            "- Request/source SHA-256 recorded in canonical provenance: "
+            f"{str(bool(request_ledger_sha256)).lower()} / "
+            f"{str(bool(source_artifact_sha256)).lower()}"
+        ),
+        f"- Burn-in eligible: {str(burn_in_eligible or 'false').lower()} ({burn_in_reason or 'not_counted'})",
         f"- Contract-counted burn-in candidate: {str(contract_counted or 'false').lower()}",
         f"- Market refresh artifact: {market_refresh_artifact or 'none'}",
         f"- Source raw/event IDs: raw={_list_label(raw_ids)} events={_list_label(event_ids)}",

@@ -1,13 +1,8 @@
 # Event Alpha Radar North Star — Catalyst Radar
 
-Research-only Catalyst Radar architecture and burn-in operating contract. Event
-Alpha discovers and grades catalyst evidence additively beneath the trader-facing
-Crypto Decision Radar. This document does not authorize live trading, Event
-Alpha paper trading, execution/order logic, normal RSI signal writes, Event
-Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by
-default, or secret handling changes.
+Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-12T18:45:07+00:00`
+- generated_at: `2026-07-13T06:45:34.693335+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -40,9 +35,14 @@ default, or secret handling changes.
 - north_star_requirement: Evidence can upgrade research confidence only through deterministic source-pack sufficiency gates.
 
 ### market_state_builder
-- role: Builds return, volume, liquidity, freshness, and relative-market context for candidates.
-- primary_artifacts: `event_market_state.jsonl`
-- north_star_requirement: Freshness and unit metadata must travel with state; stale state cannot promote fade-review or confirmed lanes.
+- role: Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, and bounded per-asset temporal baselines for candidates.
+- primary_artifacts: `event_market_state.jsonl, event_market_history.jsonl`
+- north_star_requirement: Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.
+
+### market_provenance_v2
+- role: Normalizes one closed market acquisition value and derives contract validity, burn-in eligibility, and counting without accepting caller-asserted trust flags.
+- primary_artifacts: `event_market_no_send_request_ledger.json, event_market_no_send_market_rows.json, event_market_no_send_generation.json, event_market_no_send_pilot_audit.json`
+- north_star_requirement: Only canonical crypto_radar_market_provenance_v2 live/no-send rows with explicit authorization, attempted and successful provider lineage, distinct fingerprinted request and source artifacts, generation identity, feature basis, and data quality may count as real burn-in evidence.
 
 ### derivatives_crowding_layer
 - role: Adds OI, funding, liquidations, long/short, basis, and perp/spot crowding evidence when provider artifacts exist.
@@ -57,7 +57,7 @@ default, or secret handling changes.
 ### crypto_radar_decision_model_v2
 - role: Stores one closed trader-facing Decision v2 projection on each integrated candidate and copies it to CoreOpportunity, cards, Decision preview, outcomes, review inbox, and dashboard without partial downstream re-evaluation; operator state stores exact aggregates and artifact fingerprints derived from that authority.
 - primary_artifacts: `event_integrated_radar_candidates.jsonl, event_core_opportunities.jsonl, event_decision_v2_notification_preview.md, event_integrated_radar_outcomes.jsonl, event_alpha_operator_state.json`
-- north_star_requirement: Decision Radar routes are explicit research-only metadata. They are additive to Event Alpha catalyst lanes and never authorize delivery, paper trading, execution, RSI writes, or `TRIGGERED_FADE`.
+- north_star_requirement: Decision Radar routes are explicit research-only metadata. They are additive to Event Alpha catalyst lanes and never authorize delivery, paper trading, execution, RSI writes, or TRIGGERED_FADE.
 
 ### policy_routing_gates
 - role: Applies quality, freshness, dedupe, source-strength, no-send, and safety blockers before any preview or delivery row.
@@ -70,7 +70,7 @@ default, or secret handling changes.
 - north_star_requirement: Copy must preserve research-only and human-decision-required framing; notifications route attention and never execution.
 
 ### outcome_tracker
-- role: Creates one pending row for every current canonical Decision idea, then matures rows with future market behavior labels for route/origin/source/provider usefulness analysis.
+- role: Creates one pending row for every current canonical Decision idea, then matures rows with future market behavior labels for route/origin/lane/source/provider usefulness analysis.
 - primary_artifacts: `event_integrated_radar_outcomes.jsonl, event_radar_provider_performance.json`
 - north_star_requirement: Outcomes measure future behavior; they do not auto-apply thresholds.
 
@@ -86,27 +86,16 @@ default, or secret handling changes.
 
 ## Product Layering
 
-- Event Alpha is the Catalyst Radar. It owns catalyst discovery, source strength,
-  strict catalyst classification, historical Catalyst Radar artifacts, and the
-  existing uppercase Event Alpha opportunity lanes.
-- Crypto Decision Radar is the trader-facing product layer. It owns the
-  canonical Decision v2 projection, lowercase operator routes, Decision-first
-  cards/preview, and the local read-only dashboard.
-- The relationship is additive. A market-led Decision idea can be operator-
-  visible while the Catalyst Radar remains `STORE_ONLY` or lacks a strong
-  source. This must be described as not eligible for a strict catalyst alert,
-  not as globally not alertable.
-- Unknown catalyst lowers explanatory confidence and may increase risk, but it
-  is not a universal Event Alpha gate change and does not by itself block a
-  fresh, liquid, identity-safe market-led Decision idea.
-- The dashboard is the primary surface. Notifications route human attention.
-  Neither surface authorizes automatic trading.
+- catalyst_radar: `{'name': 'Event Alpha', 'owns': ['catalyst discovery', 'source-strength classification', 'strict catalyst routes', 'historical Event Alpha artifacts']}`
+- decision_radar: `{'name': 'Crypto Decision Radar', 'owns': ['canonical trader-facing Decision v2 projection', 'operator routes', 'Decision-first cards and preview', 'local read-only dashboard'], 'primary_surface': 'dashboard', 'notifications_role': 'route human attention, never execution'}`
+- relationship: `additive`
+- unknown_catalyst_policy: `soft explanatory-confidence penalty and risk input, not a universal visibility blocker`
 
 ## Crypto Radar Decision Model v2
 
 - schema_version: `crypto_radar_decision_model_v2`
 - canonical_projection_schema_version: `crypto_radar_decision_projection_v1`
-- canonical_authority: `decision_model_values(raw_row)` stored on the integrated candidate and copied downstream
+- canonical_authority: `decision_model_values(raw_row) stored on the integrated candidate and copied downstream`
 - projection_idempotent: `True`
 - rendering_re_evaluates: `False`
 - enabled_by_default_for_research_preview: `True`
@@ -114,7 +103,8 @@ default, or secret handling changes.
 - legacy_alert_routes_preserved: `True`
 - old_artifacts_auto_promoted: `False`
 - dimensions:
-  - primary_thesis_origin / thesis_origins: market_led, catalyst_led, technical_led, derivatives_led, onchain_led, fundamental_led, macro_led
+  - primary_and_contributing_thesis_origins: market_led, catalyst_led, technical_led, derivatives_led, onchain_led, fundamental_led, macro_led
+  - legacy_thesis_origin: market_led, catalyst_led, technical_led, derivatives_led, onchain_led, fundamental_led, macro_led, mixed
   - directional_bias: long, fade_short_review, risk, neutral
   - catalyst_status: confirmed, plausible, unknown, not_required, disproven
   - confidence_band: diagnostic, exploratory, actionable, high_confidence
@@ -128,10 +118,6 @@ default, or secret handling changes.
   - risk_score
   - urgency_score
   - chase_risk_score
-- timing_contract:
-  - preferred_horizon and expires_at are canonical fields
-  - scheduled evidence may raise risk and shorten expiry but never creates directional bias alone
-  - stale or expired ideas cannot remain actionable
 - operator_routes:
   - dashboard_watch
   - actionable_watch
@@ -141,14 +127,6 @@ default, or secret handling changes.
   - risk_watch
   - calendar_risk
   - diagnostic
-- canonical_context:
-  - calendar event ids, categories, event times/windows, time certainty, importance, and resolvable references
-  - explicit read-only RSI context plus artifact references
-  - observation ids, source/provider lineage, evaluation time, and explicit safety attestations
-- canonical_consistency:
-  - candidate/Core route or deterministic score drift is a doctor blocker
-  - card, Decision preview, outcome cohort, or dashboard drift is a doctor blocker
-  - calendar-risk without attached calendar evidence is invalid
 - hard_blockers:
   - unresolved identity
   - stale data
@@ -169,51 +147,104 @@ default, or secret handling changes.
   - requires_fresh_market_snapshot: `True`
   - requires_canonical_identity: `True`
   - requires_adequate_liquidity: `True`
+  - requires_relative_move_or_stealth_accumulation: `True`
+  - requires_meaningful_volume_anomaly: `True`
   - requires_verified_good_or_acceptable_spread_for_actionable_or_rapid: `True`
   - unavailable_spread_may_reach_dashboard_watch_only: `True`
   - invent_spread: `False`
-  - requires_relative_move_or_stealth_accumulation: `True`
-  - requires_meaningful_volume_anomaly: `True`
+- market_data_quality_caps:
+  - missing_or_stale_spread_urgency_max: `55`
+  - proxy_only_actionability_max: `64`
+  - proxy_only_evidence_confidence_max: `55`
+  - proxy_only_risk_min: `55`
+  - proxy_only_urgency_max: `45`
+  - cold_or_warming_baseline_evidence_confidence_max: `62`
+  - cold_or_warming_baseline_risk_min: `48`
+  - cold_or_warming_baseline_urgency_max: `45`
+  - proxy_only_can_be_actionable_or_rapid: `False`
+- canonical_context:
+  - calendar event ids, categories, times or windows, time certainty, importance, and resolvable references
+  - explicit read-only RSI context and artifact references
+  - observation ids, source/provider lineage, evaluation timestamp, and safety attestations
+- canonical_consistency:
+  - candidate_core_route_or_score_drift: `blocker`
+  - card_projection_drift: `blocker`
+  - preview_lane_drift: `blocker`
+  - outcome_cohort_drift: `blocker`
+  - dashboard_projection_drift: `blocker`
+  - calendar_risk_without_attached_evidence: `blocker`
+- timing_contract:
+  - preferred_horizon_and_expires_at_are_canonical: `True`
+  - scheduled_evidence_may_raise_risk_and_shorten_expiry: `True`
+  - calendar_alone_creates_directional_bias: `False`
+  - stale_or_expired_idea_actionable: `False`
 - return_unit_contract:
-  - each return field has explicit unit metadata
-  - `0.10` fraction and `10.0` percent-points both normalize to 10 percent
-  - `10.0` fraction, incompatible mixed units, and implausible normalized inputs are blockers
+  - per_field_unit_metadata: `True`
+  - fraction_0_10_normalized_percent: `10.0`
+  - percent_points_10_0_normalized_percent: `10.0`
+  - fraction_10_0: `blocker`
+  - incompatible_mixed_units: `blocker`
 
 ## Decision-First Operator Surfaces
 
 - Primary preview: `event_decision_v2_notification_preview.md`
-- Preview sections: High-Confidence Ideas, Actionable Ideas, Rapid Market
-  Anomalies, Dashboard Watch, Fade / Exhaustion Review, Risk Watch, and Calendar
-  / Scheduled Risk.
-- Cards lead with `Crypto Decision Radar`: route, actionable flag, evidence
-  confidence, risk, urgency, origins, catalyst status, timing/phase,
-  tradability/spread, expiry/horizon, why-now, and confirmation/invalidation.
-- `Catalyst Radar Classification` is the secondary section and retains legacy
-  `opportunity_type`, strict catalyst route/blockers, and source/evidence state.
-- Every Decision preview item uses the canonical projection, links to the
-  dashboard, and states that research is for human decision support only.
-- The legacy Event Alpha lane preview remains separate diagnostic/compatibility
-  output. It cannot silently override the Decision projection.
+- Sections: High-Confidence Ideas, Actionable Ideas, Rapid Market Anomalies, Dashboard Watch, Fade / Exhaustion Review, Risk Watch, and Calendar / Scheduled Risk.
+- Cards lead with Crypto Decision Radar and retain Catalyst Radar Classification as a secondary strict-catalyst section.
+- Dashboard is primary; notifications route attention; every surface remains research-only and human-decision-required.
 
 ## Guarded Real/No-Send Market Generation
 
-- readiness: `make radar-market-no-send-readiness`
-- generation: `make radar-market-no-send`
-- offline mechanics smoke: `make radar-market-no-send-smoke`
-- default namespace: `radar_market_no_send`
-- provider: bounded top-liquid CoinGecko market data under the existing explicit
-  `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` authorization only
-- safe default: no sends, trades, paper trades, normal RSI writes, or
-  `TRIGGERED_FADE`; fixture/mock generations are never eligible as real
-  dashboard authority
-- provenance: data mode, provider, request/cache artifact, observation time,
-  contract-counted state, and no-send state
-- publication gate: complete operator state, exact fingerprints, matching
-  canonical counts, current run/revision/state binding, and a fresh full strict
-  doctor with zero blockers
-- fail-closed rule: blocked readiness performs no live call, and no failed,
-  stale, fixture, mock, or untrusted generation replaces the fixed dashboard
-  pointer. A clean zero-idea generation must remain honest about its counts.
+- targets: radar-market-no-send-readiness, radar-market-no-send, radar-market-no-send-smoke
+- default_namespace: `radar_market_no_send`
+- provider: `coingecko`
+- authorization:
+  - existing_explicit_environment_flag: `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1`
+  - inferred_from_cache: `False`
+  - absent_behavior: `safe blocked result, no provider call, credential-free JSON and Markdown pilot audit, pointer unchanged`
+- provenance_contract:
+  - schema_version: `crypto_radar_market_provenance_v2`
+  - contract_version: `2`
+  - data_acquisition_modes: `['live_provider', 'mocked_fixture', 'artifact_replay', 'preflight_only', 'cache_replay']`
+  - candidate_source_modes: `['live_no_send', 'mocked_fixture', 'artifact_replay', 'preflight_only']`
+  - burn_in_counting_is_derived: `True`
+  - mock_or_fixture_may_validate_mechanics: `True`
+  - mock_or_fixture_real_burn_in_counted: `False`
+  - historical_flat_rows_silently_reclassified: `False`
+- provenance_fields: data_acquisition_mode, candidate_source_mode, provider, provider_call_attempted, provider_call_succeeded, live_provider_authorized, request_ledger_path, request_ledger_sha256, provider_source_artifact, provider_source_artifact_sha256, provider_generation_id, cache_status, provenance_contract_valid, burn_in_eligible, burn_in_counted, burn_in_reason, feature_basis, data_quality, validation_errors
+- temporal_baseline:
+  - generation_snapshot_artifact: `event_market_history.jsonl`
+  - shared_live_cache: `radar_market_history_cache/event_market_history.jsonl`
+  - fixture_and_mock_cache_scope: `generation-local only; never seeds live history`
+  - authoritative_namespace_mutation: `forbidden; use a new generation namespace backed by the bounded shared cache`
+  - schema_id: `event_alpha.market_history_observation`
+  - schema_version: `1`
+  - default_limits: `{'max_history_age_days': 45, 'max_observations_per_asset': 256, 'min_baseline_observations': 8, 'max_current_age_hours': 6, 'future_tolerance_minutes': 5}`
+  - baseline_excludes_current_observation: `True`
+  - direct_provider_fields_preserved: `True`
+  - only_explicit_proxy_fields_may_be_replaced: `True`
+  - derived_evidence: `['1h/4h/24h returns in percent points', 'turnover and volume z-scores', 'return volatility', 'BTC and ETH relative returns', 'observation ids and baseline bounds']`
+- outcome_policy:
+  - pending_placeholder_per_canonical_decision_candidate: `True`
+  - candidate_outcome_count_mismatch: `publication blocker`
+  - cohort_drift: `blocker`
+- pilot_audit_artifacts: event_market_no_send_latest_attempt.json, event_market_no_send_pilot_audit.json, event_market_no_send_pilot_audit.md
+- exact_attempt_policy:
+  - doctor_and_publish_require_latest_cli_receipt_manifest_match: `True`
+  - blocked_attempt_may_reuse_older_complete_manifest: `False`
+  - provider_health_artifact: `event_provider_health.json`
+  - provider_errors_persisted_as_safe_classes_only: `True`
+- defaults:
+  - research_only: `True`
+  - no_sends: `True`
+  - no_trades: `True`
+  - no_paper_trades: `True`
+  - no_normal_rsi_writes: `True`
+  - no_triggered_fade: `True`
+- dashboard_pointer_policy:
+  - fixture_or_mock_generation_eligible: `False`
+  - pointer_changes_on_blocked_failed_stale_or_untrusted_generation: `False`
+  - current_authoritative_namespace_is_immutable: `True`
+  - required_checks: `['real live-safe data mode', 'complete operator state', 'valid exact fingerprints', 'matching canonical counts', 'current run revision and operator-state binding', 'fresh full strict doctor with zero blockers']`
 
 ## Opportunity Lanes
 
@@ -487,6 +518,8 @@ default, or secret handling changes.
 - min_outcome_rows: `100`
 - auto_apply_thresholds: `False`
 - no_auto_threshold_changes: `True`
+- candidate_count_authority: `canonical market provenance v2 with candidate_source_mode=live_no_send, exact valid lineage, and burn_in_counted=true`
+- mock_fixture_replay_cache_or_preflight_counted: `False`
 
 ### Promotion/Freeze Criteria
 

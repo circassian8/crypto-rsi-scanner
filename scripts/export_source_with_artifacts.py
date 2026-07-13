@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import errno
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import re
 import subprocess
 import stat
 import time
@@ -45,6 +46,12 @@ IDENTIFIER_ENV_FIELDS = {
     "SMTP_USER": "email_account",
     "EMAIL_TO": "email_recipient",
 }
+_GENERIC_SECRET_ENV_NAME_RE = re.compile(
+    r"(?:API_KEY|API_SECRET|AUTH_TOKEN|ACCESS_TOKEN|CLIENT_SECRET|"
+    r"SECRET_ACCESS_KEY|PRIVATE_KEY|PASSWORD|SMTP_PASS|BOT_TOKEN|WEBHOOK_URL|"
+    r"(?:^|_)(?:TOKEN|SECRET|PASS|WEBHOOK))$",
+    re.IGNORECASE,
+)
 
 EXCLUDE_DIRS = {
     ".git",
@@ -82,6 +89,101 @@ EXCLUDE_SUFFIXES = (
 ARTIFACT_ROOTS = {"event_fade_cache"}
 MIN_ZIP_TIMESTAMP = 315532800.0  # 1980-01-01, earliest timestamp ZipInfo can represent.
 DEFAULT_EXPORT_MTIME_SAFETY_MARGIN_SECONDS = 300.0
+_ARTIFACT_SECRET_VALUE_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])(?P<label>(?:api[_-]?(?:key|secret)|api\s+(?:key|secret)|"
+    r"auth[_-]?token|api[_-]?token|access[_-]?token|client[_-]?secret|private[_-]?key|"
+    r"smtp[_-]?(?:pass|password)|telegram[_-]?(?:bot[_-]?token|chat[_-]?id)|"
+    r"discord[_-]?webhook(?:[_-]?url)?|provider[_-]?token)\b)\s*[\"']?\s*[:=]\s*"
+    r"(?P<value>\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\s,}\]]+)",
+    re.IGNORECASE,
+)
+_ARTIFACT_AUTH_BEARER_RE = re.compile(
+    r"\bAuthorization[\"']?\s*[:=]\s*[\"']?\s*Bearer\s+(?P<value>[A-Za-z0-9._-]+)",
+    re.IGNORECASE,
+)
+_ARTIFACT_AUTH_BASIC_RE = re.compile(
+    r"\b(?:Proxy-)?Authorization[\"']?\s*[:=]\s*[\"']?\s*Basic\s+"
+    r"(?P<value>[A-Za-z0-9+/=]{8,})",
+    re.IGNORECASE,
+)
+_ARTIFACT_X_API_KEY_RE = re.compile(
+    r"\bX-API-Key[\"']?\s*[:=]\s*[\"']?\s*(?P<value>[A-Za-z0-9._-]+)",
+    re.IGNORECASE,
+)
+_ARTIFACT_OPENAI_KEY_RE = re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{12,}\b")
+_ARTIFACT_PROVIDER_TOKEN_RE = re.compile(
+    r"\b(?:(?:ghp|gho|ghu|github_pat)_[A-Za-z0-9_]{16,}|"
+    r"(?:xoxb|xoxp|xoxa|xoxr|xoxs)-[A-Za-z0-9-]{16,}|"
+    r"glpat-[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9]{16,})\b",
+    re.IGNORECASE,
+)
+_ARTIFACT_AWS_ACCESS_KEY_RE = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
+_ARTIFACT_GOOGLE_API_KEY_RE = re.compile(r"\bAIza[A-Za-z0-9_-]{30,}\b")
+_ARTIFACT_PRIVATE_KEY_RE = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
+_ARTIFACT_DISCORD_WEBHOOK_RE = re.compile(
+    r"https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9._-]+",
+    re.IGNORECASE,
+)
+_SAFE_ARTIFACT_SECRET_VALUES = frozenset(
+    {
+        "",
+        "0",
+        "false",
+        "fixture",
+        "configured",
+        "disabled",
+        "missing",
+        "missing_api_key",
+        "missing_config",
+        "no",
+        "none",
+        "null",
+        "n/a",
+        "not available",
+        "not_available",
+        "not configured",
+        "not_configured",
+        "not-set",
+        "placeholder",
+        "present",
+        "redacted",
+        "test",
+        "true",
+        "unavailable",
+        "unknown",
+        "***",
+        "<missing>",
+        "<not-set>",
+        "<redacted>",
+        "[redacted]",
+    }
+)
+_SAFE_ARTIFACT_SECRET_PREFIXES = (
+    "dummy-",
+    "example-",
+    "fixture-",
+    "placeholder-",
+    "test-",
+)
+_SAFE_ARTIFACT_SECRET_PLACEHOLDER_SUFFIXES = frozenset(
+    {
+        "api-key",
+        "api-secret",
+        "api-token",
+        "credential",
+        "credentials",
+        "dummy",
+        "example",
+        "fixture",
+        "key",
+        "not-a-secret",
+        "placeholder",
+        "secret",
+        "test",
+        "token",
+        "value",
+    }
+)
 
 
 def _tracked_paths(root: Path = ROOT) -> set[Path]:
@@ -271,6 +373,21 @@ def _validate(names: list[str]) -> list[str]:
     return bad
 
 
+def _unsafe_archive_name(name: str) -> str | None:
+    if not name or "\x00" in name:
+        return "empty_or_nul_name"
+    if "\\" in name:
+        return "backslash_path"
+    path = PurePosixPath(name)
+    if path.is_absolute() or name.startswith("/"):
+        return "absolute_path"
+    if any(part in {"", ".", ".."} for part in name.rstrip("/").split("/")):
+        return "relative_traversal"
+    if path.parts and path.parts[0].endswith(":"):
+        return "drive_path"
+    return None
+
+
 def _dotenv_values(path: Path) -> dict[str, str]:
     """Read the simple KEY=VALUE subset used by this project's local .env."""
 
@@ -307,6 +424,13 @@ def _configured_sensitive_values(root: Path) -> tuple[tuple[str, bytes], ...]:
             for value in (part.strip() for part in raw.split(",")):
                 if len(value) >= 5:
                     found.add((label, value.encode()))
+    configured = {**dotenv, **os.environ}
+    for key, raw in configured.items():
+        if key in SECRET_ENV_FIELDS or not _GENERIC_SECRET_ENV_NAME_RE.search(str(key)):
+            continue
+        value = str(raw or "").strip()
+        if len(value) >= 8:
+            found.add(("configured_secret", value.encode()))
     return tuple(sorted(found, key=lambda item: (item[0], item[1])))
 
 
@@ -320,22 +444,132 @@ def _validate_archive_entries(
     with zipfile.ZipFile(zip_path) as zf:
         names = zf.namelist()
         bad.extend(_validate(names))
+        for label, value in sensitive_values:
+            if value in zf.comment:
+                bad.append(f"sensitive_value:{label}:archive_comment")
+        seen_names: set[str] = set()
         for info in zf.infolist():
+            issue = _unsafe_archive_name(info.filename)
+            if issue:
+                bad.append(f"unsafe_archive_name:{issue}:{info.filename}")
+            if info.filename in seen_names:
+                bad.append(f"duplicate_archive_name:{info.filename}")
+            seen_names.add(info.filename)
+            mode = (info.external_attr >> 16) & 0xFFFF
+            if mode and stat.S_ISLNK(mode):
+                bad.append(f"symlink_archive_entry:{info.filename}")
+            metadata = info.filename.encode("utf-8", errors="ignore") + info.comment + info.extra
+            for label, value in sensitive_values:
+                if value in metadata:
+                    bad.append(f"sensitive_value:{label}:entry_metadata:{info.filename}")
             entry_ts = datetime(*info.date_time).timestamp()
+            artifact_entry = _is_artifact_archive_entry(info.filename)
             # Zip timestamps have two-second granularity.
             if entry_ts > safe_export_timestamp + 2:
                 bad.append(f"future_mtime:{info.filename}:{entry_ts:.0f}>{safe_export_timestamp:.0f}")
-            if not info.is_dir() and sensitive_values:
+            data = b""
+            if not info.is_dir() and (sensitive_values or artifact_entry):
                 data = zf.read(info)
+            if data and sensitive_values:
                 for label, value in sensitive_values:
                     if value in data:
                         bad.append(f"sensitive_value:{label}:{info.filename}")
+            if data and artifact_entry:
+                for label in _artifact_secret_labels(data):
+                    bad.append(f"artifact_secret:{label}:{info.filename}")
+            if artifact_entry:
+                for label in _artifact_secret_labels(metadata):
+                    bad.append(f"artifact_secret:{label}:entry_metadata:{info.filename}")
         makefile = next((info for info in zf.infolist() if info.filename == "Makefile"), None)
         if makefile is not None:
             makefile_ts = datetime(*makefile.date_time).timestamp()
             if makefile_ts > safe_export_timestamp + 2:
                 bad.append(f"future_makefile_mtime:{makefile_ts:.0f}>{safe_export_timestamp:.0f}")
     return bad
+
+
+def _is_artifact_archive_entry(name: str) -> bool:
+    return any(name == root or name.startswith(f"{root}/") for root in ARTIFACT_ROOTS)
+
+
+def _artifact_secret_labels(data: bytes) -> list[str]:
+    """Return redacted labels for non-placeholder secret values in artifacts."""
+
+    text = data.decode("utf-8", errors="ignore")
+    labels: set[str] = set()
+    for match in _ARTIFACT_SECRET_VALUE_RE.finditer(text):
+        value = _normalized_artifact_secret_value(match.group("value"))
+        if not _safe_artifact_secret_value(value):
+            labels.add(_normalized_artifact_secret_label(match.group("label")))
+    for pattern, label in (
+        (_ARTIFACT_AUTH_BEARER_RE, "authorization_bearer"),
+        (_ARTIFACT_AUTH_BASIC_RE, "authorization_basic"),
+        (_ARTIFACT_X_API_KEY_RE, "x_api_key"),
+    ):
+        for match in pattern.finditer(text):
+            if not _safe_artifact_secret_value(
+                _normalized_artifact_secret_value(match.group("value"))
+            ):
+                labels.add(label)
+    if any(
+        not _natural_language_sk_phrase(match.group(0))
+        for match in _ARTIFACT_OPENAI_KEY_RE.finditer(text)
+    ):
+        labels.add("openai_key")
+    if _ARTIFACT_PROVIDER_TOKEN_RE.search(text):
+        labels.add("provider_token")
+    if _ARTIFACT_AWS_ACCESS_KEY_RE.search(text):
+        labels.add("aws_access_key")
+    if _ARTIFACT_GOOGLE_API_KEY_RE.search(text):
+        labels.add("google_api_key")
+    if _ARTIFACT_PRIVATE_KEY_RE.search(text):
+        labels.add("private_key")
+    if _ARTIFACT_DISCORD_WEBHOOK_RE.search(text):
+        labels.add("discord_webhook")
+    return sorted(labels)
+
+
+def _normalized_artifact_secret_value(value: str) -> str:
+    return str(value or "").strip().strip("\"'").strip().casefold()
+
+
+def _normalized_artifact_secret_label(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(label or "").strip().casefold()).strip("_")
+
+
+def _safe_artifact_secret_value(value: str) -> bool:
+    if value in _SAFE_ARTIFACT_SECRET_VALUES:
+        return True
+    if re.fullmatch(r"\$\{[a-z0-9_]+\}?", value):
+        return True
+    if value.startswith(("<redacted>", "[redacted]", r"\u003credacted\u003e", "%3credacted%3e")):
+        return True
+    return any(
+        value.startswith(prefix)
+        and value[len(prefix):] in _SAFE_ARTIFACT_SECRET_PLACEHOLDER_SUFFIXES
+        for prefix in _SAFE_ARTIFACT_SECRET_PREFIXES
+    )
+
+
+def _natural_language_sk_phrase(token: str) -> bool:
+    """Distinguish lowercase headline/URL slugs from OpenAI key shapes."""
+
+    if not token.lower().startswith("sk-"):
+        return False
+    rest = token[3:]
+    slug_part = rest.split("_", 1)[0]
+    if (
+        "_" in rest
+        and slug_part.count("-") >= 3
+        and slug_part == slug_part.lower()
+        and all(char.isalnum() or char == "-" for char in slug_part)
+    ):
+        return True
+    if not rest or rest != rest.lower() or "_" in rest or not any(char == "-" for char in rest):
+        return False
+    if not any(char.isdigit() for char in rest):
+        return True
+    return rest.count("-") >= 3 and all(char.isalnum() or char == "-" for char in rest)
 
 
 def _safe_export_timestamp(*, now_ts: float | None = None) -> float:
@@ -456,27 +690,41 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     candidate = out.with_name(f"{out.name}.tmp")
     candidate.unlink(missing_ok=True)
     try:
-        with zipfile.ZipFile(candidate, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
-            for path in entries:
-                _write_file_to_zip(
-                    zf,
-                    path,
-                    path.relative_to(root).as_posix(),
-                    now_ts=now_ts,
-                    root=root,
-                )
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(candidate, flags, 0o600)
+        with os.fdopen(descriptor, "w+b") as candidate_file:
+            with zipfile.ZipFile(
+                candidate_file,
+                "w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=6,
+            ) as zf:
+                for path in entries:
+                    _write_file_to_zip(
+                        zf,
+                        path,
+                        path.relative_to(root).as_posix(),
+                        now_ts=now_ts,
+                        root=root,
+                    )
     except (OSError, ValueError) as exc:
         print(f"export_failed_closed={type(exc).__name__}")
         candidate.unlink(missing_ok=True)
         return 1
 
-    with zipfile.ZipFile(candidate) as zf:
-        names = zf.namelist()
-    bad = _validate_archive_entries(
-        candidate,
-        safe_export_timestamp=now_ts,
-        sensitive_values=_configured_sensitive_values(root),
-    )
+    try:
+        with zipfile.ZipFile(candidate) as zf:
+            names = zf.namelist()
+        bad = _validate_archive_entries(
+            candidate,
+            safe_export_timestamp=now_ts,
+            sensitive_values=_configured_sensitive_values(root),
+        )
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as exc:
+        print(f"export_failed_closed={type(exc).__name__}")
+        candidate.unlink(missing_ok=True)
+        return 1
     artifact_entries = [name for name in names if name.startswith("event_fade_cache/")]
     research_cards = [
         name
@@ -495,7 +743,12 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
         print("\n".join(bad[:50]))
         candidate.unlink(missing_ok=True)
         return 1
-    candidate.replace(out)
+    try:
+        candidate.replace(out)
+    except OSError as exc:
+        print(f"export_failed_closed={type(exc).__name__}")
+        candidate.unlink(missing_ok=True)
+        return 1
     return 0
 
 

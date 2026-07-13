@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Iterable, Mapping
 
+from ..operations import market_provenance as event_market_provenance
 from ..radar.decision_model_surfaces import decision_model_values
 from . import outcome_eligibility
 
@@ -61,6 +62,15 @@ def _outcome_placeholder_row(candidate: Mapping[str, Any], *, now: str) -> dict[
     )
     primary_status = str(horizon_metadata[primary_horizon]["maturity_status"])
     decision = _persisted_decision_values(candidate)
+    market_provenance = event_market_provenance.market_provenance_values(candidate)
+    market_provenance_fields = (
+        {
+            "market_provenance": market_provenance,
+            **event_market_provenance.market_provenance_flat_fields(market_provenance),
+        }
+        if market_provenance
+        else {}
+    )
     empty_returns = {horizon: None for horizon in HORIZONS}
     row = {
         "schema_version": 1,
@@ -86,6 +96,7 @@ def _outcome_placeholder_row(candidate: Mapping[str, Any], *, now: str) -> dict[
         **_calendar_evidence_values(candidate),
         "decision_projection": dict(decision),
         **decision,
+        **market_provenance_fields,
         "evidence_confidence_score_cohort": _score_cohort(
             decision.get("evidence_confidence_score")
         ),

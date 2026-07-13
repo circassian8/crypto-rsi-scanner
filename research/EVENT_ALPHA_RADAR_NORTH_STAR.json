@@ -60,12 +60,23 @@
       ],
       "role": "Finds broad market-first moves, evaluates market-led actionability, and creates catalyst-search enrichment queue items."
     },
-    "market_state_builder": {
-      "north_star_requirement": "Freshness and unit metadata must travel with state; stale state cannot promote fade-review or confirmed lanes.",
+    "market_provenance_v2": {
+      "north_star_requirement": "Only canonical crypto_radar_market_provenance_v2 live/no-send rows with explicit authorization, attempted and successful provider lineage, distinct fingerprinted request and source artifacts, generation identity, feature basis, and data quality may count as real burn-in evidence.",
       "primary_artifacts": [
-        "event_market_state.jsonl"
+        "event_market_no_send_request_ledger.json",
+        "event_market_no_send_market_rows.json",
+        "event_market_no_send_generation.json",
+        "event_market_no_send_pilot_audit.json"
       ],
-      "role": "Builds return, volume, liquidity, freshness, and relative-market context for candidates."
+      "role": "Normalizes one closed market acquisition value and derives contract validity, burn-in eligibility, and counting without accepting caller-asserted trust flags."
+    },
+    "market_state_builder": {
+      "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.",
+      "primary_artifacts": [
+        "event_market_state.jsonl",
+        "event_market_history.jsonl"
+      ],
+      "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, and bounded per-asset temporal baselines for candidates."
     },
     "opportunity_lane_classifier": {
       "north_star_requirement": "A lane is a research workflow label, not an instruction to trade.",
@@ -118,6 +129,7 @@
   },
   "burn_in_contract": {
     "auto_apply_thresholds": false,
+    "candidate_count_authority": "canonical market provenance v2 with candidate_source_mode=live_no_send, exact valid lineage, and burn_in_counted=true",
     "duration_days": 30,
     "freeze_criteria": [
       "any lane has unresolved strict blockers",
@@ -130,6 +142,7 @@
     "min_live_no_send_cycles": 20,
     "min_outcome_rows": 100,
     "min_real_candidates": 300,
+    "mock_fixture_replay_cache_or_preflight_counted": false,
     "no_auto_threshold_changes": true,
     "promotion_freeze_criteria": {
       "CONFIRMED_LONG_RESEARCH": [
@@ -208,15 +221,6 @@
         "risk",
         "neutral"
       ],
-      "market_phase": [
-        "emerging",
-        "breakout",
-        "acceleration",
-        "active",
-        "extended",
-        "exhaustion",
-        "reversal"
-      ],
       "legacy_thesis_origin": [
         "market_led",
         "catalyst_led",
@@ -226,6 +230,15 @@
         "fundamental_led",
         "macro_led",
         "mixed"
+      ],
+      "market_phase": [
+        "emerging",
+        "breakout",
+        "acceleration",
+        "active",
+        "extended",
+        "exhaustion",
+        "reversal"
       ],
       "primary_and_contributing_thesis_origins": [
         "market_led",
@@ -273,13 +286,24 @@
     "legacy_alert_routes_preserved": true,
     "legacy_mixed_thesis_origin_is_compatibility_only": true,
     "legacy_opportunity_type_preserved": true,
+    "market_data_quality_caps": {
+      "cold_or_warming_baseline_evidence_confidence_max": 62,
+      "cold_or_warming_baseline_risk_min": 48,
+      "cold_or_warming_baseline_urgency_max": 45,
+      "missing_or_stale_spread_urgency_max": 55,
+      "proxy_only_actionability_max": 64,
+      "proxy_only_can_be_actionable_or_rapid": false,
+      "proxy_only_evidence_confidence_max": 55,
+      "proxy_only_risk_min": 55,
+      "proxy_only_urgency_max": 45
+    },
     "market_led_actionability": {
       "catalyst_required": false,
       "invent_spread": false,
+      "requires_adequate_liquidity": true,
       "requires_canonical_identity": true,
       "requires_fresh_market_snapshot": true,
       "requires_meaningful_volume_anomaly": true,
-      "requires_adequate_liquidity": true,
       "requires_relative_move_or_stealth_accumulation": true,
       "requires_verified_good_or_acceptable_spread_for_actionable_or_rapid": true,
       "unavailable_spread_may_reach_dashboard_watch_only": true
@@ -316,7 +340,7 @@
       "percent_points_10_0_normalized_percent": 10.0
     }
   },
-  "generated_at": "2026-07-12T18:45:07+00:00",
+  "generated_at": "2026-07-13T06:45:34.693335+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -336,8 +360,13 @@
   },
   "live_provider_calls_allowed_by_default": false,
   "market_no_send_generation": {
-    "authorization": "existing explicit RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 only",
+    "authorization": {
+      "absent_behavior": "safe blocked result, no provider call, credential-free JSON and Markdown pilot audit, pointer unchanged",
+      "existing_explicit_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1",
+      "inferred_from_cache": false
+    },
     "dashboard_pointer_policy": {
+      "current_authoritative_namespace_is_immutable": true,
       "fixture_or_mock_generation_eligible": false,
       "pointer_changes_on_blocked_failed_stale_or_untrusted_generation": false,
       "required_checks": [
@@ -358,20 +387,95 @@
       "no_triggered_fade": true,
       "research_only": true
     },
-    "provider": "coingecko",
-    "provenance_fields": [
-      "data_mode",
-      "provider",
-      "request_or_cache_artifact",
-      "observed_at",
-      "contract_counted",
-      "no_send"
+    "exact_attempt_policy": {
+      "blocked_attempt_may_reuse_older_complete_manifest": false,
+      "doctor_and_publish_require_latest_cli_receipt_manifest_match": true,
+      "provider_errors_persisted_as_safe_classes_only": true,
+      "provider_health_artifact": "event_provider_health.json"
+    },
+    "outcome_policy": {
+      "candidate_outcome_count_mismatch": "publication blocker",
+      "cohort_drift": "blocker",
+      "pending_placeholder_per_canonical_decision_candidate": true
+    },
+    "pilot_audit_artifacts": [
+      "event_market_no_send_latest_attempt.json",
+      "event_market_no_send_pilot_audit.json",
+      "event_market_no_send_pilot_audit.md"
     ],
+    "provenance_contract": {
+      "burn_in_counting_is_derived": true,
+      "candidate_source_modes": [
+        "live_no_send",
+        "mocked_fixture",
+        "artifact_replay",
+        "preflight_only"
+      ],
+      "contract_version": 2,
+      "data_acquisition_modes": [
+        "live_provider",
+        "mocked_fixture",
+        "artifact_replay",
+        "preflight_only",
+        "cache_replay"
+      ],
+      "historical_flat_rows_silently_reclassified": false,
+      "mock_or_fixture_may_validate_mechanics": true,
+      "mock_or_fixture_real_burn_in_counted": false,
+      "schema_version": "crypto_radar_market_provenance_v2"
+    },
+    "provenance_fields": [
+      "data_acquisition_mode",
+      "candidate_source_mode",
+      "provider",
+      "provider_call_attempted",
+      "provider_call_succeeded",
+      "live_provider_authorized",
+      "request_ledger_path",
+      "request_ledger_sha256",
+      "provider_source_artifact",
+      "provider_source_artifact_sha256",
+      "provider_generation_id",
+      "cache_status",
+      "provenance_contract_valid",
+      "burn_in_eligible",
+      "burn_in_counted",
+      "burn_in_reason",
+      "feature_basis",
+      "data_quality",
+      "validation_errors"
+    ],
+    "provider": "coingecko",
     "targets": [
       "radar-market-no-send-readiness",
       "radar-market-no-send",
       "radar-market-no-send-smoke"
-    ]
+    ],
+    "temporal_baseline": {
+      "authoritative_namespace_mutation": "forbidden; use a new generation namespace backed by the bounded shared cache",
+      "baseline_excludes_current_observation": true,
+      "default_limits": {
+        "future_tolerance_minutes": 5,
+        "max_current_age_hours": 6,
+        "max_history_age_days": 45,
+        "max_observations_per_asset": 256,
+        "min_baseline_observations": 8
+      },
+      "derived_evidence": [
+        "1h/4h/24h returns in percent points",
+        "turnover and volume z-scores",
+        "return volatility",
+        "BTC and ETH relative returns",
+        "observation ids and baseline bounds"
+      ],
+      "direct_provider_fields_preserved": true,
+      "fixture_and_mock_cache_scope": "generation-local only; never seeds live history",
+      "generation_snapshot_artifact": "event_market_history.jsonl",
+      "only_explicit_proxy_fields_may_be_replaced": true,
+      "schema_id": "event_alpha.market_history_observation",
+      "schema_version": 1,
+      "shared_live_cache": "radar_market_history_cache/event_market_history.jsonl"
+    }
   },
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
@@ -670,11 +774,6 @@
     }
   },
   "paper_trades_created": 0,
-  "project_health_doctor_checks": {
-    "auto_apply_thresholds_true": "blocker",
-    "burn_in_contract_missing": "warning",
-    "north_star_document_missing": "warning"
-  },
   "product_layers": {
     "catalyst_radar": {
       "name": "Event Alpha",
@@ -687,17 +786,22 @@
     },
     "decision_radar": {
       "name": "Crypto Decision Radar",
+      "notifications_role": "route human attention, never execution",
       "owns": [
         "canonical trader-facing Decision v2 projection",
         "operator routes",
         "Decision-first cards and preview",
         "local read-only dashboard"
       ],
-      "primary_surface": "dashboard",
-      "notifications_role": "route human attention, never execution"
+      "primary_surface": "dashboard"
     },
     "relationship": "additive",
     "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker"
+  },
+  "project_health_doctor_checks": {
+    "auto_apply_thresholds_true": "blocker",
+    "burn_in_contract_missing": "warning",
+    "north_star_document_missing": "warning"
   },
   "purpose": "Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.",
   "research_only": true,

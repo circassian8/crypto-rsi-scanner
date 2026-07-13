@@ -7,6 +7,7 @@ import math
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import quote, urlsplit
 
+from ..operations import market_provenance
 from .loader import candidate_identifier
 from .models import DashboardResponse, DashboardSnapshot
 
@@ -446,6 +447,8 @@ def _candidate_detail(
             "Not Found",
             _layout(snapshot, "Candidate not found", "<p>No visible current-generation candidate has that ID.</p>"),
         )
+    provenance = _candidate_market_provenance(row)
+    data_quality = _candidate_data_quality(row)
     dimensions = _definition_list(
         (
             ("ID", candidate_identifier(row)),
@@ -480,6 +483,21 @@ def _candidate_detail(
             ("Risk", _score(row.get("risk_score"))),
             ("Chase risk", _score(row.get("chase_risk_score"))),
             ("Catalyst warning", "Catalyst unknown" if row.get("catalyst_status") == "unknown" else "none"),
+            ("Data acquisition mode", provenance.get("data_acquisition_mode") or "not recorded"),
+            ("Candidate source mode", provenance.get("candidate_source_mode") or "not recorded"),
+            ("Market provider", provenance.get("provider") or "not recorded"),
+            ("Cache status", provenance.get("cache_status") or "not recorded"),
+            ("Burn-in eligible", str(provenance.get("burn_in_eligible") is True).lower()),
+            ("Burn-in counted", str(provenance.get("burn_in_counted") is True).lower()),
+            ("Burn-in reason", provenance.get("burn_in_reason") or "not recorded"),
+            ("Provider source artifact", provenance.get("provider_source_artifact") or "not recorded"),
+            ("Request ledger", provenance.get("request_ledger_path") or "not recorded"),
+            ("Temporal baseline", data_quality.get("baseline_status") or "not evaluated"),
+            ("Direct feature count", data_quality.get("direct_feature_count") or 0),
+            ("Proxy feature count", data_quality.get("proxy_feature_count") or 0),
+            ("Liquidity basis", data_quality.get("liquidity_basis") or "not recorded"),
+            ("Volume baseline basis", data_quality.get("volume_zscore_basis") or "not recorded"),
+            ("Execution-quality basis", data_quality.get("spread_basis") or "not recorded"),
         )
     )
     source = _source_link(row)
@@ -594,6 +612,7 @@ def _candidate_table(
                 _h(row.get("preferred_horizon") or "unclassified"),
                 _h(row.get("expires_at") or "not recorded"),
                 _h(row.get("spread_status") or "unclassified"),
+                _h(_candidate_quality_label(row)),
                 _h(_score(row.get("chase_risk_score"))),
                 _market_snapshot_sparkline(row) or '<span class="muted">n/a</span>',
                 _h(warning),
@@ -614,6 +633,7 @@ def _candidate_table(
             "Horizon",
             "Expires",
             "Spread",
+            "Data quality",
             "Chase risk",
             "Snapshot",
             "Warning",
@@ -675,6 +695,73 @@ def _origin_tokens(row: Mapping[str, Any]) -> set[str]:
     if isinstance(origins, Iterable) and not isinstance(origins, (str, bytes, Mapping)):
         tokens.update(_token(value) for value in origins)
     return {token for token in tokens if token}
+
+
+def _candidate_market_provenance(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    canonical = market_provenance.market_provenance_values(row)
+    if canonical:
+        return canonical
+    projection = row.get("decision_projection")
+    projection = projection if isinstance(projection, Mapping) else {}
+    lineage = projection.get("source_provider_lineage")
+    lineage = lineage if isinstance(lineage, Mapping) else {}
+    containers = (
+        projection.get("market_provenance"),
+        row.get("market_provenance"),
+        lineage.get("market_provenance"),
+        row.get("market_state_snapshot"),
+        row.get("market_snapshot"),
+        lineage,
+    )
+    merged: dict[str, Any] = {}
+    fields = (
+        "data_mode", "data_acquisition_mode", "candidate_source_mode", "provider",
+        "cache_status", "burn_in_eligible", "burn_in_counted", "burn_in_reason",
+        "provider_source_artifact", "provider_source_sha256", "request_ledger_path",
+        "request_ledger_sha256", "provenance_contract_valid",
+    )
+    for container in containers:
+        if not isinstance(container, Mapping):
+            continue
+        for field in fields:
+            if field not in merged and container.get(field) not in (None, "", [], {}):
+                merged[field] = container.get(field)
+    return merged
+
+
+def _candidate_data_quality(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    projection = row.get("decision_projection")
+    projection = projection if isinstance(projection, Mapping) else {}
+    for container in (
+        row.get("market_state_snapshot"),
+        row.get("market_snapshot"),
+        projection.get("market_data_quality"),
+        row.get("market_data_quality"),
+        row.get("data_quality"),
+    ):
+        if not isinstance(container, Mapping):
+            continue
+        nested = container.get("market_data_quality")
+        if isinstance(nested, Mapping):
+            return nested
+        if any(
+            field in container
+            for field in (
+                "baseline_status", "direct_feature_count", "proxy_feature_count",
+                "liquidity_basis", "volume_zscore_basis", "spread_basis",
+            )
+        ):
+            return container
+    return {}
+
+
+def _candidate_quality_label(row: Mapping[str, Any]) -> str:
+    provenance = _candidate_market_provenance(row)
+    quality = _candidate_data_quality(row)
+    mode = str(provenance.get("candidate_source_mode") or "unclassified")
+    baseline = str(quality.get("baseline_status") or "not_evaluated")
+    spread = str(quality.get("spread_basis") or row.get("spread_status") or "unknown")
+    return f"{mode}; baseline={baseline}; spread={spread}"
 
 
 def _origin_display(row: Mapping[str, Any]) -> str:
@@ -872,14 +959,9 @@ code{{color:#bae6fd}}@media(max-width:760px){{table{{display:block;overflow-x:au
 
 def _generation_badges(snapshot: DashboardSnapshot) -> str:
     state = snapshot.operator_state
-    provenance = state.get("market_no_send_provenance")
-    if not isinstance(provenance, Mapping):
-        provenance = state.get("market_data_provenance")
-    if not isinstance(provenance, Mapping):
-        provenance = {}
-    data_mode = str(
-        provenance.get("data_mode")
-        or state.get("data_mode")
+    provenance = _canonical_generation_market_provenance(state)
+    claimed_mode = str(
+        state.get("data_mode")
         or next(
             (
                 row.get("data_mode")
@@ -901,6 +983,13 @@ def _generation_badges(snapshot: DashboardSnapshot) -> str:
         or state.get("run_mode")
         or "unknown"
     ).strip().casefold()
+    source_mode = str(
+        provenance.get("candidate_source_mode")
+        or provenance.get("data_acquisition_mode")
+        or claimed_mode
+    ).strip().casefold()
+    if not provenance and source_mode in {"live_no_send", "live_provider", "live"}:
+        source_mode = "unverified_live_claim"
     stale = any(
         "stale" in str(reason).casefold() or "age" in str(reason).casefold()
         for reason in snapshot.generation_authority_reasons
@@ -909,21 +998,68 @@ def _generation_badges(snapshot: DashboardSnapshot) -> str:
         "CURRENT" if snapshot.generation_authoritative else "UNTRUSTED"
     )
     status_class = "stale" if stale or not snapshot.generation_authoritative else "current"
-    is_live = data_mode.startswith(("live", "real")) or data_mode == "market_no_send"
-    mode_label = "LIVE / REAL DATA" if is_live else (
-        "FIXTURE" if "fixture" in data_mode or "mock" in data_mode else data_mode.upper()
+    exact_modes = {
+        "live_no_send": ("LIVE / REAL DATA", "live"),
+        "live_provider": ("LIVE / REAL DATA", "live"),
+        "live": ("LIVE / REAL DATA", "live"),
+        "mocked_fixture": ("MOCKED FIXTURE", "fixture"),
+        "mock_fixture": ("MOCKED FIXTURE", "fixture"),
+        "mock": ("MOCKED FIXTURE", "fixture"),
+        "artifact_replay": ("ARTIFACT REPLAY", "fixture"),
+        "cached": ("CACHED DATA", "fixture"),
+        "preflight_only": ("PREFLIGHT ONLY", "stale"),
+        "unverified_live_claim": ("UNVERIFIED LIVE CLAIM", "stale"),
+        "untrusted_provenance": ("UNTRUSTED PROVENANCE", "stale"),
+        "fixture": ("FIXTURE", "fixture"),
+    }
+    mode_label, mode_class = exact_modes.get(
+        source_mode,
+        (source_mode.upper() or "UNKNOWN MODE", "stale"),
     )
-    mode_class = "live" if is_live else "fixture"
+    is_live = bool(provenance) and source_mode in {
+        "live_no_send", "live_provider", "live",
+    }
     no_send = state.get("send_attempted") is False
+    burn_in_counted = bool(
+        provenance.get("provenance_contract_valid") is True
+        and provenance.get("burn_in_counted") is True
+        and is_live
+    )
     values = (
         (status_label, status_class),
         (mode_label or "UNKNOWN MODE", mode_class),
         ("NO-SEND" if no_send else "SEND STATE UNKNOWN", "current" if no_send else "stale"),
+        (
+            "BURN-IN COUNTED" if burn_in_counted else "BURN-IN EXCLUDED",
+            "current" if burn_in_counted and is_live else "fixture",
+        ),
     )
     return "".join(
         f'<span class="badge badge-{_h(css)}">{_h(label)}</span>'
         for label, css in values
     )
+
+
+def _canonical_generation_market_provenance(
+    state: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    raw = state.get("market_no_send_provenance")
+    if not isinstance(raw, Mapping):
+        raw = state.get("market_data_provenance")
+    if not isinstance(raw, Mapping) or not raw:
+        return {}
+    normalized = market_provenance.normalize_market_provenance(raw)
+    if (
+        normalized.get("provenance_contract_valid") is True
+        and dict(raw) == normalized
+    ):
+        return normalized
+    return {
+        "candidate_source_mode": "untrusted_provenance",
+        "provenance_contract_valid": False,
+        "burn_in_eligible": False,
+        "burn_in_counted": False,
+    }
 
 
 def _standalone_error(title: str, detail: str) -> str:

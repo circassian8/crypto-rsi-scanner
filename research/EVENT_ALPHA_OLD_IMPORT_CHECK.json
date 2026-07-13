@@ -5,6 +5,7 @@
   "blocked_internal_modules": [],
   "blocked_module_count": 0,
   "blocked_test_modules": [],
+  "cache_miss_reason": "input_fingerprint_mismatch",
   "cache_status": "miss",
   "deleted_path_import_failure_checks": 0,
   "deleted_shim_entry_count": 124,
@@ -23,7 +24,29 @@
       "retention_reason": "",
       "safe_to_remove": false,
       "shim_status": "deleted_shim",
-      "text_references": []
+      "text_references": [
+        {
+          "detail": "crypto_rsi_scanner.event_integrated_radar",
+          "line": 351,
+          "path": "tests/event_alpha/test_shim_registry.py",
+          "reference_type": "text_reference",
+          "snippet": "\"crypto_rsi_scanner.event_integrated_radar\\n\","
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_integrated_radar",
+          "line": 444,
+          "path": "tests/event_alpha/test_shim_registry.py",
+          "reference_type": "text_reference",
+          "snippet": "\"import crypto_rsi_scanner.event_integrated_radar\\n\","
+        },
+        {
+          "detail": "crypto_rsi_scanner.event_integrated_radar",
+          "line": 459,
+          "path": "tests/event_alpha/test_shim_registry.py",
+          "reference_type": "text_reference",
+          "snippet": "if row.get(\"old_path\") != \"crypto_rsi_scanner.event_integrated_radar\""
+        }
+      ]
     },
     {
       "allowed_exports": [],
@@ -2201,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 1294,
+          "line": 1362,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2239,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 1294,
+          "line": 1362,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2350,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 5007,
+          "line": 5066,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2452,17 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-13T03:57:38.167808+00:00",
+  "generated_at": "2026-07-13T06:45:36.925682+00:00",
   "include_runtime_artifacts": false,
+  "input_file_count": 879,
+  "input_fingerprint": "a41c6dabe839aa9f88455828da1e02e7bd033fe18fdae394c793aaae3381153f",
+  "input_fingerprint_match": false,
+  "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DECISIONS.md:1783914410",
-    "ROADMAP.md:1783914428",
-    "crypto_rsi_scanner/event_alpha/artifacts/research_cards/components/renderer.py:1783914319",
-    "crypto_rsi_scanner/event_alpha/dashboard/loader.py:1783914295",
-    "crypto_rsi_scanner/event_alpha/dashboard/models.py:1783914301"
+    "crypto_rsi_scanner/project_health/radar_north_star.py:1783925130",
+    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1783925135",
+    "research/EVENT_ALPHA_RADAR_NORTH_STAR.md:1783925135",
+    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1783925135",
+    "research/event_alpha_burn_in_contract.md:1783925135"
   ],
-  "newest_source_mtime": 1783915056.3596008,
+  "newest_source_mtime": 1783925135.1453247,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2471,35 +2498,40 @@
   "old_path_import_allowed_exceptions": 0,
   "old_path_internal_imports": 0,
   "old_path_test_imports": 0,
-  "old_path_text_references": 61,
+  "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1783900229.8725476,
+  "report_mtime": 1783925018.7130926,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
+    "cache_miss_reason": "input_fingerprint_mismatch",
     "cache_status": "miss",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
+    "input_file_count": 879,
+    "input_fingerprint": "a41c6dabe839aa9f88455828da1e02e7bd033fe18fdae394c793aaae3381153f",
+    "input_fingerprint_match": false,
+    "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DECISIONS.md:1783914410",
-      "ROADMAP.md:1783914428",
-      "crypto_rsi_scanner/event_alpha/artifacts/research_cards/components/renderer.py:1783914319",
-      "crypto_rsi_scanner/event_alpha/dashboard/loader.py:1783914295",
-      "crypto_rsi_scanner/event_alpha/dashboard/models.py:1783914301"
+      "crypto_rsi_scanner/project_health/radar_north_star.py:1783925130",
+      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1783925135",
+      "research/EVENT_ALPHA_RADAR_NORTH_STAR.md:1783925135",
+      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1783925135",
+      "research/event_alpha_burn_in_contract.md:1783925135"
     ],
-    "newest_source_mtime": 1783915056.3596008,
+    "newest_source_mtime": 1783925135.1453247,
     "regex_compile_count": 124,
-    "report_mtime": 1783900229.8725476,
-    "scan_duration_seconds": 1.6533,
+    "report_mtime": 1783925018.7130926,
+    "scan_duration_seconds": 1.5368,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 52,
     "scanned_makefile_files": 1,
     "scanned_script_files": 2,
-    "scanned_source_files": 696,
-    "scanned_test_files": 114,
-    "skipped_artifact_files": 1686,
+    "scanned_source_files": 705,
+    "scanned_test_files": 118,
+    "skipped_artifact_files": 1690,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
       "crypto_rsi_scanner/__pycache__",
@@ -2518,16 +2550,19 @@
       "research/archive/refactor_history/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
     ],
     "skipped_large_files": 1,
-    "skipped_suffix_files": 1
+    "skipped_suffix_files": 1,
+    "skipped_symlink_files": 0,
+    "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 1.6533,
+  "scan_duration_seconds": 1.5368,
   "scanned_doc_files": 52,
-  "scanned_source_files": 696,
-  "scanned_test_files": 114,
+  "scanned_source_files": 705,
+  "scanned_test_files": 118,
   "schema_version": "event_alpha_old_import_check_v1",
-  "skipped_artifact_files": 1686,
+  "skipped_artifact_files": 1690,
   "skipped_dirs": 66,
   "skipped_large_files": 1,
+  "source_snapshot_cache_status": "miss",
   "status": "OK",
   "strict_alerts_created": 0,
   "telegram_sends": 0,

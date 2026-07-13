@@ -65,9 +65,19 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "north_star_requirement": "Evidence can upgrade research confidence only through deterministic source-pack sufficiency gates.",
     },
     "market_state_builder": {
-        "role": "Builds return, volume, liquidity, freshness, and relative-market context for candidates.",
-        "primary_artifacts": ["event_market_state.jsonl"],
-        "north_star_requirement": "Freshness and unit metadata must travel with state; stale state cannot promote fade-review or confirmed lanes.",
+        "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, and bounded per-asset temporal baselines for candidates.",
+        "primary_artifacts": ["event_market_state.jsonl", "event_market_history.jsonl"],
+        "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.",
+    },
+    "market_provenance_v2": {
+        "role": "Normalizes one closed market acquisition value and derives contract validity, burn-in eligibility, and counting without accepting caller-asserted trust flags.",
+        "primary_artifacts": [
+            "event_market_no_send_request_ledger.json",
+            "event_market_no_send_market_rows.json",
+            "event_market_no_send_generation.json",
+            "event_market_no_send_pilot_audit.json",
+        ],
+        "north_star_requirement": "Only canonical crypto_radar_market_provenance_v2 live/no-send rows with explicit authorization, attempted and successful provider lineage, distinct fingerprinted request and source artifacts, generation identity, feature basis, and data quality may count as real burn-in evidence.",
     },
     "derivatives_crowding_layer": {
         "role": "Adds OI, funding, liquidations, long/short, basis, and perp/spot crowding evidence when provider artifacts exist.",
@@ -204,6 +214,17 @@ DECISION_MODEL_V2: dict[str, Any] = {
         "unavailable_spread_may_reach_dashboard_watch_only": True,
         "invent_spread": False,
     },
+    "market_data_quality_caps": {
+        "missing_or_stale_spread_urgency_max": 55,
+        "proxy_only_actionability_max": 64,
+        "proxy_only_evidence_confidence_max": 55,
+        "proxy_only_risk_min": 55,
+        "proxy_only_urgency_max": 45,
+        "cold_or_warming_baseline_evidence_confidence_max": 62,
+        "cold_or_warming_baseline_risk_min": 48,
+        "cold_or_warming_baseline_urgency_max": 45,
+        "proxy_only_can_be_actionable_or_rapid": False,
+    },
     "timing_contract": {
         "preferred_horizon_and_expires_at_are_canonical": True,
         "scheduled_evidence_may_raise_risk_and_shorten_expiry": True,
@@ -220,13 +241,28 @@ DECISION_MODEL_V2: dict[str, Any] = {
 }
 
 PRODUCT_LAYERS: dict[str, Any] = {
-    "event_alpha": "Catalyst Radar: catalyst discovery, source strength, strict catalyst classification, and historical uppercase lanes.",
-    "crypto_decision_radar": "Trader-facing product: canonical Decision v2 projection, lowercase routes, Decision-first cards/preview, and local dashboard.",
+    "catalyst_radar": {
+        "name": "Event Alpha",
+        "owns": [
+            "catalyst discovery",
+            "source-strength classification",
+            "strict catalyst routes",
+            "historical Event Alpha artifacts",
+        ],
+    },
+    "decision_radar": {
+        "name": "Crypto Decision Radar",
+        "owns": [
+            "canonical trader-facing Decision v2 projection",
+            "operator routes",
+            "Decision-first cards and preview",
+            "local read-only dashboard",
+        ],
+        "primary_surface": "dashboard",
+        "notifications_role": "route human attention, never execution",
+    },
     "relationship": "additive",
-    "unknown_catalyst_policy": "Lowers explanatory confidence and may raise risk; it is not a universal visibility blocker.",
-    "primary_surface": "dashboard",
-    "notification_role": "route human attention only",
-    "automatic_trading": False,
+    "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker",
 }
 
 MARKET_NO_SEND_GENERATION: dict[str, Any] = {
@@ -236,11 +272,88 @@ MARKET_NO_SEND_GENERATION: dict[str, Any] = {
     ],
     "default_namespace": "radar_market_no_send",
     "provider": "coingecko",
-    "authorization": "existing explicit RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 only",
+    "authorization": {
+        "existing_explicit_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1",
+        "inferred_from_cache": False,
+        "absent_behavior": "safe blocked result, no provider call, credential-free JSON and Markdown pilot audit, pointer unchanged",
+    },
+    "provenance_contract": {
+        "schema_version": "crypto_radar_market_provenance_v2",
+        "contract_version": 2,
+        "data_acquisition_modes": [
+            "live_provider",
+            "mocked_fixture",
+            "artifact_replay",
+            "preflight_only",
+            "cache_replay",
+        ],
+        "candidate_source_modes": [
+            "live_no_send",
+            "mocked_fixture",
+            "artifact_replay",
+            "preflight_only",
+        ],
+        "burn_in_counting_is_derived": True,
+        "mock_or_fixture_may_validate_mechanics": True,
+        "mock_or_fixture_real_burn_in_counted": False,
+        "historical_flat_rows_silently_reclassified": False,
+    },
     "provenance_fields": [
-        "data_mode", "provider", "request_or_cache_artifact", "observed_at",
-        "contract_counted", "no_send",
+        "data_acquisition_mode",
+        "candidate_source_mode",
+        "provider",
+        "provider_call_attempted",
+        "provider_call_succeeded",
+        "live_provider_authorized",
+        "request_ledger_path",
+        "request_ledger_sha256",
+        "provider_source_artifact",
+        "provider_source_artifact_sha256",
+        "provider_generation_id",
+        "cache_status",
+        "provenance_contract_valid",
+        "burn_in_eligible",
+        "burn_in_counted",
+        "burn_in_reason",
+        "feature_basis",
+        "data_quality",
+        "validation_errors",
     ],
+    "temporal_baseline": {
+        "generation_snapshot_artifact": "event_market_history.jsonl", "shared_live_cache": "radar_market_history_cache/event_market_history.jsonl",
+        "fixture_and_mock_cache_scope": "generation-local only; never seeds live history", "authoritative_namespace_mutation": "forbidden; use a new generation namespace backed by the bounded shared cache",
+        "schema_id": "event_alpha.market_history_observation",
+        "schema_version": 1,
+        "default_limits": {
+            "max_history_age_days": 45,
+            "max_observations_per_asset": 256,
+            "min_baseline_observations": 8,
+            "max_current_age_hours": 6,
+            "future_tolerance_minutes": 5,
+        },
+        "baseline_excludes_current_observation": True,
+        "direct_provider_fields_preserved": True,
+        "only_explicit_proxy_fields_may_be_replaced": True,
+        "derived_evidence": [
+            "1h/4h/24h returns in percent points",
+            "turnover and volume z-scores",
+            "return volatility",
+            "BTC and ETH relative returns",
+            "observation ids and baseline bounds",
+        ],
+    },
+    "outcome_policy": {
+        "pending_placeholder_per_canonical_decision_candidate": True, "candidate_outcome_count_mismatch": "publication blocker",
+        "cohort_drift": "blocker",
+    },
+    "pilot_audit_artifacts": [
+        "event_market_no_send_latest_attempt.json", "event_market_no_send_pilot_audit.json",
+        "event_market_no_send_pilot_audit.md",
+    ],
+    "exact_attempt_policy": {
+        "doctor_and_publish_require_latest_cli_receipt_manifest_match": True, "blocked_attempt_may_reuse_older_complete_manifest": False,
+        "provider_health_artifact": "event_provider_health.json", "provider_errors_persisted_as_safe_classes_only": True,
+    },
     "defaults": {
         "research_only": True, "no_sends": True, "no_trades": True,
         "no_paper_trades": True, "no_normal_rsi_writes": True,
@@ -249,6 +362,7 @@ MARKET_NO_SEND_GENERATION: dict[str, Any] = {
     "dashboard_pointer_policy": {
         "fixture_or_mock_generation_eligible": False,
         "pointer_changes_on_blocked_failed_stale_or_untrusted_generation": False,
+        "current_authoritative_namespace_is_immutable": True,
         "required_checks": [
             "real live-safe data mode", "complete operator state",
             "valid exact fingerprints", "matching canonical counts",
@@ -481,6 +595,8 @@ BURN_IN_CONTRACT = {
     "min_outcome_rows": 100,
     "auto_apply_thresholds": False,
     "no_auto_threshold_changes": True,
+    "candidate_count_authority": "canonical market provenance v2 with candidate_source_mode=live_no_send, exact valid lineage, and burn_in_counted=true",
+    "mock_fixture_replay_cache_or_preflight_counted": False,
     "promotion_freeze_criteria": {
         "EARLY_LONG_RESEARCH": [
             "sufficient fresh source evidence and market sanity across burn-in samples",
@@ -793,6 +909,9 @@ def format_burn_in_contract(payload: Mapping[str, Any]) -> str:
         f"- min_outcome_rows: `{payload.get('min_outcome_rows')}`",
         f"- auto_apply_thresholds: `{payload.get('auto_apply_thresholds')}`",
         f"- no_auto_threshold_changes: `{payload.get('no_auto_threshold_changes')}`",
+        f"- candidate_count_authority: `{payload.get('candidate_count_authority')}`",
+        "- mock_fixture_replay_cache_or_preflight_counted: "
+        f"`{payload.get('mock_fixture_replay_cache_or_preflight_counted')}`",
         "",
         "## Opportunity Lanes",
         "",
@@ -870,6 +989,14 @@ def _append_decision_model_north_star(
     )
     lines.append("- market_led_actionability:")
     for key, value in market_led.items():
+        lines.append(f"  - {key}: `{value}`")
+    quality_caps = (
+        decision.get("market_data_quality_caps")
+        if isinstance(decision.get("market_data_quality_caps"), Mapping)
+        else {}
+    )
+    lines.append("- market_data_quality_caps:")
+    for key, value in quality_caps.items():
         lines.append(f"  - {key}: `{value}`")
     for title, field in (
         ("canonical_context", "canonical_context"),
@@ -996,6 +1123,13 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
         "no_auto_threshold_changes",
     ):
         lines.append(f"- {field}: `{burn_in.get(field)}`")
+    lines.extend(
+        [
+            f"- candidate_count_authority: `{burn_in.get('candidate_count_authority')}`",
+            "- mock_fixture_replay_cache_or_preflight_counted: "
+            f"`{burn_in.get('mock_fixture_replay_cache_or_preflight_counted')}`",
+        ]
+    )
     lines.extend(["", "### Promotion/Freeze Criteria", ""])
     criteria = burn_in.get("promotion_freeze_criteria") if isinstance(burn_in.get("promotion_freeze_criteria"), Mapping) else {}
     for lane_name in LANE_NAMES:

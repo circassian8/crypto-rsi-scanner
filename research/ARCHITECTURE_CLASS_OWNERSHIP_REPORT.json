@@ -388,7 +388,7 @@
         "MarketNoSendReadiness"
       ],
       "exception_reason": "",
-      "max_class_line_count": 35,
+      "max_class_line_count": 55,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
       "public_class_count": 3,
@@ -1471,7 +1471,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 562,
+  "class_count": 570,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1526,12 +1526,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 6996,
+  "function_count": 7153,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-13T03:57:42.615847+00:00",
+  "generated_at": "2026-07-13T06:45:41.364839+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1882,7 +1882,7 @@
         "MarketNoSendReadiness"
       ],
       "exception_reason": "",
-      "max_class_line_count": 35,
+      "max_class_line_count": 55,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
       "public_class_count": 3,
@@ -3187,7 +3187,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 446,
+  "public_class_count": 448,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3250,6 +3250,7 @@
     "crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor": 2,
     "crypto_rsi_scanner.event_alpha.operations.daily_burn_in_plan": 1,
     "crypto_rsi_scanner.event_alpha.operations.market_no_send_models": 3,
+    "crypto_rsi_scanner.event_alpha.operations.market_no_send_provider": 1,
     "crypto_rsi_scanner.event_alpha.operations.namespace_policy": 1,
     "crypto_rsi_scanner.event_alpha.operations.review_inbox": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in": 3,
@@ -3313,6 +3314,7 @@
     "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner": 2,
     "crypto_rsi_scanner.event_alpha.radar.market_confirmation": 4,
     "crypto_rsi_scanner.event_alpha.radar.market_enrichment": 1,
+    "crypto_rsi_scanner.event_alpha.radar.market_history": 1,
     "crypto_rsi_scanner.event_alpha.radar.market_reaction": 5,
     "crypto_rsi_scanner.event_alpha.radar.market_state": 1,
     "crypto_rsi_scanner.event_alpha.radar.missed": 2,
@@ -3427,7 +3429,7 @@
       "rows": []
     },
     "production_files_over_1200_lines": {
-      "count": 8,
+      "count": 9,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
         {
@@ -3480,6 +3482,14 @@
         },
         {
           "accepted": true,
+          "line_count": 1263,
+          "path": "crypto_rsi_scanner/event_alpha/shims.py",
+          "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+          "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1261,
           "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
           "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -3527,7 +3537,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 8,
+      "production_files_over_1200_lines": 9,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -3567,6 +3577,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1263,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1261,
         "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
         "threshold": 1200
@@ -3590,7 +3605,7 @@
         "rows": []
       },
       "production_files_over_1200_lines": {
-        "count": 8,
+        "count": 9,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
           {
@@ -3643,6 +3658,14 @@
           },
           {
             "accepted": true,
+            "line_count": 1263,
+            "path": "crypto_rsi_scanner/event_alpha/shims.py",
+            "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+            "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1261,
             "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
             "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -3674,7 +3697,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 8,
+    "production_files_over_1200_lines": 9,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

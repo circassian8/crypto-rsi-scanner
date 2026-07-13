@@ -163,6 +163,37 @@ def test_market_led_missing_spread_is_provisional_dashboard_only():
     assert result.radar_route == "dashboard_watch"
     assert "spread_unavailable_dashboard_only" in result.decision_soft_penalties
     assert "spread_bps" in result.decision_missing_data
+    assert result.urgency_score <= 55.0
+
+
+def test_proxy_only_market_evidence_is_score_and_route_capped():
+    result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "market_feature_basis": {
+                    "return_4h": "cross_sectional_return_proxy",
+                    "return_24h": "provider_24h_volume_proxy",
+                    "relative_return_vs_btc_4h": "cross_sectional_proxy",
+                    "volume_zscore_24h": "cross_sectional_log_turnover_proxy",
+                    "liquidity_usd": "coingecko_total_volume_24h_proxy",
+                    "spread_bps": "unavailable",
+                },
+                "proxy_only_market_features": True,
+                "temporal_baseline_status": "warming",
+                "market_route_cap": "dashboard_watch",
+            }
+        )
+    )
+
+    assert result.radar_actionable is False
+    assert result.radar_route == "dashboard_watch"
+    assert result.radar_route_reason == "market_data_quality_limited_to_dashboard"
+    assert result.actionability_score <= 64.0
+    assert result.evidence_confidence_score <= 55.0
+    assert result.risk_score >= 55.0
+    assert result.urgency_score <= 45.0
+    assert "proxy_only_market_evidence_dashboard_only" in result.decision_soft_penalties
+    assert any("proxy-only" in warning for warning in result.decision_warnings)
 
 
 def test_acceptable_wide_spread_emits_higher_manipulation_warning():
@@ -839,6 +870,46 @@ def test_multiple_thesis_origins_preserve_primary_and_contributors():
     assert technical_with_market.thesis_origins == ("technical_led", "market_led")
     assert derivatives_only.primary_thesis_origin == "derivatives_led"
     assert derivatives_only.thesis_origins == ("derivatives_led",)
+
+
+def test_market_primary_with_confirmed_catalyst_contributor_can_be_high_confidence():
+    source = {
+        "_source_origin": "official_exchange",
+        "source_origin": "official_exchange",
+        "source_class": "official_exchange",
+        "source_pack": "official_exchange_listing_pack",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "latest_source_url": "https://example.invalid/listing",
+        "latest_source_title": "Official listing notice",
+        "event_type": "spot_listing",
+    }
+
+    result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            latest_source_url=source["latest_source_url"],
+            latest_source_title=source["latest_source_title"],
+        ),
+        source_rows=[source],
+    )
+
+    assert result.primary_thesis_origin == "market_led"
+    assert result.thesis_origins[:2] == ("market_led", "catalyst_led")
+    assert result.catalyst_status == "confirmed"
+    assert result.confidence_band == "high_confidence"
+    assert result.radar_route == "high_confidence_watch"
+
+
+def test_spoofed_catalyst_contributor_without_evidence_cannot_be_high_confidence():
+    result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=[{"_source_origin": "official_exchange"}],
+    )
+
+    assert result.primary_thesis_origin == "market_led"
+    assert "catalyst_led" in result.thesis_origins
+    assert result.catalyst_status == "unknown"
+    assert result.radar_route != "high_confidence_watch"
 
 
 def test_middle_score_is_dashboard_visible_without_becoming_actionable():

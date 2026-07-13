@@ -16,6 +16,63 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-13 - Count market-pilot truth only from canonical provenance and bounded temporal evidence
+**Status:** accepted
+**Decision:** New Decision Radar market-led generations use the closed
+`crypto_radar_market_provenance_v2` value (`contract_version=2`) as the only
+authority for acquisition mode, provider lineage, validity, and real burn-in
+counting. Consumers copy that value and its feature-basis/data-quality evidence;
+they do not trust caller-asserted `burn_in_eligible`, `burn_in_counted`, or
+contract-valid flags and do not silently reinterpret historical flat rows. A
+candidate-bearing generation must retain distinct request-ledger and provider-
+source artifacts with valid SHA-256 fingerprints, a provider generation id,
+cache status, explicit provider-call attempted/succeeded state, and explicit
+live authorization. Only a valid `live_provider` / `live_no_send` generation is
+eligible and counted. Mock/fixture generations may validate the pipeline but
+remain excluded from real burn-in and real dashboard authority; replay, cache,
+preflight, malformed, or conflicting provenance also remains excluded.
+
+Market anomaly evidence uses a bounded per-asset temporal history rather than
+presenting a one-snapshot cross-section as a mature time-series signal. The v1
+history policy retains at most 45 days and 256 observations per asset, requires
+eight strictly earlier observations to warm a feature baseline, and derives
+1h/4h/24h returns, volatility, turnover/volume z-scores, and BTC/ETH relative
+returns in percent points without including the current observation in its own
+baseline. Current rows older than six hours or beyond the five-minute future
+tolerance fail closed. Direct provider fields remain direct; only fields
+explicitly marked as proxy inputs may be replaced by a temporal derivation.
+
+Decision Model v2 makes evidence limitations operational. Missing/stale spread
+caps urgency at 55 and cannot support actionable/rapid routing. Proxy-only
+market evidence caps actionability at 64 and evidence confidence at 55, floors
+risk at 55, caps urgency at 45, and cannot be actionable or rapid. A cold,
+warming, unavailable, or stale temporal baseline caps evidence confidence at
+62, floors risk at 48, and caps urgency at 45; a still-proxy anomaly basis stays
+review-only until it warms. These are transparent Decision Radar caps, not
+changes to Event Alpha's strict Catalyst Radar lanes.
+
+The live pilot remains no-send and research-only. Missing
+`RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` authorization returns an explicit safe-
+blocked result, performs no provider call, writes only a credential-free pilot
+audit, and leaves the fixed dashboard pointer unchanged. Publication requires a
+real fresh complete generation, canonical v2 lineage, exact request/source/
+history/product fingerprints, matching candidate/Core/card/preview/pending-
+outcome counts, current operator-state binding, and a fresh full strict doctor
+with zero blockers. Every canonical Decision candidate gets one pending outcome
+placeholder; outcome cohorts remain copied measurement evidence and never
+auto-apply a threshold. No path may send, trade, paper trade, write normal RSI
+rows, execute orders, or let Event Alpha create `TRIGGERED_FADE`.
+**Why:** A provider name or mock snapshot is not evidence that a real market
+observation occurred, and a cross-sectional proxy is not a temporal baseline.
+Closed lineage, explicit warmup, and visible quality caps keep the pilot useful
+without overstating freshness, execution quality, or burn-in maturity. Guarded
+publication prevents a blocked, partial, fixture, or drifted attempt from
+becoming current operator truth.
+**Revisit when:** A versioned provenance or history contract provides equivalent
+or stronger immutable lineage and time-series evidence, or reviewed real
+no-send outcomes justify a separately human-approved change to warmup, quality
+caps, routes, or publication policy without weakening the safety boundaries.
+
 ## 2026-07-12 - Use one closed Decision v2 projection as trader-facing authority
 **Status:** accepted
 **Decision:** `crypto_radar_decision_projection_v1`, returned by
@@ -71,6 +128,17 @@ current run/revision/operator-state binding, and a fresh full strict doctor with
 zero blockers. A real clean zero-idea generation may become honest current
 authority when those same gates pass. Blocked, failed, stale, fixture, or mock
 runs must remain explicit and cannot make stale fixture data look live.
+
+The rolling temporal baseline uses the dedicated bounded research cache
+`radar_market_history_cache/event_market_history.jsonl`. Each live generation
+copies an exact fingerprinted snapshot into its own namespace; fixture/mock
+history is isolated and never warms live evidence. Published namespaces are
+immutable, so subsequent live cycles use a new namespace while seeding from the
+shared cache. `event_market_no_send_latest_attempt.json` binds Make orchestration
+to the just-completed CLI attempt; doctor/publication cannot reuse an older
+complete manifest after a blocked attempt. Live authority also requires the
+fingerprinted namespace-local provider-health artifact, which persists only
+safe error classes.
 
 Every current canonical Decision idea, including diagnostic controls, receives
 a pending outcome placeholder whose origin/route/actionability/evidence/risk/

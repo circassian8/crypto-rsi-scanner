@@ -2,15 +2,15 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-13T03:57:41.291428+00:00`
+- generated_at: `2026-07-13T06:45:40.024931+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
 - v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `8`
-- accepted_production_files_over_1200_lines: `8`
+- production_files_over_1200_lines: `9`
+- accepted_production_files_over_1200_lines: `9`
 - unresolved_production_files_over_1200_lines: `0`
 - production_size_gate_status: `warning`
 - production_files_over_1500_lines: `0`
@@ -70,7 +70,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 8 | accepted_exception |
+| `production_files_over_1200_lines` | 9 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -98,40 +98,40 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1338 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1200 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1199 |
 | `crypto_rsi_scanner/cli/services/event_alpha_research.py` | 1199 |
+| `crypto_rsi_scanner/project_health/radar_north_star.py` | 1199 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1198 |
+| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1194 |
+| `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1190 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1189 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1187 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1187 |
+| `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1182 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1182 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
-| `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1180 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1180 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1176 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1176 |
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1171 |
-| `crypto_rsi_scanner/event_alpha/shims.py` | 1169 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1168 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1156 |
+| `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1144 |
 | `crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py` | 1139 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1136 |
 | `crypto_rsi_scanner/event_alpha/radar/market_confirmation.py` | 1135 |
 | `crypto_rsi_scanner/event_alpha/outcomes/feedback_eligibility.py` | 1120 |
 | `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py` | 1115 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/rsi_scan.py` | 1103 |
-| `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1094 |
 | `crypto_rsi_scanner/event_alpha/notifications/delivery.py` | 1090 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/reports.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/providers/dex_onchain_readiness.py` | 1078 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1070 |
-| `crypto_rsi_scanner/project_health/radar_north_star.py` | 1065 |
 | `crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py` | 1056 |
-| `crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py` | 1055 |
-| `crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py` | 1047 |
-| `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1046 |
 
 ## Accepted Production Files Over 1200 Lines
 
@@ -143,6 +143,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1338 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
+| `crypto_rsi_scanner/event_alpha/shims.py` | 1263 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
 
@@ -156,9 +157,9 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
+| `tests/cli/test_make_targets.py` | 1499 |
 | `tests/event_alpha/test_operator_state.py` | 1499 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1491 |
-| `tests/cli/test_make_targets.py` | 1484 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_operator_workflows.py` | 1449 |
@@ -170,8 +171,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_evidence_acquisition.py` | 1214 |
 | `tests/event_alpha/test_news_providers.py` | 1210 |
 | `tests/event_alpha/test_watchlist_router.py` | 1207 |
+| `tests/event_alpha/test_decision_model_v2.py` | 1191 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1127 |
-| `tests/event_alpha/test_decision_model_v2.py` | 1120 |
 | `tests/event_alpha/test_catalyst_search.py` | 1107 |
 | `tests/event_alpha/test_radar_pipeline.py` | 1088 |
 | `tests/event_alpha/test_fade_validation.py` | 1081 |
@@ -179,12 +180,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_notification_inbox_rehearsals.py` | 1068 |
 | `tests/event_alpha/test_llm_radar.py` | 1040 |
 | `tests/event_alpha/test_quality_feedback.py` | 1040 |
-| `tests/test_indicators.py` | 1025 |
+| `tests/test_indicators.py` | 1028 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 993 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 979 |
 | `tests/event_alpha/test_namespace_integrations.py` | 962 |
 | `tests/event_alpha/test_notification_operations.py` | 925 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 920 |
+| `tests/event_alpha/test_radar_dashboard.py` | 899 |
 | `tests/event_alpha/test_notification_routing.py` | 895 |
 | `tests/event_alpha/test_evidence_quality.py` | 874 |
 | `tests/event_alpha/test_claim_semantics.py` | 867 |
@@ -195,7 +197,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_core_reconciliation.py` | 810 |
 | `tests/event_alpha/test_source_coverage_reports.py` | 807 |
 | `tests/event_alpha/test_doctor_reconciliation.py` | 805 |
-| `tests/event_alpha/test_operator_presentation.py` | 801 |
 
 ## Files Over 1500 Lines
 

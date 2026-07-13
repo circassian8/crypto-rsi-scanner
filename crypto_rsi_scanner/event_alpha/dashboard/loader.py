@@ -203,9 +203,25 @@ def _load_once(
     integrated_outcomes_path = namespace_dir / "event_integrated_radar_outcomes.jsonl"
     legacy_outcomes_path = namespace_dir / "event_alpha_outcomes.jsonl"
     cumulative_feedback, feedback_digest, feedback_error = _read_unverified_jsonl(feedback_path)
-    integrated_outcomes, integrated_outcomes_digest, integrated_outcomes_error = (
-        _read_unverified_jsonl(integrated_outcomes_path)
-    )
+    integrated_outcomes_blob = blobs.get("integrated_outcomes")
+    if integrated_outcomes_blob is not None:
+        try:
+            integrated_outcomes = _jsonl_rows_from_blob(integrated_outcomes_blob)
+            integrated_outcomes_digest = hashlib.sha256(
+                integrated_outcomes_blob.data
+            ).hexdigest()
+            integrated_outcomes_error = None
+            integrated_outcomes_authority = "current_generation_fingerprint_verified"
+        except DashboardLoadError:
+            integrated_outcomes = ()
+            integrated_outcomes_digest = None
+            integrated_outcomes_error = "invalid_verified_jsonl"
+            integrated_outcomes_authority = "current_generation_invalid"
+    else:
+        integrated_outcomes, integrated_outcomes_digest, integrated_outcomes_error = (
+            _read_unverified_jsonl(integrated_outcomes_path)
+        )
+        integrated_outcomes_authority = "cumulative_non_authoritative"
     legacy_outcomes, legacy_outcomes_digest, legacy_outcomes_error = _read_unverified_jsonl(
         legacy_outcomes_path
     )
@@ -220,6 +236,7 @@ def _load_once(
             now,
             integrated_outcomes_digest,
             integrated_outcomes_error,
+            authority=integrated_outcomes_authority,
         ),
         legacy_outcomes_path.name: _unverified_history_metadata(
             now,
@@ -438,7 +455,13 @@ def _expected_fingerprint_kind(artifact_name: str) -> str:
         return "canonical_run_row"
     if artifact_name == "research_cards":
         return "directory_tree_v1"
-    if artifact_name in {"core_opportunities", "unified_calendar"}:
+    if artifact_name in {
+        "core_opportunities",
+        "unified_calendar",
+        "market_history",
+        "integrated_candidates",
+        "integrated_outcomes",
+    }:
         return "jsonl_lines"
     return "file_bytes"
 
@@ -758,9 +781,11 @@ def _unverified_history_metadata(
     now: datetime,
     digest: str | None,
     error: str | None,
+    *,
+    authority: str = "cumulative_non_authoritative",
 ) -> dict[str, Any]:
     return {
-        "authority": "cumulative_non_authoritative",
+        "authority": authority,
         "read_at": now.isoformat() if digest else None,
         "sha256": digest,
         "error": error,

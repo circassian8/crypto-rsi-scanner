@@ -12,6 +12,7 @@ from .... import (
     config,
 )
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
+import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
@@ -95,6 +96,7 @@ def _core_row_serialization_context(
         "support": support,
         "diagnostics": diagnostics,
         "all_rows": all_rows,
+        "market_provenance": event_market_provenance.merge_market_provenance(all_rows),
         "support_ids": _row_ids(support),
         "diagnostic_ids": _row_ids(diagnostics),
         "diagnostic_row_count": max(
@@ -427,7 +429,7 @@ def _core_row_identity_source_fields(context: Mapping[str, Any]) -> dict[str, An
     official_event = context["official_event"]
     scheduled_event = context["scheduled_event"]
     unlock_event = context["unlock_event"]
-    return {
+    fields = {
         "schema_id": "core_opportunity_v1",
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
@@ -507,6 +509,11 @@ def _core_row_identity_source_fields(context: Mapping[str, Any]) -> dict[str, An
         "candidate_source_mode": _first_text(all_rows, ("candidate_source_mode",)),
         "contract_counted_candidate": _any_truthy(all_rows, ("contract_counted_candidate",)),
     }
+    provenance = context.get("market_provenance")
+    if isinstance(provenance, Mapping) and provenance:
+        fields["market_provenance"] = dict(provenance)
+        fields.update(event_market_provenance.market_provenance_flat_fields(provenance))
+    return fields
 
 
 def _core_row_opportunity_market_fields(context: Mapping[str, Any]) -> dict[str, Any]:

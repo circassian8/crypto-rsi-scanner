@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ...operations import market_provenance
 from ..fingerprints import (
     ALL_FINGERPRINT_KINDS,
     CANONICAL_RUN_ROW_KIND as FINGERPRINT_KIND_CANONICAL_RUN_ROW,
@@ -21,7 +22,13 @@ from ..fingerprints import (
 FINGERPRINT_KINDS = frozenset(ALL_FINGERPRINT_KINDS)
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_JSONL_ARTIFACTS = {"core_opportunities", "unified_calendar"}
+_JSONL_ARTIFACTS = {
+    "core_opportunities",
+    "unified_calendar",
+    "market_history",
+    "integrated_candidates",
+    "integrated_outcomes",
+}
 _DIRECTORY_ARTIFACTS = {"research_cards"}
 _RUN_ROW_IDENTITY_FIELDS = ("run_id", "profile", "artifact_namespace")
 _COMMON_FINGERPRINT_FIELDS = FINGERPRINT_FIELDS
@@ -36,7 +43,7 @@ _LEGACY_SHA_ONLY_OTHER_FIELDS = tuple(
     )
     if field != "sha256"
 )
-_MARKET_NO_SEND_PROVENANCE_FIELDS = frozenset(
+_MARKET_NO_SEND_PROVENANCE_V1_FIELDS = frozenset(
     {
         "contract_version",
         "data_mode",
@@ -54,6 +61,31 @@ _MARKET_NO_SEND_PROVENANCE_FIELDS = frozenset(
         "normal_rsi_signal_rows_written",
         "triggered_fade_created",
         "telegram_sends",
+    }
+)
+_MARKET_NO_SEND_PROVENANCE_V2_FIELDS = frozenset(
+    {
+        "schema_version",
+        "contract_version",
+        "data_acquisition_mode",
+        "candidate_source_mode",
+        "provider",
+        "provider_call_attempted",
+        "provider_call_succeeded",
+        "live_provider_authorized",
+        "request_ledger_path",
+        "request_ledger_sha256",
+        "provider_source_artifact",
+        "provider_source_artifact_sha256",
+        "provider_generation_id",
+        "cache_status",
+        "provenance_contract_valid",
+        "burn_in_eligible",
+        "burn_in_counted",
+        "burn_in_reason",
+        "feature_basis",
+        "data_quality",
+        "validation_errors",
     }
 )
 
@@ -85,24 +117,99 @@ def _validate_market_no_send_provenance(value: Any) -> list[str]:
     if not isinstance(value, Mapping):
         return ["operator_state_market_no_send_provenance_not_object"]
     errors: list[str] = []
-    fields = set(value)
-    if fields != _MARKET_NO_SEND_PROVENANCE_FIELDS:
-        errors.append("operator_state_market_no_send_provenance_fields_invalid")
-    if value.get("contract_version") != 1:
+    version = value.get("contract_version")
+    if version == 1:
+        return _validate_market_no_send_provenance_v1(value)
+    if version != 2:
         errors.append("operator_state_market_no_send_provenance_version_invalid")
-    data_mode = value.get("data_mode")
+        return errors
+    if set(value) != _MARKET_NO_SEND_PROVENANCE_V2_FIELDS:
+        errors.append("operator_state_market_no_send_provenance_fields_invalid")
+    if value.get("schema_version") != "crypto_radar_market_provenance_v2":
+        errors.append("operator_state_market_no_send_schema_version_invalid")
+    normalized = market_provenance.normalize_market_provenance(value)
+    if dict(value) != normalized:
+        errors.append("operator_state_market_no_send_provenance_not_canonical")
+    acquisition_mode = value.get("data_acquisition_mode")
+    source_mode = value.get("candidate_source_mode")
     provider = value.get("provider")
+    mode_pairs = {
+        "live_provider": "live_no_send",
+        "mocked_fixture": "mocked_fixture",
+        "artifact_replay": "artifact_replay",
+        "preflight_only": "preflight_only",
+        "cache_replay": "artifact_replay",
+    }
+    if acquisition_mode not in mode_pairs:
+        errors.append("operator_state_market_no_send_acquisition_mode_invalid")
+    if mode_pairs.get(acquisition_mode) != source_mode:
+        errors.append("operator_state_market_no_send_candidate_source_mode_invalid")
+    if not isinstance(provider, str) or not provider.strip():
+        errors.append("operator_state_market_no_send_provider_invalid")
+    request_artifact = value.get("provider_source_artifact")
+    request_path = Path(str(request_artifact or ""))
+    if (
+        request_artifact != "event_market_no_send_market_rows.json"
+        or request_path.is_absolute()
+        or len(request_path.parts) != 1
+    ):
+        errors.append("operator_state_market_no_send_request_artifact_invalid")
+    ledger = value.get("request_ledger_path")
+    ledger_path = Path(str(ledger or ""))
+    if (
+        ledger != "event_market_no_send_request_ledger.json"
+        or ledger_path.is_absolute()
+        or len(ledger_path.parts) != 1
+    ):
+        errors.append("operator_state_market_no_send_request_ledger_invalid")
+    for field in ("provider_source_artifact_sha256", "request_ledger_sha256"):
+        if not _valid_sha256(value.get(field)):
+            errors.append(f"operator_state_market_no_send_{field}_invalid")
+    live = source_mode == "live_no_send"
+    validation_errors = value.get("validation_errors")
+    if not isinstance(validation_errors, list) or any(not isinstance(item, str) for item in validation_errors):
+        errors.append("operator_state_market_no_send_validation_errors_invalid")
+        validation_errors = []
+    elif validation_errors:
+        errors.append("operator_state_market_no_send_provenance_contract_invalid")
+    eligible = bool(
+        live
+        and value.get("live_provider_authorized") is True
+        and value.get("provider_call_attempted") is True
+        and value.get("provider_call_succeeded") is True
+        and not validation_errors
+    )
+    contract_valid = not validation_errors
+    if value.get("provenance_contract_valid") is not contract_valid:
+        errors.append("invalid_market_no_send_provenance:provenance_contract_valid")
+    for field in ("burn_in_eligible", "burn_in_counted"):
+        if value.get(field) is not eligible:
+            errors.append(f"invalid_market_no_send_provenance:{field}")
+    if not str(value.get("provider_generation_id") or "").strip():
+        errors.append("operator_state_market_no_send_generation_id_invalid")
+    if value.get("cache_status") not in {
+        "not_applicable", "miss", "hit", "refreshed", "write_through", "unknown"
+    }:
+        errors.append("operator_state_market_no_send_cache_status_invalid")
+    if not str(value.get("burn_in_reason") or "").strip():
+        errors.append("operator_state_market_no_send_burn_in_reason_invalid")
+    for field in ("feature_basis", "data_quality"):
+        if not isinstance(value.get(field), Mapping):
+            errors.append(f"operator_state_market_no_send_{field}_invalid")
+    return errors
+
+
+def _validate_market_no_send_provenance_v1(value: Mapping[str, Any]) -> list[str]:
+    """Keep already-published historical v1 operator states readable."""
+
+    errors: list[str] = []
+    if set(value) != _MARKET_NO_SEND_PROVENANCE_V1_FIELDS:
+        errors.append("operator_state_market_no_send_provenance_fields_invalid")
+    data_mode = value.get("data_mode")
     if data_mode not in {"live", "mock"}:
         errors.append("operator_state_market_no_send_data_mode_invalid")
-    if provider != ("coingecko" if data_mode == "live" else "mock_coingecko"):
+    if value.get("provider") != ("coingecko" if data_mode == "live" else "mock_coingecko"):
         errors.append("operator_state_market_no_send_provider_invalid")
-    observed_at = value.get("observed_at")
-    try:
-        observed = datetime.fromisoformat(str(observed_at).replace("Z", "+00:00"))
-    except ValueError:
-        observed = None
-    if observed is None or observed.tzinfo is None:
-        errors.append("operator_state_market_no_send_observed_at_invalid")
     request_artifact = value.get("request_cache_artifact")
     request_path = Path(str(request_artifact or ""))
     if (

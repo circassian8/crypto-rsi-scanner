@@ -304,6 +304,63 @@ def test_shim_scan_can_opt_into_small_runtime_artifact():
     assert accounting["skipped_artifact_files"] == 0
 
 
+def test_shim_scan_does_not_follow_file_symlinks_outside_repo():
+    entry = shims.ShimRegistryEntry(
+        old_module="crypto_rsi_scanner.event_deleted_fixture",
+        new_module="crypto_rsi_scanner.event_alpha.deleted_fixture",
+        shim_status=shims.STATUS_ACTIVE_SHIM,
+        allowed_exports=("*",),
+    )
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp) / "repo"
+        package = root / "crypto_rsi_scanner"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        outside = Path(tmp) / "outside.py"
+        outside.write_text(
+            "import crypto_rsi_scanner.event_deleted_fixture\n",
+            encoding="utf-8",
+        )
+        (package / "linked.py").symlink_to(outside)
+
+        refs, accounting = shims._scan_dependency_references_with_accounting(  # noqa: SLF001
+            (entry,),
+            repo_root=root,
+        )
+
+    assert not refs[entry.old_module]["internal_import_references"]
+    assert accounting["skipped_symlink_files"] == 1
+
+
+def test_shim_snapshot_invalidates_when_large_ignored_file_becomes_scannable():
+    from crypto_rsi_scanner.event_alpha import shim_scan
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        ignored = package / "notes.md"
+        ignored.write_text("x" * 256, encoding="utf-8")
+        first = shim_scan.get_source_snapshot(root, max_file_bytes=64)
+        assert "crypto_rsi_scanner/notes.md" not in {
+            entry.scan_path.rel_path for entry in first.entries
+        }
+
+        ignored.write_text(
+            "crypto_rsi_scanner.event_integrated_radar\n",
+            encoding="utf-8",
+        )
+        second = shim_scan.get_source_snapshot(root, max_file_bytes=64)
+        shim_scan.clear_source_snapshot_cache(root=root)
+
+    assert second.cache_status == "miss"
+    assert second.input_fingerprint != first.input_fingerprint
+    assert "crypto_rsi_scanner/notes.md" in {
+        entry.scan_path.rel_path for entry in second.entries
+    }
+
+
 def test_shim_dependency_report_cache_reuse_and_force_rescan():
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -325,7 +382,7 @@ def test_shim_dependency_report_cache_reuse_and_force_rescan():
         normal_source_ts = now_ts - 10
         os.utime(json_path, (old_report_ts, old_report_ts))
         os.utime(source, (normal_source_ts, normal_source_ts))
-        normal_miss = shims.build_shim_dependency_report(root=root)
+        normal_mtime_hit = shims.build_shim_dependency_report(root=root)
 
         _json_path, _md_path, _removal_json, _removal_md, _fresh = shims.write_shim_dependency_report(
             root=root,
@@ -336,7 +393,12 @@ def test_shim_dependency_report_cache_reuse_and_force_rescan():
         old_report_ts = time.time() - 120
         os.utime(json_path, (old_report_ts, old_report_ts))
         os.utime(source, (future_source_ts, future_source_ts))
-        future_miss = shims.build_shim_dependency_report(root=root)
+        future_mtime_hit = shims.build_shim_dependency_report(root=root)
+
+        source.write_text("VALUE = 1\n", encoding="utf-8")
+        equalized_ts = json_path.stat().st_mtime
+        os.utime(source, (equalized_ts, equalized_ts))
+        content_miss = shims.build_shim_dependency_report(root=root)
 
     assert first["cache_status"] == "force_rescan"
     assert cached["cache_status"] == "hit"
@@ -345,14 +407,108 @@ def test_shim_dependency_report_cache_reuse_and_force_rescan():
     assert forced["cache_status"] == "force_rescan"
     assert forced["shim_dependency_report_cache_status"] == "force_rescan"
     assert runtime["cache_status"] == "runtime_artifacts_scan"
-    assert normal_miss["cache_status"] == "miss"
-    assert normal_miss["newest_source_mtime"] > normal_miss["report_mtime"]
-    assert normal_miss["future_mtime_paths"] == []
-    assert future_miss["cache_status"] == "miss_due_future_mtime"
-    assert future_miss["shim_dependency_report_cache_status"] == "miss_due_future_mtime"
-    assert future_miss["newest_source_mtime"] > future_miss["report_mtime"]
-    assert future_miss["future_mtime_paths"]
-    assert future_miss["scan_accounting"]["cache_status"] == "miss_due_future_mtime"
+    assert normal_mtime_hit["cache_status"] == "hit"
+    assert normal_mtime_hit["input_fingerprint_match"] is True
+    assert future_mtime_hit["cache_status"] == "hit"
+    assert future_mtime_hit["shim_dependency_report_cache_status"] == "hit"
+    assert future_mtime_hit["input_fingerprint_match"] is True
+    assert content_miss["cache_status"] == "miss"
+    assert content_miss["cache_miss_reason"] == "input_fingerprint_mismatch"
+    assert content_miss["input_fingerprint_match"] is False
+
+
+def test_old_import_cache_rejects_changed_content_with_equalized_mtimes():
+    import json
+    import shutil
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        package.mkdir()
+        research = root / "research"
+        research.mkdir()
+        shutil.copyfile(
+            "research/EVENT_ALPHA_DELETED_SHIMS.json",
+            research / "EVENT_ALPHA_DELETED_SHIMS.json",
+        )
+        source = package / "unit.py"
+        source.write_text("VALUE = 1\n", encoding="utf-8")
+        report_path, _markdown, clean = shims.write_old_import_check_report(
+            root=root,
+            out_dir=research,
+            force_rescan_shims=True,
+        )
+        assert clean["old_path_internal_imports"] == 0
+
+        source.write_text(
+            "import crypto_rsi_scanner.event_integrated_radar\n",
+            encoding="utf-8",
+        )
+        equalized_ts = report_path.stat().st_mtime
+        os.utime(source, (equalized_ts, equalized_ts))
+        os.utime(report_path, (equalized_ts, equalized_ts))
+
+        changed = shims.build_old_import_check_report(root=root)
+        repeated = shims.build_old_import_check_report(root=root)
+
+        manifest_path = research / "EVENT_ALPHA_DELETED_SHIMS.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["deleted_shims"] = [
+            row
+            for row in manifest["deleted_shims"]
+            if row.get("old_path") != "crypto_rsi_scanner.event_integrated_radar"
+        ]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        os.utime(manifest_path, (equalized_ts, equalized_ts))
+        manifest_changed = shims.build_old_import_check_report(root=root)
+
+    assert changed["cache_status"] == "miss"
+    assert changed["cache_miss_reason"] == "input_fingerprint_mismatch"
+    assert changed["input_fingerprint_match"] is False
+    assert changed["old_path_internal_imports"] == 1
+    assert changed["blocked_module_count"] == 1
+    assert repeated["cache_status"] == "hit"
+    assert repeated["old_path_internal_imports"] == 1
+    assert manifest_changed["cache_status"] == "miss"
+    assert manifest_changed["cache_miss_reason"] == "input_fingerprint_mismatch"
+    assert manifest_changed["old_path_internal_imports"] == 0
+
+
+def test_repeated_artifact_doctors_reuse_one_process_source_snapshot():
+    from crypto_rsi_scanner.event_alpha import shim_cache, shim_scan
+    from crypto_rsi_scanner.event_alpha.doctor import artifact_doctor
+
+    shim_cache.clear_process_report_cache()
+    shim_scan.clear_source_snapshot_cache()
+    calls = {"inventory": 0, "reference_scan": 0}
+    original_inventory = shim_scan._dependency_scan_inventory  # noqa: SLF001
+    original_reference_scan = shim_scan.scan_dependency_references_with_accounting
+
+    def counted_inventory(*args, **kwargs):
+        calls["inventory"] += 1
+        return original_inventory(*args, **kwargs)
+
+    def counted_reference_scan(*args, **kwargs):
+        calls["reference_scan"] += 1
+        return original_reference_scan(*args, **kwargs)
+
+    shim_scan._dependency_scan_inventory = counted_inventory  # type: ignore[assignment]  # noqa: SLF001
+    shim_scan.scan_dependency_references_with_accounting = counted_reference_scan  # type: ignore[assignment]
+    try:
+        artifact_doctor.diagnose_artifacts()
+        first_counts = dict(calls)
+        artifact_doctor.diagnose_artifacts()
+        shims.build_old_import_check_report()
+        repeated_counts = dict(calls)
+    finally:
+        shim_scan._dependency_scan_inventory = original_inventory  # type: ignore[assignment]  # noqa: SLF001
+        shim_scan.scan_dependency_references_with_accounting = original_reference_scan  # type: ignore[assignment]
+        shim_cache.clear_process_report_cache()
+        shim_scan.clear_source_snapshot_cache()
+
+    assert first_counts["inventory"] == 1
+    assert first_counts["reference_scan"] <= 2
+    assert repeated_counts == first_counts
 
 
 def test_artifact_doctor_warns_when_shim_scan_accounting_is_missing():

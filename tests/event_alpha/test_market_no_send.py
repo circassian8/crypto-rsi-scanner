@@ -2,22 +2,31 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+from datetime import datetime, timezone
 
 import pytest
 
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
     CURRENT_NAMESPACE_POINTER,
     DashboardReadinessError,
+    read_current_namespace_pointer,
+    resolve_authoritative_dashboard,
 )
+from crypto_rsi_scanner.event_alpha.dashboard.loader import load_dashboard_snapshot
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 from crypto_rsi_scanner.event_alpha.operations import market_no_send
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_cli
 
 
 _OBSERVED = "2026-07-12T12:00:00+00:00"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _clear_context_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -33,9 +42,29 @@ def _jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _write_valid_pointer(base: Path, *, namespace: str = "previous_authority") -> bytes:
+    payload = {
+        "contract_version": 1,
+        "artifact_namespace": namespace,
+        "profile": "fixture",
+        "run_id": "previous-run",
+        "revision": 1,
+        "operator_state_sha256": "a" * 64,
+        "generation_authority_status": "authoritative",
+        "authority_checked_at": _OBSERVED,
+    }
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+    (base / CURRENT_NAMESPACE_POINTER).write_bytes(data)
+    return data
+
+
 def test_no_provider_authorization_returns_safe_readiness_and_never_calls_provider(
     tmp_path,
 ):
+    artifact_base = tmp_path / "artifacts"
+    artifact_base.mkdir()
+    pointer = artifact_base / CURRENT_NAMESPACE_POINTER
+    pointer_before = _write_valid_pointer(artifact_base)
     calls = 0
 
     def forbidden_provider(_limit):
@@ -44,7 +73,7 @@ def test_no_provider_authorization_returns_safe_readiness_and_never_calls_provid
         raise AssertionError("provider must not be called")
 
     result = market_no_send.run_market_no_send_generation(
-        artifact_base_dir=tmp_path / "artifacts",
+        artifact_base_dir=artifact_base,
         artifact_namespace="blocked_no_auth",
         top_n=5,
         provider=forbidden_provider,
@@ -59,7 +88,35 @@ def test_no_provider_authorization_returns_safe_readiness_and_never_calls_provid
     assert result.provider_request_succeeded is False
     assert result.namespace_dir is None
     assert calls == 0
-    assert not (tmp_path / "artifacts").exists()
+    assert pointer.read_bytes() == pointer_before
+    assert not (artifact_base / "blocked_no_auth").exists()
+
+
+def test_unauthorized_cli_attempt_is_successful_and_writes_safe_audit(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv(market_no_send.LIVE_AUTH_ENV, raising=False)
+    monkeypatch.setattr(market_no_send.config, "FIXTURE_DIR", None)
+
+    status = market_no_send_cli.main([
+        "run",
+        "--artifact-base", str(tmp_path),
+        "--namespace", "blocked_pilot",
+        "--top-n", "5",
+        "--observed-at", _OBSERVED,
+    ])
+
+    assert status == 0
+    audit = json.loads(
+        (tmp_path / market_no_send.PILOT_AUDIT_JSON_FILENAME).read_text(encoding="utf-8")
+    )
+    assert audit["attempt_status"] == "blocked"
+    assert audit["provider_call_attempted"] is False
+    assert audit["provider_request_succeeded"] is False
+    assert audit["candidate_source_mode"] == "preflight_only"
+    assert audit["publication"]["status"] == "not_attempted"
+    assert market_no_send.LIVE_AUTH_ENV in audit["next_safe_command"]
 
 
 def test_fixture_mode_blocks_live_claim_before_provider_call(tmp_path):
@@ -144,11 +201,14 @@ def test_mocked_fresh_market_data_builds_market_led_ideas_and_blocks_low_liquidi
     assert manifest["status"] == "complete"
     assert manifest["data_mode"] == "mock"
     assert manifest["provider"] == "mock_coingecko"
-    assert manifest["contract_counted_status"] == "counted"
+    assert manifest["contract_counted_status"] == "not_counted"
+    assert manifest["candidate_source_mode"] == "mocked_fixture"
+    assert manifest["burn_in_eligible"] is False
+    assert manifest["burn_in_counted"] is False
     assert manifest["no_send"] is True
     assert manifest["pointer_published"] is False
     assert request["observed_at"] == _OBSERVED
-    assert request["contract_counted_status"] == "counted"
+    assert request["contract_counted_status"] == "not_counted"
     assert all(request[field] == 0 for field in market_no_send._SAFETY_COUNTERS)
     assert all(
         row["provider_source_artifact"] == market_no_send.REQUEST_CACHE_FILENAME
@@ -158,13 +218,31 @@ def test_mocked_fresh_market_data_builds_market_led_ideas_and_blocks_low_liquidi
         (namespace_dir / "event_alpha_operator_state.json").read_text(encoding="utf-8")
     )
     provenance = operator_state["market_no_send_provenance"]
-    assert provenance["data_mode"] == "mock"
+    assert provenance["data_acquisition_mode"] == "mocked_fixture"
     assert provenance["provider"] == "mock_coingecko"
-    assert provenance["observed_at"] == _OBSERVED
-    assert provenance["request_cache_artifact"] == market_no_send.REQUEST_CACHE_FILENAME
-    assert provenance["contract_counted_status"] == "counted"
-    assert provenance["no_send"] is True
+    assert provenance["provider_source_artifact"] == market_no_send.REQUEST_CACHE_FILENAME
+    assert provenance["request_ledger_path"] == market_no_send.REQUEST_LEDGER_FILENAME
+    assert provenance["candidate_source_mode"] == "mocked_fixture"
+    assert provenance["burn_in_eligible"] is False
+    assert provenance["burn_in_counted"] is False
+    assert provenance["provenance_contract_valid"] is True
+    assert operator_state["send_attempted"] is False
     assert schema_v1.validate_row_against_schema(operator_state, "operator_state_v1") == []
+    assert {
+        "market_no_send_source_cache",
+        "market_no_send_request_ledger",
+        "market_no_send_generation",
+        "integrated_candidates",
+        "integrated_outcomes",
+    }.issubset(operator_state["artifacts"])
+    _json_path, _md_path, audit = market_no_send.write_market_no_send_pilot_audit(
+        tmp_path,
+        "market_mock",
+        now=_OBSERVED,
+    )
+    assert audit["candidate_count"] == result.candidates
+    assert audit["outcome_placeholder_count"] == result.candidates
+    assert audit["candidate_outcome_count_match"] is True
 
 
 def test_provider_failure_is_fail_soft_and_preserves_dashboard_pointer(
@@ -174,16 +252,21 @@ def test_provider_failure_is_fail_soft_and_preserves_dashboard_pointer(
     _clear_context_overrides(monkeypatch)
     tmp_path.mkdir(exist_ok=True)
     pointer = tmp_path / CURRENT_NAMESPACE_POINTER
-    pointer.write_bytes(b"trusted-pointer-before-provider-failure\n")
+    pointer_before = _write_valid_pointer(tmp_path)
+
+    calls = 0
 
     def unavailable(_limit):
+        nonlocal calls
+        calls += 1
         raise TimeoutError("secret-bearing provider details must not escape")
+
+    monkeypatch.setattr(market_no_send, "_fetch_live_coingecko_rows", unavailable)
 
     result = market_no_send.run_market_no_send_generation(
         artifact_base_dir=tmp_path,
         artifact_namespace="provider_failure",
         top_n=5,
-        provider=unavailable,
         environ={market_no_send.LIVE_AUTH_ENV: "1"},
         fixture_dir=None,
         observed_at=_OBSERVED,
@@ -193,10 +276,152 @@ def test_provider_failure_is_fail_soft_and_preserves_dashboard_pointer(
     assert result.failure_class == "TimeoutError"
     assert result.provider_call_attempted is True
     assert result.provider_request_succeeded is False
-    assert pointer.read_bytes() == b"trusted-pointer-before-provider-failure\n"
+    assert calls == 1
+    assert pointer.read_bytes() == pointer_before
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["failure_class"] == "TimeoutError"
     assert "secret-bearing" not in result.manifest_path.read_text(encoding="utf-8")
+
+
+def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
+    tmp_path,
+    monkeypatch,
+):
+    """Prove the approved live adapter path from source row to dashboard authority."""
+
+    _clear_context_overrides(monkeypatch)
+    observed = datetime.now(timezone.utc).replace(microsecond=0)
+    observed_text = observed.isoformat()
+    namespace = "controlled_live_publication"
+    calls = 0
+
+    def controlled_live_provider(_limit):
+        nonlocal calls
+        calls += 1
+        return market_no_send._smoke_rows()
+
+    # Keep ``provider=None`` so the production-approved adapter owns the live
+    # attribution; replace only its network boundary with deterministic rows.
+    monkeypatch.setattr(
+        market_no_send,
+        "_fetch_live_coingecko_rows",
+        controlled_live_provider,
+    )
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace=namespace,
+        top_n=5,
+        observed_at=observed,
+        environ={market_no_send.LIVE_AUTH_ENV: "1"},
+        fixture_dir=None,
+    )
+
+    assert result.complete is True
+    assert calls == 1
+    assert result.candidate_source_mode == "live_no_send"
+    assert result.provenance_contract_valid is True
+    assert result.burn_in_counted is True
+    namespace_dir = tmp_path / namespace
+
+    source = json.loads(
+        (namespace_dir / market_no_send.REQUEST_CACHE_FILENAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    snapshots = _jsonl(namespace_dir / "event_market_state_snapshots.jsonl")
+    anomalies = _jsonl(namespace_dir / "event_market_anomalies.jsonl")
+    candidates = _jsonl(namespace_dir / "event_integrated_radar_candidates.jsonl")
+    core_rows = _jsonl(namespace_dir / "event_core_opportunities.jsonl")
+    outcomes = _jsonl(namespace_dir / "event_integrated_radar_outcomes.jsonl")
+    cards = tuple(
+        path
+        for path in (namespace_dir / "research_cards").glob("*.md")
+        if path.name != "index.md"
+    )
+    preview = (namespace_dir / "event_decision_v2_notification_preview.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert source["provider"] == "coingecko"
+    assert source["provider_request_succeeded"] is True
+    assert source["rows"]
+    assert len(snapshots) == result.selected_market_rows
+    assert len(anomalies) == result.market_anomalies
+    assert len(candidates) == result.candidates
+    assert len(core_rows) == result.core_rows
+    assert len(outcomes) == len(candidates)
+    assert len(cards) == result.cards
+    assert "Crypto Radar Decision v2 Preview" in preview
+    assert "live_provider / live_no_send / coingecko" in preview
+    assert "Burn-in eligible / counted: true / true" in preview
+    assert all(row["candidate_source_mode"] == "live_no_send" for row in snapshots)
+    assert all(row["candidate_source_mode"] == "live_no_send" for row in anomalies)
+    assert all(row["market_provenance"]["burn_in_counted"] is True for row in candidates)
+    assert all(row["market_provenance"]["burn_in_counted"] is True for row in core_rows)
+    assert all(row["market_provenance"]["burn_in_counted"] is True for row in outcomes)
+    card_text = "\n".join(path.read_text(encoding="utf-8") for path in cards)
+    assert "- Data acquisition mode: live_provider" in card_text
+    assert "- Candidate source mode: live_no_send" in card_text
+    assert "- Contract-counted burn-in candidate: true" in card_text
+
+    doctor_env = os.environ.copy()
+    doctor_env.update({
+        "RSI_EVENT_ALERTS_ENABLED": "0",
+        "RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED": "0",
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR": str(tmp_path),
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE": namespace,
+        "RSI_EVENT_ALPHA_RUN_MODE": "burn_in",
+        "RSI_EVENT_RESEARCH_NOW": observed_text,
+    })
+    doctor = subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "main.py"),
+            "--event-alpha-artifact-doctor",
+            "--event-alpha-profile",
+            "no_key_live",
+            "--event-alpha-artifact-namespace",
+            namespace,
+            "--event-alpha-artifact-doctor-strict",
+        ],
+        cwd=namespace_dir,
+        env=doctor_env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+
+    operator_state = json.loads(
+        (namespace_dir / "event_alpha_operator_state.json").read_text(encoding="utf-8")
+    )
+    assert operator_state["doctor"]["status"] != "BLOCKED"
+    assert operator_state["doctor"]["authoritative"] is True
+    assert operator_state["market_no_send_provenance"]["burn_in_counted"] is True
+
+    checked_at = datetime.now(timezone.utc)
+    published = market_no_send.publish_market_no_send_generation(
+        tmp_path,
+        namespace,
+        now=checked_at,
+    )
+    pointer = read_current_namespace_pointer(tmp_path)
+    assert pointer["artifact_namespace"] == namespace
+    assert pointer["run_id"] == result.run_id
+    assert pointer["revision"] == published.snapshot.revision
+    assert pointer["operator_state_sha256"] == published.snapshot.operator_state_sha256
+
+    resolved = resolve_authoritative_dashboard(tmp_path, now=checked_at)
+    loaded = load_dashboard_snapshot(tmp_path, namespace, now=checked_at)
+    assert resolved.namespace_source == "pointer"
+    assert resolved.snapshot.generation_authoritative is True
+    assert loaded.generation_authoritative is True
+    assert loaded.run_id == result.run_id
+    assert len(loaded.current_candidates) == result.core_rows
+    assert len(loaded.cumulative_outcomes) == result.candidates
+    assert loaded.cumulative_history_metadata[
+        "event_integrated_radar_outcomes.jsonl"
+    ]["authority"] == "current_generation_fingerprint_verified"
 
 
 def test_mock_generation_cannot_replace_existing_fixture_pointer(
@@ -233,55 +458,36 @@ def test_mock_generation_cannot_replace_existing_fixture_pointer(
 
 def test_live_manifest_without_matching_operator_authority_cannot_replace_pointer(
     tmp_path,
+    monkeypatch,
 ):
+    _clear_context_overrides(monkeypatch)
     namespace = "live_candidate"
-    namespace_dir = tmp_path / namespace
-    namespace_dir.mkdir()
-    run_id = f"{_OBSERVED}|{market_no_send.DEFAULT_PROFILE}"
-    request = {
-        "contract_version": market_no_send.CONTRACT_VERSION,
-        "artifact_namespace": namespace,
-        "run_id": run_id,
-        "data_mode": "live",
-        "provider": "coingecko",
-        "provider_call_attempted": True,
-        "provider_request_succeeded": True,
-        "contract_counted_status": "counted",
-        "no_send_status": "enforced",
-        "no_send": True,
-        "research_only": True,
-        **market_no_send._SAFETY_COUNTERS,
-        "rows": [],
-    }
-    request_path = namespace_dir / market_no_send.REQUEST_CACHE_FILENAME
-    request_path.write_text(json.dumps(request, sort_keys=True) + "\n", encoding="utf-8")
-    manifest = {
-        "contract_version": market_no_send.CONTRACT_VERSION,
-        "status": "complete",
-        "profile": market_no_send.DEFAULT_PROFILE,
-        "artifact_namespace": namespace,
-        "run_mode": "burn_in",
-        "run_id": run_id,
-        "data_mode": "live",
-        "provider": "coingecko",
-        "observed_at": _OBSERVED,
-        "live_provider_authorized": True,
-        "fixture_mode": False,
-        "provider_call_attempted": True,
-        "provider_request_succeeded": True,
-        "contract_counted_status": "counted",
-        "no_send_status": "enforced",
-        "no_send": True,
-        "research_only": True,
-        "pointer_published": False,
-        "request_cache_artifact": market_no_send.REQUEST_CACHE_FILENAME,
-        "request_cache_sha256": hashlib.sha256(request_path.read_bytes()).hexdigest(),
-        **market_no_send._SAFETY_COUNTERS,
-    }
-    (namespace_dir / market_no_send.RUN_MANIFEST_FILENAME).write_text(
-        json.dumps(manifest, sort_keys=True) + "\n",
-        encoding="utf-8",
+    monkeypatch.setattr(
+        market_no_send,
+        "_fetch_live_coingecko_rows",
+        lambda _limit: market_no_send._smoke_rows(),
     )
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=tmp_path,
+        artifact_namespace=namespace,
+        top_n=5,
+        observed_at=_OBSERVED,
+        environ={market_no_send.LIVE_AUTH_ENV: "1"},
+        fixture_dir=None,
+    )
+    assert result.complete
+    namespace_dir = tmp_path / namespace
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    ledger = json.loads(
+        (namespace_dir / market_no_send.REQUEST_LEDGER_FILENAME).read_text(encoding="utf-8")
+    )
+    assert manifest["candidate_source_mode"] == "live_no_send"
+    assert manifest["provenance_contract_valid"] is True
+    assert manifest["burn_in_eligible"] is True
+    assert manifest["burn_in_counted"] is True
+    assert ledger["provider_source_artifact_sha256"] == manifest["request_cache_sha256"]
+    assert ledger["burn_in_counted"] is True
+    (namespace_dir / "event_alpha_operator_state.json").unlink()
     pointer = tmp_path / CURRENT_NAMESPACE_POINTER
     pointer.write_bytes(b"previous-fixture-pointer\n")
 
@@ -296,6 +502,19 @@ def test_live_manifest_without_matching_operator_authority_cannot_replace_pointe
         )
 
     assert pointer.read_bytes() == b"previous-fixture-pointer\n"
+
+
+def test_injected_callable_cannot_claim_live_coingecko_provenance(tmp_path):
+    with pytest.raises(market_no_send.MarketNoSendError, match="cannot claim live"):
+        market_no_send.run_market_no_send_generation(
+            artifact_base_dir=tmp_path,
+            artifact_namespace="injected_live_claim",
+            top_n=5,
+            provider=lambda _limit: market_no_send._smoke_rows(),
+            observed_at=_OBSERVED,
+            environ={market_no_send.LIVE_AUTH_ENV: "1"},
+            fixture_dir=None,
+        )
 
 
 def test_market_make_targets_do_not_force_live_authorization():
@@ -398,3 +617,29 @@ def test_market_artifact_io_fails_closed_without_descriptor_features(
     with pytest.raises(market_no_send.MarketNoSendError, match="unsupported"):
         market_no_send._read_json_object(target)
     assert not target.exists()
+
+
+def test_market_quality_counts_use_populated_snapshot_and_treat_cold_as_warming(
+    tmp_path,
+):
+    path = tmp_path / "candidates.jsonl"
+    path.write_text(
+        json.dumps({
+            "market_state_snapshot": {},
+            "market_snapshot": {
+                "market_data_quality": {
+                    "baseline_status": "cold",
+                    "direct_feature_count": 4,
+                    "proxy_feature_count": 2,
+                },
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    counts = market_no_send_features.market_quality_counts(path)
+
+    assert counts["baseline_status"] == "warming"
+    assert counts["baseline_warming_assets"] == 1
+    assert counts["direct_feature_count"] == 4
+    assert counts["proxy_feature_count"] == 2

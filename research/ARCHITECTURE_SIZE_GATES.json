@@ -388,7 +388,7 @@
         "MarketNoSendReadiness"
       ],
       "exception_reason": "",
-      "max_class_line_count": 35,
+      "max_class_line_count": 55,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
       "public_class_count": 3,
@@ -1519,6 +1519,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1263,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+      "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
       "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -1535,7 +1544,7 @@
       "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 8,
+  "accepted_production_files_over_1200_lines": 9,
   "api_classes_over_limit": 0,
   "api_classes_over_limit_rows": [],
   "api_decomposition_blockers": [],
@@ -1658,7 +1667,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 810,
+  "file_count": 823,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1666,7 +1675,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-13T03:57:41.291428+00:00",
+  "generated_at": "2026-07-13T06:45:40.024931+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1708,6 +1717,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1263,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
       "source_kind": "production"
@@ -1716,6 +1731,12 @@
       "limit": 1500,
       "line_count": 1247,
       "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1200,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "source_kind": "production"
     },
     {
@@ -1732,8 +1753,26 @@
     },
     {
       "limit": 1500,
+      "line_count": 1199,
+      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1198,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1194,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1190,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
     {
@@ -1757,6 +1796,12 @@
     {
       "limit": 1500,
       "line_count": 1182,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1182,
       "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py",
       "source_kind": "production"
     },
@@ -1764,12 +1809,6 @@
       "limit": 1500,
       "line_count": 1181,
       "path": "crypto_rsi_scanner/event_fade.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1180,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
     {
@@ -1798,12 +1837,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1169,
-      "path": "crypto_rsi_scanner/event_alpha/shims.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1168,
       "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
       "source_kind": "production"
@@ -1812,6 +1845,12 @@
       "limit": 1500,
       "line_count": 1156,
       "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1144,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
@@ -1852,12 +1891,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1094,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1090,
       "path": "crypto_rsi_scanner/event_alpha/notifications/delivery.py",
       "source_kind": "production"
@@ -1882,36 +1915,18 @@
     },
     {
       "limit": 1500,
-      "line_count": 1065,
-      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1056,
       "path": "crypto_rsi_scanner/event_alpha/radar/opportunity_verdict.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1055,
-      "path": "crypto_rsi_scanner/event_alpha/providers/live_provider_readiness.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1047,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/context_loading.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1046,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
       "source_kind": "production"
     }
   ],
   "largest_test_files": [
+    {
+      "limit": 1500,
+      "line_count": 1499,
+      "path": "tests/cli/test_make_targets.py",
+      "source_kind": "test"
+    },
     {
       "limit": 1500,
       "line_count": 1499,
@@ -1922,12 +1937,6 @@
       "limit": 1500,
       "line_count": 1491,
       "path": "tests/event_alpha/test_burn_in_operations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1484,
-      "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
     {
@@ -1998,14 +2007,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1127,
-      "path": "tests/event_alpha/test_catalyst_frames.py",
+      "line_count": 1191,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1120,
-      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "line_count": 1127,
+      "path": "tests/event_alpha/test_catalyst_frames.py",
       "source_kind": "test"
     },
     {
@@ -2052,7 +2061,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1025,
+      "line_count": 1028,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
@@ -2084,6 +2093,12 @@
       "limit": 1500,
       "line_count": 920,
       "path": "tests/event_alpha/test_impact_hypotheses.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 899,
+      "path": "tests/event_alpha/test_radar_dashboard.py",
       "source_kind": "test"
     },
     {
@@ -2144,12 +2159,6 @@
       "limit": 1500,
       "line_count": 805,
       "path": "tests/event_alpha/test_doctor_reconciliation.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 801,
-      "path": "tests/event_alpha/test_operator_presentation.py",
       "source_kind": "test"
     }
   ],
@@ -2502,7 +2511,7 @@
         "MarketNoSendReadiness"
       ],
       "exception_reason": "",
-      "max_class_line_count": 35,
+      "max_class_line_count": 55,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
       "public_class_count": 3,
@@ -3731,6 +3740,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1263,
+      "path": "crypto_rsi_scanner/event_alpha/shims.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
       "source_kind": "production"
@@ -3742,7 +3757,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 8,
+  "production_files_over_1200_lines": 9,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -3985,7 +4000,7 @@
       ]
     },
     "production_files_over_1200_lines": {
-      "count": 8,
+      "count": 9,
       "reason": "accepted/documented production files over the v3 1,200-line target",
       "rows": [
         {
@@ -4045,6 +4060,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1263,
+          "path": "crypto_rsi_scanner/event_alpha/shims.py",
+          "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+          "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1261,
           "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
           "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -4093,7 +4117,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 8,
+      "production_files_over_1200_lines": 9,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -4130,6 +4154,11 @@
       {
         "line_count": 1275,
         "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1263,
+        "path": "crypto_rsi_scanner/event_alpha/shims.py",
         "threshold": 1200
       },
       {
@@ -4199,7 +4228,7 @@
         ]
       },
       "production_files_over_1200_lines": {
-        "count": 8,
+        "count": 9,
         "reason": "accepted/documented production files over the v3 1,200-line target",
         "rows": [
           {
@@ -4259,6 +4288,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1263,
+            "path": "crypto_rsi_scanner/event_alpha/shims.py",
+            "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
+            "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1261,
             "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
             "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
@@ -4291,7 +4329,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 8,
+    "production_files_over_1200_lines": 9,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

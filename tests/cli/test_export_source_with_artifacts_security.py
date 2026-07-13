@@ -6,6 +6,7 @@ import errno
 import importlib.util
 import os
 from pathlib import Path
+import stat
 from tempfile import TemporaryDirectory
 import time
 import zipfile
@@ -277,3 +278,133 @@ def test_export_verified_open_fails_enotsup_without_required_descriptor_features
             finally:
                 setattr(module, attribute, original)
             assert exc_info.value.errno == errno.ENOTSUP
+
+
+def test_export_artifact_secret_scan_allows_only_safe_status_and_placeholders():
+    module = _load_export_module("export_source_with_artifacts_secret_scan")
+
+    safe = b"\n".join(
+        (
+            b'api_key="<redacted>"',
+            b'auth_token="missing"',
+            b'provider_token="fixture-token"',
+            b'TELEGRAM_BOT_TOKEN: present',
+            b'API_KEY=${PROVIDER_API_KEY}',
+            b'client_secret=null',
+            b'headline_slug=bitcoin-rises-as-sk-yields-keep-falling-2026',
+        )
+    )
+    unsafe = b"\n".join(
+        (
+            b'api_key="unconfigured-secret-value-123456"',
+            b'"Authorization": "Bearer actual-bearer-value-123456"',
+            b'Authorization: Basic dXNlcjphY3R1YWwtcGFzc3dvcmQ=',
+            b'"X-API-Key": "actual-x-api-key-value-123456"',
+            b'client_secret="actual-client-secret-value-123456"',
+            b'-----BEGIN PRIVATE KEY-----',
+            b'https://discord.com/api/webhooks/123456789/actual-webhook-secret-value',
+            b'sk-proj-ActualSecretValue123456',
+            b"".join((b"xoxb", b"-synthetic-provider-token-value")),
+            b'AKIA1234567890ABCDEF',
+            b'AIza1234567890abcdefghijklmnopqrstuvwxyz',
+        )
+    )
+
+    assert module._artifact_secret_labels(safe) == []
+    assert module._artifact_secret_labels(unsafe) == [
+        "api_key",
+        "authorization_basic",
+        "authorization_bearer",
+        "aws_access_key",
+        "client_secret",
+        "discord_webhook",
+        "google_api_key",
+        "openai_key",
+        "private_key",
+        "provider_token",
+        "x_api_key",
+    ]
+
+    assert module._artifact_secret_labels(
+        b'api_key="test-real-production-secret-123456"'
+    ) == ["api_key"]
+
+
+def test_export_archive_validation_rejects_traversal_duplicates_and_symlinks():
+    module = _load_export_module("export_source_with_artifacts_archive_names")
+    with TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "unsafe.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("../outside.txt", "outside\n")
+            zf.writestr("duplicate.txt", "first\n")
+            with pytest.warns(UserWarning, match="Duplicate name"):
+                zf.writestr("duplicate.txt", "second\n")
+            symlink = zipfile.ZipInfo("event_fade_cache/linked.txt")
+            symlink.create_system = 3
+            symlink.external_attr = (stat.S_IFLNK | 0o777) << 16
+            zf.writestr(symlink, "../../outside.txt")
+
+        bad = module._validate_archive_entries(
+            archive,
+            safe_export_timestamp=time.time(),
+        )
+
+    assert "unsafe_archive_name:relative_traversal:../outside.txt" in bad
+    assert "duplicate_archive_name:duplicate.txt" in bad
+    assert "symlink_archive_entry:event_fade_cache/linked.txt" in bad
+
+
+def test_export_exact_scan_includes_unlisted_provider_secret_env_names():
+    module = _load_export_module("export_source_with_artifacts_generic_env")
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        secret = b"unlisted-provider-secret-123456"
+        (root / ".env").write_bytes(b"TOKENOMIST_API_KEY=" + secret + b"\n")
+        archive = root / "candidate.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("event_fade_cache/provider.json", secret)
+            zf.writestr(
+                f"event_fade_cache/{secret.decode('ascii')}.txt",
+                "safe metadata test\n",
+            )
+
+        sensitive = module._configured_sensitive_values(root)
+        bad = module._validate_archive_entries(
+            archive,
+            safe_export_timestamp=time.time(),
+            sensitive_values=sensitive,
+        )
+
+    assert ("configured_secret", secret) in sensitive
+    assert "sensitive_value:configured_secret:event_fade_cache/provider.json" in bad
+    assert any(
+        row.startswith("sensitive_value:configured_secret:entry_metadata:")
+        for row in bad
+    )
+
+
+def test_export_generic_artifact_secret_fails_and_preserves_previous_zip():
+    module = _load_export_module("export_source_with_artifacts_generic_secret")
+    with TemporaryDirectory() as tmp:
+        trusted_root = Path(tmp) / "trusted"
+        trusted_root.mkdir()
+        (trusted_root / "Makefile").write_text("verify:\n\t@true\n", encoding="utf-8")
+        artifact_root = trusted_root / "event_fade_cache" / "pilot"
+        artifact_root.mkdir(parents=True)
+        evidence = artifact_root / "provider.json"
+        evidence.write_text('{"status":"safe"}\n', encoding="utf-8")
+        archive = Path(tmp) / "review.zip"
+
+        assert module.main(root=trusted_root, out=archive) == 0
+        assert stat.S_IMODE(archive.stat().st_mode) == 0o600
+        previous = archive.read_bytes()
+        evidence.write_text(
+            '{"api_key":"unconfigured-secret-value-123456"}\n',
+            encoding="utf-8",
+        )
+
+        assert module.main(root=trusted_root, out=archive) == 1
+        assert archive.read_bytes() == previous
+        assert not archive.with_name(f"{archive.name}.tmp").exists()
+        with zipfile.ZipFile(archive) as zf:
+            assert zf.read("event_fade_cache/pilot/provider.json") == b'{"status":"safe"}\n'

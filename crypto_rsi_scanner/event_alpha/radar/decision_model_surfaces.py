@@ -12,6 +12,8 @@ from copy import deepcopy
 from typing import Any
 from urllib.parse import quote
 
+import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
+
 from ..artifacts.schema.decision_model import (
     DECISION_PROJECTION_SCHEMA_VERSION,
     validate_contract,
@@ -85,6 +87,7 @@ DECISION_PROJECTION_FIELD_NAMES = (
     "rsi_context_references",
     "observation_ids",
     "source_provider_lineage",
+    "market_provenance",
     "decision_evaluated_at",
     "decision_safety_invariants",
 )
@@ -338,6 +341,9 @@ def decision_model_markdown_lines(values: Mapping[str, Any]) -> list[str]:
     )
     if dashboard_id:
         lines.append(f"- Dashboard: /candidate/{quote(dashboard_id, safe='')}")
+    provenance = event_market_provenance.market_provenance_values(values)
+    if provenance:
+        lines.extend(_market_provenance_markdown_lines(provenance))
     lines.append("- Research idea, not a trade instruction.")
     return lines
 
@@ -398,7 +404,7 @@ def _closed_projection_values(
         else {}
     )
     rsi_references = _rsi_context_references(source, rsi_context)
-    return {
+    closed = {
         "decision_projection_schema_version": DECISION_PROJECTION_SCHEMA_VERSION,
         "hard_blockers": blockers,
         "soft_penalties": penalties,
@@ -422,6 +428,11 @@ def _closed_projection_values(
         "decision_evaluated_at": _evaluation_timestamp(source),
         "decision_safety_invariants": _safety_invariants(source),
     }
+    provenance = event_market_provenance.market_provenance_values(source)
+    if provenance:
+        closed["market_provenance"] = provenance
+        closed.update(event_market_provenance.market_provenance_flat_fields(provenance))
+    return closed
 
 
 def _calendar_evidence(source: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -534,9 +545,31 @@ def _observation_ids(source: Mapping[str, Any]) -> list[str]:
 
 
 def _source_provider_lineage(source: Mapping[str, Any]) -> dict[str, Any]:
+    provenance = event_market_provenance.market_provenance_values(source)
     existing = source.get("source_provider_lineage")
     if isinstance(existing, Mapping):
-        return deepcopy(dict(existing))
+        lineage = deepcopy(dict(existing))
+        preferred_mode = str(
+            provenance.get("data_acquisition_mode")
+            or source.get("candidate_source_mode")
+            or source.get("data_acquisition_mode")
+            or source.get("data_mode")
+            or lineage.get("data_mode")
+            or source.get("run_mode")
+            or "unknown"
+        ).strip()
+        lineage["data_mode"] = preferred_mode
+        if provenance:
+            providers = list(dict.fromkeys((
+                str(provenance.get("provider") or "").strip(),
+                *_items(lineage.get("providers")),
+            )))
+            lineage["providers"] = [provider for provider in providers if provider]
+            lineage["market_provenance"] = deepcopy(provenance)
+            lineage["candidate_source_mode"] = provenance.get("candidate_source_mode")
+            lineage["provenance_contract_valid"] = provenance.get("provenance_contract_valid")
+            lineage["burn_in_counted"] = provenance.get("burn_in_counted")
+        return lineage
     providers = list(dict.fromkeys(
         str(source.get(field) or "").strip()
         for field in ("primary_source_provider", "source_provider", "latest_source", "provider")
@@ -550,9 +583,16 @@ def _source_provider_lineage(source: Mapping[str, Any]) -> dict[str, Any]:
         *_items(source.get("source_packs")),
         *_items(source.get("source_pack")),
     )))
-    return {
+    if provenance.get("provider"):
+        providers = list(dict.fromkeys((str(provenance["provider"]), *providers)))
+    lineage = {
         "data_mode": str(
-            source.get("data_mode") or source.get("run_mode") or source.get("candidate_source_mode") or "unknown"
+            provenance.get("data_acquisition_mode")
+            or source.get("candidate_source_mode")
+            or source.get("data_acquisition_mode")
+            or source.get("data_mode")
+            or source.get("run_mode")
+            or "unknown"
         ).strip(),
         "providers": providers,
         "origins": origins,
@@ -562,6 +602,52 @@ def _source_provider_lineage(source: Mapping[str, Any]) -> dict[str, Any]:
         "profile": str(source.get("profile") or "").strip(),
         "artifact_namespace": str(source.get("artifact_namespace") or "").strip(),
     }
+    if provenance:
+        lineage.update({
+            "market_provenance": deepcopy(provenance),
+            "candidate_source_mode": provenance.get("candidate_source_mode"),
+            "provenance_contract_valid": provenance.get("provenance_contract_valid"),
+            "burn_in_counted": provenance.get("burn_in_counted"),
+        })
+    return lineage
+
+
+def _market_provenance_markdown_lines(provenance: Mapping[str, Any]) -> list[str]:
+    request_path = str(provenance.get("request_ledger_path") or "none")
+    source_path = str(provenance.get("provider_source_artifact") or "none")
+    return [
+        (
+            "- Market provenance mode / source / provider: "
+            f"{provenance.get('data_acquisition_mode') or 'unknown'} / "
+            f"{provenance.get('candidate_source_mode') or 'unknown'} / "
+            f"{provenance.get('provider') or 'unknown'}"
+        ),
+        (
+            "- Market provenance contract / provider call / cache: "
+            f"valid={str(bool(provenance.get('provenance_contract_valid'))).lower()} / "
+            f"attempted={str(bool(provenance.get('provider_call_attempted'))).lower()} / "
+            f"succeeded={str(bool(provenance.get('provider_call_succeeded'))).lower()} / "
+            f"{provenance.get('cache_status') or 'unknown'}"
+        ),
+        (
+            "- Burn-in eligible / counted: "
+            f"{str(bool(provenance.get('burn_in_eligible'))).lower()} / "
+            f"{str(bool(provenance.get('burn_in_counted'))).lower()} "
+            f"({provenance.get('burn_in_reason') or 'not_counted'})"
+        ),
+        f"- Market request ledger / source artifact: {request_path} / {source_path}",
+        f"- Feature basis: {_mapping_summary(provenance.get('feature_basis'))}",
+        f"- Market data quality: {_mapping_summary(provenance.get('data_quality'))}",
+    ]
+
+
+def _mapping_summary(value: Any) -> str:
+    if not isinstance(value, Mapping) or not value:
+        return "not recorded"
+    return "; ".join(
+        f"{key}={item}"
+        for key, item in list(sorted(value.items(), key=lambda pair: str(pair[0])))[:8]
+    )
 
 
 def _evaluation_timestamp(source: Mapping[str, Any]) -> Any:

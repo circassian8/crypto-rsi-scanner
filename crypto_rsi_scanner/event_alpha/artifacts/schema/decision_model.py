@@ -7,6 +7,8 @@ from datetime import datetime
 import math
 from typing import Any
 
+import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
+
 
 DECISION_MODEL_VERSION = "crypto_radar_decision_model_v2"
 DECISION_PROJECTION_SCHEMA_VERSION = "crypto_radar_decision_projection_v1"
@@ -49,6 +51,15 @@ FIELDS = (
     "why_now", "supporting_facts", "missing_information", "main_risks",
     "what_confirms", "what_invalidates", "calendar_evidence", "calendar_evidence_ids",
     "rsi_context", "rsi_context_references", "observation_ids", "source_provider_lineage",
+    "market_provenance",
+    "market_provenance_schema_version", "market_provenance_contract_version",
+    "data_acquisition_mode", "candidate_source_mode",
+    "provider", "provider_call_attempted", "provider_call_succeeded",
+    "provider_request_succeeded", "live_provider_authorized", "request_ledger_path",
+    "request_ledger_sha256", "provider_source_artifact", "provider_source_artifact_sha256",
+    "provider_generation_id", "cache_status", "provenance_contract_valid",
+    "burn_in_eligible", "burn_in_counted", "burn_in_reason", "feature_basis",
+    "data_quality", "contract_counted_candidate",
     "decision_evaluated_at", "decision_safety_invariants", "decision_projection",
 )
 TYPES = {
@@ -77,7 +88,19 @@ TYPES = {
     "main_risks": "list", "what_confirms": "list", "what_invalidates": "list",
     "calendar_evidence": "list", "calendar_evidence_ids": "list", "rsi_context": "dict",
     "rsi_context_references": "list", "observation_ids": "list",
-    "source_provider_lineage": "dict", "decision_evaluated_at": "str",
+    "source_provider_lineage": "dict", "market_provenance": "dict",
+    "market_provenance_schema_version": "str", "market_provenance_contract_version": "int",
+    "data_acquisition_mode": "str",
+    "candidate_source_mode": "str", "provider": "str",
+    "provider_call_attempted": "bool", "provider_call_succeeded": "bool",
+    "provider_request_succeeded": "bool", "live_provider_authorized": "bool",
+    "request_ledger_path": "str", "request_ledger_sha256": "str",
+    "provider_source_artifact": "str", "provider_source_artifact_sha256": "str",
+    "provider_generation_id": "str", "cache_status": "str",
+    "provenance_contract_valid": "bool", "burn_in_eligible": "bool",
+    "burn_in_counted": "bool", "burn_in_reason": "str", "feature_basis": "dict",
+    "data_quality": "dict", "contract_counted_candidate": "bool",
+    "decision_evaluated_at": "str",
     "decision_safety_invariants": "dict",
     "decision_projection": "dict",
 }
@@ -333,6 +356,23 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
         for field in ("providers", "origins", "source_packs"):
             if not _is_sequence(lineage.get(field)):
                 errors.append(f"decision_projection_lineage_invalid:{field}")
+
+    provenance = row.get("market_provenance")
+    if provenance is not None:
+        if not isinstance(provenance, Mapping):
+            errors.append("decision_projection_market_provenance_invalid_type")
+        else:
+            normalized_provenance = event_market_provenance.normalize_market_provenance(provenance)
+            if dict(provenance) != normalized_provenance:
+                errors.append("decision_projection_market_provenance_not_canonical")
+            if isinstance(lineage, Mapping) and lineage.get("market_provenance") != normalized_provenance:
+                errors.append("decision_projection_market_provenance_lineage_mismatch")
+            flat_provenance = event_market_provenance.market_provenance_flat_fields(
+                normalized_provenance
+            )
+            for field, expected in flat_provenance.items():
+                if row.get(field) != expected:
+                    errors.append(f"decision_projection_market_provenance_alias_mismatch:{field}")
 
     safety = row.get("decision_safety_invariants")
     required_safety = (

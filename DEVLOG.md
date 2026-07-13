@@ -17,6 +17,66 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-13 — Deliver Crypto Decision Radar Live Pilot v1 · Codex
+**Why:** Decision Model v2 was fixture-proven, but a real no-send pilot still
+needed closed market provenance, honest proxy/temporal quality limits, a rolling
+baseline, exact attempt/publication guards, a fully tested live-mode path, and a
+release gate reproducible outside the developer checkout.
+**Changes:**
+- Added canonical market provenance v2 across candidates, Core rows, cards,
+  previews, outcomes, operator state, doctor, and dashboard. Live, mock,
+  preflight, replay, and cache modes remain distinct; burn-in validity/counting
+  is derived from exact authorization, provider, source, ledger, digest,
+  generation, feature-basis, and quality evidence rather than caller claims.
+- Added a bounded 45-day/256-row per-asset temporal baseline with deterministic
+  1h/4h/24h return, volatility, volume/turnover, and BTC/ETH-relative features,
+  eight-observation warmup, stale rejection, and explicit direct/proxy bases.
+  Live history rolls through `radar_market_history_cache`; each generation gets
+  an exact fingerprinted snapshot, while fixture/mock history stays isolated.
+- Capped cold/warming, unavailable-spread, and proxy-only urgency/evidence/
+  actionability without hiding useful dashboard-watch ideas. High confidence
+  now considers confirmed contributing evidence even when the primary thesis is
+  market-led, while strict Catalyst Radar behavior remains unchanged.
+- Hardened live orchestration with namespace-local provider health/backoff,
+  safe error classes, immutable published namespaces, exact latest-attempt
+  receipts, candidate/outcome parity, strict CoinGecko source/ledger doctor
+  validation, and real-only guarded pointer publication. A blocked current
+  attempt cannot reuse an older complete manifest or call the provider.
+- Proved the controlled approved live adapter from provider rows through market
+  snapshots/anomalies, canonical ideas, Core/cards/preview/pending outcomes,
+  strict doctor, operator state, exact pointer publication, and dashboard load.
+  Dashboard badges/details now distinguish verified live no-send, mock, replay,
+  cached, stale, and unverified live claims and read fingerprinted outcomes.
+- Strengthened source-with-artifacts export and source scanning: descriptor-safe
+  shim reads, outside-root symlink rejection, content-sensitive cache reuse,
+  normalized archive timestamps, mode `0600`, ZIP path/type/duplicate checks,
+  and broader exact/generic artifact credential detection. Updated North Stars,
+  architecture reports, AGENTS, decisions, roadmap, and pilot audit output.
+**Verify:** Export parent-symlink security passed first. The focused Decision,
+calendar, dashboard, provenance, history, no-send, exporter, and shim suite
+passed 214 tests; compileall passed. Market-anomaly, integrated-radar,
+market-no-send, dashboard, and calendar smokes passed; strict doctors reported
+zero blockers; all eight Decision routes and one pending outcome per candidate
+remain covered. Architecture cleanliness passed with zero unresolved production
+files over 1,200 lines. `make verify-fast PYTHON=python3` passed 1,380 tests plus
+release smokes. `make verify PYTHON=python3` passed 1,302/1,302 standalone and
+1,380 pytest tests plus alert, 33-observation backtest, and scoreboard smokes.
+The committed source-with-artifacts archive independently passed `make
+verify-fast` (1,380 tests plus release smokes) and `make verify` (1,302/1,302
+standalone plus 1,380 pytest tests and release smokes) with the absolute tested
+Python interpreter.
+GitHub push protection then rejected a synthetic Slack-token-shaped security
+fixture before accepting the commit. The fixture now assembles the same scanner
+input at runtime without storing a token-shaped literal; the focused artifact
+secret-scan and parent-symlink regression tests both passed, and a tracked-file
+Slack-token pattern scan was clean. No protection bypass was used.
+**Notes/risks:** The bounded real pilot was attempted under the environment as
+found. Authorization was absent, so it completed safely blocked with zero
+provider calls and zero sends/trades/paper/RSI writes/triggers; the dashboard
+pointer SHA-256 stayed `d9e8e525da69d644db9597e39f9d48a9bcb4e9b7ac8ba1dd79ebb244526ef32b`.
+The first real evidence run remains waiting on owner-set
+`RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1`; Codex did not create or change it.
+
 ## 2026-07-12 — Stabilize the closed Decision Radar v2 authority · Codex
 **Why:** Decision v2 could classify market-led and calendar ideas correctly at
 the raw candidate, but partial downstream re-evaluation lost calendar/RSI

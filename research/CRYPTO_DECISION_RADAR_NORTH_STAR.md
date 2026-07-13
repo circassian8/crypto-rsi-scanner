@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-12T18:45:07+00:00`
+- generated_at: `2026-07-13T06:00:07+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -53,6 +53,30 @@ Candidate/Core/card/preview/outcome/dashboard disagreement is a doctor blocker.
 Numeric comparisons use one documented deterministic rounding tolerance; no
 consumer may silently perform a materially new evaluation.
 
+## Canonical Market Provenance v2
+
+Every new market-led candidate carries the closed
+`crypto_radar_market_provenance_v2` value (`contract_version=2`). Consumers copy
+that value; they do not infer trust from legacy flat fields or accept caller-
+asserted validity/counting flags. The contract records acquisition and candidate
+source modes, provider call attempted/succeeded state, explicit live-provider
+authorization, distinct request-ledger and provider-source artifact paths plus
+SHA-256 fingerprints, provider generation id, cache status, feature basis, data
+quality, validation errors, and the derived burn-in eligibility/count/reason.
+
+Only a contract-valid `live_provider` / `live_no_send` generation with exact
+authorized, attempted, successful provider lineage is eligible and counted for
+real burn-in. A fixture or mock may have a valid provenance contract so it can
+prove mechanics, but it always remains `burn_in_eligible=false` and
+`burn_in_counted=false`. Replay, cache, preflight, malformed, conflicting, and
+historical flat rows are never silently reclassified as fresh real evidence.
+
+The request ledger and provider-source artifact are separate fingerprinted evidence
+objects. Both paths and both digests must be present for a candidate-bearing
+generation, and the provider generation id, feature-basis map, and data-quality
+summary must agree across candidate, CoreOpportunity, card, preview, outcome,
+operator state, and dashboard.
+
 ## Thesis Origins
 
 The allowed primary and contributing origins are:
@@ -93,7 +117,16 @@ Spread states are `verified_good`, `verified_acceptable`, `verified_wide`,
 `unavailable`, and `stale`. Actionable and rapid routes require
 `verified_good` or `verified_acceptable`. Unavailable spread can support only a
 non-actionable dashboard watch unless another trusted execution-quality source
-verifies spread/tradability. The system never invents spread.
+verifies spread/tradability. The system never invents spread. Missing or stale
+spread caps urgency at 55 even before any stricter market-data-quality cap.
+
+Feature basis is explicit per market field. Proxy-only evidence cannot receive
+urgent or actionable routing: actionability is capped at 64, evidence confidence
+at 55, risk is floored at 55, and urgency is capped at 45. A cold, warming,
+unavailable, or stale temporal baseline caps evidence confidence at 62, floors
+risk at 48, and caps urgency at 45. When the affected anomaly basis is still
+cross-sectional/proxy, the row remains review-only until the temporal evidence
+warms; direct provider evidence is preserved rather than relabeled as a proxy.
 
 Timing, market phase, urgency, preferred horizon, expiry, and chase risk are
 first-class decision values, not card-only prose. A scheduled event may raise
@@ -150,26 +183,56 @@ The supported operator flow is:
 Readiness is no-write and no-network. A live CoinGecko request requires the
 existing explicit `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` authorization and no
 fixture mode. The generation uses a bounded top-liquid universe, records the
-request/cache lineage and observation time, computes market anomalies, creates
-canonical Decision ideas, then builds cards, preview, outcomes, operator state,
-and the dashboard read model. The defaults remain research-only and no-send,
-with zero trades, paper trades, normal RSI writes, or `TRIGGERED_FADE` creation.
+request-ledger/source-artifact lineage and observation time, computes market
+anomalies, creates canonical Decision ideas, then builds cards, preview,
+outcomes, operator state, the dashboard read model, and a credential-free JSON
+plus Markdown pilot audit. The defaults remain research-only and no-send, with
+zero trades, paper trades, normal RSI writes, or `TRIGGERED_FADE` creation.
+
+`radar_market_history_cache/event_market_history.jsonl` is the bounded mutable
+live/no-send research cache. Every generation copies an exact fingerprinted
+`event_market_history.jsonl` snapshot into its own namespace; fixture and mock
+history remains generation-local and can never seed the live cache. A namespace
+behind the authoritative dashboard pointer is immutable, so each later live
+cycle uses a new generation namespace while retaining the shared bounded
+baseline.
+
+The v1 history policy retains at most 45 days and 256 observations per asset,
+requires eight strictly earlier observations for a warm feature baseline, and
+derives 1h/4h/24h returns, volatility, turnover/volume z-scores, and BTC/ETH
+relative returns in percent points without using the current observation in its
+own baseline. Current rows older than six hours or materially future-dated fail
+closed. Cold/warming status and exact observation ids remain visible, and only
+fields explicitly identified as proxy inputs may be replaced by a temporal
+calculation.
 
 A fixture or mocked smoke generation can prove mechanics but is permanently
-ineligible to become the real dashboard authority. The fixed authoritative
-pointer changes only after a real, fresh, complete generation has valid exact
-fingerprints, matching counts, a current operator-state binding, and a fresh
-full strict doctor with zero blockers. A real clean zero-idea generation may
-become honest current authority when those same gates pass; it must not relabel
-stale fixture data as live. Until a trusted real run succeeds, the existing
-fixture pointer remains explicit fixture evidence.
+ineligible for burn-in counting or real dashboard authority. The fixed
+authoritative pointer changes only after a real, fresh, complete generation has
+canonical v2 provenance, distinct exact lineage fingerprints, matching
+candidate/Core/card/preview/outcome counts, a current operator-state binding,
+and a fresh full strict doctor with zero blockers. A real clean zero-idea
+generation may become honest current authority when those same gates pass; it
+must not relabel stale fixture data as live. Until a trusted real run succeeds,
+the existing fixture pointer remains explicit fixture evidence.
+
+When authorization is absent, readiness and the generation command return an
+explicit safe-blocked result, attempt no provider call, write only the
+credential-free pilot audit, and leave the authoritative pointer unchanged.
+Authorization is never enabled by the application or inferred from a cache.
+The CLI also replaces `event_market_no_send_latest_attempt.json` for every live
+attempt. Make may run the doctor and publisher only when that receipt matches
+the exact complete manifest, so a newly blocked attempt cannot accidentally
+reuse an older complete namespace. Provider health is namespace-local,
+fingerprinted for live authority, and stores only safe error classes.
 
 ## Outcomes and Learning
 
 Every current canonical Decision idea, including diagnostic controls, receives
 a pending outcome placeholder. Its origins, route, actionability cohort,
 evidence-confidence cohort, risk cohort, catalyst status, timing, and phase are
-copied from the canonical projection. Cohort drift is a doctor blocker.
+copied from the canonical projection. Candidate/outcome count mismatch or cohort
+drift is a doctor blocker for the trusted publication profile.
 
 Outcomes and optional human feedback are measurement evidence only. They do not
 automatically alter thresholds, routes, priors, or notification policy. Any

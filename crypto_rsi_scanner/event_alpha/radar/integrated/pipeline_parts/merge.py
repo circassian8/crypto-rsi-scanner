@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
+
 from ... import decision_model as event_radar_decision_model
 from ... import decision_safety as event_radar_decision_safety
 from .runtime import *
@@ -369,13 +371,14 @@ def _merge_family_source_fields(
     source_class: str,
     source_strength: str,
 ) -> dict[str, Any]:
-    return {
+    fields = {
         "source_origin": "merged" if len(origins) > 1 else origins[0],
         "source_origins": list(origins),
         "source_pack": source_pack,
         "source_packs": list(source_packs or (source_pack,)),
         "source_class": source_class,
         "source_strength": source_strength,
+        "candidate_provenance": _best_text(rows, "candidate_provenance"),
         "provider_generation_id": _best_text(rows, "provider_generation_id"),
         "provider_request_succeeded": any(_truthy(row.get("provider_request_succeeded")) for row in rows),
         "provider_source_artifact": _portable_evidence_path(
@@ -383,6 +386,11 @@ def _merge_family_source_fields(
         ),
         "request_ledger_path": _portable_evidence_path(_best_text(rows, "request_ledger_path")),
     }
+    provenance = event_market_provenance.merge_market_provenance(rows)
+    if provenance:
+        fields["market_provenance"] = provenance
+        fields.update(event_market_provenance.market_provenance_flat_fields(provenance))
+    return fields
 
 def _merge_family_opportunity_fields(
     rows: list[dict[str, Any]],

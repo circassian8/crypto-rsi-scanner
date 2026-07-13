@@ -17,7 +17,10 @@ from crypto_rsi_scanner.event_alpha.dashboard.__main__ import _smoke
 from crypto_rsi_scanner.event_alpha.dashboard.app import RadarDashboardApp, serve_dashboard
 from crypto_rsi_scanner.event_alpha.dashboard.loader import _dashboard_decision_row, load_dashboard_snapshot
 from crypto_rsi_scanner.event_alpha.dashboard.models import DashboardLoadError
-from crypto_rsi_scanner.event_alpha.dashboard.render import render_dashboard_page
+from crypto_rsi_scanner.event_alpha.dashboard.render import (
+    _candidate_data_quality,
+    render_dashboard_page,
+)
 
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -139,7 +142,114 @@ def test_dashboard_badges_distinguish_current_fixture_and_live_no_send():
         ),
     )
     live_page = render_dashboard_page(live, "/")
+    assert "UNVERIFIED LIVE CLAIM" in live_page.body
+    assert "LIVE / REAL DATA" not in live_page.body
+
+
+def test_dashboard_badges_disclose_exact_market_provenance_and_burn_in_status():
+    from crypto_rsi_scanner.event_alpha.operations.market_provenance import (
+        normalize_market_provenance,
+    )
+
+    fixture = _snapshot()
+    base_row = dict(
+        next(
+            row
+            for row in fixture.current_candidates
+            if row.get("_dashboard_route") != "diagnostic"
+        )
+    )
+    common_provenance = {
+        "schema_version": "crypto_radar_market_provenance_v2",
+        "provider_call_attempted": True,
+        "provider_call_succeeded": True,
+        "request_ledger_path": "event_market_no_send_request_ledger.json",
+        "request_ledger_sha256": "1" * 64,
+        "provider_source_artifact": "event_market_no_send_market_rows.json",
+        "provider_source_artifact_sha256": "2" * 64,
+        "provider_generation_id": "dashboard-market-run",
+        "cache_status": "write_through",
+        "feature_basis": {"spread": "provider_observed"},
+        "data_quality": {"baseline_status": "warm"},
+    }
+    mocked_provenance = normalize_market_provenance({
+        **common_provenance,
+        "data_acquisition_mode": "mocked_fixture",
+        "candidate_source_mode": "mocked_fixture",
+        "provider": "mock_coingecko",
+        "live_provider_authorized": False,
+    })
+    live_provenance = normalize_market_provenance({
+        **common_provenance,
+        "data_acquisition_mode": "live_provider",
+        "candidate_source_mode": "live_no_send",
+        "provider": "coingecko",
+        "live_provider_authorized": True,
+    })
+    mocked = {
+        **base_row,
+        "market_provenance": mocked_provenance,
+    }
+    live = {
+        **base_row,
+        "market_provenance": live_provenance,
+    }
+
+    mocked_snapshot = replace(
+        fixture,
+        operator_state={
+            **fixture.operator_state,
+            "market_no_send_provenance": mocked["market_provenance"],
+        },
+        current_candidates=(mocked,),
+    )
+    live_snapshot = replace(
+        fixture,
+        operator_state={
+            **fixture.operator_state,
+            "market_no_send_provenance": live["market_provenance"],
+        },
+        current_candidates=(live,),
+    )
+    mocked_page = render_dashboard_page(
+        mocked_snapshot,
+        "/",
+    )
+    live_page = render_dashboard_page(
+        live_snapshot,
+        "/",
+    )
+
+    assert "MOCKED FIXTURE" in mocked_page.body
+    assert "BURN-IN EXCLUDED" in mocked_page.body
     assert "LIVE / REAL DATA" in live_page.body
+    assert "BURN-IN COUNTED" in live_page.body
+    detail = render_dashboard_page(
+        live_snapshot,
+        f"/candidate/{live['core_opportunity_id']}",
+    )
+    assert "Cache status" in detail.body
+    assert "write_through" in detail.body
+
+
+def test_dashboard_prefers_per_asset_market_quality_over_generation_aggregate():
+    row = {
+        "data_quality": {
+            "direct_feature_count": 99,
+            "proxy_feature_count": 88,
+        },
+        "market_state_snapshot": {},
+        "market_snapshot": {
+            "market_data_quality": {
+                "baseline_status": "cold",
+                "direct_feature_count": 7,
+                "proxy_feature_count": 1,
+                "spread_basis": "provider_observed",
+            }
+        },
+    }
+
+    assert _candidate_data_quality(row) == row["market_snapshot"]["market_data_quality"]
 
 
 def test_dashboard_requires_explicit_supported_v2_version_and_hides_legacy_default():

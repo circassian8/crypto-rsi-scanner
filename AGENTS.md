@@ -150,6 +150,18 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   exact run/revision/operator-state hash and fails closed if it drifts. `make
   radar-dashboard-smoke` renders all fixture pages without starting a server,
   calling providers, sending, or writing artifacts.
+- **Decision Radar market pilot:** `make radar-market-no-send-readiness` is
+  read-only/no-network and reports explicit CoinGecko authorization, bounded
+  universe, rolling-baseline warmup, spread limits, artifacts, and the next
+  command. `make radar-market-no-send` attempts one bounded live call only when
+  `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` is already present and fixture mode is
+  off; an exact latest-attempt receipt prevents a blocked run from reusing an
+  older complete manifest. Only canonical live/no-send provenance plus a fresh
+  strict doctor may publish. Published namespaces are immutable, so later live
+  cycles use a new namespace and seed their exact history snapshot from the
+  bounded `radar_market_history_cache`; fixture/mock history remains isolated.
+  `make radar-market-no-send-smoke` proves mechanics offline and can never count
+  as real burn-in or replace dashboard authority.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.
   Integrated cycles normalize raw scheduled/fixture rows exactly once and bind

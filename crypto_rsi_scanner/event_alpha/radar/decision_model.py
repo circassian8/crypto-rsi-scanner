@@ -12,6 +12,13 @@ import math
 from typing import Any, Iterable, Mapping
 
 from . import decision_policy
+from .decision_market_quality import (
+    _apply_market_quality_score_caps,
+    _market_quality_allows_actionable,
+    _market_quality_metadata,
+    _market_quality_warnings,
+    _quality_adjusted_urgency,
+)
 from .decision_safety import decision_safety_blockers
 from .decision_results import build_decision_result, disabled_decision
 from .rsi_technical_context import validated_rsi_score_adjustments
@@ -94,6 +101,12 @@ def _evaluate_radar_decision(
         origin=primary_origin,
         cfg=cfg,
     )
+    market_quality_gate = _market_quality_allows_actionable(market)
+    urgency = _quality_adjusted_urgency(
+        timing_profile.urgency_score,
+        market=market,
+        spread_status=spread,
+    )
 
     (
         action_components,
@@ -110,13 +123,25 @@ def _evaluate_radar_decision(
         blockers=blockers, cfg=cfg, rsi_actionability_delta=rsi_actionability_delta,
         rsi_risk_delta=rsi_risk_delta, rsi_reasons=rsi_reasons,
     )
+    actionability, evidence_confidence, risk, penalties = _apply_market_quality_score_caps(
+        market,
+        actionability=actionability,
+        evidence_confidence=evidence_confidence,
+        risk=risk,
+        action_components=action_components,
+        evidence_components=evidence_components,
+        risk_components=risk_components,
+        penalties=penalties,
+        penalty_points=penalty_points,
+    )
 
     actionable, confidence, radar_route, route_reason = _resolve_route(
         data=data, origin=primary_origin, bias=bias, catalyst=catalyst,
         actionability=actionability, evidence_confidence=evidence_confidence,
-        risk=risk, urgency=timing_profile.urgency_score, calendar_risk=calendar_risk,
-        market_led_gate=market_led_gate, tradability=tradability, spread=spread,
-        blockers=blockers, cfg=cfg,
+        risk=risk, urgency=urgency, calendar_risk=calendar_risk,
+        market_led_gate=market_led_gate, market_quality_gate=market_quality_gate,
+        tradability=tradability, spread=spread, blockers=blockers, origins=origins,
+        cfg=cfg,
     )
     warnings = decision_policy.decision_warnings(
         data,
@@ -131,6 +156,9 @@ def _evaluate_radar_decision(
             "Validated RSI technical context adjusted research scores: "
             f"actionability={rsi_actionability_delta:+.2f}; risk={rsi_risk_delta:+.2f}."
         ))))
+    quality_warnings = _market_quality_warnings(market, spread_status=spread)
+    if quality_warnings:
+        warnings = tuple(dict.fromkeys((*warnings, *quality_warnings)))
     why_review, confirms, invalidates = decision_policy.review_copy(
         data,
         origin=primary_origin,
@@ -146,7 +174,7 @@ def _evaluate_radar_decision(
         timing=timing, tradability=tradability, spread=spread, radar_route=radar_route,
         route_reason=route_reason, actionable=actionable, actionability=actionability,
         evidence_confidence=evidence_confidence, risk=risk,
-        urgency=timing_profile.urgency_score, market_phase=timing_profile.market_phase,
+        urgency=urgency, market_phase=timing_profile.market_phase,
         preferred_horizon=timing_profile.preferred_horizon,
         expires_at=timing_profile.expires_at, chase_risk=timing_profile.chase_risk_score,
         action_components=action_components, evidence_components=evidence_components,
@@ -202,14 +230,16 @@ def _resolve_route(
     *,
     data: Mapping[str, Any], origin: str, bias: str, catalyst: str,
     actionability: float, evidence_confidence: float, risk: float, urgency: float,
-    calendar_risk: bool, market_led_gate: bool, tradability: str, spread: str,
-    blockers: tuple[str, ...], cfg: RadarDecisionConfig,
+    calendar_risk: bool, market_led_gate: bool, market_quality_gate: bool,
+    tradability: str, spread: str, blockers: tuple[str, ...], origins: tuple[str, ...],
+    cfg: RadarDecisionConfig,
 ) -> tuple[bool, str, str, str]:
     lane_enabled = cfg.market_led_enabled if decision_policy.uses_market_lane(origin) else cfg.catalyst_led_enabled
     actionable = bool(
         lane_enabled
         and not blockers
         and market_led_gate
+        and market_quality_gate
         and tradability in {TradabilityStatus.GOOD.value, TradabilityStatus.ACCEPTABLE.value}
         and spread in {SpreadStatus.VERIFIED_GOOD.value, SpreadStatus.VERIFIED_ACCEPTABLE.value}
         and actionability >= cfg.actionability_threshold
@@ -221,7 +251,8 @@ def _resolve_route(
     radar_route, route_reason = _radar_route(
         data, origin=origin, bias=bias, catalyst=catalyst, confidence=confidence,
         actionability=actionability, urgency=urgency, calendar_risk=calendar_risk,
-        actionable=actionable, blockers=blockers, cfg=cfg,
+        actionable=actionable, blockers=blockers, origins=origins,
+        market_quality_gate=market_quality_gate, cfg=cfg,
     )
     if radar_route in {
         RadarResearchRoute.DASHBOARD_WATCH.value,
@@ -304,13 +335,15 @@ def _catalyst_status(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], 
         return CatalystStatus.DISPROVEN.value
     if explicit in {item.value for item in CatalystStatus}:
         return explicit
-    official = (
-        isinstance(data.get("official_exchange_event"), Mapping)
-        or str(data.get("source_class") or "") in {"official_exchange", "official_project", "structured_calendar", "structured_unlock"}
-        or str(data.get("source_strength") or "") == "official_structured"
-        or "official_exchange" in text
+    evidence_rows = (data, *sources)
+    official = any(
+        isinstance(row.get("official_exchange_event"), Mapping)
+        or str(row.get("source_class") or "")
+        in {"official_exchange", "official_project", "structured_calendar", "structured_unlock"}
+        or str(row.get("source_strength") or "") == "official_structured"
+        for row in evidence_rows
     )
-    accepted = _number(data.get("accepted_evidence_count")) or 0.0
+    accepted = sum(_number(row.get("accepted_evidence_count")) or 0.0 for row in evidence_rows)
     source_lane_text = " ".join(
         (
             *_texts(data.get("source_origin")),
@@ -341,7 +374,10 @@ def _catalyst_status(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], 
             "prediction_market",
         )
     )
-    if official and (accepted > 0 or isinstance(data.get("official_exchange_event"), Mapping)):
+    if official and (
+        accepted > 0
+        or any(isinstance(row.get("official_exchange_event"), Mapping) for row in evidence_rows)
+    ):
         return CatalystStatus.CONFIRMED.value
     if (accepted > 0 and catalyst_specific_source) or (
         data.get("latest_source_url")
@@ -793,6 +829,8 @@ def _radar_route(
     calendar_risk: bool,
     actionable: bool,
     blockers: tuple[str, ...],
+    origins: tuple[str, ...],
+    market_quality_gate: bool,
     cfg: RadarDecisionConfig,
 ) -> tuple[str, str]:
     if blockers:
@@ -839,6 +877,12 @@ def _radar_route(
         return RadarResearchRoute.DIAGNOSTIC.value, "below_dashboard_watch_threshold"
     if not actionable:
         if actionability >= cfg.dashboard_watch_threshold:
+            if not market_quality_gate:
+                return decision_policy.configured_route(
+                    RadarResearchRoute.DASHBOARD_WATCH.value,
+                    "market_data_quality_limited_to_dashboard",
+                    enabled=cfg.dashboard_watch_route_enabled,
+                )
             return decision_policy.configured_route(
                 RadarResearchRoute.DASHBOARD_WATCH.value,
                 "useful_research_below_actionable_push_gate",
@@ -848,7 +892,13 @@ def _radar_route(
     if (
         confidence == ConfidenceBand.HIGH_CONFIDENCE.value
         and catalyst == CatalystStatus.CONFIRMED.value
-        and origin in {ThesisOrigin.CATALYST_LED.value, ThesisOrigin.FUNDAMENTAL_LED.value}
+        and any(
+            contributor in {
+                ThesisOrigin.CATALYST_LED.value,
+                ThesisOrigin.FUNDAMENTAL_LED.value,
+            }
+            for contributor in origins
+        )
     ):
         return decision_policy.configured_route(
             RadarResearchRoute.HIGH_CONFIDENCE_WATCH.value,

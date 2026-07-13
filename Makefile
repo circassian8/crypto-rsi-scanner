@@ -990,16 +990,27 @@ radar-market-no-send:
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
 		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG)
+	@if env RSI_EVENT_ALERTS_ENABLED=0 \
+		RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send status \
+			--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+			--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) >/dev/null; then \
+		env RSI_EVENT_ALERTS_ENABLED=0 \
+			RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
+			RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+			sh -c 'cd "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_NAMESPACE)" && exec "$(RADAR_MARKET_NO_SEND_PYTHON)" "$(RADAR_MARKET_NO_SEND_MAIN)" --event-alpha-artifact-doctor \
+				--event-alpha-profile no_key_live \
+				--event-alpha-artifact-namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
+				--event-alpha-artifact-doctor-strict' && \
+		env RSI_EVENT_ALERTS_ENABLED=0 \
+			RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+			$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send publish \
+				--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+				--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE); \
+	fi
 	env RSI_EVENT_ALERTS_ENABLED=0 \
-	RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	sh -c 'cd "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_NAMESPACE)" && exec "$(RADAR_MARKET_NO_SEND_PYTHON)" "$(RADAR_MARKET_NO_SEND_MAIN)" --event-alpha-artifact-doctor \
-		--event-alpha-profile no_key_live \
-		--event-alpha-artifact-namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
-		--event-alpha-artifact-doctor-strict'
-	env RSI_EVENT_ALERTS_ENABLED=0 \
-	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send publish \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send audit \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE)
 
@@ -1015,10 +1026,12 @@ radar-market-no-send-smoke:
 		--top-n 5 --observed-at $(EVENT_FIXTURE_NOW)
 	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
 	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_market_rows.json
+	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_request_ledger.json
 	test -s $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
 	grep -q '"data_mode": "mock"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
 	grep -q '"no_send": true' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
-	grep -q '"contract_counted_status": "counted"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
+	grep -q '"candidate_source_mode": "mocked_fixture"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
+	grep -q '"contract_counted_status": "not_counted"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_market_no_send_generation.json
 	grep -q '"primary_thesis_origin":"market_led"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
 	grep -q '"symbol":"MKTLOW"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl
 	grep -q '"radar_route":"diagnostic"' $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)/event_integrated_radar_candidates.jsonl

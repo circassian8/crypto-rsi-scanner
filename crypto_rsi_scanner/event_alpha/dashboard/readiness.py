@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..artifacts import fingerprints as event_alpha_fingerprints
+from ..operations.market_provenance import normalize_market_provenance
 from .loader import _read_regular_file_once, load_dashboard_snapshot
 from .models import DashboardLoadError, DashboardSnapshot
 
@@ -45,6 +46,15 @@ _REQUIRED_PRODUCT_ARTIFACTS = (
     "provider_readiness_md",
     "unified_calendar",
 )
+_MARKET_NO_SEND_REQUIRED_ARTIFACTS = (
+    "market_no_send_source_cache",
+    "market_no_send_request_ledger",
+    "market_no_send_generation",
+    "market_history",
+    "integrated_candidates",
+    "integrated_outcomes",
+)
+_LIVE_MARKET_REQUIRED_ARTIFACTS = ("provider_health",)
 
 
 class DashboardReadinessError(RuntimeError):
@@ -207,13 +217,27 @@ def _require_current_counts(snapshot: DashboardSnapshot) -> None:
             raise DashboardReadinessError(
                 f"dashboard generation current count does not match {artifact_name}"
             )
+    if isinstance(snapshot.operator_state.get("market_no_send_provenance"), Mapping):
+        candidate_count = _artifact_count(artifacts, "integrated_candidates")
+        outcome_count = _artifact_count(artifacts, "integrated_outcomes")
+        if candidate_count != outcome_count:
+            raise DashboardReadinessError(
+                "dashboard market generation candidate/outcome counts do not match"
+            )
 
 
 def _require_complete_product_artifacts(snapshot: DashboardSnapshot) -> None:
     artifacts = snapshot.operator_state.get("artifacts")
     if not isinstance(artifacts, Mapping):
         raise DashboardReadinessError("dashboard generation has no exact artifact manifest")
-    for artifact_name in _REQUIRED_PRODUCT_ARTIFACTS:
+    required = _REQUIRED_PRODUCT_ARTIFACTS
+    provenance = snapshot.operator_state.get("market_no_send_provenance")
+    if isinstance(provenance, Mapping):
+        required = (*required, *_MARKET_NO_SEND_REQUIRED_ARTIFACTS)
+        normalized = normalize_market_provenance(provenance)
+        if normalized.get("candidate_source_mode") == "live_no_send":
+            required = (*required, *_LIVE_MARKET_REQUIRED_ARTIFACTS)
+    for artifact_name in required:
         entry = artifacts.get(artifact_name)
         if not isinstance(entry, Mapping) or entry.get("status") != "current":
             raise DashboardReadinessError(
@@ -224,6 +248,16 @@ def _require_complete_product_artifacts(snapshot: DashboardSnapshot) -> None:
             raise DashboardReadinessError(
                 f"dashboard generation {artifact_name} fingerprint is invalid ({metadata_error})"
             )
+
+
+def _artifact_count(artifacts: Mapping[str, Any], artifact_name: str) -> int:
+    entry = artifacts.get(artifact_name)
+    count = entry.get("count") if isinstance(entry, Mapping) else None
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise DashboardReadinessError(
+            f"dashboard generation has invalid current count for {artifact_name}"
+        )
+    return count
 
 
 def _require_pointer_matches_snapshot(

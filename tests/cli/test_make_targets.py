@@ -838,6 +838,21 @@ def test_event_alpha_radar_north_star_generation_writes_contract():
     assert payload["burn_in_contract"]["min_outcome_rows"] == 100
     assert payload["burn_in_contract"]["auto_apply_thresholds"] is False
     assert payload["burn_in_contract"]["no_auto_threshold_changes"] is True
+    assert payload["burn_in_contract"]["mock_fixture_replay_cache_or_preflight_counted"] is False
+    assert "burn_in_counted=true" in payload["burn_in_contract"]["candidate_count_authority"]
+    market_generation = payload["market_no_send_generation"]
+    assert market_generation["provenance_contract"]["schema_version"] == "crypto_radar_market_provenance_v2"
+    assert market_generation["provenance_contract"]["contract_version"] == 2
+    assert market_generation["provenance_contract"]["mock_or_fixture_real_burn_in_counted"] is False
+    assert "live_provider" in market_generation["provenance_contract"]["data_acquisition_modes"]
+    assert "live_no_send" in market_generation["provenance_contract"]["candidate_source_modes"]
+    assert market_generation["authorization"]["inferred_from_cache"] is False
+    assert "no provider call" in market_generation["authorization"]["absent_behavior"]
+    assert market_generation["temporal_baseline"]["baseline_excludes_current_observation"] is True
+    assert market_generation["temporal_baseline"]["default_limits"]["min_baseline_observations"] == 8
+    assert market_generation["outcome_policy"]["pending_placeholder_per_canonical_decision_candidate"] is True
+    assert payload["decision_model_v2"]["market_data_quality_caps"]["proxy_only_can_be_actionable_or_rapid"] is False
+    assert payload["decision_model_v2"]["market_data_quality_caps"]["missing_or_stale_spread_urgency_max"] == 55
     assert payload["source_activation_order"] == list(radar_north_star.SOURCE_ACTIVATION_ORDER)
     assert payload["telegram_sends"] == 0
     assert payload["trades_created"] == 0
@@ -847,6 +862,9 @@ def test_event_alpha_radar_north_star_generation_writes_contract():
     assert "Event Alpha Radar North Star" in markdown
     assert "30-Day Burn-In Contract" in markdown
     assert "auto_apply_thresholds: `False`" in markdown
+    assert "crypto_radar_market_provenance_v2" in markdown
+    assert "event_market_history.jsonl" in markdown
+    assert "market_data_quality_caps" in markdown
 
 
 def test_event_alpha_radar_north_star_project_health_status_and_blocker(tmp_path):
@@ -1427,7 +1445,6 @@ def test_export_source_with_artifacts_parent_symlink_swap_fails_closed():
     import importlib.util
     import os
     import zipfile
-
     root = REPO_ROOT
     spec = importlib.util.spec_from_file_location(
         "export_source_with_artifacts_race",
@@ -1436,7 +1453,6 @@ def test_export_source_with_artifacts_parent_symlink_swap_fails_closed():
     assert spec and spec.loader
     export_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(export_module)
-
     with TemporaryDirectory() as tmp:
         trusted_root = Path(tmp) / "trusted"
         artifact_root = trusted_root / "event_fade_cache"
@@ -1451,7 +1467,6 @@ def test_export_source_with_artifacts_parent_symlink_swap_fails_closed():
         archive = Path(tmp) / "race.zip"
         original_open = export_module.os.open
         swapped = False
-
         def racing_open(path, flags, mode=0o777, *, dir_fd=None):
             nonlocal swapped
             if path == "event_fade_cache" and dir_fd is not None and not swapped:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Mapping
@@ -13,6 +14,7 @@ from ._utils import Messages, ctx_mapping, ctx_value
 from ...artifacts import paths as event_artifact_paths
 from ...artifacts import operator_state as event_alpha_operator_state
 from ...operations import common
+from ...operations import market_provenance as event_market_provenance
 from ...providers import request_lineage as event_request_lineage
 
 
@@ -468,6 +470,14 @@ def _exact_contract_ledger_valid(ctx: object, row: Mapping[str, Any]) -> bool:
     ctx_namespace = str(ctx_value(ctx, "artifact_namespace", artifact_namespace) or artifact_namespace)
     if profile != ctx_profile or artifact_namespace != ctx_namespace:
         return False
+    if provider == "coingecko":
+        return _market_no_send_contract_ledger_valid(
+            namespace_dir,
+            row,
+            generation_id=generation_id,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+        )
     report_name = _PROVIDER_REHEARSAL_REPORTS.get(provider)
     if not report_name:
         return False
@@ -514,6 +524,98 @@ def _exact_contract_ledger_valid(ctx: object, row: Mapping[str, Any]) -> bool:
     )
 
 
+def _market_no_send_contract_ledger_valid(
+    namespace_dir: Path,
+    row: Mapping[str, Any],
+    *,
+    generation_id: str,
+    profile: str,
+    artifact_namespace: str,
+) -> bool:
+    provenance = event_market_provenance.market_provenance_values(row)
+    if not provenance or provenance.get("provenance_contract_valid") is not True:
+        return False
+    if (
+        provenance.get("candidate_source_mode") != "live_no_send"
+        or provenance.get("data_acquisition_mode") != "live_provider"
+        or provenance.get("provider") != "coingecko"
+        or provenance.get("provider_generation_id") != generation_id
+        or provenance.get("live_provider_authorized") is not True
+        or provenance.get("provider_call_attempted") is not True
+        or provenance.get("provider_call_succeeded") is not True
+        or provenance.get("burn_in_counted") is not True
+        or provenance.get("cache_status") != "write_through"
+    ):
+        return False
+    ledger_path = _contract_artifact_path(
+        namespace_dir,
+        str(provenance.get("request_ledger_path") or ""),
+    )
+    source_path = _contract_artifact_path(
+        namespace_dir,
+        str(provenance.get("provider_source_artifact") or ""),
+    )
+    if ledger_path is None or source_path is None or ledger_path == source_path:
+        return False
+    if (
+        _sha256_file(ledger_path) != provenance.get("request_ledger_sha256")
+        or _sha256_file(source_path)
+        != provenance.get("provider_source_artifact_sha256")
+    ):
+        return False
+    ledger = common.read_json(ledger_path)
+    source = common.read_json(source_path)
+    identity = {
+        "run_id": generation_id,
+        "profile": profile,
+        "artifact_namespace": artifact_namespace,
+        "provider": "coingecko",
+    }
+    if any(ledger.get(field) != value for field, value in identity.items()):
+        return False
+    if any(source.get(field) != value for field, value in identity.items()):
+        return False
+    ledger_contract = {
+        "row_type": "event_market_no_send_request_ledger",
+        "data_acquisition_mode": "live_provider",
+        "candidate_source_mode": "live_no_send",
+        "live_provider_authorized": True,
+        "fixture_mode": False,
+        "provider_call_attempted": True,
+        "provider_request_succeeded": True,
+        "provider_source_artifact": source_path.name,
+        "provider_source_artifact_sha256": _sha256_file(source_path),
+        "provenance_contract_valid": True,
+        "burn_in_counted": True,
+        "no_send": True,
+        "research_only": True,
+    }
+    source_contract = {
+        "row_type": "event_market_no_send_source_cache",
+        "data_acquisition_mode": "live_provider",
+        "candidate_source_mode": "live_no_send",
+        "provider_call_attempted": True,
+        "provider_request_succeeded": True,
+        "provenance_contract_valid": True,
+        "burn_in_counted": True,
+        "no_send": True,
+        "research_only": True,
+    }
+    return (
+        all(ledger.get(field) == value for field, value in ledger_contract.items())
+        and all(source.get(field) == value for field, value in source_contract.items())
+        and all(int(ledger.get(field) or 0) == 0 for field in _FORBIDDEN_SIDE_EFFECT_FIELDS)
+        and all(int(source.get(field) or 0) == 0 for field in _FORBIDDEN_SIDE_EFFECT_FIELDS)
+    )
+
+
+def _sha256_file(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
 def _contract_provider(row: Mapping[str, Any]) -> str:
     provider = str(row.get("provider") or row.get("source_provider") or "").strip()
     return "bybit_announcements" if "bybit" in provider.casefold() else provider
@@ -530,7 +632,11 @@ def _contract_artifact_path(namespace_dir: Path, label: str) -> Path | None:
     if ".." in candidate.parts:
         return None
     path = namespace_dir / candidate.name
-    return path if path.is_file() else None
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError:
+        return None
+    return resolved if resolved.parent == namespace_dir and resolved.is_file() else None
 
 
 def _contract_bybit_source_fields_complete(row: Mapping[str, Any]) -> bool:

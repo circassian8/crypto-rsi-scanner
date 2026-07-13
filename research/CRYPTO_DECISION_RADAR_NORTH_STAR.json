@@ -91,14 +91,74 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-12T18:45:07+00:00",
+  "generated_at": "2026-07-13T06:00:07+00:00",
+  "market_provenance_contract": {
+    "burn_in_authority": {
+      "caller_asserted_counting_trusted": false,
+      "counted_candidate_source_mode": "live_no_send",
+      "mock_or_fixture_contract_may_be_valid": true,
+      "mock_or_fixture_counted": false,
+      "recomputed_from_closed_contract": true,
+      "required_live_lineage": [
+        "explicit live provider authorization",
+        "provider call attempted and succeeded",
+        "distinct request ledger and provider source artifact",
+        "valid SHA-256 for both lineage artifacts",
+        "provider generation id",
+        "feature basis",
+        "data quality"
+      ]
+    },
+    "candidate_source_modes": [
+      "live_no_send",
+      "mocked_fixture",
+      "artifact_replay",
+      "preflight_only"
+    ],
+    "contract_version": 2,
+    "data_acquisition_modes": [
+      "live_provider",
+      "mocked_fixture",
+      "artifact_replay",
+      "preflight_only",
+      "cache_replay"
+    ],
+    "historical_flat_rows_silently_reclassified": false,
+    "required_fields": [
+      "schema_version",
+      "contract_version",
+      "data_acquisition_mode",
+      "candidate_source_mode",
+      "provider",
+      "provider_call_attempted",
+      "provider_call_succeeded",
+      "live_provider_authorized",
+      "request_ledger_path",
+      "request_ledger_sha256",
+      "provider_source_artifact",
+      "provider_source_artifact_sha256",
+      "provider_generation_id",
+      "cache_status",
+      "provenance_contract_valid",
+      "burn_in_eligible",
+      "burn_in_counted",
+      "burn_in_reason",
+      "feature_basis",
+      "data_quality",
+      "validation_errors"
+    ],
+    "schema_version": "crypto_radar_market_provenance_v2"
+  },
   "market_no_send_generation": {
     "authorization": {
+      "authorization_absent_behavior": "safe blocked result, no provider call, credential-free pilot audit, pointer unchanged",
       "live_provider_calls_allowed_by_default": false,
       "required_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1"
     },
     "dashboard_pointer_policy": {
       "fixture_or_mock_generation_eligible": false,
+      "current_authoritative_namespace_is_immutable": true,
+      "latest_attempt_receipt_must_match_manifest": true,
       "pointer_changes_on_failed_or_blocked_run": false,
       "required_checks": [
         "real live-safe data mode",
@@ -122,6 +182,8 @@
     "pipeline": [
       "bounded top-liquid universe",
       "fresh market snapshots",
+      "canonical provenance v2 and distinct request/source lineage",
+      "bounded per-asset temporal history and warmup evidence",
       "market anomalies and observations",
       "canonical Decision v2 projections",
       "cards and Decision preview",
@@ -131,13 +193,30 @@
       "guarded authoritative-pointer publication"
     ],
     "provider": "coingecko",
+    "pilot_audit_artifacts": [
+      "event_market_no_send_latest_attempt.json",
+      "event_market_no_send_pilot_audit.json",
+      "event_market_no_send_pilot_audit.md",
+      "event_provider_health.json"
+    ],
     "provenance_fields": [
-      "data_mode",
+      "data_acquisition_mode",
+      "candidate_source_mode",
       "provider",
-      "request_or_cache_artifact",
-      "observed_at",
-      "contract_counted",
-      "no_send"
+      "provider_call_attempted",
+      "provider_call_succeeded",
+      "live_provider_authorized",
+      "request_ledger_path",
+      "request_ledger_sha256",
+      "provider_source_artifact",
+      "provider_source_artifact_sha256",
+      "provider_generation_id",
+      "cache_status",
+      "feature_basis",
+      "data_quality",
+      "burn_in_eligible",
+      "burn_in_counted",
+      "burn_in_reason"
     ],
     "targets": [
       "radar-market-no-send-readiness",
@@ -268,6 +347,7 @@
     ],
     "dashboard_watch_may_use_unavailable": true,
     "invent_spread": false,
+    "missing_or_stale_spread_urgency_max": 55,
     "states": [
       "verified_good",
       "verified_acceptable",
@@ -295,6 +375,46 @@
     "legacy_event_alpha_preview_role": "diagnostic and compatibility output",
     "notifications_route_attention_only": true,
     "stale_or_untrusted_data_shown_actionable": false
+  },
+  "temporal_market_baseline_policy": {
+    "generation_snapshot_artifact": "event_market_history.jsonl",
+    "shared_live_cache": "radar_market_history_cache/event_market_history.jsonl",
+    "fixture_and_mock_cache_scope": "generation-local only; never seeds live history",
+    "baseline_excludes_current_observation": true,
+    "default_limits": {
+      "future_tolerance_minutes": 5,
+      "max_current_age_hours": 6,
+      "max_history_age_days": 45,
+      "max_observations_per_asset": 256,
+      "min_baseline_observations": 8
+    },
+    "derived_evidence": [
+      "1h/4h/24h returns in percent points",
+      "turnover and volume z-scores",
+      "return volatility",
+      "BTC and ETH relative returns",
+      "observation ids and baseline bounds"
+    ],
+    "direct_provider_fields_preserved": true,
+    "market_quality_caps": {
+      "cold_or_warming_evidence_confidence_max": 62,
+      "cold_or_warming_risk_min": 48,
+      "cold_or_warming_urgency_max": 45,
+      "proxy_only_actionability_max": 64,
+      "proxy_only_can_be_actionable_or_rapid": false,
+      "proxy_only_evidence_confidence_max": 55,
+      "proxy_only_risk_min": 55,
+      "proxy_only_urgency_max": 45
+    },
+    "only_explicit_proxy_fields_may_be_replaced": true,
+    "schema_id": "event_alpha.market_history_observation",
+    "schema_version": 1,
+    "statuses": [
+      "cold",
+      "warming",
+      "warm",
+      "rejected"
+    ]
   },
   "unit_policy": {
     "fraction_example": "0.10 becomes 10 percent",
