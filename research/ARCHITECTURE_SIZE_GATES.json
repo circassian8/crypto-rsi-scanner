@@ -228,7 +228,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 39,
+      "max_class_line_count": 45,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -1514,19 +1514,19 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1285,
-      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+      "line_count": 1303,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+      "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
       "source_kind": "production"
     },
     {
       "accepted": true,
       "limit": 1500,
       "line_count": 1285,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-      "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+      "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
       "source_kind": "production"
     },
     {
@@ -1698,7 +1698,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 900,
+  "file_count": 915,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1706,7 +1706,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-14T17:23:19.594547+00:00",
+  "generated_at": "2026-07-14T23:11:06.339444+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1742,14 +1742,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1285,
-      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "line_count": 1303,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 1285,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     },
     {
@@ -1790,6 +1790,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1200,
+      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1199,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py",
       "source_kind": "production"
@@ -1798,12 +1804,6 @@
       "limit": 1500,
       "line_count": 1199,
       "path": "crypto_rsi_scanner/cli/services/event_alpha_research.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1199,
-      "path": "crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py",
       "source_kind": "production"
     },
     {
@@ -1826,6 +1826,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1192,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/public_access.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1189,
       "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
       "source_kind": "production"
@@ -1834,12 +1840,6 @@
       "limit": 1500,
       "line_count": 1187,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1182,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "source_kind": "production"
     },
     {
@@ -1869,7 +1869,19 @@
     {
       "limit": 1500,
       "line_count": 1175,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1175,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1174,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "source_kind": "production"
     },
     {
@@ -1928,26 +1940,14 @@
     },
     {
       "limit": 1500,
+      "line_count": 1130,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1126,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1120,
-      "path": "crypto_rsi_scanner/event_alpha/outcomes/feedback_eligibility.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1115,
-      "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_parts/notification_delivery_checks.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1114,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/ideas_page.py",
       "source_kind": "production"
     }
   ],
@@ -2140,7 +2140,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 905,
+      "line_count": 910,
       "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
@@ -2382,7 +2382,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 39,
+      "max_class_line_count": 45,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -3678,6 +3678,13 @@
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1303,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
     }
   ],
   "new_violation_count": 0,
@@ -3776,14 +3783,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1285,
-      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+      "line_count": 1303,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 1285,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
       "source_kind": "production"
     },
     {
@@ -4111,19 +4118,19 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1285,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+          "line_count": 1303,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
           "source_kind": "production"
         },
         {
           "accepted": true,
           "limit": 1500,
           "line_count": 1285,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
           "source_kind": "production"
         },
         {
@@ -4239,13 +4246,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1285,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "line_count": 1303,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
       },
       {
         "line_count": 1285,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       },
       {
@@ -4381,19 +4388,19 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1285,
-            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+            "line_count": 1303,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
             "source_kind": "production"
           },
           {
             "accepted": true,
             "limit": 1500,
             "line_count": 1285,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
             "source_kind": "production"
           },
           {

@@ -34,8 +34,8 @@ campaign cadence is eligible; the dashboard never sets that authorization.
 ### When a generation expires
 
 Current live generations remain authoritative for at most six hours. The
-campaign's 60-minute spacing is only the minimum interval between eligible
-observations; it does not schedule a refresh. When freshness alone expires, the
+campaign's 60-minute spacing is the minimum interval between eligible
+observations. When freshness alone expires, the
 browser keeps a quarantined diagnostic shell available under HTTP 503 so System
 Health, historical Outcomes, and clearly labeled Run History remain inspectable.
 Every current idea, market row, anomaly, calendar row, outcome, provider field,
@@ -54,9 +54,29 @@ Recover without weakening freshness or making an unapproved provider call:
    `launchctl kickstart -k "gui/$(id -u)/com.nasrenkaraf.crypto-radar-dashboard"`;
    otherwise stop and rerun `make radar-dashboard PYTHON=.venv/bin/python`.
 
-There is no automatic campaign scheduler. Installing a recurring maintainer
-would authorize periodic provider calls and process restarts, so it remains a
-separate explicit operator decision.
+Daily Operations v1 is the guarded maintainer, but it remains prepared and
+disabled until the operator explicitly installs it. Inspect it without writes
+or provider calls, or run one manual cycle, with:
+
+```sh
+make radar-daily-ops-readiness PYTHON=.venv/bin/python
+make radar-daily-ops-status PYTHON=.venv/bin/python
+make radar-daily-ops-cycle PYTHON=.venv/bin/python
+```
+
+Each cycle journals attempted and terminal states, performs readiness before a
+possible provider boundary, observes the one-hour cadence, makes at most one
+already-authorized CoinGecko no-send request, and uses a unique namespace.
+Strict doctor and complete operator state precede publication. Failure restores
+the prior pointer or removes only the failed new pointer; the exact owned
+dashboard restarts only after publication. Status treats a loaded LaunchAgent
+with a non-zero last exit as unhealthy and keeps its sanitized exit/run counts
+in maintenance telemetry. Install only after accepting those recurring calls
+and restarts:
+
+```sh
+CONFIRM=1 make radar-daily-ops-install PYTHON=.venv/bin/python
+```
 
 ## Private phone access
 
@@ -178,13 +198,18 @@ Stop it when finished:
 
 ```sh
 CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python
+CONFIRM=1 make radar-dashboard-public-guard PYTHON=.venv/bin/python
 ```
 
 Disable terminates only the exact owned process whose PID and complete live argv
 still match the runtime state. It refuses argv mismatch or unowned process state.
-The link also disappears when the process or Mac stops. If the dashboard later
-becomes stale, current research is already quarantined by the dashboard, but the
-public tunnel should still be stopped when it is not actively needed.
+The link also disappears when the process or Mac stops. The optional
+`RSI_RADAR_PUBLIC_MAX_LIFETIME_MINUTES` defaults to 240 minutes; an expired,
+stale, or unhealthy link is no longer reported as usable. Receipt expiry does
+not itself terminate `cloudflared`; status warns that it may still be public,
+and the confirmed guard stops only its exact owned process. Keep public access
+off unless actively needed. Tailscale Serve is the recommended persistent phone
+route.
 
 ## Primary pages
 
@@ -272,10 +297,27 @@ through its known UTC date instead of becoming past at midnight.
 
 An empty live calendar must name its coverage state. `Not configured` means the
 generation did not inspect a real calendar source; it does not mean there are no
-events. Configure a fresh non-fixture, operator-verified snapshot through
-`RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH`, then begin with market readiness.
-Fixture, test, mock, replay, stale, unsafe, or rejected calendar rows cannot
-silently fill a live authority.
+events. The official producer supports Fed FOMC, BLS CPI/employment, and BEA
+PCE/GDP. Readiness is no-call; live acquisition requires the pre-existing
+calendar authorization and honest BLS contact. Local import requires three
+operator-downloaded official files plus their real acquisition timestamp:
+
+```sh
+make radar-calendar-official-readiness PYTHON=.venv/bin/python
+make radar-calendar-official-acquire PYTHON=.venv/bin/python
+make radar-calendar-official-import-local \
+  FED_FOMC_HTML=/path/to/fomc.html \
+  BLS_CALENDAR_ICS=/path/to/bls.ics \
+  BEA_RELEASE_DATES_JSON=/path/to/bea.json \
+  OFFICIAL_MACRO_OBSERVED_AT=2026-07-15T00:00:00Z \
+  PYTHON=.venv/bin/python
+```
+
+Every successful pack preserves exact/window semantics and source timezones,
+writes immutable source evidence, and is hash-attested before Daily Operations
+can use its latest-success snapshot. Direct fixture, test, mock, or replay paths
+are rejected before writes. Missing, stale, unavailable, unsafe, or rejected
+calendar evidence remains explicit and cannot create directional bias alone.
 
 ### System Health
 
@@ -308,6 +350,9 @@ request result, authorization state, namespace, data mode, route/candidate
 counts, baseline progression, doctor/publication state, reservation/cadence,
 and the next eligible observation. Historical generations provide context only;
 they are never merged into current authority.
+The separate Daily Operations ledger shows readiness, provider-attempt,
+publication, rollback/invalidation, and owned-dashboard restart state; it is
+maintenance telemetry, never authority by itself.
 
 ## Scores and routes
 
@@ -373,7 +418,7 @@ ratios are labeled as percentages rather than compact currency-like numbers.
 
 ## Safe next actions
 
-For another market observation, always start with:
+For another manual market observation, always start with:
 
 ```sh
 make radar-market-no-send-readiness PYTHON=.venv/bin/python
@@ -384,3 +429,8 @@ the already-authorized provider and campaign cadence are eligible. For calendar
 coverage, first supply a fresh non-fixture snapshot through the documented local
 path, then rerun readiness. Do not lower thresholds, invent spread, substitute
 fixtures into a live generation, or enable sends to populate the dashboard.
+
+To compare execution-quality integration choices without selecting a venue or
+calling one, run `make radar-execution-quality-readiness
+PYTHON=.venv/bin/python`. No spread/depth adapter or order behavior exists until
+the operator identifies the intended spot, perpetual, or DEX venue.

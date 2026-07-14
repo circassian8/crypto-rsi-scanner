@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timedelta, timezone
+import math
 from typing import Any
 
+from ... import config
 from .campaign_page import render_campaign_page
 from .components import (
     HtmlFragment,
@@ -90,6 +93,7 @@ def render_health_page(snapshot: DashboardSnapshot) -> str:
             coverage=coverage,
         )
         + _current_contract(snapshot)
+        + _maintenance_status_section(snapshot)
         + _layer_coverage_section(coverage)
         + _provider_readiness_section(
             providers,
@@ -356,6 +360,174 @@ def _current_contract(snapshot: DashboardSnapshot) -> str:
         eyebrow="Pointer-bound truth",
         anchor="exact-generation",
     )
+
+
+def _maintenance_status_section(snapshot: DashboardSnapshot) -> str:
+    service = snapshot.maintenance_service
+    state = snapshot.maintenance_state
+    latest_constraint = next(
+        (
+            row
+            for row in reversed(snapshot.maintenance_cycles)
+            if row.get("status") in {"skipped", "blocked"}
+        ),
+        {},
+    )
+    enabled = service.get("enabled")
+    prepared = service.get("prepared")
+    if enabled is True:
+        maintenance_label = "Enabled"
+        maintenance_tone = "positive"
+    elif prepared is True:
+        maintenance_label = "Prepared / disabled"
+        maintenance_tone = "muted"
+    else:
+        maintenance_label = "Unavailable"
+        maintenance_tone = "warning"
+    scheduler_healthy = (
+        state.get("scheduler_healthy")
+        if state.get("scheduler_healthy") in {True, False}
+        else service.get("healthy")
+    )
+    scheduler_loaded = (
+        state.get("scheduler_loaded")
+        if state.get("scheduler_loaded") in {True, False}
+        else service.get("loaded")
+    )
+    scheduler_reason = (
+        state.get("scheduler_reason")
+        or service.get("scheduler_reason")
+        or service.get("reason")
+    )
+    authority_expiry = _generation_authority_expiry(snapshot)
+    clock = snapshot.generation_authority_checked_at
+    values = (
+        ("Maintenance", badge(maintenance_label, tone=maintenance_tone)),
+        ("Scheduler loaded", _boolean_badge(scheduler_loaded)),
+        (
+            "Scheduler health",
+            _boolean_badge(scheduler_healthy, false_tone="danger"),
+        ),
+        ("Scheduler detail", humanize_reason(scheduler_reason)),
+        (
+            "Service receipt updated",
+            time_element(present_time(service.get("updated_at"), now=clock)),
+        ),
+        (
+            "Last readiness check",
+            time_element(present_time(state.get("last_readiness_check"), now=clock)),
+        ),
+        (
+            "Last attempted observation",
+            time_element(
+                present_time(state.get("last_attempted_observation"), now=clock)
+            ),
+        ),
+        (
+            "Last successful publication",
+            time_element(
+                present_time(state.get("last_successful_publication"), now=clock)
+            ),
+        ),
+        (
+            "Next eligible observation",
+            time_element(
+                present_time(state.get("next_eligible_observation_at"), now=clock)
+            ),
+        ),
+        (
+            "Generation authority expiry",
+            time_element(present_time(authority_expiry, now=clock)),
+        ),
+        (
+            "Live provider authorized",
+            _boolean_badge(
+                state.get("live_provider_authorized"),
+                false_tone="warning",
+            ),
+        ),
+        ("Last cycle", badge(state.get("last_cycle_status"))),
+        (
+            "Last cycle reason",
+            humanize_reason(state.get("last_cycle_reason")),
+        ),
+        (
+            "Latest skip / block reason",
+            humanize_reason(latest_constraint.get("reason")),
+        ),
+        (
+            "Latest skip / block recorded",
+            time_element(
+                present_time(latest_constraint.get("recorded_at"), now=clock)
+            ),
+        ),
+        ("No-send", _boolean_badge(state.get("no_send"), false_tone="danger")),
+        (
+            "Research only",
+            _boolean_badge(state.get("research_only"), false_tone="danger"),
+        ),
+    )
+    scheduler_label = (
+        "Healthy"
+        if scheduler_healthy is True
+        else "Needs attention"
+        if scheduler_healthy is False
+        else "Not recorded"
+    )
+    overview = (
+        '<div class="chip-row" aria-label="Daily maintenance summary">'
+        + str(badge(maintenance_label, tone=maintenance_tone))
+        + str(
+            badge(
+                scheduler_label,
+                tone=(
+                    "positive"
+                    if scheduler_healthy is True
+                    else "danger"
+                    if scheduler_healthy is False
+                    else "neutral"
+                ),
+            )
+        )
+        + '</div><p class="health-detail-summary">'
+        + escape_html(
+            "Daily Operations uses persisted maintenance telemetry only; this page does not inspect launchd or call a provider."
+        )
+        + "</p>"
+    )
+    return _health_detail_panel(
+        "Daily Operations maintenance",
+        overview
+        + _health_disclosure(
+            "View maintenance schedule and evidence",
+            str(definition_list(values, css_class="definition-grid")),
+            summary=(
+                f"{maintenance_label} · scheduler {scheduler_label.casefold()}"
+            ),
+        ),
+        eyebrow="Artifact-backed automation status",
+        anchor="daily-operations-maintenance",
+    )
+
+
+def _generation_authority_expiry(snapshot: DashboardSnapshot) -> str | None:
+    state = snapshot.operator_state
+    raw = state.get("run_started_at") or state.get("generated_at")
+    try:
+        started = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if started.tzinfo is None or started.utcoffset() is None:
+        return None
+    try:
+        max_age_hours = float(config.EVENT_ALPHA_MAX_RUN_AGE_HOURS)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(max_age_hours) or max_age_hours <= 0:
+        return None
+    return (
+        started.astimezone(timezone.utc) + timedelta(hours=max_age_hours)
+    ).isoformat()
 
 
 def _layer_coverage_section(

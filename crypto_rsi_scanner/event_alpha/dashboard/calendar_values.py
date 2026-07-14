@@ -149,6 +149,41 @@ def _scope(row: Mapping[str, Any]) -> str:
     return "market_wide" if not assets or assets & _GLOBAL_ASSETS else "asset_specific"
 
 
+def _matches_filters(row: Mapping[str, Any], filters: Mapping[str, str]) -> bool:
+    """Apply presentation-only calendar filters to one projected event row."""
+
+    temporal_state = str(
+        row.get("_dashboard_calendar_temporal_state") or "upcoming"
+    )
+    time_filter = filters.get("time") or "current"
+    if time_filter == "current" and temporal_state not in {"active", "upcoming"}:
+        return False
+    if time_filter in {"active", "upcoming", "past"} and temporal_state != time_filter:
+        return False
+    if filters.get("importance") and filters["importance"] != _importance(row):
+        return False
+    if filters.get("category") and filters["category"] not in _category_tokens(row):
+        return False
+    if filters.get("scope") and filters["scope"] != _scope(row):
+        return False
+    search = filters.get("search")
+    if search:
+        text = " ".join(
+            str(value or "")
+            for value in (
+                row.get("title"),
+                row.get("source"),
+                row.get("provider"),
+                row.get("description"),
+                " ".join(_assets(row)),
+                " ".join(_category_tokens(row)),
+            )
+        ).casefold()
+        if search not in text:
+            return False
+    return True
+
+
 def _assets(row: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(str(value).strip() for value in _iter_values(row.get("affected_assets")) if str(value).strip())
 

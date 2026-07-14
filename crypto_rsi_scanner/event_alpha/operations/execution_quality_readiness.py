@@ -1,0 +1,444 @@
+"""Static, no-network execution-quality feasibility and interface contract.
+
+This module deliberately stops before venue selection or adapter activation.  It
+describes candidate read-only market-data surfaces and the closed value contract
+that a future operator-selected adapter must satisfy.  It reads no environment,
+credentials, files, or provider state and performs no writes or network calls.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import asdict, dataclass
+import json
+from typing import Mapping, Protocol, Sequence
+
+
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v1"
+EXECUTION_MODES = ("spot", "perpetual", "dex")
+COMMON_METRICS = (
+    "best_bid",
+    "best_ask",
+    "mid_price",
+    "spread_bps",
+    "bid_depth_usd_by_band",
+    "ask_depth_usd_by_band",
+    "buy_price_impact_bps_by_notional",
+    "sell_price_impact_bps_by_notional",
+    "provider_observed_at",
+    "acquired_at",
+    "freshness_status",
+)
+REQUIRED_SNAPSHOT_FIELDS = (
+    "schema_version",
+    "venue_id",
+    "execution_mode",
+    "instrument_id",
+    "canonical_asset_id",
+    "base_asset",
+    "quote_asset",
+    "provider_observed_at",
+    "acquired_at",
+    "freshness_status",
+    "best_bid",
+    "best_ask",
+    "mid_price",
+    "spread_bps",
+    "bid_depth_usd_by_band",
+    "ask_depth_usd_by_band",
+    "buy_price_impact_bps_by_notional",
+    "sell_price_impact_bps_by_notional",
+    "source_url",
+    "request_lineage_id",
+    "research_only",
+)
+
+
+@dataclass(frozen=True)
+class _ExecutionVenueCapability:
+    """One static candidate capability; feasibility is not authorization."""
+
+    venue_id: str
+    display_name: str
+    implementation_status: str
+    execution_modes: tuple[str, ...]
+    market_data_access: str
+    public_endpoint_expected: bool | None
+    credentials_required: tuple[str, ...]
+    required_operator_inputs: tuple[str, ...]
+    jurisdiction_constraints: tuple[str, ...]
+    network_constraints: tuple[str, ...]
+    request_limits: tuple[str, ...]
+    expected_metrics: tuple[str, ...]
+    official_source_urls: tuple[str, ...]
+    official_sources_reviewed_at: str
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class _ExecutionQualityRequest:
+    """Venue-specific read request prepared only after an operator decision."""
+
+    venue_id: str
+    execution_mode: str
+    instrument_id: str
+    canonical_asset_id: str
+    base_asset: str
+    quote_asset: str | None
+    depth_bands_bps: tuple[int, ...]
+    notionals_usd: tuple[float, ...]
+    chain_id: str | None = None
+    pool_or_router_id: str | None = None
+
+
+@dataclass(frozen=True)
+class _ExecutionQualitySnapshot:
+    """Closed normalized result expected from a future read-only adapter."""
+
+    schema_version: str
+    venue_id: str
+    execution_mode: str
+    instrument_id: str
+    canonical_asset_id: str
+    base_asset: str
+    quote_asset: str | None
+    provider_observed_at: str
+    acquired_at: str
+    freshness_status: str
+    best_bid: float
+    best_ask: float
+    mid_price: float
+    spread_bps: float
+    bid_depth_usd_by_band: Mapping[int, float]
+    ask_depth_usd_by_band: Mapping[int, float]
+    buy_price_impact_bps_by_notional: Mapping[float, float]
+    sell_price_impact_bps_by_notional: Mapping[float, float]
+    source_url: str
+    request_lineage_id: str
+    research_only: bool = True
+    chain_id: str | None = None
+    block_number: int | None = None
+    pool_or_router_id: str | None = None
+    gas_estimate_native: float | None = None
+
+
+class _ExecutionQualityReader(Protocol):
+    """Read-only future adapter boundary; intentionally has no order methods."""
+
+    venue_id: str
+
+    def read_execution_quality(
+        self, request: ExecutionQualityRequest
+    ) -> ExecutionQualitySnapshot: ...
+
+
+@dataclass(frozen=True)
+class _ExecutionQualityReadiness:
+    """Static operator-facing readiness result."""
+
+    contract_version: str
+    status: str
+    selected_venue: str | None
+    selected_execution_mode: str | None
+    supported_live_adapters: tuple[str, ...]
+    supported_interface_modes: tuple[str, ...]
+    feasible_venues: tuple[ExecutionVenueCapability, ...]
+    required_snapshot_fields: tuple[str, ...]
+    selection_blockers: tuple[str, ...]
+    provider_call_planned: bool
+    provider_call_attempted: bool
+    live_adapter_activated: bool
+    credentials_read: bool
+    network_called: bool
+    writes_performed: bool
+    research_only: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "status": self.status,
+            "selected_venue": self.selected_venue,
+            "selected_execution_mode": self.selected_execution_mode,
+            "supported_live_adapters": list(self.supported_live_adapters),
+            "supported_interface_modes": list(self.supported_interface_modes),
+            "feasible_venues": [row.to_dict() for row in self.feasible_venues],
+            "required_snapshot_fields": list(self.required_snapshot_fields),
+            "selection_blockers": list(self.selection_blockers),
+            "provider_call_planned": self.provider_call_planned,
+            "provider_call_attempted": self.provider_call_attempted,
+            "live_adapter_activated": self.live_adapter_activated,
+            "credentials_read": self.credentials_read,
+            "network_called": self.network_called,
+            "writes_performed": self.writes_performed,
+            "research_only": self.research_only,
+        }
+
+
+# Stable public API aliases keep existing imports and annotations intact while
+# the implementation classes remain an explicitly closed model bundle.
+ExecutionVenueCapability = _ExecutionVenueCapability
+ExecutionQualityRequest = _ExecutionQualityRequest
+ExecutionQualitySnapshot = _ExecutionQualitySnapshot
+ExecutionQualityReader = _ExecutionQualityReader
+ExecutionQualityReadiness = _ExecutionQualityReadiness
+
+
+_COMMON_OPERATOR_INPUTS = (
+    "intended_execution_venue",
+    "intended_execution_mode",
+    "exact_instrument_or_pair",
+    "quote_currency",
+    "jurisdiction_and_account_eligibility_confirmation",
+    "maximum_read_request_budget",
+)
+_COMMON_JURISDICTION = (
+    "operator_must_confirm_current_venue_and_account_eligibility",
+    "public_market_data_reachability_does_not_imply_trading_eligibility",
+)
+_COMMON_NETWORK = (
+    "operator_must_confirm_the_official_endpoint_is_permitted_and_reachable",
+    "rate_limit_or_region_failures_must_fail_closed_without_bypass",
+)
+
+
+VENUE_CAPABILITIES = (
+    ExecutionVenueCapability(
+        venue_id="binance",
+        display_name="Binance",
+        implementation_status="feasible_not_implemented",
+        execution_modes=("spot", "perpetual"),
+        market_data_access="public_market_data_no_credentials_expected",
+        public_endpoint_expected=True,
+        credentials_required=(),
+        required_operator_inputs=_COMMON_OPERATOR_INPUTS,
+        jurisdiction_constraints=_COMMON_JURISDICTION,
+        network_constraints=_COMMON_NETWORK + (
+            "WAF_and_IP_policy_must_be_respected",
+        ),
+        request_limits=(
+            "dynamic_request_weight_from_exchange_info_and_response_headers",
+            "back_off_on_429_and_never_continue_into_418_IP_ban",
+        ),
+        expected_metrics=COMMON_METRICS,
+        official_source_urls=(
+            "https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints",
+            "https://developers.binance.com/en/docs/products/spot/rest-api",
+            "https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Order-Book",
+        ),
+        official_sources_reviewed_at="2026-07-15",
+    ),
+    ExecutionVenueCapability(
+        venue_id="bybit",
+        display_name="Bybit",
+        implementation_status="feasible_but_current_egress_restricted_not_implemented",
+        execution_modes=("spot", "perpetual"),
+        market_data_access="public_market_data_no_credentials_expected",
+        public_endpoint_expected=True,
+        credentials_required=(),
+        required_operator_inputs=_COMMON_OPERATOR_INPUTS,
+        jurisdiction_constraints=_COMMON_JURISDICTION + (
+            "do_not_treat_a_public_endpoint_as_permission_to_use_the_venue",
+        ),
+        network_constraints=_COMMON_NETWORK + (
+            "current_project_egress_has_recorded_a_region_restricted_403",
+            "no_proxy_VPN_or_region_bypass_is_authorized",
+        ),
+        request_limits=(
+            "default_HTTP_IP_limit_600_requests_per_5_seconds",
+            "use_a_much_lower_bounded_project_budget_and_honor_backoff",
+        ),
+        expected_metrics=COMMON_METRICS + ("order_book_update_sequence",),
+        official_source_urls=(
+            "https://bybit-exchange.github.io/docs/v5/market/orderbook",
+            "https://bybit-exchange.github.io/docs/v5/rate-limit",
+        ),
+        official_sources_reviewed_at="2026-07-15",
+    ),
+    ExecutionVenueCapability(
+        venue_id="coinbase_exchange",
+        display_name="Coinbase Exchange",
+        implementation_status="feasible_not_implemented",
+        execution_modes=("spot",),
+        market_data_access="public_market_data_no_credentials_expected",
+        public_endpoint_expected=True,
+        credentials_required=(),
+        required_operator_inputs=_COMMON_OPERATOR_INPUTS,
+        jurisdiction_constraints=_COMMON_JURISDICTION,
+        network_constraints=_COMMON_NETWORK,
+        request_limits=(
+            "public_REST_10_requests_per_second_per_IP",
+            "public_REST_burst_up_to_15_requests_per_second_per_IP",
+        ),
+        expected_metrics=COMMON_METRICS + ("order_book_sequence",),
+        official_source_urls=(
+            "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-book",
+            "https://docs.cdp.coinbase.com/exchange/rest-api/rate-limits",
+        ),
+        official_sources_reviewed_at="2026-07-15",
+    ),
+    ExecutionVenueCapability(
+        venue_id="kraken",
+        display_name="Kraken",
+        implementation_status="feasible_not_implemented_limited_depth",
+        execution_modes=("spot",),
+        market_data_access="public_market_data_no_credentials_expected",
+        public_endpoint_expected=True,
+        credentials_required=(),
+        required_operator_inputs=_COMMON_OPERATOR_INPUTS,
+        jurisdiction_constraints=_COMMON_JURISDICTION,
+        network_constraints=_COMMON_NETWORK,
+        request_limits=(
+            "official_guidance_says_1_public_request_per_second_or_less_stays_within_limits",
+            "returned_pre_trade_depth_is_top_10_levels_and_must_be_labeled_truncated",
+        ),
+        expected_metrics=COMMON_METRICS + ("depth_truncated",),
+        official_source_urls=(
+            "https://docs.kraken.com/api/docs/rest-api/get-pre-trade/",
+            "https://support.kraken.com/hc/articles/206548367",
+        ),
+        official_sources_reviewed_at="2026-07-15",
+    ),
+    ExecutionVenueCapability(
+        venue_id="dex_operator_selected",
+        display_name="Operator-selected DEX router or pool",
+        implementation_status="interface_ready_provider_not_selected",
+        execution_modes=("dex",),
+        market_data_access="unknown_until_chain_and_provider_are_selected",
+        public_endpoint_expected=None,
+        credentials_required=("provider_specific_if_required",),
+        required_operator_inputs=_COMMON_OPERATOR_INPUTS + (
+            "chain_id",
+            "base_and_quote_token_contracts",
+            "pool_or_router_identity",
+            "block_freshness_policy",
+            "gas_and_route_assumptions",
+        ),
+        jurisdiction_constraints=_COMMON_JURISDICTION,
+        network_constraints=(
+            "chain_RPC_or_quote_provider_not_selected",
+            "chain_pool_router_token_and_block_identity_are_required",
+            "cross_chain_and_wrapped_asset_identity_must_fail_closed",
+        ),
+        request_limits=(
+            "unknown_until_operator_selects_the_chain_router_and_data_provider",
+        ),
+        expected_metrics=COMMON_METRICS + (
+            "chain_id",
+            "block_number",
+            "pool_or_router_id",
+            "gas_estimate_native",
+            "route_identity",
+        ),
+        official_source_urls=(),
+        official_sources_reviewed_at="2026-07-15",
+    ),
+)
+
+
+def build_execution_quality_readiness() -> ExecutionQualityReadiness:
+    """Return deterministic static readiness without inspecting ambient state."""
+
+    return ExecutionQualityReadiness(
+        contract_version=CONTRACT_VERSION,
+        status="operator_venue_required",
+        selected_venue=None,
+        selected_execution_mode=None,
+        supported_live_adapters=(),
+        supported_interface_modes=EXECUTION_MODES,
+        feasible_venues=VENUE_CAPABILITIES,
+        required_snapshot_fields=REQUIRED_SNAPSHOT_FIELDS,
+        selection_blockers=(
+            "intended_execution_venue_not_selected",
+            "intended_execution_mode_not_selected",
+            "no_live_execution_quality_adapter_implemented",
+        ),
+        provider_call_planned=False,
+        provider_call_attempted=False,
+        live_adapter_activated=False,
+        credentials_read=False,
+        network_called=False,
+        writes_performed=False,
+        research_only=True,
+    )
+
+
+def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str:
+    """Render concise operator-readable readiness without suggesting a venue."""
+
+    lines = [
+        "CRYPTO DECISION RADAR EXECUTION-QUALITY READINESS",
+        f"status={result.status}",
+        "selected_venue=none selected_execution_mode=none",
+        "supported_live_adapters=none",
+        "provider_call_planned=false provider_call_attempted=false",
+        "credentials_read=false network_called=false writes_performed=false",
+        "research_only=true",
+        "",
+        "Feasible candidates (not selected or activated):",
+    ]
+    for venue in result.feasible_venues:
+        credentials = ",".join(venue.credentials_required) or "none_for_expected_public_market_data"
+        sources = ",".join(venue.official_source_urls) or "provider_not_selected"
+        lines.extend(
+            (
+                f"- {venue.venue_id}: status={venue.implementation_status} "
+                f"modes={','.join(venue.execution_modes)}",
+                f"  access={venue.market_data_access} credentials={credentials}",
+                f"  limits={';'.join(venue.request_limits)}",
+                f"  metrics={','.join(venue.expected_metrics)}",
+                f"  prerequisites={','.join(venue.required_operator_inputs)}",
+                f"  jurisdiction={','.join(venue.jurisdiction_constraints)}",
+                f"  network={','.join(venue.network_constraints)}",
+                f"  official_sources={sources}",
+                f"  official_sources_reviewed_at={venue.official_sources_reviewed_at}",
+            )
+        )
+    lines.extend(
+        (
+            "",
+            "No venue is selected. No provider call, credential read, adapter activation, "
+            "trade, order, or execution action is authorized by this report.",
+        )
+    )
+    return "\n".join(lines)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Report static execution-quality feasibility without provider calls."
+    )
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    readiness = build_execution_quality_readiness()
+    if args.as_json:
+        print(json.dumps(readiness.to_dict(), indent=2, sort_keys=True))
+    else:
+        print(format_execution_quality_readiness(readiness))
+    return 0
+
+
+__all__ = (
+    "COMMON_METRICS",
+    "CONTRACT_VERSION",
+    "EXECUTION_MODES",
+    "ExecutionQualityReadiness",
+    "ExecutionQualityReader",
+    "ExecutionQualityRequest",
+    "ExecutionQualitySnapshot",
+    "ExecutionVenueCapability",
+    "REQUIRED_SNAPSHOT_FIELDS",
+    "VENUE_CAPABILITIES",
+    "build_execution_quality_readiness",
+    "format_execution_quality_readiness",
+    "main",
+)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

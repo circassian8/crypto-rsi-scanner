@@ -113,6 +113,29 @@
           "fixture_rejected_live"
         ]
       },
+      "official_us_macro_acquisition": {
+        "all_required_sources": [
+          "federal_reserve_fomc",
+          "bls_cpi_and_employment",
+          "bea_pce_and_gdp"
+        ],
+        "direct_fixture_test_mock_replay_import_rejected": true,
+        "failed_attempt_preserves_latest_success": true,
+        "live_authorization_env": "RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE",
+        "live_calls_by_default": 0,
+        "local_import_requires_explicit_acquisition_time": true,
+        "local_import_requires_three_operator_source_files": true,
+        "maximum_requests_per_source_per_attempt": 1,
+        "redirects_allowed": false,
+        "source_timezones_preserved": true,
+        "successful_snapshot_attestation": [
+          "closed latest-success pointer",
+          "receipt SHA-256",
+          "snapshot SHA-256",
+          "each raw-source SHA-256"
+        ],
+        "tentative_fomc_time_invented": false
+      },
       "preserved_fields": [
         "calendar_event_id",
         "category",
@@ -135,7 +158,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-13T23:54:36+00:00",
+  "generated_at": "2026-07-14T22:19:18+00:00",
   "market_provenance_contract": {
     "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
@@ -366,6 +389,45 @@
       "data-quality limitations"
     ]
   },
+  "daily_operations": {
+    "confirmation_required_for_install_or_uninstall": true,
+    "cycle_journal_statuses": [
+      "attempted",
+      "skipped",
+      "blocked",
+      "succeeded",
+      "failed"
+    ],
+    "dashboard_restart": "only exact owned job after successful publication",
+    "enabled_by_default": false,
+    "failed_authority_policy": "restore previous pointer or invalidate only failed new pointer",
+    "maximum_market_provider_calls_per_eligible_cycle": 1,
+    "post_attempt_cadence_recomputed_without_provider_call": true,
+    "publication_requires_complete_operator_state_and_strict_doctor": true,
+    "readiness_precedes_provider_boundary": true,
+    "restart_exceptions_fail_closed": true,
+    "scheduler_label": "com.nasrenkaraf.crypto-radar-daily-operations",
+    "scheduler_nonzero_last_exit_is_healthy": false,
+    "scheduler_telemetry": [
+      "last_exit_code",
+      "runs"
+    ],
+    "service_credentials_or_authorization_embedded": false,
+    "unique_immutable_namespace_per_attempt": true
+  },
+  "execution_quality_readiness": {
+    "final_live_adapter_implemented": false,
+    "operator_venue_required": true,
+    "provider_calls": 0,
+    "reports": [
+      "spot perpetual or DEX fit",
+      "public endpoint or credential boundary",
+      "jurisdiction and network constraints",
+      "request limits",
+      "spread depth and price-impact metrics"
+    ],
+    "selected_venue": null
+  },
   "market_context_lineage": {
     "canonical_fields": [
       "source",
@@ -539,15 +601,23 @@
         "temporary_public_cloudflare_quick_tunnel"
       ],
       "phone_transport": "private_tailscale_serve_https",
+      "persistent_phone_transport_recommendation": "private_tailscale_serve_https",
       "public_access_account_created": false,
       "public_access_authenticated": false,
+      "public_access_default_max_lifetime_minutes": 240,
+      "public_access_expired_or_unhealthy_url_suppressed": true,
+      "public_access_expiry_automatically_terminates_process": false,
+      "public_access_expiry_warns_process_may_remain_public": true,
+      "public_access_guard_requires_confirmation": true,
       "public_access_owner_dns_setup_required": false,
       "public_access_protocol": "http2",
       "public_access_requires_authoritative_dashboard_identity": true,
       "public_access_requires_edge_registration": true,
       "public_access_requires_public_http_200_identity_probe": true,
       "public_access_startup_service_installed": false,
-      "public_access_url_lifetime": "ephemeral_random_per_process",
+      "public_access_trusted_receipt_lifetime": "operator_configured_15_to_1440_minutes",
+      "public_access_url_lifetime": "ephemeral_random_per_process_until_process_stops",
+      "public_access_off_by_default": true,
       "public_phone_transport": "temporary_public_cloudflare_quick_tunnel",
       "public_or_lan_binding_allowed": false,
       "readiness_and_status_are_observational": true,

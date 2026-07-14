@@ -13,6 +13,7 @@ from typing import Any, Callable, Mapping
 from ..artifacts import schema_v1
 from ..operations import market_no_send_io
 from ..operations.market_no_send_models import MarketNoSendError
+from . import maintenance_history
 
 
 _CAMPAIGN_LEDGER = "event_decision_radar_campaign_outcomes.jsonl"
@@ -24,6 +25,9 @@ _SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]{0,80}$")
 
 DASHBOARD_CAMPAIGN_ATTEMPT_LIMIT = 128
 DASHBOARD_CAMPAIGN_OUTCOME_LIMIT = 512
+DASHBOARD_MAINTENANCE_CYCLE_LIMIT = (
+    maintenance_history.DASHBOARD_MAINTENANCE_CYCLE_LIMIT
+)
 DASHBOARD_EXACT_MARKET_HISTORY_LIMIT = 8_192
 _REQUEST_LEDGER_SIDE_EFFECT_COUNTERS = (
     "telegram_sends",
@@ -154,6 +158,7 @@ def load_dashboard_history(
     reservation = _project_campaign_reservation(reservation)
     if reservation_digest and not reservation and reservation_error is None:
         reservation_error = "invalid_contract"
+    maintenance = _load_maintenance_support(namespace_dir.parent, now=now)
     metadata = {
         feedback_path.name: _history_metadata(now, feedback_digest, feedback_error),
         integrated_path.name: _history_metadata(
@@ -224,6 +229,7 @@ def load_dashboard_history(
         "campaign_latest_attempt": latest_attempt,
         "campaign_reservation": reservation,
         "campaign_metadata": campaign_metadata,
+        **maintenance,
         "metadata": metadata,
     }
 
@@ -280,6 +286,21 @@ def _select_current_outcomes(
         namespace_reader=namespace_reader,
     )
     return integrated, digest, error, "cumulative_non_authoritative"
+
+
+def _load_maintenance_support(artifact_base: Path, *, now: datetime) -> dict[str, Any]:
+    return maintenance_history.load_maintenance_history(
+        now=now,
+        read_object=lambda relative_path: _read_shared_json_object(
+            artifact_base,
+            relative_path,
+        ),
+        read_jsonl=lambda relative_path, limit: _read_shared_jsonl(
+            artifact_base,
+            relative_path,
+            limit=limit,
+        ),
+    )
 
 
 def _load_exact_generation_support(
@@ -993,6 +1014,7 @@ def _path_symlink_error(base: Path, target: Path) -> str | None:
 __all__ = (
     "DASHBOARD_CAMPAIGN_ATTEMPT_LIMIT",
     "DASHBOARD_CAMPAIGN_OUTCOME_LIMIT",
+    "DASHBOARD_MAINTENANCE_CYCLE_LIMIT",
     "load_dashboard_history",
     "read_unverified_json_object",
     "read_unverified_json_object_bytes",

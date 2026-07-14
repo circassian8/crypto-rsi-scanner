@@ -44,6 +44,7 @@ from .calendar_values import (
     _importance_sort,
     _importance_tone,
     _iter_values,
+    _matches_filters,
     _operator_text,
     _parse_instant,
     _raw_impact_window,
@@ -621,6 +622,28 @@ def _calendar_metadata_disclosure(
     items = (
         ("Recorded status", metadata.get("status") or "Not recorded"),
         ("Coverage receipt", _calendar_receipt_label(metadata)),
+        ("Source provider", metadata.get("source_provider") or "Not recorded"),
+        (
+            "Source / acquisition mode",
+            f"{metadata.get('upstream_source_mode') or metadata.get('source_mode') or 'Not recorded'} / "
+            f"{metadata.get('upstream_acquisition_mode') or 'Not recorded'}",
+        ),
+        (
+            "Snapshot observed",
+            time_element(
+                present_time(
+                    metadata.get("snapshot_observed_at"),
+                    now=snapshot.generation_authority_checked_at,
+                )
+            ),
+        ),
+        ("Freshness basis", metadata.get("freshness_basis") or "Not recorded"),
+        (
+            "Source fingerprint",
+            metadata.get("source_sha256")
+            or metadata.get("canonical_rows_sha256")
+            or "Not recorded",
+        ),
         ("Configured", metadata.get("configured") if metadata.get("configured") is not None else "Not recorded"),
         ("Read error class", metadata.get("error_class") or metadata.get("error") or "Not recorded"),
         ("Retained / reported counts", count_text or "Not recorded"),
@@ -1115,37 +1138,6 @@ def _calendar_query(query: Mapping[str, str] | None) -> dict[str, str]:
     if values["time"] not in allowed_time:
         values["time"] = "current"
     return values
-
-
-def _matches_filters(row: Mapping[str, Any], filters: Mapping[str, str]) -> bool:
-    temporal_state = str(row.get(_TEMPORAL_STATE_FIELD) or "upcoming")
-    time_filter = filters.get("time") or "current"
-    if time_filter == "current" and temporal_state not in {"active", "upcoming"}:
-        return False
-    if time_filter in {"active", "upcoming", "past"} and temporal_state != time_filter:
-        return False
-    if filters.get("importance") and filters["importance"] != _importance(row):
-        return False
-    if filters.get("category") and filters["category"] not in _category_tokens(row):
-        return False
-    if filters.get("scope") and filters["scope"] != _scope(row):
-        return False
-    search = filters.get("search")
-    if search:
-        text = " ".join(
-            str(value or "")
-            for value in (
-                row.get("title"),
-                row.get("source"),
-                row.get("provider"),
-                row.get("description"),
-                " ".join(_assets(row)),
-                " ".join(_category_tokens(row)),
-            )
-        ).casefold()
-        if search not in text:
-            return False
-    return True
 
 
 def _group_events(

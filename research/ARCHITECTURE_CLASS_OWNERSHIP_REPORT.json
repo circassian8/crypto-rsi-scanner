@@ -228,7 +228,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 39,
+      "max_class_line_count": 45,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 606,
+  "class_count": 632,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 8011,
+  "function_count": 8192,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-14T17:23:21.019713+00:00",
+  "generated_at": "2026-07-14T23:11:07.786428+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -1726,7 +1726,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 39,
+      "max_class_line_count": 45,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -3022,6 +3022,13 @@
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1303,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
     }
   ],
   "near_threshold_file_status_floor": 1300,
@@ -3500,18 +3507,18 @@
         },
         {
           "accepted": true,
-          "line_count": 1285,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+          "line_count": 1303,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
           "threshold": 1200
         },
         {
           "accepted": true,
           "line_count": 1285,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
           "threshold": 1200
         },
         {
@@ -3622,13 +3629,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1285,
-        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+        "line_count": 1303,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
       },
       {
         "line_count": 1285,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+        "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
         "threshold": 1200
       },
       {
@@ -3715,18 +3722,18 @@
           },
           {
             "accepted": true,
-            "line_count": 1285,
-            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
+            "line_count": 1303,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
+            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
             "threshold": 1200
           },
           {
             "accepted": true,
             "line_count": 1285,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
+            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
+            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
             "threshold": 1200
           },
           {

@@ -304,7 +304,7 @@ def run_market_no_send_generation(
                 provider_name=provider_name, data_mode=mode, readiness=readiness,
                 top_n=bounded_top_n, fetch_limit=bounded_fetch,
                 request_telemetry=request_telemetry, campaign_reservation=reservation,
-                calendar_environ=None if mode == "live" else environ,
+                calendar_environ=_generation_calendar_environ(mode, environ),
             )
     except market_no_send_campaign_guard.CampaignReservationBusy:
         return market_no_send_campaign_guard.blocked_generation_result(
@@ -312,6 +312,24 @@ def run_market_no_send_generation(
             data_mode=mode, observed_at=observed,
             failure_class="campaign_reservation_busy",
         )
+
+
+def _generation_calendar_environ(
+    mode: str,
+    environ: Mapping[str, str] | None,
+) -> Mapping[str, str] | None:
+    """Allow a live caller to inject only the closed local-calendar path."""
+
+    if mode != "live" or environ is None:
+        return environ
+    path = str(
+        environ.get(market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV) or ""
+    ).strip()
+    return (
+        {market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV: path}
+        if path
+        else {}
+    )
 
 
 def _fetch_generation_rows(

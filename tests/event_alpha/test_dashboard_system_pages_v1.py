@@ -391,10 +391,11 @@ def test_health_page_exposes_stable_anchors_and_closes_safe_technical_tables() -
         "provider-readiness",
         "product-layer-coverage",
         "provider-request",
+        "daily-operations-maintenance",
     ):
         assert page.count(f'id="{anchor}"') == 1
 
-    assert page.count('<details class="disclosure health-detail-disclosure">') == 6
+    assert page.count('<details class="disclosure health-detail-disclosure">') == 7
     assert '<details class="disclosure health-detail-disclosure" open>' not in page
     assert page.index("Canonical exact-generation layer coverage") > page.index(
         "View product-layer coverage table"

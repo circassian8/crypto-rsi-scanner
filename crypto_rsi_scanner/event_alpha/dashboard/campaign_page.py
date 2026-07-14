@@ -155,7 +155,9 @@ def render_campaign_page(
         + current_authority
         + render_metric_grid(metrics)
         + history
+        + _maintenance_cycle_table(snapshot)
         + _campaign_metadata_disclosure(snapshot)
+        + _maintenance_metadata_disclosure(snapshot)
     )
 
 
@@ -755,6 +757,101 @@ def _campaign_metadata_disclosure(snapshot: DashboardSnapshot) -> str:
         "Campaign artifact evidence",
         table,
         summary="Historical bounds, errors, and fingerprints",
+        css_class="technical-details",
+    ))
+
+
+def _maintenance_cycle_table(snapshot: DashboardSnapshot) -> str:
+    rows = []
+    for item in reversed(snapshot.maintenance_cycles):
+        rows.append((
+            time_element(
+                present_time(
+                    item.get("recorded_at"),
+                    now=snapshot.generation_authority_checked_at,
+                ),
+                primary="combined",
+            ),
+            badge(item.get("status")),
+            _maintenance_request_summary(item),
+            _maintenance_publication_summary(item),
+            _compact_identity_value(
+                str(item.get("artifact_namespace") or UNAVAILABLE),
+                maximum=30,
+            ),
+            humanize_reason(item.get("reason")),
+        ))
+    body = (
+        '<div class="alert alert-info"><strong>Maintenance telemetry / non-authoritative.</strong> '
+        "These bounded receipts explain automatic upkeep but never replace the exact current pointer.</div>"
+        + str(data_table(
+            (
+                "Recorded",
+                "Cycle result",
+                "Provider request",
+                "Publication",
+                "Namespace",
+                "Reason",
+            ),
+            rows,
+            caption="Bounded Daily Operations maintenance cycles",
+            empty="No valid Daily Operations cycle receipts are available.",
+            compact=True,
+        ))
+    )
+    return render_panel(
+        "Daily maintenance cycle ledger",
+        body,
+        eyebrow="Daily Operations history",
+    )
+
+
+def _maintenance_request_summary(item: Mapping[str, Any]) -> HtmlFragment:
+    attempted = item.get("provider_call_attempted")
+    succeeded = item.get("provider_request_succeeded")
+    if succeeded is True:
+        return badge("Succeeded", tone="positive")
+    if attempted is True:
+        return badge("Failed", tone="danger")
+    return badge("Not attempted", tone="muted")
+
+
+def _maintenance_publication_summary(item: Mapping[str, Any]) -> HtmlFragment:
+    if item.get("pointer_invalidated") is True:
+        return badge("Authority invalidated", tone="danger")
+    if item.get("pointer_rolled_back") is True:
+        return badge("Rolled back", tone="warning")
+    if (
+        item.get("pointer_published") is True
+        and item.get("dashboard_restarted") is True
+    ):
+        return badge("Published / restarted", tone="positive")
+    if item.get("pointer_published") is True:
+        return badge("Published / restart failed", tone="danger")
+    return badge("Not published", tone="muted")
+
+
+def _maintenance_metadata_disclosure(snapshot: DashboardSnapshot) -> str:
+    rows = []
+    for name, metadata in sorted(snapshot.maintenance_history_metadata.items()):
+        rows.append((
+            name,
+            humanize_enum(metadata.get("authority")),
+            display_count(metadata.get("source_row_count")),
+            display_count(metadata.get("returned_row_count")),
+            humanize_reason(metadata.get("error"), fallback="None recorded."),
+            metadata.get("sha256") or UNAVAILABLE,
+        ))
+    table = data_table(
+        ("Artifact", "Authority", "Source rows", "Loaded rows", "Read issue", "SHA-256"),
+        rows,
+        caption="Daily Operations telemetry read metadata",
+        empty="No Daily Operations telemetry metadata was loaded.",
+    )
+    return str(disclosure(
+        "Daily Operations artifact evidence",
+        table,
+        summary="Read-only bounds, errors, and fingerprints",
         css_class="technical-details",
     ))
 

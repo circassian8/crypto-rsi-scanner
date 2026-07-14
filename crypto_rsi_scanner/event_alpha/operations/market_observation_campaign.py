@@ -478,7 +478,7 @@ def _campaign_metrics(
     baseline: Mapping[str, Any],
 ) -> dict[str, Any]:
     routes: Counter[str] = Counter()
-    direct = proxy = spread = selected = candidates = 0
+    direct = proxy = spread = selected = candidates = current_candidates = 0
     for generation in generations:
         routes.update({str(key): _int(value) for key, value in _mapping(generation.get("route_counts")).items()})
         quality = _mapping(generation.get("data_quality"))
@@ -487,9 +487,14 @@ def _campaign_metrics(
         spread += _int(quality.get("spread_available_count"))
         selected += _int(quality.get("selected_market_row_count"))
         candidates += _int(generation.get("candidate_count"))
+        if _mapping(generation.get("publication")).get("currently_authoritative") is True:
+            current_candidates += _int(generation.get("candidate_count"))
     return {
         "real_cycles": len(generations),
+        "real_observations": selected,
         "real_candidates": candidates,
+        "current_ideas": current_candidates,
+        "historical_ideas": max(0, candidates - current_candidates),
         "route_counts": dict(sorted(routes.items())),
         "pending_outcomes": _int(outcomes.get("pending")),
         "matured_outcomes": _int(outcomes.get("matured")),
@@ -497,6 +502,13 @@ def _campaign_metrics(
         "proxy_feature_count": proxy,
         "spread_available_count": spread,
         "selected_market_row_count": selected,
+        "retained_observation_count": _int(baseline.get("baseline_observation_count")),
+        "baseline_counted_observation_count": _int(
+            baseline.get("baseline_counted_observation_count")
+        ),
+        "too_close_observation_count": _int(
+            baseline.get("baseline_too_close_observation_count")
+        ),
         "spread_coverage_ratio": round(spread / selected, 6) if selected else 0.0,
         "baseline_status": _text(baseline.get("baseline_status")) or "unknown",
         "baseline_warm_asset_count": _int(baseline.get("baseline_warm_asset_count")),
@@ -682,21 +694,9 @@ def _baseline_maturity(base: Path, *, evaluated: datetime) -> dict[str, Any]:
         "minimum_observation_spacing_seconds",
         int(market_history.MarketHistoryConfig().minimum_observation_spacing.total_seconds()),
     )
-    output.setdefault("next_eligible_observation_at", _legacy_next_eligible(output))
+    next_eligible = market_observation_campaign_cadence.legacy_next_eligible(output)
+    output.setdefault("next_eligible_observation_at", next_eligible)
     return output
-
-
-def _legacy_next_eligible(readiness: Mapping[str, Any]) -> str | None:
-    newest = _parse_time(
-        readiness.get("baseline_newest_counted_observed_at")
-        or readiness.get("baseline_newest_observed_at")
-    )
-    if newest is None:
-        return None
-    seconds = _int(readiness.get("minimum_observation_spacing_seconds")) or int(
-        market_history.MarketHistoryConfig().minimum_observation_spacing.total_seconds()
-    )
-    return (newest + timedelta(seconds=seconds)).isoformat()
 
 
 def _data_quality_limitations(metrics: Mapping[str, Any]) -> list[dict[str, Any]]:

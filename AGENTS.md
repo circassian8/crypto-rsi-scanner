@@ -169,19 +169,51 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   an unauthenticated, temporary Cloudflare Quick Tunnel on 2026-07-14 for easier
   public phone access. Use `radar-dashboard-phone-*` for the private route and
   `radar-dashboard-public-*` for the public route; readiness/status are
-  observational and both enable/disable paths require `CONFIRM=1`. The public
+  observational and every enable/disable/public-guard mutation requires
+  `CONFIRM=1`. Tailscale Serve is the recommended persistent mode. The public
   helper may start only an exact owned `cloudflared` process, may expose only the
   loopback dashboard, must pin HTTP/2 plus non-debug logging, and must verify the
   local dashboard identity, edge registration, and public HTTP 200 surface
   before publishing the URL. It must never create an account, named tunnel,
   owner-controlled DNS record, credential, configuration file, startup service,
   or permanent URL. Anyone with its random `trycloudflare.com` link can read the
-  dashboard; stop it when not needed. Never bind the dashboard to a
+  dashboard. Its optional trusted-receipt lifetime defaults to 240 minutes;
+  expired or locally-unhealthy state suppresses the URL but does not itself
+  stop the external process. Status must warn that it may remain public, and
+  the confirmed guard may stop only the exact owned process. Keep it off when
+  not needed. Never bind the dashboard to a
   LAN/wildcard address, enable Tailscale Funnel, add a credential-bearing URL,
   open a router port, reset unrelated Serve configuration, or kill an unowned
   process. A stale/untrusted dashboard, unsafe private Serve state, unowned
   public-process state, malformed public URL, or failed public probe must fail
   closed.
+- **Decision Radar Daily Operations v1:** `make radar-daily-ops-readiness` and
+  `make radar-daily-ops-status` are no-provider observational checks;
+  `make radar-daily-ops-cycle` performs at most one already-authorized,
+  cadence-eligible CoinGecko no-send observation. Every attempt gets a unique
+  namespace and bounded attempted/terminal journal rows. Publication requires
+  complete operator state and strict doctor success; only then may the exact
+  owned loopback dashboard restart. Any publication, restart, or terminal-state
+  failure must restore the prior pointer or invalidate only the failed new
+  pointer. Re-read cadence after an actual attempt without crossing the provider
+  boundary again. The LaunchAgent stays prepared/disabled until `CONFIRM=1 make
+  radar-daily-ops-install`; confirmed uninstall removes only the exact owned
+  service. Never embed authorization or credentials in its plist.
+- **Official Decision Radar macro calendar:** use
+  `radar-calendar-official-readiness` before the guarded Fed/BLS/BEA producer.
+  Live acquisition is off by default and needs the already-present calendar
+  authorization plus an honest BLS contact. It performs at most one request per
+  required source, accepts only a complete pack, and never follows redirects.
+  Local import is no-network and requires all three operator-downloaded source
+  files plus an explicit real acquisition time; direct fixture/test/mock/replay
+  paths are rejected before writes. Preserve Fed window uncertainty and exact
+  BLS/BEA timezones. Latest success may be consumed only after pointer, receipt,
+  snapshot, and raw-source hash attestation; failure never replaces it.
+- **Execution-quality readiness:**
+  `make radar-execution-quality-readiness` is static/no-network and reports
+  feasible spot, perpetual, and DEX venue contracts. Do not select a venue,
+  activate a live adapter, or add execution/order behavior until the owner names
+  the intended execution venue and instrument mode.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,
@@ -204,8 +236,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   the live target also refreshes it after every success or failure. Decision
   campaign generations, candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
-  An optional current calendar snapshot is accepted only through the explicit
-  `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` environment setting. Readiness
+  An optional current calendar snapshot is accepted through the explicit
+  `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` environment setting or the Daily
+  Operations coordinator's hash-attested official-macro latest-success path. Readiness
   inspects it without network or writes; live generations reject fixture/test/
   mock/replay provenance and require the versioned current-source container.
   Container provenance plus event-row `provider`, `source`, and `source_class`

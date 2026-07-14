@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 from . import market_no_send_campaign_guard
 from . import market_no_send_campaign_provider
+from ..radar import market_history
 
 
 def next_observation(
@@ -72,6 +73,21 @@ def next_observation(
     }
 
 
+def legacy_next_eligible(readiness: Mapping[str, Any]) -> str | None:
+    """Preserve the pre-v2 history-only cadence fallback without provider state."""
+
+    newest = _time(
+        readiness.get("baseline_newest_counted_observed_at")
+        or readiness.get("baseline_newest_observed_at")
+    )
+    if newest is None:
+        return None
+    seconds = int(readiness.get("minimum_observation_spacing_seconds") or 0) or int(
+        market_history.MarketHistoryConfig().minimum_observation_spacing.total_seconds()
+    )
+    return (newest + timedelta(seconds=seconds)).isoformat()
+
+
 def _time(value: object) -> datetime | None:
     if isinstance(value, datetime):
         parsed = value
@@ -95,4 +111,4 @@ def _text(value: object) -> str:
     return str(value).strip() if value is not None else ""
 
 
-__all__ = ("next_observation",)
+__all__ = ("legacy_next_eligible", "next_observation")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import subprocess
 
@@ -17,6 +18,7 @@ from crypto_rsi_scanner.event_alpha.dashboard.public_access import (
     discover_cloudflared_binary,
     enable_public_access,
     extract_quick_tunnel_url,
+    guard_public_access,
     inspect_public_access,
     main,
 )
@@ -74,6 +76,7 @@ class _FakeBoundaries:
         self.alive: dict[int, bool] = {}
         self.process_commands: dict[int, tuple[str, ...]] = {}
         self.fail_terminate = False
+        self.now_value = datetime(2026, 7, 15, 0, 0, tzinfo=timezone.utc)
 
     @property
     def expected_command(self) -> tuple[str, ...]:
@@ -150,6 +153,7 @@ class _FakeBoundaries:
                 self.state_path.parent / "config.yml",
                 self.state_path.parent / "config.yaml",
             ),
+            now=lambda: self.now_value,
         )
 
 
@@ -315,7 +319,78 @@ def test_confirmed_enable_uses_one_fixed_argv_and_persists_only_safe_state(
     assert persisted["public_url"] == _PUBLIC_URL
     assert persisted["origin"] == LOCAL_DASHBOARD_URL
     assert persisted["argv"] == list(fake.expected_command)
+    assert persisted["started_at"] == "2026-07-15T00:00:00Z"
+    assert persisted["expires_at"] == "2026-07-15T04:00:00Z"
     assert "must-not-print" not in json.dumps(persisted)
+
+
+def test_expired_tunnel_is_logically_invalid_until_confirmed_guard_reaps_it(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake = _FakeBoundaries(tmp_path)
+    assert enable_public_access(confirm=True, dependencies=fake.dependencies()).ok is True
+    fake.terminated.clear()
+    fake.now_value += timedelta(hours=4, seconds=1)
+
+    status = inspect_public_access(fake.dependencies())
+    assert main(["status"], dependencies=fake.dependencies()) == 1
+    status_output = capsys.readouterr()
+    unconfirmed = guard_public_access(confirm=False, dependencies=fake.dependencies())
+    guarded = guard_public_access(confirm=True, dependencies=fake.dependencies())
+
+    assert status.ready is False
+    assert status.enabled is False
+    assert status.public_url is None
+    assert status.process_state == "expired"
+    assert "public_access_expired" in status.blockers
+    assert "tunnel_may_still_be_public=true" in status_output.err
+    assert "next_safe_action=confirmed_public_guard" in status_output.err
+    assert _PUBLIC_URL not in status_output.err
+    assert unconfirmed.reason == "confirmation_required"
+    assert guarded.ok is True
+    assert guarded.changed is True
+    assert fake.terminated == [_PID]
+    assert not fake.state_path.exists()
+
+
+def test_confirmed_guard_stops_owned_tunnel_when_dashboard_is_no_longer_trusted(
+    tmp_path: Path,
+) -> None:
+    fake = _FakeBoundaries(tmp_path)
+    assert enable_public_access(confirm=True, dependencies=fake.dependencies()).ok is True
+    fake.terminated.clear()
+    fake.local_status = 503
+
+    result = guard_public_access(confirm=True, dependencies=fake.dependencies())
+
+    assert result.ok is True
+    assert result.changed is True
+    assert fake.terminated == [_PID]
+    assert not fake.state_path.exists()
+
+
+@pytest.mark.parametrize("raw", ["14", "1441", "invalid"])
+def test_invalid_public_lifetime_blocks_enable_without_spawning(
+    tmp_path: Path,
+    raw: str,
+) -> None:
+    fake = _FakeBoundaries(tmp_path)
+    dependencies = replace(
+        fake.dependencies(),
+        environ={
+            CLOUDFLARED_BINARY_ENV: _BINARY,
+            public_access.PUBLIC_MAX_LIFETIME_ENV: raw,
+        },
+    )
+
+    status = inspect_public_access(dependencies)
+    result = enable_public_access(confirm=True, dependencies=dependencies)
+
+    assert "public_access_lifetime_invalid" in status.blockers
+    assert result.ok is False
+    assert result.reason == "public_access_lifetime_invalid"
+    assert fake.spawned == []
 
 
 def test_enable_never_starts_when_dashboard_is_not_authoritative(tmp_path: Path) -> None:
@@ -711,6 +786,8 @@ def test_make_targets_propagate_confirmation_only_when_explicit() -> None:
     enable_with_confirm = dry_run("radar-dashboard-public-enable", "CONFIRM=1")
     disable_without_confirm = dry_run("radar-dashboard-public-disable")
     disable_with_confirm = dry_run("radar-dashboard-public-disable", "CONFIRM=1")
+    guard_without_confirm = dry_run("radar-dashboard-public-guard")
+    guard_with_confirm = dry_run("radar-dashboard-public-guard", "CONFIRM=1")
 
     assert "dashboard.public_access readiness" in readiness
     assert "dashboard.public_access status" in status
@@ -718,6 +795,8 @@ def test_make_targets_propagate_confirmation_only_when_explicit() -> None:
     assert enable_with_confirm.count("--confirm") == 1
     assert "--confirm" not in disable_without_confirm
     assert disable_with_confirm.count("--confirm") == 1
+    assert "--confirm" not in guard_without_confirm
+    assert guard_with_confirm.count("--confirm") == 1
     rendered = "\n".join(
         (
             readiness,
@@ -726,6 +805,8 @@ def test_make_targets_propagate_confirmation_only_when_explicit() -> None:
             enable_with_confirm,
             disable_without_confirm,
             disable_with_confirm,
+            guard_without_confirm,
+            guard_with_confirm,
         )
     )
     assert LOCAL_DASHBOARD_URL not in rendered

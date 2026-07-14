@@ -485,6 +485,33 @@ def test_calendar_preserves_exact_receipt_and_release_values_inside_polished_sur
     assert "Current generation:" in page
 
 
+def test_calendar_receipt_shows_official_pack_source_freshness_and_fingerprint():
+    event = dict(_rich_snapshot().current_calendar_events[0])
+    page = render_calendar_page(
+        _snapshot(
+            events=(event,),
+            calendar_snapshot={
+                "status": "healthy_nonempty",
+                "configured": True,
+                "source_provider": "official_us_macro",
+                "upstream_source_mode": "operator_verified_calendar_snapshot",
+                "upstream_acquisition_mode": "operator_verified_export",
+                "snapshot_observed_at": "2026-07-14T15:00:00+00:00",
+                "freshness_basis": "snapshot_observed_at",
+                "source_sha256": "a" * 64,
+                "retained_row_count": 1,
+            },
+        ),
+        {},
+    )
+
+    assert "Official us macro" in page or "official_us_macro" in page
+    assert "operator_verified_calendar_snapshot / operator_verified_export" in page
+    assert "Snapshot observed" in page
+    assert "Freshness basis" in page
+    assert "a" * 64 in page
+
+
 def test_verified_calendar_leads_with_canonical_authority_when_producer_receipt_is_absent():
     event = dict(_rich_snapshot().current_calendar_events[0])
     page = render_calendar_page(_snapshot(events=(event,)), {})

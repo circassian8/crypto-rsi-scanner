@@ -5,7 +5,7 @@ from __future__ import annotations
 from ... import decision_model as event_radar_decision_model
 from ...decision_model_surfaces import decision_model_values
 from .runtime import *
-from .sidecars import _loaded_sidecar_manifest_state, _load_rsi_signal_context_result, _market_anomaly_receipt_manifest_state, _rsi_sidecar_manifest_state
+from .sidecars import _candidate_seed_sidecars, _loaded_sidecar_manifest_state, _load_rsi_signal_context_result, _market_anomaly_receipt_manifest_state, _rsi_sidecar_manifest_state
 
 @dataclass(frozen=True)
 class _IntegratedCycleStart:
@@ -258,8 +258,9 @@ def _write_integrated_candidate_artifacts(
         wall_started_at=start.wall_started,
         research_observed_at=start.research_observed_at,
     ))
+    candidate_sidecars = _candidate_seed_sidecars(inputs.sidecars, injected_calendar=calendar_source_rows is not None)
     candidates = build_integrated_candidates(
-        sidecar_rows=inputs.sidecars,
+        sidecar_rows=candidate_sidecars,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         run_mode=context.run_mode,
@@ -293,7 +294,7 @@ def _write_integrated_candidate_artifacts(
     )
     if refresh_result.snapshot_rows:
         refreshed_sidecars = event_targeted_market_refresh.apply_targeted_market_refresh_to_sidecars(
-            inputs.sidecars,
+            candidate_sidecars,
             refresh_result,
         )
         candidates = build_integrated_candidates(
@@ -386,6 +387,7 @@ def _write_integrated_candidate_artifacts(
         targeted_market_refresh_result=refresh_result,
         calendar_normalization=calendar_context,
     )
+
 
 def _write_integrated_operator_artifacts(
     start: _IntegratedCycleStart,
@@ -1190,7 +1192,6 @@ def _run_or_load_sidecars(
         rows, tuple(manifest_rows), namespace_dir=namespace_dir,
         coinalyze_namespace=coinalyze_namespace, observed_at=observed_at,
     )
-
 __all__ = (
     'run_integrated_radar_cycle',
     '_build_integrated_asset_registry',

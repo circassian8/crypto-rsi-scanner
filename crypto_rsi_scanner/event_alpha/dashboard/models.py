@@ -103,6 +103,12 @@ class DashboardSnapshot(_DashboardSnapshotViews):
     campaign_latest_attempt: Mapping[str, Any] = field(default_factory=dict)
     campaign_reservation: Mapping[str, Any] = field(default_factory=dict)
     campaign_history_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    maintenance_service: Mapping[str, Any] = field(default_factory=dict)
+    maintenance_state: Mapping[str, Any] = field(default_factory=dict)
+    maintenance_cycles: tuple[dict[str, Any], ...] = ()
+    maintenance_history_metadata: Mapping[str, Mapping[str, Any]] = field(
+        default_factory=dict
+    )
     cumulative_history_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     provider_readiness: Mapping[str, Any] = field(default_factory=dict)
     provider_health: Mapping[str, Any] = field(default_factory=dict)
@@ -165,6 +171,10 @@ def suppress_untrusted_current_data(snapshot: DashboardSnapshot) -> DashboardSna
         "manifest_status": snapshot.manifest_status,
         "doctor": dict(doctor) if isinstance(doctor, Mapping) else {},
     }
+    for field_name in ("run_started_at", "generated_at"):
+        timestamp = _safe_authority_timestamp(snapshot.operator_state.get(field_name))
+        if timestamp is not None:
+            safe_operator_state[field_name] = timestamp
     return dataclass_replace(
         snapshot,
         operator_state=safe_operator_state,
@@ -182,6 +192,18 @@ def suppress_untrusted_current_data(snapshot: DashboardSnapshot) -> DashboardSna
         market_generation={},
         provider_readiness={},
     )
+
+
+def _safe_authority_timestamp(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip() or len(value) > 64:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return value.strip()
 
 
 @dataclass(frozen=True)
@@ -278,6 +300,10 @@ def build_dashboard_snapshot(
         campaign_latest_attempt=history["campaign_latest_attempt"],
         campaign_reservation=history["campaign_reservation"],
         campaign_history_metadata=history["campaign_metadata"],
+        maintenance_service=history["maintenance_service"],
+        maintenance_state=history["maintenance_state"],
+        maintenance_cycles=history["maintenance_cycles"],
+        maintenance_history_metadata=history["maintenance_metadata"],
         cumulative_history_metadata=history["metadata"],
         provider_readiness=provider_readiness,
         provider_health=health_values,

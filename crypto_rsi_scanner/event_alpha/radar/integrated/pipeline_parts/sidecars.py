@@ -14,6 +14,27 @@ def _load_rsi_signal_context_rows(path: Path | None) -> tuple[dict[str, Any], ..
     return _load_rsi_signal_context_result(path)[0]
 
 
+def _candidate_seed_sidecars(
+    sidecars: Mapping[str, Iterable[Mapping[str, Any]]],
+    *,
+    injected_calendar: bool,
+) -> Mapping[str, Iterable[Mapping[str, Any]]]:
+    """Keep an injected generation calendar as context, not an idea seed.
+
+    Market/no-send generations inject the exact calendar so every event can be
+    fingerprinted, rendered, and overlaid on existing market ideas.  Scheduled
+    or unlock rows without market observations must not manufacture ``UNKNOWN``
+    campaign candidates.  Normal Event Alpha sidecars remain candidate sources.
+    """
+
+    if not injected_calendar:
+        return sidecars
+    return {
+        name: (() if name in {"scheduled_catalyst", "unlock"} else rows)
+        for name, rows in sidecars.items()
+    }
+
+
 def _load_rsi_signal_context_result(
     path: Path | None,
 ) -> tuple[tuple[dict[str, Any], ...], bool]:
@@ -1010,6 +1031,7 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.write_text(json.dumps(_json_ready(stamped), sort_keys=True), encoding="utf-8")
 
 __all__ = (
+    '_candidate_seed_sidecars',
     '_derivatives_manifest_mode',
     '_existing_sidecar_manifest_state',
     '_market_anomaly_receipt_manifest_state',

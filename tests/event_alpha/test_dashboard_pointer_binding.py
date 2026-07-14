@@ -213,6 +213,8 @@ def test_pointer_bound_freshness_loss_serves_quarantined_shell_with_503(
     assert health_status == "503 Service Unavailable"
     assert "System Health" in health_body
     assert "UNTRUSTED CURRENT GENERATION" in health_body
+    assert "Generation authority expiry" in health_body
+    assert 'datetime="2026-07-12T12:00:00Z"' in health_body
     assert "Fresh high-liquidity breakout" not in health_body
     assert outcomes_status == "503 Service Unavailable"
     assert "Historical campaign outcomes" in outcomes_body

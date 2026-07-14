@@ -1,0 +1,20 @@
+{
+  "Gross Domestic Product": {
+    "file_last_updated": "2026-07-01T12:00:00+00:00",
+    "release_dates": [
+      "2026-07-30T12:30:00+00:00",
+      "2026-08-26T12:30:00+00:00"
+    ]
+  },
+  "Personal Income and Outlays": {
+    "file_last_updated": "2026-07-01T12:00:00+00:00",
+    "release_dates": [
+      "2026-07-30T12:30:00+00:00",
+      "2026-08-26T12:30:00+00:00"
+    ]
+  },
+  "U.S. International Trade in Goods and Services": {
+    "file_last_updated": "2026-07-01T12:00:00+00:00",
+    "release_dates": ["2026-08-05T12:30:00+00:00"]
+  }
+}

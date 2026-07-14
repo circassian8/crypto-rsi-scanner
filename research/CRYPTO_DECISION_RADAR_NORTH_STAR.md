@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-13T23:54:36+00:00`
+- generated_at: `2026-07-14T22:19:18+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -192,6 +192,20 @@ A missing source is shown as `not_configured`; it is never silently treated
 as a quiet calendar and never replaced by fixture/test/mock/replay data in a live
 generation.
 
+The official U.S. macro producer begins with Federal Reserve FOMC dates, BLS
+CPI/employment releases, and BEA PCE/GDP releases. Live acquisition is off by
+default and requires pre-existing explicit authorization plus an honest BLS
+contact. It makes at most one request per required official source, does not
+follow redirects, and accepts only an all-required pack. Local import is
+no-network and requires three operator-downloaded source files plus their real,
+explicit acquisition time; direct checked-in fixture/test/mock/replay paths are
+rejected before writes. Fed tentative meeting windows remain windows with no
+invented decision time, while BLS TZIDs and BEA offsets survive normalization.
+Every attempt has a unique directory. A successful pointer is usable only after
+its closed fields, receipt, snapshot, and each raw-source digest are re-attested;
+Daily Operations consumes that verified latest-success path without guessing a
+file. Failed acquisition never replaces the prior successful pointer.
+
 RSI is a read-only supporting adapter. Its context and artifact references stay
 in the canonical projection and may transparently adjust an existing idea, but
 RSI context cannot create a Decision idea by itself and cannot write RSI rows,
@@ -262,7 +276,12 @@ no account, named tunnel, owner-controlled DNS record, credential, startup
 service, or permanent address.
 Neither path binds a wildcard/LAN address, opens a router port, or mutates
 dashboard/provider artifacts. Anyone with the public URL can read the dashboard
-until the exact owned process stops.
+until the exact owned process stops. Tailscale Serve is the recommended
+persistent mode. The Quick Tunnel is off by default, has an optional bounded
+trusted-receipt lifetime, and suppresses its URL when expired or when local
+authority is unavailable. Receipt expiry does not itself stop `cloudflared`;
+status warns that it may remain public, and the confirmed guard terminates only
+the exact owned process.
 
 The primary Decision preview sections are High-Confidence Ideas, Actionable
 Ideas, Rapid Market Anomalies, Dashboard Watch, Fade / Exhaustion Review, Risk
@@ -449,6 +468,36 @@ non-authoritative generations, failed/blocked attempts, route counts, feature
 maturity, next eligible time, data-quality limits, and pending/mature outcomes.
 Its Decision campaign totals remain explicitly separate from Event Alpha
 catalyst burn-in.
+
+## Daily Operations and Execution-Quality Readiness
+
+Daily Operations v1 is a local maintenance coordinator, not a trading system.
+It is implemented but remains disabled until the operator explicitly confirms
+LaunchAgent installation. A manual or scheduled cycle runs read-only readiness
+before any possible provider call, respects the stable one-hour reservation,
+makes at most one bounded already-authorized CoinGecko no-send observation, and
+uses a new immutable namespace. It records attempted, skipped, blocked,
+successful, and failed cycles plus last readiness, last attempt, last successful
+publication, post-attempt next eligibility, provider authorization, scheduler
+health, sanitized launchd last-exit/run counts, and skip/block reason. A loaded
+job with a non-zero last exit is unhealthy rather than green by ownership alone.
+
+A complete operator state and zero-blocker strict doctor precede publication.
+Only after the exact pointer changes does the coordinator restart the fully
+owned loopback dashboard job. Publication, restart, or terminal-journal failure
+restores the previous trusted authority; if restoration is impossible, only the
+failed new pointer is descriptor-safely invalidated. The dashboard reads these
+bounded receipts without invoking launchd, providers, or writes. No service
+install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
+provider authorization or credentials.
+
+Execution-quality v1 is a static readiness and interface contract only. It
+reports feasible centralized spot, perpetual, and operator-selected DEX venues;
+public versus authenticated boundaries; jurisdiction/network constraints;
+request limits; and expected spread, depth, and price-impact fields. No venue is
+selected, no live adapter is active, and no execution/order behavior may be
+implemented until the operator identifies the intended venue and instrument
+mode.
 
 The authoritative pointer uses a stable canonical operator-state digest. A
 strict-doctor rerun against an unchanged revision may refresh only the top-level

@@ -16,6 +16,57 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Keep Daily Operations prepared but explicitly opt-in
+**Status:** accepted
+**Decision:** Daily Operations v1 is the only supported recurring Decision
+Radar freshness maintainer. Every possible market call is preceded by readiness,
+uses the enforced campaign reservation, and is limited to one already-authorized
+CoinGecko no-send attempt in a unique namespace. Complete operator state and a
+zero-blocker strict doctor precede pointer publication; the exact owned dashboard
+restarts only afterward. Failure restores the previous pointer or invalidates
+only the failed new pointer, and post-attempt cadence plus every terminal state
+is persisted. Restart exceptions use the same containment path, and a loaded
+LaunchAgent with a non-zero last exit is unhealthy rather than green. The
+LaunchAgent remains uninstalled until `CONFIRM=1 make
+radar-daily-ops-install`; its plist never creates or embeds authorization.
+**Why:** The dashboard can remain current during the day without converting a
+provider allow flag into an implicit recurring service or weakening freshness,
+pointer, no-send, or research-only boundaries.
+**Revisit when:** The provider cadence, dashboard service identity, or campaign
+publication contract changes; re-review the coordinator before reinstalling.
+
+## 2026-07-15 - Trust official macro calendars only through attested source packs
+**Status:** accepted
+**Decision:** The first official live calendar producer covers Federal Reserve
+FOMC dates, BLS CPI/employment releases, and BEA PCE/GDP releases. Live calls are
+off by default and require existing explicit authorization plus an honest BLS
+contact. Local import requires all three operator-downloaded files and their real
+acquisition time; checked-in fixture/test/mock/replay paths are rejected. FOMC
+uncertainty, BLS TZIDs, and BEA offsets are preserved. Daily Operations may use
+latest success only after closed-pointer, receipt, snapshot, and raw-source hash
+attestation. Missing acquisition remains `not_configured`, never `no events`.
+**Why:** Calendar context is useful only when its authority, timing, freshness,
+and provenance survive into the exact generation without fixture laundering or
+invented directional meaning.
+**Revisit when:** A crypto unlock, exchange, or protocol calendar has an equally
+authoritative, bounded, provenance-preserving source contract.
+
+## 2026-07-15 - Keep execution quality venue-neutral and private phone access preferred
+**Status:** accepted
+**Decision:** Execution-quality work stops at a static interface/readiness
+contract until the owner selects the intended spot, perpetual, or DEX venue; no
+live adapter, order, or execution behavior is activated. For ongoing phone use,
+private Tailscale Serve remains recommended. Cloudflare Quick Tunnel stays
+public, unauthenticated, temporary, off by default, confirmation-gated, and
+given an optional 240-minute default trusted-receipt lifetime. Expiry suppresses
+the URL and reports that the external process may still be public; it is not an
+automatic process stop. The confirmation-gated guard removes only the exact
+owned process after expiry or local authority loss.
+**Why:** Venue data must match the operator's actual execution surface, while
+persistent dashboard access should retain identity-based access control.
+**Revisit when:** The operator names the execution venue/instrument mode or
+requests a separately authenticated permanent dashboard deployment.
+
 ## 2026-07-14 - Allow an explicit temporary public dashboard link
 **Status:** accepted
 **Decision:** In addition to private Tailscale Serve, the owner may expose the

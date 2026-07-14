@@ -6,7 +6,7 @@ Research-oriented crypto RSI scanner and human-decided Event Alpha Crypto Radar.
 
 `make radar-dashboard` serves the current Crypto Decision Radar operator
 generation at `http://127.0.0.1:8765/`. The seven-page terminal covers Today,
-Market Radar, Ideas, Calendar, System Health, Outcomes & Learning, and Campaign
+Market Radar, Ideas, Calendar, System Health, Outcomes & Learning, and Run
 History; see the [operator guide](research/CRYPTO_DECISION_RADAR_OPERATOR_GUIDE.md).
 It reads the exact run/revision manifest and local
 artifacts only. Current research appears only when exact file/tree/run-row
@@ -22,10 +22,24 @@ and `make radar-dashboard-ux-smoke` for primary-page semantic and responsive
 contracts.
 
 Live generations expire after six hours. The campaign's 60-minute observation
-spacing is a provider-safety minimum, not an automatic refresh schedule. Use
-`make radar-market-no-send-readiness PYTHON=.venv/bin/python` before any refresh;
-after a strict-clean generation publishes a new pointer, restart the
-pointer-bound dashboard process so it binds the new exact generation.
+spacing remains a provider-safety minimum. Daily Operations v1 can maintain
+that freshness, but the LaunchAgent is prepared and disabled until explicitly
+installed. Read-only status and one manual cycle are:
+
+```sh
+make radar-daily-ops-readiness PYTHON=.venv/bin/python
+make radar-daily-ops-status PYTHON=.venv/bin/python
+make radar-daily-ops-cycle PYTHON=.venv/bin/python
+```
+
+Every cycle runs readiness before a possible call, makes at most one already-
+authorized CoinGecko no-send observation when cadence permits, uses a unique
+immutable namespace, strict-doctors before publication, preserves or
+invalidates authority on failure, and restarts only the exact owned dashboard
+after success. A loaded LaunchAgent with a non-zero last exit is reported as
+unhealthy rather than merely “loaded.” Installation remains a separate human action:
+`CONFIRM=1 make radar-daily-ops-install PYTHON=.venv/bin/python`; remove only
+that owned job with the corresponding confirmed `radar-daily-ops-uninstall`.
 
 ### Private phone access
 
@@ -67,6 +81,7 @@ make radar-dashboard-public-readiness PYTHON=.venv/bin/python
 CONFIRM=1 make radar-dashboard-public-enable PYTHON=.venv/bin/python
 make radar-dashboard-public-status PYTHON=.venv/bin/python
 CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python
+CONFIRM=1 make radar-dashboard-public-guard PYTHON=.venv/bin/python
 ```
 
 No Cloudflare account, domain/DNS setup, router port, LAN bind, or Tailscale client is
@@ -75,8 +90,36 @@ started at login: anyone who has the printed `trycloudflare.com` URL can read
 the dashboard until the owned tunnel is stopped or dies. Enable requires a
 current authoritative dashboard identity and publishes only after its random
 hostname serves that dashboard over HTTP 200. It never calls data providers.
-Treat the URL as sensitive, stop it when finished, and use the private Tailscale
-route instead if access control becomes important.
+The optional `RSI_RADAR_PUBLIC_MAX_LIFETIME_MINUTES` (default 240) expires the
+trusted receipt and suppresses its URL; it does not itself terminate the
+external process. Status warns that an expired tunnel may still be public, and
+the confirmed guard stops only the exact owned process when expired or
+unhealthy. Treat the URL as sensitive, stop it when finished, and use private
+Tailscale Serve as the recommended persistent mode.
+
+Official U.S. macro schedules have a separate guarded producer for Fed FOMC,
+BLS CPI/employment, and BEA PCE/GDP. Readiness makes no call. Live acquisition
+requires the already-present calendar authorization plus an honest BLS contact;
+an explicit local import requires all three operator-downloaded files and their
+real acquisition timestamp. Checked-in fixture/test/mock/replay paths are
+rejected. Successful packs are immutable and hash-attested before Daily
+Operations can attach them to a generation:
+
+```sh
+make radar-calendar-official-readiness PYTHON=.venv/bin/python
+make radar-calendar-official-acquire PYTHON=.venv/bin/python
+make radar-calendar-official-import-local \
+  FED_FOMC_HTML=/path/to/fomc.html \
+  BLS_CALENDAR_ICS=/path/to/bls.ics \
+  BEA_RELEASE_DATES_JSON=/path/to/bea.json \
+  OFFICIAL_MACRO_OBSERVED_AT=2026-07-15T00:00:00Z \
+  PYTHON=.venv/bin/python
+```
+
+Execution-quality integration is intentionally venue-neutral. Run
+`make radar-execution-quality-readiness PYTHON=.venv/bin/python` to compare
+feasible spot, perpetual, and DEX inputs; no adapter is activated until the
+operator selects the intended execution venue.
 
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.

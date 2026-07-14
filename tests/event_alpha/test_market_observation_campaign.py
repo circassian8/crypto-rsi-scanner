@@ -342,7 +342,12 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert first["measurement_program"] == campaign.CAMPAIGN_PROGRAM
     assert first["measurement_scope"]["event_alpha_catalyst_burn_in"] == "separate_not_aggregated"
     assert first["campaign_metrics"]["real_cycles"] == 2
+    assert first["campaign_metrics"]["real_observations"] == 3
+    assert first["campaign_metrics"]["baseline_counted_observation_count"] == 8
+    assert first["campaign_metrics"]["too_close_observation_count"] == 1
     assert first["campaign_metrics"]["real_candidates"] == 3
+    assert first["campaign_metrics"]["current_ideas"] == 2
+    assert first["campaign_metrics"]["historical_ideas"] == 1
     assert first["campaign_metrics"]["route_counts"] == {
         "dashboard_watch": 1,
         "diagnostic": 1,

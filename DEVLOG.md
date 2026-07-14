@@ -17,6 +17,66 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Deliver Crypto Decision Radar Daily Operations v1 · Codex
+**Why:** The operator needs a trustworthy all-day dashboard without silently
+turning existing provider authorization into recurring activity, and needs a
+real authoritative macro-calendar path instead of fixture-backed coverage.
+**Changes:**
+- Added one Daily Operations coordinator with read-only readiness/status,
+  explicit manual cycles, and confirmation-gated LaunchAgent install/uninstall.
+  It rechecks authorization and cadence before at most one bounded CoinGecko
+  no-send request, uses a unique immutable namespace, strict-doctors before
+  publication, restarts only the exact owned dashboard, journals every state,
+  and restores or invalidates authority on publication, restart, or terminal
+  persistence failure. Restart exceptions now take the same fail-closed path;
+  loaded launchd jobs with non-zero last exit are unhealthy.
+- Hardened service plist installation and removal against concurrent leaf and
+  parent-directory swaps with no-follow descriptor-relative operations,
+  create-only linking, identity rechecks, and exact-owned cleanup. The service
+  is prepared but remains uninstalled.
+- Added guarded official Federal Reserve FOMC, BLS CPI/employment, and BEA
+  PCE/GDP producers plus explicit local import. Live acquisition requires
+  existing authorization and an honest BLS contact; immutable source bytes,
+  URLs, timestamps, timezones, certainty, snapshot/receipt/pointer hashes, and
+  exact-generation calendar artifacts are closed before use. Checked-in or
+  copied fixture/test/mock/replay inputs fail closed.
+- Kept injected generation calendars as context-only candidate inputs: every
+  macro row remains fingerprinted and dashboard-visible, while an unlinked
+  market-wide event can no longer manufacture an `UNKNOWN` campaign idea with
+  false or missing market provenance. Normal Event Alpha scheduled/unlock
+  candidate behavior is unchanged.
+- Added bounded maintenance state to System Health and Run History, preserved
+  campaign measurement truth for empty current generations, added static
+  venue-neutral execution-quality readiness, and tightened temporary public
+  tunnel expiry/status semantics without adding an execution adapter or
+  changing the dashboard framework.
+- Updated Make targets, environment examples, README, AGENTS, operator guide,
+  Decision Radar North Star Markdown/JSON, ROADMAP, DECISIONS, campaign report,
+  and architecture reports. Current live authority is
+  `radar_market_no_send_20260714t221551304500z_fcd6de29c447`, run
+  `2026-07-14T22:15:51.367228+00:00|no_key_live`, revision 12.
+**Verify:** Focused operations/calendar/cadence tests passed 161/161;
+dashboard/access tests passed 362/362; Decision/calendar/export-security tests
+passed 78/78; official macro-to-authoritative-dashboard composition and related
+calendar publication tests passed 52/52. Compileall, JSON validation,
+`git diff --check`, strict artifact doctors, market-no-send smoke, integrated
+radar smoke/doctor, dashboard smoke (13 pages), dashboard UX smoke (8 pages),
+calendar preview, and architecture cleanliness all passed with zero new
+violations. `make verify-fast PYTHON=.venv/bin/python` passed 1,874 tests plus
+offline smokes. Final `make verify PYTHON=.venv/bin/python` passed 1,357/1,357
+standalone checks, 1,874 pytest checks, alert rendering, fixture backtest, and
+paper scoreboard. The live dashboard returned HTTP 200 after restoring the
+exact revision-12 pointer.
+**Notes/risks:** One explicitly authorized real CoinGecko no-send observation
+occurred during the operational proof; no additional market call occurred in
+the final validation. No real calendar call occurred because calendar
+authorization/contact are absent. The campaign has 7 counted cycles, 210 real
+observations (180 baseline-counting, 30 too-close), 33 assets, 0 warm assets, 0
+current ideas, 2 historical `risk_watch` ideas, and 1 pending/1 matured outcome.
+Private and public phone routes are disabled. No Telegram send, trade, Event
+Alpha paper trade, normal RSI write, execution action, or Event Alpha-created
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-14 — Add verified temporary public phone access · Codex
 **Why:** The owner wants the simplest way to open the Decision Radar from a
 phone without joining a tailnet and explicitly accepts temporary public,

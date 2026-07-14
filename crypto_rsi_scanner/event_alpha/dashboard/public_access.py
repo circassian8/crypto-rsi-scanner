@@ -14,7 +14,7 @@ from contextlib import contextmanager
 import ctypes
 import ctypes.util
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import fcntl
 import http.client
 import json
@@ -35,8 +35,12 @@ from urllib.parse import urlsplit
 
 LOCAL_DASHBOARD_URL = "http://127.0.0.1:8765"
 CLOUDFLARED_BINARY_ENV = "RSI_RADAR_CLOUDFLARED_BIN"
+PUBLIC_MAX_LIFETIME_ENV = "RSI_RADAR_PUBLIC_MAX_LIFETIME_MINUTES"
 
-_STATE_SCHEMA_VERSION = 1
+_STATE_SCHEMA_VERSION = 2
+_DEFAULT_MAX_LIFETIME = timedelta(hours=4)
+_MIN_MAX_LIFETIME_MINUTES = 15
+_MAX_MAX_LIFETIME_MINUTES = 24 * 60
 _MAX_STATE_BYTES = 64 * 1024
 _MAX_LOG_BYTES = 256 * 1024
 _URL_POLL_ATTEMPTS = 40
@@ -122,6 +126,7 @@ class _PublicAccessStatus:
     cloudflared_found: bool
     process_state: str
     public_url: str | None
+    expires_at: str | None
     blockers: tuple[str, ...]
 
     @property
@@ -144,6 +149,8 @@ class _OwnedState:
     pid: int
     public_url: str
     argv: tuple[str, ...]
+    started_at: datetime
+    expires_at: datetime
 
 
 def discover_cloudflared_binary(
@@ -199,6 +206,8 @@ def inspect_public_access(
         blockers.append("cloudflared_binary_missing")
     if _configured_cloudflared_path(deps) is not None:
         blockers.append("cloudflared_config_present")
+    if _configured_max_lifetime(deps) is None:
+        blockers.append("public_access_lifetime_invalid")
 
     state_kind, state = _classify_state(deps)
     if state_kind == "invalid":
@@ -207,6 +216,8 @@ def inspect_public_access(
         blockers.append("public_access_state_stale")
     elif state_kind == "unowned":
         blockers.append("public_access_state_unowned")
+    elif state_kind == "expired":
+        blockers.append("public_access_expired")
     elif state_kind == "owned" and state is not None:
         try:
             public_ready = deps.public_http_ready(
@@ -218,12 +229,14 @@ def inspect_public_access(
             blockers.append("public_dashboard_unavailable")
 
     public_url = state.public_url if state_kind == "owned" and state else None
+    expires_at = _format_timestamp(state.expires_at) if state is not None else None
     return _PublicAccessStatus(
         ready=not blockers,
         dashboard_ready=dashboard_ready,
         cloudflared_found=binary is not None,
         process_state=state_kind,
         public_url=public_url,
+        expires_at=expires_at,
         blockers=tuple(blockers),
     )
 
@@ -314,13 +327,21 @@ def _enable_public_access_confirmed(
             False, False, before, "public_dashboard_unavailable"
         )
 
+    started_at = _utc_now(deps)
+    max_lifetime = _configured_max_lifetime(deps)
+    if max_lifetime is None:  # Defensive: inspection already proved this boundary.
+        if not _cleanup_spawned_child(child):
+            return _PublicAccessOperation(False, False, before, "tunnel_cleanup_failed")
+        _remove_log(deps.log_path)
+        return _PublicAccessOperation(False, False, before, "public_access_lifetime_invalid")
     payload = {
         "schema_version": _STATE_SCHEMA_VERSION,
         "pid": pid,
         "public_url": public_url,
         "origin": LOCAL_DASHBOARD_URL,
         "argv": list(command),
-        "started_at": _utc_timestamp(deps),
+        "started_at": _format_timestamp(started_at),
+        "expires_at": _format_timestamp(started_at + max_lifetime),
     }
     try:
         _atomic_write_state(deps.state_path, payload)
@@ -375,6 +396,41 @@ def disable_public_access(
         )
 
 
+def guard_public_access(
+    *,
+    confirm: bool,
+    dependencies: _PublicAccessDependencies | None = None,
+) -> _PublicAccessOperation:
+    """Stop only an exact owned tunnel that is expired or no longer trusted."""
+
+    if not confirm:
+        return _PublicAccessOperation(False, False, None, "confirmation_required")
+    deps = dependencies or _PublicAccessDependencies()
+    try:
+        with _operation_lock(deps.state_path) as acquired:
+            if not acquired:
+                return _PublicAccessOperation(
+                    False, False, None, "public_access_operation_busy"
+                )
+            status = inspect_public_access(deps)
+            unsafe_owned = status.process_state in {"owned", "expired"} and any(
+                reason
+                in {
+                    "local_dashboard_unavailable",
+                    "public_dashboard_unavailable",
+                    "public_access_expired",
+                }
+                for reason in status.blockers
+            )
+            if not unsafe_owned:
+                return _PublicAccessOperation(True, False, status)
+            return _disable_public_access_confirmed(deps)
+    except OSError:
+        return _PublicAccessOperation(
+            False, False, None, "public_access_operation_lock_failed"
+        )
+
+
 def _disable_public_access_confirmed(
     deps: _PublicAccessDependencies,
 ) -> _PublicAccessOperation:
@@ -385,7 +441,7 @@ def _disable_public_access_confirmed(
         _remove_state(deps.state_path)
         _remove_log(deps.log_path)
         return _PublicAccessOperation(True, True, inspect_public_access(deps))
-    if state_kind != "owned" or state is None:
+    if state_kind not in {"owned", "expired"} or state is None:
         reason = (
             "public_access_state_unowned"
             if state_kind == "unowned"
@@ -460,7 +516,9 @@ def _classify_state(
         matches = deps.process_matches(state.pid, state.argv)
     except Exception:
         matches = False
-    return ("owned", state) if matches else ("unowned", state)
+    if not matches:
+        return "unowned", state
+    return ("expired", state) if _utc_now(deps) >= state.expires_at else ("owned", state)
 
 
 def _validated_state(payload: object) -> _OwnedState | None:
@@ -473,6 +531,7 @@ def _validated_state(payload: object) -> _OwnedState | None:
         "origin",
         "argv",
         "started_at",
+        "expires_at",
     }:
         return None
     if payload.get("schema_version") != _STATE_SCHEMA_VERSION:
@@ -488,10 +547,22 @@ def _validated_state(payload: object) -> _OwnedState | None:
         return None
     if not isinstance(argv, list) or not argv or not all(isinstance(row, str) for row in argv):
         return None
-    started_at = payload.get("started_at")
-    if not isinstance(started_at, str) or not started_at.endswith("Z"):
+    started_at = _parse_timestamp(payload.get("started_at"))
+    expires_at = _parse_timestamp(payload.get("expires_at"))
+    if started_at is None or expires_at is None or expires_at <= started_at:
         return None
-    return _OwnedState(pid=pid, public_url=public_url, argv=tuple(argv))
+    lifetime = expires_at - started_at
+    if lifetime < timedelta(minutes=_MIN_MAX_LIFETIME_MINUTES) or lifetime > timedelta(
+        minutes=_MAX_MAX_LIFETIME_MINUTES
+    ):
+        return None
+    return _OwnedState(
+        pid=pid,
+        public_url=public_url,
+        argv=tuple(argv),
+        started_at=started_at,
+        expires_at=expires_at,
+    )
 
 
 def _is_canonical_quick_tunnel_url(value: str) -> bool:
@@ -579,6 +650,21 @@ def _configured_cloudflared_path(deps: _PublicAccessDependencies) -> Path | None
             # An unreadable/indeterminate config location is unsafe too.
             return path
     return None
+
+
+def _configured_max_lifetime(
+    deps: _PublicAccessDependencies,
+) -> timedelta | None:
+    raw = str(deps.environ.get(PUBLIC_MAX_LIFETIME_ENV, "")).strip()
+    if not raw:
+        return _DEFAULT_MAX_LIFETIME
+    try:
+        minutes = int(raw)
+    except ValueError:
+        return None
+    if not _MIN_MAX_LIFETIME_MINUTES <= minutes <= _MAX_MAX_LIFETIME_MINUTES:
+        return None
+    return timedelta(minutes=minutes)
 
 
 def _read_state(path: Path) -> object | None:
@@ -988,11 +1074,25 @@ def _response_is_dashboard(
     )
 
 
-def _utc_timestamp(deps: _PublicAccessDependencies) -> str:
+def _utc_now(deps: _PublicAccessDependencies) -> datetime:
     value = deps.now()
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _format_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
 
 
 def _first_reason(status: _PublicAccessStatus) -> str:
@@ -1006,7 +1106,7 @@ def _parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("readiness")
     subparsers.add_parser("status")
-    for command in ("enable", "disable"):
+    for command in ("enable", "disable", "guard"):
         mutation = subparsers.add_parser(command)
         mutation.add_argument("--confirm", action="store_true")
     return parser
@@ -1026,11 +1126,12 @@ def main(
             file=sys.stdout if status.ready else sys.stderr,
         )
         return 0 if status.ready else 1
-    operation = (
-        enable_public_access(confirm=args.confirm, dependencies=deps)
-        if args.command == "enable"
-        else disable_public_access(confirm=args.confirm, dependencies=deps)
-    )
+    if args.command == "enable":
+        operation = enable_public_access(confirm=args.confirm, dependencies=deps)
+    elif args.command == "disable":
+        operation = disable_public_access(confirm=args.confirm, dependencies=deps)
+    else:
+        operation = guard_public_access(confirm=args.confirm, dependencies=deps)
     print(
         _format_operation(args.command, operation),
         file=sys.stdout if operation.ok else sys.stderr,
@@ -1041,20 +1142,27 @@ def main(
 def _format_status(command: str, status: _PublicAccessStatus) -> str:
     prefix = f"radar_dashboard_public_access_{command}:"
     if not status.ready:
-        return f"{prefix} NOT_READY reason={_first_reason(status)}"
+        detail = f" process_state={status.process_state}"
+        if status.process_state == "expired":
+            detail += (
+                " tunnel_may_still_be_public=true"
+                " next_safe_action=confirmed_public_guard"
+            )
+        return f"{prefix} NOT_READY reason={_first_reason(status)}{detail}"
     state = "enabled" if status.enabled else "disabled"
     if command == "readiness" and status.enabled:
         url = "redacted_use_status"
     else:
         url = status.public_url if status.enabled else "available_after_confirmed_enable"
-    return f"{prefix} READY state={state} url={url}"
+    expiry = status.expires_at or "none"
+    return f"{prefix} READY state={state} url={url} expires_at={expiry}"
 
 
 def _format_operation(command: str, operation: _PublicAccessOperation) -> str:
     prefix = f"radar_dashboard_public_access_{command}:"
     if not operation.ok:
         return f"{prefix} BLOCKED reason={operation.reason or 'unsafe_state'}"
-    state = "ENABLED" if command == "enable" else "DISABLED"
+    state = "ENABLED" if command == "enable" else "GUARDED" if command == "guard" else "DISABLED"
     changed = "yes" if operation.changed else "no"
     public_url = (
         operation.status.public_url
@@ -1062,16 +1170,19 @@ def _format_operation(command: str, operation: _PublicAccessOperation) -> str:
         else None
     )
     url = public_url or "none"
-    return f"{prefix} {state} changed={changed} url={url}"
+    expiry = operation.status.expires_at if operation.status is not None else None
+    return f"{prefix} {state} changed={changed} url={url} expires_at={expiry or 'none'}"
 
 
 __all__ = (
     "CLOUDFLARED_BINARY_ENV",
     "LOCAL_DASHBOARD_URL",
+    "PUBLIC_MAX_LIFETIME_ENV",
     "disable_public_access",
     "discover_cloudflared_binary",
     "enable_public_access",
     "extract_quick_tunnel_url",
+    "guard_public_access",
     "inspect_public_access",
     "main",
 )

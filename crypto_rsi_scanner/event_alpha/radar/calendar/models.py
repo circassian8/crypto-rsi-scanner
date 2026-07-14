@@ -44,7 +44,10 @@ CALENDAR_TRACKING_STATES = frozenset(
 )
 
 _REMINDER_RE = re.compile(r"^[1-9][0-9]*(?:m|h|d|w)$")
-_TIMEZONE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_+.-]*(?:/[A-Za-z0-9_+.-]+)*$")
+_TIMEZONE_RE = re.compile(
+    r"^(?:[A-Za-z][A-Za-z0-9_+.-]*(?:/[A-Za-z0-9_+.-]+)*|"
+    r"UTC[+-](?:(?:0[0-9]|1[0-3]):[0-5][0-9]|14:00))$"
+)
 _EVENT_KIND_ALIASES = {
     "macro": "macro_release",
     "cpi": "inflation",
