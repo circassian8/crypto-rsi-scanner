@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import html
 import math
 from typing import Any, Iterable, Mapping
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from ..operations import market_provenance
 from .health_render import render_health as _health
@@ -16,7 +15,32 @@ from .layer_diagnostics import (
     render_market_observation_table as _market_observation_table,
 )
 from .loader import candidate_identifier
-from .models import DashboardResponse, DashboardSnapshot
+from .render_support import (
+    asset_key as _asset_key,
+    definition_list as _definition_list,
+    escape_html as _h,
+    score as _score,
+    score_components as _score_components,
+    source_link as _source_link,
+    table as _table,
+    text_list as _text_list,
+    values as _values,
+)
+from .models import (
+    DashboardResponse,
+    DashboardSnapshot,
+    suppress_untrusted_current_data,
+)
+from .calendar_page import render_calendar_page
+from .ideas_page import render_idea_detail, render_ideas_page
+from .market_page import render_market_page
+from .shell import render_shell
+from .system_pages import (
+    render_campaign_page,
+    render_health_page,
+    render_outcomes_page,
+)
+from .today_page import render_today_page
 
 
 _NAV = (
@@ -38,64 +62,129 @@ def render_dashboard_page(
     include_diagnostics: bool = False,
     query: Mapping[str, str] | None = None,
 ) -> DashboardResponse:
+    snapshot = suppress_untrusted_current_data(snapshot)
     dashboard_query = _dashboard_query(query)
-    current_generation_page = path in {"/", "/anomalies", "/catalysts", "/fade-risk", "/calendar"}
+    current_generation_page = path in {
+        "/", "/market-radar", "/anomalies", "/ideas", "/catalysts", "/fade-risk", "/calendar",
+    } or path.startswith(("/ideas/", "/candidate/"))
     if current_generation_page and not snapshot.generation_authoritative:
         title = {
             "/": "Today",
+            "/market-radar": "Market Radar",
             "/anomalies": "Market Anomalies",
+            "/ideas": "Ideas",
             "/catalysts": "Catalyst Ideas",
             "/fade-risk": "Fade / Risk",
             "/calendar": "Calendar",
-        }[path]
-        return _ok(snapshot, title, _authority_unavailable(snapshot))
-    if path == "/":
-        body = _today(
+        }.get(path, "Idea unavailable")
+        body = render_shell(
             snapshot,
-            include_diagnostics=include_diagnostics,
-            query=dashboard_query,
+            title=title,
+            path=path,
+            body=_authority_unavailable(snapshot),
         )
-        return _ok(snapshot, "Today", body)
+        if path.startswith(("/ideas/", "/candidate/")):
+            return DashboardResponse(409, "Conflict", body)
+        return DashboardResponse(200, "OK", body)
+    if path == "/":
+        return _product_response(
+            snapshot,
+            "Today",
+            path,
+            render_today_page(
+                snapshot,
+                query=dashboard_query,
+                include_diagnostics=include_diagnostics,
+            ),
+        )
+    if path == "/market-radar":
+        return _product_response(snapshot, "Market Radar", path, render_market_page(snapshot, query))
     if path == "/anomalies":
-        return _ok(
+        return _product_response(
             snapshot,
             "Market Anomalies",
+            path,
             _anomalies(
                 snapshot,
                 include_diagnostics=include_diagnostics,
                 query=dashboard_query,
             ),
         )
+    if path == "/ideas":
+        return _product_response(
+            snapshot,
+            "Ideas",
+            path,
+            render_ideas_page(snapshot, query, include_diagnostics=include_diagnostics),
+        )
     if path == "/catalysts":
-        return _ok(
+        return _product_response(
             snapshot,
             "Catalyst Ideas",
-            _catalysts(
-                snapshot,
-                include_diagnostics=include_diagnostics,
-                query=dashboard_query,
-            ),
+            path,
+            _catalysts(snapshot, include_diagnostics=include_diagnostics, query=dashboard_query),
         )
     if path == "/fade-risk":
-        return _ok(
+        return _product_response(
             snapshot,
             "Fade / Risk",
-            _fade_risk(
-                snapshot,
-                include_diagnostics=include_diagnostics,
-                query=dashboard_query,
-            ),
+            path,
+            _fade_risk(snapshot, include_diagnostics=include_diagnostics, query=dashboard_query),
         )
     if path == "/calendar":
-        return _ok(snapshot, "Calendar", _calendar(snapshot))
+        return _product_response(snapshot, "Calendar", path, render_calendar_page(snapshot, query))
     if path == "/health":
-        return _ok(snapshot, "Provider / System Health", _health(snapshot))
+        health = render_health_page(snapshot)
+        compatibility = (
+            '<details class="technical-details panel">'
+            '<summary>Exact-generation compatibility diagnostics</summary>'
+            '<div class="disclosure__body">'
+            + _health(snapshot)
+            + '</div></details>'
+        )
+        return _product_response(snapshot, "System Health", path, health + compatibility)
+    if path == "/outcomes":
+        return _product_response(
+            snapshot,
+            "Outcomes & Learning",
+            path,
+            render_outcomes_page(snapshot, query),
+        )
     if path == "/feedback-outcomes":
-        return _ok(snapshot, "Feedback / Outcomes", _feedback_outcomes(snapshot))
+        return _product_response(snapshot, "Feedback / Outcomes", path, _feedback_outcomes(snapshot))
+    if path == "/campaign-history":
+        return _product_response(
+            snapshot,
+            "Campaign History",
+            path,
+            render_campaign_page(snapshot, query),
+        )
+    if path.startswith("/ideas/"):
+        identifier = path.removeprefix("/ideas/")
+        status, title, body = render_idea_detail(
+            snapshot,
+            identifier,
+            include_diagnostics=include_diagnostics,
+        )
+        return DashboardResponse(status, "OK" if status == 200 else "Not Found", render_shell(snapshot, title=title, path=path, body=body))
     if path.startswith("/candidate/"):
         identifier = path.removeprefix("/candidate/")
-        return _candidate_detail(snapshot, identifier, include_diagnostics=include_diagnostics)
+        status, title, body = render_idea_detail(
+            snapshot,
+            identifier,
+            include_diagnostics=include_diagnostics,
+        )
+        return DashboardResponse(status, "OK" if status == 200 else "Not Found", render_shell(snapshot, title=title, path=path, body=body))
     return DashboardResponse(404, "Not Found", _standalone_error("Not Found", "Unknown dashboard page."))
+
+
+def _product_response(
+    snapshot: DashboardSnapshot,
+    title: str,
+    path: str,
+    body: str,
+) -> DashboardResponse:
+    return DashboardResponse(200, "OK", render_shell(snapshot, title=title, path=path, body=body))
 
 
 def _today(
@@ -1064,45 +1153,6 @@ def _section(title: str, body: str) -> str:
     return f"<section><h3>{_h(title)}</h3>{body}</section>"
 
 
-def _table(headers: Iterable[str], rows: Iterable[Iterable[str]], *, empty: str = "No rows.") -> str:
-    materialized = [tuple(row) for row in rows]
-    if not materialized:
-        return f'<p class="muted">{_h(empty)}</p>'
-    head = "".join(f"<th>{_h(value)}</th>" for value in headers)
-    body = "".join("<tr>" + "".join(f"<td>{value}</td>" for value in row) + "</tr>" for row in materialized)
-    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
-
-
-def _definition_list(items: Iterable[tuple[str, object]]) -> str:
-    return "<dl>" + "".join(f"<dt>{_h(key)}</dt><dd>{_h(value)}</dd>" for key, value in items) + "</dl>"
-
-
-def _text_list(title: str, values: Iterable[str]) -> str:
-    materialized = tuple(str(value) for value in values if str(value).strip())
-    if not materialized:
-        return f"<h3>{_h(title)}</h3><p class=\"muted\">None recorded.</p>"
-    return f"<h3>{_h(title)}</h3><ul>" + "".join(f"<li>{_h(value)}</li>" for value in materialized) + "</ul>"
-
-
-def _score_components(title: str, value: object) -> str:
-    if not isinstance(value, Mapping) or not value:
-        return f'<h3>{_h(title)}</h3><p class="muted">No component detail recorded.</p>'
-    rows = [(_h(key), _h(component)) for key, component in sorted(value.items()) if not isinstance(component, (Mapping, list, tuple, set))]
-    return f"<h3>{_h(title)}</h3>" + _table(("Component", "Value"), rows)
-
-
-def _values(row: Mapping[str, Any], *fields: str) -> tuple[str, ...]:
-    out = []
-    for field in fields:
-        value = row.get(field)
-        if isinstance(value, str):
-            if value.strip():
-                out.append(value.strip())
-        elif isinstance(value, Iterable) and not isinstance(value, (bytes, Mapping)):
-            out.extend(str(item).strip() for item in value if str(item).strip())
-    return tuple(dict.fromkeys(out))
-
-
 def _window_label(row: Mapping[str, Any]) -> str:
     start = str(row.get("window_start") or "").strip()
     end = str(row.get("window_end") or "").strip()
@@ -1133,35 +1183,6 @@ def _display_number(value: object) -> str:
     if number is None:
         return "—"
     return f"{number:g}"
-
-
-def _asset_key(row: Mapping[str, Any]) -> tuple[str, str]:
-    return (
-        str(row.get("symbol") or row.get("validated_symbol") or "").strip().upper(),
-        str(row.get("coin_id") or row.get("validated_coin_id") or "").strip().casefold(),
-    )
-
-
-def _source_link(row: Mapping[str, Any]) -> str:
-    raw = str(row.get("source_url") or row.get("latest_source_url") or row.get("url") or "").strip()
-    if not raw:
-        return ""
-    parsed = urlsplit(raw)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return '<span class="muted">unsafe or unavailable source URL</span>'
-    label = str(row.get("source") or row.get("latest_source") or parsed.netloc)
-    return f'<a href="{_h(raw)}" rel="noreferrer" target="_blank">{_h(label)}</a>'
-
-
-def _score(value: object) -> str:
-    try:
-        return f"{float(value):.0f}/100"
-    except (TypeError, ValueError):
-        return "n/a"
-
-
-def _h(value: object) -> str:
-    return html.escape(str(value if value is not None else ""), quote=True)
 
 
 __all__ = ("filter_sort_candidates", "render_dashboard_page")

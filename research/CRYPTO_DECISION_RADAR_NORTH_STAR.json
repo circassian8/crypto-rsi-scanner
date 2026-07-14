@@ -135,7 +135,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-13T22:47:55+00:00",
+  "generated_at": "2026-07-13T23:54:36+00:00",
   "market_provenance_contract": {
     "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
@@ -530,6 +530,77 @@
     ],
     "dashboard_get_head_side_effects": [],
     "dashboard_is_primary": true,
+    "dashboard_operator_experience_v1": {
+      "accessibility": {
+        "color_is_not_the_only_signal": true,
+        "keyboard_navigation": true,
+        "reduced_motion_supported": true,
+        "skip_navigation": true
+      },
+      "deep_technical_details_collapsed_by_default": true,
+      "exact_current_and_historical_context_visually_separate": true,
+      "exact_current_artifact_failure_demoted_to_history": false,
+      "external_source_url_policy": "absolute_http_or_https_with_hostname_and_no_userinfo",
+      "field_level_return_units_respected": true,
+      "layer_coverage": {
+        "green_requires_all_expected_healthy_or_not_applicable": true,
+        "layers": [
+          "market",
+          "catalyst",
+          "calendar",
+          "derivatives",
+          "RSI",
+          "outcomes",
+          "request ledger"
+        ],
+        "states": [
+          "healthy_nonempty",
+          "healthy_empty",
+          "not_configured",
+          "not_applicable",
+          "unavailable",
+          "degraded",
+          "stale",
+          "rejected"
+        ]
+      },
+      "market_layer_funnel": [
+        "bounded provider rows",
+        "selected top-liquid universe",
+        "fingerprint-bound observations",
+        "anomaly evidence",
+        "integrated candidates",
+        "consolidated Core operator ideas"
+      ],
+      "mixed_generation_market_funnel_is_causal": false,
+      "primary_pages": [
+        "Today",
+        "Market Radar",
+        "Ideas",
+        "Calendar",
+        "System Health",
+        "Outcomes & Learning",
+        "Campaign History"
+      ],
+      "presentation_is_render_only": true,
+      "presentation_policy": {
+        "actionability_is_win_probability": false,
+        "evidence_confidence_is_expected_return": false,
+        "exact_utc_remains_accessible": true,
+        "missing_value_label": "Unavailable",
+        "operator_local_time_primary": true,
+        "uncertain_calendar_time_rendered_exact": false
+      },
+      "responsive_viewports": [
+        "wide desktop",
+        "standard laptop",
+        "tablet",
+        "narrow mobile"
+      ],
+      "server_rendered_without_javascript": true,
+      "untrusted_current_fields_centrally_quarantined": true,
+      "ux_smoke_target": "radar-dashboard-ux-smoke"
+    },
     "dashboard_zero_idea_contract": {
       "artifact_presence_alone_proves_healthy_empty": false,
       "descriptor_anchored_namespace_load": true,
@@ -553,6 +624,16 @@
         "fixture_rejected_live",
         "normalization_rejected"
       ]
+    },
+    "pointer_bound_get_head_revalidation": {
+      "fields": [
+        "artifact_namespace",
+        "profile",
+        "run_id",
+        "revision",
+        "operator_state_sha256"
+      ],
+      "mismatch_fails_closed": true
     },
     "decision_preview_sections": [
       "High-Confidence Ideas",

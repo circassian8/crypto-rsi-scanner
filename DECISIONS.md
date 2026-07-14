@@ -16,6 +16,50 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-14 - Treat the dashboard as a seven-page decision terminal
+**Status:** accepted
+**Decision:** The primary Crypto Decision Radar interface is a server-rendered,
+loopback-only seven-page operator terminal: Today, Market Radar, Ideas,
+Calendar, System Health, Outcomes & Learning, and Campaign History. These pages
+organize human attention rather than mirror artifact filenames. Historical
+compatibility routes remain available but do not compete in primary navigation.
+
+All human formatting is a pure presentation projection over the exact canonical
+Decision v2 and supporting read models. It may translate time, units, enums,
+scores, and reason codes, but it may not re-score, reinterpret, fill, or repair
+canonical evidence. Exact-current ideas/outcomes/provider evidence remain
+visually and semantically separate from bounded historical campaign context.
+Actionability is not a win probability, evidence confidence is not expected
+return, and unavailable spread, liquidity, baseline, or calendar coverage is
+never invented.
+
+A sparse generation must expose its full layer funnel—bounded provider rows,
+selected universe, exact observations, anomaly evidence, integrated candidates,
+and consolidated Core/operator ideas—plus the state of supporting layers. A
+mixed integrated generation without a market-only receipt uses independent
+counts rather than a false causal arrow. Zero rows are meaningful only when labeled
+as verified qualification, healthy empty, unconfigured, unavailable/degraded,
+stale/rejected, or historical-only. Rendering remains GET/HEAD-only, no-provider,
+no-write, no-JavaScript, responsive, keyboard usable, and loopback-only. A
+pointer-started server revalidates the exact namespace/run/revision/operator
+digest on every request and fails closed if current authority changes.
+
+Today and Health use one canonical layer projection for market, catalyst,
+calendar, derivatives, RSI, outcomes, and provider request ledger. A green state
+requires every expected layer healthy or explicitly not applicable. If
+generation authority fails, every current artifact-derived count and row is
+centrally quarantined across all routes; a failed current artifact may not be
+reopened or demoted into historical context. Dashboard source links reject URL
+userinfo, and presentation uses field-level return units plus explicit turnover
+ratio conversion rather than shared-unit assumptions.
+**Why:** A strict-clean zero-idea run looked broken because useful market rows,
+campaign progress, and source limitations were distributed across artifacts or
+hidden entirely. A consistent operator workflow makes the product useful during
+both active and quiet markets without lowering thresholds or fabricating data.
+**Revisit when:** A replacement interface preserves the same exact-generation,
+read-only, fail-closed, accessibility, responsive, presentation-only, and
+cross-layer truth contracts with materially better measured operator usability.
+
 ## 2026-07-14 - Distinguish an empty decision set from missing product coverage
 **Status:** accepted
 **Decision:** A trusted zero-idea Decision Radar generation must still expose

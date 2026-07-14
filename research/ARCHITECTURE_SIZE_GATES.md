@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-13T22:41:56.801374+00:00`
+- generated_at: `2026-07-14T00:23:41.214825+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -111,8 +111,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1189 |
+| `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1188 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1187 |
-| `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1182 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1180 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1176 |
@@ -120,7 +120,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1175 |
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1171 |
 | `crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py` | 1168 |
-| `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1167 |
+| `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1158 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1156 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1144 |
 | `crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py` | 1139 |
@@ -165,7 +165,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_burn_in_operations.py` | 1497 |
 | `tests/event_alpha/test_radar_dashboard.py` | 1485 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
-| `tests/event_alpha/test_market_no_send.py` | 1475 |
+| `tests/event_alpha/test_market_no_send.py` | 1476 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_operator_workflows.py` | 1449 |
 | `tests/event_alpha/test_artifact_schema.py` | 1427 |

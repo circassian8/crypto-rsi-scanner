@@ -17,6 +17,65 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-14 — Deliver the Decision Radar operator terminal and expose every sparse layer · Codex
+**Why:** The live dashboard looked empty even though a trusted generation had
+evaluated 30 market rows. Calendar and several supporting inputs were also
+silently absent, so a missing acquisition path was indistinguishable from a
+healthy layer with zero qualifying rows.
+**Changes:**
+- Replaced the report-style surface with a responsive seven-page operator
+  terminal: Today, Market Radar, Ideas plus canonical detail, Calendar, System
+  Health, Outcomes & Learning, and Campaign History. Added shared navigation,
+  presentation models, compact charts, filters, sorting, decision-first cards,
+  explicit research-only framing, and responsive table behavior.
+- Added one canonical seven-layer coverage projection for market, catalyst,
+  calendar, derivatives, RSI, outcomes, and the provider request ledger. Every
+  layer now distinguishes healthy non-empty, healthy empty, not configured,
+  unavailable/degraded, stale, rejected, and not applicable rather than
+  collapsing those states into an empty panel.
+- Added exact-generation market and campaign funnels, bounded history, source
+  and provider diagnostics, honest calendar uncertainty, and exact-current
+  outcome separation. The dashboard never recomputes Decision v2 or mixes a
+  failed current artifact into historical evidence.
+- Centralized fail-closed quarantine of untrusted current rows across every
+  primary route. Pointer-mode GET/HEAD requests revalidate the exact namespace,
+  run, revision, and operator-state digest on every request; invalid current
+  outcomes remain quarantined instead of being demoted into cumulative history.
+- Hardened rendering against credential-bearing URLs and mixed return units,
+  converted turnover fractions explicitly to percentage points, and kept raw
+  anomaly evidence separate from canonical Decision ideas.
+- Split dashboard implementation into focused page, presentation, coverage,
+  history, style, and system-support modules; added the offline dashboard UX
+  smoke target, operator guide, North Star updates, architecture reports, and
+  focused read-model, coverage, security, responsive, pointer, chart, calendar,
+  and workflow tests.
+- Ran one already-authorized bounded CoinGecko no-send cycle. It published
+  `radar_market_no_send_20260714t002940z`, run
+  `2026-07-14T00:29:40.814498+00:00|no_key_live`, revision 12, with 80 provider
+  rows, 30 selected/exact observations, one anomaly, one canonical DEXE
+  `risk_watch` idea/card/pending outcome, and a clean strict doctor. The live
+  calendar remains truthfully `not_configured`; rolling market baselines remain
+  cold/warming and spread is unavailable from the CoinGecko market endpoint.
+**Verify:** Export parent-symlink regression 1/1; consolidated dashboard suite
+195/195; dashboard smoke rendered 13 routes with zero writes; UX smoke rendered
+8 primary routes with zero writes; compileall, architecture cleanliness, North
+Star JSON validation, and `git diff --check` passed. `make verify-fast
+PYTHON=.venv/bin/python` passed 1,632 pytest checks plus offline smokes. Full
+`make verify PYTHON=.venv/bin/python` passed 1,358/1,358 standalone checks and
+1,632/1,632 pytest checks plus alert rendering, fixture backtest, and paper
+scoreboard. Dashboard readiness is READY for revision 12. Browser QA covered all
+eight operator views at 1440x1000 and 390x844: no page overflow or rendered
+alerts, correct landmark/heading/skip-link structure, and 48-84 ms local loads;
+the same Calendar renderer showed all 11 fixture events, isolating the live zero
+to missing acquisition rather than view filtering. An independent final audit
+replayed the release-safety regressions and found no remaining P0-P2 dashboard
+correctness, security, or trust-boundary issue.
+**Notes/risks:** The one authorized provider request succeeded. Telegram sends,
+trades, paper trades, normal RSI writes, and `TRIGGERED_FADE` creation all
+remained zero. A current non-fixture calendar snapshot or separately authorized
+provider is still required for real calendar rows; no fixture fallback or
+provider authorization was invented.
+
 ## 2026-07-14 — Make sparse Decision Radar coverage truthful · Codex
 **Why:** The clean live dashboard authority had zero qualified ideas, but its 30
 fresh market observations, incomplete source coverage, and one historical

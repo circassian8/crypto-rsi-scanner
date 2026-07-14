@@ -4,15 +4,20 @@ Research-oriented crypto RSI scanner and human-decided Event Alpha Crypto Radar.
 
 ## Local Crypto Radar dashboard
 
-`make radar-dashboard` serves the current Event Alpha operator generation at
-`http://127.0.0.1:8765/`. It reads the exact run/revision manifest and local
+`make radar-dashboard` serves the current Crypto Decision Radar operator
+generation at `http://127.0.0.1:8765/`. The seven-page terminal covers Today,
+Market Radar, Ideas, Calendar, System Health, Outcomes & Learning, and Campaign
+History; see the [operator guide](research/CRYPTO_DECISION_RADAR_OPERATOR_GUIDE.md).
+It reads the exact run/revision manifest and local
 artifacts only. Current research appears only when exact file/tree/run-row
 fingerprints, the immutable run age, and a fresh strict doctor for the same
 revision all agree; otherwise current pages are suppressed while Health and
 clearly labeled cumulative history remain available. It does not call
 providers, send notifications, trade, paper
 trade, write normal RSI rows, or create `TRIGGERED_FADE`. Run
-`make radar-dashboard-smoke` for the deterministic fixture/no-write render gate.
+`make radar-dashboard-smoke` for the deterministic fixture/no-write render gate
+and `make radar-dashboard-ux-smoke` for primary-page semantic and responsive
+contracts.
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
 Integrated runs normalize scheduled and fixture rows once and persist only

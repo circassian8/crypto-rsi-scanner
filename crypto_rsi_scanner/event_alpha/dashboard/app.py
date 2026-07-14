@@ -11,6 +11,7 @@ from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 from .loader import load_dashboard_snapshot
 from .models import DashboardGenerationBinding, DashboardLoadError, DashboardSnapshot
+from .readiness import DashboardReadinessError, read_current_namespace_pointer
 from .render import render_dashboard_page
 
 
@@ -96,6 +97,11 @@ def _render_dashboard_request(
         max_doctor_age_hours=app.max_doctor_age_hours,
     )
     _require_generation_binding(snapshot, app.generation_binding)
+    _require_current_pointer_binding(
+        app.artifact_base_dir,
+        snapshot,
+        app.generation_binding,
+    )
     path = unquote(str(environ.get("PATH_INFO") or "/"))
     query = parse_qs(str(environ.get("QUERY_STRING") or ""), keep_blank_values=True)
     include_diagnostics = str((query.get("include_diagnostics") or [""])[0]).casefold() in {
@@ -210,6 +216,40 @@ def _require_generation_binding(
         raise DashboardLoadError(
             "dashboard pointer generation is no longer authoritative; "
             f"refusing request ({reasons})"
+        )
+
+
+def _require_current_pointer_binding(
+    artifact_base_dir: Path,
+    snapshot: DashboardSnapshot,
+    binding: DashboardGenerationBinding | None,
+) -> None:
+    """Revalidate the persisted pointer for every pointer-started request."""
+
+    if binding is None:
+        return
+    try:
+        pointer = read_current_namespace_pointer(artifact_base_dir)
+    except DashboardReadinessError as exc:
+        raise DashboardLoadError(
+            "dashboard pointer is no longer valid; refusing request "
+            f"({str(exc)})"
+        ) from exc
+    expected = {
+        "artifact_namespace": binding.artifact_namespace,
+        "profile": snapshot.profile,
+        "run_id": binding.run_id,
+        "revision": binding.revision,
+        "operator_state_sha256": binding.operator_state_sha256,
+    }
+    mismatches = tuple(
+        field for field, value in expected.items() if pointer.get(field) != value
+    )
+    if mismatches:
+        fields = ",".join(mismatches)
+        raise DashboardLoadError(
+            "dashboard pointer generation changed after startup; "
+            f"refusing request (mismatched {fields})"
         )
 
 

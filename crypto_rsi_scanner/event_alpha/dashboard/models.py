@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as dataclass_replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -29,34 +30,40 @@ class DashboardSnapshot:
     current_candidates: tuple[dict[str, Any], ...] = ()
     current_market_anomalies: tuple[dict[str, Any], ...] = ()
     current_market_observations: tuple[dict[str, Any], ...] = ()
+    exact_market_history: tuple[dict[str, Any], ...] = ()
+    exact_market_history_metadata: Mapping[str, Any] = field(default_factory=dict)
     current_calendar_events: tuple[dict[str, Any], ...] = ()
+    current_outcomes: tuple[dict[str, Any], ...] = ()
+    current_outcomes_metadata: Mapping[str, Any] = field(default_factory=dict)
+    current_request_ledger: Mapping[str, Any] = field(default_factory=dict)
+    current_request_ledger_metadata: Mapping[str, Any] = field(default_factory=dict)
     source_coverage: Mapping[str, Any] = field(default_factory=dict)
     market_generation: Mapping[str, Any] = field(default_factory=dict)
     cumulative_feedback: tuple[dict[str, Any], ...] = ()
     cumulative_outcomes: tuple[dict[str, Any], ...] = ()
     campaign_outcomes: tuple[dict[str, Any], ...] = ()
+    campaign_attempts: tuple[dict[str, Any], ...] = ()
+    campaign_latest_attempt: Mapping[str, Any] = field(default_factory=dict)
+    campaign_reservation: Mapping[str, Any] = field(default_factory=dict)
+    campaign_history_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     cumulative_history_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     provider_readiness: Mapping[str, Any] = field(default_factory=dict)
     provider_health: Mapping[str, Any] = field(default_factory=dict)
     provider_health_read_at: str | None = None
     provider_health_sha256: str | None = None
     provider_health_error: str | None = None
-
     @property
     def generation_authoritative(self) -> bool:
         return self.generation_authority_status == "authoritative"
-
     @property
     def current_generation_count(self) -> int:
         return len(self.current_candidates)
-
     @property
     def cumulative_store_count(self) -> int:
         try:
             return max(0, int(self.operator_state.get("cumulative_store_rows") or 0))
         except (TypeError, ValueError):
             return 0
-
     @property
     def visible_current_candidates(self) -> tuple[dict[str, Any], ...]:
         if not self.generation_authoritative:
@@ -67,7 +74,6 @@ class DashboardSnapshot:
             if row.get("_decision_model_status") == "v2"
             and row.get("_dashboard_route") != "diagnostic"
         )
-
     @property
     def diagnostic_candidates(self) -> tuple[dict[str, Any], ...]:
         if not self.generation_authoritative:
@@ -78,11 +84,9 @@ class DashboardSnapshot:
             if row.get("_decision_model_status") != "v2"
             or row.get("_dashboard_route") == "diagnostic"
         )
-
     @property
     def expired_current_candidates(self) -> tuple[dict[str, Any], ...]:
         """Canonical ideas suppressed from current actionability at read time."""
-
         return _expired_current_candidates(self)
 
 
@@ -95,6 +99,49 @@ def _expired_current_candidates(
         row
         for row in snapshot.current_candidates
         if row.get("_decision_expired_at_read_time") is True
+    )
+
+
+def suppress_untrusted_current_data(snapshot: DashboardSnapshot) -> DashboardSnapshot:
+    """Return a render-only view with every untrusted current artifact quarantined."""
+
+    if snapshot.generation_authoritative:
+        return snapshot
+    suppressed = {
+        "authority": "suppressed_untrusted_generation",
+        "artifact_name": None,
+        "sha256": None,
+        "fingerprint_kind": None,
+        "source_row_count": 0,
+        "returned_row_count": 0,
+        "truncated": False,
+        "error": "generation_authority_failed",
+    }
+    doctor = snapshot.operator_state.get("doctor")
+    safe_operator_state = {
+        "run_id": snapshot.run_id,
+        "profile": snapshot.profile,
+        "artifact_namespace": snapshot.artifact_namespace,
+        "revision": snapshot.revision,
+        "manifest_status": snapshot.manifest_status,
+        "doctor": dict(doctor) if isinstance(doctor, Mapping) else {},
+    }
+    return dataclass_replace(
+        snapshot,
+        operator_state=safe_operator_state,
+        current_candidates=(),
+        current_market_anomalies=(),
+        current_market_observations=(),
+        exact_market_history=(),
+        exact_market_history_metadata=suppressed,
+        current_calendar_events=(),
+        current_outcomes=(),
+        current_outcomes_metadata=suppressed,
+        current_request_ledger={},
+        current_request_ledger_metadata=suppressed,
+        source_coverage={},
+        market_generation={},
+        provider_readiness={},
     )
 
 
@@ -128,9 +175,84 @@ class DashboardResponse:
     body: str
 
 
+def build_dashboard_snapshot(
+    namespace_dir: Path,
+    *,
+    identity: tuple[str, str, str, int],
+    state: Mapping[str, Any],
+    state_digest: str,
+    now: datetime,
+    authority_reasons: list[str],
+    current_rows: tuple[
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+        tuple[dict[str, Any], ...],
+    ],
+    current_metadata: tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
+    exact_supporting_data: Mapping[str, Any],
+    history: Mapping[str, Any],
+    provider_health: tuple[Mapping[str, Any], str | None, str | None],
+) -> DashboardSnapshot:
+    """Assemble an immutable read model after the loader closes all checks."""
+
+    run_id, profile, namespace, revision = identity
+    current_candidates, current_anomalies, current_observations, current_calendar = current_rows
+    source_coverage, market_generation, provider_readiness = current_metadata
+    health_values, health_digest, health_error = provider_health
+    doctor = state.get("doctor") if isinstance(state.get("doctor"), Mapping) else {}
+    verified_revision = doctor.get("verified_revision")
+    if isinstance(verified_revision, bool) or not isinstance(verified_revision, int):
+        verified_revision = None
+    return DashboardSnapshot(
+        namespace_dir=namespace_dir,
+        run_id=run_id,
+        profile=profile,
+        artifact_namespace=namespace,
+        revision=revision,
+        manifest_status=str(state.get("manifest_status") or "unknown"),
+        doctor_status=str(doctor.get("status") or "not_run"),
+        doctor_verified_revision=verified_revision,
+        generation_authority_status=("authoritative" if not authority_reasons else "untrusted"),
+        generation_authority_reasons=tuple(authority_reasons),
+        generation_authority_checked_at=now.isoformat(),
+        operator_state_sha256=state_digest,
+        operator_state=state,
+        current_candidates=current_candidates,
+        current_market_anomalies=current_anomalies,
+        current_market_observations=current_observations,
+        exact_market_history=exact_supporting_data["exact_market_history"],
+        exact_market_history_metadata=exact_supporting_data["exact_market_history_metadata"],
+        current_calendar_events=tuple(dict(row) for row in current_calendar),
+        current_outcomes=history["current_outcomes"],
+        current_outcomes_metadata=exact_supporting_data["current_outcomes_metadata"],
+        current_request_ledger=exact_supporting_data["current_request_ledger"],
+        current_request_ledger_metadata=exact_supporting_data[
+            "current_request_ledger_metadata"
+        ],
+        source_coverage=source_coverage,
+        market_generation=market_generation,
+        cumulative_feedback=history["feedback"],
+        cumulative_outcomes=history["outcomes"],
+        campaign_outcomes=history["campaign_outcomes"],
+        campaign_attempts=history["campaign_attempts"],
+        campaign_latest_attempt=history["campaign_latest_attempt"],
+        campaign_reservation=history["campaign_reservation"],
+        campaign_history_metadata=history["campaign_metadata"],
+        cumulative_history_metadata=history["metadata"],
+        provider_readiness=provider_readiness,
+        provider_health=health_values,
+        provider_health_read_at=now.isoformat() if health_digest else None,
+        provider_health_sha256=health_digest,
+        provider_health_error=health_error,
+    )
+
+
 __all__ = (
     "DashboardGenerationBinding",
     "DashboardLoadError",
     "DashboardResponse",
     "DashboardSnapshot",
+    "build_dashboard_snapshot",
+    "suppress_untrusted_current_data",
 )

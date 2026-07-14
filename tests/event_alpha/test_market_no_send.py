@@ -850,7 +850,8 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     assert loaded.generation_authoritative is True
     assert loaded.run_id == result.run_id
     assert len(loaded.current_candidates) == result.core_rows
-    assert len(loaded.cumulative_outcomes) == result.candidates
+    assert len(loaded.current_outcomes) == result.candidates
+    assert loaded.cumulative_outcomes == ()
     for dashboard_row in loaded.current_candidates:
         source_candidate = next(
             row

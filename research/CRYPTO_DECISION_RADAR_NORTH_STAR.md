@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-13T17:17:38+00:00`
+- generated_at: `2026-07-13T23:54:36+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -206,6 +206,34 @@ risk, urgency, origins, catalyst status, timing/phase, tradability/spread,
 expiry/horizon, why-now, and confirmation/invalidation. Catalyst Radar
 classification appears second as explicitly labeled compatibility context.
 
+Operator Experience V1 organizes the dashboard around seven primary pages:
+Today, Market Radar, Ideas, Calendar, System Health, Outcomes & Learning, and
+Campaign History. Today prioritizes current attention and constraints; Market
+Radar explains the bounded provider-to-decision funnel; Ideas and Idea Detail
+render the canonical Decision v2 projection; Calendar preserves certainty and
+coverage; System Health separates failures from disabled, unselected,
+unconfigured, and warming states; Outcomes separates exact-current placeholders
+from historical learning; and Campaign History shows bounded immutable attempts
+without granting them current authority. Historical compatibility routes remain
+available but are not primary navigation.
+
+Presentation is render-only. One formatting layer translates timestamps into
+operator-local relative and calendar labels while retaining exact UTC in
+accessible details, translates internal enums and reason codes, formats units
+consistently, and uses `Unavailable` instead of inventing missing values.
+Uncertain calendar dates remain windows or date-only labels. Scores are shown as
+scores and bands: actionability is not win probability, evidence confidence is
+not expected return, and risk is never reversed into a quality score.
+
+The interface is server-rendered, loopback-only, responsive from wide desktop to
+narrow mobile, keyboard navigable, and usable without JavaScript. Semantic
+states use text and structure as well as color. Tables become contained mobile
+comparison cards where appropriate; long identifiers and technical values stay
+inside their components. Deep paths, hashes, reason codes, request-ledger data,
+and provenance are collapsed by default. The offline
+`make radar-dashboard-ux-smoke` target exercises all primary pages and the real
+browser review covers desktop, laptop, tablet, and mobile layouts.
+
 The primary Decision preview sections are High-Confidence Ideas, Actionable
 Ideas, Rapid Market Anomalies, Dashboard Watch, Fade / Exhaustion Review, Risk
 Watch, and Calendar / Scheduled Risk. Every rendered item uses the canonical
@@ -227,10 +255,42 @@ rejections from a valid empty source. Namespace-local Decision outcomes stay
 separate from the shared cumulative campaign outcome ledger, which is labeled
 historical and non-authoritative for the current generation.
 
+Market Radar makes the exact layer accounting visible: bounded provider rows,
+selected top-liquid universe, fingerprint-bound observations, anomaly evidence,
+integrated candidates, and consolidated Core/operator ideas. A reduction after
+the exact observation stage is scanner qualification or canonical consolidation
+rather than hidden dashboard loss when the stage receipts reconcile. A mixed
+integrated generation without a market-only receipt presents independent layer
+counts and never implies that catalyst-, technical-, derivatives-, on-chain-,
+fundamental-, or macro-led ideas descended from zero market anomalies. Missing
+stage receipts are not inferred.
+
+Today and System Health share one canonical seven-layer coverage projection for
+market, catalyst, calendar, derivatives, RSI, outcomes, and the exact provider
+request ledger. Each layer is healthy-nonempty, healthy-empty, not configured,
+not applicable, unavailable, degraded, stale, or rejected. Green requires every
+expected layer to be healthy or explicitly not applicable. An empty operator
+queue therefore cannot hide a provider, normalization, calendar, derivatives,
+RSI, outcome, request-ledger, spread, or baseline limitation.
+
 One descriptor-anchored namespace is held through the entire dashboard load;
 directory replacement fails closed, and operator semantic counts must reconcile
 with exact market snapshot/anomaly rows. Raw anomaly scanner outputs appear as a
 separate scan-evidence table, never as synthetic Decision candidates or routes.
+When the server was started from the authoritative pointer, every GET/HEAD
+revalidates that the pointer still names the same namespace, run, revision, and
+operator-state digest; a changed or missing pointer returns an unavailable
+response rather than serving the formerly current generation.
+If any authority check fails, all current candidates, observations, anomalies,
+calendar rows, exact outcomes, request-ledger fields, source coverage, market
+generation fields, and current counts are centrally quarantined on every page.
+Historical campaign evidence remains separately labeled. A current artifact
+that fails its fingerprint is never reopened or demoted into cumulative history.
+
+External dashboard links accept only absolute HTTP(S) URLs with a hostname and
+no embedded username or password. Field-level return-unit metadata overrides a
+row-wide unit during rendering, and turnover ratios are converted explicitly to
+percent-points for charts; presentation never performs numeric guesswork.
 
 Artifact presence alone is not evidence of healthy-empty acquisition. A
 provider/layer may receive that status only from its exact current producer

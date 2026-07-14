@@ -99,9 +99,22 @@ def _smoke(artifact_base: Path, namespace: str, *, now: str | None = None) -> in
     if not snapshot.generation_authoritative:
         reasons = ",".join(snapshot.generation_authority_reasons) or "unknown"
         raise SystemExit(f"dashboard smoke failed: generation is not authoritative ({reasons})")
-    routes = ["/", "/anomalies", "/catalysts", "/fade-risk", "/calendar", "/health", "/feedback-outcomes"]
+    routes = [
+        "/",
+        "/market-radar",
+        "/ideas",
+        "/calendar",
+        "/health",
+        "/outcomes",
+        "/campaign-history",
+        "/anomalies",
+        "/catalysts",
+        "/fade-risk",
+        "/feedback-outcomes",
+    ]
     first_id = next((candidate_identifier(row) for row in snapshot.current_candidates if candidate_identifier(row)), "")
     if first_id:
+        routes.append(f"/ideas/{first_id}")
         routes.append(f"/candidate/{first_id}")
     for route in routes:
         response = render_dashboard_page(snapshot, route, include_diagnostics=True)

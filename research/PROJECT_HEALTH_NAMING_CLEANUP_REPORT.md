@@ -2,9 +2,9 @@
 
 Research artifact only. This static gate classifies remaining migration-era naming and does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-13T22:41:51.210024+00:00`
+- generated_at: `2026-07-14T00:23:35.276614+00:00`
 - status: `OK`
-- legacy_occurrences: `2366`
+- legacy_occurrences: `2378`
 - legacy_named_files_remaining: `0`
 - refactor_named_source_files_remaining: `0`
 - active_refactor_reports_remaining: `0`
@@ -20,13 +20,13 @@ Research artifact only. This static gate classifies remaining migration-era nami
 - CLI_backwards_compatibility_alias: `48`
 - accepted_exception: `703`
 - backwards_compatibility_alias: `15`
-- historical_artifact_semantics: `643`
+- historical_artifact_semantics: `649`
 - historical_reference_keep: `556`
-- test_fixture_name: `401`
+- test_fixture_name: `407`
 
 ## Action Counts
 
-- should_keep: `2366`
+- should_keep: `2378`
 
 ## Policy
 

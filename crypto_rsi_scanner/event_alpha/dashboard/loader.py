@@ -25,7 +25,7 @@ from ..radar.calendar import CalendarValidationError, UnifiedCalendarEvent
 from ..radar.decision_model import DECISION_MODEL_VERSION
 from ..radar.decision_model_surfaces import decision_model_values
 from .history import load_dashboard_history, read_unverified_json_object_bytes
-from .models import DashboardLoadError, DashboardSnapshot
+from .models import DashboardLoadError, DashboardSnapshot, build_dashboard_snapshot
 from .secure_reader import (
     AnchoredNamespaceReader,
     _DashboardNamespaceReadError,
@@ -231,14 +231,18 @@ def _load_once(
         current_rows
     )
 
-    integrated_outcomes_blob = blobs.get("integrated_outcomes")
+    exact_artifacts = {
+        name: {
+            "data": blob.data,
+            "fingerprint_kind": blob.fingerprint_kind,
+            "path_name": blob.path.name,
+        }
+        for name in ("market_history", "integrated_outcomes", "market_no_send_request_ledger")
+        if (blob := blobs.get(name)) is not None
+    }
     history = load_dashboard_history(
         namespace_dir,
-        integrated_outcomes_data=(
-            integrated_outcomes_blob.data
-            if integrated_outcomes_blob is not None
-            else None
-        ),
+        integrated_outcomes_data=None,
         now=now,
         namespace_reader=lambda path: _read_namespace_path(
             path,
@@ -246,7 +250,23 @@ def _load_once(
             reader=reader,
             blobs=blobs,
         ),
+        exact_artifacts=exact_artifacts,
+        identity=(run_id, profile, namespace),
+        current_artifact_names=_current_manifest_artifact_names(state),
     )
+    authority_reasons.extend(history["exact_support_authority_reasons"])
+    for artifact_name, metadata_name in (
+        ("market_history", "exact_market_history_metadata"),
+        ("integrated_outcomes", "current_outcomes_metadata"),
+        ("market_no_send_request_ledger", "current_request_ledger_metadata"),
+    ):
+        _check_optional_artifact_count(
+            state,
+            blobs=blobs,
+            artifact_name=artifact_name,
+            actual=int(history[metadata_name].get("source_row_count") or 0),
+            authority_reasons=authority_reasons,
+        )
 
     source_coverage = _current_manifest_json(
         blobs.get("source_coverage_json"),
@@ -302,7 +322,7 @@ def _load_once(
         )
     )
     authority_reasons = list(dict.fromkeys(authority_reasons))
-    return _build_dashboard_snapshot(
+    return build_dashboard_snapshot(
         namespace_dir,
         identity=(run_id, profile, namespace, revision),
         state=state,
@@ -311,6 +331,7 @@ def _load_once(
         authority_reasons=authority_reasons,
         current_rows=current_rows,
         current_metadata=(source_coverage, market_generation, provider_readiness),
+        exact_supporting_data=history,
         history=history,
         provider_health=(provider_health, provider_health_digest, provider_health_error),
     )
@@ -360,17 +381,9 @@ def _load_current_rows(
         actual=len(anomalies),
         authority_reasons=authority_reasons,
     )
-    source_cache = _current_manifest_json(
-        blobs.get("market_no_send_source_cache"),
-        "market_no_send_source_cache",
-        run_id=run_id,
-        profile=profile,
-        namespace=namespace,
-        authority_reasons=authority_reasons,
-    )
     snapshot_blob = blobs.get("market_state_snapshots")
-    observations = (
-        _current_generation_jsonl_rows(
+    if snapshot_blob is not None:
+        observations = _current_generation_jsonl_rows(
             snapshot_blob,
             "market_state_snapshots",
             row_type="event_market_state_snapshot",
@@ -380,12 +393,19 @@ def _load_current_rows(
             namespace=namespace,
             authority_reasons=authority_reasons,
         )
-        if snapshot_blob is not None
-        else _current_market_observation_rows(
+    else:
+        source_cache = _current_manifest_json(
+            blobs.get("market_no_send_source_cache"),
+            "market_no_send_source_cache",
+            run_id=run_id,
+            profile=profile,
+            namespace=namespace,
+            authority_reasons=authority_reasons,
+        )
+        observations = _current_market_observation_rows(
             source_cache,
             authority_reasons=authority_reasons,
         )
-    )
     _check_optional_artifact_count(
         state,
         blobs=blobs,
@@ -421,6 +441,17 @@ def _check_optional_artifact_count(
         authority_reasons.append(f"{artifact_name}:current_count_mismatch")
 
 
+def _current_manifest_artifact_names(state: Mapping[str, Any]) -> frozenset[str]:
+    artifacts = state.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        return frozenset()
+    return frozenset(
+        str(name)
+        for name, entry in artifacts.items()
+        if isinstance(entry, Mapping) and entry.get("status") == "current"
+    )
+
+
 def _read_namespace_path(
     path: Path,
     *,
@@ -441,61 +472,6 @@ def _read_namespace_path(
     if error == "artifact_symlink_not_allowed":
         return None, "artifact_unreadable_or_symlink"
     return data, error
-
-
-def _build_dashboard_snapshot(
-    namespace_dir: Path,
-    *,
-    identity: tuple[str, str, str, int],
-    state: Mapping[str, Any],
-    state_digest: str,
-    now: datetime,
-    authority_reasons: list[str],
-    current_rows: tuple[
-        tuple[dict[str, Any], ...],
-        tuple[dict[str, Any], ...],
-        tuple[dict[str, Any], ...],
-        tuple[dict[str, Any], ...],
-    ],
-    current_metadata: tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
-    history: Mapping[str, Any],
-    provider_health: tuple[Mapping[str, Any], str | None, str | None],
-) -> DashboardSnapshot:
-    run_id, profile, namespace, revision = identity
-    current_candidates, current_anomalies, current_observations, current_calendar = current_rows
-    source_coverage, market_generation, provider_readiness = current_metadata
-    health_values, health_digest, health_error = provider_health
-    doctor = state.get("doctor") if isinstance(state.get("doctor"), Mapping) else {}
-    return DashboardSnapshot(
-        namespace_dir=namespace_dir,
-        run_id=run_id,
-        profile=profile,
-        artifact_namespace=namespace,
-        revision=revision,
-        manifest_status=str(state.get("manifest_status") or "unknown"),
-        doctor_status=str(doctor.get("status") or "not_run"),
-        doctor_verified_revision=_optional_int(doctor.get("verified_revision")),
-        generation_authority_status=("authoritative" if not authority_reasons else "untrusted"),
-        generation_authority_reasons=tuple(authority_reasons),
-        generation_authority_checked_at=now.isoformat(),
-        operator_state_sha256=state_digest,
-        operator_state=state,
-        current_candidates=current_candidates,
-        current_market_anomalies=current_anomalies,
-        current_market_observations=current_observations,
-        current_calendar_events=tuple(dict(row) for row in current_calendar),
-        source_coverage=source_coverage,
-        market_generation=market_generation,
-        cumulative_feedback=history["feedback"],
-        cumulative_outcomes=history["outcomes"],
-        campaign_outcomes=history["campaign_outcomes"],
-        cumulative_history_metadata=history["metadata"],
-        provider_readiness=provider_readiness,
-        provider_health=health_values,
-        provider_health_read_at=now.isoformat() if health_digest else None,
-        provider_health_sha256=health_digest,
-        provider_health_error=health_error,
-    )
 
 
 def _namespace_dir(artifact_base_dir: str | Path, artifact_namespace: str) -> Path:
