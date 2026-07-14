@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-14 - Keep freshness expiry inspectable but non-authoritative
+**Status:** accepted
+**Decision:** A pointer-bound dashboard whose exact identity still matches but
+whose only authority loss is `generation:stale` and/or `doctor:stale` returns a
+full quarantined diagnostic shell with HTTP 503. System Health, historical
+Outcomes, and explicitly historical Run History remain inspectable, while every
+current artifact-derived row, field, count, detail route, and actionability
+claim stays centrally suppressed. HTTP 503 keeps private phone readiness fail-closed. Pointer,
+identity, fingerprint, schema, or integrity loss continues to return the minimal
+unavailable response. The six-hour current-generation limit is not raised.
+
+The one-hour campaign cadence is a minimum provider-safety interval, not a
+refresh scheduler. Recurring provider calls and dashboard restarts must not be
+installed without a separate explicit operator decision.
+**Why:** Freshness expiry is expected operational degradation, not evidence
+corruption. Keeping safe health and historical context visible makes recovery
+possible without presenting stale research as current or weakening the private
+access gate. A scheduler would materially broaden provider activity and must
+remain opt-in.
+**Revisit when:** The dashboard gains a separately reviewed dynamic-generation
+rebinding contract, or the owner explicitly authorizes a guarded recurring
+no-send maintainer.
+
 ## 2026-07-14 - Expose the dashboard to phones only through private tailnet HTTPS
 **Status:** accepted
 **Decision:** The Crypto Radar HTTP backend remains bound to loopback. Optional

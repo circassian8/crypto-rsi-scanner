@@ -47,7 +47,12 @@ def _bound_app(tmp_path: Path) -> tuple[Path, RadarDashboardApp]:
     return base, app
 
 
-def _request(app: RadarDashboardApp, *, method: str = "GET") -> tuple[str, str]:
+def _request(
+    app: RadarDashboardApp,
+    *,
+    method: str = "GET",
+    path: str = "/",
+) -> tuple[str, str]:
     captured: dict[str, object] = {}
 
     def start_response(status, _headers, _exc_info=None):
@@ -57,7 +62,7 @@ def _request(app: RadarDashboardApp, *, method: str = "GET") -> tuple[str, str]:
         app(
             {
                 "REQUEST_METHOD": method,
-                "PATH_INFO": "/",
+                "PATH_INFO": path,
                 "QUERY_STRING": "",
             },
             start_response,
@@ -165,6 +170,82 @@ def test_pointer_authority_timestamp_only_refresh_remains_allowed_and_read_only(
     assert (head_status, head_body) == ("200 OK", "")
     assert (base / CURRENT_NAMESPACE_POINTER).read_bytes() == refreshed_pointer
     assert _tree_hashes(namespace_dir) == namespace_before
+
+
+@pytest.mark.parametrize(
+    ("max_generation_age_hours", "max_doctor_age_hours", "expected_reason"),
+    (
+        (6.0, 12.0, "generation:stale"),
+        (12.0, 6.0, "doctor:stale"),
+        (6.0, 6.0, "generation:stale"),
+    ),
+)
+def test_pointer_bound_freshness_loss_serves_quarantined_shell_with_503(
+    tmp_path,
+    max_generation_age_hours,
+    max_doctor_age_hours,
+    expected_reason,
+):
+    base = _copy_fixture(tmp_path)
+    published = publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    app = RadarDashboardApp(
+        base,
+        published.snapshot.artifact_namespace,
+        now="2026-07-12T13:03:00+00:00",
+        max_generation_age_hours=max_generation_age_hours,
+        max_doctor_age_hours=max_doctor_age_hours,
+        generation_binding=DashboardGenerationBinding.from_snapshot(published.snapshot),
+    )
+
+    today_status, today_body = _request(app)
+    health_status, health_body = _request(app, path="/health")
+    outcomes_status, outcomes_body = _request(app, path="/outcomes")
+    feedback_status, feedback_body = _request(app, path="/feedback-outcomes")
+    history_status, history_body = _request(app, path="/campaign-history")
+    unknown_status, unknown_body = _request(app, path="/not-a-dashboard-route")
+
+    assert today_status == "503 Service Unavailable"
+    assert "UNTRUSTED CURRENT GENERATION" in today_body
+    assert expected_reason in today_body
+    assert "Current-generation research content is unavailable" in today_body
+    assert "Fresh high-liquidity breakout" not in today_body
+    assert "Dashboard unavailable" not in today_body
+    assert health_status == "503 Service Unavailable"
+    assert "System Health" in health_body
+    assert "UNTRUSTED CURRENT GENERATION" in health_body
+    assert "Fresh high-liquidity breakout" not in health_body
+    assert outcomes_status == "503 Service Unavailable"
+    assert "Historical campaign outcomes" in outcomes_body
+    assert "UNTRUSTED CURRENT GENERATION" in outcomes_body
+    assert "Fresh high-liquidity breakout" not in outcomes_body
+    assert feedback_status == "503 Service Unavailable"
+    assert "shared / non-authoritative" in feedback_body
+    assert "UNTRUSTED CURRENT GENERATION" in feedback_body
+    assert "Fresh high-liquidity breakout" not in feedback_body
+    assert history_status == "503 Service Unavailable"
+    assert "Run history" in history_body
+    assert "UNTRUSTED CURRENT GENERATION" in history_body
+    assert "Fresh high-liquidity breakout" not in history_body
+    assert unknown_status == "404 Not Found"
+    assert "Unknown dashboard page" in unknown_body
+    assert "UNTRUSTED CURRENT GENERATION" not in unknown_body
+
+
+def test_pointer_bound_integrity_loss_keeps_minimal_hard_error(tmp_path):
+    base, app = _bound_app(tmp_path)
+    brief_path = base / _FIXTURE_NAMESPACE / "event_alpha_daily_brief.md"
+    brief_path.write_text(
+        brief_path.read_text(encoding="utf-8") + "\nchanged after publication\n",
+        encoding="utf-8",
+    )
+
+    status, body = _request(app)
+
+    assert status == "503 Service Unavailable"
+    assert "Dashboard unavailable" in body
+    assert "daily_brief:fingerprint_content_mismatch:sha256" in body
+    assert "UNTRUSTED CURRENT GENERATION" not in body
+    assert "Fresh high-liquidity breakout" not in body
 
 
 def test_explicit_namespace_app_does_not_require_a_current_pointer(tmp_path):

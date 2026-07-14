@@ -651,6 +651,15 @@
         "revision",
         "operator_state_sha256"
       ],
+      "freshness_only_current_rows_suppressed": true,
+      "freshness_only_expiry_response": "quarantined_diagnostic_shell_http_503",
+      "freshness_only_shell_visible_sections": [
+        "System Health",
+        "Outcomes",
+        "Run History"
+      ],
+      "integrity_or_identity_failure_response": "minimal_unavailable_http_503",
+      "phone_access_requires_authoritative_http_200": true,
       "mismatch_fails_closed": true
     },
     "decision_preview_sections": [
@@ -669,7 +678,9 @@
   "temporal_market_baseline_policy": {
     "baseline_excludes_current_observation": true,
     "cadence_policy": {
+      "background_refresh_requires_explicit_operator_authorization": true,
       "default_minimum_observation_spacing_minutes": 60,
+      "minimum_spacing_is_scheduler": false,
       "next_eligible_observation_at_is_reported": true,
       "rapid_cycles_advance_warmup": false,
       "too_close_observations_are_retained": true,

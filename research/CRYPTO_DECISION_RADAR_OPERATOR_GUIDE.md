@@ -31,6 +31,33 @@ Readiness does not call providers. The live market command may make one bounded
 CoinGecko request only when the explicit authorization already exists and the
 campaign cadence is eligible; the dashboard never sets that authorization.
 
+### When a generation expires
+
+Current live generations remain authoritative for at most six hours. The
+campaign's 60-minute spacing is only the minimum interval between eligible
+observations; it does not schedule a refresh. When freshness alone expires, the
+browser keeps a quarantined diagnostic shell available under HTTP 503 so System
+Health, historical Outcomes, and clearly labeled Run History remain inspectable.
+Every current idea, market row, anomaly, calendar row, outcome, provider field,
+and current count is suppressed. Phone readiness continues to reject the backend
+because it is not authoritative. Pointer, identity, fingerprint, schema, and
+integrity failures remain a minimal unavailable response.
+
+Recover without weakening freshness or making an unapproved provider call:
+
+1. Run `make radar-market-no-send-readiness PYTHON=.venv/bin/python`.
+2. Only when it reports the already-authorized provider and cadence as eligible,
+   run `make radar-market-no-send PYTHON=.venv/bin/python`. The command may make
+   at most one bounded request and publishes only after a strict-clean run.
+3. Restart the pointer-bound dashboard so it binds the newly published exact
+   generation. For the installed local job, use
+   `launchctl kickstart -k "gui/$(id -u)/com.nasrenkaraf.crypto-radar-dashboard"`;
+   otherwise stop and rerun `make radar-dashboard PYTHON=.venv/bin/python`.
+
+There is no automatic campaign scheduler. Installing a recurring maintainer
+would authorize periodic provider calls and process restarts, so it remains a
+separate explicit operator decision.
+
 ## Private phone access
 
 Phone access uses Tailscale Serve as a private HTTPS proxy to the unchanged

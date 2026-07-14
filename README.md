@@ -11,13 +11,21 @@ History; see the [operator guide](research/CRYPTO_DECISION_RADAR_OPERATOR_GUIDE.
 It reads the exact run/revision manifest and local
 artifacts only. Current research appears only when exact file/tree/run-row
 fingerprints, the immutable run age, and a fresh strict doctor for the same
-revision all agree; otherwise current pages are suppressed while Health and
-clearly labeled cumulative history remain available. It does not call
-providers, send notifications, trade, paper
+revision all agree. A freshness-only expiry keeps the full diagnostic shell
+available under HTTP 503, with every current row suppressed and only Health,
+Outcomes, and clearly labeled Run History available; identity, pointer, fingerprint,
+schema, or integrity failures remain a minimal unavailable response. It does
+not call providers, send notifications, trade, paper
 trade, write normal RSI rows, or create `TRIGGERED_FADE`. Run
 `make radar-dashboard-smoke` for the deterministic fixture/no-write render gate
 and `make radar-dashboard-ux-smoke` for primary-page semantic and responsive
 contracts.
+
+Live generations expire after six hours. The campaign's 60-minute observation
+spacing is a provider-safety minimum, not an automatic refresh schedule. Use
+`make radar-market-no-send-readiness PYTHON=.venv/bin/python` before any refresh;
+after a strict-clean generation publishes a new pointer, restart the
+pointer-bound dashboard process so it binds the new exact generation.
 
 ### Private phone access
 

@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-14 — Restore the dashboard and keep freshness expiry inspectable · Codex
+**Why:** The authoritative live generation crossed its six-hour age limit, so
+the pointer-bound server correctly returned HTTP 503 but reduced the entire
+operator surface to an unhelpful one-line error. The one-hour campaign cadence
+was a minimum interval, not an automatic refresh schedule.
+**Changes:**
+- Ran one already-authorized, cadence-eligible CoinGecko no-send observation and
+  published strict-clean namespace `radar_market_no_send_20260714t163300z` at
+  revision 12. It contains 80 bounded provider rows, 30 selected market
+  observations, zero anomalies/ideas, and zero sends, trades, paper trades,
+  normal RSI writes, or `TRIGGERED_FADE` creation. Restarted the owned local
+  dashboard job against the new exact pointer; loopback serving is HTTP 200.
+- Changed pointer-bound serving so freshness-only authority loss
+  (`generation:stale` and/or `doctor:stale`) renders the complete quarantined
+  diagnostic shell under HTTP 503. System Health plus labeled historical
+  Outcomes and Run History remain inspectable, all current artifact-derived
+  content stays suppressed, and phone readiness remains fail-closed. Identity,
+  pointer, fingerprint, schema, and integrity failures still use the minimal
+  unavailable response.
+- Added regressions for generation, doctor, and combined staleness plus the hard
+  integrity-failure boundary. Updated the README, operator guide, Decision Radar
+  North Star Markdown/JSON, `ROADMAP.md`, and `DECISIONS.md`; recurring provider
+  maintenance remains an explicit human decision rather than a silent install.
+- Refreshed the artifact-derived campaign report: six countable cycles, 180
+  retained/150 baseline-counting observations across 33 assets, two historical
+  `risk_watch` ideas, one pending and one matured outcome, and zero trusted
+  spread observations.
+**Verify:** Focused pointer/readiness/phone/dashboard tests passed 134/134.
+Compileall, both North Star/campaign JSON parses, and `git diff --check` passed.
+Dashboard smoke rendered 13 pages with zero writes; UX smoke rendered eight
+primary pages with zero writes. The live dashboard returned HTTP 200 on the new
+namespace after restart, and private phone status remained safely disabled.
+**Notes/risks:** Full `make verify` was not repeated because this is a localized
+serving/status change and the focused dashboard boundaries plus offline render
+smokes cover the touched risk. No automatic campaign scheduler is installed;
+after six hours without a new strict-clean generation, the UI will enter the
+new diagnostic-only HTTP 503 state instead of showing stale research as current.
+
 ## 2026-07-14 — Add private tailnet phone access to the Decision Radar · Codex
 **Why:** The owner needs to open the local dashboard from a phone without
 publishing research artifacts to the LAN or internet, weakening the existing

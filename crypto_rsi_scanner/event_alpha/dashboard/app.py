@@ -16,6 +16,7 @@ from .render import render_dashboard_page
 
 
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
+_FRESHNESS_ONLY_AUTHORITY_REASONS = frozenset({"generation:stale", "doctor:stale"})
 
 
 class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
@@ -115,6 +116,12 @@ def _render_dashboard_request(
         include_diagnostics=include_diagnostics,
         query={key: str(values[0]) for key, values in query.items() if values},
     )
+    if (
+        app.generation_binding is not None
+        and _is_freshness_only_authority_loss(snapshot)
+        and rendered.status_code != 404
+    ):
+        return "503 Service Unavailable", rendered.body.encode("utf-8")
     return f"{rendered.status_code} {rendered.reason}", rendered.body.encode("utf-8")
 
 
@@ -217,12 +224,17 @@ def _require_generation_binding(
             "dashboard pointer generation changed after startup; "
             f"refusing request (mismatched {fields})"
         )
-    if not snapshot.generation_authoritative:
+    if not snapshot.generation_authoritative and not _is_freshness_only_authority_loss(snapshot):
         reasons = ",".join(snapshot.generation_authority_reasons[:6]) or "unknown"
         raise DashboardLoadError(
             "dashboard pointer generation is no longer authoritative; "
             f"refusing request ({reasons})"
         )
+
+
+def _is_freshness_only_authority_loss(snapshot: DashboardSnapshot) -> bool:
+    reasons = frozenset(snapshot.generation_authority_reasons)
+    return bool(reasons) and reasons <= _FRESHNESS_ONLY_AUTHORITY_REASONS
 
 
 def _require_current_pointer_binding(

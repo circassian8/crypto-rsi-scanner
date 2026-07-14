@@ -305,6 +305,13 @@ When the server was started from the authoritative pointer, every GET/HEAD
 revalidates that the pointer still names the same namespace, run, revision, and
 operator-state digest; a changed or missing pointer returns an unavailable
 response rather than serving the formerly current generation.
+Freshness-only loss is a distinct degraded state: while the same exact pointer
+binding still matches, the server returns HTTP 503 with a quarantined diagnostic
+shell so System Health, historical Outcomes, and explicitly historical Run
+History remain inspectable. All current rows and fields stay suppressed, and
+private phone readiness still fails closed. Identity, pointer, fingerprint,
+schema, or integrity loss retains the minimal unavailable response rather than
+rendering artifact content.
 If any authority check fails, all current candidates, observations, anomalies,
 calendar rows, exact outcomes, request-ledger fields, source coverage, market
 generation fields, and current counts are centrally quarantined on every page.
