@@ -16,11 +16,50 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-14 - Keep operator hierarchy current-first, route-aware, and density-adaptive
+**Status:** accepted
+**Decision:** Dashboard presentation must lead with the smallest truthful answer
+to the operator's current question, then disclose supporting evidence on demand.
+Today names a sole specialist route such as `risk_watch` instead of overstating
+every visible row as a generic actionable idea. Current attention, active
+scheduled risk, actionability constraints, and exact coverage precede expired,
+historical, diagnostic, compatibility, and technical material.
+
+Market anomaly evidence and canonical Decision routes remain distinct but are
+visibly connected by exact asset identity. The observed move leads; unavailable
+scanner strength is secondary metadata, never the dominant claim. Raw provider
+slugs and full run identities remain available in context/provenance disclosures
+instead of competing with symbols and current-run labels. A one-row idea set
+does not offer a comparison matrix. Active calendar windows lead upcoming dates;
+past events remain collapsed. Trader-facing status uses `Integrity checks` and
+`Validation passed`; strict-doctor terminology remains in exact technical
+contracts.
+
+Responsive density is part of the product contract: wide screens use compact
+comparison tables; common laptop widths use balanced cards or two-column market
+rows; phone layouts preserve readable score labels, touch targets, no horizontal
+overflow, and a compact masthead without hiding the research-only, human-decision,
+no-execution statement. Missing, unavailable, suppressed, not configured, stale,
+and healthy-empty states remain visually distinct and are never converted to
+zero merely for layout convenience. Missing boolean receipt fields render as
+`Not recorded`, never as an inferred `No`. Every relative time on an exact-run
+page is computed from `generation_authority_checked_at`, so fixture, replay, and
+live surfaces share one deterministic read clock. All visible route names come
+from one operator-label projection; the canonical route tokens remain unchanged.
+**Why:** Repeated desktop and mobile renders showed that correct data could still
+feel illogical when generic counts, internal jargon, unavailable metrics, raw
+identifiers, or secondary history dominated the first viewport. This hierarchy
+makes the exact same canonical evidence faster to interpret without changing any
+Decision v2 score, route, safety gate, provider policy, or artifact authority.
+**Revisit when:** Measured operator research shows a different hierarchy is
+faster while preserving the same exact-generation, presentation-only,
+fail-closed, accessible, no-send/no-trade contracts.
+
 ## 2026-07-14 - Treat the dashboard as a seven-page decision terminal
 **Status:** accepted
 **Decision:** The primary Crypto Decision Radar interface is a server-rendered,
 loopback-only seven-page operator terminal: Today, Market Radar, Ideas,
-Calendar, System Health, Outcomes & Learning, and Campaign History. These pages
+Calendar, System Health, Outcomes & Learning, and Run History. These pages
 organize human attention rather than mirror artifact filenames. Historical
 compatibility routes remain available but do not compete in primary navigation.
 

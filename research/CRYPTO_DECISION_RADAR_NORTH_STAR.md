@@ -208,14 +208,22 @@ classification appears second as explicitly labeled compatibility context.
 
 Operator Experience V1 organizes the dashboard around seven primary pages:
 Today, Market Radar, Ideas, Calendar, System Health, Outcomes & Learning, and
-Campaign History. Today prioritizes current attention and constraints; Market
+Run History. Today prioritizes current attention and constraints; Market
 Radar explains the bounded provider-to-decision funnel; Ideas and Idea Detail
 render the canonical Decision v2 projection; Calendar preserves certainty and
 coverage; System Health separates failures from disabled, unselected,
 unconfigured, and warming states; Outcomes separates exact-current placeholders
-from historical learning; and Campaign History shows bounded immutable attempts
+from historical learning; and Run History shows bounded immutable attempts
 without granting them current authority. Historical compatibility routes remain
 available but are not primary navigation.
+
+The hierarchy is current-first and route-aware. A sole risk watch is named as a
+risk watch rather than a generic actionable idea; active scheduled windows lead
+future and past events; observed anomaly moves lead unavailable secondary
+strength fields; raw provider IDs, full run identities, expired rows, diagnostic
+controls, historical samples, and technical contracts remain available behind
+clearly labeled disclosures. Comparison controls appear only when comparison is
+possible.
 
 Presentation is render-only. One formatting layer translates timestamps into
 operator-local relative and calendar labels while retaining exact UTC in
@@ -224,6 +232,12 @@ consistently, and uses `Unavailable` instead of inventing missing values.
 Uncertain calendar dates remain windows or date-only labels. Scores are shown as
 scores and bands: actionability is not win probability, evidence confidence is
 not expected return, and risk is never reversed into a quality score.
+
+Every exact-run relative timestamp uses the generation authority check as its
+single read clock. Missing receipt booleans remain tri-state and display as
+`Not recorded`; they are never collapsed into `No`. One operator-label
+projection names all canonical routes consistently while preserving their
+stored route tokens and routing behavior.
 
 The interface is server-rendered, loopback-only, responsive from wide desktop to
 narrow mobile, keyboard navigable, and usable without JavaScript. Semantic

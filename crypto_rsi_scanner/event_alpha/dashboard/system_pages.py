@@ -1,4 +1,4 @@
-"""Operator Experience V1 health, learning, and campaign-history pages."""
+"""Compatibility exports for dashboard health, outcomes, and campaign pages."""
 
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from .components import (
 from .layer_coverage import (
     DashboardLayerCoverage,
     dashboard_layer_coverage,
-    dashboard_layer_coverage_by_key,
 )
 from .models import DashboardSnapshot
+from .outcomes_page import render_outcomes_page
 from .presentation import (
     UNAVAILABLE,
     format_duration,
@@ -39,28 +39,9 @@ from .system_page_support import (
     render_metric_grid as _metric_grid,
     render_page_intro as _page_intro,
     render_panel as _panel,
+    render_validation_badge as _validation_badge,
     summarize_market_quality as _quality_summary,
 )
-
-
-_MATURED_OUTCOME_STATES = {
-    "complete",
-    "completed",
-    "filled",
-    "graded",
-    "mature",
-    "matured",
-    "resolved",
-}
-_PENDING_OUTCOME_STATES = {
-    "",
-    "awaiting_data",
-    "awaiting_horizon",
-    "open",
-    "pending",
-    "scheduled",
-}
-
 
 def render_health_page(snapshot: DashboardSnapshot) -> str:
     """Render exact trust, provider, acquisition, and quality state."""
@@ -80,26 +61,26 @@ def render_health_page(snapshot: DashboardSnapshot) -> str:
     coverage_by_key = {row.key: row for row in coverage}
     layer_gaps = sum(1 for row in coverage if row.action_required)
     status_tone = "positive" if snapshot.generation_authoritative else "danger"
+    integrity_status = (
+        "Passed"
+        if snapshot.doctor_status.casefold() == "ok"
+        else humanize_enum(snapshot.doctor_status)
+    )
     metrics = (
         ("Current authority", humanize_enum(snapshot.generation_authority_status), status_tone),
-        ("Strict doctor", humanize_enum(snapshot.doctor_status), _status_tone(snapshot.doctor_status)),
-        ("Layer gaps", str(layer_gaps), "warning" if layer_gaps else "positive"),
-        ("Actual failures", str(failures), "danger" if failures else "positive"),
-        ("Disabled / not selected", str(disabled), "muted"),
-        ("Missing setup", str(missing), "warning" if missing else "positive"),
-        (
-            "Market observations",
-            str(len(rows)) if snapshot.generation_authoritative else "Suppressed",
-            "info" if snapshot.generation_authoritative else "danger",
-        ),
+        ("Integrity checks", integrity_status, _status_tone(snapshot.doctor_status)),
+        ("Provider failures", str(failures), "danger" if failures else "positive"),
+        ("Coverage gaps", str(layer_gaps), "warning" if layer_gaps else "positive"),
     )
     return (
         _page_intro(
-            "System Health",
+            "Trust and evidence status",
             "Exact run trust, provider state, acquisition evidence, and data-quality constraints.",
             "Current-generation evidence",
         )
+        + '<div class="health-metrics">'
         + _metric_grid(metrics)
+        + '</div>'
         + _health_action_summary(
             snapshot,
             failures=failures,
@@ -110,126 +91,49 @@ def render_health_page(snapshot: DashboardSnapshot) -> str:
         )
         + _current_contract(snapshot)
         + _layer_coverage_section(coverage)
-        + _provider_readiness_section(providers)
+        + _provider_readiness_section(
+            providers,
+            now=snapshot.generation_authority_checked_at,
+        )
         + _request_ledger_section(snapshot, coverage_by_key["request_ledger"])
-        + _market_quality_section(snapshot, quality)
         + _source_coverage_section(snapshot)
+        + _market_quality_section(snapshot, quality)
         + _historical_provider_health(snapshot)
         + _technical_health_details(snapshot)
     )
 
 
-def render_outcomes_page(
-    snapshot: DashboardSnapshot,
-    query: Mapping[str, str] | None,
-) -> str:
-    """Render exact outcome placeholders separately from historical learning."""
 
-    filters = _outcome_filters(query)
-    current = tuple(snapshot.current_outcomes)
-    historical = _historical_outcomes(snapshot)
-    filtered_current = _filter_outcomes(current, filters)
-    filtered_history = _filter_outcomes(
-        tuple(row for row, _source in historical),
-        filters,
-    )
-    history_sources = {
-        _outcome_key(row): source for row, source in historical
-    }
-    current_counts = _outcome_counts(current)
-    historical_counts = _outcome_counts(tuple(row for row, _source in historical))
-    current_matured = current_counts["matured"]
-    history_matured = historical_counts["matured"]
-    outcome_layer = dashboard_layer_coverage_by_key(snapshot)["outcomes"]
-    outcome_authority = str(snapshot.current_outcomes_metadata.get("authority") or "").strip()
-    outcome_authority_label = (
-        humanize_enum(outcome_authority)
-        if outcome_authority
-        else humanize_enum(outcome_layer.status)
-    )
-    current_value = str(len(current)) if snapshot.generation_authoritative else "Suppressed"
-    metrics = (
-        ("Current ideas tracked", current_value, "info" if snapshot.generation_authoritative else "danger"),
-        (
-            "Current outcome coverage",
-            humanize_enum(outcome_layer.status),
-            _coverage_tone(outcome_layer.status),
-        ),
-        (
-            "Current pending",
-            str(current_counts["pending"]) if snapshot.generation_authoritative else "Suppressed",
-            "warning" if snapshot.generation_authoritative else "danger",
-        ),
-        (
-            "Current matured",
-            str(current_matured) if snapshot.generation_authoritative else "Suppressed",
-            "positive" if current_matured and snapshot.generation_authoritative else "muted",
-        ),
-        ("Historical rows", str(len(historical)), "neutral"),
-        ("Historical matured", str(history_matured), "positive" if history_matured else "muted"),
-        ("Optional feedback", str(len(snapshot.cumulative_feedback)), "info"),
-    )
-    sections: list[str] = [
-        _page_intro(
-            "Outcomes & Learning",
-            "Pending ideas, matured observations, and score cohorts. Evidence confidence is not win probability.",
-            "Research-only learning loop",
-        ),
-        _metric_grid(metrics),
-        _outcome_filter_form(filters),
-    ]
-    if not snapshot.generation_authoritative:
-        sections.append(
-            _panel(
-                "Current outcome rows suppressed",
-                (
-                    "Current outcome rows are unavailable because generation authority "
-                    "did not pass. Historical campaign rows remain separately labeled context."
-                ),
-                eyebrow="Fail-closed authority",
-            )
-        )
-    else:
-        sections.append(_sample_warning(current_matured, scope="exact current generation"))
-    if snapshot.generation_authoritative and filters["scope"] in {"all", "current"}:
-        sections.append(
-            _outcome_section(
-                "Exact current-generation outcomes",
-                (
-                    "Fingerprint-verified placeholders and outcomes for this run only; the coverage badge still reports count or contract gaps."
-                    if outcome_authority == "current_generation_fingerprint_verified"
-                    and snapshot.current_outcomes_metadata.get("sha256")
-                    else "Exact current-generation outcome coverage; unavailable or rejected data is never presented as verified."
-                ),
-                filtered_current,
-                source_labels=None,
-                empty_message=_current_outcome_empty_message(
-                    current=current,
-                    filtered_current=filtered_current,
-                    layer=outcome_layer,
-                ),
-                authority=outcome_authority_label,
-            )
-        )
-    if filters["scope"] in {"all", "historical"}:
-        sections.extend(
-            (
-                _sample_warning(history_matured, scope="historical campaign"),
-                _outcome_section(
-                    "Historical campaign outcomes",
-                    (
-                        "Historical / non-authoritative for the current generation. These rows "
-                        "support learning but never alter current visibility or thresholds."
-                    ),
-                    filtered_history,
-                    source_labels=history_sources,
-                    empty_message="No historical outcome rows match these filters.",
-                    authority="Historical / non-authoritative",
-                ),
-            )
-        )
-    sections.extend((_cohort_summary(current, historical), _feedback_summary(snapshot)))
-    return "".join(sections)
+
+def _operator_coverage_label(value: object) -> str:
+    token = str(value or "").strip().casefold()
+    return {
+        "healthy_nonempty": "Complete",
+        "healthy_empty": "Complete · empty",
+        "degraded": "Incomplete",
+        "not_configured": "Not configured",
+        "not_applicable": "Not applicable",
+    }.get(token, humanize_enum(value))
+
+
+def _boolean_badge(
+    value: object,
+    *,
+    false_tone: str = "muted",
+) -> HtmlFragment:
+    if value is True:
+        return badge("Yes", tone="positive")
+    if value is False:
+        return badge("No", tone=false_tone)
+    return badge("Not recorded", tone="neutral")
+
+
+def _no_send_enforced_badge(send_attempted: object) -> HtmlFragment:
+    if send_attempted is False:
+        return badge("Yes", tone="positive")
+    if send_attempted is True:
+        return badge("No", tone="danger")
+    return badge("Not recorded", tone="neutral")
 
 
 def _health_action_summary(
@@ -241,76 +145,168 @@ def _health_action_summary(
     quality: Mapping[str, int],
     coverage: tuple[DashboardLayerCoverage, ...],
 ) -> str:
-    items: list[tuple[str, str, str]] = []
+    items: list[tuple[str, str, str, str]] = []
     if not snapshot.generation_authoritative:
         items.append((
             "Current generation is not authoritative",
             "Pointer, manifest, exact-artifact, or strict-doctor authority checks did not pass.",
             "danger",
+            "#exact-generation",
         ))
     if snapshot.doctor_status.casefold() != "ok":
         items.append((
-            "Strict doctor requires attention",
-            f"The exact strict-doctor state is {humanize_enum(snapshot.doctor_status)}.",
+            "Integrity checks require attention",
+            f"The exact run-integrity state is {humanize_enum(snapshot.doctor_status)}.",
             "danger" if snapshot.doctor_status.casefold() not in {"warn", "warning"} else "warning",
+            "#exact-generation",
         ))
     if failures:
         items.append((
             "Actual provider failures need review",
             f"{failures} provider state{'s' if failures != 1 else ''} record a failure, degraded response, or backoff.",
             "danger",
+            "#provider-readiness",
         ))
     if missing:
         items.append((
             "Configuration or authorization is missing",
             f"{missing} provider state{'s' if missing != 1 else ''} cannot be selected until explicit setup exists.",
             "warning",
+            "#provider-readiness",
         ))
     if disabled:
         items.append((
             "Disabled providers are not failures",
             f"{disabled} provider state{'s' if disabled != 1 else ''} were disabled or not selected; no request was expected.",
             "muted",
+            "#provider-readiness",
         ))
     if quality["warming"] or quality["cold"]:
         items.append((
             "Temporal evidence is still warming",
             f"{quality['warming']} warming and {quality['cold']} cold assets are retained without being presented as mature.",
             "warning",
+            "#market-quality",
         ))
     if snapshot.current_market_observations and not quality["spread"]:
         items.append((
             "Spread evidence is unavailable",
             "No current asset has verified execution spread, so actionable execution-quality claims remain capped.",
             "warning",
+            "#market-quality",
         ))
+    coverage_items: list[tuple[str, str, str, str]] = []
     for layer in coverage:
         if not layer.action_required:
             continue
-        items.append((
+        coverage_items.append((
             _coverage_action_title(layer),
             layer.detail,
             _coverage_tone(layer.status),
+            _coverage_action_href(layer),
         ))
+    items.extend(coverage_items)
     if not items:
         items.append((
             "No action-required health constraint",
             "Authority, strict doctor, provider acquisition, current quality, and every expected product layer are healthy or explicitly not applicable.",
             "positive",
+            "#exact-generation",
         ))
-    body = "".join(
-        '<article class="health-action">'
-        f"{badge(title, tone=tone)}<p>{escape_html(detail)}</p></article>"
-        for title, detail, tone in items
+    groups = (
+        ("blocking", "Blocking issues", {"danger"}),
+        ("attention", "Constraints and setup", {"warning"}),
+        ("context", "Expected or informational", {"muted"}),
+        ("clear", "All clear", {"positive"}),
     )
-    return _panel("Operator action summary", body, eyebrow="What needs attention")
+    grouped = []
+    for key, label, tones in groups:
+        group_items = tuple(item for item in items if item[2] in tones)
+        if not group_items:
+            continue
+        visible_limit = 3 if key == "attention" else len(group_items)
+        visible_items = group_items[:visible_limit]
+        remaining_items = group_items[visible_limit:]
+        content = "".join(_health_action_link(*item) for item in visible_items)
+        if remaining_items:
+            remainder = "".join(_health_action_link(*item) for item in remaining_items)
+            count = len(remaining_items)
+            remaining_are_coverage = all(item in coverage_items for item in remaining_items)
+            overflow_label = (
+                f"Show all {count} product-layer gap{'s' if count != 1 else ''}"
+                if remaining_are_coverage
+                else f"Show {count} additional check{'s' if count != 1 else ''}"
+            )
+            content += (
+                '<details class="disclosure health-action-overflow"><summary>'
+                f'{escape_html(overflow_label)}'
+                f'</summary><div class="disclosure__body">{remainder}</div></details>'
+            )
+        grouped.append(
+            f'<div class="health-action-group health-action-group--{key}" role="group" '
+            f'aria-labelledby="health-action-{key}"><h3 id="health-action-{key}">'
+            f'{escape_html(label)}</h3>{content}</div>'
+        )
+    body = '<div class="health-action-groups">' + "".join(grouped) + "</div>"
+    return _health_detail_panel(
+        "Operator action summary",
+        body,
+        eyebrow="What needs attention",
+        anchor="operator-action-summary",
+    )
+
+
+def _health_action_link(title: str, detail: str, tone: str, href: str) -> str:
+    symbol = {"positive": "✓", "muted": "i"}.get(tone, "!")
+    return (
+        f'<a class="health-action" href="{escape_html(href)}" '
+        f'data-tone="{escape_html(tone)}">'
+        f'<span class="health-action__icon" aria-hidden="true">{symbol}</span>'
+        '<span class="health-action__copy">'
+        f'<strong>{escape_html(title)}</strong><p>{escape_html(detail)}</p></span>'
+        '<b class="health-action__arrow" aria-hidden="true">→</b></a>'
+    )
+
+
+def _health_detail_panel(
+    title: str,
+    body: str,
+    *,
+    eyebrow: str,
+    anchor: str | None = None,
+) -> str:
+    anchor_attr = f' id="{escape_html(anchor)}"' if anchor else ""
+    return (
+        f'<section class="panel health-detail-panel"{anchor_attr}>'
+        '<div class="section-heading"><div>'
+        f'<p class="eyebrow">{escape_html(eyebrow)}</p>'
+        f'<h2>{escape_html(title)}</h2></div></div>{body}</section>'
+    )
+
+
+def _health_disclosure(
+    label: str,
+    body: str,
+    *,
+    summary: str,
+) -> str:
+    return str(disclosure(
+        label,
+        HtmlFragment(body),
+        summary=summary,
+        css_class="health-detail-disclosure",
+    ))
 
 
 def _current_contract(snapshot: DashboardSnapshot) -> str:
     state = snapshot.operator_state
-    checked = time_element(present_time(snapshot.generation_authority_checked_at))
+    clock = snapshot.generation_authority_checked_at
+    checked = time_element(present_time(clock, now=clock))
     generated = time_element(
-        present_time(state.get("generated_at") or state.get("run_started_at"))
+        present_time(
+            state.get("generated_at") or state.get("run_started_at"),
+            now=clock,
+        )
     )
     doctor_revision = (
         snapshot.doctor_verified_revision
@@ -327,8 +323,8 @@ def _current_contract(snapshot: DashboardSnapshot) -> str:
         ("Manifest", badge(snapshot.manifest_status)),
         ("Authority checked", checked),
         ("Generation started", generated),
-        ("Research only", badge(state.get("research_only") is True)),
-        ("No-send enforced", badge(state.get("send_attempted") is False)),
+        ("Research only", _boolean_badge(state.get("research_only"), false_tone="danger")),
+        ("No-send enforced", _no_send_enforced_badge(state.get("send_attempted"))),
     )
     reasons = ""
     if snapshot.generation_authority_reasons:
@@ -340,10 +336,25 @@ def _current_contract(snapshot: DashboardSnapshot) -> str:
             )
             + "</ul></div>"
         )
-    return _panel(
+    summary = (
+        f"{humanize_enum(snapshot.generation_authority_status)} · "
+        f"doctor {humanize_enum(snapshot.doctor_status).casefold()}"
+    )
+    overview = (
+        '<div class="chip-row" aria-label="Generation trust summary">'
+        f'{badge(snapshot.generation_authority_status)}{_validation_badge(snapshot.doctor_status)}</div>'
+    )
+    return _health_detail_panel(
         "Exact operator generation",
-        str(definition_list(values, css_class="definition-grid")) + reasons,
+        overview
+        + reasons
+        + _health_disclosure(
+            "View exact generation contract",
+            str(definition_list(values, css_class="definition-grid")),
+            summary=summary,
+        ),
         eyebrow="Pointer-bound truth",
+        anchor="exact-generation",
     )
 
 
@@ -360,8 +371,13 @@ def _layer_coverage_section(
         )
         for layer in coverage
     ]
-    return _panel(
-        "Product-layer coverage",
+    gaps = sum(1 for layer in coverage if layer.action_required)
+    overview = (
+        f"{gaps} of {len(coverage)} expected product layers require attention."
+        if gaps
+        else f"All {len(coverage)} expected product layers are healthy or explicitly not applicable."
+    )
+    table = (
         str(
             data_table(
                 ("Layer", "State", "Contract", "Rows", "Meaning"),
@@ -374,8 +390,18 @@ def _layer_coverage_section(
             '<p class="muted">Healthy empty means the configured exact layer was observed and '
             "returned zero rows. Missing, unavailable, stale, or rejected coverage never means "
             "nothing exists.</p>"
+        )
+    )
+    return _health_detail_panel(
+        "Product-layer coverage",
+        f'<p class="health-detail-summary">{escape_html(overview)}</p>'
+        + _health_disclosure(
+            "View product-layer coverage table",
+            table,
+            summary=f"{len(coverage)} layers · {gaps} gaps",
         ),
         eyebrow="One coverage contract",
+        anchor="product-layer-coverage",
     )
 
 
@@ -385,6 +411,14 @@ def _coverage_action_title(layer: DashboardLayerCoverage) -> str:
     if layer.key == "calendar" and layer.status == "not_configured":
         return "Calendar acquisition not configured"
     return f"{layer.label} {humanize_enum(layer.status).casefold()}"
+
+
+def _coverage_action_href(layer: DashboardLayerCoverage) -> str:
+    if layer.key == "request_ledger":
+        return "#provider-request"
+    if layer.key == "market":
+        return "#market-quality"
+    return "#product-layer-coverage"
 
 
 def _coverage_tone(status: str) -> str:
@@ -399,6 +433,8 @@ def _coverage_tone(status: str) -> str:
 
 def _provider_readiness_section(
     providers: tuple[Mapping[str, Any], ...],
+    *,
+    now: object = None,
 ) -> str:
     rows: list[tuple[object, ...]] = []
     for item in providers:
@@ -407,7 +443,8 @@ def _provider_readiness_section(
         last = present_time(
             item.get("last_success_at")
             or item.get("last_success")
-            or item.get("latest_rehearsal_generated_at")
+            or item.get("latest_rehearsal_generated_at"),
+            now=now,
         )
         last_label: object = time_element(last, primary="relative") if last.available else UNAVAILABLE
         rows.append((
@@ -422,11 +459,31 @@ def _provider_readiness_section(
         caption="Exact-generation provider readiness",
         empty="No provider-readiness rows are attached to this exact generation.",
     )
-    return _panel(
+    assessments = tuple(_provider_assessment(item) for item in providers)
+    failures = sum(1 for _label, tone, _detail in assessments if tone == "danger")
+    setup_gaps = sum(
+        1
+        for label, _tone, _detail in assessments
+        if label in {"Authorization missing", "Not configured"}
+    )
+    disabled = sum(1 for label, _tone, _detail in assessments if label == "Disabled / not selected")
+    overview = (
+        f"{len(providers)} provider states: {failures} failures, "
+        f"{setup_gaps} setup gaps, {disabled} disabled or not selected."
+    )
+    detail = str(table) + (
+        '<p class="muted">Disabled, not selected, and missing authorization are setup states—not request failures.</p>'
+    )
+    return _health_detail_panel(
         "Provider readiness",
-        str(table)
-        + '<p class="muted">Disabled, not selected, and missing authorization are setup states—not request failures.</p>',
+        f'<p class="health-detail-summary">{escape_html(overview)}</p>'
+        + _health_disclosure(
+            "View provider readiness table",
+            detail,
+            summary=f"{len(providers)} providers · {failures} failures",
+        ),
         eyebrow="Expected vs failed",
+        anchor="provider-readiness",
     )
 
 
@@ -444,13 +501,17 @@ def _request_ledger_section(
             f"Exact request ledger {humanize_enum(coverage.status).casefold()}",
             detail,
         )
-        return _panel(
+        return _health_detail_panel(
             "Provider request",
             str(badge(coverage.status, tone=_coverage_tone(coverage.status))) + str(body),
             eyebrow="Exact acquisition evidence",
+            anchor="provider-request",
         )
-    start = time_element(present_time(ledger.get("request_started_at")))
-    end = time_element(present_time(ledger.get("request_ended_at")))
+    clock = snapshot.generation_authority_checked_at
+    start = time_element(
+        present_time(ledger.get("request_started_at"), now=clock)
+    )
+    end = time_element(present_time(ledger.get("request_ended_at"), now=clock))
     duration = format_duration(
         _duration_seconds(ledger.get("duration_ms"), milliseconds=True)
     )
@@ -458,9 +519,15 @@ def _request_ledger_section(
     http_label = f"HTTP {http}" if http not in (None, "") else UNAVAILABLE
     values = (
         ("Provider", humanize_enum(ledger.get("provider"))),
-        ("Authorization present", badge(ledger.get("live_provider_authorized") is True)),
-        ("Provider call attempted", badge(ledger.get("provider_call_attempted") is True)),
-        ("Request succeeded", badge(ledger.get("provider_request_succeeded") is True)),
+        (
+            "Authorization present",
+            _boolean_badge(ledger.get("live_provider_authorized"), false_tone="warning"),
+        ),
+        ("Provider call attempted", _boolean_badge(ledger.get("provider_call_attempted"))),
+        (
+            "Request succeeded",
+            _boolean_badge(ledger.get("provider_request_succeeded"), false_tone="danger"),
+        ),
         ("Response", http_label),
         ("Request started", start),
         ("Request ended", end),
@@ -469,7 +536,7 @@ def _request_ledger_section(
         ("Retries", _count(ledger.get("retry_count"))),
         ("Cache behavior", humanize_enum(ledger.get("cache_behavior") or ledger.get("cache_status"))),
         ("Data mode", humanize_enum(ledger.get("candidate_source_mode") or ledger.get("data_mode"))),
-        ("No-send", badge(ledger.get("no_send") is True)),
+        ("No-send", _boolean_badge(ledger.get("no_send"), false_tone="danger")),
         ("Side effects", _side_effect_summary(ledger)),
     )
     failure = ""
@@ -478,13 +545,40 @@ def _request_ledger_section(
             '<div class="alert alert-danger"><strong>Actual request failure:</strong> '
             f"{escape_html(humanize_reason(ledger.get('error_class')))}</div>"
         )
-    return _panel(
+    provider = humanize_enum(ledger.get("provider"))
+    request_state = _request_state_label(ledger)
+    overview = (
+        f"{provider} request {request_state}; {http_label}; "
+        f"{_count(ledger.get('selected_market_row_count'))} selected rows."
+    )
+    detail = str(definition_list(values, css_class="definition-grid"))
+    return _health_detail_panel(
         "Provider request",
         str(badge(coverage.status, tone=_coverage_tone(coverage.status)))
-        + str(definition_list(values, css_class="definition-grid"))
-        + failure,
+        + f'<p class="health-detail-summary">{escape_html(overview)}</p>'
+        + failure
+        + _health_disclosure(
+            "View exact provider request receipt",
+            detail,
+            summary=f"{provider} · {http_label}",
+        ),
         eyebrow="Exact acquisition evidence",
+        anchor="provider-request",
     )
+
+
+def _request_state_label(ledger: Mapping[str, Any]) -> str:
+    attempted = ledger.get("provider_call_attempted")
+    succeeded = ledger.get("provider_request_succeeded")
+    if succeeded is True:
+        return "succeeded"
+    if attempted is True and succeeded is False:
+        return "failed"
+    if attempted is True:
+        return "has no recorded result"
+    if attempted is False:
+        return "was not attempted"
+    return "state was not recorded"
 
 
 def _market_quality_section(
@@ -507,13 +601,36 @@ def _market_quality_section(
         ("Liquidity basis", humanize_enum(feature_basis.get("liquidity"))),
         ("Spread basis", humanize_enum(feature_basis.get("spread"))),
         ("Campaign cadence", humanize_enum(generation.get("cadence_status") or "not_recorded")),
-        ("Next eligible observation", time_element(present_time(generation.get("next_eligible_observation_at")))),
+        (
+            "Next eligible observation",
+            time_element(
+                present_time(
+                    generation.get("next_eligible_observation_at"),
+                    now=snapshot.generation_authority_checked_at,
+                )
+            ),
+        ),
     )
-    return _panel(
-        "Market data quality",
+    observation_count = len(snapshot.current_market_observations)
+    overview = (
+        f"{observation_count} exact observations; {summary['spread']} spread verified; "
+        f"{summary['warm']} warm baselines."
+    )
+    detail = (
         str(definition_list(values, css_class="definition-grid"))
-        + '<p class="muted">Direct observations and proxy features remain visibly separate. Warming is evidence progress, not failure.</p>',
+        + '<p class="muted">Direct observations and proxy features remain visibly separate. '
+        "Warming is evidence progress, not failure.</p>"
+    )
+    return _health_detail_panel(
+        "Market data quality",
+        f'<p class="health-detail-summary">{escape_html(overview)}</p>'
+        + _health_disclosure(
+            "View market data-quality evidence",
+            detail,
+            summary=f"{observation_count} observations · {summary['spread']} spread verified",
+        ),
         eyebrow="Freshness, baseline, spread",
+        anchor="market-quality",
     )
 
 
@@ -529,13 +646,7 @@ def _source_coverage_section(snapshot: DashboardSnapshot) -> str:
         status = item.get("provider_coverage_status") or item.get("source_pack_coverage_status")
         missing = _joined(item.get("missing_providers"))
         gap = item.get("coverage_gap_reason") or item.get("source_coverage_gap_reason")
-        detail = (
-            humanize_reason(gap)
-            if gap not in (None, "")
-            else "No coverage gap recorded."
-        )
-        if missing != UNAVAILABLE:
-            detail = f"{detail} Missing: {missing}."
+        detail = _source_gap_detail(gap, missing=missing)
         rows.append((
             humanize_enum(item.get("source_pack")),
             badge(status),
@@ -543,16 +654,47 @@ def _source_coverage_section(snapshot: DashboardSnapshot) -> str:
             _joined(item.get("healthy_providers")),
             detail,
         ))
-    return _panel(
-        "Source-pack coverage",
-        str(data_table(
-            ("Source pack", "State", "Accepted", "Healthy providers", "Coverage meaning"),
-            rows,
-            caption="Exact-generation source coverage",
-            empty="No source-pack coverage assessment is attached.",
-        )),
-        eyebrow="Coverage is not absence",
+    accepted = sum(
+        max(0, int(value))
+        for item in packs
+        if (value := _number(item.get("accepted_evidence_count"))) is not None
     )
+    overview = f"{len(packs)} source packs; {accepted} accepted evidence rows."
+    table = str(data_table(
+        ("Source pack", "State", "Accepted", "Healthy providers", "Coverage meaning"),
+        rows,
+        caption="Exact-generation source coverage",
+        empty="No source-pack coverage assessment is attached.",
+    ))
+    return _health_detail_panel(
+        "Source-pack coverage",
+        f'<p class="health-detail-summary">{escape_html(overview)}</p>'
+        + _health_disclosure(
+            "View source-pack coverage table",
+            table,
+            summary=f"{len(packs)} packs · {accepted} accepted rows",
+        ),
+        eyebrow="Coverage is not absence",
+        anchor="source-pack-coverage",
+    )
+
+
+def _source_gap_detail(gap: object, *, missing: str) -> str:
+    token = str(gap or "").strip().casefold()
+    detail = {
+        "missing_provider_configuration": "Provider configuration is missing.",
+        "missing_provider_authorization": "Provider authorization is missing.",
+        "provider_not_selected": "No provider was selected for this source pack.",
+        "no_healthy_provider": "No healthy provider evidence was recorded.",
+    }.get(
+        token,
+        humanize_reason(gap)
+        if gap not in (None, "")
+        else "No coverage gap recorded.",
+    )
+    if missing == UNAVAILABLE:
+        return detail
+    return f"{detail} Affected providers: {missing}."
 
 
 def _historical_provider_health(snapshot: DashboardSnapshot) -> str:
@@ -572,7 +714,8 @@ def _historical_provider_health(snapshot: DashboardSnapshot) -> str:
         empty="No cumulative provider-health rows are available.",
     )
     metadata = (
-        f"Read {time_element(present_time(snapshot.provider_health_read_at))}. "
+        "Read "
+        f"{time_element(present_time(snapshot.provider_health_read_at, now=snapshot.generation_authority_checked_at))}. "
         "This cumulative file is context only and cannot override exact current readiness."
     )
     return str(disclosure(
@@ -607,140 +750,12 @@ def _technical_health_details(snapshot: DashboardSnapshot) -> str:
     ))
 
 
-def _outcome_section(
-    title: str,
-    description: str,
-    rows: tuple[Mapping[str, Any], ...],
-    *,
-    source_labels: Mapping[tuple[str, ...], str] | None,
-    empty_message: str,
-    authority: str,
-) -> str:
-    table_rows = []
-    for row in rows:
-        state = _outcome_state(row)
-        source = source_labels.get(_outcome_key(row), UNAVAILABLE) if source_labels else "Exact generation"
-        table_rows.append((
-            row.get("symbol") or row.get("coin_id") or row.get("candidate_id") or "Idea",
-            badge(state),
-            humanize_enum(row.get("radar_route") or row.get("route")),
-            _outcome_time(row),
-            humanize_enum(row.get("primary_horizon") or row.get("preferred_horizon")),
-            _cohort_label(row.get("actionability_score_cohort"), row.get("actionability_score")),
-            _cohort_label(row.get("evidence_confidence_score_cohort"), row.get("evidence_confidence_score")),
-            _cohort_label(row.get("risk_score_cohort"), row.get("risk_score")),
-            humanize_enum(row.get("outcome_label") or row.get("validation_label")),
-            source,
-        ))
-    table = data_table(
-        (
-            "Idea", "State", "Route", "Observed / evaluated", "Horizon",
-            "Actionability cohort", "Evidence cohort", "Risk cohort", "Result", "Scope",
-        ),
-        table_rows,
-        caption=title,
-        empty=empty_message,
-    )
-    return _panel(
-        title,
-        f'<p>{escape_html(description)}</p>'
-        + str(badge(authority, tone="info" if "historical" in authority.casefold() else None))
-        + str(table),
-        eyebrow="Pending and matured",
-    )
 
 
-def _current_outcome_empty_message(
-    *,
-    current: tuple[Mapping[str, Any], ...],
-    filtered_current: tuple[Mapping[str, Any], ...],
-    layer: DashboardLayerCoverage,
-) -> str:
-    if current and not filtered_current:
-        return (
-            "Exact current outcome rows exist, but none match the selected filters. "
-            "Clear or adjust the filters to see them."
-        )
-    if layer.status == "healthy_empty":
-        return (
-            "The fingerprint-verified outcome artifact is empty for this zero-idea generation. "
-            "That is a verified empty result, not a missing artifact."
-        )
-    if layer.status == "not_applicable":
-        return (
-            "This generation has no canonical current ideas, so no outcome placeholder is required. "
-            "No fingerprint-verification claim is made for an absent artifact."
-        )
-    if layer.status == "rejected":
-        return (
-            "The exact outcome artifact was rejected and no current rows were admitted. "
-            "Zero rows is not a verified empty result."
-        )
-    if layer.status == "stale":
-        return (
-            "The exact outcome artifact is stale and cannot be presented as current. "
-            "Zero rows is not a verified empty result."
-        )
-    return (
-        "No fingerprint-verified exact outcome artifact is available for the current ideas. "
-        "Zero rows is not a verified empty result."
-    )
 
 
-def _cohort_summary(
-    current: tuple[Mapping[str, Any], ...],
-    historical: tuple[tuple[Mapping[str, Any], str], ...],
-) -> str:
-    matured = [
-        row
-        for row in (*current, *(row for row, _source in historical))
-        if _outcome_bucket(row) == "matured"
-    ]
-    route_counts = Counter(
-        humanize_enum(row.get("radar_route") or row.get("route"))
-        for row in matured
-    )
-    rows = [
-        (route, count, "Descriptive only · no automatic threshold")
-        for route, count in route_counts.most_common()
-    ]
-    return _panel(
-        "Matured route cohorts",
-        str(data_table(
-            ("Route cohort", "Matured rows", "Use"),
-            rows,
-            caption="Matured sample by Decision route",
-            empty="No matured outcome cohort is available yet.",
-        ))
-        + '<p class="muted">Cohort summaries need adequate sample size and diversity before supporting any human policy review.</p>',
-        eyebrow="Learning, not auto-calibration",
-    )
 
 
-def _feedback_summary(snapshot: DashboardSnapshot) -> str:
-    counts = Counter(
-        humanize_enum(
-            row.get("feedback_label")
-            or row.get("label")
-            or row.get("human_label")
-            or "unclassified"
-        )
-        for row in snapshot.cumulative_feedback
-    )
-    rows = [(label, count) for label, count in counts.most_common()]
-    return _panel(
-        "Optional human feedback",
-        str(data_table(
-            ("Preference label", "Rows"),
-            rows,
-            caption="Cumulative optional feedback",
-            empty="No optional human preference feedback has been recorded.",
-        ))
-        + (
-            '<p class="muted">Feedback is preference data only. It does not automatically change scores, routes, gates, or visibility.</p>'
-        ),
-        eyebrow="Human input",
-    )
 
 
 def _provider_items(payload: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
@@ -859,136 +874,44 @@ def _freshness_counts(rows: Iterable[Mapping[str, Any]]) -> Counter[str]:
     return counts
 
 
-def _outcome_filters(query: Mapping[str, str] | None) -> dict[str, str]:
-    raw = query or {}
-    scope = str(raw.get("scope") or "all").casefold()
-    status = str(raw.get("status") or "all").casefold()
-    return {
-        "scope": scope if scope in {"all", "current", "historical"} else "all",
-        "status": status if status in {"all", "pending", "matured"} else "all",
-        "route": str(raw.get("route") or "").strip().casefold(),
-        "search": str(raw.get("search") or "").strip().casefold(),
-    }
 
 
-def _filter_outcomes(
-    rows: tuple[Mapping[str, Any], ...],
-    filters: Mapping[str, str],
-) -> tuple[Mapping[str, Any], ...]:
-    selected = []
-    for row in rows:
-        if filters["status"] != "all" and _outcome_bucket(row) != filters["status"]:
-            continue
-        route = str(row.get("radar_route") or row.get("route") or "").casefold()
-        if filters["route"] and route != filters["route"]:
-            continue
-        search_text = " ".join(
-            str(row.get(field) or "")
-            for field in ("symbol", "coin_id", "candidate_id", "core_opportunity_id")
-        ).casefold()
-        if filters["search"] and filters["search"] not in search_text:
-            continue
-        selected.append(row)
-    return tuple(selected)
 
 
-def _historical_outcomes(
-    snapshot: DashboardSnapshot,
-) -> tuple[tuple[Mapping[str, Any], str], ...]:
-    rows: list[tuple[Mapping[str, Any], str]] = []
-    seen: set[tuple[str, ...]] = set()
-    for values, source in (
-        (snapshot.campaign_outcomes, "Decision campaign"),
-        (snapshot.cumulative_outcomes, "Namespace history"),
-    ):
-        for row in values:
-            key = _outcome_key(row)
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append((row, source))
-    return tuple(rows)
 
 
-def _outcome_key(row: Mapping[str, Any]) -> tuple[str, ...]:
-    return (
-        str(row.get("artifact_namespace") or ""),
-        str(row.get("candidate_id") or row.get("core_opportunity_id") or ""),
-        str(row.get("observed_at") or row.get("decision_evaluated_at") or ""),
-    )
 
 
-def _outcome_state(row: Mapping[str, Any]) -> str:
-    return str(
-        row.get("outcome_status")
-        or row.get("maturation_state")
-        or "pending"
-    ).strip().casefold()
 
 
-def _outcome_bucket(row: Mapping[str, Any]) -> str:
-    state = _outcome_state(row)
-    if state in _MATURED_OUTCOME_STATES or row.get("outcome_evaluated_at"):
-        return "matured"
-    if state in _PENDING_OUTCOME_STATES:
-        return "pending"
-    return "matured" if row.get("outcome_label") else "pending"
 
 
-def _outcome_counts(rows: tuple[Mapping[str, Any], ...]) -> Counter[str]:
-    return Counter(_outcome_bucket(row) for row in rows)
 
 
-def _outcome_time(row: Mapping[str, Any]) -> HtmlFragment:
-    value = (
-        row.get("outcome_evaluated_at")
-        or row.get("observed_at")
-        or row.get("decision_evaluated_at")
-    )
-    return time_element(present_time(value))
 
 
-def _cohort_label(value: object, score: object) -> str:
-    text = str(value or "").strip()
-    if text:
-        parts = text.split("_")
-        if len(parts) == 2 and all(part.replace(".", "", 1).isdigit() for part in parts):
-            return f"{parts[0]}–{parts[1]}"
-        return humanize_enum(text)
-    number = _number(score)
-    return format_number(number, decimals=1) if number is not None else UNAVAILABLE
 
 
-def _sample_warning(matured: int, *, scope: str) -> str:
-    if matured >= 30:
-        return (
-            '<div class="alert alert-positive"><strong>Sample-size checkpoint:</strong> '
-            f"{matured} matured rows in the {escape_html(scope)}. Cohort diversity still matters.</div>"
-        )
-    return (
-        '<div class="alert alert-warning"><strong>Small-sample warning:</strong> '
-        f"Only {matured} matured row{'s' if matured != 1 else ''} in the {escape_html(scope)}. "
-        "Do not infer edge or change thresholds from this sample.</div>"
-    )
 
 
-def _outcome_filter_form(filters: Mapping[str, str]) -> str:
-    return (
-        '<form class="filter-panel" method="get" action="/outcomes"><div class="filter-grid">'
-        f'<label><span>Scope</span><select name="scope">{_options(filters["scope"], (("all", "Current + historical"), ("current", "Exact current"), ("historical", "Historical")))}</select></label>'
-        f'<label><span>State</span><select name="status">{_options(filters["status"], (("all", "Pending + matured"), ("pending", "Pending"), ("matured", "Matured")))}</select></label>'
-        f'<label><span>Route</span><input name="route" value="{escape_html(filters["route"])}" placeholder="Risk watch"></label>'
-        f'<label><span>Search idea</span><input type="search" name="search" value="{escape_html(filters["search"])}" placeholder="BTC, DEXE…"></label>'
-        '</div><div class="filter-actions"><button class="button button-primary" type="submit">Apply</button>'
-        '<a class="button button-quiet" href="/outcomes">Clear</a></div></form>'
-    )
 
 
-def _options(selected: str, values: tuple[tuple[str, str], ...]) -> str:
-    return "".join(
-        f'<option value="{escape_html(value)}"{" selected" if selected == value else ""}>{escape_html(label)}</option>'
-        for value, label in values
-    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def _technical_code(value: object) -> HtmlFragment:

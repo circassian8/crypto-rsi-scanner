@@ -29,14 +29,13 @@ class _SemanticDocument:
     skip_link: bool = False
     navigation: bool = False
     main: bool = False
-    research_banner: bool = False
+    research_guard: bool = False
 
 
 class _ContractParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.document = _SemanticDocument()
-        self._research_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {key: value or "" for key, value in attrs}
@@ -49,16 +48,11 @@ class _ContractParser(HTMLParser):
             self.document.navigation = True
         if tag == "main" and values.get("id") == "main-content":
             self.document.main = True
-        if "research-banner" in classes:
-            self._research_depth += 1
-
-    def handle_endtag(self, tag: str) -> None:
-        if self._research_depth and tag == "div":
-            self._research_depth -= 1
 
     def handle_data(self, data: str) -> None:
-        if self._research_depth and "Human decision required" in data:
-            self.document.research_banner = True
+        normalized = " ".join(data.split()).casefold()
+        if "human decision required" in normalized:
+            self.document.research_guard = True
 
 
 def run_ux_smoke(
@@ -95,7 +89,7 @@ def run_ux_smoke(
         _check_document(response.body, route, snapshot.run_id, snapshot.revision)
     print(
         "radar_dashboard_ux_smoke: "
-        f"pages={len(routes)} semantic_shell=ok responsive_contract=ok "
+        f"pages={len(routes)} semantic_shell=ok responsive_css_contract=ok "
         f"run_id={snapshot.run_id} revision={snapshot.revision} writes=0"
     )
     return 0

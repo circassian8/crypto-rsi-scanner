@@ -6,16 +6,16 @@ from __future__ import annotations
 FOUNDATION_CSS = r"""
 :root {
   color-scheme: dark;
-  --color-canvas: #070b14;
-  --color-canvas-raised: #0b1120;
-  --color-surface: #111a2d;
-  --color-surface-raised: #17233a;
-  --color-surface-soft: #0d1628;
+  --color-canvas: #080c13;
+  --color-canvas-raised: #0c121c;
+  --color-surface: #111925;
+  --color-surface-raised: #182332;
+  --color-surface-soft: #0d141f;
   --color-text: #f4f7ff;
   --color-text-muted: #aebbd2;
   --color-text-subtle: #7f8da7;
-  --color-border: #2a3955;
-  --color-border-strong: #425675;
+  --color-border: #263448;
+  --color-border-strong: #3c506b;
   --color-accent: #67d4ff;
   --color-accent-strong: #13b9fa;
   --color-positive: #5ee6a8;
@@ -39,7 +39,7 @@ FOUNDATION_CSS = r"""
   --radius-sm: 0.45rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
-  --shadow-panel: 0 18px 45px rgb(0 0 0 / 0.2);
+  --shadow-panel: 0 10px 30px rgb(0 0 0 / 0.14);
   --content-max: 90rem;
   --touch-target: 2.75rem;
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -53,18 +53,21 @@ FOUNDATION_CSS = r"""
 }
 
 html {
-  min-width: 20rem;
+  min-width: 0;
   background: var(--color-canvas);
+  scroll-padding-block-start: 6rem;
   scroll-behavior: smooth;
+}
+
+main [id] {
+  scroll-margin-block-start: 6rem;
 }
 
 body {
   min-width: 0;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 10% -10%, rgb(19 185 250 / 0.12), transparent 32rem),
-    var(--color-canvas);
+  background: var(--color-canvas);
   color: var(--color-text);
   font: 0.9375rem/1.55 var(--font-sans);
   text-rendering: optimizeLegibility;
@@ -108,9 +111,9 @@ h4 {
   letter-spacing: -0.018em;
 }
 
-h1 { font-size: clamp(1.55rem, 3vw, 2.25rem); }
-h2 { font-size: clamp(1.3rem, 2.4vw, 1.75rem); }
-h3 { font-size: clamp(1.05rem, 1.8vw, 1.3rem); }
+h1 { font-size: clamp(1.65rem, 2.5vw, 2rem); }
+h2 { font-size: clamp(1.2rem, 1.9vw, 1.5rem); }
+h3 { font-size: clamp(1.02rem, 1.5vw, 1.18rem); }
 h4 { font-size: 1rem; }
 
 p {
@@ -256,8 +259,8 @@ section,
   overflow-wrap: anywhere;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, var(--color-surface), var(--color-surface-soft));
-  box-shadow: var(--shadow-panel);
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 .card,
@@ -274,7 +277,7 @@ section,
   color: var(--color-accent);
   font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
 }
 
@@ -441,6 +444,10 @@ dd {
   scrollbar-color: var(--color-border-strong) var(--color-surface-soft);
 }
 
+.table-scroll table {
+  background: var(--color-surface-soft);
+}
+
 .table-scroll:focus-visible {
   outline-offset: 0.1rem;
 }
@@ -452,6 +459,10 @@ table {
   border-collapse: collapse;
   border-spacing: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.data-table {
+  min-width: 64rem;
 }
 
 .data-table caption,
@@ -475,6 +486,14 @@ table td {
   vertical-align: top;
 }
 
+.data-table td.number,
+.data-table th.number,
+table td.number,
+table th.number {
+  white-space: nowrap;
+  text-align: right;
+}
+
 .data-table thead th,
 table thead th {
   background: var(--color-surface-raised);
@@ -483,6 +502,10 @@ table thead th {
   font-weight: 800;
   letter-spacing: 0.035em;
   text-transform: uppercase;
+}
+
+.data-table thead th {
+  white-space: nowrap;
 }
 
 .data-table tbody th[scope="row"] {
@@ -588,6 +611,46 @@ button {
   cursor: pointer;
   color: var(--color-text);
   font-weight: 760;
+}
+
+.disclosure > summary {
+  justify-content: space-between;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary::after {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  color: var(--color-text-subtle);
+  content: "+";
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.disclosure[open] > summary::after {
+  content: "−";
+}
+
+/* Author display rules must never override the native closed-details state. */
+details:not([open]) > :not(summary) {
+  display: none;
+}
+
+.disclosure__summary {
+  color: var(--color-text-subtle);
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-align: end;
+}
+
+.disclosure summary::marker,
+details summary::marker {
+  color: var(--color-text-subtle);
 }
 
 .disclosure__body {

@@ -36,8 +36,8 @@ def test_history_chart_is_responsive_accessible_and_escapes_all_supplied_text():
     assert "&lt;script&gt;" in svg
     assert "<script>" not in svg
     assert "<img" not in svg
-    assert "&lt;start &amp; \"open\"&gt;" in svg
-    assert "latest&lt;/text&gt;&lt;script&gt;alert(…" in svg
+    assert "&lt;start &amp;" in svg
+    assert "latest&lt;/text&gt;…" in svg
 
 
 def test_missing_cold_warming_and_proxy_states_are_visible_and_honest():
@@ -70,6 +70,21 @@ def test_missing_cold_warming_and_proxy_states_are_visible_and_honest():
     assert "Three of eight required samples." in warming
     assert "explicitly proxy-derived evidence" in warming
     assert '<polyline class="chart-line"' in warming
+
+
+def test_timestamp_axis_labels_are_compact_enough_for_phone_charts() -> None:
+    svg = render_history_chart(
+        [
+            ("2026-07-13T15:17:06.228233+00:00", 41.23),
+            ("2026-07-14T00:29:40.814498+00:00", 41.86),
+        ],
+        title="Compact phone axis",
+        value_format="price",
+    )
+
+    assert "Jul 13 15:17Z · $41.23" in svg
+    assert "Jul 14 00:29Z · $41.86" in svg
+    assert "2026-07-13T15:17" not in svg
 
 
 def test_nonfinite_observations_are_explicit_gaps_and_never_svg_coordinates():
@@ -155,6 +170,8 @@ def test_metric_wrappers_cover_price_activity_relative_and_progression():
     assert "Price history" in price and "$105.00" in price
     assert "Volume history" in volume and "1.6M" in volume
     assert "Turnover history" in turnover and "900.0K" in turnover
+    assert ">-0" not in volume
+    assert ">-0" not in turnover
     assert volume.count('<rect class="chart-bar"') == 2
     assert "Relative performance vs BTC" in btc and "+3.0%" in btc
     assert '<line class="chart-zero"' in btc

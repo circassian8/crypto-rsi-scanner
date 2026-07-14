@@ -580,7 +580,7 @@
         "Calendar",
         "System Health",
         "Outcomes & Learning",
-        "Campaign History"
+        "Run History"
       ],
       "presentation_is_render_only": true,
       "presentation_policy": {
@@ -588,7 +588,13 @@
         "evidence_confidence_is_expected_return": false,
         "exact_utc_remains_accessible": true,
         "missing_value_label": "Unavailable",
+        "missing_booleans_are_tri_state": true,
         "operator_local_time_primary": true,
+        "operator_route_labels_are_canonical": true,
+        "raw_provider_identity_is_secondary": true,
+        "relative_time_clock": "generation_authority_checked_at",
+        "route_aware_current_attention": true,
+        "secondary_support_is_collapsed": true,
         "uncertain_calendar_time_rendered_exact": false
       },
       "responsive_viewports": [

@@ -8,6 +8,7 @@ from .calendar_window import CalendarWindowPresentation
 from .score_band import ScoreBand
 from .semantic_status import SemanticStatus
 from .time import TimePresentation
+from .turnover_series import TurnoverSeriesPresentation
 
 
 __all__ = (
@@ -15,4 +16,5 @@ __all__ = (
     "ScoreBand",
     "SemanticStatus",
     "TimePresentation",
+    "TurnoverSeriesPresentation",
 )

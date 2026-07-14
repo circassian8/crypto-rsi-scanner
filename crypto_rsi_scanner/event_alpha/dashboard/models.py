@@ -12,8 +12,65 @@ class DashboardLoadError(RuntimeError):
     """Raised when an exact, coherent operator generation cannot be read."""
 
 
+class _DashboardSnapshotViews:
+    """Computed render views kept separate from the immutable field contract."""
+
+    @property
+    def generation_authoritative(self) -> bool:
+        return self.generation_authority_status == "authoritative"
+
+    @property
+    def current_generation_count(self) -> int:
+        return len(self.current_candidates)
+
+    @property
+    def cumulative_store_count(self) -> int:
+        try:
+            return max(0, int(self.operator_state.get("cumulative_store_rows") or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    @property
+    def visible_current_candidates(self) -> tuple[dict[str, Any], ...]:
+        if not self.generation_authoritative:
+            return ()
+        return tuple(
+            row
+            for row in self.current_candidates
+            if row.get("_decision_model_status") == "v2"
+            and row.get("_decision_expired_at_read_time") is not True
+            and row.get("_dashboard_route") != "diagnostic"
+        )
+
+    @property
+    def diagnostic_candidates(self) -> tuple[dict[str, Any], ...]:
+        if not self.generation_authoritative:
+            return ()
+        return tuple(
+            row
+            for row in self.current_candidates
+            if row.get("_decision_expired_at_read_time") is not True
+            and is_canonical_diagnostic_candidate(row)
+        )
+
+    @property
+    def expired_visible_current_candidates(self) -> tuple[dict[str, Any], ...]:
+        """Expired canonical operator routes retained as read-only history."""
+        return _expired_candidate_view(self, diagnostics=False)
+
+    @property
+    def expired_diagnostic_candidates(self) -> tuple[dict[str, Any], ...]:
+        """Expired diagnostic rows available only through explicit opt-in."""
+        return _expired_candidate_view(self, diagnostics=True)
+
+    @property
+    def expired_current_candidates(self) -> tuple[dict[str, Any], ...]:
+        """Compatibility alias for expired operator-visible canonical routes."""
+        return self.expired_visible_current_candidates
+
+
 @dataclass(frozen=True)
-class DashboardSnapshot:
+class DashboardSnapshot(_DashboardSnapshotViews):
     namespace_dir: Path
     run_id: str
     profile: str
@@ -52,46 +109,27 @@ class DashboardSnapshot:
     provider_health_read_at: str | None = None
     provider_health_sha256: str | None = None
     provider_health_error: str | None = None
-    @property
-    def generation_authoritative(self) -> bool:
-        return self.generation_authority_status == "authoritative"
-    @property
-    def current_generation_count(self) -> int:
-        return len(self.current_candidates)
-    @property
-    def cumulative_store_count(self) -> int:
-        try:
-            return max(0, int(self.operator_state.get("cumulative_store_rows") or 0))
-        except (TypeError, ValueError):
-            return 0
-    @property
-    def visible_current_candidates(self) -> tuple[dict[str, Any], ...]:
-        if not self.generation_authoritative:
-            return ()
-        return tuple(
-            row
-            for row in self.current_candidates
-            if row.get("_decision_model_status") == "v2"
-            and row.get("_dashboard_route") != "diagnostic"
-        )
-    @property
-    def diagnostic_candidates(self) -> tuple[dict[str, Any], ...]:
-        if not self.generation_authoritative:
-            return ()
-        return tuple(
-            row
-            for row in self.current_candidates
-            if row.get("_decision_model_status") != "v2"
-            or row.get("_dashboard_route") == "diagnostic"
-        )
-    @property
-    def expired_current_candidates(self) -> tuple[dict[str, Any], ...]:
-        """Canonical ideas suppressed from current actionability at read time."""
-        return _expired_current_candidates(self)
 
 
-def _expired_current_candidates(
+def is_canonical_diagnostic_candidate(row: Mapping[str, Any]) -> bool:
+    """Return whether the stored Decision projection is diagnostic.
+
+    The read-time expiry overlay deliberately changes ``_dashboard_route`` to
+    ``diagnostic`` without mutating the canonical route.  Diagnostic visibility
+    therefore has to be decided from the canonical projection rather than the
+    effective read-time route.
+    """
+
+    return (
+        row.get("_decision_model_status") != "v2"
+        or str(row.get("radar_route") or "").strip().casefold() == "diagnostic"
+    )
+
+
+def _expired_candidate_view(
     snapshot: DashboardSnapshot,
+    *,
+    diagnostics: bool,
 ) -> tuple[dict[str, Any], ...]:
     if not snapshot.generation_authoritative:
         return ()
@@ -99,6 +137,7 @@ def _expired_current_candidates(
         row
         for row in snapshot.current_candidates
         if row.get("_decision_expired_at_read_time") is True
+        and is_canonical_diagnostic_candidate(row) is diagnostics
     )
 
 

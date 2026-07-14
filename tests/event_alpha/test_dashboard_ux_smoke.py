@@ -21,7 +21,7 @@ def test_dashboard_ux_smoke_covers_primary_operator_surface(capsys) -> None:
     output = capsys.readouterr().out
     assert "pages=8" in output
     assert "semantic_shell=ok" in output
-    assert "responsive_contract=ok" in output
+    assert "responsive_css_contract=ok" in output
     assert "writes=0" in output
 
 

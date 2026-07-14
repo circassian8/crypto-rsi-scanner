@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta, timezone, tzinfo
-from typing import Iterable
 from zoneinfo import ZoneInfo
 
 from .presentation_models import (
@@ -18,6 +18,7 @@ from .presentation_models import (
     ScoreBand,
     SemanticStatus,
     TimePresentation,
+    TurnoverSeriesPresentation,
 )
 
 
@@ -46,15 +47,25 @@ _ACRONYMS = {
     "utc": "UTC",
 }
 
-_ENUM_LABELS = {
-    "actionable_watch": "Actionable watch",
-    "high_confidence_watch": "High-confidence watch",
-    "rapid_market_anomaly": "Rapid market anomaly",
+_OPERATOR_ROUTE_LABELS = {
     "dashboard_watch": "Dashboard watch",
+    "actionable_watch": "Actionable idea",
+    "high_confidence_watch": "High-confidence idea",
+    "rapid_market_anomaly": "Rapid market anomaly",
     "fade_exhaustion_review": "Fade / exhaustion review",
     "risk_watch": "Risk watch",
     "calendar_risk": "Calendar / scheduled risk",
     "diagnostic": "Diagnostic",
+}
+
+_ENUM_LABELS = {
+    "binance": "Binance",
+    "bybit": "Bybit",
+    "coingecko": "CoinGecko",
+    "coinalyze": "Coinalyze",
+    "cryptopanic": "CryptoPanic",
+    "gdelt": "GDELT",
+    "polymarket": "Polymarket",
     "market_led": "Market-led",
     "catalyst_led": "Catalyst-led",
     "technical_led": "Technical-led",
@@ -76,7 +87,15 @@ _ENUM_LABELS = {
     "no_send_rehearsal": "No-send rehearsal",
     "percent_points": "Percentage points",
     "date_only": "Date known · time unconfirmed",
+    "1h": "1 hour",
+    "4h": "4 hours",
+    "24h": "24 hours",
+    "3d_7d": "3–7 days",
+    "multi_day": "Multi-day",
+    "cross_sectional_log_turnover_proxy": "Cross-sectional log-turnover proxy",
 }
+
+_TURNOVER_PRESENTATION_VALUE_KEY = "_dashboard_turnover_percent_points"
 
 _REASON_LABELS = {
     "cause_unknown_market_dislocation": "The market moved, but the cause is still unknown.",
@@ -97,6 +116,9 @@ _REASON_LABELS = {
     "spread_unavailable": "Spread evidence is unavailable.",
     "spread_unverified": "Spread has not been independently verified.",
     "freshness_unknown": "Data freshness is unknown.",
+    "canonical_expiry_at_or_before_dashboard_read_time": (
+        "The recorded research window had expired by dashboard read time."
+    ),
 }
 
 
@@ -253,6 +275,8 @@ def humanize_identifier(value: object, *, fallback: str = UNAVAILABLE) -> str:
     if not raw:
         return fallback
     token = _normal_token(raw)
+    if token in _OPERATOR_ROUTE_LABELS:
+        return _OPERATOR_ROUTE_LABELS[token]
     if token in _ENUM_LABELS:
         return _ENUM_LABELS[token]
     separated = _CAMEL_BOUNDARY.sub(" ", raw)
@@ -267,6 +291,39 @@ def humanize_identifier(value: object, *, fallback: str = UNAVAILABLE) -> str:
 
 def humanize_enum(value: object, *, fallback: str = UNAVAILABLE) -> str:
     return humanize_identifier(value, fallback=fallback)
+
+
+def operator_route_label(value: object, *, fallback: str = UNAVAILABLE) -> str:
+    """Return the one singular operator label for a canonical Decision route."""
+
+    token = _normal_token(value)
+    if not token:
+        return fallback
+    return _OPERATOR_ROUTE_LABELS.get(
+        token,
+        humanize_identifier(value, fallback=fallback),
+    )
+
+
+def candidate_operator_route(row: Mapping[str, object]) -> object:
+    """Select the route whose meaning should be shown without changing routing."""
+
+    if row.get("_decision_expired_at_read_time") is True:
+        return row.get("radar_route") or row.get("_dashboard_route")
+    return row.get("_dashboard_route") or row.get("radar_route")
+
+
+def candidate_operator_route_label(
+    row: Mapping[str, object],
+    *,
+    fallback: str = UNAVAILABLE,
+) -> str:
+    """Label a current route, or an expired idea's canonical evaluation route."""
+
+    label = operator_route_label(candidate_operator_route(row), fallback=fallback)
+    if row.get("_decision_expired_at_read_time") is True:
+        return f"Expired · {label} at evaluation"
+    return label
 
 
 def humanize_reason(value: object, *, fallback: str = UNAVAILABLE) -> str:
@@ -366,6 +423,54 @@ def format_percent(
     elif normalized_unit not in {"percent", "percentage", "percent_points", "percentage_points"}:
         raise ValueError(f"unsupported percent unit: {unit!r}")
     return f"{format_number(number, decimals=decimals, signed=signed)}%"
+
+
+def present_turnover_series(
+    history: Iterable[Mapping[str, object]],
+    *,
+    metric_basis: object = None,
+) -> TurnoverSeriesPresentation:
+    """Copy turnover ratios into percent-points with canonical chart metadata.
+
+    ``turnover_24h`` remains a fraction in the artifact/read model.  Only the
+    copied presentation key is multiplied by 100, so chart rendering cannot
+    mutate or silently reinterpret the stored evidence.
+    """
+
+    rows: list[Mapping[str, object]] = []
+    inferred_basis = metric_basis
+    for source in history:
+        source_copy = dict(source)
+        value = _finite_number(source.get("turnover_24h"))
+        source_copy[_TURNOVER_PRESENTATION_VALUE_KEY] = (
+            value * 100.0 if value is not None else None
+        )
+        rows.append(source_copy)
+        if inferred_basis in (None, ""):
+            inferred_basis = source.get("volume_zscore_basis")
+            feature_basis = source.get("feature_basis")
+            if inferred_basis in (None, "") and isinstance(feature_basis, Mapping):
+                inferred_basis = feature_basis.get("volume_zscore")
+
+    metric_label = humanize_enum(
+        inferred_basis,
+        fallback="Proxy metric basis unavailable",
+    )
+    unit_label = "Percent of market cap"
+    return TurnoverSeriesPresentation(
+        rows=tuple(rows),
+        title="Turnover history · proxy evidence",
+        summary=(
+            "Turnover ratio is 24h volume divided by market cap. "
+            f"Unit: {unit_label}."
+        ),
+        state_detail=f"Proxy metric: {metric_label}",
+        metric_label=metric_label,
+        unit_label=unit_label,
+        value_key=_TURNOVER_PRESENTATION_VALUE_KEY,
+        value_format="percent",
+        proxy=True,
+    )
 
 
 def format_duration(value: object) -> str:
@@ -719,7 +824,10 @@ __all__ = (
     "ScoreBand",
     "SemanticStatus",
     "TimePresentation",
+    "TurnoverSeriesPresentation",
     "UNAVAILABLE",
+    "candidate_operator_route",
+    "candidate_operator_route_label",
     "format_calendar_window",
     "format_compact_number",
     "format_currency",
@@ -734,8 +842,10 @@ __all__ = (
     "humanize_identifier",
     "humanize_reason",
     "humanize_reasons",
+    "operator_route_label",
     "present_calendar_window",
     "present_time",
+    "present_turnover_series",
     "score_band",
     "semantic_status",
     "status_tone",

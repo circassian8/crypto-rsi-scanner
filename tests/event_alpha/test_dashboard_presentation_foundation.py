@@ -34,12 +34,20 @@ from crypto_rsi_scanner.event_alpha.dashboard.presentation import (
     humanize_identifier,
     humanize_reason,
     humanize_reasons,
+    operator_route_label,
     present_calendar_window,
     present_time,
     score_band,
     semantic_status,
     status_tone,
 )
+from crypto_rsi_scanner.event_alpha.dashboard.style_decision_detail import (
+    DECISION_DETAIL_CSS,
+)
+from crypto_rsi_scanner.event_alpha.dashboard.style_foundation import FOUNDATION_CSS
+from crypto_rsi_scanner.event_alpha.dashboard.style_operator import OPERATOR_CSS
+from crypto_rsi_scanner.event_alpha.dashboard.style_records import RECORDS_CSS
+from crypto_rsi_scanner.event_alpha.dashboard.style_responsive import RESPONSIVE_CSS
 from crypto_rsi_scanner.event_alpha.dashboard.styles import (
     DASHBOARD_CSS,
     dashboard_css,
@@ -182,11 +190,35 @@ def test_identifier_and_reason_humanization_is_operator_facing() -> None:
         "Needs clearer price and volume confirmation."
     )
     assert humanize_reason("custom_reason_code") == "Custom reason code."
+    assert humanize_reason(
+        "canonical_expiry_at_or_before_dashboard_read_time"
+    ) == "The recorded research window had expired by dashboard read time."
     assert humanize_reasons(
         ["market_context_missing", "market_context_missing", "source_noise"],
         limit=1,
     ) == "Market context is missing. +1 more"
     assert humanize_reasons([]) == UNAVAILABLE
+
+
+@pytest.mark.parametrize(
+    ("route", "label"),
+    (
+        ("dashboard_watch", "Dashboard watch"),
+        ("actionable_watch", "Actionable idea"),
+        ("high_confidence_watch", "High-confidence idea"),
+        ("rapid_market_anomaly", "Rapid market anomaly"),
+        ("fade_exhaustion_review", "Fade / exhaustion review"),
+        ("risk_watch", "Risk watch"),
+        ("calendar_risk", "Calendar / scheduled risk"),
+        ("diagnostic", "Diagnostic"),
+    ),
+)
+def test_operator_route_labels_use_one_canonical_singular_projection(
+    route: str,
+    label: str,
+) -> None:
+    assert operator_route_label(route) == label
+    assert humanize_enum(route) == label
 
 
 def test_numeric_formatters_are_compact_and_unit_explicit() -> None:
@@ -332,6 +364,16 @@ def test_css_contains_accessibility_responsiveness_and_overflow_contracts() -> N
     assert "--touch-target: 2.75rem" in DASHBOARD_CSS
     assert ".skip-link" in DASHBOARD_CSS
     assert ":focus-visible" in DASHBOARD_CSS
+    assert (
+        ".section-heading > a,\n"
+        ".diagnostic-link > a,\n"
+        ".anomaly-card__decision > a,\n"
+        ".market-mobile-summary a {\n"
+        "  display: inline-flex;\n"
+        "  min-height: 1.5rem;"
+        in DASHBOARD_CSS
+    )
+    assert DASHBOARD_CSS.count("min-height: 1.5rem;") >= 4
     assert "@media (prefers-reduced-motion: reduce)" in DASHBOARD_CSS
     assert ".table-scroll" in DASHBOARD_CSS
     assert "overflow-x: auto" in DASHBOARD_CSS
@@ -340,3 +382,49 @@ def test_css_contains_accessibility_responsiveness_and_overflow_contracts() -> N
     assert "grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr)" in DASHBOARD_CSS
     assert "overflow-wrap: anywhere" in DASHBOARD_CSS
     assert "@media (pointer: coarse)" in DASHBOARD_CSS
+    assert ".mobile-nav:not([open]) > nav" in DASHBOARD_CSS
+    assert ".mobile-nav[open] > nav" in DASHBOARD_CSS
+    assert "details:not([open]) > :not(summary)" in DASHBOARD_CSS
+    assert ".market-mobile-list" in DASHBOARD_CSS
+    assert (
+        ".outcome-metrics .metric-grid {\n"
+        "    grid-template-columns: repeat(2, minmax(0, 1fr));\n"
+        "  }"
+        in DASHBOARD_CSS
+    )
+
+
+def test_stylesheet_composition_preserves_fragment_order() -> None:
+    assert DASHBOARD_CSS == "\n\n".join(
+        (
+            FOUNDATION_CSS,
+            OPERATOR_CSS,
+            DECISION_DETAIL_CSS,
+            RECORDS_CSS,
+            RESPONSIVE_CSS,
+        )
+    )
+    assert DASHBOARD_CSS.index(".score-grid {") < DASHBOARD_CSS.index(
+        ".outcome-mobile-list,"
+    )
+    assert DASHBOARD_CSS.index(".outcome-mobile-list,") < DASHBOARD_CSS.index(
+        "@media (max-width: 86rem)"
+    )
+
+
+def test_css_keeps_tablet_idea_cards_and_text_metrics_readable() -> None:
+    assert "@media (max-width: 86rem)" in DASHBOARD_CSS
+    assert "@media (max-width: 62rem)" in DASHBOARD_CSS
+    assert (
+        ".idea-grid {\n    grid-template-columns: minmax(0, 1fr);\n  }"
+        in DASHBOARD_CSS
+    )
+    assert ".market-desktop-table {\n    display: none;\n  }" in DASHBOARD_CSS
+    assert ".market-mobile-list {\n    display: grid;" in DASHBOARD_CSS
+    assert "overflow-wrap: break-word" in DASHBOARD_CSS
+    assert "word-break: normal" in DASHBOARD_CSS
+    assert ".history-empty-state" in DASHBOARD_CSS
+    assert ".history-empty-series" in DASHBOARD_CSS
+    assert ".radar-inline-chart .chart-x-label" in DASHBOARD_CSS
+    assert "backdrop-filter: none" in DASHBOARD_CSS
+    assert ".topbar-safety" in DASHBOARD_CSS

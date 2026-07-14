@@ -957,6 +957,9 @@ def _dashboard_decision_row(
     Expiry is a read-time safety overlay only.  The canonical route and
     ``radar_actionable`` value remain untouched so historical artifacts are not
     silently reinterpreted, while the dashboard's effective route fails closed.
+    Expiry applies to every complete Decision v2 row independently of canonical
+    actionability: a watch/review idea with a closed research window is no more
+    current than an actionable idea with the same closed window.
     """
 
     out = dict(row)
@@ -976,7 +979,6 @@ def _dashboard_decision_row(
     expiry = _strict_timestamp(projection.get("expires_at")) if projection else None
     expired = bool(
         complete
-        and projection.get("radar_actionable") is True
         and checked_at is not None
         and expiry is not None
         and expiry <= checked_at

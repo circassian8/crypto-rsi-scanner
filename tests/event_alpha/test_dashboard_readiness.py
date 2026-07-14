@@ -390,12 +390,17 @@ def test_dashboard_filters_sorts_dashboard_watch_risk_watch_and_snapshot_svg():
         "/",
         query={"route": "dashboard_watch", "sort": "urgency_desc"},
     )
+    ideas = render_dashboard_page(
+        visible,
+        "/ideas",
+        query={"route": "dashboard_watch", "sort": "urgency_desc"},
+    )
     fade = render_dashboard_page(visible, "/fade-risk", query={"route": "risk_watch"})
     assert "Dashboard watch" in today.body
     assert "ALPHA" in today.body
     assert "LIST" not in today.body
-    assert '<svg class="sparkline"' in today.body
-    assert "Existing market snapshot trend" in today.body
+    assert 'class="attention-card route-dashboard_watch"' in today.body
+    assert "Existing market snapshot trend" in ideas.body
     assert "risk_watch" in fade.body
     assert "FADE" in fade.body
 

@@ -7,12 +7,10 @@ changes calendar/provider configuration.
 
 from __future__ import annotations
 
-import math
-import re
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
@@ -25,18 +23,45 @@ from .components import (
     empty_state,
     escape_html,
     link,
-    safe_external_href,
     time_element,
 )
+from .calendar_values import (
+    _asset_token,
+    _asset_tokens,
+    _assets,
+    _category_tokens,
+    _certainty_label,
+    _day_heading,
+    _duration_seconds,
+    _duration_value,
+    _event_instant,
+    _event_is_exact,
+    _event_sort_key,
+    _finite_number,
+    _has_window,
+    _impact_window,
+    _importance,
+    _importance_sort,
+    _importance_tone,
+    _iter_values,
+    _operator_text,
+    _parse_instant,
+    _raw_impact_window,
+    _reminder_labels,
+    _scope,
+    _source,
+    _temporal_label,
+    _temporal_tone,
+    _token,
+)
 from .loader import candidate_identifier
+from .layer_coverage import dashboard_layer_coverage_by_key
 from .models import DashboardSnapshot
 from .presentation import (
     UNAVAILABLE,
-    format_duration,
     format_exact_utc,
     format_number,
     humanize_enum,
-    humanize_reason,
     present_calendar_window,
     present_time,
 )
@@ -46,10 +71,15 @@ _NEXT_SAFE_ACTION = (
     "Configure RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH with a fresh non-fixture "
     "operator-verified snapshot, then run make radar-market-no-send-readiness"
 )
-_FILTER_FIELDS = ("search", "importance", "category", "scope")
-_GLOBAL_ASSETS = {"ALL", "CRYPTO", "CRYPTO_MARKET", "GLOBAL", "MARKET", "MARKET_WIDE"}
-_DURATION = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(s|sec|m|min|h|hr|d|day|w|week)s?\s*$", re.I)
-_UTC = timezone.utc
+_FILTER_FIELDS = ("search", "importance", "category", "scope", "time")
+_TIME_FILTER_OPTIONS = (
+    ("current", "Active + upcoming"),
+    ("active", "Active risk window"),
+    ("upcoming", "Upcoming"),
+    ("past", "Past"),
+    ("all", "All event history"),
+)
+_TEMPORAL_STATE_FIELD = "_dashboard_calendar_temporal_state"
 
 
 @dataclass(frozen=True)
@@ -92,25 +122,50 @@ def render_calendar_page(
             )
         )
 
-    rows = tuple(snapshot.current_calendar_events)
-    state = _calendar_state(snapshot, has_rows=bool(rows))
-    status = _calendar_state_panel(state, row_count=len(rows), snapshot=snapshot)
-    if not rows:
+    canonical_rows = tuple(snapshot.current_calendar_events)
+    state = _calendar_state(snapshot, has_rows=bool(canonical_rows))
+    status = _calendar_state_panel(state, row_count=len(canonical_rows), snapshot=snapshot)
+    if not canonical_rows:
         return str(status)
 
     filters = _calendar_query(query)
+    rows = tuple(
+        _calendar_event_projection(
+            row,
+            clock=snapshot.generation_authority_checked_at,
+        )
+        for row in canonical_rows
+    )
+    past_count = sum(
+        1 for row in rows if row.get(_TEMPORAL_STATE_FIELD) == "past"
+    )
     selected = tuple(row for row in rows if _matches_filters(row, filters))
     controls = _filter_controls(rows, filters, selected_count=len(selected))
     if not selected:
-        no_results = empty_state(
-            "No calendar events match these filters",
-            "The exact generation still contains calendar rows. Clear or adjust the filters to see them.",
-            action_label="Clear calendar filters",
-            action_href="/calendar",
-        )
+        if filters["time"] == "current" and past_count:
+            no_results = empty_state(
+                "No active or upcoming calendar risk",
+                (
+                    f"This verified snapshot contains {past_count} past "
+                    f"event{'s' if past_count != 1 else ''}, kept outside the default current view."
+                ),
+                action_label="Review past events",
+                action_href="/calendar?time=past",
+            )
+        else:
+            no_results = empty_state(
+                "No calendar events match this view",
+                "The exact generation still contains calendar rows. Clear or adjust the filters to see them.",
+                action_label="Clear calendar filters",
+                action_href="/calendar",
+            )
         return str(HtmlFragment(str(status) + str(controls) + str(no_results)))
 
-    grouped = _group_events(selected, clock=snapshot.generation_authority_checked_at)
+    grouped = _group_events(
+        selected,
+        clock=snapshot.generation_authority_checked_at,
+        reverse=filters["time"] == "past",
+    )
     rendered_groups: list[str] = []
     event_index = 0
     for group_index, (heading, group_rows) in enumerate(grouped, start=1):
@@ -134,27 +189,164 @@ def render_calendar_page(
             f'{len(group_rows)} event{"s" if len(group_rows) != 1 else ""}</span></header>'
             f'<div class="card-grid calendar-grid">{"".join(cards)}</div></section>'
         )
-    return str(HtmlFragment(str(status) + str(controls) + "".join(rendered_groups)))
+    past_summary = (
+        _past_event_summary(past_count)
+        if filters["time"] == "current" and past_count
+        else ""
+    )
+    return str(
+        HtmlFragment(
+            str(status) + str(controls) + "".join(rendered_groups) + str(past_summary)
+        )
+    )
 
 
 def _calendar_state(snapshot: DashboardSnapshot, *, has_rows: bool) -> _CalendarState:
     raw = snapshot.market_generation.get("calendar_snapshot")
-    metadata = raw if isinstance(raw, Mapping) else {}
+    raw_metadata = raw if isinstance(raw, Mapping) else {}
+    coverage = dashboard_layer_coverage_by_key(snapshot)["calendar"]
+    metadata = {
+        **raw_metadata,
+        "canonical_coverage_status": coverage.status,
+        "canonical_coverage_detail": coverage.detail,
+    }
+    raw_status = _token(
+        raw_metadata.get("normalization_status") or raw_metadata.get("status")
+    )
+    raw_error = _token(raw_metadata.get("error_class") or raw_metadata.get("error"))
+    raw_combined = f"{raw_status} {raw_error}"
+    rejected_count = _finite_number(
+        raw_metadata.get("normalization_rejected_count")
+    )
+    coverage_state = _calendar_coverage_state(
+        snapshot,
+        coverage=coverage,
+        metadata=metadata,
+        raw_metadata=raw_metadata,
+        raw_combined=raw_combined,
+        rejected_count=rejected_count,
+        has_rows=has_rows,
+    )
+    if coverage_state is not None:
+        return coverage_state
+    return _calendar_receipt_state(snapshot, metadata=metadata)
+
+
+def _calendar_coverage_state(
+    snapshot: DashboardSnapshot,
+    *,
+    coverage: Any,
+    metadata: Mapping[str, Any],
+    raw_metadata: Mapping[str, Any],
+    raw_combined: str,
+    rejected_count: float | None,
+    has_rows: bool,
+) -> _CalendarState | None:
     if has_rows:
+        if coverage.status == "degraded":
+            return _CalendarState(
+                "degraded",
+                "Incomplete snapshot",
+                "warning",
+                "Calendar rows have coverage gaps",
+                (
+                    f"{coverage.detail} Admitted rows remain visible, but this is not a fully "
+                    "verified-empty or complete-coverage claim."
+                ),
+                True,
+                metadata,
+            )
         return _CalendarState(
             "observed",
-            "Observed for this exact generation",
+            "Verified snapshot",
             "positive",
-            "Calendar coverage is current",
-            "Only fingerprint-bound rows from the current operator generation are shown.",
+            "Calendar snapshot verified",
+            (
+                "Fingerprint-bound rows from the exact operator generation are available. "
+                "Active, upcoming, and past status is derived at dashboard read time."
+            ),
             False,
             metadata,
         )
 
+    if coverage.status == "healthy_empty":
+        return _CalendarState(
+            "healthy_empty",
+            "Observed · no scheduled events",
+            "positive",
+            "The observed calendar is empty",
+            coverage.detail,
+            False,
+            metadata,
+        )
+    if coverage.status == "not_configured":
+        if not raw_metadata:
+            legacy = _source_pack_calendar_state(snapshot)
+            if legacy is not None:
+                return legacy
+        return _CalendarState(
+            "not_configured",
+            "Not configured",
+            "muted",
+            "No calendar snapshot was configured",
+            (
+                "Calendar acquisition was not configured for this generation; zero rows is "
+                "not evidence that no scheduled events exist."
+            ),
+            True,
+            metadata,
+        )
+    if coverage.status in {"rejected", "stale"}:
+        if coverage.status == "stale":
+            message = (
+                "The configured calendar snapshot was stale and was not admitted. Zero rows "
+                "is not evidence that no scheduled events exist."
+            )
+        elif rejected_count is not None and rejected_count > 0:
+            message = (
+                "Retained calendar rows failed unified-calendar normalization. Zero rows is "
+                "not evidence that no scheduled events exist."
+            )
+        elif "fixture" in raw_combined:
+            message = (
+                "Fixture, test, mock, or replay calendar provenance was rejected for this live "
+                "generation. Zero rows is not evidence that no scheduled events exist."
+            )
+        else:
+            message = coverage.detail
+        return _CalendarState(
+            coverage.status,
+            "Snapshot rejected" if coverage.status == "rejected" else "Snapshot stale",
+            "danger",
+            "Calendar input did not pass admission" if coverage.status == "rejected" else "Calendar input is out of date",
+            message,
+            True,
+            metadata,
+        )
+    if coverage.status in {"degraded", "unavailable"}:
+        return _CalendarState(
+            "unavailable",
+            "Coverage incomplete" if coverage.status == "degraded" else "Coverage unavailable",
+            "warning",
+            "Calendar coverage is incomplete" if coverage.status == "degraded" else "Calendar acquisition is unavailable",
+            coverage.detail,
+            True,
+            metadata,
+        )
+    return None
+
+
+def _calendar_receipt_state(
+    snapshot: DashboardSnapshot,
+    *,
+    metadata: Mapping[str, Any],
+) -> _CalendarState:
     status = _token(metadata.get("status"))
     error = _token(metadata.get("error_class") or metadata.get("error"))
     configured = metadata.get("configured")
-    rejected_count = _finite_number(metadata.get("normalization_rejected_count")) or 0.0
+    rejected_count = (
+        _finite_number(metadata.get("normalization_rejected_count")) or 0.0
+    )
     combined = f"{status} {error}"
     if rejected_count > 0 or any(word in combined for word in ("reject", "invalid", "fixture_provenance")):
         rejection_message = (
@@ -316,27 +508,100 @@ def _calendar_state_panel(
     snapshot: DashboardSnapshot,
 ) -> HtmlFragment:
     count = (
-        f"{row_count} exact-generation event{'s' if row_count != 1 else ''}."
+        f"{row_count} exact-generation event{'s' if row_count != 1 else ''}"
         if row_count
-        else "No exact-generation events."
+        else "No exact-generation events"
     )
-    action = ""
-    if state.needs_snapshot_action:
-        action = f'<p class="next-action"><strong>Next safe action:</strong> {escape_html(_NEXT_SAFE_ACTION)}.</p>'
-    elif state.key == "healthy_empty":
-        action = (
-            '<p class="next-action"><strong>Next safe action:</strong> No corrective action is required. '
-            f'For a newer operator snapshot, {escape_html(_NEXT_SAFE_ACTION)}.</p>'
-        )
+    action = _calendar_operator_action(state)
     metadata = _calendar_metadata_disclosure(state.metadata, snapshot=snapshot)
+    if state.key == "observed":
+        return HtmlFragment(
+            '<section class="panel calendar-coverage calendar-coverage--verified" '
+            'aria-labelledby="calendar-coverage-title">'
+            '<div class="calendar-coverage__heading"><div>'
+            '<p class="eyebrow">Exact-generation calendar</p>'
+            f'<h2 id="calendar-coverage-title">{escape_html(state.title)}</h2></div>'
+            f'{badge(state.key, tone=state.tone, label=state.label)}</div>'
+            '<p class="calendar-coverage__receipt">'
+            f'<strong>{escape_html(count)}</strong> · fingerprint-bound to this operator generation; '
+            'timing is evaluated at dashboard read time.</p>'
+            f'{metadata}</section>'
+        )
     return HtmlFragment(
         '<section class="panel calendar-coverage" aria-labelledby="calendar-coverage-title">'
         '<div class="section-heading cluster"><div><p class="eyebrow">Exact-generation coverage</p>'
         f'<h2 id="calendar-coverage-title">{escape_html(state.title)}</h2></div>'
         f'{badge(state.key, tone=state.tone, label=state.label)}</div>'
-        f'<p>{escape_html(state.message)} <span class="muted">{escape_html(count)}</span></p>'
+        f'<p>{escape_html(state.message)} <span class="muted">{escape_html(count)}.</span></p>'
         f'{action}{metadata}</section>'
     )
+
+
+def _past_event_summary(count: int) -> HtmlFragment:
+    return HtmlFragment(
+        '<section class="panel calendar-past-summary" aria-labelledby="calendar-past-title">'
+        '<div class="section-heading cluster"><div><p class="eyebrow">Historical schedule</p>'
+        '<h2 id="calendar-past-title">Past events</h2></div>'
+        f'<span class="count-label">{count}</span></div>'
+        f'<p>{count} event{"s" if count != 1 else ""} from this verified snapshot '
+        'are preserved as historical context and excluded from the default current-risk view.</p>'
+        + str(
+            link(
+                f'Review {count} past event{"s" if count != 1 else ""}',
+                "/calendar?time=past",
+                css_class="button button-quiet",
+            )
+        )
+        + '</section>'
+    )
+
+
+def _calendar_operator_action(state: _CalendarState) -> str:
+    if state.needs_snapshot_action:
+        explanation = (
+            "Calendar coverage is not available for this generation. Review System Health "
+            "to see whether the snapshot is missing, stale, rejected, or unavailable before "
+            "starting another no-send readiness check."
+        )
+        setup = _calendar_setup_disclosure(optional=False)
+    elif state.key == "healthy_empty":
+        explanation = (
+            "No corrective action is required. Review System Health for the accepted coverage "
+            "receipt, or open the optional setup instructions before requesting a newer snapshot."
+        )
+        setup = _calendar_setup_disclosure(optional=True)
+    elif state.key == "untrusted":
+        explanation = (
+            "Current calendar content is suppressed. Review System Health before relying on "
+            "this generation."
+        )
+        setup = ""
+    else:
+        return ""
+    health_link = link(
+        "Review System Health",
+        "/health",
+        aria_label="Review calendar coverage in System Health",
+        css_class="button button-primary",
+    )
+    return (
+        '<div class="calendar-operator-action"><p><strong>Operator next step:</strong> '
+        f'{escape_html(explanation)}</p>{health_link}</div>{setup}'
+    )
+
+
+def _calendar_setup_disclosure(*, optional: bool) -> str:
+    prefix = (
+        "Optional refresh: "
+        if optional
+        else "Use only a fresh, non-fixture, operator-verified local snapshot. "
+    )
+    body = HtmlFragment(
+        f'<p>{escape_html(prefix)}The Calendar page never enables a provider or performs a request.</p>'
+        '<p class="next-action"><strong>Exact local readiness sequence:</strong> '
+        f'{escape_html(_NEXT_SAFE_ACTION)}.</p>'
+    )
+    return str(disclosure("Calendar readiness and setup instructions", body))
 
 
 def _calendar_metadata_disclosure(
@@ -350,24 +615,51 @@ def _calendar_metadata_disclosure(
         count_text = ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
     elif metadata.get("retained_row_count") is not None:
         count_text = str(metadata.get("retained_row_count"))
+    canonical_coverage = _calendar_coverage_label(
+        metadata.get("canonical_coverage_status")
+    )
     items = (
-        ("Recorded status", metadata.get("status") or UNAVAILABLE),
+        ("Recorded status", metadata.get("status") or "Not recorded"),
         ("Coverage receipt", _calendar_receipt_label(metadata)),
-        ("Configured", metadata.get("configured") if metadata.get("configured") is not None else UNAVAILABLE),
-        ("Read error class", metadata.get("error_class") or metadata.get("error") or "None recorded"),
+        ("Configured", metadata.get("configured") if metadata.get("configured") is not None else "Not recorded"),
+        ("Read error class", metadata.get("error_class") or metadata.get("error") or "Not recorded"),
         ("Retained / reported counts", count_text or "Not recorded"),
-        ("Normalization rejected", metadata.get("normalization_rejected_count") or 0),
+        (
+            "Normalization rejected",
+            metadata.get("normalization_rejected_count")
+            if metadata.get("normalization_rejected_count") is not None
+            else "Not recorded",
+        ),
         ("Legacy source-pack statuses", ", ".join(metadata.get("legacy_source_pack_statuses") or ()) or "Not applicable"),
         (
             "Current generation",
             f"Current generation: {snapshot.artifact_namespace}; namespace-local core store rows {snapshot.cumulative_store_count}",
         ),
     )
-    return disclosure("Exact calendar coverage metadata", definition_list(items))
+    body = HtmlFragment(
+        '<p class="calendar-coverage__authority"><strong>Canonical coverage:</strong> '
+        f'{escape_html(canonical_coverage)}</p>{definition_list(items)}'
+    )
+    return disclosure("Producer receipt metadata", body)
+
+
+def _calendar_coverage_label(value: object) -> str:
+    status = _token(value)
+    return {
+        "healthy_nonempty": "Complete",
+        "healthy_empty": "Complete · no scheduled events",
+        "degraded": "Incomplete",
+        "not_configured": "Not configured",
+        "rejected": "Rejected",
+        "stale": "Stale",
+        "unavailable": "Unavailable",
+    }.get(status, humanize_enum(status) if status else "Not recorded")
 
 
 def _calendar_receipt_label(metadata: Mapping[str, Any]) -> str:
-    parts = [f"status={metadata.get('status') or 'unknown'}"]
+    parts = []
+    if metadata.get("status") is not None:
+        parts.append(f"status={metadata.get('status')}")
     configured = metadata.get("configured")
     if configured is not None:
         parts.append(f"configured={str(configured).lower() if isinstance(configured, bool) else configured}")
@@ -386,7 +678,7 @@ def _calendar_receipt_label(metadata: Mapping[str, Any]) -> str:
     ):
         if metadata.get(field) is not None:
             parts.append(f"{field}={metadata.get(field)}")
-    return "; ".join(parts)
+    return "; ".join(parts) or "Not recorded"
 
 
 def _filter_controls(
@@ -399,26 +691,54 @@ def _filter_controls(
     categories = sorted({value for row in rows for value in _category_tokens(row)})
     scopes = sorted({_scope(row) for row in rows})
     search = escape_html(filters.get("search", ""))
-    fields = (
+    primary_fields = (
         '<label class="filter-search" for="calendar-search"><span>Search</span>'
         f'<input id="calendar-search" name="search" type="search" maxlength="120" value="{search}" '
         'placeholder="Event, asset, or source"></label>'
         + _select("importance", "Importance", importance, filters.get("importance"))
-        + _select("category", "Category", categories, filters.get("category"))
+        + _time_select(filters["time"])
+    )
+    advanced_fields = (
+        _select("category", "Category", categories, filters.get("category"))
         + _select("scope", "Scope", scopes, filters.get("scope"))
     )
-    summary = (
+    advanced_count = sum(1 for name in ("category", "scope") if filters.get(name))
+    advanced_open = " open" if advanced_count else ""
+    result_summary = (
         f'<p class="result-summary" role="status">Showing <strong>{selected_count}</strong> of '
-        f'<strong>{len(rows)}</strong> exact-generation events, ordered chronologically.</p>'
+        f'<strong>{len(rows)}</strong> exact-generation events for the '
+        f'{escape_html(_time_filter_label(filters["time"]).casefold())} view.</p>'
     )
-    return HtmlFragment(
-        '<form class="filter-panel calendar-filters" action="/calendar" method="get" '
-        'aria-label="Filter calendar events"><div class="section-heading"><div>'
+    form = (
+        '<form class="filter-panel embedded-filter-panel calendar-filters" action="/calendar" '
+        'method="get" aria-label="Filter calendar events"><div class="section-heading"><div>'
         '<p class="eyebrow">Calendar controls</p><h2>Find scheduled risk</h2></div></div>'
-        f'<div class="filter-grid">{fields}</div><div class="filter-actions cluster">'
+        f'<div class="filter-grid">{primary_fields}</div>'
+        '<details class="disclosure filter-advanced"'
+        + advanced_open
+        + '><summary><span>More calendar filters</span>'
+        + f'<span class="filter-chip">{advanced_count} active</span></summary>'
+        + f'<div class="disclosure__body"><div class="filter-grid">{advanced_fields}</div></div></details>'
+        '<div class="filter-actions cluster">'
         '<button class="button button-primary" type="submit">Apply filters</button>'
         '<a class="button button-quiet" href="/calendar">Clear</a></div>'
-        f'{summary}</form>'
+        f'{result_summary}</form>'
+    )
+    active_count = sum(
+        1 for name in ("search", "importance", "category", "scope") if filters.get(name)
+    ) + (1 if filters.get("time", "current") != "current" else 0)
+    open_attr = " open" if active_count else ""
+    disclosure_summary = (
+        f"{active_count} active · {selected_count} shown"
+        if active_count
+        else f"{selected_count} current"
+    )
+    return HtmlFragment(
+        '<details class="disclosure filter-disclosure calendar-filter-disclosure"'
+        + open_attr
+        + '><summary><span>Filter calendar events</span>'
+        f'<span class="disclosure__summary">{escape_html(disclosure_summary)}</span></summary>'
+        f'<div class="disclosure__body">{form}</div></details>'
     )
 
 
@@ -434,6 +754,22 @@ def _select(name: str, label: str, values: Iterable[str], selected: str | None) 
         f'<select id="calendar-{escape_html(name)}" name="{escape_html(name)}">'
         f'{"".join(options)}</select></label>'
     )
+
+
+def _time_select(selected: str) -> str:
+    options = "".join(
+        f'<option value="{escape_html(value)}"'
+        f'{" selected" if value == selected else ""}>{escape_html(label)}</option>'
+        for value, label in _TIME_FILTER_OPTIONS
+    )
+    return (
+        '<label for="calendar-time"><span>Time</span>'
+        f'<select id="calendar-time" name="time">{options}</select></label>'
+    )
+
+
+def _time_filter_label(value: str) -> str:
+    return dict(_TIME_FILTER_OPTIONS).get(value, "Active + upcoming")
 
 
 def _filter_label(name: str, value: str) -> str:
@@ -475,32 +811,68 @@ def _event_card(
         else HtmlFragment(f'<span class="unavailable">{escape_html(source[0])} · source link unavailable</span>')
     )
     high_impact = importance in {"critical", "high"}
+    temporal_state = str(row.get(_TEMPORAL_STATE_FIELD) or "upcoming")
     classes = "calendar-event-card card" + (" calendar-event-card--high-impact" if high_impact else "")
     heading_id = f"calendar-event-{index}"
-    context_parts = []
-    if metrics:
-        context_parts.append(str(metrics))
-    context_parts.append(
-        '<div class="calendar-context grid"><div><h4>Affected scope</h4>'
-        + str(chips(assets or ("market_wide",), aria_label="Affected assets"))
+    visible_context = (
+        '<div class="calendar-context grid"><div><h4>Affected assets</h4>'
+        + str(chips(
+            assets or ("Market-wide",),
+            aria_label="Affected assets",
+            humanize=False,
+        ))
         + '</div><div><h4>Impact window</h4><p>'
         + escape_html(impact)
-        + "</p></div><div><h4>Display reminders</h4>"
-        + str(chips(reminders, aria_label="Display reminder windows", empty="None recorded"))
-        + "</div></div>"
+        + "</p></div></div>"
     )
-    ideas_html = _ideas_block(ideas)
-    metadata = disclosure("Exact event metadata", _event_metadata(row))
+    detail_sections = []
+    if metrics:
+        detail_sections.append(
+            '<section class="calendar-detail-section"><h4>Release data</h4>'
+            + str(metrics)
+            + '</section>'
+        )
+    detail_sections.append(
+        '<section class="calendar-detail-section"><h4>Display reminders</h4>'
+        + str(chips(reminders, aria_label="Display reminder windows", empty="None recorded"))
+        + '</section>'
+    )
+    detail_sections.append(
+        '<section class="calendar-detail-section"><h4>Related ideas</h4>'
+        + _ideas_block(ideas)
+        + '</section>'
+    )
+    provenance = HtmlFragment(
+        f'<footer class="calendar-event-card__footer">{source_html}</footer>'
+        + str(_event_metadata(row))
+    )
+    detail_sections.append(
+        '<section class="calendar-detail-section"><h4>Source and provenance</h4>'
+        + str(provenance)
+        + '</section>'
+    )
+    details = str(
+        disclosure(
+            "Event details",
+            HtmlFragment("".join(detail_sections)),
+            summary=(
+                f'{len(reminders)} reminder{"s" if len(reminders) != 1 else ""} · '
+                f'{len(ideas)} linked idea{"s" if len(ideas) != 1 else ""}'
+            ),
+            css_class="calendar-event-details",
+        )
+    )
     return HtmlFragment(
         f'<article class="{classes}" aria-labelledby="{heading_id}">'
         '<header class="calendar-event-card__header"><div class="badge-row cluster">'
         f'{badge(importance, tone=_importance_tone(importance), label=f"{humanize_enum(importance)} impact")}'
         f'{badge(category, tone="info", label=humanize_enum(category))}'
-        f'{badge(scope, tone="neutral", label=_filter_label("scope", scope))}'
-        f'{badge(certainty, tone="positive" if exact_time else "warning", label=_certainty_label(certainty, has_window=not exact_time and _has_window(row)))}'
-        f'</div><h3 id="{heading_id}">{escape_html(title)}</h3>{timing}</header>'
-        f'<div class="calendar-event-card__body">{"".join(context_parts)}{ideas_html}'
-        f'<footer class="calendar-event-card__footer">{source_html}</footer>{metadata}</div></article>'
+        f'{badge(temporal_state, tone=_temporal_tone(temporal_state), label=_temporal_label(temporal_state))}'
+        f'</div><p class="calendar-event-meta">{escape_html(_filter_label("scope", scope))} · '
+        f'{escape_html(_certainty_label(certainty, has_window=not exact_time and _has_window(row)))}</p>'
+        f'<h3 id="{heading_id}">{escape_html(title)}</h3>{timing}</header>'
+        f'<div class="calendar-event-card__body">{visible_context}{details}'
+        '</div></article>'
     )
 
 
@@ -554,7 +926,7 @@ def _economic_metrics(row: Mapping[str, Any]) -> HtmlFragment:
         _metric_value(value, signed=signed) for _, value, signed in values
     )
     return HtmlFragment(
-        '<div class="calendar-release-data" aria-label="Release data"><h4>Release data</h4>'
+        '<div class="calendar-release-data" aria-label="Release data">'
         f'{definition_list(items, css_class="metric-grid")}'
         '<p class="release-sequence"><strong>Previous / forecast / actual / surprise:</strong> '
         f'{escape_html(sequence)}</p></div>'
@@ -573,7 +945,7 @@ def _metric_value(value: object, *, signed: bool) -> str:
 
 def _ideas_block(ideas: tuple[tuple[Mapping[str, Any], str], ...]) -> str:
     if not ideas:
-        return '<div class="nearby-ideas"><h4>Nearby active ideas</h4><p class="muted">No active exact-generation idea is linked by calendar evidence or affected asset.</p></div>'
+        return '<div class="nearby-ideas"><p class="muted">No active exact-generation idea is linked by calendar evidence or affected asset.</p></div>'
     items = []
     for row, match in ideas:
         identifier = candidate_identifier(row)
@@ -586,7 +958,7 @@ def _ideas_block(ideas: tuple[tuple[Mapping[str, Any], str], ...]) -> str:
             + f'<span class="muted">{escape_html(_operator_text(row.get("why_now"), reason=True, fallback="Open the idea for decision context."))}</span>'
             + f'</div>{badge(match, tone="info", label=match_label)}</li>'
         )
-    return '<div class="nearby-ideas"><h4>Nearby active ideas</h4><ul class="idea-link-list">' + "".join(items) + "</ul></div>"
+    return '<div class="nearby-ideas"><ul class="idea-link-list">' + "".join(items) + "</ul></div>"
 
 
 def _nearby_ideas(
@@ -661,31 +1033,97 @@ def _event_metadata(row: Mapping[str, Any]) -> HtmlFragment:
     return definition_list(items, css_class="technical-grid")
 
 
-def _raw_impact_window(row: Mapping[str, Any]) -> str:
-    before = str(row.get("impact_window_before") or "").strip()
-    after = str(row.get("impact_window_after") or "").strip()
-    if before and after:
-        return f"-{before} / +{after}"
-    if before:
-        return f"-{before}"
-    if after:
-        return f"+{after}"
-    return "Not recorded"
+def _calendar_event_projection(
+    row: Mapping[str, Any],
+    *,
+    clock: str | None,
+) -> Mapping[str, Any]:
+    """Return a presentation-only temporal projection without changing the artifact row."""
+
+    projected = dict(row)
+    projected[_TEMPORAL_STATE_FIELD] = _calendar_temporal_state(row, clock=clock)
+    return projected
+
+
+def _calendar_temporal_state(
+    row: Mapping[str, Any],
+    *,
+    clock: str | None,
+) -> str:
+    checked_at = _parse_instant(clock)
+    if checked_at is None:
+        return "upcoming"
+    start, end = _calendar_event_bounds(row)
+    if start is None or end is None:
+        return "upcoming"
+    before = _duration_seconds(row.get("impact_window_before")) or 0.0
+    after = _duration_seconds(row.get("impact_window_after")) or 0.0
+    active_start = start - timedelta(seconds=before)
+    active_end = end + timedelta(seconds=after)
+    if checked_at < active_start:
+        return "upcoming"
+    if checked_at <= active_end:
+        return "active"
+    return "past"
+
+
+def calendar_temporal_state(
+    row: Mapping[str, Any],
+    *,
+    clock: str | None,
+) -> str:
+    """Expose the read-time calendar state for other dashboard summaries."""
+
+    return _calendar_temporal_state(row, clock=clock)
+
+
+def _calendar_event_bounds(
+    row: Mapping[str, Any],
+) -> tuple[datetime | None, datetime | None]:
+    if _has_window(row):
+        start = _parse_instant(row.get("window_start"))
+        end = _parse_instant(row.get("window_end"))
+        start = start or end
+        end = end or start
+    else:
+        scheduled = _parse_instant(row.get("scheduled_at"))
+        if scheduled is not None and _token(row.get("time_certainty")) in {
+            "date_known",
+            "date_only",
+            "day_only",
+        }:
+            start = scheduled.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=1) - timedelta(microseconds=1)
+        else:
+            start = scheduled
+            end = scheduled
+    if start is not None and end is not None and end < start:
+        return end, start
+    return start, end
 
 
 def _calendar_query(query: Mapping[str, str] | None) -> dict[str, str]:
+    values: dict[str, str] = {"time": "current"}
     if not isinstance(query, Mapping):
-        return {}
-    values: dict[str, str] = {}
+        return values
     for field in _FILTER_FIELDS:
         raw = query.get(field)
         text = str(raw).strip().casefold() if isinstance(raw, str) else ""
         if text and len(text) <= 120:
             values[field] = text
+    allowed_time = {value for value, _label in _TIME_FILTER_OPTIONS}
+    if values["time"] not in allowed_time:
+        values["time"] = "current"
     return values
 
 
 def _matches_filters(row: Mapping[str, Any], filters: Mapping[str, str]) -> bool:
+    temporal_state = str(row.get(_TEMPORAL_STATE_FIELD) or "upcoming")
+    time_filter = filters.get("time") or "current"
+    if time_filter == "current" and temporal_state not in {"active", "upcoming"}:
+        return False
+    if time_filter in {"active", "upcoming", "past"} and temporal_state != time_filter:
+        return False
     if filters.get("importance") and filters["importance"] != _importance(row):
         return False
     if filters.get("category") and filters["category"] not in _category_tokens(row):
@@ -714,233 +1152,31 @@ def _group_events(
     rows: tuple[Mapping[str, Any], ...],
     *,
     clock: str | None,
+    reverse: bool = False,
 ) -> tuple[tuple[str, tuple[Mapping[str, Any], ...]], ...]:
-    ordered = sorted(rows, key=_event_sort_key)
+    ordered = sorted(rows, key=_event_sort_key, reverse=reverse)
+    active = tuple(
+        row for row in ordered
+        if calendar_temporal_state(row, clock=clock) == "active"
+    )
+    active_ids = {id(row) for row in active}
     groups: OrderedDict[date | None, list[Mapping[str, Any]]] = OrderedDict()
     for row in ordered:
+        if id(row) in active_ids:
+            continue
         instant = _event_instant(row)
         local_day = instant.astimezone().date() if instant is not None else None
         groups.setdefault(local_day, []).append(row)
     current = _parse_instant(clock)
     current_day = current.astimezone().date() if current is not None else datetime.now().astimezone().date()
-    return tuple(
+    dated = tuple(
         (
             _day_heading(day, current_day),
             tuple(group_rows),
         )
         for day, group_rows in groups.items()
     )
+    return (("Active now", active), *dated) if active else dated
 
 
-def _event_sort_key(row: Mapping[str, Any]) -> tuple[datetime, str]:
-    instant = _event_instant(row) or datetime.max.replace(tzinfo=_UTC)
-    return instant, str(row.get("title") or "").casefold()
-
-
-def _event_instant(row: Mapping[str, Any]) -> datetime | None:
-    for field in ("window_start", "scheduled_at", "window_end"):
-        parsed = _parse_instant(row.get(field))
-        if parsed is not None:
-            return parsed
-    return None
-
-
-def _parse_instant(value: object) -> datetime | None:
-    if isinstance(value, datetime):
-        parsed = value
-    elif isinstance(value, date):
-        parsed = datetime(value.year, value.month, value.day, tzinfo=_UTC)
-    elif isinstance(value, str) and value.strip():
-        raw = value.strip()
-        normalized = raw[:-1] + "+00:00" if raw.endswith(("Z", "z")) else raw
-        try:
-            parsed = datetime.fromisoformat(normalized)
-        except ValueError:
-            try:
-                parsed_date = date.fromisoformat(normalized)
-            except ValueError:
-                return None
-            parsed = datetime(parsed_date.year, parsed_date.month, parsed_date.day, tzinfo=_UTC)
-    else:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=_UTC)
-    return parsed.astimezone(_UTC)
-
-
-def _day_heading(day: date | None, current: date) -> str:
-    if day is None:
-        return "Date to be confirmed"
-    relative = ""
-    if day == current:
-        relative = "Today · "
-    elif (day - current).days == 1:
-        relative = "Tomorrow · "
-    year = f", {day.year}" if day.year != current.year else ""
-    return f"{relative}{day:%A, %B} {day.day}{year}"
-
-
-def _importance(row: Mapping[str, Any]) -> str:
-    return _token(row.get("importance") or row.get("impact")) or "unknown"
-
-
-def _importance_sort(value: str) -> tuple[int, str]:
-    return ({"critical": 0, "high": 1, "medium": 2, "low": 3}.get(value, 9), value)
-
-
-def _importance_tone(value: str) -> str:
-    return {"critical": "danger", "high": "warning", "medium": "info", "low": "neutral"}.get(value, "muted")
-
-
-def _certainty_label(value: str, *, has_window: bool = False) -> str:
-    if has_window:
-        return "Scheduled window"
-    labels = {
-        "confirmed": "Confirmed time",
-        "exact": "Confirmed time",
-        "scheduled": "Scheduled time",
-        "window": "Scheduled window",
-        "range": "Scheduled window",
-        "approximate": "Approximate time",
-        "estimated": "Approximate time",
-        "date_only": "Date known · time unconfirmed",
-        "unknown": "Timing unconfirmed",
-        "unconfirmed": "Timing unconfirmed",
-    }
-    return labels.get(value, "Timing certainty not recorded")
-
-
-def _event_is_exact(row: Mapping[str, Any]) -> bool:
-    certainty = _token(row.get("time_certainty"))
-    return (
-        certainty in {"confirmed", "exact", "scheduled"}
-        and row.get("scheduled_at") not in (None, "")
-        and not _has_window(row)
-    )
-
-
-def _has_window(row: Mapping[str, Any]) -> bool:
-    return row.get("window_start") not in (None, "") or row.get("window_end") not in (None, "")
-
-
-def _category_tokens(row: Mapping[str, Any]) -> tuple[str, ...]:
-    values: list[object] = [row.get("category"), row.get("event_category"), row.get("event_kind")]
-    values.extend(_iter_values(row.get("categories")))
-    return tuple(dict.fromkeys(value for item in values if (value := _token(item))))
-
-
-def _scope(row: Mapping[str, Any]) -> str:
-    explicit = _token(row.get("scope") or row.get("market_scope"))
-    if explicit in {"global", "market", "market_wide"}:
-        return "market_wide"
-    if explicit in {"asset", "asset_specific", "token_specific"}:
-        return "asset_specific"
-    assets = _asset_tokens(row)
-    return "market_wide" if not assets or assets & _GLOBAL_ASSETS else "asset_specific"
-
-
-def _assets(row: Mapping[str, Any]) -> tuple[str, ...]:
-    return tuple(str(value).strip() for value in _iter_values(row.get("affected_assets")) if str(value).strip())
-
-
-def _asset_tokens(row: Mapping[str, Any]) -> set[str]:
-    return {_asset_token(value) for value in _assets(row) if _asset_token(value)}
-
-
-def _asset_token(value: object) -> str:
-    return str(value or "").strip().upper().replace("-", "_").replace(" ", "_")
-
-
-def _impact_window(row: Mapping[str, Any]) -> str:
-    before = _duration_value(row.get("impact_window_before"))
-    after = _duration_value(row.get("impact_window_after"))
-    if before != UNAVAILABLE and after != UNAVAILABLE:
-        return f"From {before} before through {after} after"
-    if before != UNAVAILABLE:
-        return f"Begins {before} before the event"
-    if after != UNAVAILABLE:
-        return f"Continues {after} after the event"
-    return "Not recorded"
-
-
-def _reminder_labels(value: object) -> tuple[str, ...]:
-    labels = []
-    for item in _iter_values(value):
-        raw = item.get("offset") if isinstance(item, Mapping) else item
-        label = _duration_value(raw)
-        if label != UNAVAILABLE:
-            labels.append(f"{label} before")
-    return tuple(labels)
-
-
-def _duration_value(value: object) -> str:
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return format_duration(value)
-    match = _DURATION.fullmatch(str(value or ""))
-    if not match:
-        return UNAVAILABLE
-    magnitude = float(match.group(1))
-    unit = match.group(2).casefold()
-    multiplier = {
-        "s": 1,
-        "sec": 1,
-        "m": 60,
-        "min": 60,
-        "h": 3600,
-        "hr": 3600,
-        "d": 86400,
-        "day": 86400,
-        "w": 604800,
-        "week": 604800,
-    }[unit]
-    return format_duration(magnitude * multiplier)
-
-
-def _source(row: Mapping[str, Any]) -> tuple[str, str]:
-    label = _operator_text(
-        row.get("source") or row.get("provider"),
-        fallback="Recorded source",
-    )
-    raw = str(row.get("source_url") or "").strip()
-    if not raw:
-        return label, ""
-    safe_url = safe_external_href(raw)
-    if safe_url is None:
-        return label, ""
-    return label, safe_url
-
-
-def _operator_text(value: object, *, reason: bool = False, fallback: str) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return fallback
-    if "_" in text and not any(character.isspace() for character in text):
-        return humanize_reason(text) if reason else humanize_enum(text)
-    return text
-
-
-def _iter_values(value: object) -> tuple[object, ...]:
-    if value is None:
-        return ()
-    if isinstance(value, (str, bytes, Mapping)):
-        return (value,)
-    if isinstance(value, Iterable):
-        return tuple(value)
-    return (value,)
-
-
-def _token(value: object) -> str:
-    return str(value or "").strip().casefold().replace("-", "_").replace(" ", "_")
-
-
-def _finite_number(value: object) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return number if math.isfinite(number) else None
-
-
-__all__ = ("render_calendar_page",)
+__all__ = ("calendar_temporal_state", "render_calendar_page")

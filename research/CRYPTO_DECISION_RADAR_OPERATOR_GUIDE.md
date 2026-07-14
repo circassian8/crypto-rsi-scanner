@@ -36,9 +36,15 @@ campaign cadence is eligible; the dashboard never sets that authorization.
 ### Today
 
 The command center answers what needs attention now and whether the generation
-is safe to interpret. It shows the exact trust/mode/doctor state, prioritized
+is safe to interpret. It shows the exact trust, data mode, validation state, prioritized
 Decision routes, calendar and provider constraints, market observations,
 campaign maturity, pending outcomes, and meaningful generation changes.
+
+A sole specialist route is named directly (`1 risk watch`, for example) rather
+than being overstated as a generic actionable idea. Compact attention cards lead
+with route, symbol, directional posture, actionability/evidence/risk, current
+thesis, and research window. Expired and diagnostic rows never inflate the
+current queue; they remain in separately labeled disclosures.
 
 Zero current ideas is not automatically a failure. If the page shows evaluated
 assets and zero anomaly/idea rows, the assets passed into the exact observation
@@ -65,6 +71,13 @@ CoinGecko volume or turnover is a proxy, not order-book depth. Missing spread
 means unavailable; it may permit a dashboard watch but cannot be invented to
 justify an actionable or rapid route.
 
+An anomaly card is scanner evidence, not a Decision route. It leads with the
+observed move, keeps missing scanner strength secondary, and links the exact
+asset to any separately gated canonical Decision. Wide displays use a compact
+comparison table; laptop widths use balanced two-column observation cards where
+space permits; phones use one-column cards. Provider coin IDs remain in Context
+or More market evidence rather than displacing the operator-facing symbol.
+
 For a mixed integrated generation without a market-only receipt, these are
 independent layer counts rather than one arrow chain. Catalyst-, technical-,
 derivatives-, on-chain-, fundamental-, and macro-led ideas are not presented as
@@ -75,6 +88,13 @@ if they descended from absent market anomalies.
 Ideas can be searched, sorted, and filtered by route, origins, bias, scores,
 timing, phase, catalyst, tradability, spread, freshness, horizon, and data mode.
 Selected filters remain visible and can be cleared.
+
+The comparison matrix appears only when at least two current ideas exist.
+Filters and advanced controls stay collapsed until selected, so a one-idea view
+does not lead with an empty comparison affordance.
+Expired operator-visible ideas remain labeled historical context. A canonical
+diagnostic row stays behind the diagnostics opt-in even after expiry; expiry
+never grants it default visibility or direct-detail access.
 
 Idea Detail leads with the canonical Decision v2 interpretation: route, bias,
 actionability, evidence confidence, risk, urgency, chase risk, origins,
@@ -91,6 +111,9 @@ Calendar rows are grouped chronologically with importance/category filters,
 affected assets, countdowns, forecast/previous/actual/surprise fields, reminder
 windows, safe source links, and nearby current ideas. Exact times, date-only
 events, tentative dates, and expected windows are presented differently.
+An active risk window is grouped under **Active now**, ahead of future dates;
+past events remain collapsed by default. A date-only event remains current
+through its known UTC date instead of becoming past at midnight.
 
 An empty live calendar must name its coverage state. `Not configured` means the
 generation did not inspect a real calendar source; it does not mean there are no
@@ -123,9 +146,9 @@ explicit cohorts with sample-size warnings. Feedback is optional preference
 data and never a prerequisite for idea visibility or an automatic threshold
 change.
 
-### Campaign History
+### Run History
 
-Campaign History shows bounded immutable attempts, the latest attempt, provider
+Run History shows bounded immutable attempts, the latest attempt, provider
 request result, authorization state, namespace, data mode, route/candidate
 counts, baseline progression, doctor/publication state, reservation/cadence,
 and the next eligible observation. Historical generations provide context only;
@@ -153,11 +176,23 @@ itself.
 
 ## Trust and display states
 
-The top trust strip distinguishes current versus untrusted authority, live real
-data versus fixture/replay/cache modes, no-send state, campaign eligibility, and
-strict-doctor status. Local human time is primary; exact UTC remains available
-in accessible details. Missing values render as `Unavailable`, not as zero,
-`None`, `null`, or manufactured precision.
+The top trust strip distinguishes current versus untrusted authority, live data
+versus fixture/replay/cache modes, no-send state, campaign eligibility, and
+validation status. Local human time and relative expiry are primary; exact UTC
+and full run identity remain available in accessible or technical details.
+Missing values render as `Unavailable`, not as zero, `None`, `null`, or
+manufactured precision. Trader-facing surfaces say `Integrity checks` and
+`Validation passed`; strict-doctor terms remain in the exact technical contract.
+Missing boolean receipts say `Not recorded` instead of implying `No`, and every
+relative timestamp is measured from the exact generation's authority-check
+clock rather than the workstation wall clock.
+
+Supporting filters, historical samples, compatibility tables, source receipts,
+and technical hashes are collapsed by default. At 320px the compact masthead,
+2×2 health summary, and readable score cards keep the first operator action in
+the initial viewport; at intermediate widths KPI grids rebalance rather than
+forcing narrow five-column cards. These layout changes never hide the visible
+research-only, human-decision-required, no-execution statement.
 
 The supporting layers use distinct states:
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from html import escape
 from itertools import islice
 import math
@@ -22,7 +23,7 @@ ValueFormat = Literal["number", "price", "compact", "percent", "score"]
 
 _VIEWBOX_WIDTH = 640.0
 _VIEWBOX_HEIGHT = 180.0
-_PLOT_LEFT = 54.0
+_PLOT_LEFT = 76.0
 _PLOT_RIGHT = 622.0
 _PLOT_TOP = 32.0
 _PLOT_BOTTOM = 142.0
@@ -403,6 +404,7 @@ def _value_extent(
     kind: ChartKind,
 ) -> tuple[float, float]:
     values = [point.value for point in usable if point.value is not None]
+    nonnegative_bars = kind == "bar" and min(values) >= 0.0
     low = min(values)
     high = max(values)
     if value_format == "score":
@@ -416,7 +418,8 @@ def _value_extent(
     else:
         padding = (high - low) * 0.06
     if value_format != "score":
-        low -= padding
+        if not nonnegative_bars:
+            low -= padding
         high += padding
     return low, high
 
@@ -510,7 +513,7 @@ def _grid_markup(low: float, high: float, *, value_format: ValueFormat) -> str:
     labels = ((high, _PLOT_TOP + 4), (middle, (_PLOT_TOP + _PLOT_BOTTOM) / 2 + 4), (low, _PLOT_BOTTOM + 4))
     for value, y in labels:
         lines.append(
-            f'<text class="chart-y-label" x="47" y="{y:.1f}" text-anchor="end" '
+            f'<text class="chart-y-label" x="69" y="{y:.1f}" text-anchor="end" '
             'fill="var(--muted,#a9b6d3)" font-size="10">'
             + _svg_text(_format_value(value, value_format))
             + "</text>"
@@ -525,7 +528,7 @@ def _status_markup(state_label: str, *, proxy: bool, input_capped: bool) -> str:
     if input_capped:
         parts.append("Bounded view")
     return (
-        '<text class="chart-status" x="54" y="19" '
+        '<text class="chart-status" x="76" y="19" '
         'fill="var(--muted,#a9b6d3)" font-size="11">'
         + _svg_text(" · ".join(parts))
         + "</text>"
@@ -536,7 +539,7 @@ def _axis_edge_labels(start: str | None, end: str | None) -> str:
     start_text = start or "Start · unavailable"
     end_text = end or "Latest · unavailable"
     return (
-        '<text class="chart-x-label chart-x-start" x="54" y="166" text-anchor="start" '
+        '<text class="chart-x-label chart-x-start" x="76" y="166" text-anchor="start" '
         'fill="var(--muted,#a9b6d3)" font-size="11">'
         + _svg_text(start_text)
         + "</text>"
@@ -606,7 +609,19 @@ def _compact_number(value: float) -> str:
 
 
 def _trim_label(value: object, *, fallback: str) -> str:
-    return _plain_text(value, fallback=fallback, limit=28)
+    raw = str(value or "").strip()
+    if raw:
+        normalized = raw[:-1] + "+00:00" if raw.endswith(("Z", "z")) else raw
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            parsed = None
+        if parsed is not None:
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            utc = parsed.astimezone(timezone.utc)
+            return f"{utc:%b} {utc.day} {utc:%H:%M}Z"
+    return _plain_text(value, fallback=fallback, limit=14)
 
 
 def _plain_text(value: object, *, fallback: str = "", limit: int) -> str:

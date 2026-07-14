@@ -168,6 +168,7 @@ def test_today_green_state_requires_every_expected_layer() -> None:
 
     snapshot = _snapshot()
     source_coverage = dict(snapshot.source_coverage)
+    source_coverage["packs"] = []
     source_coverage["input_manifest"] = [
         _manifest_row(
             "derivatives",
@@ -200,6 +201,14 @@ def test_today_green_state_requires_every_expected_layer() -> None:
     assert "Derivatives context not configured" in page
     assert "RSI context not configured" in page
     assert "Provider request ledger unavailable" in page
+    assert "Catalyst context unavailable" in page
+    assert "Optional coverage gaps" in page
+    assert "system failure" in page
+    assert "system constraints" not in page
+    assert page.count('href="/health#source-pack-coverage"') == 1
+    assert page.count('href="/health#provider-readiness"') == 1
+    assert page.count('href="/health#product-layer-coverage"') == 1
+    assert page.count('href="/health#provider-request"') == 1
 
 
 def test_untrusted_projection_suppresses_underlying_layer_counts_and_green_states() -> None:

@@ -155,7 +155,7 @@ def render_dashboard_page(
     if path == "/campaign-history":
         return _product_response(
             snapshot,
-            "Campaign History",
+            "Run history",
             path,
             render_campaign_page(snapshot, query),
         )
@@ -239,7 +239,15 @@ def _today(
             ),
         ),
     ]
-    if snapshot.expired_current_candidates:
+    expired_rows = (
+        (
+            *snapshot.expired_visible_current_candidates,
+            *snapshot.expired_diagnostic_candidates,
+        )
+        if include_diagnostics
+        else snapshot.expired_visible_current_candidates
+    )
+    if expired_rows:
         sections.append(
             _section(
                 "Expired ideas (not currently actionable)",
@@ -247,7 +255,7 @@ def _today(
                 "suppressed from current actionability because their recorded expiry is at or before "
                 "the dashboard read time.</p>"
                 + _candidate_table(
-                    snapshot.expired_current_candidates,
+                    expired_rows,
                     query=query,
                 ),
             )

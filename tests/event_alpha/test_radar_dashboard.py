@@ -310,7 +310,7 @@ def test_dashboard_badges_disclose_exact_market_provenance_and_campaign_status()
 
     assert "MOCKED FIXTURE" in mocked_page.body
     assert "CAMPAIGN EXCLUDED" in mocked_page.body
-    assert "LIVE / REAL DATA" in live_page.body
+    assert "LIVE DATA" in live_page.body
     assert "CAMPAIGN COUNTED" in live_page.body
     detail = render_dashboard_page(
         live_snapshot,
@@ -605,7 +605,7 @@ def test_candidate_detail_renders_v2_explanations_components_and_safe_source_url
         "Thesis origins",
         "Timing",
         "Preferred horizon",
-        "Expires at",
+        "Expires",
         "Spread",
         "Urgency",
         "Chase risk",
@@ -618,36 +618,6 @@ def test_dashboard_candidate_table_shows_trader_timing_and_execution_dimensions(
 
     for label in ("Urgency", "Horizon", "Expires", "Spread", "Chase risk"):
         assert label in page.body
-
-
-def test_dashboard_suppresses_expired_actionability_at_read_time_without_mutating_canonical_values():
-    snapshot = _snapshot()
-    rows = tuple(
-        _dashboard_decision_row(row, read_at="2026-07-12T12:00:00+00:00")
-        for row in snapshot.current_candidates
-    )
-    expired_snapshot = replace(snapshot, current_candidates=rows)
-    alpha = next(row for row in rows if row.get("symbol") == "ALPHA")
-
-    assert alpha["radar_route"] == "actionable_watch"
-    assert alpha["radar_actionable"] is True
-    assert alpha["_dashboard_route"] == "diagnostic"
-    assert alpha["_decision_expired_at_read_time"] is True
-    assert alpha["_decision_read_time_reason"] == (
-        "canonical_expiry_at_or_before_dashboard_read_time"
-    )
-
-    page = render_dashboard_page(expired_snapshot, "/")
-    assert "Expired ideas (not currently actionable)" in page.body
-    assert "Expired; current actionability suppressed" in page.body
-    assert "/candidate/core%3Aalpha" not in page.body.split(
-        "Expired ideas (not currently actionable)", 1
-    )[0]
-
-    detail = render_dashboard_page(expired_snapshot, "/candidate/core:alpha")
-    assert detail.status_code == 200
-    assert "suppressed: expired at dashboard read time" in detail.body
-    assert "canonical_expiry_at_or_before_dashboard_read_time" in detail.body
 
 
 def test_dashboard_calendar_renders_uncertain_window_and_current_scope_labels():

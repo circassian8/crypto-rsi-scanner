@@ -56,7 +56,11 @@ def render_health(snapshot: DashboardSnapshot) -> str:
         _section("Current operator generation", summary)
         + _section(
             "Artifact manifest",
-            _table(("Artifact", "Status", "Count", "Path", "Reason"), artifact_rows),
+            _table(
+                ("Artifact", "Status", "Count", "Path", "Reason"),
+                artifact_rows,
+                caption="Artifact manifest compatibility diagnostics",
+            ),
         )
         + _section(
             "Exact-generation source-pack coverage",
@@ -64,16 +68,25 @@ def render_health(snapshot: DashboardSnapshot) -> str:
                 ("Source pack", "Status", "Accepted", "Configured", "Healthy", "Missing", "Gap"),
                 source_coverage_rows(snapshot.source_coverage),
                 empty="No per-pack coverage assessment is recorded for this exact generation.",
+                caption="Exact-generation source-pack compatibility diagnostics",
             ),
         )
         + _section(
             "Exact-generation provider readiness",
-            _table(("Provider", "Status", "Detail"), _provider_rows(snapshot.provider_readiness)),
+            _table(
+                ("Provider", "Status", "Detail"),
+                _provider_rows(snapshot.provider_readiness),
+                caption="Exact-generation provider readiness compatibility diagnostics",
+            ),
         )
         + _section(
             "Cumulative provider health (non-authoritative)",
             cumulative_health_metadata
-            + _table(("Provider", "Status", "Detail"), _provider_rows(snapshot.provider_health)),
+            + _table(
+                ("Provider", "Status", "Detail"),
+                _provider_rows(snapshot.provider_health),
+                caption="Cumulative provider health compatibility diagnostics",
+            ),
         )
     )
 
@@ -172,16 +185,30 @@ def _table(
     rows: Iterable[Iterable[str]],
     *,
     empty: str = "No rows.",
+    caption: str = "Compatibility diagnostics",
 ) -> str:
     materialized = [tuple(row) for row in rows]
     if not materialized:
         return f'<p class="muted">{_h(empty)}</p>'
-    head = "".join(f"<th>{_h(value)}</th>" for value in headers)
-    body = "".join(
-        "<tr>" + "".join(f"<td>{value}</td>" for value in row) + "</tr>"
-        for row in materialized
+    head = "".join(f'<th scope="col">{_h(value)}</th>' for value in headers)
+    body_rows: list[str] = []
+    for row in materialized:
+        cells = "".join(
+            (
+                f'<th scope="row">{value}</th>'
+                if index == 0
+                else f"<td>{value}</td>"
+            )
+            for index, value in enumerate(row)
+        )
+        body_rows.append(f"<tr>{cells}</tr>")
+    safe_caption = _h(caption)
+    return (
+        f'<div class="table-scroll" role="region" tabindex="0" aria-label="{safe_caption}">'
+        '<table class="responsive-table compact-table">'
+        f'<caption class="sr-only">{safe_caption}</caption>'
+        f'<thead><tr>{head}</tr></thead><tbody>{"".join(body_rows)}</tbody></table></div>'
     )
-    return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
 def _definition_list(items: Iterable[tuple[str, object]]) -> str:

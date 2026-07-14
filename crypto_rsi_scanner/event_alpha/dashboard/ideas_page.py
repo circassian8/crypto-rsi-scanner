@@ -6,19 +6,19 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from .charts import (
-    render_activity_chart,
-    render_price_chart,
-    render_relative_chart,
-)
 from .components import escape_html, safe_external_href
+from .idea_history import render_market_history_charts as _market_history_charts
 from .loader import candidate_identifier
-from .models import DashboardSnapshot
+from .layer_coverage import dashboard_layer_coverage_by_key
+from .models import DashboardSnapshot, is_canonical_diagnostic_candidate
 from .presentation import (
     UNAVAILABLE,
+    candidate_operator_route,
+    candidate_operator_route_label,
     format_score,
     humanize_enum,
     humanize_reason,
+    operator_route_label,
     present_calendar_window,
     present_time,
     score_band,
@@ -41,47 +41,128 @@ def render_ideas_page(
     include_diagnostics: bool = False,
 ) -> str:
     filters = dashboard_query(query)
-    rows: Iterable[Mapping[str, Any]] = snapshot.current_candidates
-    if not include_diagnostics:
-        rows = tuple(
-            row for row in rows
-            if row.get("_decision_model_status") == "v2"
-            and row.get("_dashboard_route") != "diagnostic"
-        )
+    rows = (
+        (*snapshot.visible_current_candidates, *snapshot.diagnostic_candidates)
+        if include_diagnostics
+        else snapshot.visible_current_candidates
+    )
     selected = filter_sort_candidates(rows, filters)
+    expired_diagnostics = (
+        filter_sort_candidates(snapshot.expired_diagnostic_candidates, filters)
+        if include_diagnostics
+        else ()
+    )
+    valid_unfiltered_zero = not filters and not rows
+    match_label = "matching idea" if len(selected) == 1 else "matching ideas"
+    count_label = "idea" if len(selected) == 1 else "ideas"
     return (
-        '<section class="page-intro"><div><p class="eyebrow">Canonical Decision v2 ideas</p>'
-        '<h2>Research opportunities, ranked for human review</h2>'
-        '<p>Actionability describes usefulness now; evidence confidence describes how well the '
-        'explanation is supported. Neither is a win probability.</p></div>'
-        f'<div class="count-badge" aria-label="{len(selected)} matching ideas">{len(selected)}<small>matching</small></div></section>'
+        '<section class="page-intro ideas-intro"><div><p class="eyebrow">Canonical Decision v2 ideas</p>'
+        '<h2>Current research ideas</h2>'
+        '<p>Ranked by usefulness, evidence, and risk for human review—not by win probability.</p></div>'
+        f'<div class="count-badge" aria-label="{len(selected)} {match_label}">{len(selected)}<small>{count_label}</small></div></section>'
         + render_idea_filters(filters, action="/ideas")
         + _active_filters(filters)
-        + render_idea_cards(selected)
-        + render_idea_comparison(selected)
+        + render_idea_cards(
+            selected,
+            now=snapshot.generation_authority_checked_at,
+            empty_title=(
+                "No current ideas qualified"
+                if valid_unfiltered_zero
+                else "No ideas match this view"
+            ),
+            empty_detail=(
+                "This exact generation produced no operator-visible Decision idea. "
+                "Market observations and coverage state remain available in Market Radar and System Health."
+                if valid_unfiltered_zero
+                else None
+            ),
+        )
+        + render_idea_comparison(
+            selected,
+            now=snapshot.generation_authority_checked_at,
+        )
+        + _expired_diagnostic_history(
+            expired_diagnostics,
+            now=snapshot.generation_authority_checked_at,
+        )
         + (
             '<p class="diagnostic-link"><a href="/ideas?include_diagnostics=1">Show diagnostic controls</a></p>'
-            if not include_diagnostics and snapshot.diagnostic_candidates else ""
+            if not include_diagnostics
+            and (snapshot.diagnostic_candidates or snapshot.expired_diagnostic_candidates)
+            else ""
         )
     )
 
 
-def render_idea_cards(rows: Iterable[Mapping[str, Any]], *, limit: int | None = None) -> str:
+def _expired_diagnostic_history(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    now: object = None,
+) -> str:
+    materialized = tuple(rows)
+    if not materialized:
+        return ""
+    return (
+        '<details class="disclosure panel expired-ideas"><summary><span>'
+        'Expired diagnostic controls</span>'
+        f'<span class="filter-chip">{len(materialized)} retained</span></summary>'
+        '<div class="disclosure__body"><p>These diagnostic rows are retained as '
+        'historical model evidence and remain outside the current idea queue.</p>'
+        + render_idea_cards(materialized, now=now)
+        + '</div></details>'
+    )
+
+
+def render_idea_cards(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int | None = None,
+    now: object = None,
+    empty_title: str = "No ideas match this view",
+    empty_detail: str | None = None,
+) -> str:
     materialized = tuple(rows)
     if limit is not None:
         materialized = materialized[: max(0, int(limit))]
     if not materialized:
+        detail = empty_detail or (
+            "This can be a valid outcome. Market observations and coverage state "
+            "remain available in Market Radar and System Health."
+        )
         return (
             '<div class="empty-state"><span aria-hidden="true">○</span><div>'
-            '<h3>No ideas match this view</h3><p>This can be a valid outcome. Market observations '
-            'and coverage state remain available in Market Radar and System Health.</p></div></div>'
+            f'<h3>{escape_html(empty_title)}</h3><p>{escape_html(detail)}</p></div></div>'
         )
-    return '<div class="idea-grid">' + "".join(_idea_card(row) for row in materialized) + "</div>"
+    return (
+        '<div class="idea-grid">'
+        + "".join(_idea_card(row, now=now) for row in materialized)
+        + "</div>"
+    )
 
 
-def render_idea_comparison(rows: Iterable[Mapping[str, Any]]) -> str:
+def render_attention_cards(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int = 4,
+    now: object = None,
+) -> str:
+    """Render a deliberately compact command-center review queue."""
+
+    materialized = tuple(rows)[: max(0, int(limit))]
+    return (
+        '<div class="attention-card-grid">'
+        + "".join(_attention_card(row, now=now) for row in materialized)
+        + "</div>"
+    )
+
+
+def render_idea_comparison(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    now: object = None,
+) -> str:
     materialized = tuple(rows)
-    if not materialized:
+    if len(materialized) < 2:
         return ""
     headers = (
         "Idea", "Route", "Bias", "Actionability", "Evidence", "Risk", "Urgency",
@@ -93,7 +174,7 @@ def render_idea_comparison(rows: Iterable[Mapping[str, Any]]) -> str:
         href = f"/ideas/{quote(identifier, safe='')}"
         cells = (
             f'<a href="{href}"><strong>{escape_html(row.get("symbol") or identifier)}</strong></a>',
-            escape_html(humanize_enum(row.get("_dashboard_route") or row.get("radar_route"))),
+            escape_html(operator_route_label(candidate_operator_route(row))),
             escape_html(humanize_enum(row.get("directional_bias"))),
             escape_html(format_score(row.get("actionability_score"))),
             escape_html(format_score(row.get("evidence_confidence_score"))),
@@ -105,27 +186,37 @@ def render_idea_comparison(rows: Iterable[Mapping[str, Any]]) -> str:
             escape_html(humanize_enum(row.get("tradability_status"))),
             escape_html(humanize_enum(row.get("spread_status"))),
             escape_html(humanize_enum(row.get("preferred_horizon"))),
-            _time_markup(row.get("expires_at"), expiry=True),
+            _time_markup(row.get("expires_at"), expiry=True, now=now),
         )
         body.append(
-            "<tr>" + "".join(
+            '<tr><th scope="row" data-label="Idea">'
+            + cells[0]
+            + "</th>"
+            + "".join(
                 f'<td data-label="{escape_html(label)}">{value}</td>'
-                for label, value in zip(headers, cells, strict=True)
-            ) + "</tr>"
+                for label, value in zip(headers[1:], cells[1:], strict=True)
+            )
+            + "</tr>"
         )
     head = "".join(f'<th scope="col">{escape_html(value)}</th>' for value in headers)
+    idea_label = "idea" if len(materialized) == 1 else "ideas"
     return (
-        '<section class="panel comparison-panel"><div class="section-heading"><div><p class="eyebrow">Comparison</p>'
-        '<h2>Idea matrix</h2></div></div><div class="table-scroll" role="region" tabindex="0" '
-        'aria-label="Scrollable idea comparison"><table class="responsive-table"><caption class="sr-only">'
+        '<details class="disclosure panel comparison-panel"><summary><span>Compare ideas in matrix</span>'
+        f'<span class="filter-chip">{len(materialized)} {idea_label}</span></summary>'
+        '<div class="disclosure__body"><div class="table-scroll" role="region" tabindex="0" '
+        'aria-label="Scrollable idea comparison"><table class="responsive-table mobile-cards"><caption class="sr-only">'
         f'{len(materialized)} current Decision Radar ideas</caption><thead><tr>{head}</tr></thead>'
-        f'<tbody>{"".join(body)}</tbody></table></div></section>'
+        f'<tbody>{"".join(body)}</tbody></table></div></div></details>'
     )
 
 
 def render_idea_filters(query: Mapping[str, str], *, action: str) -> str:
-    options = (
-        ("route", "Route", ("dashboard_watch", "actionable_watch", "high_confidence_watch", "rapid_market_anomaly", "fade_exhaustion_review", "risk_watch", "calendar_risk", "diagnostic")),
+    route_values = (
+        "dashboard_watch", "actionable_watch", "high_confidence_watch",
+        "rapid_market_anomaly", "fade_exhaustion_review", "risk_watch",
+        "calendar_risk", "diagnostic",
+    )
+    advanced_options = (
         ("origin", "Origin", ("market_led", "catalyst_led", "technical_led", "derivatives_led", "onchain_led", "fundamental_led", "macro_led")),
         ("bias", "Bias", ("long_watch", "fade_short_review", "risk", "neutral")),
         ("actionability", "Actionability", ("very_high", "high", "medium", "low")),
@@ -139,17 +230,11 @@ def render_idea_filters(query: Mapping[str, str], *, action: str) -> str:
         ("freshness", "Freshness", ("fresh", "warming", "stale", "unknown")),
         ("horizon", "Horizon", ("intraday", "1h", "4h", "24h", "multi_day")),
     )
-    fields = [
+    primary_fields = [
         '<label class="filter-search"><span>Search symbol or thesis</span>'
         f'<input type="search" name="search" value="{escape_html(query.get("search", ""))}" placeholder="BTC, breakout, listing…"></label>'
     ]
-    for name, label, values in options:
-        selected = query.get(name, "")
-        option_html = '<option value="">All</option>' + "".join(
-            f'<option value="{escape_html(value)}"{(" selected" if value == selected else "")}>{escape_html(humanize_enum(value))}</option>'
-            for value in values
-        )
-        fields.append(f'<label><span>{escape_html(label)}</span><select name="{name}">{option_html}</select></label>')
+    primary_fields.append(_filter_select("route", "Route", route_values, query))
     sort_selected = query.get("sort", "attention")
     sort_values = (
         ("attention", "Operator attention"), ("actionability_desc", "Actionability · high first"),
@@ -157,17 +242,71 @@ def render_idea_filters(query: Mapping[str, str], *, action: str) -> str:
         ("risk_asc", "Risk · low first"), ("risk_desc", "Risk · high first"),
         ("expiry_asc", "Expiry · soonest first"),
     )
-    fields.append(
+    primary_fields.append(
         '<label><span>Sort</span><select name="sort">' + "".join(
             f'<option value="{value}"{(" selected" if value == sort_selected else "")}>{escape_html(label)}</option>'
             for value, label in sort_values
         ) + '</select></label>'
     )
-    return (
-        f'<form class="filter-panel" method="get" action="{escape_html(action)}"><div class="filter-grid">'
-        + "".join(fields)
-        + '</div><div class="filter-actions"><button class="button button-primary" type="submit">Apply filters</button>'
+    advanced_fields = [
+        _filter_select(name, label, values, query)
+        for name, label, values in advanced_options
+    ]
+    advanced_count = sum(
+        1 for name, _label, _values in advanced_options if query.get(name)
+    )
+    advanced_open = " open" if advanced_count else ""
+    active_filter_label = "filter" if advanced_count == 1 else "filters"
+    form = (
+        f'<form class="filter-panel{(" embedded-filter-panel idea-filters" if action == "/ideas" else "")}" '
+        f'method="get" action="{escape_html(action)}" aria-label="Filter and sort ideas"><div class="filter-grid">'
+        + "".join(primary_fields)
+        + '</div><details class="disclosure filter-advanced"'
+        + advanced_open
+        + '><summary><span>Advanced filters</span>'
+        + f'<span class="filter-chip" aria-label="{advanced_count} advanced {active_filter_label} active">{advanced_count} active</span>'
+        + '</summary><div class="disclosure__body"><div class="filter-grid">'
+        + "".join(advanced_fields)
+        + '</div></div></details><div class="filter-actions"><button class="button button-primary" type="submit">Apply filters</button>'
         f'<a class="button button-quiet" href="{escape_html(action)}">Clear all</a></div></form>'
+    )
+    if action != "/ideas":
+        return form
+
+    active_count = sum(
+        1
+        for name in ("search", "route", *(item[0] for item in advanced_options))
+        if query.get(name)
+    ) + (1 if query.get("sort", "attention") != "attention" else 0)
+    open_attr = " open" if active_count else ""
+    active_label = (
+        f"{active_count} active"
+        if active_count
+        else "All current ideas"
+    )
+    return (
+        '<details class="disclosure filter-disclosure idea-filter-disclosure"'
+        + open_attr
+        + '><summary><span>Filter &amp; sort ideas</span>'
+        f'<span class="disclosure__summary">{escape_html(active_label)}</span></summary>'
+        f'<div class="disclosure__body">{form}</div></details>'
+    )
+
+
+def _filter_select(
+    name: str,
+    label: str,
+    values: Iterable[str],
+    query: Mapping[str, str],
+) -> str:
+    selected = query.get(name, "")
+    option_html = '<option value="">All</option>' + "".join(
+        f'<option value="{escape_html(value)}"{(" selected" if value == selected else "")}>{escape_html(operator_route_label(value) if name == "route" else humanize_enum(value))}</option>'
+        for value in values
+    )
+    return (
+        f'<label><span>{escape_html(label)}</span>'
+        f'<select name="{escape_html(name)}">{option_html}</select></label>'
     )
 
 
@@ -180,8 +319,7 @@ def render_idea_detail(
     row = next((item for item in snapshot.current_candidates if candidate_identifier(item) == identifier), None)
     if row is None or (
         not include_diagnostics
-        and row.get("_decision_expired_at_read_time") is not True
-        and (row.get("_decision_model_status") != "v2" or row.get("_dashboard_route") == "diagnostic")
+        and is_canonical_diagnostic_candidate(row)
     ):
         return 404, "Idea not found", (
             '<div class="empty-state"><h2>Idea not found</h2>'
@@ -192,30 +330,40 @@ def render_idea_detail(
     title = f"{row.get('symbol') or 'Idea'} decision brief"
     provenance = candidate_provenance(row)
     quality = candidate_data_quality(row)
+    expired_at_read_time = row.get("_decision_expired_at_read_time") is True
     score_cards = "".join(
         _score_card(label, row.get(field), dimension=dimension, explanation=explanation)
         for label, field, dimension, explanation in (
-            ("Actionability", "actionability_score", "quality", "Usefulness and timing now — not win probability."),
-            ("Evidence", "evidence_confidence_score", "quality", "Confidence in the explanation — not expected return."),
-            ("Risk", "risk_score", "risk", "Higher is more risk; the scale is not reversed."),
-            ("Urgency", "urgency_score", "urgency", "How quickly the research window may change."),
-            ("Chase risk", "chase_risk_score", "risk", "Risk that the move is already extended."),
+            (
+                "Actionability at evaluation" if expired_at_read_time else "Actionability",
+                "actionability_score", "quality",
+                "Recorded usefulness at evaluation; this idea is expired." if expired_at_read_time else "Usefulness and timing now — not win probability.",
+            ),
+            ("Evidence at evaluation" if expired_at_read_time else "Evidence", "evidence_confidence_score", "quality", "Confidence in the recorded explanation — not expected return."),
+            ("Risk at evaluation" if expired_at_read_time else "Risk", "risk_score", "risk", "Higher is more risk; the scale is not reversed."),
+            ("Urgency at evaluation" if expired_at_read_time else "Urgency", "urgency_score", "urgency", "How quickly the recorded research window could change."),
+            ("Chase risk at evaluation" if expired_at_read_time else "Chase risk", "chase_risk_score", "risk", "Risk that the recorded move was already extended."),
         )
     )
     history = _idea_history(snapshot, row)
     baseline_state = str(quality.get("baseline_status") or "missing")
     chart_state = baseline_state if baseline_state in {"warming", "cold"} else ("ready" if history else "missing")
-    charts = (
-        '<div class="chart-grid">'
-        + render_price_chart(history, state=chart_state, state_detail="Exact-generation bounded history")
-        + render_activity_chart(history, activity="volume", value_key="volume_24h", state=chart_state, proxy=False)
-        + render_activity_chart(history, activity="turnover", value_key="turnover_24h", state=chart_state, proxy=True)
-        + render_relative_chart(history, benchmark="BTC", state=chart_state, state_detail="Relative history may be unavailable until baseline warms")
-        + '</div>'
+    charts = _market_history_charts(
+        history,
+        chart_state=chart_state,
+        baseline_state=baseline_state,
+        turnover_basis=(
+            quality.get("volume_zscore_basis")
+            or row.get("volume_zscore_basis")
+        ),
     )
-    context = _decision_context(row, provenance, quality)
-    source = _source_block(row)
-    calendar = _nearby_calendar(snapshot, row)
+    context = _decision_context(
+        row,
+        provenance,
+        quality,
+        now=snapshot.generation_authority_checked_at,
+    )
+    context_coverage = _context_coverage(snapshot, row)
     outcome = _outcome_block(snapshot, row)
     feedback_command = (
         f".venv/bin/python main.py --event-feedback-mark {identifier} useful --confirm"
@@ -223,40 +371,73 @@ def render_idea_detail(
     body = (
         '<p class="back-link"><a href="/ideas">← All ideas</a></p>'
         '<section class="idea-hero panel"><div><p class="eyebrow">Crypto Decision Radar</p>'
-        f'<h2>{escape_html(row.get("symbol") or identifier)} <span>{escape_html(row.get("coin_id") or "")}</span></h2>'
-        f'<div class="chip-row">{_status_badge(row.get("_dashboard_route"))}{_status_badge(row.get("directional_bias"))}'
-        f'{_status_badge(row.get("catalyst_status"))}{_status_badge(row.get("market_phase"))}</div></div>'
-        f'<div class="idea-expiry"><span>Research window</span>{_time_markup(row.get("expires_at"), expiry=True)}</div></section>'
-        f'<section class="score-grid" aria-label="Decision score summary">{score_cards}</section>'
-        + context
-        + source
+        f'<h2>{_idea_hero_label(row, identifier)}</h2>'
+        f'<div class="chip-row">{_detail_route_badges(row)}{_status_badge(row.get("directional_bias"), label=_bias_label(row.get("directional_bias")))}'
+        f'{_qualified_status_badge("Catalyst", row.get("catalyst_status"))}'
+        f'{_qualified_status_badge("Phase", row.get("market_phase"))}</div></div>'
+        f'<div class="idea-expiry"><span>Research window</span>{_time_markup(row.get("expires_at"), expiry=True, now=snapshot.generation_authority_checked_at)}</div></section>'
+        + (
+            '<div class="alert alert-warning"><strong>Historical evaluation snapshot.</strong> '
+            'Every score and market/context label below describes evaluation time, not current usefulness.</div>'
+            if expired_at_read_time else ""
+        )
         + _narrative_grid(row)
+        + _primary_calendar_callout(snapshot, row)
+        + f'<section class="score-grid" aria-label="Decision scores{" at evaluation" if expired_at_read_time else ""}">{score_cards}</section>'
+        + context
         + _decision_evidence(row)
         + '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Measured context</p><h2>Market history</h2></div>'
         f'{_status_badge(baseline_state)}</div>{charts}</section>'
-        + calendar
-        + _technical_context(row)
-        + _catalyst_context(row)
+        + context_coverage
         + outcome
-        + '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Optional preference signal</p>'
-        '<h2>Usefulness feedback</h2></div></div><p>Feedback is optional and never controls visibility or thresholds. '
+        + '<details class="technical-details panel"><summary>How to record optional feedback</summary>'
+        '<div class="disclosure__body"><p>Feedback is optional and never controls visibility or thresholds. '
         'The dashboard remains GET/HEAD-only; use the explicit confirmed CLI pathway.</p>'
-        f'<pre class="copy-value"><code>{escape_html(feedback_command)}</code></pre></section>'
+        f'<pre class="copy-value"><code>{escape_html(feedback_command)}</code></pre></div></details>'
         + _technical_details(row, provenance, quality)
     )
     return 200, title, body
 
 
-def _idea_card(row: Mapping[str, Any]) -> str:
+def _attention_card(row: Mapping[str, Any], *, now: object = None) -> str:
     identifier = candidate_identifier(row)
-    route = row.get("_dashboard_route") or row.get("radar_route")
-    warning_values = _values(row, "decision_warnings", "main_risks")
+    route = candidate_operator_route(row)
     why = _values(row, "why_now", "why_still_worth_reviewing", "supporting_facts")
-    expiry = _time_markup(row.get("expires_at"), expiry=True)
     scores = "".join(
         _mini_score(label, row.get(field), dimension)
         for label, field, dimension in (
-            ("Act", "actionability_score", "quality"),
+            ("Action", "actionability_score", "quality"),
+            ("Evidence", "evidence_confidence_score", "quality"),
+            ("Risk", "risk_score", "risk"),
+        )
+    )
+    href = f'/ideas/{quote(identifier, safe="")}'
+    return (
+        f'<article class="attention-card route-{escape_html(str(route or "unknown"))}">'
+        '<header class="attention-card__head"><div>'
+        f'<p class="eyebrow">{escape_html(candidate_operator_route_label(row))}</p>'
+        f'<h3><a href="{href}">{escape_html(row.get("symbol") or identifier)}</a></h3>'
+        f'</div>{_status_badge(row.get("directional_bias"), label=_bias_label(row.get("directional_bias")))}</header>'
+        f'<div class="mini-score-grid attention-card__scores">{scores}</div>'
+        f'<p class="attention-card__thesis">{escape_html(why[0] if why else "No concise thesis recorded.")}</p>'
+        '<footer class="attention-card__footer"><span><small>Research window</small>'
+        f'{_time_markup(row.get("expires_at"), expiry=True, now=now)}</span>'
+        f'<a class="card-action" href="{href}">Review brief <span aria-hidden="true">→</span></a>'
+        '</footer></article>'
+    )
+
+
+def _idea_card(row: Mapping[str, Any], *, now: object = None) -> str:
+    identifier = candidate_identifier(row)
+    route = candidate_operator_route(row)
+    warning_values = _values(row, "decision_warnings", "main_risks")
+    card_warning = next((value for value in warning_values if not _generic_safety_note(value)), "")
+    why = _values(row, "why_now", "why_still_worth_reviewing", "supporting_facts")
+    expiry = _time_markup(row.get("expires_at"), expiry=True, now=now)
+    scores = "".join(
+        _mini_score(label, row.get(field), dimension)
+        for label, field, dimension in (
+            ("Actionability", "actionability_score", "quality"),
             ("Evidence", "evidence_confidence_score", "quality"),
             ("Risk", "risk_score", "risk"),
             ("Urgency", "urgency_score", "urgency"),
@@ -265,45 +446,76 @@ def _idea_card(row: Mapping[str, Any]) -> str:
     return (
         f'<article class="idea-card route-{escape_html(str(route or "unknown"))}">'
         '<div class="idea-card-head"><div>'
-        f'<p class="eyebrow">{escape_html(humanize_enum(route))}</p><h3><a href="/ideas/{quote(identifier, safe="")}">'
+        f'<p class="eyebrow">{escape_html(candidate_operator_route_label(row))}</p><h3><a href="/ideas/{quote(identifier, safe="")}">'
         f'{escape_html(row.get("symbol") or identifier)}</a></h3>'
         f'<p class="muted">{escape_html(" + ".join(humanize_enum(value) for value in origin_tokens(row)))}</p></div>'
-        f'{_status_badge(row.get("directional_bias"))}</div>'
+        f'{_status_badge(row.get("directional_bias"), label=_bias_label(row.get("directional_bias")))}</div>'
         f'<div class="mini-score-grid">{scores}</div>'
         f'<p class="idea-why">{escape_html(why[0] if why else "No concise thesis recorded.")}</p>'
         + _card_sparkline(row)
         + '<div class="idea-meta">'
-        f'<span>{escape_html(humanize_enum(row.get("market_phase") or row.get("timing_state")))}</span>'
-        f'<span>{escape_html(humanize_enum(row.get("preferred_horizon")))}</span><span>{expiry}</span></div>'
-        f'<div class="chip-row">{_status_badge(row.get("catalyst_status"))}{_status_badge(row.get("spread_status"))}'
-        f'{_status_badge(row.get("tradability_status"))}</div>'
-        + (f'<p class="card-warning">{escape_html(humanize_reason(warning_values[0]))}</p>' if warning_values else "")
+        f'<span><small>Phase</small>{escape_html(humanize_enum(row.get("market_phase") or row.get("timing_state")))}</span>'
+        f'<span><small>Horizon</small>{escape_html(humanize_enum(row.get("preferred_horizon")))}</span>'
+        f'<span><small>Expiry</small>{expiry}</span></div>'
+        f'<div class="chip-row">{_qualified_status_badge("Catalyst", row.get("catalyst_status"))}'
+        f'{_qualified_status_badge("Spread", row.get("spread_status"))}'
+        f'{_qualified_status_badge("Tradability", row.get("tradability_status"))}</div>'
+        + (f'<p class="card-warning">{escape_html(humanize_reason(card_warning))}</p>' if card_warning else "")
         + f'<a class="card-action" href="/ideas/{quote(identifier, safe="")}">Open decision brief <span aria-hidden="true">→</span></a></article>'
     )
+
+
+def _idea_hero_label(row: Mapping[str, Any], identifier: str) -> str:
+    symbol = str(row.get("symbol") or identifier)
+    coin_id = str(row.get("coin_id") or "").strip()
+    if not coin_id or coin_id.casefold() == symbol.casefold():
+        return escape_html(symbol)
+    return f'{escape_html(symbol)} <span>{escape_html(coin_id)}</span>'
 
 
 def _decision_context(
     row: Mapping[str, Any],
     provenance: Mapping[str, Any],
     quality: Mapping[str, Any],
+    *,
+    now: object = None,
 ) -> str:
-    items = (
+    route = str(row.get("_dashboard_route") or row.get("radar_route") or "diagnostic")
+    if row.get("_decision_expired_at_read_time") is True:
+        actionability = "Expired · read-time visibility suppressed"
+    elif row.get("radar_actionable") is True:
+        actionability = "Operator-actionable research"
+    else:
+        actionability = {
+            "dashboard_watch": "Dashboard-only research",
+            "fade_exhaustion_review": "Manual fade / exhaustion review",
+            "risk_watch": "Downside-risk review only",
+            "calendar_risk": "Scheduled-risk review",
+            "diagnostic": "Diagnostic only",
+        }.get(route, "Research review only")
+    evaluation_suffix = (
+        " at evaluation"
+        if row.get("_decision_expired_at_read_time") is True
+        else ""
+    )
+    decision_items = [
         ("Primary thesis origin", humanize_enum(row.get("primary_thesis_origin") or row.get("thesis_origin"))),
         ("Thesis origins", " · ".join(humanize_enum(value) for value in origin_tokens(row))),
-        (
-            "Current actionability",
-            "suppressed: expired at dashboard read time"
-            if row.get("_decision_expired_at_read_time") is True
-            else str(bool(row.get("radar_actionable"))).casefold(),
-        ),
-        ("Read-time safety reason", row.get("_decision_read_time_reason") or UNAVAILABLE),
-        ("Timing", humanize_enum(row.get("timing_state"))),
-        ("Market phase", humanize_enum(row.get("market_phase"))),
+        ("Operator status", actionability),
+        ("Timing" + evaluation_suffix, humanize_enum(row.get("timing_state"))),
+        ("Market phase" + evaluation_suffix, humanize_enum(row.get("market_phase"))),
         ("Preferred horizon", humanize_enum(row.get("preferred_horizon"))),
-        ("Expires at", present_time(row.get("expires_at")).utc_label),
-        ("Tradability", humanize_enum(row.get("tradability_status"))),
-        ("Spread", humanize_enum(row.get("spread_status"))),
-        ("Market freshness", humanize_enum(row.get("market_data_freshness") or row.get("market_context_freshness_status"))),
+        ("Expires", _friendly_expiry(row.get("expires_at"), now=now)),
+        ("Tradability" + evaluation_suffix, humanize_enum(row.get("tradability_status"))),
+        ("Spread" + evaluation_suffix, humanize_enum(row.get("spread_status"))),
+        ("Market freshness" + evaluation_suffix, humanize_enum(row.get("market_data_freshness") or row.get("market_context_freshness_status"))),
+    ]
+    if row.get("_decision_read_time_reason") not in (None, "", UNAVAILABLE):
+        decision_items.append((
+            "Read-time safety reason",
+            humanize_reason(row.get("_decision_read_time_reason")),
+        ))
+    provenance_items = (
         ("Data mode", humanize_enum(provenance.get("candidate_source_mode") or provenance.get("data_mode"))),
         ("Market provider", humanize_enum(provenance.get("provider"))),
         ("Baseline", humanize_enum(quality.get("baseline_status"))),
@@ -311,27 +523,110 @@ def _decision_context(
         ("Volume basis", humanize_enum(quality.get("volume_zscore_basis"))),
         ("Execution quality", humanize_enum(quality.get("spread_basis") or row.get("spread_status"))),
     )
-    return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Decision context</p><h2>How to read this idea</h2></div></div>' + _definition_grid(items) + '</section>'
+    return (
+        '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Decision context</p>'
+        '<h2>How to read this idea</h2></div></div>'
+        + _definition_grid(tuple(decision_items))
+        + '<details class="disclosure data-provenance"><summary>Data provenance and measurement quality</summary>'
+        '<div class="disclosure__body">'
+        + _definition_grid(provenance_items)
+        + '</div></details></section>'
+    )
+
+
+def _friendly_expiry(value: object, *, now: object = None) -> str:
+    presented = present_time(value, now=now)
+    if not presented.available:
+        return UNAVAILABLE
+    return f"{presented.local_label} · {presented.relative_label}"
 
 
 def _narrative_grid(row: Mapping[str, Any]) -> str:
-    blocks = (
+    recorded_risks = tuple(
+        value for value in _values(row, "main_risks", "decision_warnings")
+        if not _generic_safety_note(value)
+    )
+    primary_blocks = (
         ("Why now", _values(row, "why_now", "why_still_worth_reviewing"), "info"),
+        (
+            "Main risks",
+            _dedupe_risk_values(recorded_risks),
+            "warning",
+        ),
+    )
+    checklist_blocks = (
         ("What confirms", _values(row, "radar_what_confirms", "what_confirms"), "positive"),
         ("What invalidates", _values(row, "radar_what_invalidates", "what_invalidates"), "danger"),
-        ("Main risks", _values(row, "main_risks", "decision_warnings"), "warning"),
+    )
+    research_blocks = (
         ("Missing information", _values(row, "missing_information", "decision_missing_data"), "neutral"),
         ("Supporting facts", _values(row, "supporting_facts"), "neutral"),
+        ("Recorded risk detail", recorded_risks, "neutral"),
     )
-    cards = []
-    for title, values, tone in blocks:
-        content = "".join(f"<li>{escape_html(_narrative_text(value))}</li>" for value in values)
-        cards.append(
-            f'<section class="narrative-card tone-{tone}"><h2>{escape_html(title)}</h2>'
-            + (f"<ul>{content}</ul>" if content else '<p class="muted">No item recorded.</p>')
-            + "</section>"
-        )
-    return '<div class="narrative-grid">' + "".join(cards) + "</div>"
+    return (
+        '<section class="panel decision-thesis"><div class="section-heading"><div>'
+        '<p class="eyebrow">Decision thesis</p><h2>What matters before the scores</h2></div></div>'
+        '<div class="narrative-grid">'
+        + "".join(_narrative_card(*block) for block in primary_blocks)
+        + '</div><details class="disclosure decision-checklist"><summary><span>Confirmation and invalidation checklist</span>'
+        '<span class="disclosure__summary">Review before acting</span></summary>'
+        '<div class="disclosure__body"><div class="narrative-grid">'
+        + "".join(_narrative_card(*block) for block in checklist_blocks)
+        + '</div></div></details><details class="disclosure thesis-notes"><summary>Supporting research notes</summary>'
+        '<div class="disclosure__body"><div class="narrative-grid">'
+        + "".join(_narrative_card(*block) for block in research_blocks)
+        + '</div></div></details></section>'
+    )
+
+
+def _narrative_card(title: str, values: tuple[str, ...], tone: str) -> str:
+    content = "".join(
+        f"<li>{escape_html(_narrative_text(value))}</li>" for value in values
+    )
+    return (
+        f'<section class="narrative-card tone-{tone}"><h2>{escape_html(title)}</h2>'
+        + (f"<ul>{content}</ul>" if content else '<p class="muted">No item recorded.</p>')
+        + "</section>"
+    )
+
+
+def _generic_safety_note(value: str) -> bool:
+    token = str(value).casefold()
+    return (
+        "not a trade instruction" in token
+        or "research only" in token
+        or "human decision" in token
+    )
+
+
+def _dedupe_risk_values(values: tuple[str, ...]) -> tuple[str, ...]:
+    """Keep one operator-facing explanation per repeated risk concept."""
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        token = " ".join(str(value).casefold().split())
+        concept = _risk_concept(token)
+        key = concept or token.rstrip(".")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(value)
+    return tuple(deduped)
+
+
+def _risk_concept(token: str) -> str | None:
+    if "catalyst" in token and ("unknown" in token or "source" in token):
+        return "catalyst_support"
+    if "spread" in token or "execution-quality" in token or "execution quality" in token:
+        return "execution_quality"
+    if "baseline" in token and ("warm" in token or "temporal" in token):
+        return "temporal_baseline"
+    if "turnover" in token:
+        return "market_turnover"
+    if "confirmation gate" in token:
+        return "market_confirmation"
+    return None
 
 
 def _decision_evidence(row: Mapping[str, Any]) -> str:
@@ -383,6 +678,54 @@ def _component_table(title: str, value: object) -> str:
     )
 
 
+def _context_coverage(snapshot: DashboardSnapshot, row: Mapping[str, Any]) -> str:
+    source_url = str(
+        row.get("source_url")
+        or row.get("latest_source_url")
+        or row.get("url")
+        or ""
+    ).strip()
+    calendar_rows = _nearby_calendar_rows(snapshot, row)
+    rsi_context = row.get("rsi_context")
+    rsi_references = _values(row, "rsi_context_references")
+    catalyst_status = str(row.get("catalyst_status") or "").strip().casefold()
+    catalyst_present = catalyst_status not in {
+        "",
+        "unknown",
+        "unavailable",
+        "not_recorded",
+    } and any(
+        row.get(field) not in (None, "", [], {})
+        for field in (
+            "opportunity_type",
+            "final_route_after_quality_gate",
+            "route",
+            "source_strength",
+        )
+    )
+    source_attached = bool(source_url and safe_external_href(source_url) is not None)
+    attached_count = sum(
+        (
+            source_attached,
+            bool(calendar_rows),
+            isinstance(rsi_context, Mapping) or bool(rsi_references),
+            catalyst_present,
+        )
+    )
+    return (
+        '<details class="disclosure panel context-coverage"><summary><span>Context coverage</span>'
+        f'<span class="filter-chip">{attached_count} of 4 layers attached</span></summary>'
+        '<div class="disclosure__body"><p class="muted">Supporting source, calendar, technical, and catalyst layers. '
+        'Unavailable layers remain explicit and do not imply evidence.</p>'
+        '<div class="context-coverage__grid">'
+        + _source_block(row)
+        + _nearby_calendar(snapshot, row, nearby=calendar_rows)
+        + _technical_context(row)
+        + _catalyst_context(row)
+        + '</div></div></details>'
+    )
+
+
 def _source_block(row: Mapping[str, Any]) -> str:
     raw = str(
         row.get("source_url")
@@ -403,7 +746,7 @@ def _source_block(row: Mapping[str, Any]) -> str:
                 f'{escape_html(label)}</a>'
             )
     return (
-        '<section class="panel source-panel"><div class="section-heading"><div>'
+        '<section class="context-coverage__section source-context"><div class="section-heading"><div>'
         '<p class="eyebrow">Evidence source</p><h2>Latest recorded source</h2>'
         f'</div></div><p>{source}</p></section>'
     )
@@ -413,6 +756,17 @@ def _narrative_text(value: str) -> str:
     text = str(value).strip()
     if not text:
         return UNAVAILABLE
+    if text.casefold().startswith("nearby calendar risk:"):
+        raw_items = text.split(":", 1)[1].split(",")
+        seen: set[str] = set()
+        items: list[str] = []
+        for item in raw_items:
+            token = item.strip().casefold()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            items.append(humanize_enum(item.strip()))
+        return "Nearby calendar risk: " + (", ".join(items) or UNAVAILABLE)
     if "_" in text and not any(character.isspace() for character in text):
         return humanize_reason(text)
     return text
@@ -456,7 +810,10 @@ def _card_sparkline(row: Mapping[str, Any]) -> str:
     )
 
 
-def _nearby_calendar(snapshot: DashboardSnapshot, row: Mapping[str, Any]) -> str:
+def _nearby_calendar_rows(
+    snapshot: DashboardSnapshot,
+    row: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], ...]:
     evidence_ids = set(_values(row, "calendar_evidence_ids"))
     evidence = row.get("calendar_evidence")
     if isinstance(evidence, Iterable) and not isinstance(evidence, (str, bytes, Mapping)):
@@ -472,13 +829,25 @@ def _nearby_calendar(snapshot: DashboardSnapshot, row: Mapping[str, Any]) -> str
         assets = {str(item).upper() for item in event.get("affected_assets") or ()}
         if event_id in evidence_ids or symbol and symbol in assets:
             nearby.append(event)
+    return tuple(nearby)
+
+
+def _nearby_calendar(
+    snapshot: DashboardSnapshot,
+    row: Mapping[str, Any],
+    *,
+    nearby: tuple[Mapping[str, Any], ...] | None = None,
+) -> str:
+    if nearby is None:
+        nearby = _nearby_calendar_rows(snapshot, row)
     if not nearby:
-        return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Scheduled risk</p><h2>Nearby calendar events</h2></div></div><div class="empty-inline">No exact-generation calendar event is attached to this idea.</div></section>'
+        return '<section class="context-coverage__section calendar-context"><div class="section-heading"><div><p class="eyebrow">Scheduled risk</p><h2>Nearby calendar events</h2></div></div><div class="empty-inline">No exact-generation calendar event is attached to this idea.</div></section>'
     cards = []
     for event in nearby:
         timing = present_calendar_window(
             scheduled_at=event.get("scheduled_at"), window_start=event.get("window_start"),
             window_end=event.get("window_end"), time_certainty=event.get("time_certainty"),
+            now=snapshot.generation_authority_checked_at,
         )
         cards.append(
             '<article class="calendar-mini"><div>'
@@ -486,14 +855,53 @@ def _nearby_calendar(snapshot: DashboardSnapshot, row: Mapping[str, Any]) -> str
             f'<p>{escape_html(timing.label)} · {escape_html(timing.relative_label)}</p></div>'
             f'{_status_badge(event.get("importance"))}</article>'
         )
-    return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Scheduled risk</p><h2>Nearby calendar events</h2></div></div>' + "".join(cards) + '</section>'
+    return '<section class="context-coverage__section calendar-context"><div class="section-heading"><div><p class="eyebrow">Scheduled risk</p><h2>Nearby calendar events</h2></div></div>' + "".join(cards) + '</section>'
+
+
+def _primary_calendar_callout(
+    snapshot: DashboardSnapshot,
+    row: Mapping[str, Any],
+) -> str:
+    route = str(row.get("_dashboard_route") or row.get("radar_route") or "")
+    if route != "calendar_risk":
+        return ""
+    nearby = _nearby_calendar_rows(snapshot, row)
+    if not nearby:
+        return (
+            '<section class="panel primary-calendar-callout"><p class="eyebrow">Scheduled risk</p>'
+            '<h2>Calendar evidence is missing</h2><p>The route references scheduled risk, but no '
+            'exact-generation event row is attached. Treat this as an evidence gap.</p></section>'
+        )
+    cards = []
+    for event in nearby[:3]:
+        timing = present_calendar_window(
+            scheduled_at=event.get("scheduled_at"),
+            window_start=event.get("window_start"),
+            window_end=event.get("window_end"),
+            time_certainty=event.get("time_certainty"),
+            now=snapshot.generation_authority_checked_at,
+        )
+        cards.append(
+            '<article class="calendar-mini"><div>'
+            f'<strong>{escape_html(event.get("title") or "Scheduled event")}</strong>'
+            f'<p>{escape_html(timing.label)} · {escape_html(timing.relative_label)}</p></div>'
+            f'{_status_badge(event.get("importance"))}</article>'
+        )
+    return (
+        '<section class="panel primary-calendar-callout"><div class="section-heading"><div>'
+        '<p class="eyebrow">Scheduled risk tied to this decision</p>'
+        '<h2>Calendar context before the scores</h2></div>'
+        '<a href="/calendar">Open calendar</a></div>'
+        + "".join(cards)
+        + '</section>'
+    )
 
 
 def _technical_context(row: Mapping[str, Any]) -> str:
     context = row.get("rsi_context")
     refs = _values(row, "rsi_context_references")
     if not isinstance(context, Mapping) and not refs:
-        return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Technical context</p><h2>RSI and setup evidence</h2></div></div><div class="empty-inline">No exact RSI context is attached. No RSI scan, alert, or write is performed by this page.</div></section>'
+        return '<section class="context-coverage__section rsi-context"><div class="section-heading"><div><p class="eyebrow">Technical context</p><h2>RSI and setup evidence</h2></div></div><div class="empty-inline">No exact RSI context is attached. No RSI scan, alert, or write is performed by this page.</div></section>'
     values = []
     if isinstance(context, Mapping):
         for key in ("setup", "timeframe", "rsi", "regime", "trend", "edge_status"):
@@ -501,13 +909,13 @@ def _technical_context(row: Mapping[str, Any]) -> str:
                 values.append((humanize_enum(key), humanize_enum(context.get(key))))
     if refs:
         values.append(("Evidence references", ", ".join(refs)))
-    return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Technical context</p><h2>RSI and setup evidence</h2></div></div>' + _definition_grid(values) + '<p class="muted">Read-only context; no RSI writes, alerts, paper trades, or execution.</p></section>'
+    return '<section class="context-coverage__section rsi-context"><div class="section-heading"><div><p class="eyebrow">Technical context</p><h2>RSI and setup evidence</h2></div></div>' + _definition_grid(values) + '<p class="muted">Read-only context; no RSI writes, alerts, paper trades, or execution.</p></section>'
 
 
 def _catalyst_context(row: Mapping[str, Any]) -> str:
     blockers = _values(row, "opportunity_type_why_not_alertable", "why_not_alertable")
     return (
-        '<section class="panel catalyst-panel"><div class="section-heading"><div><p class="eyebrow">Catalyst Radar classification</p>'
+        '<section class="context-coverage__section catalyst-context"><div class="section-heading"><div><p class="eyebrow">Catalyst Radar classification</p>'
         '<h2>Secondary catalyst view</h2></div>' + _status_badge(row.get("catalyst_status")) + '</div>'
         + _definition_grid((
             ("Legacy classification", humanize_enum(row.get("opportunity_type"))),
@@ -524,13 +932,31 @@ def _outcome_block(snapshot: DashboardSnapshot, row: Mapping[str, Any]) -> str:
     identifier = candidate_identifier(row)
     outcome = next((item for item in snapshot.current_outcomes if str(item.get("core_opportunity_id") or item.get("candidate_id")) == identifier), None)
     if outcome is None:
-        return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Learning loop</p><h2>Outcome</h2></div></div><div class="empty-inline">No exact-generation outcome row is attached.</div></section>'
+        layer = dashboard_layer_coverage_by_key(snapshot)["outcomes"]
+        authority = str(snapshot.current_outcomes_metadata.get("authority") or "")
+        fingerprint_verified = (
+            authority == "current_generation_fingerprint_verified"
+            and bool(snapshot.current_outcomes_metadata.get("sha256"))
+        )
+        admitted = layer.status in {"healthy_nonempty", "healthy_empty"} or (
+            layer.status == "degraded" and fingerprint_verified
+        )
+        message = (
+            "A required outcome placeholder is missing from the verified exact-generation outcome artifact."
+            if admitted
+            else "The outcome layer is unavailable for this generation; no pending or matured state is inferred."
+        )
+        return (
+            '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Learning loop</p>'
+            '<h2>Outcome</h2></div></div><div class="empty-inline">'
+            f'{escape_html(message)}</div></section>'
+        )
     items = (
         ("State", humanize_enum(outcome.get("outcome_status") or outcome.get("maturation_state"))),
-        ("Route cohort", humanize_enum(outcome.get("radar_route") or outcome.get("route"))),
-        ("Actionability cohort", humanize_enum(outcome.get("actionability_score_cohort"))),
-        ("Evidence cohort", humanize_enum(outcome.get("evidence_confidence_score_cohort"))),
-        ("Risk cohort", humanize_enum(outcome.get("risk_score_cohort"))),
+        ("Route cohort", operator_route_label(outcome.get("radar_route") or outcome.get("route"))),
+        ("Actionability cohort", _score_cohort_label(outcome.get("actionability_score_cohort"))),
+        ("Evidence cohort", _score_cohort_label(outcome.get("evidence_confidence_score_cohort"))),
+        ("Risk cohort", _score_cohort_label(outcome.get("risk_score_cohort"))),
     )
     return '<section class="panel"><div class="section-heading"><div><p class="eyebrow">Learning loop</p><h2>Outcome</h2></div></div>' + _definition_grid(items) + '<p class="sample-warning">One idea cannot establish statistical edge. Outcomes remain descriptive until a meaningful sample matures.</p></section>'
 
@@ -542,6 +968,8 @@ def _technical_details(
 ) -> str:
     values = (
         ("Candidate ID", candidate_identifier(row)),
+        ("Symbol", row.get("symbol")),
+        ("Coin ID", row.get("coin_id")),
         ("Canonical route code", row.get("radar_route")),
         ("Model version", row.get("decision_model_version")),
         ("Evaluation time", present_time(row.get("decision_evaluated_at")).utc_label),
@@ -552,6 +980,7 @@ def _technical_details(
         ("Cache status", provenance.get("cache_status")),
         ("Measurement program", provenance.get("measurement_program")),
         ("Campaign counted", provenance.get("decision_radar_campaign_counted")),
+        ("Read-time safety reason code", row.get("_decision_read_time_reason")),
         ("Direct feature count", quality.get("direct_feature_count")),
         ("Proxy feature count", quality.get("proxy_feature_count")),
     )
@@ -592,13 +1021,54 @@ def _mini_score(label: str, value: object, dimension: str) -> str:
     return f'<div class="mini-score tone-{escape_html(band.tone)}"><span>{escape_html(label)}</span><strong>{escape_html(format_score(value))}</strong><small>{escape_html(band.label)}</small></div>'
 
 
-def _status_badge(value: object) -> str:
+def _status_badge(value: object, *, label: str | None = None) -> str:
     status = semantic_status(value)
-    return f'<span class="status-badge tone-{escape_html(status.tone)}"><i aria-hidden="true"></i>{escape_html(status.label)}</span>'
+    return f'<span class="status-badge tone-{escape_html(status.tone)}"><i aria-hidden="true"></i>{escape_html(label or status.label)}</span>'
 
 
-def _time_markup(value: object, *, expiry: bool = False) -> str:
-    presented = present_time(value)
+def _bias_label(value: object) -> str:
+    return {
+        "long": "Long bias",
+        "short": "Short bias",
+        "risk": "Downside risk",
+        "neutral": "Neutral bias",
+    }.get(str(value or "").strip().casefold(), humanize_enum(value))
+
+
+def _detail_route_badges(row: Mapping[str, Any]) -> str:
+    if row.get("_decision_expired_at_read_time") is True:
+        canonical_route = candidate_operator_route(row)
+        return (
+            _status_badge("expired", label="Expired")
+            + _status_badge(
+                canonical_route,
+                label=f"{operator_route_label(canonical_route)} at evaluation",
+            )
+        )
+    route = candidate_operator_route(row)
+    return _status_badge(route, label=operator_route_label(route))
+
+
+def _qualified_status_badge(name: str, value: object) -> str:
+    label = humanize_enum(value)
+    return _status_badge(value, label=f"{name} {label.casefold()}")
+
+
+def _score_cohort_label(value: object) -> str:
+    text = str(value or "").strip()
+    parts = text.split("_")
+    if len(parts) == 2 and all(part.replace(".", "", 1).isdigit() for part in parts):
+        return f"{parts[0]}–{parts[1]}"
+    return humanize_enum(value)
+
+
+def _time_markup(
+    value: object,
+    *,
+    expiry: bool = False,
+    now: object = None,
+) -> str:
+    presented = present_time(value, now=now)
     if not presented.available:
         return '<span class="muted">Unavailable</span>'
     prefix = "Expired " if expiry and presented.relative_label.endswith("ago") else ""

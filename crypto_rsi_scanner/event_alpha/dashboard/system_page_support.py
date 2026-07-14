@@ -6,7 +6,8 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from .components import escape_html
+from .components import HtmlFragment, badge, escape_html
+from .presentation import UNAVAILABLE, humanize_enum
 
 
 def render_page_intro(title: str, description: str, eyebrow: str) -> str:
@@ -29,6 +30,16 @@ def render_metric_grid(values: tuple[tuple[str, str, str], ...]) -> str:
         "</article>"
         for label, value, tone in values
     ) + "</div>"
+
+
+def render_validation_badge(status: object) -> HtmlFragment:
+    """Translate the internal doctor state into operator-facing validation language."""
+
+    token = str(status or "").strip().casefold()
+    if token == "ok":
+        return badge("Validation passed", tone="positive")
+    tone = "warning" if token in {"warn", "warning"} else "danger"
+    return badge(f"Validation {humanize_enum(status).casefold()}", tone=tone)
 
 
 def render_panel(title: str, body: str, *, eyebrow: str) -> str:
@@ -59,11 +70,19 @@ def as_number(value: object) -> float | None:
     return number if number == number and abs(number) != float("inf") else None
 
 
-def display_count(value: object) -> str:
-    """Render a non-negative integral count, defaulting invalid values to zero."""
+def first_recorded(*values: object) -> object | None:
+    """Return the first explicitly recorded value, preserving exact zeroes."""
+
+    return next((value for value in values if value is not None), None)
+
+
+def display_count(value: object, *, missing: str = UNAVAILABLE) -> str:
+    """Render a non-negative integral count without inventing a missing zero."""
 
     number = as_number(value)
-    return str(max(0, int(number))) if number is not None else "0"
+    if number is None or number < 0 or not number.is_integer():
+        return missing
+    return str(int(number))
 
 
 def summarize_market_quality(
@@ -112,6 +131,7 @@ __all__ = (
     "as_mapping",
     "as_number",
     "display_count",
+    "first_recorded",
     "render_metric_grid",
     "render_page_intro",
     "render_panel",

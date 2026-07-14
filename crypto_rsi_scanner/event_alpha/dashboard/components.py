@@ -81,6 +81,7 @@ def chips(
     aria_label: object = "Tags",
     tone: str = "neutral",
     empty: object = UNAVAILABLE,
+    humanize: bool = True,
 ) -> HtmlFragment:
     if isinstance(values, (str, bytes)) or values is None:
         materialized = [values] if values not in (None, "") else []
@@ -94,7 +95,8 @@ def chips(
             f'<span class="unavailable">{escape_html(empty)}</span>'
         )
     items = "".join(
-        f'<li><span class="chip chip--{_tone(tone)}">{escape_html(humanize_enum(value))}</span></li>'
+        f'<li><span class="chip chip--{_tone(tone)}">'
+        f'{escape_html(humanize_enum(value) if humanize else value)}</span></li>'
         for value in materialized
     )
     return HtmlFragment(

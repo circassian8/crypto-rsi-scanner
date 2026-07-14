@@ -17,6 +17,64 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-14 — Polish Decision Radar into a current-first professional operator product · Codex
+**Why:** The first operator-terminal pass made every layer visible, but repeated
+desktop, laptop, tablet, and phone renders still exposed clunky density,
+misleading generic labels, internal jargon, weak information hierarchy, and
+several empty or unavailable states that looked more conclusive than their
+evidence allowed.
+**Changes:**
+- Rebuilt the Today hierarchy around the current operator question: one
+  specialist route now uses route-aware language, compact attention cards name
+  their actual actionability constraints, and expired, diagnostic, historical,
+  comparison, technical, and compatibility material stays secondary until the
+  operator requests it. Expired diagnostics remain unavailable by direct URL
+  unless diagnostic opt-in is explicit.
+- Refined Market Radar into a measured-evidence surface. Observed 24-hour moves
+  lead scanner strength, canonical Decision rows remain distinct but linked,
+  exact layer counts are independent rather than a false funnel, raw provider
+  slugs are secondary, actionability uses an explicit 100-point scale, and wide,
+  laptop, tablet, and phone layouts use density appropriate to their viewport.
+- Reworked Calendar to lead with active risk, then upcoming dates, with past
+  events collapsed. Date-only, day-only, and `date_known` evidence now remains
+  current through its known UTC day before becoming past. Producer receipts and
+  normalization truth distinguish configured, degraded, healthy-empty, and not
+  configured without inventing coverage.
+- Made Outcomes, Run History, and Health concise and truthful. Missing outcome
+  evidence is unavailable rather than zero edge; current identity is compact;
+  attempts expose validation outcome and provider provenance; missing receipt
+  booleans render `Not recorded`; and Health leads with plain-language integrity,
+  coverage, and linked action rows while retaining exact technical detail.
+- Added one deterministic presentation clock based on
+  `generation_authority_checked_at`, canonical singular operator route labels,
+  a compact accessible mobile navigation, 44px form controls, minimum 24px
+  inline action targets, keyboard focus order, responsive metric grids, and
+  explicit research-only/human-decision/no-execution framing. No presentation
+  code re-evaluates Decision v2.
+- Split calendar values, idea history, outcome rendering, outcome and turnover
+  presentation models, and decision/record CSS into focused modules below the
+  architecture size gates. Updated the North Star, operator guide, ROADMAP,
+  DECISIONS, architecture reports, and regression coverage for the new truth
+  and interaction contracts.
+**Verify:** The export parent-symlink security regression passed 1/1; the focused
+dashboard suite passed 286/286; compileall, architecture cleanliness, JSON
+validation, and `git diff --check` passed. Dashboard smoke rendered 13 routes
+with zero writes, UX smoke rendered 8 primary routes with zero writes, and live
+readiness is READY for `radar_market_no_send_20260714t002940z` revision 12.
+`make verify-fast PYTHON=.venv/bin/python` passed 1,724 pytest checks plus the
+offline alert, backtest, and scoreboard smokes. Full `make verify
+PYTHON=.venv/bin/python` passed 1,357/1,357 standalone checks and 1,724/1,724
+pytest checks plus the same release smokes. Browser QA rendered every primary
+page at 320, 390, 768, 1024, 1366, and 1440px: no horizontal overflow, duplicate
+IDs, missing main/H1 landmarks, contrast failures, undersized controls, or
+broken focus order. Live and fixture states were both reviewed; an independent
+trust-boundary audit found no remaining P0-P2 issue.
+**Notes/risks:** This was a presentation/read-model hardening pass only. It made
+no provider call and added no sends, trades, paper trades, normal RSI writes,
+execution path, or `TRIGGERED_FADE`. The live calendar still correctly reports
+`not_configured`; real rows require a fresh non-fixture snapshot or separately
+authorized provider, not a UI fallback. GitHub CI is not awaited after push.
+
 ## 2026-07-14 — Deliver the Decision Radar operator terminal and expose every sparse layer · Codex
 **Why:** The live dashboard looked empty even though a trusted generation had
 evaluated 30 market rows. Calendar and several supporting inputs were also
