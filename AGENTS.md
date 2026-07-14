@@ -163,16 +163,25 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   descriptor-anchored namespace is held for the complete load, manifest counts
   are reconciled to the exact snapshot/anomaly rows, and raw anomaly scan
   evidence remains visibly separate from canonical Decision candidates.
-- **Private phone dashboard access:** keep the dashboard backend on
-  `127.0.0.1:8765`; phone access is allowed only through private Tailscale Serve
-  HTTPS to identities permitted by the owner's tailnet policy. Use
-  `make radar-dashboard-phone-readiness` / `make radar-dashboard-phone-status`
-  for observational checks and require `CONFIRM=1` for the enable/disable
-  targets. Never bind the dashboard to a LAN/wildcard address, enable Tailscale
-  Funnel, add a credential-bearing URL, open a router port, or reset unrelated
-  Serve configuration. A stale/untrusted dashboard, offline Tailscale node,
-  configured Funnel, missing tailnet DNS, or conflicting HTTPS handler must
-  fail closed.
+- **Phone dashboard access:** keep the dashboard backend on
+  `127.0.0.1:8765`. Private access may use Tailscale Serve HTTPS to identities
+  permitted by the owner's tailnet policy. The owner also explicitly approved
+  an unauthenticated, temporary Cloudflare Quick Tunnel on 2026-07-14 for easier
+  public phone access. Use `radar-dashboard-phone-*` for the private route and
+  `radar-dashboard-public-*` for the public route; readiness/status are
+  observational and both enable/disable paths require `CONFIRM=1`. The public
+  helper may start only an exact owned `cloudflared` process, may expose only the
+  loopback dashboard, must pin HTTP/2 plus non-debug logging, and must verify the
+  local dashboard identity, edge registration, and public HTTP 200 surface
+  before publishing the URL. It must never create an account, named tunnel,
+  owner-controlled DNS record, credential, configuration file, startup service,
+  or permanent URL. Anyone with its random `trycloudflare.com` link can read the
+  dashboard; stop it when not needed. Never bind the dashboard to a
+  LAN/wildcard address, enable Tailscale Funnel, add a credential-bearing URL,
+  open a router port, reset unrelated Serve configuration, or kill an unowned
+  process. A stale/untrusted dashboard, unsafe private Serve state, unowned
+  public-process state, malformed public URL, or failed public probe must fail
+  closed.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,

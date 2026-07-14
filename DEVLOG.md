@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-14 — Add verified temporary public phone access · Codex
+**Why:** The owner wants the simplest way to open the Decision Radar from a
+phone without joining a tailnet and explicitly accepts temporary public,
+unauthenticated access.
+**Changes:**
+- Added a separate confirmation-gated Cloudflare Quick Tunnel helper and Make
+  targets for read-only readiness/status plus explicit enable/disable. The
+  dashboard backend remains loopback-only; the helper creates no Cloudflare
+  account, named tunnel, owner DNS setup, credential, startup service, LAN bind,
+  router rule, Tailscale Funnel route, or permanent hostname.
+- Hardened enablement around one fixed HTTP/2, non-debug `cloudflared` argv. It
+  validates the exact local dashboard identity before spawn, accepts only one
+  canonical lowercase random Quick Tunnel URL, waits for edge registration,
+  and publishes only after that public address returns the expected HTTP 200
+  page and security headers. An early QUIC-only attempt returned Cloudflare 530;
+  fixed HTTP/2 plus registration-aware DNS timing resolved it without weakening
+  the verification boundary.
+- Retained the exact newly spawned process handle until enable commits, so URL,
+  ownership, registration, public-probe, state-write, and post-write failures
+  roll back and reap the child. Persistent status/disable use the private 0600
+  receipt, exact PID/live argv checks, bounded no-follow files, a private
+  mutation lock, sanitized child environment, and exact-process termination.
+- Added `X-Robots-Tag: noindex, nofollow, noarchive`, installed
+  `cloudflared` 2026.7.1 through Homebrew, restarted only the loopback dashboard,
+  and left one verified ephemeral public link running. Updated `AGENTS.md`,
+  `README.md`, the operator guide, Decision Radar North Star Markdown/JSON,
+  `ROADMAP.md`, and `DECISIONS.md` with the explicit public trust boundary.
+- Refreshed the current architecture/terminology/old-import reports after adding
+  the isolated helper and its tests; size gates still report zero new
+  violations, with no transitional files or old-path imports.
+**Verify:** Public/private/pointer/readiness/server tests passed 174/174; the
+public helper suite passed 40/40. `make verify-fast PYTHON=.venv/bin/python`
+passed 1,789 pytest checks plus alert-render, fixture-backtest, and paper-score
+smokes. Compileall, North Star JSON validation, and `git diff --check` passed.
+Dashboard smoke rendered 13 pages with zero writes; UX smoke rendered eight
+primary pages with zero writes. Architecture cleanliness passed with zero new
+size violations. Live local and public probes both returned the
+expected dashboard over HTTP 200 with no-store and browser-hardening headers,
+while `lsof` confirmed port 8765 listens only on `127.0.0.1`.
+**Notes/risks:** Anyone with the random URL can read the dashboard; the URL is
+not authentication and is intentionally absent from tracked files. The Mac,
+loopback dashboard, and owned tunnel process must stay running. Stop it with
+`CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python` when it
+is no longer needed. No provider call, send, trade, paper trade, normal RSI
+write, or `TRIGGERED_FADE` creation occurred. Full `make verify` was not
+repeated because the broad local fast gate and focused live/access regressions
+cover this localized serving change without rerunning the duplicate standalone
+compatibility runner.
+
 ## 2026-07-14 — Restore the dashboard and keep freshness expiry inspectable · Codex
 **Why:** The authoritative live generation crossed its six-hour age limit, so
 the pointer-bound server correctly returned HTTP 503 but reduced the entire

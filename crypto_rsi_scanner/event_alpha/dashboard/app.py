@@ -141,6 +141,7 @@ def _dashboard_headers(payload: bytes) -> list[tuple[str, str]]:
         ("Cache-Control", "no-store"),
         ("X-Content-Type-Options", "nosniff"),
         ("X-Frame-Options", "DENY"),
+        ("X-Robots-Tag", "noindex, nofollow, noarchive"),
         ("Referrer-Policy", "no-referrer"),
         (
             "Permissions-Policy",

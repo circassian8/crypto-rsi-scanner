@@ -128,6 +128,64 @@ There is no repository phone-access token to rotate, and the project must not
 add a Tailscale API credential merely to automate device revocation. Device
 identity rotation and revocation remain explicit Tailscale operator actions.
 
+## Temporary public phone access
+
+The easier no-tailnet option is an ephemeral Cloudflare Quick Tunnel. It keeps
+the Python dashboard bound to `127.0.0.1:8765` and creates an outbound-only
+connection to a randomized public `https://…trycloudflare.com` address. It does
+not need a Cloudflare account, domain, DNS change, router port, dashboard token,
+or phone app.
+
+Public means unauthenticated: anyone with the URL can read the dashboard. Quick
+Tunnels are intended for development/testing, have no uptime guarantee, and the
+address changes after a restart. They are suitable for temporary personal phone
+access, not a permanent deployment.
+
+Inspect without changing exposure:
+
+```sh
+make radar-dashboard-public-readiness PYTHON=.venv/bin/python
+make radar-dashboard-public-status PYTHON=.venv/bin/python
+```
+
+Readiness requires the local dashboard to return its authoritative HTTP 200
+identity and security headers, an
+executable `cloudflared`, no conflicting default Cloudflare configuration, and
+no stale or unowned public-process state. It does not call providers, write
+dashboard artifacts, create a tunnel, or reveal a prior URL.
+
+If readiness reports `cloudflared_binary_missing` on macOS, install the CLI
+without starting a background service, then rerun readiness:
+
+```sh
+brew install cloudflared
+```
+
+Start the temporary public link:
+
+```sh
+CONFIRM=1 make radar-dashboard-public-enable PYTHON=.venv/bin/python
+```
+
+Open the printed HTTPS URL directly on the phone. The helper launches one fixed
+HTTP/2, non-debug `cloudflared` command, waits for edge registration, accepts
+only one canonical lowercase `trycloudflare.com` URL, and prints it only after
+that address returns the expected dashboard and security headers over HTTP 200.
+It stores only bounded machine-local runtime state. It does not install a
+startup service, create Cloudflare credentials, or alter Tailscale.
+
+Stop it when finished:
+
+```sh
+CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python
+```
+
+Disable terminates only the exact owned process whose PID and complete live argv
+still match the runtime state. It refuses argv mismatch or unowned process state.
+The link also disappears when the process or Mac stops. If the dashboard later
+becomes stale, current research is already quarantined by the dashboard, but the
+public tunnel should still be stopped when it is not actively needed.
+
 ## Primary pages
 
 ### Today

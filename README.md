@@ -56,6 +56,28 @@ then rerun readiness and enable. See the
 [operator guide](research/CRYPTO_DECISION_RADAR_OPERATOR_GUIDE.md) for the full
 workflow.
 
+### Temporary public phone link
+
+For the simplest no-tailnet option, an explicitly confirmed Cloudflare Quick
+Tunnel can publish the unchanged loopback dashboard at a random public HTTPS
+address:
+
+```sh
+make radar-dashboard-public-readiness PYTHON=.venv/bin/python
+CONFIRM=1 make radar-dashboard-public-enable PYTHON=.venv/bin/python
+make radar-dashboard-public-status PYTHON=.venv/bin/python
+CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python
+```
+
+No Cloudflare account, domain/DNS setup, router port, LAN bind, or Tailscale client is
+required. This route is deliberately temporary, unauthenticated, and not
+started at login: anyone who has the printed `trycloudflare.com` URL can read
+the dashboard until the owned tunnel is stopped or dies. Enable requires a
+current authoritative dashboard identity and publishes only after its random
+hostname serves that dashboard over HTTP 200. It never calls data providers.
+Treat the URL as sensitive, stop it when finished, and use the private Tailscale
+route instead if access control becomes important.
+
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
 Integrated runs normalize scheduled and fixture rows once and persist only

@@ -250,13 +250,19 @@ and provenance are collapsed by default. The offline
 browser review covers desktop, laptop, tablet, and mobile layouts.
 
 Optional phone access preserves that loopback boundary. It may expose the
-backend only through private Tailscale Serve HTTPS to identities allowed by the
-owner's tailnet policy. Status and readiness are observational; enable and
-disable require explicit confirmation. The access helper fails closed when the
-dashboard is not current, Tailscale is offline, Funnel is configured, DNS is
-unavailable, or HTTPS port 443 has a conflicting Serve handler. It adds no
-dashboard credential, never binds a wildcard/LAN address, never enables Funnel,
-and never resets unrelated Serve configuration.
+backend through private Tailscale Serve HTTPS to identities allowed by the
+owner's tailnet policy, or through an explicitly confirmed unauthenticated
+Cloudflare Quick Tunnel for temporary public access. Both status/readiness paths
+are observational and both enable/disable paths require confirmation. The
+private helper fails closed on Tailscale/DNS/Funnel/Serve conflicts. The public
+helper requires the authoritative local HTTP 200 dashboard identity, a fixed
+HTTP/2 non-debug owned process, edge registration, an end-to-end public HTTP 200
+identity probe, and one canonical randomized `trycloudflare.com` URL; it creates
+no account, named tunnel, owner-controlled DNS record, credential, startup
+service, or permanent address.
+Neither path binds a wildcard/LAN address, opens a router port, or mutates
+dashboard/provider artifacts. Anyone with the public URL can read the dashboard
+until the exact owned process stops.
 
 The primary Decision preview sections are High-Confidence Ideas, Actionable
 Ideas, Rapid Market Anomalies, Dashboard Watch, Fade / Exhaustion Review, Risk

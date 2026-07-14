@@ -1444,6 +1444,7 @@ def test_dashboard_server_serves_while_another_client_stalls():
         assert response.status == 200
         assert response.getheader("Cache-Control") == "no-store"
         assert response.getheader("X-Frame-Options") == "DENY"
+        assert response.getheader("X-Robots-Tag") == "noindex, nofollow, noarchive"
         assert response.getheader("Referrer-Policy") == "no-referrer"
         assert response.getheader("Permissions-Policy") == (
             "camera=(), microphone=(), geolocation=(), payment=(), usb=()"

@@ -16,6 +16,32 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-14 - Allow an explicit temporary public dashboard link
+**Status:** accepted
+**Decision:** In addition to private Tailscale Serve, the owner may expose the
+loopback-only Decision Radar through an unauthenticated Cloudflare Quick Tunnel.
+Public enable and disable require explicit confirmation. Enable must require an
+authoritative local HTTP 200 dashboard with its expected identity, an executable `cloudflared`, no
+conflicting default configuration, and no stale or unowned runtime state. The
+helper owns one fixed HTTP/2, non-debug process and accepts only one canonical
+lowercase `https://<random>.trycloudflare.com` URL. It publishes that URL only
+after edge registration and an end-to-end HTTP 200 identity probe. Disable may
+terminate only the exact owned PID whose full command still matches.
+
+The helper must not bind the dashboard to LAN/wildcard interfaces, open a router
+port, use Tailscale Funnel, create Cloudflare credentials/accounts/named tunnels,
+change owner-controlled DNS, install a startup service, persist a permanent public URL, print raw
+logs, or mutate provider/Decision artifacts. Anyone with the URL can read the
+dashboard; the operator should stop it when not in use. The existing private
+Tailscale route remains the access-controlled alternative.
+**Why:** The owner explicitly prefers a simpler phone workflow and accepts
+public reachability. A temporary outbound Quick Tunnel provides a one-command
+HTTPS link without weakening the loopback bind or silently creating permanent
+infrastructure.
+**Revisit when:** The dashboard needs durable uptime, a stable hostname,
+multiple users, or access control; replace the Quick Tunnel with a separately
+reviewed authenticated deployment rather than extending this temporary path.
+
 ## 2026-07-14 - Keep freshness expiry inspectable but non-authoritative
 **Status:** accepted
 **Decision:** A pointer-bound dashboard whose exact identity still matches but
@@ -23,9 +49,10 @@ whose only authority loss is `generation:stale` and/or `doctor:stale` returns a
 full quarantined diagnostic shell with HTTP 503. System Health, historical
 Outcomes, and explicitly historical Run History remain inspectable, while every
 current artifact-derived row, field, count, detail route, and actionability
-claim stays centrally suppressed. HTTP 503 keeps private phone readiness fail-closed. Pointer,
-identity, fingerprint, schema, or integrity loss continues to return the minimal
-unavailable response. The six-hour current-generation limit is not raised.
+claim stays centrally suppressed. HTTP 503 keeps private phone readiness
+fail-closed. Pointer, identity, fingerprint, schema, or integrity loss continues
+to return the minimal unavailable response. The six-hour current-generation
+limit is not raised.
 
 The one-hour campaign cadence is a minimum provider-safety interval, not a
 refresh scheduler. Recurring provider calls and dashboard restarts must not be
@@ -39,10 +66,10 @@ remain opt-in.
 rebinding contract, or the owner explicitly authorizes a guarded recurring
 no-send maintainer.
 
-## 2026-07-14 - Expose the dashboard to phones only through private tailnet HTTPS
+## 2026-07-14 - Use private tailnet HTTPS when access control is required
 **Status:** accepted
 **Decision:** The Crypto Radar HTTP backend remains bound to loopback. Optional
-phone access uses Tailscale Serve on HTTPS 443 and is available only to
+private phone access uses Tailscale Serve on HTTPS 443 and is available only to
 identities permitted by the owner's tailnet policy. Readiness and status are
 observational; enable and disable require explicit confirmation. Enablement
 must fail closed unless the dashboard returns authoritative HTTP 200, the local
@@ -50,7 +77,8 @@ Tailscale node is running and online with a `.ts.net` DNS name, Funnel is
 disabled, and the HTTPS Serve configuration is empty or exactly owned by this
 dashboard. Disable removes only that exact route and never resets unrelated
 Serve configuration. Do not add a dashboard token, LAN/wildcard binding,
-router forwarding, public tunnel, or Funnel fallback.
+router forwarding, or Funnel fallback. The separately governed temporary public
+Quick Tunnel is not a private-access substitute.
 **Why:** This gives the owner authenticated phone access at home or away without
 expanding the dashboard's loopback trust boundary, handling a second secret, or
 making research artifacts public. Exact configuration checks protect future
