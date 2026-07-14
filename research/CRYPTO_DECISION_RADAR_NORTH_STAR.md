@@ -239,14 +239,24 @@ single read clock. Missing receipt booleans remain tri-state and display as
 projection names all canonical routes consistently while preserving their
 stored route tokens and routing behavior.
 
-The interface is server-rendered, loopback-only, responsive from wide desktop to
-narrow mobile, keyboard navigable, and usable without JavaScript. Semantic
+The interface is server-rendered, with its backend loopback-only, responsive
+from wide desktop to narrow mobile, keyboard navigable, and usable without
+JavaScript. Semantic
 states use text and structure as well as color. Tables become contained mobile
 comparison cards where appropriate; long identifiers and technical values stay
 inside their components. Deep paths, hashes, reason codes, request-ledger data,
 and provenance are collapsed by default. The offline
 `make radar-dashboard-ux-smoke` target exercises all primary pages and the real
 browser review covers desktop, laptop, tablet, and mobile layouts.
+
+Optional phone access preserves that loopback boundary. It may expose the
+backend only through private Tailscale Serve HTTPS to identities allowed by the
+owner's tailnet policy. Status and readiness are observational; enable and
+disable require explicit confirmation. The access helper fails closed when the
+dashboard is not current, Tailscale is offline, Funnel is configured, DNS is
+unavailable, or HTTPS port 443 has a conflicting Serve handler. It adds no
+dashboard credential, never binds a wildcard/LAN address, never enables Funnel,
+and never resets unrelated Serve configuration.
 
 The primary Decision preview sections are High-Confidence Ideas, Actionable
 Ideas, Rapid Market Anomalies, Dashboard Watch, Fade / Exhaustion Review, Risk

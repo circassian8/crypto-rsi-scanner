@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-14 — Add private tailnet phone access to the Decision Radar · Codex
+**Why:** The owner needs to open the local dashboard from a phone without
+publishing research artifacts to the LAN or internet, weakening the existing
+loopback boundary, or introducing another long-lived credential.
+**Changes:**
+- Added a guarded Tailscale Serve operator that discovers the installed CLI,
+  verifies the loopback dashboard returns authoritative HTTP 200, requires a
+  running/online node with valid tailnet DNS, rejects Funnel and any conflicting
+  Serve configuration, and exposes only the exact private HTTPS 443 proxy to
+  `http://127.0.0.1:8765`. Enable/disable require explicit confirmation;
+  disable removes only the exact owned route and never runs a broad reset.
+- Added read-only readiness/status plus confirmation-gated enable/disable Make
+  targets. Subprocesses use fixed argument arrays, bounded timeouts, sanitized
+  output, duplicate-key-safe bounded JSON, and no shell. Focused regressions
+  cover missing/offline state, invalid DNS/JSON, stale dashboard authority,
+  Funnel/conflict refusal, exact command shape, idempotence, safe disable,
+  redaction, and Make confirmation propagation.
+- Kept the dashboard server loopback-only and GET/HEAD-only while adding frame,
+  referrer, and browser-capability response hardening. Updated `AGENTS.md`, the
+  README/operator guide, Decision Radar North Star Markdown/JSON, `ROADMAP.md`,
+  and `DECISIONS.md` with the private-access trust boundary and lost-phone
+  revocation workflow.
+- Refreshed one already-authorized, cadence-eligible CoinGecko no-send
+  observation so the backend was current before exposure checks. Namespace
+  `radar_market_no_send_20260714t102122z` is strict-clean revision 12 with 80
+  provider rows, 30 selected observations, zero anomalies/ideas, and zero
+  sends, trades, paper trades, normal RSI writes, or `TRIGGERED_FADE` creation.
+  The campaign report now records five countable cycles, 150 observations, 120
+  baseline-counting rows, and two historical pending `risk_watch` outcomes.
+**Verify:** Focused dashboard/phone/readiness tests passed 119/119; the final
+phone helper suite passed 21/21. Compileall, JSON validation, secret-pattern
+diff scan, `git diff --check`, and architecture cleanliness passed with zero new
+size violations. Dashboard smoke rendered 13 pages with zero writes; UX smoke
+rendered 8 primary pages with zero writes. Full `make verify
+PYTHON=.venv/bin/python` passed 1,357/1,357 standalone checks and 1,745/1,745
+pytest checks plus alert-render, fixture-backtest, and paper-scoreboard smokes.
+Live phone readiness reached `READY state=disabled`; the guarded enable command
+correctly left the route off when Tailscale required its one-time web consent.
+**Notes/risks:** The remaining human action is the one-time Tailscale admin
+sign-in and **Enable HTTPS/Serve** approval already opened in the browser. Do not
+enable Funnel. After approval, rerun the confirmed enable target; tailnet
+identity/ACL policy, not a repository token, controls access. The Mac must stay
+awake, connected to Tailscale, and keep the loopback dashboard backend running.
+
 ## 2026-07-14 — Polish Decision Radar into a current-first professional operator product · Codex
 **Why:** The first operator-terminal pass made every layer visible, but repeated
 desktop, laptop, tablet, and phone renders still exposed clunky density,

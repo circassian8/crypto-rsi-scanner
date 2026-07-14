@@ -18,6 +18,36 @@ trade, write normal RSI rows, or create `TRIGGERED_FADE`. Run
 `make radar-dashboard-smoke` for the deterministic fixture/no-write render gate
 and `make radar-dashboard-ux-smoke` for primary-page semantic and responsive
 contracts.
+
+### Private phone access
+
+The dashboard can be opened on a phone through private Tailscale Serve without
+changing its loopback-only bind or creating a dashboard password/token. Install
+the Tailscale app on the phone, sign in to the same tailnet as this Mac, and make
+sure the Mac is awake, connected to Tailscale, and running a current dashboard
+backend. Then use:
+
+```sh
+make radar-dashboard-phone-readiness PYTHON=.venv/bin/python
+make radar-dashboard-phone-status PYTHON=.venv/bin/python
+CONFIRM=1 make radar-dashboard-phone-enable PYTHON=.venv/bin/python
+CONFIRM=1 make radar-dashboard-phone-disable PYTHON=.venv/bin/python
+```
+
+The first activation may require one Tailscale admin sign-in and **Enable
+HTTPS/Serve** consent in the browser. Approve only that private tailnet feature,
+not Funnel, then rerun the confirmed enable command.
+
+Enable prints the private HTTPS URL to open on the phone. Access is governed by
+the tailnet's users, devices, and ACL/grant policy, so review that trust boundary
+before enabling it on a shared tailnet. This workflow never binds the dashboard
+to the LAN, uses Tailscale Funnel, creates a URL token, or exposes it to the
+public internet. If the phone is lost, disable the route immediately, revoke the
+old phone in Tailscale's device administration, enroll the replacement phone,
+then rerun readiness and enable. See the
+[operator guide](research/CRYPTO_DECISION_RADAR_OPERATOR_GUIDE.md) for the full
+workflow.
+
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
 Integrated runs normalize scheduled and fixture rows once and persist only

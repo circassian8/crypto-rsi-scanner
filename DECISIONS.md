@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-14 - Expose the dashboard to phones only through private tailnet HTTPS
+**Status:** accepted
+**Decision:** The Crypto Radar HTTP backend remains bound to loopback. Optional
+phone access uses Tailscale Serve on HTTPS 443 and is available only to
+identities permitted by the owner's tailnet policy. Readiness and status are
+observational; enable and disable require explicit confirmation. Enablement
+must fail closed unless the dashboard returns authoritative HTTP 200, the local
+Tailscale node is running and online with a `.ts.net` DNS name, Funnel is
+disabled, and the HTTPS Serve configuration is empty or exactly owned by this
+dashboard. Disable removes only that exact route and never resets unrelated
+Serve configuration. Do not add a dashboard token, LAN/wildcard binding,
+router forwarding, public tunnel, or Funnel fallback.
+**Why:** This gives the owner authenticated phone access at home or away without
+expanding the dashboard's loopback trust boundary, handling a second secret, or
+making research artifacts public. Exact configuration checks protect future
+unrelated Serve handlers and make exposure drift visible.
+**Revisit when:** Tailscale is no longer available, multiple trusted dashboard
+users require application-level authorization, or a separately threat-modeled
+deployment replaces the local operator surface.
+
 ## 2026-07-14 - Keep operator hierarchy current-first, route-aware, and density-adaptive
 **Status:** accepted
 **Decision:** Dashboard presentation must lead with the smallest truthful answer

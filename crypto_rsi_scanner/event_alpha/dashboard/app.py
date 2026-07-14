@@ -133,6 +133,12 @@ def _dashboard_headers(payload: bytes) -> list[tuple[str, str]]:
         ("Content-Length", str(len(payload))),
         ("Cache-Control", "no-store"),
         ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("Referrer-Policy", "no-referrer"),
+        (
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        ),
         (
             "Content-Security-Policy",
             "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
@@ -149,7 +155,7 @@ def serve_dashboard(
     port: int = 8765,
     generation_binding: DashboardGenerationBinding | None = None,
 ) -> None:
-    """Serve the local dashboard until interrupted."""
+    """Serve the loopback-only dashboard until interrupted."""
 
     if str(host).strip().casefold() not in {"127.0.0.1", "localhost", "::1"}:
         raise ValueError("radar dashboard only binds to a loopback host")

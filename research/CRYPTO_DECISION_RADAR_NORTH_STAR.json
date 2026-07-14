@@ -528,6 +528,18 @@
       "Crypto Decision Radar",
       "Catalyst Radar Classification"
     ],
+    "dashboard_access_policy": {
+      "application_credential_added": false,
+      "backend_bind": "loopback_only",
+      "conflicting_serve_config_fails_closed": true,
+      "funnel_allowed": false,
+      "mutation_requires_explicit_confirmation": true,
+      "phone_transport": "private_tailscale_serve_https",
+      "public_or_lan_binding_allowed": false,
+      "readiness_and_status_are_observational": true,
+      "serve_reset_allowed": false,
+      "tailnet_access_policy_applies": true
+    },
     "dashboard_get_head_side_effects": [],
     "dashboard_is_primary": true,
     "dashboard_operator_experience_v1": {

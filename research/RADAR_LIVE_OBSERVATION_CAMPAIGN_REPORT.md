@@ -1,12 +1,12 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-14T00:29:48.091041+00:00` from local artifacts only.
+Generated at `2026-07-14T10:21:29.774236+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
 
 - Status: `in_progress_baseline_warming`
-- Counted real/no-send cycles: `4`
+- Counted real/no-send cycles: `5`
 - Real Decision candidates: `2`
 - Provider failures: `0`
 - Preflight/blocked attempts: `1`
@@ -20,8 +20,8 @@ Research and decision support only. This report contains no trade recommendation
 ## Authority and pointer
 
 - Pointer status: `authoritative`
-- Current namespace: `radar_market_no_send_20260714t002940z`
-- Exact run: `2026-07-14T00:29:40.814498+00:00|no_key_live`
+- Current namespace: `radar_market_no_send_20260714t102122z`
+- Exact run: `2026-07-14T10:21:23.140944+00:00|no_key_live`
 - Revision: `12`
 - Exact operator binding: `true`
 
@@ -30,7 +30,8 @@ Research and decision support only. This report contains no trade recommendation
 | Namespace | Observed at | Candidates | Routes | Current |
 |---|---|---:|---|---|
 | radar_market_no_send_20260713t190728z | 2026-07-13T19:07:29.084694+00:00 | 0 | none | false |
-| radar_market_no_send_20260714t002940z | 2026-07-14T00:29:40.814498+00:00 | 1 | risk_watch=1 | true |
+| radar_market_no_send_20260714t002940z | 2026-07-14T00:29:40.814498+00:00 | 1 | risk_watch=1 | false |
+| radar_market_no_send_20260714t102122z | 2026-07-14T10:21:23.140944+00:00 | 0 | none | true |
 
 ### Complete but non-authoritative generations
 
@@ -42,12 +43,12 @@ Research and decision support only. This report contains no trade recommendation
 ## Baseline maturity
 
 - Status: `warming`
-- Retained observations: `120`
-- Baseline-counted observations: `90`
+- Retained observations: `150`
+- Baseline-counted observations: `120`
 - Too-close observations: `30`
 - Duplicate observations: `0`
 - Conflicting duplicate observations: `0`
-- Assets: `31`
+- Assets: `32`
 - Warm assets: `0`
 - Minimum spacing seconds: `3600`
 
@@ -55,13 +56,13 @@ Research and decision support only. This report contains no trade recommendation
 
 | Feature group | Warm assets | Warming assets | Status counts |
 |---|---:|---:|---|
-| btc_eth_relative | 0 | 31 | cold=31 |
-| returns_1h | 0 | 31 | cold=31 |
-| returns_24h | 0 | 31 | cold=31 |
-| returns_4h | 0 | 31 | cold=31 |
-| turnover | 0 | 31 | warming=31 |
-| volatility | 0 | 31 | cold=31 |
-| volume | 0 | 31 | warming=31 |
+| btc_eth_relative | 0 | 32 | cold=32 |
+| returns_1h | 0 | 32 | cold=32 |
+| returns_24h | 0 | 32 | cold=32 |
+| returns_4h | 0 | 32 | cold=32 |
+| turnover | 0 | 32 | warming=32 |
+| volatility | 0 | 32 | cold=32 |
+| volume | 0 | 32 | warming=32 |
 
 ## Outcomes
 
@@ -87,20 +88,20 @@ Research and decision support only. This report contains no trade recommendation
 
 ## Data-quality limitations
 
-- **execution_quality_spread:** Trusted spread coverage is 0/120. Provider selection is deferred until the operator identifies the intended execution venue.
-- **proxy_market_features:** The campaign retains 360 proxy feature observations; proxy evidence remains explicitly quality-capped.
+- **execution_quality_spread:** Trusted spread coverage is 0/150. Provider selection is deferred until the operator identifies the intended execution venue.
+- **proxy_market_features:** The campaign retains 450 proxy feature observations; proxy evidence remains explicitly quality-capped.
 - **temporal_baseline_maturity:** The required feature/time-aware temporal baseline is not globally warm.
 
 ## Next observation
 
-- Next eligible time: `2026-07-14T01:29:40.814498+00:00`
+- Next eligible time: `2026-07-14T11:21:23.140944+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-market-no-send-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 4 counted real/no-send cycles and 2 canonical ideas; 2 outcomes are pending and 0 are matured. There are 0 provider failures and 1 blocked/preflight attempts. Baseline status is warming with 0/31 warm assets. Pointer history contains 2 bound generations and current authority is radar_market_no_send_20260714t002940z. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 5 counted real/no-send cycles and 2 canonical ideas; 2 outcomes are pending and 0 are matured. There are 0 provider failures and 1 blocked/preflight attempts. Baseline status is warming with 0/32 warm assets. Pointer history contains 3 bound generations and current authority is radar_market_no_send_20260714t102122z. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Spread-provider selection remains deferred until the operator identifies the intended execution venue.
 No trade is recommended. No automatic threshold or route change is authorized.

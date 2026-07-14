@@ -31,6 +31,76 @@ Readiness does not call providers. The live market command may make one bounded
 CoinGecko request only when the explicit authorization already exists and the
 campaign cadence is eligible; the dashboard never sets that authorization.
 
+## Private phone access
+
+Phone access uses Tailscale Serve as a private HTTPS proxy to the unchanged
+loopback dashboard. It does not bind the Python server to a LAN address, open a
+router port, create a dashboard password/token, use Tailscale Funnel, or publish
+the dashboard on the public internet. The phone must be connected to the same
+tailnet as this Mac. Tailnet ACL/grant policy and device membership are the
+access-control boundary; on a shared tailnet, confirm that policy limits access
+to the intended user or devices before enabling the route.
+
+Prerequisites:
+
+1. Install the Tailscale app on the phone and sign in to the same tailnet as the
+   Mac.
+2. Keep the Mac awake, online, and connected to Tailscale.
+3. Start the loopback dashboard and ensure its exact generation is current. A
+   stale or unavailable backend remains fail-closed and is not made usable by
+   phone access.
+
+Inspect the local dashboard and private-access prerequisites without changing
+the Serve route:
+
+```sh
+make radar-dashboard-phone-readiness PYTHON=.venv/bin/python
+make radar-dashboard-phone-status PYTHON=.venv/bin/python
+```
+
+Readiness reports whether the loopback dashboard, authoritative generation,
+Tailscale connection, private DNS, and route ownership are safe to use. Status
+shows the sanitized current state. Neither command enables access, prints raw
+Tailscale account data, nor creates a public route.
+
+Enable private HTTPS access with the explicit confirmation gate:
+
+```sh
+CONFIRM=1 make radar-dashboard-phone-enable PYTHON=.venv/bin/python
+```
+
+On the first activation, Tailscale may require a one-time admin sign-in and
+**Enable HTTPS/Serve** consent in the browser. Approve only that private tailnet
+feature, never Funnel, then rerun the confirmed enable command. This is a
+Tailscale account setting rather than a repository credential.
+
+Open the printed `https://...ts.net/` URL in the phone browser while Tailscale is
+connected. The URL contains no dashboard credential; tailnet identity and policy
+control who can reach it. Keep it as operator information rather than posting it
+publicly.
+
+Disable phone access without stopping the local loopback dashboard:
+
+```sh
+CONFIRM=1 make radar-dashboard-phone-disable PYTHON=.venv/bin/python
+```
+
+Disable removes only the HTTPS route owned by this dashboard. It does not reset
+unrelated Tailscale Serve configuration. Re-run status afterward to confirm that
+private phone access is off.
+
+If a phone is lost or replaced:
+
+1. Run the disable command immediately.
+2. Revoke or remove the old phone from Tailscale's device administration.
+3. Enroll the replacement phone into the intended tailnet and confirm its access
+   policy.
+4. Run readiness, then enable the private route again.
+
+There is no repository phone-access token to rotate, and the project must not
+add a Tailscale API credential merely to automate device revocation. Device
+identity rotation and revocation remain explicit Tailscale operator actions.
+
 ## Primary pages
 
 ### Today

@@ -163,6 +163,16 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   descriptor-anchored namespace is held for the complete load, manifest counts
   are reconciled to the exact snapshot/anomaly rows, and raw anomaly scan
   evidence remains visibly separate from canonical Decision candidates.
+- **Private phone dashboard access:** keep the dashboard backend on
+  `127.0.0.1:8765`; phone access is allowed only through private Tailscale Serve
+  HTTPS to identities permitted by the owner's tailnet policy. Use
+  `make radar-dashboard-phone-readiness` / `make radar-dashboard-phone-status`
+  for observational checks and require `CONFIRM=1` for the enable/disable
+  targets. Never bind the dashboard to a LAN/wildcard address, enable Tailscale
+  Funnel, add a credential-bearing URL, open a router port, or reset unrelated
+  Serve configuration. A stale/untrusted dashboard, offline Tailscale node,
+  configured Funnel, missing tailnet DNS, or conflicting HTTPS handler must
+  fail closed.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,
