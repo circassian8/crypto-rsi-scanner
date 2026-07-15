@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ..artifacts import operator_state, run_ledger
-from ..radar import market_anomaly_scanner
+from ..artifacts import operator_state, run_ledger, schema_v1
+from ..radar import (
+    market_anomaly_receipt,
+    market_anomaly_scanner,
+    market_shadow_surprise,
+)
 from . import (
     market_no_send_calendar,
     market_no_send_provider,
     market_provenance,
 )
-from .market_no_send_io import read_jsonl, write_jsonl
+from .market_no_send_io import (
+    parse_jsonl_bytes,
+    read_jsonl,
+)
 from .market_no_send_models import MarketNoSendError, MarketNoSendReadiness
 
 
@@ -115,18 +125,67 @@ def attach_market_no_send_lineage(
     run_id: str,
     provenance: Mapping[str, Any],
     safety_counters: Mapping[str, int],
+    history_artifact: str,
+    history_sha256: str,
+    minimum_shadow_sample_count: int,
 ) -> market_anomaly_scanner.MarketAnomalyScanResult:
-    """Attach one closed provenance contract to scanner snapshots and anomalies."""
+    """Attach provenance and post-scan-only shadow evidence to market artifacts."""
 
+    source_rows = tuple(dict(row) for row in normalized_rows if isinstance(row, Mapping))
     by_coin = {
         str(row.get("coin_id") or ""): dict(row)
-        for row in normalized_rows
+        for row in source_rows
         if str(row.get("coin_id") or "")
     }
-    snapshot_path = namespace_dir / market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME
-    anomaly_path = namespace_dir / market_anomaly_scanner.MARKET_ANOMALY_FILENAME
-    snapshot_rows = read_jsonl(snapshot_path)
-    anomaly_rows = read_jsonl(anomaly_path)
+    if Path(history_artifact).name != history_artifact:
+        raise MarketNoSendError("market shadow history artifact must be a basename")
+    history_path = namespace_dir / history_artifact
+    identity = (scan_result.namespace_device, scan_result.namespace_inode)
+    scanner_names = (
+        market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME,
+        market_anomaly_scanner.MARKET_ANOMALY_FILENAME,
+        market_anomaly_scanner.MARKET_ANOMALY_CATALYST_SEARCH_QUEUE_FILENAME,
+        market_anomaly_scanner.MARKET_ANOMALY_REPORT_FILENAME,
+    )
+    scanner_paths = (
+        scan_result.snapshots_path,
+        scan_result.anomalies_path,
+        scan_result.catalyst_search_queue_path,
+        scan_result.report_path,
+    )
+    payloads = market_anomaly_receipt.artifact_payloads(
+        namespace_dir,
+        namespace_identity=identity,
+        paths=(history_path, *scanner_paths),
+        expected_names=(history_artifact, *scanner_names),
+    )
+    history_bytes = payloads[history_artifact]
+    if hashlib.sha256(history_bytes).hexdigest() != history_sha256:
+        raise MarketNoSendError("market shadow history artifact fingerprint mismatch")
+    expected_scanner_sha256 = {
+        scanner_names[0]: scan_result.snapshots_sha256,
+        scanner_names[1]: scan_result.anomalies_sha256,
+        scanner_names[2]: scan_result.catalyst_search_queue_sha256,
+        scanner_names[3]: scan_result.report_sha256,
+    }
+    if any(
+        market_anomaly_receipt.sha256(payloads[name]) != expected
+        for name, expected in expected_scanner_sha256.items()
+    ):
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:artifact_identity"
+        )
+    shadow_by_observation = _shadow_surprise_by_observation_id(
+        source_rows,
+        parse_jsonl_bytes(history_bytes),
+        minimum_sample_count=minimum_shadow_sample_count,
+        history_artifact=history_artifact,
+        history_sha256=history_sha256,
+    )
+    snapshot_path = scan_result.snapshots_path
+    anomaly_path = scan_result.anomalies_path
+    snapshot_rows = parse_jsonl_bytes(payloads[scanner_names[0]])
+    anomaly_rows = parse_jsonl_bytes(payloads[scanner_names[1]])
     lineage = _lineage_values(
         provider=provider,
         data_mode=data_mode,
@@ -139,19 +198,127 @@ def attach_market_no_send_lineage(
         source = by_coin.get(str(row.get("coin_id") or ""), {})
         row.update(lineage)
         _copy_market_quality_fields(row, source)
+        _copy_shadow_temporal_surprise(row, source, shadow_by_observation)
     for row in anomaly_rows:
         source = by_coin.get(str(row.get("coin_id") or ""), {})
         row.update(lineage)
         row["provider_generation_id"] = run_id
+        _copy_shadow_temporal_surprise(row, source, shadow_by_observation)
         snapshot = row.get("market_state_snapshot")
         if isinstance(snapshot, Mapping):
             attached = dict(snapshot)
             attached.update(lineage)
             _copy_market_quality_fields(attached, source)
             row["market_state_snapshot"] = attached
-    write_jsonl(snapshot_path, snapshot_rows)
-    write_jsonl(anomaly_path, anomaly_rows)
+    market_anomaly_receipt.write_artifacts_atomic(
+        namespace_dir,
+        payloads={
+            scanner_names[0]: _jsonl_payload(snapshot_path, snapshot_rows),
+            scanner_names[1]: _jsonl_payload(anomaly_path, anomaly_rows),
+            scanner_names[2]: payloads[scanner_names[2]],
+            scanner_names[3]: payloads[scanner_names[3]],
+        },
+        expected_names=scanner_names,
+        expected_namespace_identity=identity,
+        expected_existing_sha256=expected_scanner_sha256,
+        expected_guarded_sha256={history_artifact: history_sha256},
+    )
     return market_anomaly_scanner.refresh_market_anomaly_scan_result(scan_result)
+
+
+def _shadow_surprise_by_observation_id(
+    normalized_rows: Iterable[Mapping[str, Any]],
+    history_rows: Iterable[Mapping[str, Any]],
+    *,
+    minimum_sample_count: int,
+    history_artifact: str,
+    history_sha256: str,
+) -> dict[str, dict[str, Any]]:
+    history = tuple(dict(row) for row in history_rows if isinstance(row, Mapping))
+    by_observation: dict[str, list[dict[str, Any]]] = {}
+    for row in history:
+        observation_id = str(row.get("observation_id") or "")
+        if observation_id:
+            by_observation.setdefault(observation_id, []).append(row)
+    result: dict[str, dict[str, Any]] = {}
+    seen_source_observations: set[str] = set()
+    for source in normalized_rows:
+        observation_id = str(source.get("market_history_observation_id") or "")
+        if not observation_id:
+            continue
+        if observation_id in seen_source_observations:
+            raise MarketNoSendError(
+                "market shadow source observation identity is not unique"
+            )
+        seen_source_observations.add(observation_id)
+        matches = by_observation.get(observation_id, [])
+        if len(matches) != 1:
+            raise MarketNoSendError(
+                "market shadow current observation has no unique history row"
+            )
+        current = matches[0]
+        asset_id = str(current.get("canonical_asset_id") or "")
+        source_asset_id = str(source.get("canonical_asset_id") or "")
+        current_at = _market_history_time(current.get("observed_at"))
+        if (
+            not asset_id
+            or not source_asset_id
+            or asset_id != source_asset_id
+            or current_at is None
+        ):
+            raise MarketNoSendError("market shadow current observation identity is invalid")
+        prior = tuple(
+            row
+            for row in history
+            if str(row.get("canonical_asset_id") or "") == asset_id
+            and row.get("baseline_counted") is True
+            and (observed_at := _market_history_time(row.get("observed_at"))) is not None
+            and observed_at < current_at
+        )
+        result[observation_id] = market_shadow_surprise.evaluate_shadow_temporal_surprise(
+            current,
+            prior,
+            minimum_sample_count=minimum_sample_count,
+            history_artifact=history_artifact,
+            history_sha256=history_sha256,
+        )
+    return result
+
+
+def _copy_shadow_temporal_surprise(
+    target: dict[str, Any],
+    source: Mapping[str, Any],
+    shadow_by_observation: Mapping[str, Mapping[str, Any]],
+) -> None:
+    observation_id = str(source.get("market_history_observation_id") or "")
+    shadow = shadow_by_observation.get(observation_id)
+    if shadow is not None:
+        target["shadow_temporal_surprise"] = copy.deepcopy(dict(shadow))
+
+
+def _market_history_time(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _jsonl_payload(path: Path, rows: Iterable[Mapping[str, Any]]) -> bytes:
+    lines = [
+        json.dumps(
+            schema_v1.stamp_artifact_row(row, path=path),
+            sort_keys=True,
+            default=str,
+            separators=(",", ":"),
+        )
+        for row in rows
+    ]
+    return (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
 
 
 def _lineage_values(

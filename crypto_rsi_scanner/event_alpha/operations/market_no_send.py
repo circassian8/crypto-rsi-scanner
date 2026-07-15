@@ -564,6 +564,8 @@ def _build_market_generation_from_rows(
             run_id=run_id,
             provenance=provenance,
             safety_counters=_SAFETY_COUNTERS,
+            history_artifact=HISTORY_FILENAME, history_sha256=history_sha256,
+            minimum_shadow_sample_count=_market_history_config()[0].min_baseline_observations,
         )
         return _finish_market_generation(
             context=context,

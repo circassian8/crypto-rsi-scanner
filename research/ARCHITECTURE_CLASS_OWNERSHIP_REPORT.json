@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 8378,
+  "function_count": 8442,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-15T06:13:54.897821+00:00",
+  "generated_at": "2026-07-15T07:22:05.182855+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2989,6 +2989,13 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
+      "line_count": 1467,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -2998,13 +3005,6 @@
     {
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1457,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3052,7 +3052,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1303,
+      "line_count": 1305,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3499,6 +3499,14 @@
       "rows": [
         {
           "accepted": true,
+          "line_count": 1467,
+          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1466,
           "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
           "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
@@ -3511,14 +3519,6 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
           "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
           "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1457,
-          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
           "threshold": 1200
         },
         {
@@ -3571,7 +3571,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1303,
+          "line_count": 1305,
           "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
           "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
           "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
@@ -3684,6 +3684,11 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1467,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1466,
         "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
@@ -3691,11 +3696,6 @@
       {
         "line_count": 1465,
         "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1457,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
       },
       {
@@ -3729,7 +3729,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1303,
+        "line_count": 1305,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
       },
@@ -3792,6 +3792,14 @@
         "rows": [
           {
             "accepted": true,
+            "line_count": 1467,
+            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1466,
             "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
             "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
@@ -3804,14 +3812,6 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
             "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
             "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1457,
-            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
             "threshold": 1200
           },
           {
@@ -3864,7 +3864,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1303,
+            "line_count": 1305,
             "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
             "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
             "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",

@@ -186,6 +186,13 @@ def _normalize_market_row(
         "volume_24h": total_volume,
         "total_volume": total_volume,
         "volume_to_market_cap": volume_mcap,
+        "feature_basis": {
+            "volume_24h": "provider_observed",
+            "market_cap": "provider_observed",
+            "turnover_24h": (
+                "derived_provider_ratio" if volume_mcap is not None else "unavailable"
+            ),
+        },
         "volume_zscore_24h": volume_zscore,
         "volume_zscore_basis": volume_zscore_basis,
         "liquidity_usd": liquidity,

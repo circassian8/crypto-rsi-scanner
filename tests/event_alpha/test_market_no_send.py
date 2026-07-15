@@ -678,6 +678,7 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     assert source["measurement_program"] == "decision_radar_live_observation_campaign_v2"
     assert source["decision_radar_campaign_counted"] is True
     assert source["rows"]
+    assert all("shadow_temporal_surprise" not in row for row in source["rows"])
     assert request_ledger["endpoint_path"] == "/coins/markets"
     assert request_ledger["http_status"] == 200
     assert request_ledger["result_count"] == len(market_no_send._smoke_rows())
@@ -701,6 +702,21 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
     assert len(core_rows) == result.core_rows
     assert len(outcomes) == len(candidates)
     assert len(cards) == result.cards
+    history_rows = _jsonl(namespace_dir / market_no_send.HISTORY_FILENAME)
+    assert all("shadow_temporal_surprise" not in row for row in history_rows)
+    assert all("shadow_temporal_surprise" in row for row in snapshots)
+    assert all("shadow_temporal_surprise" in row for row in anomalies)
+    assert all(
+        "shadow_temporal_surprise" not in row.get("market_state_snapshot", {})
+        for row in anomalies
+    )
+    assert all("shadow_temporal_surprise" not in row for row in candidates)
+    assert all(
+        "shadow_temporal_surprise" not in row.get("decision_projection", {})
+        for row in candidates
+    )
+    assert all("shadow_temporal_surprise" not in row for row in core_rows)
+    assert all("shadow_temporal_surprise" not in row for row in outcomes)
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["calendar_snapshot"]["status"] == "not_configured"
     assert manifest["calendar_snapshot"]["configured"] is False

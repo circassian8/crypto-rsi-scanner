@@ -1035,7 +1035,13 @@ def _observation_values(
     market_cap = _first_number(row, "market_cap", "mcap")
     if market_cap is not None and market_cap <= 0:
         market_cap = None
-    turnover = _first_number(row, "turnover_24h", "volume_to_market_cap", "volume_mcap")
+    supplied_turnover = _first_number(
+        row,
+        "turnover_24h",
+        "volume_to_market_cap",
+        "volume_mcap",
+    )
+    turnover = supplied_turnover
     if turnover is None and volume is not None and market_cap is not None:
         turnover = volume / market_cap
     if turnover is not None and turnover < 0:
@@ -1073,7 +1079,11 @@ def _observation_values(
             "turnover_24h": _input_feature_basis(
                 row,
                 "turnover_24h",
-                default="derived_provider_ratio" if turnover is not None else "unavailable",
+                default=(
+                    "provider_observed"
+                    if supplied_turnover is not None
+                    else "derived_provider_ratio" if turnover is not None else "unavailable"
+                ),
             ),
         },
         "research_only": True,

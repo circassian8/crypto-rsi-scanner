@@ -15,10 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from .radar_north_star_campaign import (
-    MARKET_NO_SEND_GENERATION,
-    REVIEW_EXPORT_POLICY,
-)
+from .radar_north_star_campaign import MARKET_NO_SEND_GENERATION, REVIEW_EXPORT_POLICY
+from .radar_north_star_shadow import SHADOW_TEMPORAL_SURPRISE_POLICY, append_shadow_temporal_surprise_north_star
 
 REPORT_SCHEMA_VERSION = "event_alpha_radar_north_star_v1"
 REPORT_JSON = "EVENT_ALPHA_RADAR_NORTH_STAR.json"
@@ -120,9 +118,9 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "north_star_requirement": "Evidence can upgrade research confidence only through deterministic source-pack sufficiency gates.",
     },
     "market_state_builder": {
-        "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, and bounded per-asset temporal baselines for candidates.",
+        "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence.",
         "primary_artifacts": ["event_market_state.jsonl", "event_market_history.jsonl"],
-        "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.",
+        "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth. Robust surprise stays post-scan, routing-ineligible, threshold-free shadow metadata until outcome evidence supports a separate decision.",
     },
     "market_provenance_v2": {
         "role": "Normalizes one closed market acquisition value, derives Decision Radar campaign eligibility/counting, and retains legacy burn-in fields as explicit compatibility metadata without accepting caller-asserted trust flags.",
@@ -610,6 +608,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "architecture": deepcopy(ARCHITECTURE_COMPONENTS),
         "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
         "llm_catalyst_frame_binding_policy": deepcopy(LLM_CATALYST_FRAME_BINDING_POLICY),
+        "shadow_temporal_surprise_policy": deepcopy(SHADOW_TEMPORAL_SURPRISE_POLICY),
         "product_layers": deepcopy(PRODUCT_LAYERS),
         "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "market_no_send_generation": deepcopy(MARKET_NO_SEND_GENERATION),
@@ -1031,6 +1030,7 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
         )
     _append_source_authority_north_star(lines, payload)
     _append_catalyst_frame_binding_north_star(lines, payload)
+    append_shadow_temporal_surprise_north_star(lines, payload)
     layers = payload.get("product_layers") if isinstance(payload.get("product_layers"), Mapping) else {}
     lines.extend(["## Product Layering", ""])
     for key, value in layers.items():

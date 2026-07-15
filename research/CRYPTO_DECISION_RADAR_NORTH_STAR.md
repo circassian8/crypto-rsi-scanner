@@ -478,6 +478,29 @@ closed. Cold/warming status and exact observation ids remain visible, and only
 fields explicitly identified as proxy inputs may be replaced by a temporal
 calculation.
 
+The optional `event_alpha.shadow_temporal_surprise` v1 comparison uses only
+positive finite provider-observed `volume_24h` and provider-observed or explicit
+provider-ratio `turnover_24h`. It applies a natural log, baseline median, and
+normal-consistent MAD scale (`MAD * 1.482602218505602`) over the same strictly
+earlier cadence-counted history. A derived-ratio turnover must match provider
+volume divided by provider market cap within fixed `1e-9` relative and `1e-12`
+absolute tolerances; independently supplied turnover remains
+provider-observed. Degenerate MAD returns a null robust z-score;
+there is no epsilon or standard-deviation fallback. Its add-one upper-tail rank
+is labeled descriptive and never a p-value. The value is computed from the
+exact fingerprinted generation-history snapshot only after anomaly
+classification, bucketing, priority, sorting, and truncation, then attached as
+top-level snapshot/anomaly diagnostic metadata. The exact history artifact
+basename and verified SHA-256 remain inside the closed value, while bundle
+enrichment stays bound to the original scan namespace device/inode and unchanged
+artifact hashes. It never enters provider source
+rows, canonical history, nested market snapshots, integrated candidates, the
+Decision projection, routes, priorities, scores, thresholds, cards, or sends.
+Its explicit policy remains routing/priority/Decision-score ineligible,
+`auto_apply=false`, and research-only until matured outcome and control evidence
+supports a separate reviewed decision. The detailed method and limitations are
+recorded in `research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
+
 A fixture or mocked smoke generation can prove mechanics but is permanently
 ineligible for Decision campaign counting or real dashboard authority. The fixed
 authoritative pointer changes only after a real, fresh, complete generation has

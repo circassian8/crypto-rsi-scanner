@@ -73,12 +73,12 @@
       "role": "Normalizes one closed market acquisition value, derives Decision Radar campaign eligibility/counting, and retains legacy burn-in fields as explicit compatibility metadata without accepting caller-asserted trust flags."
     },
     "market_state_builder": {
-      "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.",
+      "north_star_requirement": "Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth. Robust surprise stays post-scan, routing-ineligible, threshold-free shadow metadata until outcome evidence supports a separate decision.",
       "primary_artifacts": [
         "event_market_state.jsonl",
         "event_market_history.jsonl"
       ],
-      "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, and bounded per-asset temporal baselines for candidates."
+      "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence."
     },
     "opportunity_lane_classifier": {
       "north_star_requirement": "A lane is a research workflow label, not an instruction to trade.",
@@ -982,6 +982,47 @@
     "triggered_fade_source_boundary": "event_fade.py + proxy_fade only"
   },
   "schema_version": "event_alpha_radar_north_star_v1",
+  "shadow_temporal_surprise_policy": {
+    "attachment": "top_level_post_scan_snapshot_and_anomaly_metadata_only",
+    "auto_apply": false,
+    "baseline": "same_asset_strictly_earlier_cadence_counted_observations",
+    "canonical_history_or_provider_source_mutated": false,
+    "copied_to_decision_projection": false,
+    "current_observation_in_own_baseline": false,
+    "decision_score_eligible": false,
+    "degenerate_mad_policy": "mad_le_1e-12_returns_null_without_epsilon_or_std_fallback",
+    "descriptive_tail_is_p_value": false,
+    "descriptive_upper_tail": "(count_baseline_log_ge_current_log+1)/(n+1)",
+    "derived_ratio_validation": "volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12",
+    "eligible_feature_basis": [
+      "provider_observed",
+      "derived_provider_ratio"
+    ],
+    "features": [
+      "volume_24h",
+      "turnover_24h"
+    ],
+    "history_binding": "exact_generation_artifact_basename_and_sha256",
+    "history_fingerprint_persisted_in_shadow": true,
+    "history_fingerprint_verified_before_parse": true,
+    "location": "median_of_log_baseline",
+    "method_references": [
+      "https://doi.org/10.1111/j.2517-6161.1964.tb00553.x",
+      "https://doi.org/10.1080/01621459.1993.10476408",
+      "https://doi.org/10.1086/341527"
+    ],
+    "namespace_binding": "exact_scan_device_inode_and_unchanged_bundle_hashes",
+    "positive_finite_values_only": true,
+    "priority_eligible": false,
+    "proxy_or_cross_sectional_basis_eligible": false,
+    "research_only": true,
+    "routing_eligible": false,
+    "scale": "median_absolute_deviation_times_1.482602218505602",
+    "schema_id": "event_alpha.shadow_temporal_surprise",
+    "schema_version": 1,
+    "score_adjustment_eligible": false,
+    "transform": "natural_log"
+  },
   "source_activation_order": [
     "coinalyze_derivatives_oi_funding",
     "bybit_binance_official_announcements",

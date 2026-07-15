@@ -35,9 +35,9 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - north_star_requirement: Evidence can upgrade research confidence only through deterministic source-pack sufficiency gates.
 
 ### market_state_builder
-- role: Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, and bounded per-asset temporal baselines for candidates.
+- role: Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence.
 - primary_artifacts: `event_market_state.jsonl, event_market_history.jsonl`
-- north_star_requirement: Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth.
+- north_star_requirement: Freshness, unit, observation-id, warmup, and direct/proxy basis metadata must travel with state; stale state, proxy-only evidence, and unwarmed proxy anomaly inputs cannot be presented as urgent or actionable truth. Robust surprise stays post-scan, routing-ineligible, threshold-free shadow metadata until outcome evidence supports a separate decision.
 
 ### market_provenance_v2
 - role: Normalizes one closed market acquisition value, derives Decision Radar campaign eligibility/counting, and retains legacy burn-in fields as explicit compatibility metadata without accepting caller-asserted trust flags.
@@ -120,6 +120,38 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - provider_output_schema_changed: `False`
 - routing_authority: `deterministic_validation_only`
 - research_only: `True`
+
+## Shadow Robust Temporal Surprise
+
+- schema_id: `event_alpha.shadow_temporal_surprise`
+- schema_version: `1`
+- features: volume_24h, turnover_24h
+- eligible_feature_basis: provider_observed, derived_provider_ratio
+- derived_ratio_validation: `volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12`
+- proxy_or_cross_sectional_basis_eligible: `False`
+- baseline: `same_asset_strictly_earlier_cadence_counted_observations`
+- history_binding: `exact_generation_artifact_basename_and_sha256`
+- history_fingerprint_verified_before_parse: `True`
+- history_fingerprint_persisted_in_shadow: `True`
+- namespace_binding: `exact_scan_device_inode_and_unchanged_bundle_hashes`
+- current_observation_in_own_baseline: `False`
+- positive_finite_values_only: `True`
+- transform: `natural_log`
+- location: `median_of_log_baseline`
+- scale: `median_absolute_deviation_times_1.482602218505602`
+- degenerate_mad_policy: `mad_le_1e-12_returns_null_without_epsilon_or_std_fallback`
+- descriptive_upper_tail: `(count_baseline_log_ge_current_log+1)/(n+1)`
+- descriptive_tail_is_p_value: `False`
+- attachment: `top_level_post_scan_snapshot_and_anomaly_metadata_only`
+- canonical_history_or_provider_source_mutated: `False`
+- copied_to_decision_projection: `False`
+- routing_eligible: `False`
+- priority_eligible: `False`
+- decision_score_eligible: `False`
+- score_adjustment_eligible: `False`
+- auto_apply: `False`
+- research_only: `True`
+- method_references: https://doi.org/10.1111/j.2517-6161.1964.tb00553.x, https://doi.org/10.1080/01621459.1993.10476408, https://doi.org/10.1086/341527
 
 ## Product Layering
 

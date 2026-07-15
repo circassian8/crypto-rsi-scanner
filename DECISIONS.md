@@ -16,6 +16,38 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Keep robust temporal surprise shadow-only until measured
+**Status:** accepted
+**Decision:** Compare provider-observed 24-hour volume and provider-observed or
+explicit provider-ratio turnover with a versioned, log-median/MAD temporal
+surprise value over same-asset, strictly earlier, cadence-counted observations.
+Derived turnover is eligible only when it matches provider volume divided by
+provider market cap within fixed `1e-9` relative and `1e-12` absolute
+tolerances; an independently supplied turnover defaults to provider-observed.
+MAD at or below `1e-12` yields no robust z-score, and the add-one upper-tail
+rank is descriptive rather than a p-value. The calculation reads one exact
+fingerprinted generation-history buffer after anomaly classification, records
+its safe basename and SHA-256 in the closed value, and rewrites the complete
+scanner bundle only while the original namespace device/inode and input hashes
+still match. It attaches only top-level snapshot/anomaly diagnostic metadata.
+It never mutates
+provider source or retained history, enters a nested market snapshot, copies to
+Decision candidates/outcomes, changes a route/priority/score/threshold, or
+applies automatically. Missing, ineligible-basis, invalid, insufficient, and
+degenerate samples remain explicit. Non-unique current observation identity,
+canonical-asset drift, source duplication, or history fingerprint drift fails
+closed.
+**Why:** The canonical mean/standard-deviation temporal features are sensitive
+to the skew and isolated extremes common in crypto activity series, but there
+is not yet episode-level outcome/control evidence that a robust alternative
+improves decisions. A closed shadow comparison creates measurable evidence
+without changing trader-facing truth prematurely.
+**Revisit when:** Matured Decision outcomes and matched non-idea controls are
+evaluated at anomaly-episode level with coverage, degeneracy, provider/basis,
+false-positive, calibration, and confidence-interval reporting. Any promotion
+requires a separate versioned decision, frozen thresholds, rollback criteria,
+and proof that the new feature adds out-of-sample value.
+
 ## 2026-07-15 - Bind LLM catalyst frames to exact immutable source evidence
 **Status:** accepted
 **Decision:** An LLM catalyst-frame analysis is eligible for deterministic

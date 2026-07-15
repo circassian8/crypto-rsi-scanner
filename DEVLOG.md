@@ -17,6 +17,56 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Add fail-closed robust temporal-surprise shadow · Codex
+**Why:** The canonical temporal volume and turnover features use arithmetic
+mean and standard deviation, which can be distorted by skew and isolated crypto
+activity spikes. The project needed a measurable robust comparison before any
+proposal to change anomaly thresholds or trader-facing routes.
+**Changes:**
+- Added a closed `event_alpha.shadow_temporal_surprise` v1 value for positive,
+  finite provider-observed 24-hour volume and provider-observed or
+  provider-ratio turnover. It uses a natural log, median, normal-consistent MAD,
+  null output for degenerate scale, and an explicitly descriptive add-one
+  upper-tail rank; it never claims a p-value.
+- Bound every result to exact current/prior observation identity, canonical
+  asset, cadence-counted strictly earlier history, feature basis, dependency
+  values, bounded sample references, sample SHA-256, and the exact immutable
+  history artifact SHA-256. Derived turnover is eligible only when it matches
+  provider volume divided by provider market cap within fixed tolerances.
+- Attached the comparison only after anomaly classification as top-level raw
+  snapshot/anomaly metadata. Closed schema checks recursively reject it in
+  nested market snapshots, candidates, Decision projections, Core rows,
+  outcomes, and every other non-market-evidence artifact; provider source and
+  canonical retained-history bytes remain unchanged.
+- Hardened the shared scanner-bundle writer with exact namespace/existing-leaf
+  identity, separately guarded history bytes, complete staging, descriptor-
+  anchored backups, install-intent verification, and byte-exact rollback. Added
+  adversarial namespace, leaf-drift, late-replace, and rename-success-then-error
+  tests, then split the transaction into bounded helpers and a dedicated test
+  module to keep architecture gates clean.
+- Documented the method, limitations, literature basis, promotion evidence,
+  fixed non-routing/non-scoring policy, durable decision, and North Star state;
+  regenerated the checked architecture reports.
+**Verify:** `202 passed` across the estimator, schema, integration, market
+history/no-send/surfaces, and namespace contracts; the full Event Alpha package
+passed 1,805 tests in 92.56 seconds; the offline market no-send smoke completed
+with 5/5 snapshots and 3/3 anomalies carrying top-level shadow metadata, zero
+nested/candidate/history copies, strict doctor `OK` with zero blockers/warnings,
+and dashboard smoke success; `make verify-fast PYTHON=python3` passed 2,050
+tests in 110.27 seconds plus alert rendering, fixture backtest, and paper
+scoreboard gates; `python3 -m compileall -q crypto_rsi_scanner tests`; exact
+generated Event North Star equality and Decision/Event JSON parsing; `git diff
+--check`; and `make architecture-cleanliness-check PYTHON=python3` passed with
+zero new size violations and no over-limit functions.
+**Notes/risks:** The robust values are comparison evidence only:
+`routing_eligible=false`, `priority_eligible=false`,
+`decision_score_eligible=false`, `score_adjustment_eligible=false`, and
+`auto_apply=false`. Consecutive rolling observations are dependent, so the next
+measurement slice is fixed, shadow-only anomaly-episode declustering before a
+Decision-v2 outcome scorecard. No live provider call, send, trade, paper trade,
+normal RSI write, execution action, pointer mutation, or Event Alpha-created
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-15 — Bind LLM catalyst frames to exact source evidence · Codex
 **Why:** Catalyst-frame validation ignored the analysis `raw_id`, searched a
 concatenation of every supplied raw and normalized event text, accepted fuzzy

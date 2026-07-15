@@ -161,6 +161,45 @@ def test_market_history_enriches_temporal_features_and_preserves_lineage_and_bas
     assert json.loads(json.dumps(result.to_dict()))["summary"]["research_only"] is True
 
 
+def test_turnover_basis_distinguishes_provider_value_from_derived_ratio():
+    result = event_market_history.enrich_market_rows_with_history(
+        [
+            _row(
+                "provider-turnover",
+                NOW,
+                price=10,
+                volume=100,
+                market_cap=1_000,
+                turnover_24h=0.9,
+            ),
+            _row(
+                "derived-turnover",
+                NOW,
+                price=10,
+                volume=100,
+                market_cap=1_000,
+            ),
+        ],
+        now=NOW,
+        config=_config(),
+    )
+
+    retained = {
+        row["canonical_asset_id"]: row
+        for row in result.retained_history
+    }
+    assert retained["provider-turnover"]["turnover_24h"] == 0.9
+    assert (
+        retained["provider-turnover"]["feature_basis"]["turnover_24h"]
+        == "provider_observed"
+    )
+    assert retained["derived-turnover"]["turnover_24h"] == pytest.approx(0.1)
+    assert (
+        retained["derived-turnover"]["feature_basis"]["turnover_24h"]
+        == "derived_provider_ratio"
+    )
+
+
 def test_provider_observed_zscore_is_not_replaced_by_temporal_baseline():
     current = _row(
         "move-token",
