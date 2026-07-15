@@ -813,6 +813,256 @@ def test_final_reevaluation_applies_catalyst_disproof_before_derived_status():
         assert source_corrected.radar_route != "high_confidence_watch"
 
 
+def test_retrospective_official_source_cannot_claim_catalyst_confirmation():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "decision-model-v2-move",
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "raw_id": "later-official-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/move",
+            "content_hash": "a" * 64,
+            "published_at": "2026-06-15T16:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "main_frame_role": "background_context",
+            "candidate_role": "background_context",
+            "impact_path_strength": "direct",
+        },
+    )
+    row = _market_led_candidate(
+        source_origin="official_exchange",
+        source_origins=["market_anomaly", "official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        latest_source_url="https://exchange.example/notices/move",
+        official_exchange_event={"event_type": "spot_listing"},
+        catalyst_attributions=[attribution],
+    )
+
+    result = decision_model.evaluate_radar_decision(row)
+
+    assert attribution["evidence_use"] == "retrospective_context"
+    assert result.catalyst_status == "unknown"
+    assert result.confidence_band == "actionable"
+    assert result.radar_route == "actionable_watch"
+    assert result.radar_route != "high_confidence_watch"
+    assert any("retrospective or contextual" in item for item in result.decision_warnings)
+
+
+def test_antecedent_official_source_can_confirm_catalyst_with_attribution():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "decision-model-v2-move",
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "raw_id": "earlier-official-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/move",
+            "content_hash": "b" * 64,
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+    row = _market_led_candidate(
+        source_origin="official_exchange",
+        source_origins=["market_anomaly", "official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        latest_source_url="https://exchange.example/notices/move",
+        official_exchange_event={"event_type": "spot_listing"},
+        catalyst_attributions=[attribution],
+    )
+
+    result = decision_model.evaluate_radar_decision(row)
+
+    assert attribution["causal_eligible"] is True
+    assert result.catalyst_status == "confirmed"
+    assert result.confidence_band == "high_confidence"
+    assert result.radar_route == "high_confidence_watch"
+
+
+def test_invalid_supplied_catalyst_attribution_fails_closed():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "decision-model-v2-move",
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "raw_id": "official-source",
+            "provider": "official_exchange",
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "main_frame_role": "main_catalyst",
+        },
+    )
+    attribution["causal_eligible"] = False
+    row = _market_led_candidate(
+        source_origin="official_exchange",
+        source_origins=["market_anomaly", "official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        catalyst_attributions=[attribution],
+    )
+
+    result = decision_model.evaluate_radar_decision(row)
+
+    assert result.catalyst_status == "unknown"
+    assert result.radar_route != "high_confidence_watch"
+    assert any("closed contract" in item for item in result.decision_warnings)
+
+    disproven = decision_model.evaluate_radar_decision(
+        {**row, "catalyst_status": "disproven"}
+    )
+    assert disproven.catalyst_status == "disproven"
+    assert disproven.radar_route != "high_confidence_watch"
+
+
+def test_catalyst_attribution_survives_projection_and_pending_outcome_exactly():
+    from crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcome_rows import (
+        _outcome_placeholder_row,
+    )
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "decision-model-v2-move",
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "raw_id": "later-official-source",
+            "provider": "official_exchange",
+            "published_at": "2026-06-15T16:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "main_frame_role": "background_context",
+            "candidate_role": "background_context",
+        },
+    )
+    raw = _market_led_candidate(
+        catalyst_attributions=[attribution],
+        run_id="catalyst-attribution-run",
+        profile="fixture",
+        artifact_namespace="catalyst_attribution",
+    )
+    candidate = {**raw, **decision_model.evaluate_radar_decision(raw).to_dict()}
+
+    projected = decision_model_values(candidate)
+    outcome = _outcome_placeholder_row(
+        candidate, now="2026-06-15T16:01:00+00:00"
+    )
+
+    assert projected["catalyst_attributions"] == [attribution]
+    assert decision_model_values(projected) == projected
+    assert outcome["catalyst_attributions"] == [attribution]
+    assert outcome["decision_projection"]["catalyst_attributions"] == [attribution]
+
+
+def test_empty_projection_attribution_list_preserves_legacy_confirmed_status():
+    from crypto_rsi_scanner.event_alpha.radar import decision_catalyst_policy
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    raw = _market_led_candidate(
+        source_origin="official_exchange",
+        source_origins=["official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        latest_source_url="https://exchange.example/notices/move",
+        official_exchange_event={"event_type": "spot_listing"},
+    )
+    candidate = {**raw, **decision_model.evaluate_radar_decision(raw).to_dict()}
+    projection = decision_model_values(candidate)
+
+    assert projection["catalyst_status"] == "confirmed"
+    assert projection["catalyst_attributions"] == []
+    assert decision_catalyst_policy.catalyst_status(projection, ()) == "confirmed"
+    assert decision_model_values(projection) == projection
+
+
+def test_foreign_anomaly_attribution_fails_closed_in_raw_and_projection():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import (
+        validate_contract,
+    )
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {"market_anomaly_id": "anomaly-a", "observed_at": "2026-06-15T16:00:00Z"},
+        {
+            "raw_id": "official-a",
+            "provider": "official_exchange",
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "main_frame_role": "main_catalyst",
+        },
+    )
+    foreign = _market_led_candidate(
+        market_anomaly_id="anomaly-b",
+        source_origin="official_exchange",
+        source_origins=["market_anomaly", "official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        catalyst_attributions=[attribution],
+    )
+
+    foreign_result = decision_model.evaluate_radar_decision(foreign)
+    foreign_candidate = {**foreign, **foreign_result.to_dict()}
+    foreign_projection = decision_model_values(foreign_candidate)
+
+    assert foreign_result.catalyst_status == "unknown"
+    assert foreign_result.radar_route != "high_confidence_watch"
+    assert foreign_projection["catalyst_attributions"] == []
+
+    bound = {**foreign, "market_anomaly_id": "anomaly-a"}
+    bound_candidate = {**bound, **decision_model.evaluate_radar_decision(bound).to_dict()}
+    projection = decision_model_values(bound_candidate)
+    projection["observation_ids"] = ["anomaly-b"]
+
+    assert any(
+        "anomaly_binding_mismatch" in error for error in validate_contract(projection)
+    )
+    assert decision_model_values(projection) == {}
+
+
 def test_actionability_score_cohort_boundaries_are_canonical():
     from crypto_rsi_scanner.event_alpha.radar.decision_models import (
         actionability_score_cohort,

@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable, Mapping
 
+from . import decision_catalyst_policy
 from . import decision_policy
 from .decision_market_quality import (
     _apply_market_quality_score_caps,
@@ -65,7 +66,7 @@ def _evaluate_radar_decision(
         sources,
         rsi_context_authoritative=bool(rsi_reasons),
     )
-    catalyst = _catalyst_status(data, sources)
+    catalyst = decision_catalyst_policy.catalyst_status(data, sources)
     timing_profile = decision_policy.timing_profile(data, market)
     calendar_risk = decision_policy.has_calendar_risk(data)
     timing = decision_policy.timing_state_for_profile(
@@ -151,6 +152,9 @@ def _evaluate_radar_decision(
         blockers=blockers,
         risk_components=risk_components,
     )
+    attribution_warning = decision_catalyst_policy.attribution_warning(data, sources)
+    if attribution_warning:
+        warnings = tuple(dict.fromkeys((*warnings, attribution_warning)))
     if rsi_reasons:
         warnings = tuple(dict.fromkeys((*warnings, (
             "Validated RSI technical context adjusted research scores: "
@@ -319,74 +323,6 @@ def _aggregate_scores(
     if blockers:
         risk = max(risk, 85.0)
     return _clamp(actionability), evidence_confidence, _clamp(risk)
-
-
-def _catalyst_status(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], ...]) -> str:
-    explicit = str(data.get("catalyst_status") or "").strip().casefold()
-    text = _row_text(data, sources)
-    structured_disproof = any(
-        _truthy(row.get("catalyst_disproven"))
-        or str(row.get("cause_status") or "").strip().casefold() == "ruled_out"
-        for row in (data, *sources)
-    )
-    if structured_disproof or any(
-        term in text for term in ("source correction", "official denial", "catalyst_disproven")
-    ):
-        return CatalystStatus.DISPROVEN.value
-    if explicit in {item.value for item in CatalystStatus}:
-        return explicit
-    evidence_rows = (data, *sources)
-    official = any(
-        isinstance(row.get("official_exchange_event"), Mapping)
-        or str(row.get("source_class") or "")
-        in {"official_exchange", "official_project", "structured_calendar", "structured_unlock"}
-        or str(row.get("source_strength") or "") == "official_structured"
-        for row in evidence_rows
-    )
-    accepted = sum(_number(row.get("accepted_evidence_count")) or 0.0 for row in evidence_rows)
-    source_lane_text = " ".join(
-        (
-            *_texts(data.get("source_origin")),
-            *_texts(data.get("source_origins")),
-            *_texts(data.get("source_class")),
-            *_texts(data.get("source_pack")),
-            *(str(row.get("_source_origin") or "") for row in sources),
-            *(str(row.get("source_class") or "") for row in sources),
-            *(str(row.get("source_pack") or "") for row in sources),
-        )
-    ).casefold()
-    catalyst_specific_source = any(
-        token in source_lane_text
-        for token in (
-            "official_exchange",
-            "official_project",
-            "scheduled_catalyst",
-            "structured_calendar",
-            "structured_unlock",
-            "unlock",
-            "news",
-            "cryptopanic",
-            "gdelt",
-            "rss",
-            "project_blog",
-            "regulatory",
-            "external_catalyst",
-            "prediction_market",
-        )
-    )
-    if official and (
-        accepted > 0
-        or any(isinstance(row.get("official_exchange_event"), Mapping) for row in evidence_rows)
-    ):
-        return CatalystStatus.CONFIRMED.value
-    if (accepted > 0 and catalyst_specific_source) or (
-        data.get("latest_source_url")
-        and catalyst_specific_source
-    ):
-        return CatalystStatus.PLAUSIBLE.value
-    if bool(data.get("catalyst_not_required")):
-        return CatalystStatus.NOT_REQUIRED.value
-    return CatalystStatus.UNKNOWN.value
 
 
 def _hard_blockers(
@@ -1063,23 +999,6 @@ def _is_duplicate(data: Mapping[str, Any]) -> bool:
         or data.get("suppressed_duplicate")
         or route == "SUPPRESS_DUPLICATE"
     )
-
-
-def _row_text(data: Mapping[str, Any], sources: tuple[Mapping[str, Any], ...]) -> str:
-    values: list[str] = []
-    for row in (data, *sources):
-        for key in (
-            "source_class",
-            "source_pack",
-            "source_strength",
-            "event_type",
-            "title",
-            "event_name",
-            "reason_codes",
-            "warnings",
-        ):
-            values.extend(_texts(row.get(key)))
-    return " ".join(values).casefold()
 
 
 def _weighted_score(values: Mapping[str, float], weights: Mapping[str, float]) -> float:

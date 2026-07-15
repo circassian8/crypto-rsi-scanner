@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .radar_north_star_campaign import MARKET_NO_SEND_GENERATION, REVIEW_EXPORT_POLICY
+from .radar_north_star_evidence import (
+    CATALYST_ATTRIBUTION_POLICY,
+    LLM_CATALYST_FRAME_BINDING_POLICY,
+    SOURCE_AUTHORITY_POLICY,
+)
 from .radar_north_star_shadow import SHADOW_ANOMALY_EPISODE_POLICY, SHADOW_TEMPORAL_SURPRISE_POLICY, append_shadow_policies_north_star
 
 REPORT_SCHEMA_VERSION = "event_alpha_radar_north_star_v1"
@@ -40,57 +45,6 @@ SOURCE_ACTIVATION_ORDER = (
     "cryptopanic_context",
     "rss_gdelt_context_only",
 )
-SOURCE_AUTHORITY_POLICY: dict[str, Any] = {
-    "canonical_classifier": "event_alpha.providers.source_registry",
-    "authority_inputs": ["exact canonical provider id", "exact or child trusted hostname"],
-    "article_text_may_establish_authority": False,
-    "source_origin_or_source_class_hint_may_establish_authority": False,
-    "shared_hosting_authority": {
-        "medium.com": "context_only_without_separate_ownership_attestation",
-        "github.com": "context_only_without_separate_ownership_attestation",
-    },
-    "lookalike_hostname_policy": "exact-or-child boundary match; sibling and suffix lookalikes fail closed",
-    "project_blog_rss_role": "transport_not_automatic_official_project_attestation",
-    "evidence_quality_reuses_registry_authority": True,
-    "source_pack_impact_validation": "requires membership in declared impact_path_validating_sources",
-    "unverified_authority_claim_action": "retain as capped context with source_authority_unverified",
-    "historical_artifacts_rewritten": False,
-}
-LLM_CATALYST_FRAME_BINDING_POLICY: dict[str, Any] = {
-    "analysis_raw_resolution": "exactly_one_matching_raw_id_required",
-    "eligible_source_fields": ["title", "body", "quality_gated_enriched_text"],
-    "quote_matching": "normalized_contiguous_span_within_one_source_field",
-    "minimum_quote_contract": "at_least_10_normalized_chars_two_terms_and_one_four_char_term",
-    "cross_raw_event_or_cross_field_quote_matching": False,
-    "fuzzy_term_overlap_allowed": False,
-    "analysis_binding": "canonical_analysis_payload_sha256_required",
-    "validation_integrity": "canonical_validation_payload_sha256_required",
-    "frame_schema_validation": "closed_keys_enums_types_finite_confidence_and_canonical_frame_id",
-    "short_ticker_identity": "token_boundary_plus_crypto_context_or_dollar_ticker_required",
-    "binding_fields": [
-        "source_raw_id",
-        "source_provider",
-        "source_url",
-        "source_published_at",
-        "source_fetched_at",
-        "source_confidence",
-        "source_content_hash",
-        "source_surface_hash",
-        "source_surface_provenance_hash",
-        "analysis_sha256",
-        "validation_payload_sha256",
-        "evidence_source_field",
-        "evidence_normalized_start",
-        "evidence_normalized_end",
-    ],
-    "apply_and_rehydration": "fail_closed_on_any_binding_drift",
-    "invalid_analysis_identity": "fail_soft_unresolved_without_current_validation",
-    "enriched_source_provenance": "quality_triage_extractor_cleaner_url_and_source_enrichment_hash_bound",
-    "legacy_unbound_frames": "historical_bytes_preserved_but_not_current_evidence",
-    "provider_output_schema_changed": False,
-    "routing_authority": "deterministic_validation_only",
-    "research_only": True,
-}
 ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
     "asset_universe": {
         "role": "Defines the tradable asset universe and filters out quotes, sectors, themes, and proxy-only assets unless explicitly labeled.",
@@ -116,6 +70,15 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
         "role": "Targets missing source packs for near-misses and hypotheses without changing thresholds or routes automatically.",
         "primary_artifacts": ["event_evidence_acquisition.jsonl"],
         "north_star_requirement": "Evidence can upgrade research confidence only through deterministic source-pack sufficiency gates.",
+    },
+    "catalyst_attribution": {
+        "role": "Binds one exact source to one exact anomaly and separates source-public time, claimed event time, semantic role, and causal eligibility before Decision-v2 catalyst confidence is assigned.",
+        "primary_artifacts": [
+            "event_integrated_radar_candidates.jsonl",
+            "event_core_opportunities.jsonl",
+            "event_integrated_radar_outcomes.jsonl",
+        ],
+        "north_star_requirement": "A retrospective, background, historical, reaction, corrective, or unclocked source may remain visible context but cannot become antecedent causal confirmation merely because it is official or accepted.",
     },
     "market_state_builder": {
         "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence.",
@@ -608,6 +571,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "architecture": deepcopy(ARCHITECTURE_COMPONENTS),
         "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
         "llm_catalyst_frame_binding_policy": deepcopy(LLM_CATALYST_FRAME_BINDING_POLICY),
+        "catalyst_attribution_policy": deepcopy(CATALYST_ATTRIBUTION_POLICY),
         "shadow_temporal_surprise_policy": deepcopy(SHADOW_TEMPORAL_SURPRISE_POLICY),
         "shadow_anomaly_episode_policy": deepcopy(SHADOW_ANOMALY_EPISODE_POLICY),
         "product_layers": deepcopy(PRODUCT_LAYERS),
@@ -1002,6 +966,23 @@ def _append_catalyst_frame_binding_north_star(lines: list[str], payload: Mapping
     lines.append("")
 
 
+def _append_catalyst_attribution_north_star(
+    lines: list[str], payload: Mapping[str, Any]
+) -> None:
+    policy = (
+        payload.get("catalyst_attribution_policy")
+        if isinstance(payload.get("catalyst_attribution_policy"), Mapping)
+        else {}
+    )
+    lines.extend(["## Catalyst Attribution and Causal Timing", ""])
+    for key, value in policy.items():
+        if isinstance(value, list):
+            lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
+        else:
+            lines.append(f"- {key}: `{value}`")
+    lines.append("")
+
+
 def format_north_star(payload: Mapping[str, Any]) -> str:
     lines = [
         "# Event Alpha Radar North Star — Catalyst Radar",
@@ -1031,6 +1012,7 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
         )
     _append_source_authority_north_star(lines, payload)
     _append_catalyst_frame_binding_north_star(lines, payload)
+    _append_catalyst_attribution_north_star(lines, payload)
     append_shadow_policies_north_star(lines, payload)
     layers = payload.get("product_layers") if isinstance(payload.get("product_layers"), Mapping) else {}
     lines.extend(["## Product Layering", ""])

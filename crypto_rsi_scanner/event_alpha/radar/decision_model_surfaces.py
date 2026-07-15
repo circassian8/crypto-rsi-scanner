@@ -18,6 +18,7 @@ from ..artifacts.schema.decision_model import (
     DECISION_PROJECTION_SCHEMA_VERSION,
     validate_contract,
 )
+from . import decision_catalyst_policy
 from .decision_models import actionability_score_cohort
 
 
@@ -87,6 +88,7 @@ DECISION_PROJECTION_FIELD_NAMES = (
     "rsi_context_references",
     "observation_ids",
     "source_provider_lineage",
+    "catalyst_attributions",
     "market_provenance",
     "market_context_reference",
     "decision_evaluated_at",
@@ -217,6 +219,11 @@ def _nested_projection_matches_row(
                 observed = row.get(row_field)
                 if observed not in (None, "") and observed != expected:
                     return False
+    if "catalyst_attributions" in row:
+        if deepcopy(projection.get("catalyst_attributions")) != deepcopy(
+            row.get("catalyst_attributions")
+        ):
+            return False
     return True
 
 
@@ -454,6 +461,9 @@ def _closed_projection_values(
         "rsi_context_references": rsi_references,
         "observation_ids": _observation_ids(source),
         "source_provider_lineage": _source_provider_lineage(source),
+        "catalyst_attributions": list(
+            decision_catalyst_policy.attribution_values(source)
+        ),
         "market_context_reference": market_context_reference(source),
         "decision_evaluated_at": _evaluation_timestamp(source),
         "decision_safety_invariants": _safety_invariants(source),

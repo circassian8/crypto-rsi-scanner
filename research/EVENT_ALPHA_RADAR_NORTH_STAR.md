@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-15T09:36:54.392077+00:00`
+- generated_at: `2026-07-15T11:01:42.976433+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -33,6 +33,11 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - role: Targets missing source packs for near-misses and hypotheses without changing thresholds or routes automatically.
 - primary_artifacts: `event_evidence_acquisition.jsonl`
 - north_star_requirement: Evidence can upgrade research confidence only through deterministic source-pack sufficiency gates.
+
+### catalyst_attribution
+- role: Binds one exact source to one exact anomaly and separates source-public time, claimed event time, semantic role, and causal eligibility before Decision-v2 catalyst confidence is assigned.
+- primary_artifacts: `event_integrated_radar_candidates.jsonl, event_core_opportunities.jsonl, event_integrated_radar_outcomes.jsonl`
+- north_star_requirement: A retrospective, background, historical, reaction, corrective, or unclocked source may remain visible context but cannot become antecedent causal confirmation merely because it is official or accepted.
 
 ### market_state_builder
 - role: Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence.
@@ -120,6 +125,32 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - provider_output_schema_changed: `False`
 - routing_authority: `deterministic_validation_only`
 - research_only: `True`
+
+## Catalyst Attribution and Causal Timing
+
+- schema: `event_alpha.catalyst_attribution v1`
+- unit_of_evidence: `one exact source bound to one exact market anomaly`
+- anomaly_binding: `digest of anomaly id, UTC clock, provider/content identity, canonical asset, snapshot identity, state, bucket, and market snapshot`
+- source_public_clock: `published_at_then_fetched_at`
+- claimed_event_time_is_separate: `True`
+- contemporaneous_tolerance_seconds: `300`
+- temporal_relations: antecedent, contemporaneous, retrospective, unknown
+- causal_eligibility: `antecedent_or_contemporaneous plus direct official evidence or a validated direct beneficiary with a strong impact path`
+- retrospective_source_use: `context_only_never_causal_confirmation`
+- background_historical_reaction_side_note_use: `context_only`
+- semantic_role_contract: `only the eight canonical catalyst-frame roles; unrecognized explicit roles are noncausal`
+- negated_corrective_ruled_out_use: `disproof`
+- scheduled_future_event: `may be scheduled_anticipation only when its source was already public`
+- missing_or_naive_clock: `unknown_and_not_causal`
+- source_url_credentials: `credential paths or userinfo rejected; all query and fragment data removed`
+- canonical_propagation: raw catalyst-search attachment, discovery candidate data quality, alert evidence components, integrated candidate, CoreOpportunity, Decision v2 projection, pending outcome
+- decision_policy: `once attribution is supplied, malformed or exclusively noncausal evidence cannot fall back to hostname or accepted-count confirmation`
+- foreign_or_mixed_binding: `reject the complete supplied attribution set and retain rejection telemetry`
+- historical_rows_without_attribution: `retain_v2_compatibility_heuristic`
+- historical_artifacts_rewritten: `False`
+- research_only: `True`
+- auto_apply: `False`
+- research_basis: MacKinlay 1997 event-study timing and event-window discipline, Miller 2023 event-study design and interpretation guidance
 
 ## Shadow Robust Temporal Surprise
 

@@ -108,6 +108,7 @@ _INTEGRATED_SCALAR_TRUTH_FIELDS = (
     "burn_in_reason",
     "contract_counted_candidate",
     "supporting_evidence_quotes",
+    "catalyst_attribution_rejected",
     "research_only",
     *DECISION_MODEL_FIELD_NAMES,
 )
@@ -133,6 +134,11 @@ _INTEGRATED_SEQUENCE_TRUTH_FIELDS = (
     ("calendar_events", "calendar_events"),
     ("unified_calendar_context", "unified_calendar_context"),
     ("rsi_adjustment_reason_codes", "rsi_adjustment_reason_codes"),
+    ("catalyst_attributions", "catalyst_attributions"),
+    (
+        "catalyst_attribution_rejection_reasons",
+        "catalyst_attribution_rejection_reasons",
+    ),
 )
 
 _INTEGRATED_MAPPING_TRUTH_FIELDS = (
@@ -153,6 +159,7 @@ _INTEGRATED_MAPPING_TRUTH_FIELDS = (
     "market_context_reference",
     "feature_basis",
     "data_quality",
+    "catalyst_attribution",
 )
 
 

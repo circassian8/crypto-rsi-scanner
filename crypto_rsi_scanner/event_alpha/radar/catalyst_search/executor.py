@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
 from urllib.parse import urlparse
 import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
+import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ....event_providers.cryptopanic import CryptoPanicProvider, normalize_cryptopanic_currency_code
 from ....event_providers.gdelt import GdeltProvider
@@ -295,8 +296,9 @@ def attach_search_results_to_anomaly(
         "title": raw_event.title,
         "symbol": _event_symbol(raw_event),
     }
-    attached = [
-        _annotate_raw_event(
+    attached: list[RawDiscoveredEvent] = []
+    for event in result_events:
+        annotated_source = _annotate_raw_event(
             event,
             {
                 "market_anomaly_catalyst_search": {
@@ -308,6 +310,14 @@ def attach_search_results_to_anomaly(
                 }
             },
         )
-        for event in result_events
-    ]
+        attribution = event_catalyst_attribution.assess_catalyst_attribution(
+            annotated_parent,
+            annotated_source,
+        )
+        payload = dict(annotated_source.raw_json or {})
+        payload["catalyst_attribution"] = attribution
+        # The attribution binds the already-annotated source content hash.  Keep
+        # that hash stable so downstream source-binding validation is not
+        # circular over the contract that contains the hash itself.
+        attached.append(replace(annotated_source, raw_json=payload))
     return (annotated_parent, *attached)

@@ -1752,7 +1752,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 947,
+  "file_count": 952,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1760,7 +1760,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-15T09:37:42.341562+00:00",
+  "generated_at": "2026-07-15T11:01:50.222840+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1910,12 +1910,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1198,
-      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1196,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
       "source_kind": "production"
@@ -1954,6 +1948,12 @@
       "limit": 1500,
       "line_count": 1180,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/decision_episode_scorecard.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1180,
+      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
       "source_kind": "production"
     },
     {
@@ -2044,6 +2044,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1460,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1459,
       "path": "tests/event_alpha/test_operator_workflows.py",
       "source_kind": "test"
@@ -2106,12 +2112,6 @@
       "limit": 1500,
       "line_count": 1214,
       "path": "tests/event_alpha/test_evidence_acquisition.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1210,
-      "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
     {

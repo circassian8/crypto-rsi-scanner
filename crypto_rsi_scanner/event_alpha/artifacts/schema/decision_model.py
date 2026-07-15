@@ -8,6 +8,7 @@ import math
 from typing import Any
 
 import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
+import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
 
 
 DECISION_MODEL_VERSION = "crypto_radar_decision_model_v2"
@@ -51,6 +52,7 @@ FIELDS = (
     "why_now", "supporting_facts", "missing_information", "main_risks",
     "what_confirms", "what_invalidates", "calendar_evidence", "calendar_evidence_ids",
     "rsi_context", "rsi_context_references", "observation_ids", "source_provider_lineage",
+    "catalyst_attributions",
     "market_provenance",
     "market_context_reference",
     "market_provenance_schema_version", "market_provenance_contract_version",
@@ -90,6 +92,7 @@ TYPES = {
     "calendar_evidence": "list", "calendar_evidence_ids": "list", "rsi_context": "dict",
     "rsi_context_references": "list", "observation_ids": "list",
     "source_provider_lineage": "dict", "market_provenance": "dict",
+    "catalyst_attributions": "list",
     "market_context_reference": "dict",
     "market_provenance_schema_version": "str", "market_provenance_contract_version": "int",
     "data_acquisition_mode": "str",
@@ -290,6 +293,7 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
         "hard_blockers", "soft_penalties", "warnings", "supporting_facts",
         "missing_information", "main_risks", "what_confirms", "what_invalidates",
         "calendar_evidence", "calendar_evidence_ids", "rsi_context_references", "observation_ids",
+        "catalyst_attributions",
     ):
         if field in row and not _is_sequence(row.get(field)):
             errors.append(f"decision_projection_invalid_type:{field}")
@@ -316,6 +320,7 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             errors.append(f"decision_projection_alias_mismatch:{alias}")
 
     errors.extend(_validate_projection_calendar_and_rsi(row))
+    errors.extend(_validate_projection_catalyst_attributions(row))
 
     lineage = row.get("source_provider_lineage")
     if isinstance(lineage, Mapping):
@@ -404,6 +409,56 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             elif safety.get(field) is not (row.get(attestation) is not True):
                 errors.append(f"decision_projection_safety_attestation_mismatch:{field}")
     return list(dict.fromkeys(errors))
+
+
+def _validate_projection_catalyst_attributions(
+    row: Mapping[str, Any],
+) -> list[str]:
+    if "catalyst_attributions" not in row:
+        return []
+    values = row.get("catalyst_attributions")
+    if not _is_sequence(values):
+        return ["decision_projection_catalyst_attributions_invalid_type"]
+    errors: list[str] = []
+    digests: list[str] = []
+    explicit_anomaly_id = str(row.get("market_anomaly_id") or "").strip()
+    observation_ids = (
+        row.get("observation_ids", ())
+        if _is_sequence(row.get("observation_ids"))
+        else ()
+    )
+    candidate_ids = (
+        {explicit_anomaly_id}
+        if explicit_anomaly_id
+        else {
+            str(value).strip()
+            for value in observation_ids
+            if str(value or "").strip()
+        }
+    )
+    for index, value in enumerate(values):
+        if not isinstance(value, Mapping):
+            errors.append(
+                f"decision_projection_catalyst_attribution_{index}:not_mapping"
+            )
+            continue
+        contract_errors = event_catalyst_attribution.validate_contract(value)
+        errors.extend(
+            f"decision_projection_catalyst_attribution_{index}:{error}"
+            for error in contract_errors
+        )
+        if not candidate_ids or str(value.get("anomaly_id") or "") not in candidate_ids:
+            errors.append(
+                f"decision_projection_catalyst_attribution_{index}:anomaly_binding_mismatch"
+            )
+        digest = str(
+            value.get("attribution_digest") or value.get("digest") or ""
+        )
+        if digest:
+            digests.append(digest)
+    if len(digests) != len(set(digests)):
+        errors.append("decision_projection_catalyst_attributions_duplicate")
+    return errors
 
 
 def _validate_projection_calendar_and_rsi(row: Mapping[str, Any]) -> list[str]:

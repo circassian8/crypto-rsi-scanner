@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
+import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
 
 from ... import decision_model as event_radar_decision_model
 from ... import decision_safety as event_radar_decision_safety
@@ -129,6 +130,7 @@ def _merge_family(
         reason_codes=context.reason_codes,
         warnings=context.warnings,
     ))
+    candidate.update(_merge_family_catalyst_attribution_fields(rows))
     candidate.update(_merge_family_safety_fields(rows))
     candidate.update(_merge_family_incident_source_fields(
         rows,
@@ -158,6 +160,213 @@ def _merge_family(
         ).to_dict()
     )
     return candidate
+
+
+def _family_rows_with_catalyst_attributions(
+    rows: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Bind relevant family sources to one exact anomaly before merge policy."""
+
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    anomalies = [row for row in materialized if _is_market_anomaly_row(row)]
+    if not anomalies:
+        return [
+            _without_catalyst_attributions(
+                row, rejection_reason="catalyst_attribution_without_anomaly"
+            )
+            if _row_catalyst_attributions(row)
+            else row
+            for row in materialized
+        ]
+    attributed: list[dict[str, Any]] = []
+    for row in materialized:
+        supplied = _row_catalyst_attributions(row)
+        if _is_market_anomaly_row(row):
+            attributed.append(
+                _without_catalyst_attributions(
+                    row, rejection_reason="catalyst_attribution_on_anomaly_row"
+                )
+                if supplied else row
+            )
+            continue
+        if not _is_integrated_catalyst_source_row(row):
+            attributed.append(
+                _without_catalyst_attributions(
+                    row, rejection_reason="catalyst_attribution_on_non_source_row"
+                )
+                if supplied else row
+            )
+            continue
+        anomaly = _exact_attribution_anomaly(row, anomalies)
+        if anomaly is None:
+            attributed.append(
+                _without_catalyst_attributions(
+                    row, rejection_reason="catalyst_attribution_anomaly_binding_unavailable"
+                )
+                if supplied else row
+            )
+            continue
+        binding_results = [
+            (
+                value,
+                event_catalyst_attribution.validate_mapping_binding(
+                    value, anomaly, row
+                ),
+            )
+            for value in supplied
+        ]
+        if any(errors for _value, errors in binding_results):
+            attributed.append(
+                _without_catalyst_attributions(
+                    row, rejection_reason="catalyst_attribution_mapping_binding_mismatch"
+                )
+            )
+            continue
+        existing = [dict(value) for value, _errors in binding_results]
+        if existing:
+            existing.sort(key=lambda value: str(value.get("attribution_digest") or ""))
+            clean = _without_catalyst_attributions(row)
+            clean["catalyst_attribution"] = existing[0]
+            attributed.append(clean)
+            continue
+        source = dict(row)
+        source.pop("catalyst_attribution", None)
+        source.pop("catalyst_attributions", None)
+        value = event_catalyst_attribution.assess_mapping_attribution(anomaly, source)
+        if event_catalyst_attribution.validate_contract(value):
+            attributed.append(row)
+            continue
+        row["catalyst_attribution"] = value
+        attributed.append(row)
+    return attributed
+
+
+def _without_catalyst_attributions(
+    row: Mapping[str, Any],
+    *,
+    rejection_reason: str | None = None,
+) -> dict[str, Any]:
+    clean = dict(row)
+    clean.pop("catalyst_attribution", None)
+    clean.pop("catalyst_attributions", None)
+    for key in ("data_quality", "score_components", "latest_score_components"):
+        nested = clean.get(key)
+        if not isinstance(nested, Mapping):
+            continue
+        copied = dict(nested)
+        copied.pop("catalyst_attribution", None)
+        copied.pop("catalyst_attributions", None)
+        clean[key] = copied
+    if rejection_reason:
+        clean["catalyst_attribution_rejected"] = True
+        clean["catalyst_attribution_rejection_reasons"] = [rejection_reason]
+    return clean
+
+
+def _merge_family_catalyst_attribution_fields(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    values: dict[str, dict[str, Any]] = {}
+    rejection_reasons: list[str] = []
+    for row in rows:
+        if row.get("catalyst_attribution_rejected") is True:
+            raw_reasons = row.get("catalyst_attribution_rejection_reasons")
+            if isinstance(raw_reasons, (list, tuple)):
+                rejection_reasons.extend(str(reason) for reason in raw_reasons)
+        for value in _row_catalyst_attributions(row):
+            if event_catalyst_attribution.validate_contract(value):
+                continue
+            copied = dict(value)
+            values[str(copied["attribution_digest"])] = copied
+    ordered = sorted(
+        values.values(),
+        key=lambda value: (
+            not bool(value.get("causal_eligible")),
+            str(value.get("source_public_at") or ""),
+            str(value.get("source_id") or ""),
+            str(value.get("attribution_digest") or ""),
+        ),
+    )
+    result: dict[str, Any] = {}
+    if ordered:
+        result.update({
+            "catalyst_attribution": dict(ordered[0]),
+            "catalyst_attributions": [dict(value) for value in ordered],
+        })
+    if rejection_reasons:
+        result.update({
+            "catalyst_attribution_rejected": True,
+            "catalyst_attribution_rejection_reasons": sorted(
+                set(rejection_reasons)
+            ),
+        })
+    return result
+
+
+def _row_catalyst_attributions(row: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
+    values: list[Mapping[str, Any]] = []
+    containers = [row]
+    for key in ("data_quality", "score_components", "latest_score_components"):
+        value = row.get(key)
+        if isinstance(value, Mapping):
+            containers.append(value)
+    for container in containers:
+        single = container.get("catalyst_attribution")
+        if isinstance(single, Mapping):
+            values.append(single)
+        multiple = container.get("catalyst_attributions")
+        if isinstance(multiple, (list, tuple)):
+            values.extend(value for value in multiple if isinstance(value, Mapping))
+    return tuple(values)
+
+
+def _is_market_anomaly_row(row: Mapping[str, Any]) -> bool:
+    return (
+        str(row.get("row_type") or "") == "event_market_anomaly"
+        or str(row.get("_source_origin") or "") == "market_anomaly"
+    )
+
+
+def _is_integrated_catalyst_source_row(row: Mapping[str, Any]) -> bool:
+    if _row_catalyst_attributions(row):
+        return True
+    origin = str(row.get("_source_origin") or "").casefold()
+    if origin in {
+        "official_exchange", "scheduled_catalyst", "unlock", "news",
+        "catalyst_search", "cryptopanic", "gdelt", "public_rss",
+        "project_blog_rss", "external_catalyst",
+    }:
+        return True
+    row_type = str(row.get("row_type") or "").casefold()
+    return any(
+        token in row_type
+        for token in ("listing", "announcement", "catalyst", "unlock", "news", "source_evidence")
+    )
+
+
+def _exact_attribution_anomaly(
+    source: Mapping[str, Any],
+    anomalies: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    explicit_ids: set[str] = set()
+    for key in ("market_anomaly_id", "anomaly_raw_id", "anomaly_id"):
+        value = str(source.get(key) or "").strip()
+        if value:
+            explicit_ids.add(value)
+    search = source.get("market_anomaly_catalyst_search")
+    parent = search.get("parent") if isinstance(search, Mapping) else None
+    if isinstance(parent, Mapping) and str(parent.get("raw_id") or "").strip():
+        explicit_ids.add(str(parent["raw_id"]).strip())
+    if explicit_ids:
+        matches = [
+            anomaly for anomaly in anomalies
+            if explicit_ids & {
+                str(anomaly.get(key) or "").strip()
+                for key in ("raw_id", "market_anomaly_id", "anomaly_id")
+            }
+        ]
+        return matches[0] if len(matches) == 1 else None
+    return anomalies[0] if len(anomalies) == 1 else None
 
 def _merge_family_context(key: str, rows: list[dict[str, Any]], *, observed_at: str) -> _MergedFamilyContext:
     origins = tuple(dict.fromkeys(str(row.get("_source_origin") or "unknown") for row in rows))
@@ -624,4 +833,4 @@ def _merge_family_supporting_fields(
     }
 
 
-__all__ = ("_merge_family",)
+__all__ = ("_family_rows_with_catalyst_attributions", "_merge_family")

@@ -24,6 +24,7 @@
     "required_context": [
       "calendar_evidence",
       "calendar_evidence_ids",
+      "catalyst_attributions",
       "market_context_reference",
       "rsi_context",
       "rsi_context_references",
@@ -178,7 +179,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-15T05:00:23+00:00",
+  "generated_at": "2026-07-15T10:23:27+00:00",
   "market_provenance_contract": {
     "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
@@ -413,6 +414,47 @@
     "source_hints_may_establish_authority": false,
     "source_pack_impact_validation": "declared_validator_membership_required",
     "unverified_authority_reason": "source_authority_unverified"
+  },
+  "catalyst_attribution_policy": {
+    "schema": "event_alpha.catalyst_attribution v1",
+    "unit_of_evidence": "one exact source bound to one exact market anomaly",
+    "anomaly_binding": "digest of anomaly id, UTC clock, provider/content identity, canonical asset, snapshot identity, state, bucket, and market snapshot",
+    "source_public_clock": "published_at_then_fetched_at",
+    "claimed_event_time_is_separate": true,
+    "contemporaneous_tolerance_seconds": 300,
+    "temporal_relations": [
+      "antecedent",
+      "contemporaneous",
+      "retrospective",
+      "unknown"
+    ],
+    "causal_eligibility": "antecedent_or_contemporaneous plus direct official evidence or a validated direct beneficiary with a strong impact path",
+    "retrospective_source_use": "context_only_never_causal_confirmation",
+    "background_historical_reaction_side_note_use": "context_only",
+    "semantic_role_contract": "only the eight canonical catalyst-frame roles; unrecognized explicit roles are noncausal",
+    "negated_corrective_ruled_out_use": "disproof",
+    "scheduled_future_event": "may be scheduled_anticipation only when its source was already public",
+    "missing_or_naive_clock": "unknown_and_not_causal",
+    "source_url_credentials": "credential paths or userinfo rejected; all query and fragment data removed",
+    "canonical_propagation": [
+      "raw catalyst-search attachment",
+      "discovery candidate data quality",
+      "alert evidence components",
+      "integrated candidate",
+      "CoreOpportunity",
+      "Decision v2 projection",
+      "pending outcome"
+    ],
+    "decision_policy": "once attribution is supplied, malformed or exclusively noncausal evidence cannot fall back to hostname or accepted-count confirmation",
+    "foreign_or_mixed_binding": "reject the complete supplied attribution set and retain rejection telemetry",
+    "historical_rows_without_attribution": "retain_v2_compatibility_heuristic",
+    "historical_artifacts_rewritten": false,
+    "research_only": true,
+    "auto_apply": false,
+    "research_basis": [
+      "MacKinlay 1997 event-study timing and event-window discipline",
+      "Miller 2023 event-study design and interpretation guidance"
+    ]
   },
   "llm_catalyst_frame_binding_policy": {
     "analysis_raw_resolution": "exactly_one_matching_raw_id_required",

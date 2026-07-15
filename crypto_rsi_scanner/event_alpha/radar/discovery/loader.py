@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
 from .... import event_fade
+import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
 import crypto_rsi_scanner.event_alpha.radar.anomaly_scanner as event_anomaly_scanner
 import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
 import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
@@ -288,6 +289,9 @@ def run_discovery(
                     "has_derivatives_snapshot": fade_candidate is not None and fade_candidate.derivatives is not None,
                     "has_supply_snapshot": fade_candidate is not None and fade_candidate.supply is not None,
                     "has_technical_snapshot": fade_candidate is not None and fade_candidate.technical is not None,
+                    "catalyst_attributions": list(
+                        _validated_candidate_catalyst_attributions(event, raw_by_id)
+                    ),
                 },
             ))
     return EventDiscoveryResult(
@@ -297,6 +301,32 @@ def run_discovery(
         classifications=tuple(classifications),
         candidates=tuple(candidates),
         warnings=tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
+    )
+
+
+def _validated_candidate_catalyst_attributions(
+    event: NormalizedEvent,
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
+) -> tuple[dict[str, Any], ...]:
+    """Copy only contracts bound to an exact raw source and parent anomaly."""
+
+    values: dict[str, dict[str, Any]] = {}
+    for raw_id in event.raw_ids:
+        source = raw_by_id.get(raw_id)
+        payload = source.raw_json if source is not None and isinstance(source.raw_json, Mapping) else {}
+        value = payload.get("catalyst_attribution")
+        if not isinstance(value, Mapping):
+            continue
+        anomaly = raw_by_id.get(str(value.get("anomaly_id") or ""))
+        if anomaly is None or source is None:
+            continue
+        if event_catalyst_attribution.validate_source_binding(value, anomaly, source):
+            continue
+        copied = dict(value)
+        values[str(copied["attribution_digest"])] = copied
+    return tuple(
+        values[key]
+        for key in sorted(values)
     )
 
 

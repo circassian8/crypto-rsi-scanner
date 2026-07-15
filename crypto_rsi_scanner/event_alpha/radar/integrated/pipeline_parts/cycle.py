@@ -954,6 +954,7 @@ def build_integrated_candidates(
     decision_cfg = event_radar_decision_model.RadarDecisionConfig.from_runtime(config)
     merged: list[dict[str, Any]] = []
     for key, rows in grouped.items():
+        rows = _family_rows_with_catalyst_attributions(rows)
         candidate = _merge_family(
             key,
             rows,
@@ -980,7 +981,6 @@ def build_integrated_candidates(
             )
         merged.append(candidate)
     return tuple(sorted(merged, key=_candidate_sort_key, reverse=True))
-
 
 def _unique_rsi_context_index(
     rows: Iterable[Mapping[str, Any]],

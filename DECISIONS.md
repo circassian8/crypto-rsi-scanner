@@ -16,6 +16,42 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Require temporal-semantic attribution for current catalyst confirmation
+**Status:** accepted
+**Decision:** Bind each current catalyst-confidence claim to one exact source
+and one exact market anomaly with the closed
+`event_alpha.catalyst_attribution` v1 value. Use `published_at`, falling back to
+`fetched_at`, as the source-public clock and keep claimed `event_time` separate.
+Bind the anomaly id and clock to a digest of its provider/content identity,
+canonical asset, snapshot identity, market state, anomaly bucket, and exact
+market snapshot. Reject foreign bindings and mixed valid/invalid supplied sets
+as a whole while retaining explicit rejection telemetry.
+Treat a source more than five minutes after the anomaly as retrospective
+context; background, historical, market-reaction, and side-note roles as
+context-only; and negated, corrective, denied, or ruled-out evidence as
+disproof. A future scheduled event may be anticipation evidence only if its
+source was already public. Missing or timezone-naive clocks are unknown and
+noncausal. Causal eligibility additionally requires direct official evidence or
+a validated direct beneficiary with a strong impact path. Copy the same
+digest-bound attribution through discovery, alert evidence, integrated
+candidate, CoreOpportunity, canonical Decision projection, and outcomes. Once a
+current row supplies attribution, malformed or exclusively noncausal evidence
+cannot fall back to official-hostname, source-class, or accepted-count
+confirmation. Preserve historical rows without attribution under the prior v2
+compatibility heuristic and never rewrite their bytes. Attribution remains
+research-only, `auto_apply=false`, and neither precedence nor an official source
+alone proves causality.
+**Why:** The prior merge could label an official article published after a
+market move—even one explicitly marked background context—as a confirmed
+catalyst and promote the idea to `high_confidence_watch`. Separating information
+availability from claimed event time removes look-ahead attribution while
+retaining useful retrospective context and scheduled-event evidence.
+**Revisit when:** A versioned outcome study with frozen anomaly/source windows,
+matched non-idea controls, dependency-aware uncertainty, and out-of-sample
+evidence supports a different contemporaneous window or causal eligibility
+rule. Any routing or threshold change requires a separate human-approved
+decision.
+
 ## 2026-07-15 - Score frozen anomaly representatives with canonical Decision-v2 outcomes
 **Status:** accepted
 **Decision:** Evaluate only the chronologically first representative frozen by

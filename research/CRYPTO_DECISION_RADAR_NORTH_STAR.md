@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-15T05:00:23+00:00`
+- generated_at: `2026-07-15T10:23:27+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -74,6 +74,37 @@ fail-soft unresolved row rather than crashing the cycle. Historical unbound
 rows remain immutable audit bytes but are not current catalyst evidence, and
 the provider output schema remains unchanged.
 
+Catalyst confirmation also requires a closed temporal-semantic attribution
+between one exact source and one exact market anomaly. The source-public clock
+is `published_at`, falling back to `fetched_at`; a claimed `event_time` remains
+separate and can never backdate when evidence became available. Sources more
+than five minutes after an anomaly are retrospective context, not causal
+confirmation. Background, historical, reaction, and side-note frames remain
+context-only; negated, corrective, denied, or ruled-out evidence remains
+disproof. A future scheduled event can be `scheduled_anticipation` only when
+its source was already public before or contemporaneous with the anomaly.
+Missing or timezone-naive clocks fail closed as unknown.
+
+The immutable `event_alpha.catalyst_attribution` v1 value binds anomaly/source
+identities, a digest over the exact anomaly asset/snapshot/state evidence,
+public and event clocks, publication lag, one of the eight canonical semantic
+roles, candidate role, impact strength, canonical source capabilities, evidence
+use, causal eligibility, reason codes, safety flags, and a canonical digest. URL userinfo and
+credential-like paths are rejected, while all query and fragment data is
+removed before propagation. Catalyst search, discovery, alert evidence,
+integrated candidate, CoreOpportunity, canonical Decision projection, and
+pending outcome copy the same validated value. Once a current row supplies an
+attribution, malformed, foreign, mixed-validity, or exclusively
+retrospective/contextual evidence cannot
+fall back to the old official-hostname or accepted-count shortcut. Historical
+rows without the new value remain readable under the existing compatibility
+heuristic and are never rewritten. This timing discipline follows the event-
+window and information-availability principles in [MacKinlay's event-study
+review (1997)](https://econpapers.repec.org/article/aeajeclit/v_3a35_3ay_3a1997_3ai_3a1_3ap_3a13-39.htm)
+and [Miller's event-study design guide
+(2023)](https://www.aeaweb.org/articles?id=10.1257/jep.37.2.203); it does not
+assert that temporal precedence alone proves causality.
+
 ## One Closed Decision Authority
 
 `decision_model_values(raw_row)` returns the canonical, schema-backed Decision
@@ -92,6 +123,8 @@ The projection carries all data required to validate and render itself:
 - hard blockers, soft penalties, warnings, why-now, supporting facts, missing
   information, main risks, confirmation conditions, and invalidation conditions;
 - minimal resolvable calendar evidence and explicit RSI-context references;
+- validated catalyst-attribution values tying every causal-confidence claim to
+  an exact source and anomaly;
 - the canonical market-context reference (`source`, `observed_at`,
   `freshness_status`, and `market_snapshot_id`);
 - observation ids, source/provider lineage, evaluation timestamp, and explicit

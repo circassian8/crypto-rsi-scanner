@@ -11,7 +11,7 @@ import math
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from ... import event_fade
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
@@ -400,6 +400,11 @@ def _score_components(
         source_quality -= 25
     fade_components = fade_candidate.component_scores if fade_candidate is not None else {}
     accepted_link = _cluster_link_for_candidate(candidate, cluster)
+    catalyst_attributions = [
+        dict(value)
+        for value in candidate.data_quality.get("catalyst_attributions", ())
+        if isinstance(value, Mapping)
+    ]
     return {
         "asset_resolution": _clamp(candidate.link.link_confidence * 100),
         "proxy_relationship": _proxy_quality(candidate),
@@ -417,6 +422,7 @@ def _score_components(
         "independent_source_count": int(cluster.independent_source_count if cluster else len(event.raw_ids)),
         "accepted_link_kind": accepted_link.accepted_kind if accepted_link else "none",
         "event_time_consensus": _clamp(cluster.event_time_consensus if cluster else 0),
+        "catalyst_attributions": catalyst_attributions,
     }
 
 

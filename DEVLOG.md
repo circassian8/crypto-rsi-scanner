@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Bind catalyst claims to exact anomaly timing and evidence · Codex
+**Why:** A source published after a market anomaly could still be treated as a
+confirmed catalyst when it was official but explicitly retrospective or
+background context. That overstated causal confidence and could promote a
+market-led idea to `high_confidence_watch` without antecedent evidence.
+**Changes:**
+- Added the closed `event_alpha.catalyst_attribution` v1 contract: each source
+  is bound to one exact anomaly digest, source-public and claimed-event clocks
+  stay separate, temporal relation and canonical semantic role are explicit,
+  and only antecedent/contemporaneous direct-official or validated direct-impact
+  evidence can be causally eligible. Retrospective/background/reaction evidence
+  stays context; negated/corrective/ruled-out evidence stays disproof.
+- Recompute every security- and decision-relevant attribution field during
+  validation, reject credential-bearing or malformed source URLs, strip query
+  and fragment data, bind canonical source authority/capabilities, preserve
+  zero-valued confidences, reject bool schema versions, and fail closed on
+  foreign, mixed-validity, malformed, or mutated attribution sets.
+- Propagated the exact contract through catalyst-search raw rows, discovery
+  candidates, alert evidence, integrated candidates, CoreOpportunity,
+  canonical Decision-v2 projection, and pending outcomes. Downstream Decision
+  policy consumes the canonical projection without silently returning to
+  accepted-count/hostname heuristics once current attribution evidence exists;
+  historical rows without attribution retain their prior deterministic path.
+- Added focused contract, propagation, projection, routing, idempotence,
+  mutation, URL, source-authority, semantic-role, and rejection tests. Split
+  static North Star evidence-policy constants into a focused project-health
+  module so the new documentation remains inside the established architecture
+  size gate.
+- Updated the Event Alpha and Decision Radar North Star Markdown/JSON,
+  `DECISIONS.md`, `ROADMAP.md`, and generated architecture/project-health
+  reports. The policy cites MacKinlay's event-study timing discipline and
+  Miller's event-study design guidance; it does not auto-apply a threshold.
+**Verify:** 86 focused attribution/model tests and 214 expanded affected tests
+passed; the full Event Alpha suite passed 1,917 tests in 96.44 seconds; the
+integrated-radar smoke produced 15 candidates and 12 Core/card rows with strict
+doctor at zero blockers and warnings; the export parent-symlink/TOCTOU security
+regression passed; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-radar-north-star PYTHON=python3`; `make
+architecture-cleanliness-check PYTHON=python3` with zero new size violations
+and zero over-limit functions; `make verify-fast PYTHON=python3` passed 2,162
+tests in 114.01 seconds plus alert, backtest, and paper-scoreboard gates; full
+`make verify PYTHON=python3` passed the 1,381-test standalone compatibility
+runner, 2,162-test pytest gate in 114.98 seconds, and every remaining release
+smoke; `git diff --check`.
+**Notes/risks:** This is deterministic research attribution, not proof of
+causality. It made no provider call, send, trade, paper trade, normal RSI write,
+Event Alpha `TRIGGERED_FADE`, score/threshold auto-change, or dashboard-authority
+mutation, and it does not reinterpret historical artifacts.
+
 ## 2026-07-15 — Grade frozen anomaly episodes with canonical Decision-v2 outcomes · Codex
 **Why:** Fixed-window episodes made repeated detections visible, but the project
 still lacked one closed, primary-horizon scorecard that could measure the
