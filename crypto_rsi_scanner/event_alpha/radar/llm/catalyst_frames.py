@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
 import crypto_rsi_scanner.event_alpha.radar.source_enrichment as event_source_enrichment
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
@@ -322,7 +323,7 @@ def parse_catalyst_frame_analysis(
 ) -> EventLLMCatalystFrameAnalysis:
     cfg = cfg or EventLLMCatalystFrameConfig()
     warnings: list[str] = [str(item) for item in raw.get("warnings", ()) if item]
-    source_text = _packet_source_text(packet)
+    source_fields = _packet_source_fields(packet)
 
     def parse_frame(value: Any, *, default_role: str | None = None) -> EventLLMCatalystFrame | None:
         if value is None:
@@ -342,7 +343,7 @@ def parse_catalyst_frame_analysis(
         if cause not in CAUSE_STATUS_VALUES:
             raise EventLLMCatalystFrameValidationError(f"invalid LLM catalyst cause_status: {cause}")
         quote = _string(value.get("evidence_quote"))
-        found = _quote_found(quote, source_text)
+        found = _quote_found(quote, source_fields)
         if cfg.require_evidence_quotes and quote and not found:
             warnings.append(f"quote_not_found:{frame_type}:{frame_role}")
         return EventLLMCatalystFrame(
@@ -476,26 +477,21 @@ def _needs_frame_analysis(raw: RawDiscoveredEvent) -> bool:
     return required
 
 
-def _packet_source_text(packet: Mapping[str, Any]) -> str:
-    return " ".join(
-        str(packet.get(key) or "")
+def _packet_source_fields(packet: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        key: str(packet.get(key) or "")
         for key in ("title", "body", "enriched_text")
-    )
+    }
 
 
-def _quote_found(quote: str, source_text: str) -> bool:
+def _quote_found(quote: str, source_fields: Mapping[str, str]) -> bool:
     quote_clean = clean_text(quote)
-    source_clean = clean_text(source_text)
-    if not quote_clean:
+    if not event_catalyst_frame_binding.quote_is_informative(quote):
         return False
-    if quote_clean in source_clean:
-        return True
-    quote_terms = {term for term in quote_clean.split() if len(term) > 3}
-    if not quote_terms:
-        return False
-    source_terms = set(source_clean.split())
-    overlap = len(quote_terms & source_terms) / max(1, len(quote_terms))
-    return overlap >= 0.80
+    return any(
+        quote_clean in clean_text(source_fields.get(field) or "")
+        for field in ("title", "body", "enriched_text")
+    )
 
 
 def _enriched_text(raw: RawDiscoveredEvent) -> str:

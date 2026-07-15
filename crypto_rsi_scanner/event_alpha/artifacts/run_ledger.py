@@ -15,6 +15,7 @@ from typing import Any, Iterable, Mapping
 
 from . import paths as event_artifact_paths
 from . import run_counters as event_alpha_run_counters
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 
 
 RUN_LEDGER_SCHEMA_VERSION = "event_alpha_run_ledger_v1"
@@ -1095,8 +1096,8 @@ def _catalyst_frame_counts(
             skipped += 1
             reason = str(payload.get("catalyst_frame_skip_reason") or status or "unknown").strip()
             skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
-        validation = payload.get("llm_catalyst_frame_validation")
-        if not isinstance(validation, Mapping):
+        validation = event_catalyst_frame_binding.current_validation_for_raw(raw)
+        if validation is None:
             continue
         if validation.get("frame_rule_disagreement"):
             disagreements += 1

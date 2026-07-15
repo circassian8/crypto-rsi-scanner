@@ -58,6 +58,41 @@ SOURCE_AUTHORITY_POLICY: dict[str, Any] = {
     "unverified_authority_claim_action": "retain as capped context with source_authority_unverified",
     "historical_artifacts_rewritten": False,
 }
+LLM_CATALYST_FRAME_BINDING_POLICY: dict[str, Any] = {
+    "analysis_raw_resolution": "exactly_one_matching_raw_id_required",
+    "eligible_source_fields": ["title", "body", "quality_gated_enriched_text"],
+    "quote_matching": "normalized_contiguous_span_within_one_source_field",
+    "minimum_quote_contract": "at_least_10_normalized_chars_two_terms_and_one_four_char_term",
+    "cross_raw_event_or_cross_field_quote_matching": False,
+    "fuzzy_term_overlap_allowed": False,
+    "analysis_binding": "canonical_analysis_payload_sha256_required",
+    "validation_integrity": "canonical_validation_payload_sha256_required",
+    "frame_schema_validation": "closed_keys_enums_types_finite_confidence_and_canonical_frame_id",
+    "short_ticker_identity": "token_boundary_plus_crypto_context_or_dollar_ticker_required",
+    "binding_fields": [
+        "source_raw_id",
+        "source_provider",
+        "source_url",
+        "source_published_at",
+        "source_fetched_at",
+        "source_confidence",
+        "source_content_hash",
+        "source_surface_hash",
+        "source_surface_provenance_hash",
+        "analysis_sha256",
+        "validation_payload_sha256",
+        "evidence_source_field",
+        "evidence_normalized_start",
+        "evidence_normalized_end",
+    ],
+    "apply_and_rehydration": "fail_closed_on_any_binding_drift",
+    "invalid_analysis_identity": "fail_soft_unresolved_without_current_validation",
+    "enriched_source_provenance": "quality_triage_extractor_cleaner_url_and_source_enrichment_hash_bound",
+    "legacy_unbound_frames": "historical_bytes_preserved_but_not_current_evidence",
+    "provider_output_schema_changed": False,
+    "routing_authority": "deterministic_validation_only",
+    "research_only": True,
+}
 ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
     "asset_universe": {
         "role": "Defines the tradable asset universe and filters out quotes, sectors, themes, and proxy-only assets unless explicitly labeled.",
@@ -574,6 +609,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "purpose": "Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.",
         "architecture": deepcopy(ARCHITECTURE_COMPONENTS),
         "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
+        "llm_catalyst_frame_binding_policy": deepcopy(LLM_CATALYST_FRAME_BINDING_POLICY),
         "product_layers": deepcopy(PRODUCT_LAYERS),
         "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "market_no_send_generation": deepcopy(MARKET_NO_SEND_GENERATION),
@@ -951,6 +987,21 @@ def _append_source_authority_north_star(lines: list[str], payload: Mapping[str, 
     lines.append("")
 
 
+def _append_catalyst_frame_binding_north_star(lines: list[str], payload: Mapping[str, Any]) -> None:
+    policy = (
+        payload.get("llm_catalyst_frame_binding_policy")
+        if isinstance(payload.get("llm_catalyst_frame_binding_policy"), Mapping)
+        else {}
+    )
+    lines.extend(["## LLM Catalyst-Frame Source Binding", ""])
+    for key, value in policy.items():
+        if isinstance(value, list):
+            lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
+        else:
+            lines.append(f"- {key}: `{value}`")
+    lines.append("")
+
+
 def format_north_star(payload: Mapping[str, Any]) -> str:
     lines = [
         "# Event Alpha Radar North Star — Catalyst Radar",
@@ -979,6 +1030,7 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
             ]
         )
     _append_source_authority_north_star(lines, payload)
+    _append_catalyst_frame_binding_north_star(lines, payload)
     layers = payload.get("product_layers") if isinstance(payload.get("product_layers"), Mapping) else {}
     lines.extend(["## Product Layering", ""])
     for key, value in layers.items():

@@ -20,6 +20,7 @@ from ...artifacts import run_ledger as event_alpha_run_ledger
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
@@ -293,10 +294,7 @@ def _actual_signal_quality_case(
     false_positive_reason: str,
     brief_section: str,
 ) -> dict[str, Any]:
-    catalyst_frame = (raw.raw_json if isinstance(raw.raw_json, Mapping) else {}).get(
-        "llm_catalyst_frame_validation",
-        {},
-    )
+    catalyst_frame = event_catalyst_frame_binding.current_validation_for_raw(raw) or {}
     return {
         "impact_path_type": reported_impact_path,
         "candidate_role": reported_role,

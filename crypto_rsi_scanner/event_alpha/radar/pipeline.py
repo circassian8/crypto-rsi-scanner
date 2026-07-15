@@ -767,6 +767,19 @@ def _operating_cycle_validated_catalyst_frame_raw(
         (raw,),
         rule_frames=rule_frames,
     )
+    if (
+        validation.source_raw_id != raw.raw_id
+        or not validation.source_binding_schema_version
+        or not validation.analysis_sha256
+    ):
+        return _raw_with_catalyst_frame_status(
+            raw,
+            status="unresolved",
+            required=required,
+            required_reason=required_reason,
+            skip_reason="catalyst_frame_source_binding_invalid",
+            warnings=validation.frame_warnings,
+        )
     status = (
         "unresolved"
         if validation.resolution == event_catalyst_frame_validator.RESOLUTION_UNRESOLVED

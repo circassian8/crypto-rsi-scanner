@@ -13,6 +13,7 @@ import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor as event_watchlist_monitor
 import crypto_rsi_scanner.event_alpha.radar.anomaly_state as event_anomaly_state
 import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
@@ -277,7 +278,7 @@ class _PipelineDiscoveryProperties:
     def catalyst_frame_validations_applied(self) -> int:
         return len([
             raw for raw in self.discovery_result.raw_events
-            if raw.raw_json and raw.raw_json.get("llm_catalyst_frame_validation")
+            if event_catalyst_frame_binding.current_validation_for_raw(raw) is not None
         ])
 
     @property

@@ -100,6 +100,27 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - unverified_authority_claim_action: `retain as capped context with source_authority_unverified`
 - historical_artifacts_rewritten: `False`
 
+## LLM Catalyst-Frame Source Binding
+
+- analysis_raw_resolution: `exactly_one_matching_raw_id_required`
+- eligible_source_fields: title, body, quality_gated_enriched_text
+- quote_matching: `normalized_contiguous_span_within_one_source_field`
+- minimum_quote_contract: `at_least_10_normalized_chars_two_terms_and_one_four_char_term`
+- cross_raw_event_or_cross_field_quote_matching: `False`
+- fuzzy_term_overlap_allowed: `False`
+- analysis_binding: `canonical_analysis_payload_sha256_required`
+- validation_integrity: `canonical_validation_payload_sha256_required`
+- frame_schema_validation: `closed_keys_enums_types_finite_confidence_and_canonical_frame_id`
+- short_ticker_identity: `token_boundary_plus_crypto_context_or_dollar_ticker_required`
+- binding_fields: source_raw_id, source_provider, source_url, source_published_at, source_fetched_at, source_confidence, source_content_hash, source_surface_hash, source_surface_provenance_hash, analysis_sha256, validation_payload_sha256, evidence_source_field, evidence_normalized_start, evidence_normalized_end
+- apply_and_rehydration: `fail_closed_on_any_binding_drift`
+- invalid_analysis_identity: `fail_soft_unresolved_without_current_validation`
+- enriched_source_provenance: `quality_triage_extractor_cleaner_url_and_source_enrichment_hash_bound`
+- legacy_unbound_frames: `historical_bytes_preserved_but_not_current_evidence`
+- provider_output_schema_changed: `False`
+- routing_authority: `deterministic_validation_only`
+- research_only: `True`
+
 ## Product Layering
 
 - catalyst_radar: `{'name': 'Event Alpha', 'owns': ['catalyst discovery', 'source-strength classification', 'strict catalyst routes', 'historical Event Alpha artifacts']}`

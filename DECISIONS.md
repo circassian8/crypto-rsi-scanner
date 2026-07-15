@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Bind LLM catalyst frames to exact immutable source evidence
+**Status:** accepted
+**Decision:** An LLM catalyst-frame analysis is eligible for deterministic
+validation only when its `raw_id` resolves to exactly one supplied raw row.
+Every accepted quote must match one normalized contiguous span inside that
+row's title, body, or quality-gated enriched text; event summaries, adjacent
+rows, cross-field concatenation, and fuzzy term overlap are ineligible. Current
+validation persists the raw/provider/URL/publication identity, original content
+hash, fetch clock, source confidence, canonical evidence-surface and controlled
+enrichment-provenance hashes, source field, normalized offsets, and exact
+analysis/validation payload digests on the closed validation and frame. Closed
+keys, enums, primitive types, finite bounded confidence, canonical frame ids,
+source-evidenced subjects/entities, and boundary-safe short ticker identity are
+revalidated before use. Application and rehydration fail closed if any binding
+drifts. Invalid or ambiguous analysis identity remains fail-soft unresolved
+instead of crashing the cycle. Legacy unbound validation remains unchanged
+historical data but does not rehydrate as current LLM evidence. Provider output
+remains a semantic proposal schema and does not self-attest these deterministic
+bindings.
+**Why:** The previous validator merged all raw and normalized-event text,
+ignored the analysis `raw_id`, accepted an 80-percent bag-of-words overlap, and
+stamped valid frames with the first raw. A quote from one article could
+therefore be laundered into another article's provenance and remain trusted
+after source mutation.
+**Revisit when:** A versioned evidence format can prove byte offsets directly
+against immutable provider bytes. It must retain single-source resolution,
+quality gating, deterministic binding, and fail-closed revalidation.
+
 ## 2026-07-15 - Derive catalyst source authority from canonical identity only
 **Status:** accepted
 **Decision:** Official exchange, official project, structured, derivatives,

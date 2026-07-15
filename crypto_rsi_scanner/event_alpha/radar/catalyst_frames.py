@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Iterable
 
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from .resolver import clean_text
 
@@ -82,8 +83,19 @@ class EventCatalystFrame:
     confidence: float = 0.0
     evidence_quote: str = ""
     source_raw_id: str | None = None
+    source_provider: str | None = None
     source_url: str | None = None
     published_at: datetime | None = None
+    fetched_at: datetime | None = None
+    source_confidence: float | None = None
+    source_binding_schema_version: str | None = None
+    source_content_hash: str | None = None
+    source_surface_hash: str | None = None
+    source_surface_provenance_hash: str | None = None
+    analysis_sha256: str | None = None
+    evidence_source_field: str | None = None
+    evidence_normalized_start: int | None = None
+    evidence_normalized_end: int | None = None
 
 
 def build_catalyst_frames(
@@ -120,24 +132,43 @@ def select_main_catalyst_frame(
 
 
 def frame_summary(frames: Iterable[EventCatalystFrame]) -> tuple[dict[str, object], ...]:
-    return tuple(
-        {
-            "frame_id": frame.frame_id,
-            "frame_type": frame.frame_type,
-            "frame_role": frame.frame_role,
-            "subject": frame.subject,
-            "actor": frame.actor,
-            "object": frame.object,
-            "event_archetype": frame.event_archetype,
-            "claim_polarity": frame.claim_polarity,
-            "cause_status": frame.cause_status,
-            "confidence": round(float(frame.confidence or 0.0), 4),
-            "evidence_quote": frame.evidence_quote,
-            "source_raw_id": frame.source_raw_id,
-            "source_url": frame.source_url,
-        }
-        for frame in frames
-    )
+    return tuple(_frame_summary_row(frame) for frame in frames)
+
+
+def _frame_summary_row(frame: EventCatalystFrame) -> dict[str, object]:
+    row: dict[str, object] = {
+        "frame_id": frame.frame_id,
+        "frame_type": frame.frame_type,
+        "frame_role": frame.frame_role,
+        "subject": frame.subject,
+        "actor": frame.actor,
+        "object": frame.object,
+        "affected_entities": list(frame.affected_entities),
+        "affected_assets": list(frame.affected_assets),
+        "event_archetype": frame.event_archetype,
+        "claim_polarity": frame.claim_polarity,
+        "cause_status": frame.cause_status,
+        "confidence": round(float(frame.confidence or 0.0), 4),
+        "evidence_quote": frame.evidence_quote,
+        "source_raw_id": frame.source_raw_id,
+        "source_provider": frame.source_provider,
+        "source_url": frame.source_url,
+        "published_at": frame.published_at.isoformat() if frame.published_at else None,
+        "fetched_at": frame.fetched_at.isoformat() if frame.fetched_at else None,
+        "source_confidence": frame.source_confidence,
+    }
+    if frame.source_binding_schema_version:
+        row.update({
+            "source_binding_schema_version": frame.source_binding_schema_version,
+            "source_content_hash": frame.source_content_hash,
+            "source_surface_hash": frame.source_surface_hash,
+            "source_surface_provenance_hash": frame.source_surface_provenance_hash,
+            "analysis_sha256": frame.analysis_sha256,
+            "evidence_source_field": frame.evidence_source_field,
+            "evidence_normalized_start": frame.evidence_normalized_start,
+            "evidence_normalized_end": frame.evidence_normalized_end,
+        })
+    return row
 
 
 def _frames_from_raw(raw: RawDiscoveredEvent, *, event: NormalizedEvent | None) -> list[EventCatalystFrame]:
@@ -154,26 +185,29 @@ def _frames_from_raw(raw: RawDiscoveredEvent, *, event: NormalizedEvent | None) 
 
 
 def _validated_llm_frames_from_raw(raw: RawDiscoveredEvent) -> list[EventCatalystFrame]:
-    payload = raw.raw_json if isinstance(raw.raw_json, dict) else {}
-    validation = payload.get("llm_catalyst_frame_validation") if isinstance(payload.get("llm_catalyst_frame_validation"), dict) else {}
+    validation = event_catalyst_frame_binding.current_validation_for_raw(raw)
+    if validation is None:
+        return []
     raw_frames = validation.get("valid_frames") if isinstance(validation.get("valid_frames"), list) else []
     frames: list[EventCatalystFrame] = []
     for item in raw_frames:
         if not isinstance(item, dict):
             continue
+        if not event_catalyst_frame_binding.frame_contract_valid(item, raw):
+            continue
         frame_type = str(item.get("frame_type") or "")
         frame_role = str(item.get("frame_role") or "")
         if not frame_type or not frame_role:
             continue
-        quote = re.sub(r"\s+", " ", str(item.get("evidence_quote") or "")).strip()[:320]
-        subject = _clean_subject(str(item.get("subject") or "")) if item.get("subject") else None
+        quote = str(item.get("evidence_quote") or "")
+        subject = str(item.get("subject") or "") or None
         frame_id = str(item.get("frame_id") or _frame_id(raw.raw_id, frame_type, frame_role, subject, quote))
         frames.append(EventCatalystFrame(
             frame_id=frame_id,
             frame_type=frame_type,
             frame_role=frame_role,
             subject=subject,
-            actor=_clean_subject(str(item.get("actor") or "")) if item.get("actor") else None,
+            actor=str(item.get("actor") or "") or None,
             object=str(item.get("object") or "") or None,
             affected_entities=tuple(str(value) for value in item.get("affected_entities") or () if str(value).strip()),
             affected_assets=tuple(str(value) for value in item.get("affected_assets") or () if str(value).strip()),
@@ -182,9 +216,20 @@ def _validated_llm_frames_from_raw(raw: RawDiscoveredEvent) -> list[EventCatalys
             cause_status=str(item.get("cause_status") or event_claim_semantics.CauseStatus.UNKNOWN.value),
             confidence=max(0.0, min(1.0, float(item.get("confidence") or 0.0))),
             evidence_quote=quote,
-            source_raw_id=raw.raw_id,
-            source_url=raw.source_url,
+            source_raw_id=str(item.get("source_raw_id") or ""),
+            source_provider=str(item.get("source_provider") or ""),
+            source_url=str(item.get("source_url") or "") or None,
             published_at=raw.published_at,
+            fetched_at=raw.fetched_at,
+            source_confidence=float(item["source_confidence"]),
+            source_binding_schema_version=str(item.get("source_binding_schema_version") or ""),
+            source_content_hash=str(item.get("source_content_hash") or ""),
+            source_surface_hash=str(item.get("source_surface_hash") or ""),
+            source_surface_provenance_hash=str(item.get("source_surface_provenance_hash") or ""),
+            analysis_sha256=str(item.get("analysis_sha256") or ""),
+            evidence_source_field=str(item.get("evidence_source_field") or ""),
+            evidence_normalized_start=int(item["evidence_normalized_start"]),
+            evidence_normalized_end=int(item["evidence_normalized_end"]),
         ))
     return frames
 

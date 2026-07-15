@@ -17,6 +17,51 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Bind LLM catalyst frames to exact source evidence · Codex
+**Why:** Catalyst-frame validation ignored the analysis `raw_id`, searched a
+concatenation of every supplied raw and normalized event text, accepted fuzzy
+term overlap, and stamped accepted frames with the first raw's provenance. A
+quote from one article could therefore validate a frame attributed to another
+article and survive downstream as current evidence.
+**Changes:**
+- Added one canonical v2 catalyst-frame validation contract. Each analysis now
+  resolves exactly one raw row, and every accepted quote binds an informative
+  normalized contiguous span inside one title, body, or quality-gated enriched
+  text field; cross-row, event-summary, cross-field, fuzzy, and trivial quote
+  matches fail closed.
+- Bound raw/provider/URL/publication/fetch/source-confidence identity, original
+  content, canonical evidence surface, controlled enrichment provenance, exact
+  analysis payload, and closed validation payload with SHA-256 digests. Each
+  detachable frame carries the binding and a recomputed canonical frame id.
+- Enforced closed keys, enums, exact primitive/container types, finite bounded
+  confidence, source-evidenced subjects/entities, and boundary-safe short
+  ticker identity. Unknown keys, type coercion, semantic forgery, stale source
+  clocks/content/provenance, and self-consistent selected/derived metadata drift
+  are rejected before rehydration.
+- Made invalid/missing/duplicate analysis identity fail soft as unresolved in
+  the operating cycle. Incident metadata, pipeline/ledger counters, signal
+  quality, and downstream frame reconstruction now consume only the canonical
+  current validator instead of trusting embedded legacy dictionaries.
+- Preserved historical unbound bytes as audit data without treating them as
+  current LLM evidence; upgraded the checked signal-quality fixture to a real
+  bound analysis/validation pair. Updated both North Star contracts, their
+  generator, the durable decision, roadmap, and focused adversarial coverage.
+**Verify:** `28 passed` across exact binding and catalyst-frame tests; the
+curated catalyst-frame eval passed 5/5 and the signal-quality eval passed 36/36;
+the full Event Alpha package passed 1,735 tests in 92.62 seconds; `make
+verify-fast PYTHON=python3` passed 1,980 tests in 109.70 seconds plus all alert
+render, fixture-backtest, and paper-scoreboard gates; `python3 -m compileall -q
+crypto_rsi_scanner tests`; exact generated Event North Star equality and
+Decision North Star JSON parsing; `git diff --check`; and `make
+architecture-cleanliness-check PYTHON=python3` passed with zero new size
+violations and no over-limit functions.
+**Notes/risks:** This v2 contract binds the exact stored analysis and validated
+source/output, while the complete pre-analysis packet and independently derived
+rule/event context do not yet have a separate digest. Existing artifact
+fingerprints still protect persisted bytes. No provider call, send, trade,
+paper trade, normal RSI write, execution action, pointer mutation, or Event
+Alpha-created `TRIGGERED_FADE` occurred.
+
 ## 2026-07-15 — Close catalyst source-authority spoofing · Codex
 **Why:** The source registry derived official/structured authority from article
 text and substring domains, so an unrelated article mentioning Binance or an

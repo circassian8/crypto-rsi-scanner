@@ -15,6 +15,7 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
 import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
@@ -558,9 +559,8 @@ def _frame_validation_metadata(raws: tuple[RawDiscoveredEvent, ...]) -> dict[str
     resolutions: list[str] = []
     disagreement = False
     for raw in raws:
-        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
-        validation = payload.get("llm_catalyst_frame_validation")
-        if not isinstance(validation, Mapping):
+        validation = event_catalyst_frame_binding.current_validation_for_raw(raw)
+        if validation is None:
             continue
         rule_path = str(validation.get("rule_predicted_impact_path") or "").strip()
         llm_path = str(validation.get("llm_predicted_main_frame_type") or "").strip()

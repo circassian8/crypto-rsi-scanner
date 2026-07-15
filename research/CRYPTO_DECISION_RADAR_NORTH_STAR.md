@@ -57,6 +57,23 @@ class appears in that pack's declared validator set. Historical bytes are not
 rewritten; current re-evaluation fails closed and records
 `source_authority_unverified`.
 
+LLM catalyst frames are proposals until deterministic validation binds them to
+exactly one matching raw source. Each accepted quote must be a normalized,
+informative contiguous span inside one eligible field—title, body, or
+quality-gated enriched text—and carries the raw/provider/URL/publication/fetch
+identity, source confidence, original content hash, canonical evidence-surface
+and enrichment-provenance hashes, source field, normalized offsets, and exact
+analysis and validation digests. Frames use closed keys, enums, primitive
+types, finite bounded confidence, and a recomputed canonical id; subjects and
+entities must occur in the bound source, while short ticker symbols additionally
+require a token boundary plus crypto context or an explicit dollar ticker.
+Event summaries, neighbouring raws, cross-field concatenation, and fuzzy term
+overlap cannot validate a quote. Application and rehydration fail closed on any
+binding drift, while missing, duplicate, or invalid analysis identity remains a
+fail-soft unresolved row rather than crashing the cycle. Historical unbound
+rows remain immutable audit bytes but are not current catalyst evidence, and
+the provider output schema remains unchanged.
+
 ## One Closed Decision Authority
 
 `decision_model_values(raw_row)` returns the canonical, schema-backed Decision
