@@ -27,6 +27,9 @@ from . import daily_operations_publication
 from . import market_no_send_audit, market_no_send_history_cache
 from . import market_no_send_publication
 from . import market_observation_campaign_cadence
+from . import market_observation_campaign_contract
+from . import market_observation_campaign_episodes
+from . import market_observation_campaign_snapshots
 from . import market_observation_outcomes
 from .market_no_send_models import SAFETY_COUNTERS
 from .market_no_send_attempt import ATTEMPT_LEDGER_FILENAME, LATEST_ATTEMPT_FILENAME
@@ -106,8 +109,38 @@ def build_campaign_report(
     ]
 
     counted_generations = [row for row in generations if row["campaign_counted"] is True]
-    outcomes = _campaign_outcomes(base, counted_generations)
+    episode_input_generations = [
+        *counted_generations,
+        *(
+            dict(value)
+            for row in excluded_generations
+            if isinstance(
+                value := row.get("_candidate_snapshot_episode_input"),
+                Mapping,
+            )
+        ),
+    ]
+    ledger_snapshot = market_observation_campaign_snapshots.campaign_outcome_ledger_snapshot(
+        base,
+        history_namespace=market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE,
+        filename=CAMPAIGN_OUTCOMES_FILENAME,
+    )
+    outcomes = _campaign_outcomes(
+        base,
+        counted_generations,
+        ledger_snapshot=ledger_snapshot,
+    )
     outcome_metrics = _outcome_metrics(outcomes)
+    episode_shadow, episode_input_audit = (
+        market_observation_campaign_episodes.build_campaign_anomaly_episode_shadow(
+            base,
+            episode_input_generations,
+            evaluated_at=evaluated,
+            outcome_ledger_rows=ledger_snapshot["rows"],
+            outcome_ledger_status=ledger_snapshot["status"],
+            outcome_ledger_sha256=ledger_snapshot["sha256"],
+        )
+    )
     baseline = _baseline_maturity(base, evaluated=evaluated)
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
     metrics["provider_failed_attempts"] = len(provider_failed)
@@ -136,56 +169,28 @@ def build_campaign_report(
         blocked=blocked,
         limitations=limitations,
     )
-    return {
-        "contract_version": 2,
-        "schema_id": CAMPAIGN_REPORT_SCHEMA,
-        "schema_version": CAMPAIGN_REPORT_SCHEMA,
-        "row_type": "decision_radar_live_observation_campaign_report",
-        "measurement_program": CAMPAIGN_PROGRAM,
-        "generated_at": evaluated.isoformat(),
-        "campaign_status": status,
-        "measurement_scope": {
-            "decision_radar_live_observation_campaign": "included",
-            "event_alpha_catalyst_burn_in": "separate_not_aggregated",
-            "historical_market_provenance_v2_adapter": "read_only",
-            "historical_rows_rewritten": False,
-        },
-        "campaign_metrics": metrics,
-        "baseline_maturity": baseline,
-        "authoritative_generations": authoritative,
-        "non_authoritative_complete_generations": non_authoritative,
-        "provider_failed_attempts": provider_failed,
-        "blocked_or_preflight_attempts": blocked,
-        "excluded_invalid_generations": excluded_generations,
-        "generation_validation": {
-            "valid_generation_count": len(generations),
-            "excluded_generation_count": len(excluded_generations),
-            "exclusion_reason_counts": dict(sorted(Counter(
-                reason
-                for row in excluded_generations
-                for reason in row.get("validation_errors", ())
-            ).items())),
-        },
-        "pointer": pointer_state,
-        "pointer_history": pointer_history,
-        "outcomes": outcome_metrics,
-        "data_quality_limitations": limitations,
-        "next_observation": next_observation,
-        "campaign_v2_conclusion": conclusion,
-        "safety": {
-            "research_only": True,
-            "no_trade_recommendation": True,
-            "provider_calls_made_by_report": 0,
-            "provider_authorization_modified": False,
-            "telegram_sends": 0,
-            "trades_created": 0,
-            "paper_trades_created": 0,
-            "normal_rsi_signal_rows_written": 0,
-            "triggered_fade_created": 0,
-            "automatic_threshold_changes": False,
-            "automatic_route_changes": False,
-        },
-    }
+    return market_observation_campaign_contract.build_report_value(
+        schema_id=CAMPAIGN_REPORT_SCHEMA,
+        measurement_program=CAMPAIGN_PROGRAM,
+        generated_at=evaluated.isoformat(),
+        status=status,
+        metrics=metrics,
+        baseline=baseline,
+        authoritative=authoritative,
+        non_authoritative=non_authoritative,
+        provider_failed=provider_failed,
+        blocked=blocked,
+        excluded=excluded_generations,
+        valid_generation_count=len(generations),
+        pointer=pointer_state,
+        pointer_history=pointer_history,
+        outcome_metrics=outcome_metrics,
+        episode_shadow=episode_shadow,
+        episode_input_audit=episode_input_audit,
+        limitations=limitations,
+        next_observation=next_observation,
+        conclusion=conclusion,
+    )
 
 
 def write_campaign_report(
@@ -202,6 +207,7 @@ def write_campaign_report(
         else _require_aware_utc(evaluated_at, field_name="evaluated_at")
     )
     report = build_campaign_report(artifact_base_dir, evaluated_at=evaluated)
+    _validate_shadow_campaign_contracts(report)
     destination = _validated_existing_directory(output_dir, label="campaign output")
     json_path = destination / CAMPAIGN_REPORT_JSON_FILENAME
     markdown_path = destination / CAMPAIGN_REPORT_MD_FILENAME
@@ -218,7 +224,28 @@ def write_campaign_report(
 def format_campaign_report(report: Mapping[str, Any]) -> str:
     """Render the canonical report as deterministic operator-facing Markdown."""
 
+    _validate_shadow_campaign_contracts(report)
     return _render_campaign_report(report)
+
+
+def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
+    from ..outcomes import anomaly_episode_shadow
+
+    value = _mapping(report.get("shadow_anomaly_episodes"))
+    errors = anomaly_episode_shadow.validate_contract(value)
+    if errors:
+        raise MarketNoSendError(
+            "shadow anomaly episode report contract invalid: " + ";".join(errors)
+        )
+    audit_errors = market_observation_campaign_episodes.validate_input_audit(
+        _mapping(report.get("shadow_anomaly_episode_input_audit")),
+        episode_value=value,
+    )
+    if audit_errors:
+        raise MarketNoSendError(
+            "shadow anomaly episode input audit invalid: "
+            + ";".join(audit_errors)
+        )
 
 
 def _load_generations(
@@ -270,15 +297,38 @@ def _load_generations(
                 "campaign_counting_reason": validation.counting_reason,
             })
             continue
-        generations.append(
-            _generation_row(
+        try:
+            generation = _generation_row(
                 namespace_dir,
                 manifest=manifest,
                 audit=audit,
                 validation=validation,
                 current_authority=current_authority,
             )
-        )
+        except (MarketNoSendError, OSError, TypeError, ValueError) as exc:
+            excluded.append({
+                "artifact_namespace": namespace,
+                "run_id": _text(
+                    manifest.get("run_id") or audit.get("exact_run_id")
+                ) or None,
+                "observed_at": _safe_timestamp(
+                    manifest.get("observed_at") or audit.get("generated_at")
+                ),
+                "validation_errors": [
+                    "candidate_snapshot:" + _validation_error_code(exc)
+                ],
+                "campaign_counting_source": validation.counting_source,
+                "campaign_counting_reason": validation.counting_reason,
+                "_candidate_snapshot_episode_input": {
+                    "artifact_namespace": namespace,
+                    "run_id": _text(
+                        manifest.get("run_id") or audit.get("exact_run_id")
+                    ) or None,
+                    "campaign_counted": validation.campaign_counted,
+                },
+            })
+            continue
+        generations.append(generation)
     generations.sort(key=_generation_sort_key)
     attempts.sort(key=_attempt_sort_key)
     excluded.sort(key=_generation_sort_key)
@@ -293,7 +343,13 @@ def _generation_row(
     validation: market_no_send_publication.CampaignGenerationValidation,
     current_authority: Mapping[str, Any],
 ) -> dict[str, Any]:
-    candidates = read_jsonl(namespace_dir / integrated_radar.INTEGRATED_CANDIDATES_FILENAME)
+    candidate_snapshot = market_observation_campaign_snapshots.capture_candidate_snapshot(
+        namespace_dir,
+        manifest=manifest,
+        validation=validation,
+        operator_state_filename=OPERATOR_STATE_FILENAME,
+    )
+    candidates = candidate_snapshot["rows"]
     outcomes = (
         read_jsonl(namespace_dir / integrated_radar.INTEGRATED_OUTCOMES_FILENAME)
         if validation.integrated_outcome_artifact_bound else []
@@ -365,6 +421,14 @@ def _generation_row(
             "request_ledger": REQUEST_LEDGER_FILENAME if request else None,
             "outcomes": integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
         },
+        "_candidate_snapshot_rows": tuple(dict(row) for row in candidates),
+        "_candidate_snapshot_artifact": candidate_snapshot["artifact"],
+        "_candidate_snapshot_sha256": candidate_snapshot["sha256"],
+        "_candidate_snapshot_size_bytes": candidate_snapshot["size_bytes"],
+        "_candidate_snapshot_binding_source": candidate_snapshot[
+            "binding_source"
+        ],
+        "_candidate_snapshot_verified": True,
     }
 
 
@@ -674,6 +738,8 @@ def _campaign_metrics(
 def _campaign_outcomes(
     base: Path,
     generations: Sequence[Mapping[str, Any]],
+    *,
+    ledger_snapshot: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     candidates_by_key: dict[tuple[str, str], dict[str, Any]] = {}
     pending_rows: list[dict[str, Any]] = []
@@ -681,11 +747,20 @@ def _campaign_outcomes(
         namespace = _text(generation.get("artifact_namespace"))
         if not namespace:
             continue
-        try:
-            namespace_dir = safe_existing_namespace_dir(base, namespace)
-        except MarketNoSendError:
-            continue
-        for source in read_jsonl(namespace_dir / integrated_radar.INTEGRATED_CANDIDATES_FILENAME):
+        sources = market_observation_campaign_snapshots.generation_candidate_rows(
+            generation
+        )
+        if sources is None:
+            # Compatibility for private callers passing pre-snapshot rows.  The
+            # canonical report builder never takes this branch.
+            try:
+                namespace_dir = safe_existing_namespace_dir(base, namespace)
+                sources = read_jsonl(
+                    namespace_dir / integrated_radar.INTEGRATED_CANDIDATES_FILENAME
+                )
+            except MarketNoSendError:
+                continue
+        for source in sources:
             candidate = dict(source)
             candidate_id = _text(candidate.get("candidate_id"))
             if not candidate_id:
@@ -697,16 +772,19 @@ def _campaign_outcomes(
                     namespace=namespace,
                 )
             )
-    campaign_path = (
-        base
-        / market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE
-        / CAMPAIGN_OUTCOMES_FILENAME
+    snapshot = (
+        market_observation_campaign_snapshots.campaign_outcome_ledger_snapshot(
+            base,
+            history_namespace=market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE,
+            filename=CAMPAIGN_OUTCOMES_FILENAME,
+        )
+        if ledger_snapshot is None
+        else dict(ledger_snapshot)
     )
+    ledger_sources = snapshot.get("rows")
+    if not isinstance(ledger_sources, (list, tuple)):
+        ledger_sources = ()
     campaign_rows: list[dict[str, Any]] = []
-    try:
-        ledger_sources = read_jsonl(campaign_path)
-    except MarketNoSendError:
-        ledger_sources = []
     for source in ledger_sources:
         row = dict(source)
         key = (
@@ -902,6 +980,31 @@ def _campaign_conclusion(
 ) -> dict[str, Any]:
     categories = [_text(_mapping(row).get("category")) for row in limitations]
     highest = _text(_mapping(limitations[0]).get("category")) if limitations else "none"
+    pointer_target = {
+        key: pointer.get(key)
+        for key in ("artifact_namespace", "run_id", "revision", "status")
+    } if pointer.get("artifact_namespace") else None
+    current_authority = (
+        {
+            key: pointer.get(key)
+            for key in (
+                "artifact_namespace",
+                "run_id",
+                "revision",
+                "exact_operator_binding",
+            )
+        }
+        if pointer.get("status") == "authoritative"
+        and pointer.get("exact_operator_binding") is True
+        else None
+    )
+    authority_summary = (
+        f"current authority is {_text(pointer.get('artifact_namespace'))}"
+        if current_authority is not None
+        else f"pointer target is {_text(pointer.get('artifact_namespace'))}, but no current authority is proven"
+        if pointer_target is not None
+        else "no pointer target or current authority is available"
+    )
     summary = (
         f"Decision Radar campaign v2 has {_int(metrics.get('real_cycles'))} counted real/no-send "
         f"cycles and {_int(metrics.get('real_candidates'))} canonical {'idea' if _int(metrics.get('real_candidates')) == 1 else 'ideas'}; "
@@ -910,8 +1013,7 @@ def _campaign_conclusion(
         f"There are {len(provider_failed)} provider failures and {len(blocked)} blocked/preflight "
         f"attempts. Baseline status is {_text(baseline.get('baseline_status')) or 'unknown'} with "
         f"{_int(baseline.get('baseline_warm_asset_count'))}/{_int(baseline.get('baseline_asset_count'))} "
-        f"warm assets. Pointer history contains {len(pointer_history)} bound {'generation' if len(pointer_history) == 1 else 'generations'} and current "
-        f"authority is {_text(pointer.get('artifact_namespace')) or 'none'}. Data-quality limitation "
+        f"warm assets. Pointer history contains {len(pointer_history)} bound {'generation' if len(pointer_history) == 1 else 'generations'} and {authority_summary}. Data-quality limitation "
         f"categories are {', '.join(categories) or 'none'}; highest-value missing input is {highest}."
     )
     return {
@@ -925,11 +1027,8 @@ def _campaign_conclusion(
             "warm_asset_count": _int(baseline.get("baseline_warm_asset_count")),
         },
         "pointer_history_count": len(pointer_history),
-        "current_authority": {
-            key: pointer.get(key) for key in (
-                "artifact_namespace", "run_id", "revision", "exact_operator_binding"
-            )
-        },
+        "current_authority": current_authority,
+        "pointer_target": pointer_target,
         "data_quality_limitation_categories": categories,
         "highest_value_missing_input_category": highest,
         "spread_provider_selection": "deferred_pending_operator_execution_venue",

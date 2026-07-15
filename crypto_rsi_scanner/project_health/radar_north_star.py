@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .radar_north_star_campaign import MARKET_NO_SEND_GENERATION, REVIEW_EXPORT_POLICY
-from .radar_north_star_shadow import SHADOW_TEMPORAL_SURPRISE_POLICY, append_shadow_temporal_surprise_north_star
+from .radar_north_star_shadow import SHADOW_ANOMALY_EPISODE_POLICY, SHADOW_TEMPORAL_SURPRISE_POLICY, append_shadow_policies_north_star
 
 REPORT_SCHEMA_VERSION = "event_alpha_radar_north_star_v1"
 REPORT_JSON = "EVENT_ALPHA_RADAR_NORTH_STAR.json"
@@ -609,6 +609,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
         "llm_catalyst_frame_binding_policy": deepcopy(LLM_CATALYST_FRAME_BINDING_POLICY),
         "shadow_temporal_surprise_policy": deepcopy(SHADOW_TEMPORAL_SURPRISE_POLICY),
+        "shadow_anomaly_episode_policy": deepcopy(SHADOW_ANOMALY_EPISODE_POLICY),
         "product_layers": deepcopy(PRODUCT_LAYERS),
         "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "market_no_send_generation": deepcopy(MARKET_NO_SEND_GENERATION),
@@ -1030,7 +1031,7 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
         )
     _append_source_authority_north_star(lines, payload)
     _append_catalyst_frame_binding_north_star(lines, payload)
-    append_shadow_temporal_surprise_north_star(lines, payload)
+    append_shadow_policies_north_star(lines, payload)
     layers = payload.get("product_layers") if isinstance(payload.get("product_layers"), Mapping) else {}
     lines.extend(["## Product Layering", ""])
     for key, value in layers.items():

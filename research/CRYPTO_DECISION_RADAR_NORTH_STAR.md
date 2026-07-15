@@ -501,6 +501,32 @@ Its explicit policy remains routing/priority/Decision-score ineligible,
 supports a separate reviewed decision. The detailed method and limitations are
 recorded in `research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
 
+Repeated campaign observations of one persistent market move are measured with
+the closed `event_alpha.shadow_anomaly_episodes` v1 contract. It partitions
+each exact canonical asset with a fixed-start, half-open 24-hour primary window
+and parallel 12/24/48-hour sensitivity views. The first observation is selected
+solely from exact identity and time, independently of outcome availability,
+maturity, route, score, or return; a repeat never extends the window and a later
+mature observation never replaces the representative. Membership binds exact namespace, run,
+candidate, canonical outcome, anomaly, asset, and UTC observation identity.
+Raw outcome multiplicity is inspected before the campaign compatibility
+deduplication view, so missing, invalid, duplicate, conflicting, and orphan
+outcome rows stay explicit. A row claimed by multiple candidates is one
+cross-candidate collision component, not one duplicate group per claimant.
+Each candidate artifact is captured once and
+verified against its manifest or legacy operator binding; one exact mutable
+outcome-ledger byte snapshot is reused by headline and episode calculations.
+The closed input audit distinguishes `missing`, `observed_empty`, `observed`,
+and `unavailable` ledgers and independently reports candidate, outcome, and
+overall input readiness. Observation and episode counts remain side by side,
+and neither is described as statistically or cross-asset independent. Complete
+references are retained within fixed 256-row member and exclusion bounds; a
+bound overflow fails closed without a contract. This
+measurement is research-only and cannot change routing, priority, Decision
+scores, calibration, thresholds, provider activity, publication, or authority;
+`auto_apply=false`. The detailed contract and research basis are in
+`research/ANOMALY_EPISODE_SHADOW.md`.
+
 A fixture or mocked smoke generation can prove mechanics but is permanently
 ineligible for Decision campaign counting or real dashboard authority. The fixed
 authoritative pointer changes only after a real, fresh, complete generation has

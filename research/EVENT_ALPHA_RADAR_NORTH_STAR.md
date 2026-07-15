@@ -153,6 +153,46 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - research_only: `True`
 - method_references: https://doi.org/10.1111/j.2517-6161.1964.tb00553.x, https://doi.org/10.1080/01621459.1993.10476408, https://doi.org/10.1086/341527
 
+## Shadow Anomaly Episodes
+
+- schema_id: `event_alpha.shadow_anomaly_episodes`
+- schema_version: `1`
+- input_audit_schema_id: `event_alpha.shadow_anomaly_episode_input_audit`
+- input_audit_schema_version: `1`
+- source_population: `validated_campaign_counted_market_anomaly_candidates`
+- candidate_snapshot: `one_read_verified_manifest_digest_reused_across_report`
+- outcome_ledger_snapshot: `one_read_exact_bytes_reused_across_report`
+- outcome_ledger_statuses: missing, observed_empty, observed, unavailable
+- input_statuses: empty, ready, partial, unavailable
+- canonical_asset_identity_required: `True`
+- symbol_fallback_allowed: `False`
+- method: `fixed_start_window_declustering`
+- primary_window_hours: `24`
+- sensitivity_window_hours: 12, 24, 48
+- boundary: `member_observed_at_lt_episode_start_plus_window`
+- repeat_extends_window: `False`
+- representative: `chronologically_first_exact_identity_outcome_join_independent`
+- later_matured_member_may_replace_representative: `False`
+- outcome_multiplicity: `inspect_raw_rows_before_lossy_campaign_deduplication`
+- outcome_claim_collisions: `distinct_connected_components_not_duplicate_rows`
+- input_audit_validation: `closed_keys_counts_closures_bindings_safety_and_digest`
+- membership_binding: `exact_namespace_run_candidate_outcome_anomaly_asset_time`
+- member_reference_limit: `256`
+- exclusion_reference_limit: `256`
+- references_complete_within_bound: `True`
+- bound_exceeded_policy: `fail_closed_without_contract`
+- routing_eligible: `False`
+- priority_eligible: `False`
+- decision_score_eligible: `False`
+- score_adjustment_eligible: `False`
+- calibration_eligible: `False`
+- threshold_change_eligible: `False`
+- statistical_independence_claim: `False`
+- cross_asset_independence_claim: `False`
+- auto_apply: `False`
+- research_only: `True`
+- method_references: https://doi.org/10.1111/1467-9868.00401, https://doi.org/10.1214/09-AOAS292, https://doi.org/10.1086/260910, https://doi.org/10.1080/01621459.1994.10476870
+
 ## Product Layering
 
 - catalyst_radar: `{'name': 'Event Alpha', 'owns': ['catalyst discovery', 'source-strength classification', 'strict catalyst routes', 'historical Event Alpha artifacts']}`

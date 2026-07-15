@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Measure repeated anomalies as closed fixed-window episodes · Codex
+**Why:** Hourly campaign observations reuse rolling 4-hour/24-hour market
+features and overlapping outcome horizons, so counting every repeated detection
+as independent evidence would overstate sample size. The campaign also needed
+one exact input snapshot and a closed audit before episode results could be
+trusted as measurement evidence.
+**Changes:**
+- Added the closed `event_alpha.shadow_anomaly_episodes` v1 research contract.
+  It partitions exact canonical assets into fixed-start, half-open 24-hour
+  episodes with 12/24/48-hour sensitivity views, freezes the chronologically
+  first representative independently of outcomes, forbids symbol fallback and
+  sliding/chained windows, and preserves complete member/exclusion evidence
+  within fixed fail-closed bounds.
+- Added semantic validation that recomputes identities, partitions, sensitivity
+  counts, status counts, exclusions, and digests; rejects malformed/future/
+  overflowing clocks, noncanonical UTC spellings, identity collisions, invalid
+  primary returns, and impossible or truncated contracts; and keeps every routing, scoring,
+  calibration, threshold, publication, and automatic-application flag false.
+- Captured each counted generation's candidate artifact exactly once, verified
+  it against its manifest or legacy operator binding, and reused that snapshot
+  across campaign outcomes and episodes. Captured the mutable outcome ledger
+  once as exact bytes with distinct `missing`, `observed_empty`, `observed`, and
+  `unavailable` states.
+- Added a closed `event_alpha.shadow_anomaly_episode_input_audit` v1 binding all
+  candidate snapshots, ledger bytes, raw multiplicity, joins, rejection and
+  count closures, episode digests, and zero-side-effect constants. Reports now
+  distinguish candidate, outcome, overall-input, and structural readiness and
+  no longer call a stale pointer target current authority. Post-validation
+  snapshot failures remain explicit audit rejections; legacy bindings recheck
+  complete operator identity; and cross-candidate outcome-row collisions remain
+  distinct from duplicate identities instead of being multiplied per claimant.
+- Regenerated the exact real campaign report and North Star/architecture
+  artifacts, and documented the method, research basis, limitations, promotion
+  evidence, and durable shadow-only policy.
+**Verify:** 52 focused episode/campaign tests passed; the full Event Alpha suite
+passed 1,842 tests in 94.67 seconds; `make verify-fast PYTHON=python3` passed
+2,087 tests in 111.03 seconds plus alert rendering, fixture backtest, and paper
+scoreboard gates; `python3 -m compileall -q crypto_rsi_scanner tests`; `make
+architecture-cleanliness-check PYTHON=python3` with zero new size violations
+and no over-limit functions; `make radar-market-campaign-report PYTHON=python3`
+with seven exact candidate snapshots, two eligible observations, one episode,
+one repeat, and zero provider calls; and `git diff --check`.
+**Notes/risks:** This is descriptive shadow measurement only and makes no iid or
+cross-asset-independence claim. It did not call a provider, send a notification,
+create a trade or paper trade, write normal RSI state, create
+`TRIGGERED_FADE`, change routes/scores/thresholds, or mutate dashboard authority.
+The next measurement slice is a Decision-v2 episode outcome scorecard with
+primary-horizon censoring and canonical cohorts.
+
 ## 2026-07-15 — Add fail-closed robust temporal-surprise shadow · Codex
 **Why:** The canonical temporal volume and turnover features use arithmetic
 mean and standard deviation, which can be distorted by skew and isolated crypto

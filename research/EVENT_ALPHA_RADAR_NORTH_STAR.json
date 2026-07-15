@@ -982,6 +982,64 @@
     "triggered_fade_source_boundary": "event_fade.py + proxy_fade only"
   },
   "schema_version": "event_alpha_radar_north_star_v1",
+  "shadow_anomaly_episode_policy": {
+    "auto_apply": false,
+    "bound_exceeded_policy": "fail_closed_without_contract",
+    "boundary": "member_observed_at_lt_episode_start_plus_window",
+    "calibration_eligible": false,
+    "candidate_snapshot": "one_read_verified_manifest_digest_reused_across_report",
+    "canonical_asset_identity_required": true,
+    "cross_asset_independence_claim": false,
+    "decision_score_eligible": false,
+    "exclusion_reference_limit": 256,
+    "input_audit_schema_id": "event_alpha.shadow_anomaly_episode_input_audit",
+    "input_audit_schema_version": 1,
+    "input_audit_validation": "closed_keys_counts_closures_bindings_safety_and_digest",
+    "input_statuses": [
+      "empty",
+      "ready",
+      "partial",
+      "unavailable"
+    ],
+    "later_matured_member_may_replace_representative": false,
+    "member_reference_limit": 256,
+    "membership_binding": "exact_namespace_run_candidate_outcome_anomaly_asset_time",
+    "method": "fixed_start_window_declustering",
+    "method_references": [
+      "https://doi.org/10.1111/1467-9868.00401",
+      "https://doi.org/10.1214/09-AOAS292",
+      "https://doi.org/10.1086/260910",
+      "https://doi.org/10.1080/01621459.1994.10476870"
+    ],
+    "outcome_claim_collisions": "distinct_connected_components_not_duplicate_rows",
+    "outcome_ledger_snapshot": "one_read_exact_bytes_reused_across_report",
+    "outcome_ledger_statuses": [
+      "missing",
+      "observed_empty",
+      "observed",
+      "unavailable"
+    ],
+    "outcome_multiplicity": "inspect_raw_rows_before_lossy_campaign_deduplication",
+    "primary_window_hours": 24,
+    "priority_eligible": false,
+    "references_complete_within_bound": true,
+    "repeat_extends_window": false,
+    "representative": "chronologically_first_exact_identity_outcome_join_independent",
+    "research_only": true,
+    "routing_eligible": false,
+    "schema_id": "event_alpha.shadow_anomaly_episodes",
+    "schema_version": 1,
+    "score_adjustment_eligible": false,
+    "sensitivity_window_hours": [
+      12,
+      24,
+      48
+    ],
+    "source_population": "validated_campaign_counted_market_anomaly_candidates",
+    "statistical_independence_claim": false,
+    "symbol_fallback_allowed": false,
+    "threshold_change_eligible": false
+  },
   "shadow_temporal_surprise_policy": {
     "attachment": "top_level_post_scan_snapshot_and_anomaly_metadata_only",
     "auto_apply": false,
@@ -991,9 +1049,9 @@
     "current_observation_in_own_baseline": false,
     "decision_score_eligible": false,
     "degenerate_mad_policy": "mad_le_1e-12_returns_null_without_epsilon_or_std_fallback",
+    "derived_ratio_validation": "volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12",
     "descriptive_tail_is_p_value": false,
     "descriptive_upper_tail": "(count_baseline_log_ge_current_log+1)/(n+1)",
-    "derived_ratio_validation": "volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12",
     "eligible_feature_basis": [
       "provider_observed",
       "derived_provider_ratio"

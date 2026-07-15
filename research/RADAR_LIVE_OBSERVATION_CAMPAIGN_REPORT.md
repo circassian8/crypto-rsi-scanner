@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-15T04:22:51.647284+00:00` from local artifacts only.
+Generated at `2026-07-15T08:48:00.011843+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -29,7 +29,8 @@ Research and decision support only. This report contains no trade recommendation
 ## Authority and pointer
 
 - Pointer status: `invalid_or_untrusted`
-- Current namespace: `radar_market_no_send_20260714t221551304500z_fcd6de29c447`
+- Current authority namespace: `none`
+- Pointer target namespace: `radar_market_no_send_20260714t221551304500z_fcd6de29c447`
 - Exact run: `2026-07-14T22:15:51.367228+00:00|no_key_live`
 - Revision: `12`
 - Exact operator binding: `false`
@@ -85,6 +86,35 @@ Research and decision support only. This report contains no trade recommendation
 - Refresh/build errors: `0`
 - Human labels remain optional preference feedback; no thresholds or routes change automatically.
 
+## Anomaly episodes (shadow)
+
+Repeated observations are grouped into fixed-start descriptive episodes; they are not claimed to be statistically independent.
+- Input status: `partial`
+- Candidate input status: `ready`
+- Outcome input status: `partial`
+- Structural membership status: `ready`
+- Outcome ledger status: `observed`
+- Candidate snapshots: `7`/`7` generations
+- Eligible anomaly observations: `2`
+- Excluded observations: `0`
+- Primary 24h episodes: `1`
+- Primary repeats: `1`
+- Candidate rows outside market-anomaly scope: `0`
+- Missing outcome joins: `0`
+- Ambiguous outcome joins: `0`
+- Invalid outcome rows: `0`
+- Duplicate outcome identities: groups=`0`, rows=`0`
+- Cross-candidate outcome collisions: groups=`0`, candidates=`0`, rows=`0`
+- Orphan outcome rows: `0`
+- Outcome evidence statuses: `available=1, unavailable=1`
+- Generation rejections: `0` (`none`)
+- Candidate-row rejections: `0` (`none`)
+- `12h` sensitivity: episodes=`1`, repeats=`1`
+- `24h` sensitivity: episodes=`1`, repeats=`1`
+- `48h` sensitivity: episodes=`1`, repeats=`1`
+- The first observation is frozen as representative before outcome maturity is inspected.
+- Shadow only: no route, score, threshold, provider, publication, or authority change.
+
 ## Failed and blocked attempts
 
 - No provider failures recorded.
@@ -112,7 +142,7 @@ Research and decision support only. This report contains no trade recommendation
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 7 counted real/no-send cycles and 2 canonical ideas; 1 outcome is pending and 1 are matured. There are 0 provider failures and 1 blocked/preflight attempts. Baseline status is warming with 0/33 warm assets. Pointer history contains 5 bound generations and current authority is radar_market_no_send_20260714t221551304500z_fcd6de29c447. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 7 counted real/no-send cycles and 2 canonical ideas; 1 outcome is pending and 1 are matured. There are 0 provider failures and 1 blocked/preflight attempts. Baseline status is warming with 0/33 warm assets. Pointer history contains 5 bound generations and pointer target is radar_market_no_send_20260714t221551304500z_fcd6de29c447, but no current authority is proven. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Spread-provider selection remains deferred until the operator identifies the intended execution venue.
 No trade is recommended. No automatic threshold or route change is authorized.

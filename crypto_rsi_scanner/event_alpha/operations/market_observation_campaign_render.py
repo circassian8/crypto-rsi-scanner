@@ -7,7 +7,6 @@ from typing import Any, Mapping
 
 def format_campaign_report(report: Mapping[str, Any]) -> str:
     """Render the canonical report as deterministic operator-facing Markdown."""
-
     metrics = _mapping(report.get("campaign_metrics"))
     outcomes = _mapping(report.get("outcomes"))
     baseline = _mapping(report.get("baseline_maturity"))
@@ -15,6 +14,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
     next_observation = _mapping(report.get("next_observation"))
     limitations = list(report.get("data_quality_limitations") or ())
     conclusion = _mapping(report.get("campaign_v2_conclusion"))
+    authority_proven = _authority_proven(pointer)
     lines = [
         "# Decision Radar live observation campaign v2",
         "",
@@ -44,16 +44,14 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
     ]
     route_counts = _mapping(metrics.get("route_counts"))
-    lines.extend(
-        [f"- `{route}`: `{_int(count)}`" for route, count in sorted(route_counts.items())]
-        or ["- No real Decision candidates yet."]
-    )
+    lines.extend(_route_lines(route_counts))
     lines.extend([
         "",
         "## Authority and pointer",
         "",
         f"- Pointer status: `{_text(pointer.get('status'))}`",
-        f"- Current namespace: `{_text(pointer.get('artifact_namespace')) or 'none'}`",
+        f"- Current authority namespace: `{_text(pointer.get('artifact_namespace')) if authority_proven else 'none'}`",
+        f"- Pointer target namespace: `{_text(pointer.get('artifact_namespace')) or 'none'}`",
         f"- Exact run: `{_text(pointer.get('run_id')) or 'none'}`",
         f"- Revision: `{_text(pointer.get('revision')) or 'none'}`",
         f"- Exact operator binding: `{str(pointer.get('exact_operator_binding') is True).lower()}`",
@@ -97,6 +95,10 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         f"- Source: `{_text(outcomes.get('source'))}`",
         f"- Refresh/build errors: `{_int(outcomes.get('refresh_build_error_count'))}`",
         "- Human labels remain optional preference feedback; no thresholds or routes change automatically.",
+        "",
+        "## Anomaly episodes (shadow)",
+        "",
+        *_episode_shadow_lines_from_report(report),
         "",
         "## Failed and blocked attempts",
         "",
@@ -153,6 +155,86 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
     ])
     return "\n".join(lines)
+
+
+def _authority_proven(pointer: Mapping[str, Any]) -> bool:
+    return bool(
+        pointer.get("status") == "authoritative"
+        and pointer.get("exact_operator_binding") is True
+    )
+
+
+def _route_lines(route_counts: Mapping[str, Any]) -> list[str]:
+    lines = [
+        f"- `{route}`: `{_int(count)}`"
+        for route, count in sorted(route_counts.items())
+    ]
+    return lines or ["- No real Decision candidates yet."]
+
+
+def _episode_shadow_lines_from_report(report: Mapping[str, Any]) -> list[str]:
+    return _episode_shadow_lines(
+        _mapping(report.get("shadow_anomaly_episodes")),
+        _mapping(report.get("shadow_anomaly_episode_input_audit")),
+    )
+
+
+def _episode_shadow_lines(
+    value: Mapping[str, Any],
+    audit: Mapping[str, Any],
+) -> list[str]:
+    sensitivity = _mapping(value.get("sensitivity_counts"))
+    outcome_counts = _mapping(audit.get("outcome_evidence_status_counts"))
+    candidate_rejections = _mapping(
+        audit.get("candidate_row_rejection_reason_counts")
+    )
+    generation_rejections = _mapping(
+        audit.get("generation_rejection_reason_counts")
+    )
+    lines = [
+        "Repeated observations are grouped into fixed-start descriptive episodes; "
+        "they are not claimed to be statistically independent.",
+        f"- Input status: `{_text(audit.get('status'))}`",
+        f"- Candidate input status: `{_text(audit.get('candidate_input_status'))}`",
+        f"- Outcome input status: `{_text(audit.get('outcome_input_status'))}`",
+        f"- Structural membership status: `{_text(value.get('status'))}`",
+        f"- Outcome ledger status: `{_text(audit.get('outcome_ledger_status'))}`",
+        f"- Candidate snapshots: `{_int(audit.get('candidate_snapshot_generation_count'))}`/"
+        f"`{_int(audit.get('counted_generation_count'))}` generations",
+        f"- Eligible anomaly observations: `{_int(value.get('records_eligible'))}`",
+        f"- Excluded observations: `{_int(value.get('records_excluded'))}`",
+        f"- Primary 24h episodes: `{_int(value.get('primary_episode_count'))}`",
+        f"- Primary repeats: `{_int(value.get('primary_repeat_member_count'))}`",
+        f"- Candidate rows outside market-anomaly scope: "
+        f"`{_int(audit.get('out_of_scope_candidate_count'))}`",
+        f"- Missing outcome joins: `{_int(audit.get('missing_outcome_join_count'))}`",
+        f"- Ambiguous outcome joins: `{_int(audit.get('ambiguous_outcome_join_count'))}`",
+        f"- Invalid outcome rows: `{_int(audit.get('invalid_outcome_row_count'))}`",
+        f"- Duplicate outcome identities: "
+        f"groups=`{_int(audit.get('duplicate_outcome_identity_group_count'))}`, "
+        f"rows=`{_int(audit.get('duplicate_outcome_row_count'))}`",
+        f"- Cross-candidate outcome collisions: "
+        f"groups=`{_int(audit.get('cross_candidate_outcome_collision_group_count'))}`, "
+        f"candidates=`{_int(audit.get('cross_candidate_outcome_collision_candidate_count'))}`, "
+        f"rows=`{_int(audit.get('cross_candidate_outcome_collision_row_count'))}`",
+        f"- Orphan outcome rows: `{_int(audit.get('orphan_outcome_row_count'))}`",
+        f"- Outcome evidence statuses: `{_counts(outcome_counts)}`",
+        f"- Generation rejections: `{_int(audit.get('generation_rejection_count'))}` "
+        f"(`{_counts(generation_rejections)}`)",
+        f"- Candidate-row rejections: `{_int(audit.get('candidate_row_rejection_count'))}` "
+        f"(`{_counts(candidate_rejections)}`)",
+    ]
+    for label in ("12h", "24h", "48h"):
+        row = _mapping(sensitivity.get(label))
+        lines.append(
+            f"- `{label}` sensitivity: episodes=`{_int(row.get('episode_count'))}`, "
+            f"repeats=`{_int(row.get('repeat_member_count'))}`"
+        )
+    lines.extend([
+        "- The first observation is frozen as representative before outcome maturity is inspected.",
+        "- Shadow only: no route, score, threshold, provider, publication, or authority change.",
+    ])
+    return lines
 
 
 def _feature_maturity_lines(value: Any) -> list[str]:
@@ -234,6 +316,12 @@ def _int(value: Any) -> int:
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def _counts(value: Mapping[str, Any]) -> str:
+    return ", ".join(
+        f"{key}={_int(count)}" for key, count in sorted(value.items())
+    ) or "none"
 
 
 def _md(value: Any) -> str:

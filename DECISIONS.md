@@ -16,6 +16,40 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Measure repeated anomalies as fixed-start shadow episodes
+**Status:** accepted
+**Decision:** Partition validated market-anomaly candidates from campaign-counted
+real/no-send generations by exact canonical asset into fixed-start, half-open
+episodes. The primary window is 24 hours, with 12/24/48-hour sensitivity views
+computed from the same member population. The first exact observation is
+selected solely from identity and time, independently of outcome availability,
+maturity, route, score, or return; repeats never slide the boundary and later
+mature rows never replace it. Membership binds namespace, run, candidate,
+canonical outcome, market-anomaly, asset, and UTC observation identity. Inspect
+raw campaign-outcome multiplicity before the compatibility deduplication view,
+and keep missing, invalid, duplicate, conflicting, colliding, and orphan rows
+explicit. One row claimed by several candidates is one cross-candidate
+collision component, never one duplicate group per claimant. Episode counts are
+descriptive: they do not claim statistical or cross-asset independence and are
+ineligible for routing, priority, Decision scoring, calibration, threshold
+changes, publication authority, or automatic application. All member and
+exclusion references remain complete within fixed 256-row bounds; exceeding
+either bound fails closed without a contract.
+The campaign captures each manifest-bound candidate artifact and the mutable
+outcome ledger once, reuses those exact snapshots across headline and episode
+surfaces, and persists a closed input audit with count closures, snapshot and
+episode digests, explicit ledger/input statuses, and zero-side-effect constants.
+**Why:** Successive campaign cycles can observe one persistent move through
+overlapping rolling features and outcome horizons. Counting every observation
+as an independent result would inflate the apparent evidence base, while
+outcome-aware representative selection would introduce survivorship bias.
+Fixed-start episodes make dependence visible without changing runtime behavior.
+**Revisit when:** A sufficiently large set of matured primary-horizon episode
+outcomes and matched non-idea controls supports predeclared cohort analysis,
+dependent-data uncertainty estimates, and out-of-sample comparison. Any runtime
+promotion requires a separate versioned decision with frozen thresholds and
+rollback criteria.
+
 ## 2026-07-15 - Keep robust temporal surprise shadow-only until measured
 **Status:** accepted
 **Decision:** Compare provider-observed 24-hour volume and provider-observed or
