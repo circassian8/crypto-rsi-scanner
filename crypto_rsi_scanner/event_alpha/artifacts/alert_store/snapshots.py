@@ -59,6 +59,19 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "asset_role": candidate.classification.asset_role,
         "source": candidate.event.source,
         "source_count": len(candidate.event.raw_ids),
+        "source_update_count": len(candidate.event.raw_ids),
+        "independent_source_count": int(alert.score_components.get("independent_source_count") or 0),
+        "independent_corroboration_count": int(alert.score_components.get("independent_corroboration_count") or 0),
+        "source_content_cluster_count": int(alert.score_components.get("source_content_cluster_count") or 0),
+        # The closed contract already lives in score_components. Keep only the
+        # bounded operator aliases here so one large contract is not serialized
+        # twice into every direct snapshot row.
+        "source_independence_status": str(
+            alert.score_components.get("source_independence_status") or "unassessed"
+        ),
+        "source_independence_errors": list(
+            alert.score_components.get("source_independence_errors") or ()
+        )[:16],
         "tier": alert.tier.value,
         "requested_tier_before_quality_gate": alert.tier.value,
         "requested_state_before_quality_gate": None,

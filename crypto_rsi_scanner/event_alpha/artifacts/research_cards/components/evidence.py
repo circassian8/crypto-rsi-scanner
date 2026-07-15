@@ -725,7 +725,11 @@ def _cluster_lines(cluster: event_graph.EventCluster | None) -> list[str]:
     lines = [
         f"- Cluster ID: {cluster.cluster_id}",
         f"- Cluster confidence: {cluster.cluster_confidence}",
-        f"- Independent sources: {cluster.independent_source_count}",
+        f"- Raw source updates: {cluster.source_count}",
+        f"- Distinct source origins: {cluster.source_domain_count}",
+        f"- Independent evidence units: {cluster.independent_source_count}",
+        f"- Additional independent corroborations: {cluster.independent_corroboration_count}",
+        f"- Distinct content clusters: {cluster.source_content_cluster_count}",
         f"- Event-time consensus: {cluster.event_time_consensus}",
         f"- Source providers: {', '.join(providers) if providers else 'unknown'}",
         f"- Source origins: {', '.join(origins) if origins else 'unknown'}",

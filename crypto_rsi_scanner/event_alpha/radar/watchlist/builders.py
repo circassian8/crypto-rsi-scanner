@@ -13,7 +13,30 @@ from .... import event_fade
 import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+from crypto_rsi_scanner.event_alpha.radar.source_independence import validated_source_independence_container
 from .models import *  # noqa: F403 - split modules share historical model names
+
+
+def _validated_corroboration_count(value: object) -> int | None:
+    if isinstance(value, Mapping):
+        container = value
+    else:
+        container = {
+            key: getattr(value, key, None)
+            for key in (
+                "source_independence",
+                "source_independence_status",
+                "source_independence_errors",
+                "independent_source_count",
+                "independent_corroboration_count",
+                "source_content_cluster_count",
+            )
+        }
+    contract = validated_source_independence_container(container)
+    if not contract:
+        return None
+    raw = contract.get("independent_corroboration_count")
+    return int(raw) if isinstance(raw, int) and not isinstance(raw, bool) and raw >= 0 else None
 
 
 def refresh_watchlist(
@@ -201,9 +224,9 @@ def _hypothesis_material_change_reasons(
     previous_level = str(components.get("opportunity_level") or "")
     if level in {"validated_digest", "watchlist", "high_priority"} and level != previous_level:
         reasons.append("opportunity_score_upgraded")
-    current_sources = _item_count(getattr(hypothesis, "independent_source_domains", None)) or _item_count(getattr(hypothesis, "source_raw_ids", None))
-    previous_sources = _item_count(components.get("independent_source_domains")) or _item_count(components.get("source_raw_ids"))
-    if current_sources > previous_sources:
+    current_sources = _validated_corroboration_count(hypothesis)
+    previous_sources = _validated_corroboration_count(components)
+    if current_sources is not None and previous_sources is not None and current_sources > previous_sources:
         reasons.append("independent_source_confirmation")
         reasons.append("incident_new_independent_source")
     current_cause = _optional_str(getattr(hypothesis, "cause_status", None)) or ""
@@ -404,9 +427,9 @@ def _material_change_reasons(
     score_jump = _score_jump(alert, prior)
     if score_jump >= 10:
         reasons.append("score_jump")
-    current_sources = int(alert.score_components.get("independent_source_count") or len(alert.discovery_candidate.event.raw_ids))
-    previous_sources = int(prior.latest_score_components.get("independent_source_count") or prior.source_count or 0)
-    if current_sources > previous_sources:
+    current_sources = _validated_corroboration_count(alert.score_components)
+    previous_sources = _validated_corroboration_count(prior.latest_score_components)
+    if current_sources is not None and previous_sources is not None and current_sources > previous_sources:
         reasons.append("new_independent_source")
     current_time = int(alert.score_components.get("event_time_consensus") or alert.score_components.get("event_time_quality") or 0)
     previous_time = int(

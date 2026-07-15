@@ -223,7 +223,8 @@ def _impact_hypothesis_frame_lines(
         f"- Incident confidence: {components.get('incident_confidence') if components.get('incident_confidence') is not None else 'n/a'}",
         f"- Claim polarity: {', '.join(str(item) for item in (components.get('claim_polarities') or [])[:6]) if components.get('claim_polarities') else 'unknown'}",
         f"- Claim history: {_claim_history_summary(components.get('claim_history') or [])}",
-        f"- Independent source domains: {', '.join(str(item) for item in (components.get('independent_source_domains') or components.get('source_domains') or [])[:6]) if (components.get('independent_source_domains') or components.get('source_domains')) else 'none'}",
+        f"- Independent source domains: {', '.join(str(item) for item in (components.get('independent_source_domains') or [])[:6]) if components.get('independent_source_domains') else 'none or legacy-unassessed'}",
+        f"- Observed source domains: {', '.join(str(item) for item in (components.get('source_domains') or [])[:6]) if components.get('source_domains') else 'none'}",
         f"- Conflicting claims: {'; '.join(str(item) for item in (components.get('conflicting_claims') or [])[:4]) if components.get('conflicting_claims') else 'none'}",
     ]
 

@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import crypto_rsi_scanner.event_alpha.radar.catalyst_frames as event_catalyst_frames
 import crypto_rsi_scanner.event_alpha.radar.catalyst_frame_binding as event_catalyst_frame_binding
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
 from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
 
@@ -172,7 +173,13 @@ class CanonicalIncident:
     raw_ids: tuple[str, ...]
     event_ids: tuple[str, ...]
     source_urls: tuple[str, ...]
+    source_domains: tuple[str, ...]
     independent_source_domains: tuple[str, ...]
+    independent_source_count: int = 0
+    independent_corroboration_count: int = 0
+    source_content_cluster_count: int = 0
+    source_independence: Mapping[str, Any] = field(default_factory=dict)
+    source_independence_errors: tuple[str, ...] = ()
     claim_history: tuple[event_claim_semantics.EventClaim, ...] = ()
     current_cause_status: str = event_claim_semantics.CauseStatus.UNKNOWN.value
     conflicting_claims: tuple[str, ...] = ()
@@ -478,7 +485,28 @@ def _incident_from_group(
         }
         else event_archetype(first_event, raws, claims=claims)
     )
-    domains = _independent_domains(raws)
+    expected_raw_ids = {
+        raw_id for event in events for raw_id in event.raw_ids
+    }
+    source_independence, source_independence_errors = event_source_independence.assess_source_independence_safe(
+        [_source_independence_row(raw) for raw in raws],
+        expected_document_count=len(expected_raw_ids),
+    )
+    domains = tuple(str(value) for value in source_independence.get("distinct_origins", ()) if str(value or ""))
+    documents = {
+        str(row.get("document_id") or ""): row
+        for row in source_independence.get("documents", ())
+        if isinstance(row, Mapping)
+    }
+    independent_domains = tuple(dict.fromkeys(
+        str(documents[str(document_id)].get("canonical_origin") or "")
+        for document_id in source_independence.get("independent_representative_ids", ())
+        if str(document_id) in documents
+        and str(documents[str(document_id)].get("canonical_origin") or "")
+    ))
+    corroboration_count = int(source_independence.get("independent_corroboration_count") or 0)
+    independent_source_count = int(source_independence.get("independent_evidence_count") or 0)
+    content_cluster_count = int(source_independence.get("content_cluster_count") or 0)
     urls = tuple(sorted({raw.source_url for raw in raws if raw.source_url}))
     status = (
         str(main_frame.cause_status)
@@ -489,6 +517,7 @@ def _incident_from_group(
     name = _canonical_name(primary_subject, archetype, ecosystem, event=first_event, raws=raws)
     linked_assets = _incident_linked_assets(first_event, raws, archetype)
     warnings = _incident_warnings_for_group(first_event, raws, archetype, primary_subject)
+    warnings = tuple(dict.fromkeys((*warnings, *source_independence_errors)))
     if subject_quality != "valid":
         warnings = tuple(dict.fromkeys((*warnings, f"incident_primary_subject_{subject_quality}")))
     if validation.warnings:
@@ -524,7 +553,13 @@ def _incident_from_group(
         raw_ids=tuple(sorted({raw.raw_id for raw in raws})),
         event_ids=tuple(sorted({event.event_id for event in events})),
         source_urls=urls,
-        independent_source_domains=domains,
+        source_domains=domains,
+        independent_source_domains=independent_domains,
+        independent_source_count=independent_source_count,
+        independent_corroboration_count=corroboration_count,
+        source_content_cluster_count=content_cluster_count,
+        source_independence=source_independence,
+        source_independence_errors=source_independence_errors,
         claim_history=claims,
         current_cause_status=status,
         conflicting_claims=conflicts,
@@ -551,6 +586,21 @@ def _incident_from_group(
         diagnostic_only=diagnostic_only,
         warnings=warnings,
     )
+
+
+def _source_independence_row(raw: RawDiscoveredEvent) -> dict[str, Any]:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    provenance = payload.get("provenance") if isinstance(payload.get("provenance"), Mapping) else {}
+    return {
+        "source_id": raw.raw_id,
+        "source_url": raw.source_url,
+        "title": raw.title,
+        "body": raw.body,
+        "provider": raw.provider,
+        "source_class": payload.get("source_class") or provenance.get("source_class"),
+        "published_at": raw.published_at,
+        "fetched_at": raw.fetched_at,
+    }
 
 
 def _frame_validation_metadata(raws: tuple[RawDiscoveredEvent, ...]) -> dict[str, Any]:

@@ -1178,7 +1178,8 @@ def _incident_lines(
         f"- claim history: {_claim_history_value(claim_history)}",
         f"- conflicting claims: {_list_value(source.get('conflicting_claims') or components.get('conflicting_claims'))}",
         f"- source updates: {source.get('source_update_count') or len(source.get('source_raw_ids') or []) or 'unknown'} "
-        f"(independent={source.get('independent_source_count') or len(source.get('independent_source_domains') or []) or 'unknown'})",
+        f"(independent={source.get('independent_source_count') if type(source.get('independent_source_count')) is int else 'legacy-unassessed'}; "
+        f"corroborations={source.get('independent_corroboration_count') if type(source.get('independent_corroboration_count')) is int else 'legacy-unassessed'})",
         f"- market reaction vs causal mechanism: observed={str(bool(reaction_observed)).lower()} "
         f"confirmed={str(bool(reaction_confirmed)).lower()} "
         f"causal={str(bool(causal)).lower()} "

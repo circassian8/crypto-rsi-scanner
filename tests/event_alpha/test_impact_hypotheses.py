@@ -12,6 +12,73 @@ globals().update({
 })
 
 
+def test_hypothesis_family_and_watchlist_preserve_source_independence_state():
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as hypotheses
+    from crypto_rsi_scanner.event_alpha.radar.impact_hypotheses import family
+    from crypto_rsi_scanner.event_alpha.radar import source_independence
+    from crypto_rsi_scanner.event_alpha.radar.watchlist import entries
+
+    def contract(source_id: str, origin: str, word: str):
+        return source_independence.assess_source_independence(
+            [
+                {
+                    "source_id": source_id,
+                    "source_url": f"https://{origin}/story",
+                    "published_at": "2026-07-15T12:00:00Z",
+                    "title": f"{word} catalyst report",
+                    "body": " ".join(f"{word}{index}" for index in range(24)),
+                }
+            ]
+        )
+
+    def hypothesis(hypothesis_id: str, value):
+        return hypotheses.EventImpactHypothesis(
+            hypothesis_id=hypothesis_id,
+            event_cluster_id="cluster:source-independence",
+            incident_id="incident:source-independence",
+            event_type="protocol_upgrade",
+            external_asset="Protocol",
+            impact_category="infrastructure_upgrade",
+            candidate_sectors=("infrastructure",),
+            candidate_symbols=("SRC",),
+            confidence=0.8,
+            source_independence=value,
+            source_independence_status="assessed",
+            independent_source_count=1,
+            independent_corroboration_count=0,
+            source_content_cluster_count=1,
+        )
+
+    merged = family._merge_duplicate_hypotheses(  # noqa: SLF001
+        hypothesis("hyp:a", contract("a", "a.example", "alpha")),
+        hypothesis("hyp:b", contract("b", "b.example", "bravo")),
+    )
+
+    assert merged.source_independence_status == "assessed"
+    assert merged.independent_source_count == 2
+    assert merged.independent_corroboration_count == 1
+    assert merged.score_components["source_independence_status"] == "assessed"
+
+    rejected = hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:rejected",
+        event_cluster_id="cluster:source-independence",
+        event_type="protocol_upgrade",
+        external_asset="Protocol",
+        impact_category="infrastructure_upgrade",
+        candidate_sectors=("infrastructure",),
+        candidate_symbols=("SRC",),
+        source_independence_status="rejected",
+        source_independence_errors=("source_independence_source_context_incomplete",),
+    )
+    components = entries._hypothesis_source_independence_fields(rejected)  # noqa: SLF001
+
+    assert components["source_independence_status"] == "rejected"
+    assert components["source_independence"] == {}
+    assert components["source_independence_errors"] == [
+        "source_independence_source_context_incomplete"
+    ]
+
+
 def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import config

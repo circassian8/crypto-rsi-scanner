@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .runtime import *
 from ....radar.decision_model_surfaces import decision_model_values
+from ....radar import source_independence as event_source_independence
 
 def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
     components = _card_components(entry, alert)
@@ -28,10 +29,45 @@ def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
     )
     source_title = components.get("latest_source_title") or structured_event.get("title") or structured_event.get("event_name") or (sample.get("title") if sample else None)
     accepted_count = _int_value(components.get("evidence_acquisition_accepted_count")) or len(_accepted_evidence_samples(components))
-    source_count = _int_value(components.get("source_count")) or (entry.source_count if entry is not None else 0) or accepted_count
+    source_count = _int_value(components.get("source_update_count")) or _int_value(
+        components.get("source_count")
+    ) or (entry.source_count if entry is not None else 0)
+    source_independence = (
+        event_source_independence.validated_source_independence_container(components)
+    )
+    independence_assessed = bool(source_independence)
+    independent_count = _int_value(
+        source_independence.get("independent_evidence_count")
+    )
+    corroboration_count = _int_value(
+        source_independence.get("independent_corroboration_count")
+    )
+    content_cluster_count = _int_value(
+        source_independence.get("content_cluster_count")
+    )
+    reported_errors = _list_strings(components.get("source_independence_errors"))
+    independence_status = (
+        "rejected"
+        if reported_errors or components.get("source_independence_status") == "rejected"
+        else "assessed"
+        if independence_assessed
+        else "unassessed"
+    )
+    if independence_assessed:
+        independent_display = str(independent_count)
+        corroboration_display = str(corroboration_count)
+        cluster_display = str(content_cluster_count)
+    else:
+        independent_display = "not assessed"
+        corroboration_display = "not assessed"
+        cluster_display = "not assessed"
     lines: list[str] = [
         f"- Latest source: {latest_source or 'not available'}",
-        f"- Source count: {source_count if source_count else 'not available'}",
+        f"- Raw source updates: {source_count if source_count else 'not available'}",
+        f"- Source independence status: {independence_status}",
+        f"- Independent evidence units: {independent_display}",
+        f"- Additional independent corroborations: {corroboration_display}",
+        f"- Content clusters: {cluster_display}",
     ]
     if accepted_count:
         lines.append(f"- Accepted evidence count: {accepted_count}")

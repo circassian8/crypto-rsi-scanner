@@ -10,6 +10,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
+from crypto_rsi_scanner.event_alpha.radar.source_independence import (
+    validate_source_independence_container,
+    validated_source_independence_container,
+)
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
 
@@ -68,6 +72,7 @@ def _row_from_incident(
     )
     relevance_status = str(relevance["incident_relevance_status"])
     diagnostic_only = bool(diagnostic_only or relevance_status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES)
+    source_independence_fields = _incident_source_independence_row_fields(incident)
     if diagnostic_only and subject_quality == "valid":
         subject_quality = "diagnostic_only"
     hidden_by_default = _status_hidden_by_default(relevance_status) or diagnostic_only
@@ -134,8 +139,9 @@ def _row_from_incident(
         "source_raw_ids": tuple(incident.raw_ids),
         "source_event_ids": tuple(incident.event_ids),
         "source_urls": source_urls[:12],
-        "source_domains": tuple(incident.independent_source_domains),
-        "independent_source_count": len(incident.independent_source_domains),
+        "source_domains": tuple(incident.source_domains),
+        "source_domain_count": len(incident.source_domains),
+        **source_independence_fields,
         "source_update_count": len(incident.raw_ids),
         "linked_hypothesis_ids": _unique(row.get("hypothesis_id") for row in h_rows),
         "linked_watchlist_keys": _unique(row.get("key") for row in w_rows),
@@ -157,6 +163,38 @@ def _row_from_incident(
         ])),
     }
     return row
+
+
+def _incident_source_independence_row_fields(
+    incident: event_incident_graph.CanonicalIncident,
+) -> dict[str, Any]:
+    contract = _validated_source_independence(incident)
+    container = _incident_source_independence_container(incident)
+    errors = list(
+        dict.fromkeys(
+            (*incident.source_independence_errors, *validate_source_independence_container(container))
+        )
+    )
+    return {
+        "independent_source_domains": tuple(incident.independent_source_domains),
+        "independent_source_domain_count": len(incident.independent_source_domains),
+        "independent_source_count": int(
+            contract.get("independent_evidence_count") or 0
+        ),
+        "independent_corroboration_count": int(
+            contract.get("independent_corroboration_count") or 0
+        ),
+        "source_content_cluster_count": int(
+            contract.get("content_cluster_count") or 0
+        ),
+        "source_independence": contract,
+        "source_independence_errors": errors,
+        "source_independence_status": (
+            "assessed" if contract else "rejected" if errors else "unassessed"
+        ),
+    }
+
+
 def _incident_source_text(
     incident: event_incident_graph.CanonicalIncident,
     raw_by_id: Mapping[str, RawDiscoveredEvent],
@@ -258,7 +296,9 @@ def _incident_confidence(
     h_rows: list[dict[str, Any]],
     market: Mapping[str, Any],
 ) -> float:
-    score = 35.0 + len(incident.raw_ids) * 10.0 + len(incident.independent_source_domains) * 18.0
+    source_independence = _validated_source_independence(incident)
+    independent_evidence = int(source_independence.get("independent_evidence_count") or 0)
+    score = 35.0 + independent_evidence * 28.0
     if incident.current_cause_status == event_claim_semantics.CauseStatus.CONFIRMED.value:
         score += 12.0
     elif incident.current_cause_status == event_claim_semantics.CauseStatus.SUSPECTED.value:
@@ -272,6 +312,30 @@ def _incident_confidence(
     if any(row.get("conflicting_claims") for row in h_rows) or incident.conflicting_claims:
         score -= 10.0
     return round(max(0.0, min(100.0, score)), 2)
+
+
+def _validated_source_independence(
+    incident: event_incident_graph.CanonicalIncident,
+) -> dict[str, Any]:
+    return validated_source_independence_container(
+        _incident_source_independence_container(incident)
+    )
+
+
+def _incident_source_independence_container(
+    incident: event_incident_graph.CanonicalIncident,
+) -> dict[str, Any]:
+    errors = list(incident.source_independence_errors)
+    contract = incident.source_independence
+    status = "rejected" if errors else "assessed" if contract else "unassessed"
+    return {
+        "source_independence": contract,
+        "source_independence_status": status,
+        "source_independence_errors": errors,
+        "independent_source_count": incident.independent_source_count,
+        "independent_corroboration_count": incident.independent_corroboration_count,
+        "source_content_cluster_count": incident.source_content_cluster_count,
+    }
 def _incident_warnings(
     incident: event_incident_graph.CanonicalIncident,
     market: Mapping[str, Any],

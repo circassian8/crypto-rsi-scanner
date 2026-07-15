@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -180,6 +180,13 @@ class EvidenceAcquisitionResult:
     acquisition_upgrade_status: str = "unchanged"
     acquisition_upgrade_reason: str | None = None
     no_upgrade_reason: str | None = None
+    source_update_count: int = 0
+    independent_source_count: int = 0
+    independent_corroboration_count: int = 0
+    source_content_cluster_count: int = 0
+    source_independence: Mapping[str, Any] = field(default_factory=dict)
+    source_independence_status: str = "unassessed"
+    source_independence_errors: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
     def to_metadata(self) -> dict[str, Any]:
@@ -206,6 +213,13 @@ def evidence_acquisition_result_metadata(result: EvidenceAcquisitionResult) -> d
         "evidence_acquisition_provider_failures": result.provider_failures,
         "evidence_acquisition_accepted_count": len(result.accepted_evidence),
         "evidence_acquisition_rejected_count": len(result.rejected_evidence),
+        "evidence_acquisition_source_update_count": result.source_update_count,
+        "evidence_acquisition_independent_source_count": result.independent_source_count,
+        "evidence_acquisition_independent_corroboration_count": result.independent_corroboration_count,
+        "evidence_acquisition_source_content_cluster_count": result.source_content_cluster_count,
+        "evidence_acquisition_source_independence": dict(result.source_independence),
+        "evidence_acquisition_source_independence_status": result.source_independence_status,
+        "evidence_acquisition_source_independence_errors": result.source_independence_errors,
         "evidence_acquisition_accepted_evidence": tuple(dict(item) for item in result.accepted_evidence[:5]),
         "evidence_acquisition_rejected_samples": tuple(dict(item) for item in result.rejected_evidence[:5]),
         "accepted_evidence_reason_codes": reason_codes,

@@ -16,6 +16,50 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Count independent catalyst evidence by origin-aware content units
+**Status:** accepted
+**Decision:** Measure source independence with the closed
+`event_alpha.source_independence` v1 contract before describing catalyst
+corroboration. Preserve raw-document count, canonical-domain count, content
+cluster count, independent evidence units, and additional independent
+corroborations as distinct quantities. Normalize the exact title/newline/body
+surface with Unicode NFKC, casefolding, alphanumeric-whitespace projection,
+whitespace collapse, and trim; exact duplicates share that surface digest.
+Compare assessable non-exact documents as sets of consecutive three-word
+shingles and treat Jaccard similarity at or above `0.80` as near-duplicate.
+Assign a document only against canonical representatives in deterministic
+public-time/source-id order; do not use transitive member-to-member chaining.
+An independent evidence unit must be a corroboration-eligible content cluster,
+and every selected unit after the first must introduce a canonical origin not
+already represented. Content-distinct rows from an already represented origin
+may remain additional context but cannot increment independent corroboration.
+Missing origin or assessable content stays unassessable; malformed or
+overflowing inputs stay rejected; fixed document, text, URL, metadata, and
+shingle bounds fail closed without truncating evidence into apparent support.
+Persist full input statuses/digests, assignments, reasons, count closure, and a
+closed contract digest. The result explicitly does not assess source authority,
+ownership independence, claim truth, impact validity, causal attribution, or
+statistical independence. It is research-only and cannot weaken a blocker or
+threshold, apply calibration, publish authority, send, trade, paper trade,
+execute, write normal RSI rows, or create Event Alpha `TRIGGERED_FADE`. The
+contract may replace raw-row or hostname counts in existing diversity bonuses
+and gates, so duplicate-derived scores, priority, or routes can fail closed; it
+cannot introduce a new positive promotion mechanism.
+**Why:** News syndication and lightly edited copies can turn one underlying
+story into many provider rows or domains, inflating apparent corroboration.
+Rodier and Carter's LREC 2020 work supports shingle-based online near-duplicate
+detection; the project deliberately adds a fixed conservative threshold,
+origin eligibility, non-transitive representative assignment, complete
+rejection telemetry, and no-authority/no-causality semantics for operator
+truth. See `research/SOURCE_INDEPENDENCE_NEAR_DUPLICATE_POLICY.md`.
+**Revisit when:** A labeled, source-diverse corpus supports a predeclared
+precision/recall study of the normalization, minimum length, and `0.80`
+threshold, including syndicated cross-domain articles and same-domain original
+reporting. Any new positive promotion, threshold change, or calibration effect
+beyond the accepted one-for-one replacement of legacy raw-row/hostname
+diversity inputs requires a separate outcome-backed, out-of-sample,
+human-approved policy with frozen thresholds and rollback criteria.
+
 ## 2026-07-15 - Require temporal-semantic attribution for current catalyst confirmation
 **Status:** accepted
 **Decision:** Bind each current catalyst-confidence claim to one exact source

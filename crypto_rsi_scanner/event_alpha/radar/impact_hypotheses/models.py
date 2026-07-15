@@ -237,6 +237,12 @@ class _ImpactHypothesisRoleVerdictFields:
     role_validation_warnings: tuple[str, ...] = ()
     role_capabilities: Mapping[str, bool] = field(default_factory=dict)
     independent_source_domains: tuple[str, ...] = ()
+    independent_source_count: int | None = None
+    independent_corroboration_count: int | None = None
+    source_content_cluster_count: int | None = None
+    source_independence: Mapping[str, Any] = field(default_factory=dict)
+    source_independence_status: str = "unassessed"
+    source_independence_errors: tuple[str, ...] = ()
     conflicting_claims: tuple[str, ...] = ()
     opportunity_score_final: float | None = None
     opportunity_level: str | None = None

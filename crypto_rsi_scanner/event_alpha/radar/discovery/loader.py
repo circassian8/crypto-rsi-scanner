@@ -15,6 +15,7 @@ from .... import event_fade
 import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
 import crypto_rsi_scanner.event_alpha.radar.anomaly_scanner as event_anomaly_scanner
 import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 import crypto_rsi_scanner.event_alpha.providers.provider_health as event_provider_health
 from ....derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
 from ..classification import classify_event_asset
@@ -122,7 +123,7 @@ def _merge_event_group(key: tuple[str, str, str, str], group: list[NormalizedEve
     first = min(group, key=lambda e: e.first_seen_time)
     raw_ids = tuple(sorted({raw_id for event in group for raw_id in event.raw_ids}))
     urls = tuple(sorted({url for event in group for url in event.source_urls}))
-    confidence = min(1.0, max(event.confidence for event in group) + 0.05 * (len(group) - 1))
+    confidence = max(event.confidence for event in group)
     best_time = _best_event_time_event(group) or first
     description = " ".join(_unique(
         value
@@ -240,6 +241,11 @@ def run_discovery(
 
     by_coin = {asset.coin_id: asset for asset in assets_tuple}
     for event in normalized:
+        source_independence_contract, source_independence_errors = event_source_independence.assess_source_independence_safe([
+            _source_independence_row(raw_by_id[raw_id])
+            for raw_id in event.raw_ids
+            if raw_id in raw_by_id
+        ], expected_document_count=len(event.raw_ids))
         event_links = resolve_event_assets(event, assets_tuple, min_confidence=cfg.min_link_confidence)
         links.extend(event_links)
         for link in event_links:
@@ -272,6 +278,19 @@ def run_discovery(
                 fade_signal=fade_signal,
                 data_quality={
                     "source_count": len(event.raw_ids),
+                    "source_update_count": len(event.raw_ids),
+                    "independent_source_count": int(source_independence_contract.get("independent_evidence_count") or 0),
+                    "independent_corroboration_count": int(source_independence_contract.get("independent_corroboration_count") or 0),
+                    "source_content_cluster_count": int(source_independence_contract.get("content_cluster_count") or 0),
+                    "source_independence": source_independence_contract,
+                    "source_independence_errors": list(source_independence_errors),
+                    "source_independence_status": (
+                        "assessed"
+                        if source_independence_contract
+                        else "rejected"
+                        if source_independence_errors
+                        else "unassessed"
+                    ),
                     "has_event_time": event.event_time is not None,
                     "link_confidence": link.link_confidence,
                     "classifier_confidence": classification.confidence,
@@ -302,6 +321,21 @@ def run_discovery(
         candidates=tuple(candidates),
         warnings=tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
     )
+
+
+def _source_independence_row(raw: RawDiscoveredEvent) -> dict[str, Any]:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    provenance = payload.get("provenance") if isinstance(payload.get("provenance"), Mapping) else {}
+    return {
+        "source_id": raw.raw_id,
+        "source_url": raw.source_url,
+        "title": raw.title,
+        "body": raw.body,
+        "provider": raw.provider,
+        "source_class": payload.get("source_class") or provenance.get("source_class"),
+        "published_at": raw.published_at,
+        "fetched_at": raw.fetched_at,
+    }
 
 
 def _validated_candidate_catalyst_attributions(

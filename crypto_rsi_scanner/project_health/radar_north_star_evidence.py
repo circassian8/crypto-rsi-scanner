@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 
 SOURCE_AUTHORITY_POLICY: dict[str, Any] = {
@@ -20,6 +20,37 @@ SOURCE_AUTHORITY_POLICY: dict[str, Any] = {
     "source_pack_impact_validation": "requires membership in declared impact_path_validating_sources",
     "unverified_authority_claim_action": "retain as capped context with source_authority_unverified",
     "historical_artifacts_rewritten": False,
+}
+
+
+SOURCE_INDEPENDENCE_POLICY: dict[str, Any] = {
+    "schema": "event_alpha.source_independence v1",
+    "unit_of_measurement": "origin-aware content cluster",
+    "raw_documents_are_independent_sources": False,
+    "distinct_domains_are_independent_sources": False,
+    "comparison_surface": "normalized title newline body",
+    "normalization": "unicode NFKC, casefold, alphanumeric whitespace projection",
+    "near_duplicate_method": "three-word set-shingle Jaccard",
+    "near_duplicate_threshold": 0.80,
+    "minimum_near_duplicate_tokens": 12,
+    "cluster_assignment": "public-time/source-id ordered canonical representatives only",
+    "transitive_member_chaining": False,
+    "independent_unit_rule": (
+        "assessable content cluster that introduces a previously unseen canonical origin"
+    ),
+    "independent_corroboration_count": "max(0, independent_evidence_count - 1)",
+    "missing_short_malformed_or_overflowing_inputs": "unassessable_or_rejected_fail_closed",
+    "source_authority_assessed": False,
+    "claim_truth_assessed": False,
+    "causal_attribution_assessed": False,
+    "historical_rows_without_contract": "legacy_unassessed_no_diversity_promotion",
+    "positive_policy": (
+        "may replace prior raw-row or hostname diversity bonuses only; cannot create a new "
+        "route, lower a blocker, or weaken an evidence threshold"
+    ),
+    "research_only": True,
+    "auto_apply_calibration": False,
+    "research_basis": ["Rodier and Carter 2020 online near-duplicate news detection"],
 }
 
 LLM_CATALYST_FRAME_BINDING_POLICY: dict[str, Any] = {
@@ -104,3 +135,22 @@ CATALYST_ATTRIBUTION_POLICY: dict[str, Any] = {
         "Miller 2023 event-study design and interpretation guidance",
     ],
 }
+
+
+def append_source_independence_north_star(
+    lines: list[str], payload: Mapping[str, Any]
+) -> None:
+    """Render the closed source-independence policy into North Star Markdown."""
+
+    policy = (
+        payload.get("source_independence_policy")
+        if isinstance(payload.get("source_independence_policy"), Mapping)
+        else {}
+    )
+    lines.extend(["## Source Independence and Near-Duplicate Evidence", ""])
+    for key, value in policy.items():
+        if isinstance(value, list):
+            lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
+        else:
+            lines.append(f"- {key}: `{value}`")
+    lines.append("")

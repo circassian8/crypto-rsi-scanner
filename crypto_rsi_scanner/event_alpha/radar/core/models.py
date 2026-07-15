@@ -135,6 +135,13 @@ class CoreEvidenceAcquisitionView:
     accepted_reason_code_counts: Mapping[str, int] | None = None
     accepted_evidence_samples: tuple[dict[str, Any], ...] = ()
     rejected_evidence_samples: tuple[dict[str, Any], ...] = ()
+    source_update_count: int = 0
+    independent_source_count: int = 0
+    independent_corroboration_count: int = 0
+    source_content_cluster_count: int = 0
+    source_independence: Mapping[str, Any] = field(default_factory=dict)
+    source_independence_status: str = "unassessed"
+    source_independence_errors: tuple[str, ...] = ()
     provider_failures: tuple[str, ...] = ()
     evidence_quality_before: float | None = None
     evidence_quality_after: float | None = None
@@ -157,6 +164,13 @@ class CoreEvidenceAcquisitionView:
             "accepted_provider_counts": dict(self.accepted_provider_counts or {}),
             "rejected_provider_counts": dict(self.rejected_provider_counts or {}),
             "accepted_reason_code_counts": dict(self.accepted_reason_code_counts or {}),
+            "source_update_count": self.source_update_count,
+            "independent_source_count": self.independent_source_count,
+            "independent_corroboration_count": self.independent_corroboration_count,
+            "source_content_cluster_count": self.source_content_cluster_count,
+            "source_independence": dict(self.source_independence),
+            "source_independence_status": self.source_independence_status,
+            "source_independence_errors": self.source_independence_errors,
             "provider_failures": self.provider_failures,
             "evidence_quality_before": self.evidence_quality_before,
             "evidence_quality_after": self.evidence_quality_after,

@@ -13,6 +13,7 @@ from .... import (
 )
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction
@@ -117,6 +118,26 @@ def _build_core_evidence_acquisition_view(
     )
     status = _best_acquisition_status(primary, accepted_count=accepted_count, rejected_count=rejected_count)
     source_pack = _best_source_pack(primary, _first_text(primary, ("impact_path_type", "primary_impact_path")))
+    (
+        source_independence,
+        source_independence_status,
+        source_independence_errors,
+    ) = _acquisition_source_independence(primary)
+    source_update_count = max(
+        accepted_count,
+        *(
+            _int_or_zero(
+                _first_value(
+                    [row],
+                    (
+                        "evidence_acquisition_source_update_count",
+                        "source_update_count",
+                    ),
+                )
+            )
+            for row in primary
+        ),
+    )
     return CoreEvidenceAcquisitionView(
         core_opportunity_id=clean_core,
         acquisition_attempted=_any_truthy(primary, ("evidence_acquisition_attempted", "source_acquisition_attempted")) or status != "not_executed",
@@ -131,6 +152,13 @@ def _build_core_evidence_acquisition_view(
         accepted_reason_code_counts=accepted_reason_code_counts,
         accepted_evidence_samples=tuple(accepted_samples[:5]),
         rejected_evidence_samples=tuple(rejected_samples[:5]),
+        source_update_count=source_update_count,
+        independent_source_count=int(source_independence.get("independent_evidence_count") or 0),
+        independent_corroboration_count=int(source_independence.get("independent_corroboration_count") or 0),
+        source_content_cluster_count=int(source_independence.get("content_cluster_count") or 0),
+        source_independence=source_independence,
+        source_independence_status=source_independence_status,
+        source_independence_errors=source_independence_errors,
         provider_failures=tuple(provider_failures),
         evidence_quality_before=_first_float(primary, ("evidence_quality_before", "evidence_acquisition_score_before", "evidence_quality_score_before")),
         evidence_quality_after=_best_float(primary, ("evidence_quality_after", "evidence_acquisition_score_after", "evidence_quality_score_after", "post_refresh_evidence_quality_score")),
@@ -142,3 +170,62 @@ def _build_core_evidence_acquisition_view(
         no_upgrade_reason=_first_text(primary, ("no_upgrade_reason",)),
         diagnostic_rows=tuple(_unique_rows(diagnostics)),
     )
+
+
+def _acquisition_source_independence(
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, Any], str, tuple[str, ...]]:
+    contracts: dict[str, dict[str, Any]] = {}
+    errors: list[str] = []
+    statuses: list[str] = []
+    for row in rows:
+        error_value = row.get("evidence_acquisition_source_independence_errors")
+        if error_value in (None, [], ()) and str(row.get("row_type") or "") == "event_evidence_acquisition":
+            error_value = row.get("source_independence_errors")
+        if isinstance(error_value, str):
+            error_value = [error_value]
+        if isinstance(error_value, (list, tuple)):
+            errors.extend(
+                str(item).strip()[:160]
+                for item in error_value
+                if str(item).strip()
+            )
+        status_value = row.get("evidence_acquisition_source_independence_status")
+        if status_value in (None, "") and str(row.get("row_type") or "") == "event_evidence_acquisition":
+            status_value = row.get("source_independence_status")
+        if status_value not in (None, ""):
+            status = str(status_value).strip().casefold()
+            statuses.append(status)
+            if status not in {"assessed", "unassessed", "rejected"}:
+                errors.append("source_independence_status_invalid")
+        value = row.get("evidence_acquisition_source_independence")
+        if value in (None, {}) and str(row.get("row_type") or "") == "event_evidence_acquisition":
+            value = row.get("source_independence")
+        if value in (None, {}):
+            continue
+        if not isinstance(value, Mapping):
+            errors.append("source_independence_contract_invalid")
+            continue
+        if event_source_independence.validate_source_independence_contract(value):
+            errors.append("source_independence_contract_invalid")
+            continue
+        contract = dict(value)
+        contracts[str(contract.get("contract_digest") or "")] = contract
+    if contracts and any(status != "assessed" for status in statuses):
+        errors.append("source_independence_status_contract_mismatch")
+    if not contracts and "assessed" in statuses:
+        errors.append("source_independence_assessed_without_contract")
+    if "rejected" in statuses and not errors:
+        errors.append("source_independence_rejected_without_error")
+    errors = list(dict.fromkeys(errors))[:16]
+    if errors:
+        return {}, "rejected", tuple(errors)
+    if not contracts:
+        return {}, "unassessed", ()
+    try:
+        contract = event_source_independence.combine_source_independence_contracts(
+            list(contracts.values())
+        )
+    except (TypeError, ValueError):
+        return {}, "rejected", ("source_independence_contract_union_failed",)
+    return contract, "assessed", ()

@@ -19,6 +19,7 @@ from ..artifacts.schema.decision_model import (
     validate_contract,
 )
 from . import decision_catalyst_policy
+from . import source_independence as event_source_independence
 from .decision_models import actionability_score_cohort
 
 
@@ -89,6 +90,12 @@ DECISION_PROJECTION_FIELD_NAMES = (
     "observation_ids",
     "source_provider_lineage",
     "catalyst_attributions",
+    "source_independence",
+    "independent_source_count",
+    "independent_corroboration_count",
+    "source_content_cluster_count",
+    "source_independence_status",
+    "source_independence_errors",
     "market_provenance",
     "market_context_reference",
     "decision_evaluated_at",
@@ -150,6 +157,19 @@ def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
                 if cohort:
                     projection["actionability_score_cohort"] = cohort
             closed_values = _closed_projection_values(authority, projection)
+            if (
+                "decision_projection_schema_version" in authority
+                and "source_independence" not in authority
+            ):
+                for field in (
+                    "source_independence",
+                    "independent_source_count",
+                    "independent_corroboration_count",
+                    "source_content_cluster_count",
+                    "source_independence_status",
+                    "source_independence_errors",
+                ):
+                    closed_values.pop(field, None)
             # Historical v2 artifacts predate explicit observation/evaluation
             # identity.  Keep their former readable projection without
             # pretending that missing provenance can be reconstructed.  Every
@@ -224,6 +244,22 @@ def _nested_projection_matches_row(
             row.get("catalyst_attributions")
         ):
             return False
+    for field in (
+        "source_independence",
+        "independent_source_count",
+        "independent_corroboration_count",
+        "source_content_cluster_count",
+        "source_independence_status",
+        "source_independence_errors",
+    ):
+        if field in row:
+            projected_value = deepcopy(projection.get(field))
+            row_value = deepcopy(row.get(field))
+            if (
+                type(projected_value) is not type(row_value)
+                or projected_value != row_value
+            ):
+                return False
     return True
 
 
@@ -440,6 +476,7 @@ def _closed_projection_values(
         else {}
     )
     rsi_references = _rsi_context_references(source, rsi_context)
+    source_independence = _source_independence_projection_values(source)
     closed = {
         "decision_projection_schema_version": DECISION_PROJECTION_SCHEMA_VERSION,
         "hard_blockers": blockers,
@@ -464,6 +501,7 @@ def _closed_projection_values(
         "catalyst_attributions": list(
             decision_catalyst_policy.attribution_values(source)
         ),
+        **source_independence,
         "market_context_reference": market_context_reference(source),
         "decision_evaluated_at": _evaluation_timestamp(source),
         "decision_safety_invariants": _safety_invariants(source),
@@ -473,6 +511,154 @@ def _closed_projection_values(
         closed["market_provenance"] = provenance
         closed.update(event_market_provenance.market_provenance_flat_fields(provenance))
     return closed
+
+
+def _source_independence_projection_values(
+    source: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Close one exact independence contract without legacy count fallbacks."""
+
+    count_aliases = {
+        "independent_source_count": "independent_evidence_count",
+        "independent_corroboration_count": "independent_corroboration_count",
+        "source_content_cluster_count": "content_cluster_count",
+    }
+    empty = {
+        "source_independence": {},
+        "independent_source_count": 0,
+        "independent_corroboration_count": 0,
+        "source_content_cluster_count": 0,
+        "source_independence_status": "unassessed",
+        "source_independence_errors": [],
+    }
+    nested_containers = [
+        value
+        for field in ("latest_score_components", "score_components", "data_quality")
+        if isinstance((value := source.get(field)), Mapping)
+    ]
+    status_values = [
+        str(container.get("source_independence_status") or "").strip().casefold()
+        for container in (source, *nested_containers)
+        if "source_independence_status" in container
+    ]
+    errors = list(dict.fromkeys(
+        str(item).strip()[:160]
+        for container in (source, *nested_containers)
+        for item in _items(container.get("source_independence_errors"))
+        if str(item).strip()
+    ))[:16]
+    errors.extend(
+        "source_independence_status_invalid"
+        for status in status_values
+        if status not in {"assessed", "unassessed", "rejected"}
+    )
+    if "rejected" in status_values and not errors:
+        errors.append("source_independence_rejected_without_error")
+    errors = list(dict.fromkeys(errors))[:16]
+    if errors:
+        empty["source_independence_status"] = "rejected"
+        empty["source_independence_errors"] = errors
+    supplied: list[tuple[Mapping[str, Any], Any]] = []
+    if "source_independence" in source:
+        supplied.append((source, source.get("source_independence")))
+    else:
+        supplied.extend(
+            (container, container.get("source_independence"))
+            for container in nested_containers
+            if "source_independence" in container
+        )
+    if not supplied:
+        return empty
+
+    nonempty = [item for item in supplied if item[1] != {}]
+    if not nonempty:
+        if "assessed" in status_values:
+            empty["source_independence_status"] = "rejected"
+            empty["source_independence_errors"] = [
+                "source_independence_assessed_without_contract"
+            ]
+        return empty
+    if errors:
+        return empty
+    invalid_item = next(
+        (
+            item
+            for item in nonempty
+            for value in (item[1],)
+            if not isinstance(value, Mapping)
+            or event_source_independence.validate_source_independence_contract(value)
+        ),
+        None,
+    )
+    if invalid_item is not None:
+        return {
+            **empty,
+            "source_independence": deepcopy(invalid_item[1]),
+            "source_independence_status": "rejected",
+            "source_independence_errors": errors or [
+                "source_independence_contract_invalid"
+            ],
+        }
+
+    if any(status != "assessed" for status in status_values):
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_status_contract_mismatch"
+            ],
+        }
+
+    contracts = [dict(value) for _container, value in nonempty]
+    try:
+        contract = event_source_independence.combine_source_independence_contracts(
+            contracts
+        )
+    except (TypeError, ValueError):
+        return {
+            **empty,
+            "source_independence": {
+                "projection_error": "source_independence_contract_union_failed"
+            },
+        }
+    contract = deepcopy(contract)
+    expected = {
+        alias: contract.get(contract_field)
+        for alias, contract_field in count_aliases.items()
+    }
+    for container, value in nonempty:
+        source_contract = dict(value)
+        for alias, expected_value in expected.items():
+            source_expected = source_contract.get(count_aliases[alias])
+            observed = container.get(alias)
+            if alias in container and (
+                type(observed) is not type(source_expected)
+                or observed != source_expected
+            ):
+                return {
+                    **empty,
+                    "source_independence": {
+                        "projection_error": "source_independence_alias_mismatch"
+                    },
+                }
+    for alias, expected_value in expected.items():
+        observed = source.get(alias)
+        if alias in source and (
+            type(observed) is not type(expected_value)
+            or observed != expected_value
+        ):
+            return {
+                **empty,
+                "source_independence": {
+                    "projection_error": "source_independence_alias_mismatch"
+                },
+            }
+    return {
+        "source_independence": contract,
+        "source_independence_status": "assessed",
+        "source_independence_errors": [],
+        **expected,
+    }
 
 
 def _calendar_evidence(source: Mapping[str, Any]) -> list[dict[str, Any]]:

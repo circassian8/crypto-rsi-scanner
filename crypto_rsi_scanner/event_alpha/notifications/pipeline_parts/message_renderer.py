@@ -3,6 +3,18 @@
 from __future__ import annotations
 
 from .runtime import *
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
+
+
+def _independent_corroboration_for_entry(entry: Any) -> int | None:
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    contract = event_source_independence.validated_source_independence_container(
+        components
+    )
+    if not contract:
+        return None
+    value = contract.get("independent_corroboration_count")
+    return value if type(value) is int and value >= 0 else None
 
 def format_exploratory_telegram_digest(
     items: Iterable[EventAlphaExploratoryDigestItem],
@@ -286,7 +298,7 @@ def _ambiguous_has_learning_value(entry: Any) -> bool:
         or _component_score(components, "market_move_volume") >= 25
         or _component_score(components, "source_quality") >= 40
         or _component_score(components, "cluster_confidence") >= 40
-        or int(getattr(entry, "source_count", 0) or 0) > 1
+        or (_independent_corroboration_for_entry(entry) or 0) >= 1
     )
 
 def _exploratory_rank(entry: Any) -> tuple[float, list[str]]:
@@ -642,8 +654,11 @@ def _human_risk(entry: Any, decision: event_alpha_router.EventAlphaRouteDecision
         risks.append("low classifier confidence")
     if not getattr(entry, "event_time", None):
         risks.append("no dated catalyst")
-    if int(getattr(entry, "source_count", 0) or 0) <= 1:
-        risks.append("single-source evidence")
+    corroboration_count = _independent_corroboration_for_entry(entry)
+    if corroboration_count is None:
+        risks.append("source independence unassessed")
+    elif corroboration_count < 1:
+        risks.append("no independent corroboration")
     warnings = tuple(dict.fromkeys((*getattr(entry, "warnings", ()), *getattr(decision, "warnings", ()))))
     if warnings and len(risks) < 3:
         risks.append(str(warnings[0]).replace("_", " "))

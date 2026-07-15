@@ -9,6 +9,7 @@ from typing import Any
 
 import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
 import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 
 
 DECISION_MODEL_VERSION = "crypto_radar_decision_model_v2"
@@ -53,6 +54,9 @@ FIELDS = (
     "what_confirms", "what_invalidates", "calendar_evidence", "calendar_evidence_ids",
     "rsi_context", "rsi_context_references", "observation_ids", "source_provider_lineage",
     "catalyst_attributions",
+    "source_independence", "independent_source_count",
+    "independent_corroboration_count", "source_content_cluster_count",
+    "source_independence_status", "source_independence_errors",
     "market_provenance",
     "market_context_reference",
     "market_provenance_schema_version", "market_provenance_contract_version",
@@ -93,6 +97,9 @@ TYPES = {
     "rsi_context_references": "list", "observation_ids": "list",
     "source_provider_lineage": "dict", "market_provenance": "dict",
     "catalyst_attributions": "list",
+    "source_independence": "dict", "independent_source_count": "int",
+    "independent_corroboration_count": "int", "source_content_cluster_count": "int",
+    "source_independence_status": "str", "source_independence_errors": "list",
     "market_context_reference": "dict",
     "market_provenance_schema_version": "str", "market_provenance_contract_version": "int",
     "data_acquisition_mode": "str",
@@ -297,7 +304,10 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
     ):
         if field in row and not _is_sequence(row.get(field)):
             errors.append(f"decision_projection_invalid_type:{field}")
-    for field in ("rsi_context", "source_provider_lineage", "decision_safety_invariants"):
+    for field in (
+        "rsi_context", "source_provider_lineage", "decision_safety_invariants",
+        "source_independence",
+    ):
         if field in row and not isinstance(row.get(field), Mapping):
             errors.append(f"decision_projection_invalid_type:{field}")
     if not isinstance(row.get("why_now"), str) or not str(row.get("why_now") or "").strip():
@@ -321,6 +331,7 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
 
     errors.extend(_validate_projection_calendar_and_rsi(row))
     errors.extend(_validate_projection_catalyst_attributions(row))
+    errors.extend(_validate_projection_source_independence(row))
 
     lineage = row.get("source_provider_lineage")
     if isinstance(lineage, Mapping):
@@ -409,6 +420,81 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             elif safety.get(field) is not (row.get(attestation) is not True):
                 errors.append(f"decision_projection_safety_attestation_mismatch:{field}")
     return list(dict.fromkeys(errors))
+
+
+def _validate_projection_source_independence(
+    row: Mapping[str, Any],
+) -> list[str]:
+    """Validate the closed independence value and its projection aliases."""
+
+    contract = row.get("source_independence")
+    count_fields = {
+        "independent_source_count": "independent_evidence_count",
+        "independent_corroboration_count": "independent_corroboration_count",
+        "source_content_cluster_count": "content_cluster_count",
+    }
+    extension_fields = {
+        "source_independence",
+        "source_independence_status",
+        "source_independence_errors",
+        *count_fields,
+    }
+    present = extension_fields.intersection(row)
+    if not present:
+        # Shipped projection-v1 artifacts predate this additive, fail-closed
+        # extension. They remain readable without inventing source evidence.
+        return []
+    if present != extension_fields:
+        return ["decision_projection_source_independence_extension_incomplete"]
+    errors: list[str] = []
+    status = row.get("source_independence_status")
+    if status not in {"assessed", "unassessed", "rejected"}:
+        errors.append("decision_projection_source_independence_status_invalid")
+    raw_errors = row.get("source_independence_errors")
+    if not _is_sequence(raw_errors) or any(
+        not isinstance(item, str) or not item.strip() or len(item) > 160
+        for item in _items(raw_errors)
+    ):
+        errors.append("decision_projection_source_independence_errors_invalid")
+    for field in count_fields:
+        value = row.get(field)
+        if type(value) is not int or value < 0:
+            errors.append(
+                f"decision_projection_source_independence_count_invalid:{field}"
+            )
+
+    if not isinstance(contract, Mapping):
+        return [
+            *errors,
+            "decision_projection_source_independence_invalid_type",
+        ]
+    if not contract:
+        if status == "assessed":
+            errors.append("decision_projection_source_independence_assessed_without_contract")
+        if status == "rejected" and not _items(raw_errors):
+            errors.append("decision_projection_source_independence_rejected_without_error")
+        for field in count_fields:
+            if row.get(field) != 0:
+                errors.append(
+                    f"decision_projection_source_independence_alias_mismatch:{field}"
+                )
+        return errors
+
+    if status != "assessed" or _items(raw_errors):
+        errors.append("decision_projection_source_independence_contract_status_mismatch")
+
+    errors.extend(
+        f"decision_projection_source_independence:{error}"
+        for error in event_source_independence.validate_source_independence_contract(
+            contract
+        )
+    )
+    for field, contract_field in count_fields.items():
+        if row.get(field) != contract.get(contract_field):
+            errors.append(
+                f"decision_projection_source_independence_alias_mismatch:{field}"
+            )
+    return errors
 
 
 def _validate_projection_catalyst_attributions(

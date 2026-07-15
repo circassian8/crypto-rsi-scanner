@@ -326,6 +326,7 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
         EventClassification,
         EventDiscoveryResult,
         NormalizedEvent,
+        RawDiscoveredEvent,
     )
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -388,8 +389,27 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
             data_quality={},
         )
 
+    raw_events = tuple(
+        RawDiscoveredEvent(
+            raw_id=norm_event.raw_ids[0],
+            provider="test",
+            fetched_at=now,
+            published_at=now,
+            source_url=norm_event.source_urls[0],
+            title=norm_event.event_name,
+            body=(
+                f"{norm_event.event_name} with independently reported context "
+                f"and source-specific details for catalyst review number {index}"
+            ),
+            raw_json={"source_class": "broad_news"},
+            source_confidence=0.90,
+            content_hash=f"hash-{index}",
+        )
+        for index, norm_event in enumerate(events, start=1)
+    )
+
     result = EventDiscoveryResult(
-        raw_events=(),
+        raw_events=raw_events,
         normalized_events=events,
         links=(),
         classifications=(),
@@ -425,7 +445,10 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     report = event_graph.format_event_cluster_report(clusters)
     assert "EVENT CLUSTER REPORT" in report
     assert "cluster_conf=" in report
-    assert "sources: total=3 independent=3" in report
+    assert (
+        "sources: raw=3 domains=3 independent=3 corroborations=2 "
+        "content_clusters=3"
+    ) in report
     assert "VELVET/velvet accepted" in report
     assert "accepted_kinds=proxy:2" in report
     assert "ASTER/aster accepted" in report
@@ -525,7 +548,10 @@ def test_event_graph_accepts_direct_supply_and_derivatives_without_boosting_infr
 
     alerts = event_alerts.build_event_alert_candidates(result, now=now)
     by_symbol = {alert.symbol: alert for alert in alerts}
-    assert by_symbol["LIST"].score_components["cluster_confirmation"] > 0
-    assert by_symbol["UNLOCK"].score_components["cluster_confirmation"] > 0
-    assert by_symbol["PERP"].score_components["cluster_confirmation"] > 0
+    assert by_symbol["LIST"].score_components["cluster_confirmation"] == 0
+    assert "source_independence_source_context_incomplete" in by_symbol[
+        "LIST"
+    ].score_components["source_independence_errors"]
+    assert by_symbol["UNLOCK"].score_components["cluster_confirmation"] == 0
+    assert by_symbol["PERP"].score_components["cluster_confirmation"] == 0
     assert by_symbol["LINK"].score_components["cluster_confirmation"] == 0

@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
 import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from . import market_confirmation as event_market_confirmation
 from .opportunity_verdict_evidence import (
     _cryptopanic_tag_only_cannot_confirm_direct_path,
@@ -991,8 +992,8 @@ def _source_only_narrative_without_market_confirmation(
     Token-tagged CryptoPanic evidence is valuable context, but for fan-token,
     pre-IPO/RWA proxy, and political-meme narratives it should not be the sole
     reason a live-style row stays validated digest or higher. Those rows need
-    official/structured corroboration, a second accepted source, or fresh market
-    confirmation unless the operator explicitly opts in.
+    official/structured evidence, validated independent corroboration, or fresh
+    market confirmation unless the operator explicitly opts in.
     """
     if allow_source_only_narrative_digest or not _narrative_source_pack(data):
         return False
@@ -1004,7 +1005,7 @@ def _source_only_narrative_without_market_confirmation(
         data.get("accepted_evidence"),
         data.get("evidence_acquisition_accepted_evidence"),
     )
-    if accepted_count >= 2:
+    if _independent_corroboration_count(data) >= 1:
         return False
     if _has_fresh_market_confirmation(data):
         return False
@@ -1021,6 +1022,20 @@ def _source_only_narrative_without_market_confirmation(
         if str(value or "").strip()
     }
     return "cryptopanic_currency_tag_match" in {item.casefold() for item in reason_codes}
+
+
+def _independent_corroboration_count(data: Mapping[str, Any]) -> int:
+    counts: list[int] = []
+    for prefix in ("", "evidence_acquisition_"):
+        value = event_source_independence.validated_source_independence_container(
+            data, prefix=prefix
+        )
+        if not value:
+            continue
+        count = value.get("independent_corroboration_count")
+        if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+            counts.append(count)
+    return max(counts, default=0)
 
 
 

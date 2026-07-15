@@ -557,7 +557,9 @@ def test_event_discovery_normalizes_and_dedupes_events():
     assert spacex.event_type == "ipo_proxy"
     assert spacex.external_asset == "SpaceX"
     assert len(spacex.raw_ids) == 2
-    assert spacex.confidence == 1.0
+    # A duplicated/syndicated row is retained in raw lineage but cannot raise
+    # event confidence without a validated independent content unit.
+    assert spacex.confidence == 0.95
 
 
 def test_event_discovery_canonical_dedupe_merges_variant_headlines_and_payloads():

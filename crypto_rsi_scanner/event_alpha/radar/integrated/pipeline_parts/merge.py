@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
 import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 
 from ... import decision_model as event_radar_decision_model
 from ... import decision_safety as event_radar_decision_safety
@@ -131,6 +132,7 @@ def _merge_family(
         warnings=context.warnings,
     ))
     candidate.update(_merge_family_catalyst_attribution_fields(rows))
+    candidate.update(_merge_family_source_independence_fields(rows))
     candidate.update(_merge_family_safety_fields(rows))
     candidate.update(_merge_family_incident_source_fields(
         rows,
@@ -318,6 +320,117 @@ def _row_catalyst_attributions(row: Mapping[str, Any]) -> tuple[Mapping[str, Any
         if isinstance(multiple, (list, tuple)):
             values.extend(value for value in multiple if isinstance(value, Mapping))
     return tuple(values)
+
+
+def _merge_family_source_independence_fields(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    contracts: dict[str, dict[str, Any]] = {}
+    invalid_seen = False
+    assessment_errors: list[str] = []
+    statuses: list[str] = []
+    for row in rows:
+        containers: list[Mapping[str, Any]] = []
+        for key in ("latest_score_components", "score_components"):
+            value = row.get(key)
+            if isinstance(value, Mapping):
+                containers.append(value)
+        containers.append(row)
+        value = row.get("data_quality")
+        if isinstance(value, Mapping):
+            containers.append(value)
+        assessment_errors.extend(
+            str(item).strip()[:160]
+            for container in containers
+            for item in _source_independence_error_items(
+                container.get("source_independence_errors")
+            )
+            if str(item).strip()
+        )
+        for container in containers:
+            if "source_independence_status" not in container:
+                continue
+            status = str(
+                container.get("source_independence_status") or ""
+            ).strip().casefold()
+            statuses.append(status)
+            if status not in {"assessed", "unassessed", "rejected"}:
+                assessment_errors.append("source_independence_status_invalid")
+        selected = next(
+            (container.get("source_independence") for container in containers if container.get("source_independence") not in (None, {})),
+            None,
+        )
+        if selected is None:
+            continue
+        if not isinstance(selected, Mapping) or event_source_independence.validate_source_independence_contract(selected):
+            invalid_seen = True
+            continue
+        copied = dict(selected)
+        contracts[str(copied.get("contract_digest") or "")] = copied
+    if contracts and any(status != "assessed" for status in statuses):
+        assessment_errors.append("source_independence_status_contract_mismatch")
+    if not contracts and "assessed" in statuses:
+        assessment_errors.append("source_independence_assessed_without_contract")
+    if "rejected" in statuses and not assessment_errors:
+        assessment_errors.append("source_independence_rejected_without_error")
+    assessment_errors = list(dict.fromkeys(assessment_errors))[:16]
+    if invalid_seen or assessment_errors:
+        return {
+            "source_independence": {},
+            "source_independence_status": "rejected",
+            "source_independence_errors": assessment_errors or [
+                "source_independence_contract_invalid"
+            ],
+            "source_independence_rejected": True,
+            "source_independence_rejection_reason": (
+                "assessment_error" if assessment_errors else "invalid_contract"
+            ),
+            "independent_source_count": 0,
+            "independent_corroboration_count": 0,
+            "source_content_cluster_count": 0,
+        }
+    if not contracts:
+        return {
+            "source_independence": {},
+            "source_independence_status": "unassessed",
+            "source_independence_errors": [],
+            "independent_source_count": 0,
+            "independent_corroboration_count": 0,
+            "source_content_cluster_count": 0,
+        }
+    try:
+        contract = event_source_independence.combine_source_independence_contracts(
+            list(contracts.values())
+        )
+    except (TypeError, ValueError):
+        return {
+            "source_independence": {},
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_contract_union_failed"
+            ],
+            "source_independence_rejected": True,
+            "source_independence_rejection_reason": "contract_union_failed",
+            "independent_source_count": 0,
+            "independent_corroboration_count": 0,
+            "source_content_cluster_count": 0,
+        }
+    return {
+        "source_independence": contract,
+        "source_independence_status": "assessed",
+        "source_independence_errors": [],
+        "independent_source_count": int(contract.get("independent_evidence_count") or 0),
+        "independent_corroboration_count": int(contract.get("independent_corroboration_count") or 0),
+        "source_content_cluster_count": int(contract.get("content_cluster_count") or 0),
+    }
+
+
+def _source_independence_error_items(value: Any) -> tuple[Any, ...]:
+    if value in (None, "", [], (), {}):
+        return ()
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    return (value,)
 
 
 def _is_market_anomaly_row(row: Mapping[str, Any]) -> bool:

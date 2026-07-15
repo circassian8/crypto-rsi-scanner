@@ -220,6 +220,11 @@ def _core_row_acquisition_metrics(
     accepted_source = _accepted_evidence_source_summary(acquisition.accepted_evidence_samples)
     latest_source = _first_real_text(all_rows, ("latest_source", "source", "source_provider", "provider")) or accepted_source.get("provider")
     source_count = _canonical_source_count(all_rows, acquisition)
+    (
+        source_independence,
+        source_independence_status,
+        source_independence_errors,
+    ) = _canonical_event_source_independence(all_rows)
     market_summary = _canonical_market_summary(
         market_level=market_level,
         market_score=market_after,
@@ -251,6 +256,12 @@ def _core_row_acquisition_metrics(
         "accepted_source": accepted_source,
         "latest_source": latest_source,
         "source_count": source_count,
+        "source_independence": source_independence,
+        "independent_source_count": int(source_independence.get("independent_evidence_count") or 0),
+        "independent_corroboration_count": int(source_independence.get("independent_corroboration_count") or 0),
+        "source_content_cluster_count": int(source_independence.get("content_cluster_count") or 0),
+        "source_independence_status": source_independence_status,
+        "source_independence_errors": list(source_independence_errors),
         "market_summary": market_summary,
         "market_snapshot": market_snapshot,
     }
@@ -319,6 +330,12 @@ def _core_row_policy_context(
         "rejected_provider_counts": dict(acquisition.rejected_provider_counts or {}),
         "accepted_reason_code_counts": dict(acquisition.accepted_reason_code_counts or {}),
         "source_pack": source_pack,
+        "evidence_acquisition_source_independence": dict(acquisition.source_independence),
+        "evidence_acquisition_independent_source_count": acquisition.independent_source_count,
+        "evidence_acquisition_independent_corroboration_count": acquisition.independent_corroboration_count,
+        "evidence_acquisition_source_content_cluster_count": acquisition.source_content_cluster_count,
+        "evidence_acquisition_source_independence_status": acquisition.source_independence_status,
+        "evidence_acquisition_source_independence_errors": list(acquisition.source_independence_errors),
     }
     live_policy = event_opportunity_verdict.apply_live_confirmation_policy(
         live_policy_input,
@@ -460,6 +477,12 @@ def _core_row_identity_source_fields(context: Mapping[str, Any]) -> dict[str, An
         "supporting_evidence_quotes": list(item.supporting_evidence_quotes),
         "evidence_quotes": list(item.supporting_evidence_quotes),
         "source_count": context["source_count"],
+        "source_independence": dict(context["source_independence"]),
+        "independent_source_count": context["independent_source_count"],
+        "independent_corroboration_count": context["independent_corroboration_count"],
+        "source_content_cluster_count": context["source_content_cluster_count"],
+        "source_independence_status": context["source_independence_status"],
+        "source_independence_errors": list(context["source_independence_errors"]),
         "latest_source": context["latest_source"],
         "latest_source_url": context["latest_source_url"],
         "latest_source_title": context["latest_source_title"],
@@ -621,6 +644,13 @@ def _core_row_frame_evidence_fields(context: Mapping[str, Any]) -> dict[str, Any
         "source_pack": source_pack,
         "evidence_acquisition_accepted_count": acquisition.accepted_evidence_count,
         "evidence_acquisition_rejected_count": acquisition.rejected_evidence_count,
+        "evidence_acquisition_source_update_count": acquisition.source_update_count,
+        "evidence_acquisition_independent_source_count": acquisition.independent_source_count,
+        "evidence_acquisition_independent_corroboration_count": acquisition.independent_corroboration_count,
+        "evidence_acquisition_source_content_cluster_count": acquisition.source_content_cluster_count,
+        "evidence_acquisition_source_independence": dict(acquisition.source_independence),
+        "evidence_acquisition_source_independence_status": acquisition.source_independence_status,
+        "evidence_acquisition_source_independence_errors": list(acquisition.source_independence_errors),
         "accepted_evidence_count": acquisition.accepted_evidence_count,
         "rejected_evidence_count": acquisition.rejected_evidence_count,
         "accepted_provider_counts": dict(acquisition.accepted_provider_counts or {}),

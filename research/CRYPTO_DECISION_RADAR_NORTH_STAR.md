@@ -105,6 +105,25 @@ and [Miller's event-study design guide
 (2023)](https://www.aeaweb.org/articles?id=10.1257/jep.37.2.203); it does not
 assert that temporal precedence alone proves causality.
 
+Catalyst corroboration is content-aware rather than a raw row or hostname
+count. The closed `event_alpha.source_independence` v1 contract normalizes each
+title/body surface, clusters exact and near-duplicate reports with a
+representative-only three-word-shingle Jaccard rule, and counts an additional
+independent unit only when an assessable content cluster introduces a new
+canonical origin. Raw documents, observed domains, content clusters,
+independent evidence units, and additional corroborations remain distinct.
+Missing, incomplete, over-bound, or invalid assessments are explicitly
+`unassessed` or `rejected` and provide zero diversity promotion; legacy rows
+remain readable without fabricated values. This contract does not establish
+publisher ownership independence, authority, truth, impact, or causality. It
+only replaces legacy raw-row/hostname diversity inputs one for one and may
+remove duplicate-derived support; any new positive promotion or calibration
+requires a separate outcome-backed decision. The method is informed by
+[Rodier and Carter's near-duplicate news study
+(2020)](https://aclanthology.org/2020.lrec-1.156/), while the fixed `0.80`
+threshold and evidence semantics are project policy rather than claims from
+the paper.
+
 ## One Closed Decision Authority
 
 `decision_model_values(raw_row)` returns the canonical, schema-backed Decision
@@ -125,6 +144,9 @@ The projection carries all data required to validate and render itself:
 - minimal resolvable calendar evidence and explicit RSI-context references;
 - validated catalyst-attribution values tying every causal-confidence claim to
   an exact source and anomaly;
+- the validated source-independence contract, explicit assessed/unassessed/
+  rejected status, bounded errors, and exact independent-unit/corroboration/
+  content-cluster counts;
 - the canonical market-context reference (`source`, `observed_at`,
   `freshness_status`, and `market_snapshot_id`);
 - observation ids, source/provider lineage, evaluation timestamp, and explicit

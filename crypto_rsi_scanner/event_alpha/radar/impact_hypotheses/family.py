@@ -22,6 +22,7 @@ import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
 import crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames as event_llm_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from ..llm.extractor import EventLLMExtractionReportRow
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from ..resolver import clean_text
@@ -240,6 +241,8 @@ def _merge_aggregated_hypotheses(
         "supporting_categories": supporting_categories,
         "supporting_impact_paths": supporting_impact_paths,
     })
+    independence_fields, independence_warning = _matching_source_independence(current, item)
+    _replace_independence_components(components, independence_fields)
     return replace(
         winner,
         aggregated_candidate_id=aggregate_id,
@@ -253,7 +256,13 @@ def _merge_aggregated_hypotheses(
         source_event_ids=tuple(dict.fromkeys((*current.source_event_ids, *item.source_event_ids))),
         evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),
         validation_reasons=tuple(dict.fromkeys((*current.validation_reasons, *item.validation_reasons))),
-        warnings=tuple(dict.fromkeys((*current.warnings, *item.warnings, "aggregated_validated_hypothesis"))),
+        warnings=tuple(dict.fromkeys((
+            *current.warnings,
+            *item.warnings,
+            "aggregated_validated_hypothesis",
+            *((independence_warning,) if independence_warning else ()),
+        ))),
+        **independence_fields,
         score_components=components,
     )
 
@@ -271,6 +280,8 @@ def _merge_duplicate_hypotheses(
     other = current if winner is item else item
     components = dict(other.score_components or {})
     components.update(dict(winner.score_components or {}))
+    independence_fields, independence_warning = _matching_source_independence(current, item)
+    _replace_independence_components(components, independence_fields)
     components["incident_source_update_count"] = float(len(set((*current.source_raw_ids, *item.source_raw_ids))))
     incident_confidence = max(
         _coerce_score(current.incident_confidence),
@@ -298,12 +309,194 @@ def _merge_duplicate_hypotheses(
         evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),
         validation_reasons=tuple(dict.fromkeys((*current.validation_reasons, *item.validation_reasons))),
         rejection_reasons=tuple(dict.fromkeys((*current.rejection_reasons, *item.rejection_reasons))),
-        warnings=tuple(dict.fromkeys((*current.warnings, *item.warnings, "incident_evidence_update"))),
+        warnings=tuple(dict.fromkeys((
+            *current.warnings,
+            *item.warnings,
+            "incident_evidence_update",
+            *((independence_warning,) if independence_warning else ()),
+        ))),
         claim_history=tuple({json.dumps(row, sort_keys=True): row for row in (*current.claim_history, *item.claim_history)}.values()),
-        independent_source_domains=tuple(dict.fromkeys((*current.independent_source_domains, *item.independent_source_domains))),
+        **independence_fields,
         conflicting_claims=tuple(dict.fromkeys((*current.conflicting_claims, *item.conflicting_claims))),
         score_components=components,
     )
+
+
+def _matching_source_independence(
+    current: EventImpactHypothesis,
+    item: EventImpactHypothesis,
+) -> tuple[dict[str, Any], str | None]:
+    scope_ids = {
+        str(value).strip()
+        for hypothesis in (current, item)
+        for value in (hypothesis.incident_id or hypothesis.event_cluster_id,)
+        if str(value or "").strip()
+    }
+    if len(scope_ids) > 1:
+        return _source_independence_merge_result(
+            "rejected", ("source_independence_scope_mismatch",)
+        ), "source_independence_merge_rejected"
+
+    contracts: list[dict[str, Any]] = []
+    unassessed = False
+    for hypothesis in (current, item):
+        errors = _bounded_source_independence_errors(
+            hypothesis.source_independence_errors
+        )
+        if errors:
+            return _source_independence_merge_result(
+                "rejected", errors
+            ), "source_independence_merge_rejected"
+        status = str(hypothesis.source_independence_status or "").strip().casefold()
+        if status == "rejected":
+            return _source_independence_merge_result(
+                "rejected", ("source_independence_upstream_rejected",)
+            ), "source_independence_merge_rejected"
+        if status == "unassessed":
+            if hypothesis.source_independence not in ({}, None):
+                return _source_independence_merge_result(
+                    "rejected", ("source_independence_status_contract_mismatch",)
+                ), "source_independence_merge_rejected"
+            unassessed = True
+            continue
+        if status != "assessed":
+            return _source_independence_merge_result(
+                "rejected", ("source_independence_status_invalid",)
+            ), "source_independence_merge_rejected"
+        value = hypothesis.source_independence
+        if not isinstance(value, Mapping):
+            return _source_independence_merge_result(
+                "rejected", ("source_independence_contract_invalid",)
+            ), "source_independence_merge_rejected"
+        validation_errors = (
+            event_source_independence.validate_source_independence_contract(value)
+        )
+        if validation_errors:
+            return _source_independence_merge_result(
+                "rejected", validation_errors
+            ), "source_independence_merge_rejected"
+        expected = (
+            (hypothesis.independent_source_count, value.get("independent_evidence_count")),
+            (
+                hypothesis.independent_corroboration_count,
+                value.get("independent_corroboration_count"),
+            ),
+            (
+                hypothesis.source_content_cluster_count,
+                value.get("content_cluster_count"),
+            ),
+        )
+        if any(
+            type(observed) is not int
+            or type(contract_value) is not int
+            or observed != contract_value
+            for observed, contract_value in expected
+        ):
+            return _source_independence_merge_result(
+                "rejected", ("source_independence_hypothesis_alias_mismatch",)
+            ), "source_independence_merge_rejected"
+        contracts.append(dict(value))
+    if unassessed or not contracts:
+        return _source_independence_merge_result(
+            "unassessed"
+        ), "source_independence_merge_unassessed"
+    try:
+        contract = event_source_independence.combine_source_independence_contracts(
+            contracts
+        )
+    except (TypeError, ValueError):
+        return _source_independence_merge_result(
+            "rejected", ("source_independence_contract_union_failed",)
+        ), "source_independence_merge_rejected"
+    return _source_independence_merge_result("assessed", contract=contract), None
+
+
+def _source_independence_merge_result(
+    status: str,
+    errors: Iterable[object] = (),
+    *,
+    contract: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    if status != "assessed" or not isinstance(contract, Mapping):
+        return {
+            "independent_source_domains": (),
+            "source_independence": {},
+            "source_independence_status": status,
+            "source_independence_errors": _bounded_source_independence_errors(
+                errors
+            ),
+            "independent_source_count": None,
+            "independent_corroboration_count": None,
+            "source_content_cluster_count": None,
+        }
+    return {
+        "independent_source_domains": _independent_domains(contract),
+        "source_independence": dict(contract),
+        "source_independence_status": "assessed",
+        "source_independence_errors": (),
+        "independent_source_count": contract["independent_evidence_count"],
+        "independent_corroboration_count": contract[
+            "independent_corroboration_count"
+        ],
+        "source_content_cluster_count": contract["content_cluster_count"],
+    }
+
+
+def _independent_domains(contract: Mapping[str, Any]) -> tuple[str, ...]:
+    documents = {
+        str(row.get("document_id") or ""): row
+        for row in contract.get("documents", ())
+        if isinstance(row, Mapping)
+    }
+    return tuple(dict.fromkeys(
+        str(documents[document_id].get("canonical_origin") or "")
+        for value in contract.get("independent_representative_ids", ())
+        for document_id in (str(value or ""),)
+        if document_id in documents
+        and str(documents[document_id].get("canonical_origin") or "")
+    ))
+
+
+def _bounded_source_independence_errors(value: object) -> tuple[str, ...]:
+    values = (value,) if isinstance(value, str) else value
+    if not isinstance(values, Iterable):
+        return ()
+    return tuple(dict.fromkeys(
+        str(error).strip()[:160]
+        for error in values
+        if str(error).strip()
+    ))[:16]
+
+
+def _replace_independence_components(
+    components: dict[str, Any],
+    fields: Mapping[str, Any],
+) -> None:
+    for key in (
+        "source_independence",
+        "source_independence_status",
+        "source_independence_errors",
+        "independent_source_count",
+        "independent_corroboration_count",
+        "source_content_cluster_count",
+    ):
+        components.pop(key, None)
+    components["source_independence"] = dict(
+        fields.get("source_independence") or {}
+    )
+    components["source_independence_status"] = str(
+        fields.get("source_independence_status") or "unassessed"
+    )
+    components["source_independence_errors"] = list(
+        fields.get("source_independence_errors") or ()
+    )
+    for key in (
+        "independent_source_count",
+        "independent_corroboration_count",
+        "source_content_cluster_count",
+    ):
+        if fields.get(key) is not None:
+            components[key] = float(fields[key])
 
 
 def _hypothesis_id(

@@ -17,6 +17,64 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Prevent syndicated catalyst copies from inflating evidence · Codex
+**Why:** Reposted or lightly edited news could previously raise duplicate,
+domain-diversity, graph, alert, incident, and hypothesis confidence as though it
+were independent corroboration. That made source quantity a misleading proxy
+for evidentiary strength in a core catalyst-detection path.
+**Changes:**
+- Added the closed `event_alpha.source_independence` v1 contract. It normalizes
+  bounded title/body surfaces, detects exact copies and near-duplicates with
+  deterministic three-word shingle Jaccard similarity, and requires both
+  independent content and independent canonical origin before counting an
+  additional corroboration. Raw document count, observed domains, content
+  clusters, independent evidence units, and additional corroborations remain
+  separate.
+- Made the contract recomputable and tamper-evident, with strict URL hygiene,
+  representative-only non-transitive clustering, public-time ordering,
+  bounded inputs, deterministic union/deduplication, and explicit
+  `assessed`/`unassessed`/`rejected` status plus bounded error codes. Invalid,
+  incomplete, contradictory, or over-limit inputs fail soft operationally but
+  provide no confidence, confirmation, novelty, or promotion boost. Every
+  positive consumer now validates the complete status/error/count wrapper, so
+  a valid inner contract paired with rejected state, errors, or alias drift
+  also fails closed.
+- Replaced legacy raw-row/domain-diversity boosts in discovery, graphs, alerts,
+  incidents, impact hypotheses, watchlist material-change detection, evidence
+  acquisition, and source-only narrative policy with validated independent
+  corroboration. Event and later acquisition scopes stay separate; timestamp
+  consensus alone cannot confirm a cluster.
+- Propagated the contract and status through CoreOpportunity, integrated
+  candidates, canonical Decision-v2 projection, cards, notifications, pending
+  outcomes, and cross-artifact consistency machinery. Existing projection-v1
+  artifacts without the additive extension remain readable and idempotent;
+  current malformed or semantically contradictory projections fail closed.
+- Updated operator language so legacy raw source counts are never described as
+  corroboration, documented the policy and its future labeled out-of-sample
+  validation requirement, and updated the Event Alpha/Decision Radar North Star,
+  `DECISIONS.md`, `ROADMAP.md`, and generated health reports. The design follows
+  the title/body shingling and cross-site near-duplicate evidence in [Rodier and
+  Carter, LREC 2020](https://aclanthology.org/2020.lrec-1.156/), while keeping
+  the selected threshold explicit and uncalibrated until outcomes exist.
+**Verify:** 63 focused contract/surface tests, 161 expanded affected tests, and
+107 Decision/schema/security tests passed; the full Event Alpha suite passed
+1,956 tests in 99.01 seconds; the integrated-radar smoke produced 15 candidates
+and 12 Core/card rows with strict doctor at zero blockers and warnings and
+dashboard readiness green; `python3 -m compileall -q crypto_rsi_scanner tests`;
+`make architecture-cleanliness-check PYTHON=python3` with zero new size
+violations and zero over-limit functions; 69 post-audit Unicode, wrapper,
+consumer, North Star, and architecture regressions passed; the final `make
+verify-fast PYTHON=python3` passed 2,201 tests in 116.67 seconds plus alert,
+backtest, and paper-scoreboard
+gates; full `make verify PYTHON=python3` passed the 1,383-test standalone
+compatibility runner, the 2,198-test pytest gate in 116.39 seconds, and every
+remaining release smoke; all modified JSON parsed; `git diff --check`.
+**Notes/risks:** The current contract is deliberately copied through canonical
+artifacts for closed validation; bounded digest-addressed compaction is the next
+tracked storage improvement. This change made no provider call, send, trade,
+paper trade, normal RSI write, Event Alpha `TRIGGERED_FADE`, authorization,
+threshold auto-change, or dashboard-authority mutation.
+
 ## 2026-07-15 — Bind catalyst claims to exact anomaly timing and evidence · Codex
 **Why:** A source published after a market anomaly could still be treated as a
 confirmed catalyst when it was official but explicitly retrospective or

@@ -20,6 +20,8 @@ from .radar_north_star_evidence import (
     CATALYST_ATTRIBUTION_POLICY,
     LLM_CATALYST_FRAME_BINDING_POLICY,
     SOURCE_AUTHORITY_POLICY,
+    SOURCE_INDEPENDENCE_POLICY,
+    append_source_independence_north_star,
 )
 from .radar_north_star_shadow import SHADOW_ANOMALY_EPISODE_POLICY, SHADOW_TEMPORAL_SURPRISE_POLICY, append_shadow_policies_north_star
 
@@ -79,6 +81,15 @@ ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
             "event_integrated_radar_outcomes.jsonl",
         ],
         "north_star_requirement": "A retrospective, background, historical, reaction, corrective, or unclocked source may remain visible context but cannot become antecedent causal confirmation merely because it is official or accepted.",
+    },
+    "source_independence": {
+        "role": "Separates raw updates, canonical origins, content clusters, independent evidence units, and additional corroborations so syndicated or mirrored copies cannot masquerade as confirmation.",
+        "primary_artifacts": [
+            "event_integrated_radar_candidates.jsonl",
+            "event_core_opportunities.jsonl",
+            "event_integrated_radar_outcomes.jsonl",
+        ],
+        "north_star_requirement": "Only a closed origin-aware near-duplicate contract may support current source-diversity bonuses; missing or invalid contracts fail closed without reinterpreting historical rows.",
     },
     "market_state_builder": {
         "role": "Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence.",
@@ -572,6 +583,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
         "llm_catalyst_frame_binding_policy": deepcopy(LLM_CATALYST_FRAME_BINDING_POLICY),
         "catalyst_attribution_policy": deepcopy(CATALYST_ATTRIBUTION_POLICY),
+        "source_independence_policy": deepcopy(SOURCE_INDEPENDENCE_POLICY),
         "shadow_temporal_surprise_policy": deepcopy(SHADOW_TEMPORAL_SURPRISE_POLICY),
         "shadow_anomaly_episode_policy": deepcopy(SHADOW_ANOMALY_EPISODE_POLICY),
         "product_layers": deepcopy(PRODUCT_LAYERS),
@@ -1013,6 +1025,7 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
     _append_source_authority_north_star(lines, payload)
     _append_catalyst_frame_binding_north_star(lines, payload)
     _append_catalyst_attribution_north_star(lines, payload)
+    append_source_independence_north_star(lines, payload)
     append_shadow_policies_north_star(lines, payload)
     layers = payload.get("product_layers") if isinstance(payload.get("product_layers"), Mapping) else {}
     lines.extend(["## Product Layering", ""])

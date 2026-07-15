@@ -13,7 +13,83 @@ from .... import event_fade
 import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+from crypto_rsi_scanner.event_alpha.radar.source_independence import validate_source_independence_contract
 from .models import *  # noqa: F403 - split modules share historical model names
+
+
+def _hypothesis_source_independence_fields(hypothesis: object) -> dict[str, Any]:
+    empty = {
+        "source_independence": {},
+        "source_independence_status": "unassessed",
+        "source_independence_errors": [],
+        "independent_source_count": None,
+        "independent_corroboration_count": None,
+        "source_content_cluster_count": None,
+    }
+    raw_errors = getattr(hypothesis, "source_independence_errors", ())
+    values = (raw_errors,) if isinstance(raw_errors, str) else raw_errors
+    errors = list(dict.fromkeys(
+        str(error).strip()[:160]
+        for error in values
+        if str(error).strip()
+    ))[:16] if isinstance(values, Iterable) else []
+    if errors:
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": errors,
+        }
+    status = str(
+        getattr(hypothesis, "source_independence_status", "unassessed") or ""
+    ).strip().casefold()
+    contract = getattr(hypothesis, "source_independence", {})
+    if status == "unassessed" and contract in ({}, None):
+        return empty
+    if status == "rejected":
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_upstream_rejected"
+            ],
+        }
+    if (
+        status != "assessed"
+        or not isinstance(contract, Mapping)
+        or validate_source_independence_contract(contract)
+    ):
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_contract_or_status_invalid"
+            ],
+        }
+    expected = {
+        "independent_source_count": contract.get("independent_evidence_count"),
+        "independent_corroboration_count": contract.get(
+            "independent_corroboration_count"
+        ),
+        "source_content_cluster_count": contract.get("content_cluster_count"),
+    }
+    if any(
+        type(getattr(hypothesis, field, None)) is not int
+        or getattr(hypothesis, field, None) != value
+        for field, value in expected.items()
+    ):
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_hypothesis_alias_mismatch"
+            ],
+        }
+    return {
+        "source_independence": dict(contract),
+        "source_independence_status": "assessed",
+        "source_independence_errors": [],
+        **expected,
+    }
 
 
 def _entry_from_alert(
@@ -31,6 +107,7 @@ def _entry_from_alert(
         **quality,
         "source_raw_ids": list(event.raw_ids),
         "source_event_ids": [event.event_id],
+        "source_update_count": len(event.raw_ids),
     }
     final_state, quality_state_block = quality_cap_watchlist_state(requested_state, score_components)
     state = EventWatchlistState(final_state)
@@ -361,6 +438,7 @@ def _hypothesis_latest_score_components(
     validated: bool,
     validated_asset: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    source_independence = _hypothesis_source_independence_fields(hypothesis)
     return {
         "run_id": _optional_str(getattr(hypothesis, "run_id", None)),
         "profile": _optional_str(getattr(hypothesis, "profile", None)),
@@ -375,6 +453,7 @@ def _hypothesis_latest_score_components(
         "supporting_evidence_quotes": list(getattr(hypothesis, "supporting_evidence_quotes", ()) or ())[:8],
         "source_raw_ids": list(getattr(hypothesis, "source_raw_ids", ()) or ())[:24],
         "source_event_ids": list(getattr(hypothesis, "source_event_ids", ()) or ())[:24],
+        "source_update_count": len(tuple(getattr(hypothesis, "source_raw_ids", ()) or ())),
         "impact_category": category,
         "validation_stage": validation_stage or "unknown",
         "impact_path_reason": _optional_str(getattr(hypothesis, "impact_path_reason", None)),
@@ -487,6 +566,7 @@ def _hypothesis_latest_score_components(
         "crypto_candidate_assets": list(getattr(hypothesis, "crypto_candidate_assets", ()) or ())[:12],
         "rejected_candidate_assets": list(getattr(hypothesis, "rejected_candidate_assets", ()) or ())[:8],
         **dict(getattr(hypothesis, "score_components", {}) or {}),
+        **source_independence,
     }
 
 

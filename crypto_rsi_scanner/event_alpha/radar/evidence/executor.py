@@ -14,6 +14,7 @@ from typing import Any, Iterable, Mapping, Protocol
 import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
 import crypto_rsi_scanner.event_alpha.radar.llm.evidence_planner as event_llm_evidence_planner
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from ..resolver import clean_text
 from ...providers import source_packs as event_source_packs
 from ...providers import source_registry as event_source_registry
@@ -243,6 +244,11 @@ def _execute_request(
         if provider_used:
             providers_used.append(provider_used)
     final_status = _aggregate_status(query_results)
+    accepted_raw_by_id = {raw.raw_id: raw for raw in accepted_raw}
+    source_independence, source_independence_errors = event_source_independence.assess_source_independence_safe([
+        _source_independence_row(raw)
+        for raw in accepted_raw_by_id.values()
+    ], expected_document_count=len(accepted_raw_by_id))
     result = EvidenceAcquisitionResult(
         acquisition_id=request.acquisition_id,
         opportunity_id=request.opportunity_id,
@@ -283,14 +289,45 @@ def _execute_request(
         acquisition_upgrade_status="unchanged",
         final_upgrade_status="unchanged",
         no_upgrade_reason=None if accepted_evidence else _no_upgrade_reason(final_status, failures),
-        warnings=tuple(dict.fromkeys(
-            warning
-            for query_result in query_results
-            for warning in (*query_result.warnings, *query_result.provider_failures)
-            if warning
-        )),
+        source_update_count=len(accepted_raw_by_id),
+        independent_source_count=int(source_independence.get("independent_evidence_count") or 0),
+        independent_corroboration_count=int(source_independence.get("independent_corroboration_count") or 0),
+        source_content_cluster_count=int(source_independence.get("content_cluster_count") or 0),
+        source_independence=source_independence,
+        source_independence_status=(
+            "assessed"
+            if source_independence
+            else "rejected"
+            if source_independence_errors
+            else "unassessed"
+        ),
+        source_independence_errors=source_independence_errors,
+        warnings=tuple(dict.fromkeys((
+            *source_independence_errors,
+            *(
+                warning
+                for query_result in query_results
+                for warning in (*query_result.warnings, *query_result.provider_failures)
+                if warning
+            ),
+        ))),
     )
     return result, tuple(accepted_raw)
+
+
+def _source_independence_row(raw: RawDiscoveredEvent) -> dict[str, Any]:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    provenance = payload.get("provenance") if isinstance(payload.get("provenance"), Mapping) else {}
+    return {
+        "source_id": raw.raw_id,
+        "source_url": raw.source_url,
+        "title": raw.title,
+        "body": raw.body,
+        "provider": raw.provider,
+        "source_class": payload.get("source_class") or provenance.get("source_class"),
+        "published_at": raw.published_at,
+        "fetched_at": raw.fetched_at,
+    }
 
 
 def _execute_plan_query(

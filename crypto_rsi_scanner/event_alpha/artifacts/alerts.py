@@ -395,7 +395,8 @@ def _score_components(
     fade_candidate = candidate.fade_candidate
     signal = candidate.fade_signal
     source_quality = event.confidence * 100
-    source_quality += min(10, max(0, len(event.raw_ids) - 1) * 5)
+    corroboration_count = int(cluster.independent_corroboration_count if cluster else 0)
+    source_quality += min(10, max(0, corroboration_count) * 5)
     if is_market_recap_event(event):
         source_quality -= 25
     fade_components = fade_candidate.component_scores if fade_candidate is not None else {}
@@ -414,12 +415,23 @@ def _score_components(
         "derivatives_crowding": _derivatives_quality(fade_candidate),
         "supply_pressure": _clamp(fade_components.get("supply_pressure", 0)),
         "event_time_quality": _clamp((event.event_time_confidence if event.event_time else 0.0) * 100),
-        "novelty_freshness": _novelty_quality(event.first_seen_time, now, len(event.raw_ids)),
+        "novelty_freshness": _novelty_quality(event.first_seen_time, now, corroboration_count),
         "fade_score": _clamp(signal.fade_score if signal else 0),
         "classifier": _clamp(cls.confidence * 100),
         "cluster_confirmation": _cluster_confirmation_quality(candidate, cluster),
         "cluster_confidence": _clamp(cluster.cluster_confidence if cluster else 0),
-        "independent_source_count": int(cluster.independent_source_count if cluster else len(event.raw_ids)),
+        "independent_source_count": int(cluster.independent_source_count if cluster else 0),
+        "independent_corroboration_count": corroboration_count,
+        "source_content_cluster_count": int(cluster.source_content_cluster_count if cluster else 0),
+        "source_independence": dict(cluster.source_independence) if cluster else {},
+        "source_independence_errors": list(cluster.source_independence_errors) if cluster else [],
+        "source_independence_status": (
+            "assessed"
+            if cluster and cluster.source_independence
+            else "rejected"
+            if cluster and cluster.source_independence_errors
+            else "unassessed"
+        ),
         "accepted_link_kind": accepted_link.accepted_kind if accepted_link else "none",
         "event_time_consensus": _clamp(cluster.event_time_consensus if cluster else 0),
         "catalyst_attributions": catalyst_attributions,
@@ -639,12 +651,12 @@ def _derivatives_quality(candidate: event_fade.FadeCandidate | None) -> int:
     return max(values)
 
 
-def _novelty_quality(first_seen: datetime | None, now: datetime, source_count: int) -> int:
+def _novelty_quality(first_seen: datetime | None, now: datetime, independent_corroboration_count: int) -> int:
     if first_seen is None:
         return 45
     hours = max(0.0, (_as_utc(now) - _as_utc(first_seen)).total_seconds() / 3600.0)
     freshness = 100 if hours <= 24 else 75 if hours <= 72 else 45 if hours <= 168 else 20
-    return _clamp(freshness + min(10, max(0, source_count - 1) * 5))
+    return _clamp(freshness + min(10, max(0, independent_corroboration_count) * 5))
 
 
 def _reason(
@@ -811,7 +823,7 @@ def _cluster_confirmation_quality(
     matching_link = _cluster_link_for_candidate(candidate, cluster)
     if matching_link is None or not _cluster_link_kind_matches_candidate(candidate, matching_link):
         return 0
-    if cluster.independent_source_count < 2 and cluster.event_time_consensus < 100:
+    if cluster.independent_corroboration_count < 1:
         return 0
     return _clamp(cluster.cluster_confidence)
 

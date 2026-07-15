@@ -11,6 +11,7 @@ from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from ...artifacts import paths as event_artifact_paths
 from .. import core_opportunities as event_core_opportunities
 from ..decision_model_surfaces import DECISION_MODEL_FIELD_NAMES, decision_model_values
@@ -449,11 +450,82 @@ def _canonical_source_count(
     acquisition: CoreEvidenceAcquisitionView,
 ) -> int:
     counts = [
-        _float_or_none(_first_value(rows, ("source_count", "independent_source_count", "source_update_count"))),
-        float(acquisition.accepted_evidence_count) if acquisition.accepted_evidence_count else None,
+        _float_or_none(_first_value(rows, ("source_count", "source_update_count"))),
+        float(acquisition.accepted_evidence_count)
+        if acquisition.accepted_evidence_count
+        else None,
     ]
-    count = max((int(value) for value in counts if value is not None), default=0)
-    return count
+    return max((int(value) for value in counts if value is not None), default=0)
+
+
+def _canonical_event_source_independence(
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, Any], str, tuple[str, ...]]:
+    contracts: dict[str, dict[str, Any]] = {}
+    errors: list[str] = []
+    statuses: list[str] = []
+    for row in rows:
+        if str(row.get("row_type") or "") == "event_evidence_acquisition":
+            continue
+        containers = [row]
+        containers.extend(
+            value
+            for key in ("latest_score_components", "score_components", "data_quality")
+            if isinstance((value := row.get(key)), Mapping)
+        )
+        for container in containers:
+            value = container.get("source_independence_errors")
+            if isinstance(value, str):
+                value = [value]
+            if isinstance(value, (list, tuple)):
+                errors.extend(
+                    str(item).strip()[:160]
+                    for item in value
+                    if str(item).strip()
+                )
+            if "source_independence_status" in container:
+                status = str(
+                    container.get("source_independence_status") or ""
+                ).strip().casefold()
+                statuses.append(status)
+                if status not in {"assessed", "unassessed", "rejected"}:
+                    errors.append("source_independence_status_invalid")
+        value = next(
+            (
+                container.get("source_independence")
+                for container in containers
+                if container.get("source_independence") not in (None, {})
+            ),
+            None,
+        )
+        if value is None:
+            continue
+        if not isinstance(value, Mapping):
+            errors.append("source_independence_contract_invalid")
+            continue
+        if event_source_independence.validate_source_independence_contract(value):
+            errors.append("source_independence_contract_invalid")
+            continue
+        contract = dict(value)
+        contracts[str(contract.get("contract_digest") or "")] = contract
+    if contracts and any(status != "assessed" for status in statuses):
+        errors.append("source_independence_status_contract_mismatch")
+    if not contracts and "assessed" in statuses:
+        errors.append("source_independence_assessed_without_contract")
+    if "rejected" in statuses and not errors:
+        errors.append("source_independence_rejected_without_error")
+    errors = list(dict.fromkeys(errors))[:16]
+    if errors:
+        return {}, "rejected", tuple(errors)
+    if not contracts:
+        return {}, "unassessed", ()
+    try:
+        contract = event_source_independence.combine_source_independence_contracts(
+            list(contracts.values())
+        )
+    except (TypeError, ValueError):
+        return {}, "rejected", ("source_independence_contract_union_failed",)
+    return contract, "assessed", ()
 
 
 def _first_real_text(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> str | None:

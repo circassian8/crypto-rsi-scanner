@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-15T11:01:42.976433+00:00`
+- generated_at: `2026-07-15T12:19:39.566648+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -38,6 +38,11 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - role: Binds one exact source to one exact anomaly and separates source-public time, claimed event time, semantic role, and causal eligibility before Decision-v2 catalyst confidence is assigned.
 - primary_artifacts: `event_integrated_radar_candidates.jsonl, event_core_opportunities.jsonl, event_integrated_radar_outcomes.jsonl`
 - north_star_requirement: A retrospective, background, historical, reaction, corrective, or unclocked source may remain visible context but cannot become antecedent causal confirmation merely because it is official or accepted.
+
+### source_independence
+- role: Separates raw updates, canonical origins, content clusters, independent evidence units, and additional corroborations so syndicated or mirrored copies cannot masquerade as confirmation.
+- primary_artifacts: `event_integrated_radar_candidates.jsonl, event_core_opportunities.jsonl, event_integrated_radar_outcomes.jsonl`
+- north_star_requirement: Only a closed origin-aware near-duplicate contract may support current source-diversity bonuses; missing or invalid contracts fail closed without reinterpreting historical rows.
 
 ### market_state_builder
 - role: Builds return, volume, liquidity, freshness, relative-market context, explicit feature bases, bounded per-asset temporal baselines, and isolated post-scan robust-surprise shadow evidence.
@@ -151,6 +156,31 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - research_only: `True`
 - auto_apply: `False`
 - research_basis: MacKinlay 1997 event-study timing and event-window discipline, Miller 2023 event-study design and interpretation guidance
+
+## Source Independence and Near-Duplicate Evidence
+
+- schema: `event_alpha.source_independence v1`
+- unit_of_measurement: `origin-aware content cluster`
+- raw_documents_are_independent_sources: `False`
+- distinct_domains_are_independent_sources: `False`
+- comparison_surface: `normalized title newline body`
+- normalization: `unicode NFKC, casefold, alphanumeric whitespace projection`
+- near_duplicate_method: `three-word set-shingle Jaccard`
+- near_duplicate_threshold: `0.8`
+- minimum_near_duplicate_tokens: `12`
+- cluster_assignment: `public-time/source-id ordered canonical representatives only`
+- transitive_member_chaining: `False`
+- independent_unit_rule: `assessable content cluster that introduces a previously unseen canonical origin`
+- independent_corroboration_count: `max(0, independent_evidence_count - 1)`
+- missing_short_malformed_or_overflowing_inputs: `unassessable_or_rejected_fail_closed`
+- source_authority_assessed: `False`
+- claim_truth_assessed: `False`
+- causal_attribution_assessed: `False`
+- historical_rows_without_contract: `legacy_unassessed_no_diversity_promotion`
+- positive_policy: `may replace prior raw-row or hostname diversity bonuses only; cannot create a new route, lower a blocker, or weaken an evidence threshold`
+- research_only: `True`
+- auto_apply_calibration: `False`
+- research_basis: Rodier and Carter 2020 online near-duplicate news detection
 
 ## Shadow Robust Temporal Surprise
 

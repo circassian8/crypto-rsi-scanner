@@ -232,6 +232,26 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         source_confidence=0.88,
         content_hash="rune-accepted",
     )
+    accepted_independent_raw = RawDiscoveredEvent(
+        raw_id="raw:rune-independent",
+        provider="cryptopanic",
+        fetched_at=fetched,
+        published_at=fetched,
+        source_url="https://news.cryptopanic.com/rune-security-recovery",
+        title="THORChain publishes independent RUNE security recovery details",
+        body=(
+            "THORChain validators completed the exploit recovery procedure and "
+            "documented the separate security controls used before RUNE markets "
+            "resumed normal settlement operations."
+        ),
+        raw_json={
+            "currency_tags": ("RUNE",),
+            "currencies": [{"code": "RUNE", "slug": "thorchain"}],
+            "source_origin": "CryptoPanic",
+        },
+        source_confidence=0.92,
+        content_hash="rune-independent",
+    )
     rejected_raw = RawDiscoveredEvent(
         raw_id="raw:rune-rejected",
         provider="polymarket",
@@ -245,7 +265,10 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         content_hash="rune-rejected",
     )
     provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={
-        "RUNE hack incident security market reaction": (accepted_raw,),
+        "RUNE hack incident security market reaction": (
+            accepted_raw,
+            accepted_independent_raw,
+        ),
         "RUNE exploit official update": (rejected_raw,),
     })
     with TemporaryDirectory() as tmp:
@@ -269,6 +292,10 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert result.accepted == 1
         assert result.rows_written == 1
         assert result.results[0].status == "accepted_evidence_found"
+        assert result.results[0].source_update_count == 2
+        assert result.results[0].source_independence_status == "assessed"
+        assert result.results[0].independent_source_count == 2
+        assert result.results[0].independent_corroboration_count == 1
         assert any("cryptopanic_currency_tag_match" in item["reason_codes"] for item in result.results[0].accepted_evidence)
         accepted_sample = result.results[0].accepted_evidence[0]
         assert accepted_sample["source_class"] == "cryptopanic_tagged"
@@ -291,6 +318,15 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert "token_identity_validation" in rows[0]["source_can_prove"]
         assert "security_or_regulatory_shock" in rows[0]["source_useful_playbooks"]
         assert "official_confirmation" in rows[0]["source_cannot_prove"]
+        import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_store
+
+        acquisition = event_core_store._build_core_evidence_acquisition_view(  # noqa: SLF001
+            rows[0]["core_opportunity_id"],
+            rows,
+        )
+        assert acquisition.source_independence_status == "assessed"
+        assert acquisition.independent_source_count == 2
+        assert acquisition.independent_corroboration_count == 1
 
 
 def test_event_evidence_acquisition_accepts_structured_tokenomist_unlocks():

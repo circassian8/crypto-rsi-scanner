@@ -22,6 +22,7 @@ import crypto_rsi_scanner.event_alpha.radar.identity as event_identity
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator
 import crypto_rsi_scanner.event_alpha.radar.llm.catalyst_frames as event_llm_catalyst_frames
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 from ..llm.extractor import EventLLMExtractionReportRow
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from ..resolver import clean_text
@@ -219,6 +220,7 @@ def _incident_hypothesis_kwargs(
     claim_rows: tuple[Any, ...],
     score_components: Mapping[str, Any],
 ) -> dict[str, Any]:
+    source_independence = _incident_source_independence_fields(incident)
     return {
         "incident_confidence": _optional_score(score_components.get("incident_confidence")) if incident else None,
         "incident_id": incident.incident_id if incident else None,
@@ -262,9 +264,114 @@ def _incident_hypothesis_kwargs(
         "llm_predicted_main_frame_type": incident.llm_predicted_main_frame_type if incident else None,
         "frame_rule_disagreement": incident.frame_rule_disagreement if incident else None,
         "disagreement_resolution": incident.disagreement_resolution if incident else None,
-        "independent_source_domains": incident.independent_source_domains if incident else (),
+        **source_independence,
         "conflicting_claims": incident.conflicting_claims if incident else (),
     }
+
+
+def _incident_source_independence_fields(
+    incident: event_incident_graph.CanonicalIncident | None,
+) -> dict[str, Any]:
+    empty = {
+        "independent_source_domains": (),
+        "independent_source_count": None,
+        "independent_corroboration_count": None,
+        "source_content_cluster_count": None,
+        "source_independence": {},
+        "source_independence_status": "unassessed",
+        "source_independence_errors": (),
+    }
+    if incident is None:
+        return empty
+    upstream_errors = _bounded_source_independence_errors(
+        incident.source_independence_errors
+    )
+    if upstream_errors:
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": upstream_errors,
+        }
+    contract = incident.source_independence
+    if contract == {}:
+        return empty
+    if not isinstance(contract, Mapping):
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": (
+                "source_independence_contract_invalid",
+            ),
+        }
+    validation_errors = event_source_independence.validate_source_independence_contract(
+        contract
+    )
+    if validation_errors:
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": _bounded_source_independence_errors(
+                validation_errors
+            ),
+        }
+    expected_counts = (
+        (incident.independent_source_count, contract.get("independent_evidence_count")),
+        (
+            incident.independent_corroboration_count,
+            contract.get("independent_corroboration_count"),
+        ),
+        (incident.source_content_cluster_count, contract.get("content_cluster_count")),
+    )
+    if any(
+        type(observed) is not int
+        or type(expected) is not int
+        or observed != expected
+        for observed, expected in expected_counts
+    ):
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": (
+                "source_independence_incident_alias_mismatch",
+            ),
+        }
+    return {
+        "independent_source_domains": _independent_domains(contract),
+        "independent_source_count": contract["independent_evidence_count"],
+        "independent_corroboration_count": contract[
+            "independent_corroboration_count"
+        ],
+        "source_content_cluster_count": contract["content_cluster_count"],
+        "source_independence": dict(contract),
+        "source_independence_status": "assessed",
+        "source_independence_errors": (),
+    }
+
+
+def _independent_domains(contract: Mapping[str, Any]) -> tuple[str, ...]:
+    documents = {
+        str(row.get("document_id") or ""): row
+        for row in contract.get("documents", ())
+        if isinstance(row, Mapping)
+    }
+    return tuple(dict.fromkeys(
+        str(documents[document_id].get("canonical_origin") or "")
+        for value in contract.get("independent_representative_ids", ())
+        for document_id in (str(value or ""),)
+        if document_id in documents
+        and str(documents[document_id].get("canonical_origin") or "")
+    ))
+
+
+def _bounded_source_independence_errors(value: object) -> tuple[str, ...]:
+    values = (value,) if isinstance(value, str) else value
+    if not isinstance(values, Iterable):
+        return ()
+    return tuple(dict.fromkeys(
+        str(item).strip()[:160]
+        for item in values
+        if str(item).strip()
+    ))[:16]
 
 
 def _frame_gate_hypothesis_kwargs(frame_gate: Mapping[str, Any]) -> dict[str, Any]:
@@ -357,9 +464,19 @@ def _category_from_incident(category: str, incident: event_incident_graph.Canoni
 
 
 def _incident_score_components(incident: event_incident_graph.CanonicalIncident) -> dict[str, float]:
+    fields = _incident_source_independence_fields(incident)
+    contract = (
+        fields["source_independence"]
+        if fields["source_independence_status"] == "assessed"
+        else {}
+    )
+    independent_evidence = int(contract.get("independent_evidence_count") or 0)
+    independent_corroboration = int(contract.get("independent_corroboration_count") or 0)
     components: dict[str, float] = {
-        "incident_confidence": min(100.0, 35.0 + len(incident.raw_ids) * 12.0 + len(incident.independent_source_domains) * 18.0),
-        "independent_source_count": float(len(incident.independent_source_domains)),
+        "incident_confidence": min(100.0, 35.0 + independent_evidence * 30.0),
+        "independent_source_count": float(independent_evidence),
+        "independent_corroboration_count": float(independent_corroboration),
+        "source_content_cluster_count": float(int(contract.get("content_cluster_count") or 0)),
     }
     if incident.current_cause_status == event_claim_semantics.CauseStatus.CONFIRMED.value:
         components["causal_mechanism_confirmed"] = 85.0

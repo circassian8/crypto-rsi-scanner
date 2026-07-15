@@ -11,11 +11,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable
-from urllib.parse import urlparse
+from typing import Any, Iterable, Mapping
 
-from crypto_rsi_scanner.event_core.models import DiscoveredEventFadeCandidate, EventDiscoveryResult, NormalizedEvent
+from crypto_rsi_scanner.event_core.models import DiscoveredEventFadeCandidate, EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from crypto_rsi_scanner.event_alpha.radar.resolver import clean_text
+import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
 
 EVENT_GRAPH_SCHEMA_VERSION = "event_graph_v1"
 
@@ -63,6 +63,12 @@ class EventCluster:
     source_urls: tuple[str, ...]
     source_count: int = 0
     independent_source_count: int = 0
+    independent_corroboration_count: int = 0
+    source_domain_count: int = 0
+    source_domains: tuple[str, ...] = ()
+    source_content_cluster_count: int = 0
+    source_independence: Mapping[str, Any] = field(default_factory=dict)
+    source_independence_errors: tuple[str, ...] = ()
     source_quality_score: int = 0
     event_time_consensus: int = 0
     accepted_asset_count: int = 0
@@ -84,8 +90,9 @@ def build_event_clusters(result: EventDiscoveryResult) -> tuple[EventCluster, ..
         cluster_id = cluster_id_for_event(candidate.event)
         candidate_links.setdefault(cluster_id, []).append(_asset_link_for_candidate(candidate, cluster_id))
 
+    raw_by_id = {raw.raw_id: raw for raw in result.raw_events}
     clusters = [
-        _cluster_from_events(cluster_id, events, candidate_links.get(cluster_id, ()))
+        _cluster_from_events(cluster_id, events, candidate_links.get(cluster_id, ()), raw_by_id=raw_by_id)
         for cluster_id, events in grouped.items()
     ]
     return tuple(sorted(clusters, key=_cluster_sort_key))
@@ -132,7 +139,10 @@ def format_event_cluster_report(clusters: Iterable[EventCluster]) -> str:
             f"bucket={cluster.event_date_bucket}"
         )
         rows.append(
-            f"  sources: total={cluster.source_count} independent={cluster.independent_source_count} "
+            f"  sources: raw={cluster.source_count} domains={cluster.source_domain_count} "
+            f"independent={cluster.independent_source_count} "
+            f"corroborations={cluster.independent_corroboration_count} "
+            f"content_clusters={cluster.source_content_cluster_count} "
             f"quality={cluster.source_quality_score} · event_time_consensus={cluster.event_time_consensus}"
         )
         accepted_kinds = _accepted_kind_summary(cluster.asset_links)
@@ -163,6 +173,8 @@ def _cluster_from_events(
     cluster_id: str,
     events: Iterable[NormalizedEvent],
     asset_links: Iterable[EventClusterAssetLink],
+    *,
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
 ) -> EventCluster:
     ordered = sorted(events, key=lambda event: (event.first_seen_time, event.event_id))
     first = ordered[0]
@@ -185,21 +197,33 @@ def _cluster_from_events(
     accepted_count = sum(1 for link in links if _counts_for_cluster_confidence(link))
     rejected_count = sum(1 for link in links if not link.accepted)
     source_count = len(raw_ids)
-    independent_sources = _independent_sources(ordered)
-    source_quality = _source_quality_score(ordered, len(independent_sources))
+    source_rows = [
+        _source_independence_row(raw_by_id[raw_id])
+        for raw_id in raw_ids
+        if raw_id in raw_by_id
+    ]
+    independence, independence_errors = event_source_independence.assess_source_independence_safe(
+        source_rows,
+        expected_document_count=len(raw_ids),
+    )
+    independent_evidence_count = int(independence.get("independent_evidence_count") or 0)
+    corroboration_count = int(independence.get("independent_corroboration_count") or 0)
+    source_domains = tuple(str(value) for value in independence.get("distinct_origins", ()) if str(value or ""))
+    content_cluster_count = int(independence.get("content_cluster_count") or 0)
+    source_quality = _source_quality_score(ordered, corroboration_count)
     time_consensus = _event_time_consensus(ordered)
     confidence = _cluster_confidence(
         source_quality=source_quality,
-        independent_source_count=len(independent_sources),
+        independent_source_count=corroboration_count,
         event_time_consensus=time_consensus,
         accepted_asset_count=accepted_count,
         rejected_asset_count=rejected_count,
     )
-    warnings = _cluster_warnings(
-        independent_source_count=len(independent_sources),
+    warnings = tuple(dict.fromkeys((*_cluster_warnings(
+        independent_source_count=corroboration_count,
         event_time_consensus=time_consensus,
         accepted_asset_count=accepted_count,
-    )
+    ), *independence_errors)))
     return EventCluster(
         schema_version=EVENT_GRAPH_SCHEMA_VERSION,
         cluster_id=cluster_id,
@@ -212,7 +236,13 @@ def _cluster_from_events(
         raw_ids=raw_ids,
         source_urls=urls,
         source_count=source_count,
-        independent_source_count=len(independent_sources),
+        independent_source_count=independent_evidence_count,
+        independent_corroboration_count=corroboration_count,
+        source_domain_count=len(source_domains),
+        source_domains=source_domains,
+        source_content_cluster_count=content_cluster_count,
+        source_independence=independence,
+        source_independence_errors=independence_errors,
         source_quality_score=source_quality,
         event_time_consensus=time_consensus,
         accepted_asset_count=accepted_count,
@@ -222,6 +252,22 @@ def _cluster_from_events(
         asset_links=links,
         warnings=warnings,
     )
+
+
+def _source_independence_row(raw: RawDiscoveredEvent) -> dict[str, Any]:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    provenance = payload.get("provenance") if isinstance(payload.get("provenance"), Mapping) else {}
+    source_class = payload.get("source_class") or provenance.get("source_class")
+    return {
+        "source_id": raw.raw_id,
+        "source_url": raw.source_url,
+        "title": raw.title,
+        "body": raw.body,
+        "provider": raw.provider,
+        "source_class": source_class,
+        "published_at": raw.published_at,
+        "fetched_at": raw.fetched_at,
+    }
 
 
 def _asset_link_for_candidate(
@@ -325,27 +371,10 @@ def _cluster_sort_key(cluster: EventCluster) -> tuple[str, str, str]:
     return (cluster.event_date_bucket, cluster.external_asset_slug, cluster.event_type)
 
 
-def _independent_sources(events: Iterable[NormalizedEvent]) -> set[str]:
-    sources: set[str] = set()
-    for event in events:
-        origins = {_source_origin(url) for url in event.source_urls if url}
-        origins = {origin for origin in origins if origin}
-        if origins:
-            sources.update(origins)
-        else:
-            sources.add(clean_text(event.source) or "unknown")
-    return sources
-
-
-def _source_origin(url: str) -> str:
-    parsed = urlparse(url)
-    return (parsed.netloc or parsed.path or "").lower().removeprefix("www.")
-
-
-def _source_quality_score(events: Iterable[NormalizedEvent], independent_source_count: int) -> int:
+def _source_quality_score(events: Iterable[NormalizedEvent], independent_corroboration_count: int) -> int:
     values = [max(0.0, min(1.0, float(event.confidence))) for event in events]
     average = (sum(values) / len(values)) * 100 if values else 0.0
-    diversity_bonus = min(15, max(0, independent_source_count - 1) * 5)
+    diversity_bonus = min(15, max(0, independent_corroboration_count) * 5)
     return _clamp(average + diversity_bonus)
 
 
@@ -368,7 +397,7 @@ def _cluster_confidence(
     accepted_asset_count: int,
     rejected_asset_count: int,
 ) -> int:
-    diversity = min(100, 45 + max(0, independent_source_count - 1) * 25)
+    diversity = min(100, 45 + max(0, independent_source_count) * 25)
     accepted = 70 if accepted_asset_count else 25
     noise_penalty = min(20, max(0, rejected_asset_count - accepted_asset_count) * 5)
     return _clamp(
@@ -387,8 +416,8 @@ def _cluster_warnings(
     accepted_asset_count: int,
 ) -> tuple[str, ...]:
     warnings: list[str] = []
-    if independent_source_count < 2:
-        warnings.append("single independent source")
+    if independent_source_count < 1:
+        warnings.append("no independent corroboration")
     if event_time_consensus < 75:
         warnings.append("weak event-time consensus")
     if accepted_asset_count == 0:

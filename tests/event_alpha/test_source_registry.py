@@ -308,7 +308,11 @@ def test_north_star_records_closed_source_authority_policy():
     policy = payload["source_authority_policy"]
     assert policy["article_text_may_establish_authority"] is False
     assert policy["evidence_quality_reuses_registry_authority"] is True
-    assert "## Catalyst Source Authority" in radar_north_star.format_north_star(payload)
+    markdown = radar_north_star.format_north_star(payload)
+    assert "## Catalyst Source Authority" in markdown
+    assert "## Source Independence and Near-Duplicate Evidence" in markdown
+    assert "near_duplicate_threshold: `0.8`" in markdown
+    assert "transitive_member_chaining: `False`" in markdown
 
 
 def test_event_source_packs_and_feed_coverage_semantics():

@@ -67,6 +67,29 @@ def test_normal_notification_preview_and_heartbeat_wording_stay_no_send():
     assert preview_result["preview_rendered_items"] == 1
 
 
+def test_human_risk_never_treats_legacy_raw_source_count_as_corroboration():
+    from crypto_rsi_scanner.event_alpha.notifications.pipeline_parts import (
+        message_renderer,
+    )
+
+    entry = SimpleNamespace(
+        latest_playbook_type="listing",
+        latest_effective_playbook_type="listing",
+        relationship_type="direct_event",
+        state="RADAR",
+        event_time=datetime(2026, 7, 15, 16, tzinfo=timezone.utc),
+        source_count=9,
+        latest_score_components={},
+        warnings=(),
+    )
+    decision = SimpleNamespace(warnings=())
+
+    risk = message_renderer._human_risk(entry, decision)  # noqa: SLF001
+
+    assert "source independence unassessed" in risk
+    assert "multi-source" not in risk
+
+
 def test_research_review_skip_telemetry_renders_and_delivery_status_fields_persist(tmp_path):
     from crypto_rsi_scanner.event_alpha.notifications import delivery, pipeline
 

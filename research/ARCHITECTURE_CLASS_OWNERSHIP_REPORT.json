@@ -734,7 +734,7 @@
         "EventCoreOpportunityStoreWriteResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 48,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
       "public_class_count": 7,
@@ -794,7 +794,7 @@
         "EvidenceSearchProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 54,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
       "public_class_count": 7,
@@ -826,7 +826,7 @@
         "EventClusterAssetLink"
       ],
       "exception_reason": "",
-      "max_class_line_count": 21,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.graph",
       "public_class_count": 3,
@@ -913,7 +913,7 @@
         "IncidentSubjectValidation"
       ],
       "exception_reason": "",
-      "max_class_line_count": 38,
+      "max_class_line_count": 44,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
       "public_class_count": 3,
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 8643,
+  "function_count": 8700,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-15T11:01:53.197060+00:00",
+  "generated_at": "2026-07-15T12:35:37.850247+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2232,7 +2232,7 @@
         "EventCoreOpportunityStoreWriteResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 48,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
       "public_class_count": 7,
@@ -2292,7 +2292,7 @@
         "EvidenceSearchProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 54,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
       "public_class_count": 7,
@@ -2324,7 +2324,7 @@
         "EventClusterAssetLink"
       ],
       "exception_reason": "",
-      "max_class_line_count": 21,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.graph",
       "public_class_count": 3,
@@ -2411,7 +2411,7 @@
         "IncidentSubjectValidation"
       ],
       "exception_reason": "",
-      "max_class_line_count": 38,
+      "max_class_line_count": 44,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
       "public_class_count": 3,

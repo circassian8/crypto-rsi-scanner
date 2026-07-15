@@ -734,7 +734,7 @@
         "EventCoreOpportunityStoreWriteResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 48,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
       "public_class_count": 7,
@@ -794,7 +794,7 @@
         "EvidenceSearchProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 54,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
       "public_class_count": 7,
@@ -826,7 +826,7 @@
         "EventClusterAssetLink"
       ],
       "exception_reason": "",
-      "max_class_line_count": 21,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.graph",
       "public_class_count": 3,
@@ -913,7 +913,7 @@
         "IncidentSubjectValidation"
       ],
       "exception_reason": "",
-      "max_class_line_count": 38,
+      "max_class_line_count": 44,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
       "public_class_count": 3,
@@ -1752,7 +1752,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 952,
+  "file_count": 956,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1760,7 +1760,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-15T11:01:50.222840+00:00",
+  "generated_at": "2026-07-15T12:35:34.764062+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1916,13 +1916,19 @@
     },
     {
       "limit": 1500,
+      "line_count": 1193,
+      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1189,
       "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1187,
+      "line_count": 1188,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
@@ -1948,12 +1954,6 @@
       "limit": 1500,
       "line_count": 1180,
       "path": "crypto_rsi_scanner/event_alpha/outcomes/decision_episode_scorecard.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1180,
-      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
       "source_kind": "production"
     },
     {
@@ -2110,7 +2110,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1214,
+      "line_count": 1250,
       "path": "tests/event_alpha/test_evidence_acquisition.py",
       "source_kind": "test"
     },
@@ -2194,6 +2194,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 987,
+      "path": "tests/event_alpha/test_impact_hypotheses.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 979,
       "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
       "source_kind": "test"
@@ -2202,12 +2208,6 @@
       "limit": 1500,
       "line_count": 925,
       "path": "tests/event_alpha/test_notification_operations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 920,
-      "path": "tests/event_alpha/test_impact_hypotheses.py",
       "source_kind": "test"
     },
     {
@@ -2942,7 +2942,7 @@
         "EventCoreOpportunityStoreWriteResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 48,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
       "public_class_count": 7,
@@ -3002,7 +3002,7 @@
         "EvidenceSearchProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 54,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
       "public_class_count": 7,
@@ -3034,7 +3034,7 @@
         "EventClusterAssetLink"
       ],
       "exception_reason": "",
-      "max_class_line_count": 21,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.graph",
       "public_class_count": 3,
@@ -3121,7 +3121,7 @@
         "IncidentSubjectValidation"
       ],
       "exception_reason": "",
-      "max_class_line_count": 38,
+      "max_class_line_count": 44,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
       "public_class_count": 3,

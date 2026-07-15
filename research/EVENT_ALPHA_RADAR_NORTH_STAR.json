@@ -129,6 +129,15 @@
       ],
       "role": "Maps tickers, coin ids, exchange symbols, Coinalyze markets, and future contract/pool ids into canonical asset identity."
     },
+    "source_independence": {
+      "north_star_requirement": "Only a closed origin-aware near-duplicate contract may support current source-diversity bonuses; missing or invalid contracts fail closed without reinterpreting historical rows.",
+      "primary_artifacts": [
+        "event_integrated_radar_candidates.jsonl",
+        "event_core_opportunities.jsonl",
+        "event_integrated_radar_outcomes.jsonl"
+      ],
+      "role": "Separates raw updates, canonical origins, content clusters, independent evidence units, and additional corroborations so syndicated or mirrored copies cannot masquerade as confirmation."
+    },
     "source_ingestion": {
       "north_star_requirement": "Provider rows must preserve source URL, title/body evidence, published time, provider health, and no-live-default request posture.",
       "primary_artifacts": [
@@ -392,7 +401,7 @@
       "percent_points_10_0_normalized_percent": 10.0
     }
   },
-  "generated_at": "2026-07-15T11:01:42.976433+00:00",
+  "generated_at": "2026-07-15T12:19:39.566648+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1158,6 +1167,32 @@
     "source_origin_or_source_class_hint_may_establish_authority": false,
     "source_pack_impact_validation": "requires membership in declared impact_path_validating_sources",
     "unverified_authority_claim_action": "retain as capped context with source_authority_unverified"
+  },
+  "source_independence_policy": {
+    "auto_apply_calibration": false,
+    "causal_attribution_assessed": false,
+    "claim_truth_assessed": false,
+    "cluster_assignment": "public-time/source-id ordered canonical representatives only",
+    "comparison_surface": "normalized title newline body",
+    "distinct_domains_are_independent_sources": false,
+    "historical_rows_without_contract": "legacy_unassessed_no_diversity_promotion",
+    "independent_corroboration_count": "max(0, independent_evidence_count - 1)",
+    "independent_unit_rule": "assessable content cluster that introduces a previously unseen canonical origin",
+    "minimum_near_duplicate_tokens": 12,
+    "missing_short_malformed_or_overflowing_inputs": "unassessable_or_rejected_fail_closed",
+    "near_duplicate_method": "three-word set-shingle Jaccard",
+    "near_duplicate_threshold": 0.8,
+    "normalization": "unicode NFKC, casefold, alphanumeric whitespace projection",
+    "positive_policy": "may replace prior raw-row or hostname diversity bonuses only; cannot create a new route, lower a blocker, or weaken an evidence threshold",
+    "raw_documents_are_independent_sources": false,
+    "research_basis": [
+      "Rodier and Carter 2020 online near-duplicate news detection"
+    ],
+    "research_only": true,
+    "schema": "event_alpha.source_independence v1",
+    "source_authority_assessed": false,
+    "transitive_member_chaining": false,
+    "unit_of_measurement": "origin-aware content cluster"
   },
   "strict_alerts_created": 0,
   "telegram_sends": 0,
