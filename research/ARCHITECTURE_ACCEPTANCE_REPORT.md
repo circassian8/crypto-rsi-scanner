@@ -2,7 +2,7 @@
 
 Research-only architecture acceptance report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-10T07:34:49.234380+00:00`
+- generated_at: `2026-07-15T04:24:38.565339+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - architecture_status: `accepted`
@@ -28,6 +28,7 @@ Research-only architecture acceptance report. This report does not authorize liv
 | `oversized_classes_are_accepted` | `pass` |
 | `unresolved_multi_class_modules_zero` | `pass` |
 | `doctor_registry_api_unregistered_zero` | `pass` |
+| `namespace_inventory_complete` | `pass` |
 | `namespace_unknown_zero` | `pass` |
 | `shim_dependency_status_ok` | `pass` |
 | `transitional_file_status_ok` | `pass` |
@@ -42,7 +43,7 @@ Research-only architecture acceptance report. This report does not authorize liv
 
 | item | value |
 |---|---:|
-| `production_files_over_1200_lines` | `9` |
+| `production_files_over_1200_lines` | `18` |
 | `accepted_class_exceptions_count` | `3` |
 | `architecture_v3_gate_status` | `accepted_with_documented_exceptions` |
 | `architecture_v3_auto_accept_blockers` | `[]` |
@@ -73,12 +74,12 @@ Retained public shims:
 ## Size And Ownership
 
 - production_files_over_1500_lines: `0`
-- production_files_over_1200_lines: `9`
+- production_files_over_1200_lines: `18`
 - unresolved_production_files_over_1200_lines: `0`
 - functions_over_150_lines: `0`
 - classes_over_75_lines: `None`
 - accepted_class_exceptions_count: `3`
-- model_bundles_count: `79`
+- model_bundles_count: `83`
 - unresolved_multi_class_modules_count: `0`
 
 ## Test Results

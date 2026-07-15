@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Mapping
+
+from ..operations import daily_operations_current_status
 
 
 SERVICE_FILENAME = "event_radar_daily_operations_service.json"
 STATE_FILENAME = "event_radar_daily_operations_state.json"
 CYCLE_LEDGER_FILENAME = "event_radar_daily_operations_cycles.jsonl"
 DASHBOARD_MAINTENANCE_CYCLE_LIMIT = 128
+CURRENT_STATUS_FILENAME = daily_operations_current_status.CURRENT_STATUS_FILENAME
 
 _SAFE_NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
@@ -57,6 +60,13 @@ def load_maintenance_history(
     if state_digest and not state and state_error is None:
         state_error = "invalid_contract"
 
+    current_status, current_digest, current_error = read_object(
+        Path(CURRENT_STATUS_FILENAME)
+    )
+    current_status = _project_current_status(current_status, now=now)
+    if current_digest and not current_status and current_error is None:
+        current_error = "invalid_contract"
+
     raw_cycles, cycles_digest, cycles_error, cycle_stats = read_jsonl(
         Path(CYCLE_LEDGER_FILENAME),
         DASHBOARD_MAINTENANCE_CYCLE_LIMIT,
@@ -88,6 +98,14 @@ def load_maintenance_history(
             returned_row_count=1 if state else 0,
             truncated=False,
         ),
+        CURRENT_STATUS_FILENAME: _metadata(
+            now,
+            current_digest,
+            current_error,
+            source_row_count=1 if current_digest else 0,
+            returned_row_count=1 if current_status else 0,
+            truncated=False,
+        ),
         CYCLE_LEDGER_FILENAME: _metadata(
             now,
             cycles_digest,
@@ -99,6 +117,7 @@ def load_maintenance_history(
     return {
         "maintenance_service": service,
         "maintenance_state": state,
+        "maintenance_current_status": current_status,
         "maintenance_cycles": cycles,
         "maintenance_metadata": metadata,
     }
@@ -189,6 +208,7 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
                 "last_attempted_observation",
                 "last_successful_publication",
                 "next_eligible_observation_at",
+                "authorization_checked_at_last_cycle",
             ),
         )
         or not _boolean_fields(
@@ -207,6 +227,7 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
         or not _optional_nonnegative_int(row.get("scheduler_last_exit_code"))
         or not _optional_nonnegative_int(row.get("scheduler_runs"))
         or not _optional_boolean(row.get("pointer_invalidated"))
+        or not _optional_boolean(row.get("authorization_at_last_cycle"))
         or not _zero_safety_counters(row)
     ):
         return {}
@@ -223,6 +244,8 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
         "last_successful_publication",
         "last_successful_namespace",
         "next_eligible_observation_at",
+        "authorization_at_last_cycle",
+        "authorization_checked_at_last_cycle",
         "live_provider_authorized",
         "provider_call_attempted",
         "pointer_published",
@@ -240,6 +263,107 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
     )
     projected = {field: row.get(field) for field in fields}
     projected["pointer_invalidated"] = row.get("pointer_invalidated") is True
+    return projected
+
+
+def _project_current_status(
+    row: Mapping[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    authorization_status = row.get("current_authorization_status")
+    eligibility = row.get("current_provider_call_eligibility")
+    if (
+        row.get("contract_version") != 1
+        or row.get("row_type")
+        != "decision_radar_daily_operations_current_status"
+        or row.get("research_only") is not True
+        or row.get("no_send") is not True
+        or authorization_status not in {"authorized", "not_authorized"}
+        or not _valid_provider_call_eligibility(eligibility)
+        or not _required_aware_timestamps(
+            row,
+            (
+                "updated_at",
+                "current_authorization_checked_at",
+                "current_status_valid_until",
+            ),
+        )
+        or not _optional_aware_timestamps(
+            row,
+            ("next_eligible_observation_at",),
+        )
+        or not _optional_boolean(row.get("scheduler_enabled"))
+        or not _optional_boolean(row.get("scheduler_loaded"))
+        or not _optional_boolean(row.get("scheduler_healthy"))
+        or not _optional_boolean(row.get("dashboard_owned"))
+        or not _required_safe_tokens(
+            row,
+            (
+                "readiness_status",
+                "readiness_reason",
+                "authorization_boundary",
+                "implications",
+                "expected_provider_activity",
+            ),
+        )
+        or row.get("safe_manual_readiness_command")
+        != daily_operations_current_status.READINESS_COMMAND
+        or row.get("installation_command")
+        != daily_operations_current_status.INSTALL_COMMAND
+        or row.get("rollback_disable_command")
+        != daily_operations_current_status.DISABLE_COMMAND
+        or row.get("installation_requires_confirmation") is not True
+        or row.get("provider_call_attempted") is not False
+        or not _zero_safety_counters(row)
+    ):
+        return {}
+    updated_at = _aware_timestamp(row.get("updated_at"))
+    checked_at = _aware_timestamp(row.get("current_authorization_checked_at"))
+    valid_until = _aware_timestamp(row.get("current_status_valid_until"))
+    if (
+        updated_at is None
+        or checked_at is None
+        or valid_until is None
+        or updated_at != checked_at
+        or valid_until - checked_at
+        != timedelta(
+            seconds=daily_operations_current_status.CURRENT_STATUS_TTL_SECONDS
+        )
+        or checked_at > now
+    ):
+        return {}
+    fields = (
+        "contract_version",
+        "row_type",
+        "updated_at",
+        "current_authorization_status",
+        "current_authorization_checked_at",
+        "current_status_valid_until",
+        "current_provider_call_eligibility",
+        "next_eligible_observation_at",
+        "scheduler_enabled",
+        "scheduler_loaded",
+        "scheduler_healthy",
+        "dashboard_owned",
+        "readiness_status",
+        "readiness_reason",
+        "safe_manual_readiness_command",
+        "installation_command",
+        "rollback_disable_command",
+        "installation_requires_confirmation",
+        "authorization_boundary",
+        "implications",
+        "expected_provider_activity",
+        "provider_call_attempted",
+        *_SAFETY_COUNTER_FIELDS,
+        "no_send",
+        "research_only",
+    )
+    projected = {field: row.get(field) for field in fields}
+    projected["current_status_freshness"] = (
+        "current" if valid_until > now else "stale"
+    )
     return projected
 
 
@@ -338,6 +462,14 @@ def _required_safe_tokens(row: Mapping[str, Any], fields: tuple[str, ...]) -> bo
     )
 
 
+def _valid_provider_call_eligibility(value: object) -> bool:
+    token = str(value or "").strip()
+    return token in {"eligible", "waiting_cadence"} or (
+        token.startswith("blocked_")
+        and bool(_SAFE_TOKEN_RE.fullmatch(token))
+    )
+
+
 def _optional_safe_namespace(value: object, *, required: bool = False) -> bool:
     namespace = str(value or "").strip()
     if not namespace:
@@ -428,6 +560,7 @@ def _metadata(
 
 __all__ = (
     "CYCLE_LEDGER_FILENAME",
+    "CURRENT_STATUS_FILENAME",
     "DASHBOARD_MAINTENANCE_CYCLE_LIMIT",
     "SERVICE_FILENAME",
     "STATE_FILENAME",

@@ -84,6 +84,30 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
         "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
     },
+    "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py": {
+        "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
+        "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py": {
+        "reason": "Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary.",
+        "revisit_condition": "When the live calendar container schema changes or a second publication format is introduced.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py": {
+        "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+        "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/daily_operations.py": {
+        "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
+        "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+    },
+    "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py": {
+        "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
+        "revisit_condition": "When the calendar page gains a new interaction family and has byte-stable page-section fixtures.",
+    },
+    "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py": {
+        "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
+        "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
+    },
     "crypto_rsi_scanner/architecture_report.py": {
         "reason": "Static final-report aggregator tying size, class, shim, namespace, and legacy-retirement gates together.",
         "revisit_condition": "When final-report sections can be split with byte-stable JSON/Markdown fixture comparisons.",

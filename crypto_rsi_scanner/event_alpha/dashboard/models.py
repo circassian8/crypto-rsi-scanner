@@ -105,6 +105,7 @@ class DashboardSnapshot(_DashboardSnapshotViews):
     campaign_history_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     maintenance_service: Mapping[str, Any] = field(default_factory=dict)
     maintenance_state: Mapping[str, Any] = field(default_factory=dict)
+    maintenance_current_status: Mapping[str, Any] = field(default_factory=dict)
     maintenance_cycles: tuple[dict[str, Any], ...] = ()
     maintenance_history_metadata: Mapping[str, Mapping[str, Any]] = field(
         default_factory=dict
@@ -302,6 +303,7 @@ def build_dashboard_snapshot(
         campaign_history_metadata=history["campaign_metadata"],
         maintenance_service=history["maintenance_service"],
         maintenance_state=history["maintenance_state"],
+        maintenance_current_status=history["maintenance_current_status"],
         maintenance_cycles=history["maintenance_cycles"],
         maintenance_history_metadata=history["maintenance_metadata"],
         cumulative_history_metadata=history["metadata"],

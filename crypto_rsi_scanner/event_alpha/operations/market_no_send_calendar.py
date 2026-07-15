@@ -50,6 +50,21 @@ LIVE_CALENDAR_SOURCE_MODES = frozenset(
 LIVE_CALENDAR_ACQUISITION_MODES = frozenset(
     {"live_provider", "operator_verified_export"}
 )
+OFFICIAL_MACRO_SNAPSHOT_STATUSES = frozenset(
+    {"complete", "partial", "unavailable"}
+)
+OFFICIAL_MACRO_SOURCE_STATUSES = frozenset(
+    {
+        "observed",
+        "no_results",
+        "unavailable",
+        "missing_configuration",
+        "parse_error",
+        "rate_limited",
+    }
+)
+OFFICIAL_MACRO_SOURCE_NAMES = ("bls", "federal_reserve", "bea")
+_OBSERVED_OFFICIAL_SOURCE_STATUSES = frozenset({"observed", "no_results"})
 
 DEFAULT_MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
 DEFAULT_MAX_SNAPSHOT_ROWS = 1_000
@@ -157,6 +172,9 @@ _LIVE_CONTAINER_FIELDS = frozenset(
         "events",
         "source_provider",
         "provider",
+        "snapshot_status",
+        "source_coverage",
+        "source_coverage_sha256",
         *_SNAPSHOT_TIME_KEYS,
         *_PROVENANCE_FIELDS,
         *_PROVENANCE_CONTAINERS,
@@ -214,6 +232,9 @@ class MarketNoSendCalendarSnapshot:
     upstream_source_mode: str | None = None
     upstream_acquisition_mode: str | None = None
     source_provider: str | None = None
+    snapshot_status: str | None = None
+    source_coverage: tuple[dict[str, Any], ...] = ()
+    source_coverage_sha256: str | None = None
     source_filename: str | None = None
     source_sha256: str | None = None
     source_size_bytes: int = 0
@@ -261,7 +282,7 @@ class MarketNoSendCalendarSnapshot:
     def copy_digest_metadata(self) -> dict[str, Any]:
         """Return only bounded metadata needed to attest a later exact copy."""
 
-        return {
+        payload = {
             "copy_artifact_filename": self.copy_artifact_filename,
             "source_sha256": self.source_sha256,
             "canonical_rows_sha256": self.canonical_rows_sha256,
@@ -269,6 +290,10 @@ class MarketNoSendCalendarSnapshot:
             "source_row_count": self.source_row_count,
             "retained_row_count": self.retained_row_count,
         }
+        if self.snapshot_status is not None:
+            payload["snapshot_status"] = self.snapshot_status
+            payload["source_coverage_sha256"] = self.source_coverage_sha256
+        return payload
 
     def to_dict(self, *, include_rows: bool = False) -> dict[str, Any]:
         return _snapshot_result_dict(self, include_rows=include_rows)
@@ -299,6 +324,21 @@ def _validate_snapshot_result(snapshot: MarketNoSendCalendarSnapshot) -> None:
         raise ValueError("calendar snapshot cannot report side effects")
     if not snapshot.no_send or not snapshot.research_only:
         raise ValueError("calendar snapshot must remain research-only and no-send")
+    if snapshot.snapshot_status is not None:
+        if snapshot.snapshot_status not in OFFICIAL_MACRO_SNAPSHOT_STATUSES:
+            raise ValueError("calendar upstream snapshot status is invalid")
+        if snapshot.source_provider != "official_us_macro":
+            raise ValueError("calendar upstream coverage provider is invalid")
+        if not snapshot.source_coverage_sha256:
+            raise ValueError("calendar upstream coverage digest is missing")
+        _validate_official_source_coverage(
+            snapshot.source_coverage,
+            snapshot_status=snapshot.snapshot_status,
+            acquisition_mode=snapshot.upstream_acquisition_mode,
+            expected_sha256=snapshot.source_coverage_sha256,
+        )
+        if snapshot.snapshot_status == "unavailable" and snapshot.usable:
+            raise ValueError("unavailable upstream calendar cannot be usable")
     side_effect_switches = (
         snapshot.network_call_attempted,
         snapshot.provider_call_attempted,
@@ -328,6 +368,9 @@ def _snapshot_result_dict(
         "upstream_source_mode": snapshot.upstream_source_mode,
         "upstream_acquisition_mode": snapshot.upstream_acquisition_mode,
         "source_provider": snapshot.source_provider,
+        "snapshot_status": snapshot.snapshot_status,
+        "source_coverage": [dict(row) for row in snapshot.source_coverage],
+        "source_coverage_sha256": snapshot.source_coverage_sha256,
         "source_filename": snapshot.source_filename,
         "source_sha256": snapshot.source_sha256,
         "source_size_bytes": snapshot.source_size_bytes,
@@ -487,6 +530,19 @@ def _evaluate_loaded_snapshot(
             source_digest=source_digest, source_row_count=len(raw_rows),
             error_class=exc.code,
         )
+    snapshot_status = _optional_official_snapshot_status(metadata)
+    if snapshot_status == "unavailable":
+        return _metadata_result(
+            status="unavailable",
+            path=path,
+            snapshot=snapshot,
+            source_digest=source_digest,
+            source_row_count=len(raw_rows),
+            snapshot_observed=observed,
+            freshness_basis=freshness_basis,
+            error_class="upstream_calendar_unavailable",
+            metadata=metadata,
+        )
     freshness_error = _snapshot_freshness_error(
         observed, evaluated_at=evaluated_at, max_age=max_age,
         future_tolerance=future_tolerance,
@@ -497,6 +553,7 @@ def _evaluate_loaded_snapshot(
             path=path, snapshot=snapshot, source_digest=source_digest,
             source_row_count=len(raw_rows), snapshot_observed=observed,
             freshness_basis=freshness_basis, error_class=freshness_error,
+            metadata=metadata,
         )
     try:
         retained, before_count, after_count = _rows_in_window(
@@ -507,7 +564,7 @@ def _evaluate_loaded_snapshot(
             status="unavailable", path=path, snapshot=snapshot,
             source_digest=source_digest, source_row_count=len(raw_rows),
             snapshot_observed=observed, freshness_basis=freshness_basis,
-            error_class=exc.code,
+            error_class=exc.code, metadata=metadata,
         )
     return _healthy_snapshot_result(
         path=path, snapshot=snapshot, source_digest=source_digest,
@@ -604,6 +661,11 @@ def _healthy_snapshot_result(
         source_provider=_safe_provider_value(
             metadata.get("source_provider") or metadata.get("provider")
         ),
+        snapshot_status=_optional_official_snapshot_status(metadata),
+        source_coverage=_official_source_coverage(metadata),
+        source_coverage_sha256=_optional_sha256(
+            metadata.get("source_coverage_sha256")
+        ),
         source_filename=_safe_source_label(path),
         source_sha256=source_digest,
         source_size_bytes=snapshot.size,
@@ -628,11 +690,29 @@ def _metadata_result(
     snapshot_observed: datetime | None = None,
     freshness_basis: str | None = None,
     error_class: str | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> MarketNoSendCalendarSnapshot:
+    source_metadata = metadata or {}
     return MarketNoSendCalendarSnapshot(
         status=status,
         configured=True,
         source_mode="explicit_local_snapshot",
+        upstream_source_mode=_allowlisted_value(
+            source_metadata.get("source_mode"), LIVE_CALENDAR_SOURCE_MODES
+        ),
+        upstream_acquisition_mode=_allowlisted_value(
+            source_metadata.get("data_acquisition_mode")
+            or source_metadata.get("acquisition_mode"),
+            LIVE_CALENDAR_ACQUISITION_MODES,
+        ),
+        source_provider=_safe_provider_value(
+            source_metadata.get("source_provider") or source_metadata.get("provider")
+        ),
+        snapshot_status=_optional_official_snapshot_status(source_metadata),
+        source_coverage=_official_source_coverage(source_metadata),
+        source_coverage_sha256=_optional_sha256(
+            source_metadata.get("source_coverage_sha256")
+        ),
         source_filename=_safe_source_label(path),
         source_sha256=source_digest,
         source_size_bytes=snapshot.size,
@@ -647,6 +727,176 @@ def _metadata_result(
 def _allowlisted_value(value: Any, allowed: frozenset[str]) -> str | None:
     text = str(value or "").strip()
     return text if text in allowed else None
+
+
+def _optional_sha256(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text if re.fullmatch(r"[0-9a-f]{64}", text) else None
+
+
+def _optional_official_snapshot_status(metadata: Mapping[str, Any]) -> str | None:
+    value = metadata.get("snapshot_status")
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    return text if text in OFFICIAL_MACRO_SNAPSHOT_STATUSES else None
+
+
+def _official_source_coverage(
+    metadata: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    value = metadata.get("source_coverage")
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return ()
+    return tuple(dict(row) for row in value if isinstance(row, Mapping))
+
+
+def _validate_official_source_coverage(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    snapshot_status: str,
+    acquisition_mode: str | None,
+    expected_sha256: str,
+) -> tuple[dict[str, Any], ...]:
+    expected_fields = {
+        "source",
+        "status",
+        "request_attempted",
+        "http_status",
+        "content_type",
+        "size_bytes",
+        "sha256",
+        "raw_filename",
+        "source_rows_seen",
+        "accepted_rows",
+        "rejected_rows",
+        "failure_class",
+    }
+    filenames = {
+        "bls": "bls_release_calendar.ics",
+        "federal_reserve": "federal_reserve_fomc.html",
+        "bea": "bea_release_dates.json",
+    }
+    if (
+        snapshot_status not in OFFICIAL_MACRO_SNAPSHOT_STATUSES
+        or acquisition_mode not in LIVE_CALENDAR_ACQUISITION_MODES
+        or len(rows) != len(OFFICIAL_MACRO_SOURCE_NAMES)
+    ):
+        raise ValueError("official calendar source coverage is invalid")
+    safe: list[dict[str, Any]] = []
+    statuses: list[str] = []
+    for expected_source, row in zip(OFFICIAL_MACRO_SOURCE_NAMES, rows, strict=True):
+        if not isinstance(row, Mapping) or set(row) != expected_fields:
+            raise ValueError("official calendar source coverage is invalid")
+        source = str(row.get("source") or "")
+        status = str(row.get("status") or "")
+        attempted = row.get("request_attempted")
+        accepted = row.get("accepted_rows")
+        rejected = row.get("rejected_rows")
+        seen = row.get("source_rows_seen")
+        http_status = row.get("http_status")
+        if any(
+            (
+                source != expected_source,
+                status not in OFFICIAL_MACRO_SOURCE_STATUSES,
+                not isinstance(attempted, bool),
+                attempted
+                is not (
+                    acquisition_mode == "live_provider"
+                    and status != "missing_configuration"
+                ),
+                isinstance(accepted, bool)
+                or not isinstance(accepted, int)
+                or accepted < 0,
+                isinstance(rejected, bool)
+                or not isinstance(rejected, int)
+                or rejected < 0,
+                seen is not None
+                and (
+                    isinstance(seen, bool)
+                    or not isinstance(seen, int)
+                    or seen < accepted
+                ),
+                http_status is not None
+                and (
+                    isinstance(http_status, bool)
+                    or not isinstance(http_status, int)
+                    or not 100 <= http_status <= 599
+                ),
+            )
+        ):
+            raise ValueError("official calendar source coverage is invalid")
+        captured = status in {"observed", "no_results", "parse_error"}
+        capture_fields_valid = all(
+            (
+                row.get("raw_filename") == filenames[source],
+                _optional_sha256(row.get("sha256")) is not None,
+                isinstance(row.get("size_bytes"), int),
+                not isinstance(row.get("size_bytes"), bool),
+                int(row.get("size_bytes") or 0) > 0,
+                isinstance(row.get("content_type"), str),
+                bool(str(row.get("content_type") or "").strip()),
+            )
+        )
+        if captured != capture_fields_valid:
+            raise ValueError("official calendar source coverage is invalid")
+        if status == "observed" and (accepted <= 0 or seen is None):
+            raise ValueError("official calendar source coverage is invalid")
+        if status == "no_results" and (accepted != 0 or seen is None):
+            raise ValueError("official calendar source coverage is invalid")
+        failure = row.get("failure_class")
+        if status in _OBSERVED_OFFICIAL_SOURCE_STATUSES:
+            if failure is not None:
+                raise ValueError("official calendar source coverage is invalid")
+        elif (
+            not isinstance(failure, str)
+            or not failure
+            or len(failure) > 120
+            or _contains_sensitive_text(failure)
+        ):
+            raise ValueError("official calendar source coverage is invalid")
+        if status == "rate_limited" and http_status != 429:
+            raise ValueError("official calendar source coverage is invalid")
+        statuses.append(status)
+        safe.append(dict(row))
+    observed_count = sum(
+        status in _OBSERVED_OFFICIAL_SOURCE_STATUSES for status in statuses
+    )
+    expected_status = (
+        "complete"
+        if observed_count == len(OFFICIAL_MACRO_SOURCE_NAMES)
+        else "partial"
+        if observed_count
+        else "unavailable"
+    )
+    digest = hashlib.sha256(
+        json.dumps(
+            safe,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    if snapshot_status != expected_status or expected_sha256 != digest:
+        raise ValueError("official calendar source coverage is invalid")
+    return tuple(safe)
+
+
+def validate_official_source_coverage(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    snapshot_status: str,
+    acquisition_mode: str | None,
+    expected_sha256: str,
+) -> tuple[dict[str, Any], ...]:
+    """Validate the closed official-source coverage projection."""
+
+    return _validate_official_source_coverage(
+        rows,
+        snapshot_status=snapshot_status,
+        acquisition_mode=acquisition_mode,
+        expected_sha256=expected_sha256,
+    )
 
 
 def _safe_provider_value(value: Any) -> str | None:
@@ -788,6 +1038,24 @@ def _validate_live_container(
         raise _SnapshotReadError("live_snapshot_source_provider_invalid")
     if _fixture_token(source_provider):
         raise _SnapshotReadError("live_snapshot_source_provider_invalid")
+    coverage_fields_present = any(
+        metadata.get(field) not in (None, "", ())
+        for field in ("snapshot_status", "source_coverage", "source_coverage_sha256")
+    )
+    if source_provider == "official_us_macro":
+        try:
+            _validate_official_source_coverage(
+                _official_source_coverage(metadata),
+                snapshot_status=str(metadata.get("snapshot_status") or ""),
+                acquisition_mode=str(acquisition_mode or ""),
+                expected_sha256=str(metadata.get("source_coverage_sha256") or ""),
+            )
+        except ValueError:
+            raise _SnapshotReadError(
+                "live_snapshot_official_source_coverage_invalid"
+            ) from None
+    elif coverage_fields_present:
+        raise _SnapshotReadError("live_snapshot_source_coverage_provider_invalid")
 
 
 def _safe_calendar_rows(
@@ -1117,10 +1385,13 @@ __all__ = (
     "CALENDAR_SNAPSHOT_PATH_ENV",
     "CALENDAR_SNAPSHOT_STATUSES",
     "CALENDAR_SOURCE_COPY_FILENAME",
+    "OFFICIAL_MACRO_SNAPSHOT_STATUSES",
+    "OFFICIAL_MACRO_SOURCE_STATUSES",
     "LIVE_CALENDAR_ACQUISITION_MODES",
     "LIVE_CALENDAR_SOURCE_MODES",
     "MarketNoSendCalendarSnapshot",
     "load_market_no_send_calendar_snapshot",
     "materialize_market_calendar_snapshot",
     "validate_calendar_artifact_rows",
+    "validate_official_source_coverage",
 )

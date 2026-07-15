@@ -60,6 +60,7 @@ def validate_optional_calendar_snapshot(
     )
     if source_count < retained_count:
         raise MarketNoSendError("campaign_calendar_snapshot_source_count_mismatch")
+    _validate_upstream_coverage(metadata)
     if status == "healthy_empty" and retained_count != 0:
         raise MarketNoSendError("campaign_calendar_snapshot_status_count_mismatch")
     if status == "healthy_nonempty" and retained_count == 0:
@@ -89,6 +90,37 @@ def _nonnegative_count(value: Any, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise MarketNoSendError(f"campaign_calendar_snapshot_{field}_invalid")
     return value
+
+
+def _validate_upstream_coverage(metadata: Mapping[str, Any]) -> None:
+    source_provider = metadata.get("source_provider")
+    coverage_fields = (
+        metadata.get("snapshot_status"),
+        metadata.get("source_coverage"),
+        metadata.get("source_coverage_sha256"),
+    )
+    if source_provider != "official_us_macro":
+        if any(value not in (None, "", [], ()) for value in coverage_fields):
+            raise MarketNoSendError(
+                "campaign_calendar_snapshot_source_coverage_provider_invalid"
+            )
+        return
+    rows = metadata.get("source_coverage")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
+        raise MarketNoSendError("campaign_calendar_snapshot_source_coverage_invalid")
+    try:
+        market_no_send_calendar.validate_official_source_coverage(
+            rows,
+            snapshot_status=str(metadata.get("snapshot_status") or ""),
+            acquisition_mode=_optional_text(
+                metadata.get("upstream_acquisition_mode")
+            ),
+            expected_sha256=str(metadata.get("source_coverage_sha256") or ""),
+        )
+    except ValueError:
+        raise MarketNoSendError(
+            "campaign_calendar_snapshot_source_coverage_invalid"
+        ) from None
 
 
 def _validate_no_derivation(
@@ -167,6 +199,7 @@ def _source_copy_mismatched(
     upstream_source = metadata.get("upstream_source_mode")
     upstream_acquisition = metadata.get("upstream_acquisition_mode")
     source_provider = metadata.get("source_provider")
+    source_coverage = metadata.get("source_coverage")
     return any(
         (
             payload.get("row_type") != "event_market_no_send_calendar_source",
@@ -188,6 +221,10 @@ def _source_copy_mismatched(
             payload.get("upstream_source_mode") != upstream_source,
             payload.get("upstream_acquisition_mode") != upstream_acquisition,
             payload.get("source_provider") != source_provider,
+            payload.get("snapshot_status") != metadata.get("snapshot_status"),
+            payload.get("source_coverage") != source_coverage,
+            payload.get("source_coverage_sha256")
+            != metadata.get("source_coverage_sha256"),
             payload.get("source_sha256") != metadata.get("source_sha256"),
             payload.get("canonical_rows_sha256") != canonical,
             metadata.get("canonical_rows_sha256") != canonical,

@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import source_cache
+
 
 REPORT_SCHEMA_VERSION = "architecture_api_inventory_v1"
 REPORT_JSON = "ARCHITECTURE_API_INVENTORY.json"
@@ -153,19 +155,15 @@ def _is_api_filename(name: str) -> bool:
 
 
 def _line_count(path: Path) -> int:
-    try:
-        return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
-    except OSError:
-        return 0
+    return source_cache.source_line_count(path)
 
 
 def _collect_ownership_rows(paths: list[Path], *, repo_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     classes: list[dict[str, Any]] = []
     functions: list[dict[str, Any]] = []
     for path in paths:
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=path.as_posix())
-        except (OSError, SyntaxError):
+        tree = source_cache.source_ast(path)
+        if tree is None:
             continue
         visitor = _ApiOwnershipVisitor(
             module=_module_name(path, repo_root=repo_root),

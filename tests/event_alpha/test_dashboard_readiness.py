@@ -10,10 +10,21 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+from threading import Event, Thread
 
 import pytest
 
 import crypto_rsi_scanner.event_alpha.dashboard.__main__ as dashboard_cli
+from crypto_rsi_scanner.event_alpha.operations import daily_operations
+from crypto_rsi_scanner.event_alpha.operations import daily_operations_publication
+from crypto_rsi_scanner.event_alpha.operations.market_no_send_io import (
+    read_json_object,
+    write_json_atomic,
+    write_jsonl,
+)
+from crypto_rsi_scanner.event_alpha.operations.market_no_send_models import (
+    SAFETY_COUNTERS,
+)
 from crypto_rsi_scanner.event_alpha.artifacts import operator_state
 from crypto_rsi_scanner.event_alpha.dashboard.__main__ import main as dashboard_main
 from crypto_rsi_scanner.event_alpha.dashboard.app import (
@@ -24,9 +35,15 @@ from crypto_rsi_scanner.event_alpha.dashboard.loader import load_dashboard_snaps
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
     CURRENT_NAMESPACE_POINTER,
     DashboardReadinessError,
+    _publish_prepublication_namespace_pointer,
+    _resolve_dashboard_startup,
     publish_current_namespace_pointer,
     read_current_namespace_pointer,
     resolve_authoritative_dashboard,
+)
+from crypto_rsi_scanner.event_alpha.dashboard.pointer_mutation import (
+    CurrentPointerMutationError,
+    current_pointer_mutation_lock,
 )
 from crypto_rsi_scanner.event_alpha.dashboard.render import (
     filter_sort_candidates,
@@ -116,6 +133,93 @@ def test_dashboard_readiness_publishes_exact_pointer_and_default_cli_uses_it(tmp
     assert _file_hashes(namespace_dir) == namespace_hashes
 
 
+def test_revalidating_same_authority_preserves_pointer_publication_bytes(tmp_path):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    published = pointer_path.read_bytes()
+
+    publish_current_namespace_pointer(
+        base,
+        _FIXTURE_NAMESPACE,
+        now="2026-07-12T06:04:00+00:00",
+    )
+
+    assert pointer_path.read_bytes() == published
+
+
+def test_publish_and_invalidation_share_pointer_mutation_lock(tmp_path):
+    base = _copy_fixture(tmp_path)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+
+    publish_started = Event()
+    publish_finished = Event()
+    publish_errors: list[BaseException] = []
+
+    def publish() -> None:
+        publish_started.set()
+        try:
+            publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+        except BaseException as exc:  # pragma: no cover - asserted in parent thread
+            publish_errors.append(exc)
+        finally:
+            publish_finished.set()
+
+    with current_pointer_mutation_lock(base):
+        publish_thread = Thread(target=publish)
+        publish_thread.start()
+        assert publish_started.wait(1.0)
+        assert publish_finished.wait(0.05) is False
+        assert pointer_path.exists() is False
+    publish_thread.join(timeout=2.0)
+    assert publish_finished.is_set()
+    assert publish_errors == []
+    assert pointer_path.exists()
+
+    invalidate_started = Event()
+    invalidate_finished = Event()
+    invalidated: list[bool] = []
+
+    def invalidate() -> None:
+        invalidate_started.set()
+        invalidated.append(
+            daily_operations._default_invalidate_pointer(base, _FIXTURE_NAMESPACE)
+        )
+        invalidate_finished.set()
+
+    with current_pointer_mutation_lock(base):
+        invalidate_thread = Thread(target=invalidate)
+        invalidate_thread.start()
+        assert invalidate_started.wait(1.0)
+        assert invalidate_finished.wait(0.05) is False
+        assert pointer_path.exists()
+    invalidate_thread.join(timeout=2.0)
+    assert invalidate_finished.is_set()
+    assert invalidated == [True]
+    assert pointer_path.exists() is False
+
+
+def test_pointer_mutation_remains_anchored_during_artifact_root_swap(tmp_path):
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    pointer_name = CURRENT_NAMESPACE_POINTER
+    (base / pointer_name).write_bytes(b"original\n")
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    replacement_bytes = b"replacement-must-not-change\n"
+    (replacement / pointer_name).write_bytes(replacement_bytes)
+    displaced = tmp_path / "displaced"
+
+    with pytest.raises(CurrentPointerMutationError):
+        with current_pointer_mutation_lock(base) as mutation:
+            base.rename(displaced)
+            replacement.rename(base)
+            mutation.write_bytes_atomic(pointer_name, b"anchored-original\n")
+
+    assert (base / pointer_name).read_bytes() == replacement_bytes
+    assert (displaced / pointer_name).read_bytes() == b"anchored-original\n"
+
+
 def test_published_pointer_survives_unchanged_strict_doctor_reverification(tmp_path):
     base = _copy_fixture(tmp_path)
     namespace_dir = base / _FIXTURE_NAMESPACE
@@ -144,6 +248,233 @@ def test_published_pointer_survives_unchanged_strict_doctor_reverification(tmp_p
     )
     assert resolved.snapshot.operator_state_sha256 == published.snapshot.operator_state_sha256
     assert (base / CURRENT_NAMESPACE_POINTER).read_bytes() == pointer_before
+
+
+def test_v11_managed_pointer_fails_closed_without_final_receipts(tmp_path):
+    base = _copy_fixture(tmp_path)
+    namespace_dir = base / _FIXTURE_NAMESPACE
+    write_json_atomic(
+        namespace_dir / daily_operations_publication.PREPUBLICATION_AUDIT_FILENAME,
+        {
+            "row_type": "event_market_no_send_pilot_audit",
+            "artifact_namespace": _FIXTURE_NAMESPACE,
+            "attempt_status": "complete",
+            "publication": {"status": "not_published"},
+        },
+    )
+    _publish_prepublication_namespace_pointer(
+        base,
+        _FIXTURE_NAMESPACE,
+        now=_TEST_NOW,
+    )
+    pointer_before = (base / CURRENT_NAMESPACE_POINTER).read_bytes()
+    write_json_atomic(
+        base / daily_operations_publication.STATE_FILENAME,
+        {"last_successful_namespace": _FIXTURE_NAMESPACE},
+    )
+    (namespace_dir / daily_operations_publication.PREPUBLICATION_AUDIT_FILENAME).unlink()
+
+    with pytest.raises(
+        DashboardReadinessError,
+        match="current_authority_missing_publication_receipt",
+    ):
+        resolve_authoritative_dashboard(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    with pytest.raises(
+        DashboardReadinessError,
+        match="current_authority_missing_publication_receipt",
+    ):
+        publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    with pytest.raises(
+        DashboardReadinessError,
+        match="current_authority_missing_publication_receipt",
+    ):
+        resolve_authoritative_dashboard(base, now=_TEST_NOW)
+
+    assert (base / CURRENT_NAMESPACE_POINTER).read_bytes() == pointer_before
+    assert read_current_namespace_pointer(base)["artifact_namespace"] == (
+        _FIXTURE_NAMESPACE
+    )
+
+
+def test_prepublication_pointer_rejects_authority_changed_mid_cycle(tmp_path):
+    base = _copy_fixture(tmp_path)
+    published = publish_current_namespace_pointer(
+        base,
+        _FIXTURE_NAMESPACE,
+        now=_TEST_NOW,
+    )
+    pointer_before = published.pointer_path.read_bytes()
+
+    with pytest.raises(
+        DashboardReadinessError,
+        match="changed during Daily Operations publication",
+    ):
+        _publish_prepublication_namespace_pointer(
+            base,
+            _FIXTURE_NAMESPACE,
+            now=_TEST_NOW,
+            expected_current_pointer_sha256="0" * 64,
+        )
+
+    assert published.pointer_path.read_bytes() == pointer_before
+
+
+def test_managed_historical_publish_restores_prior_pointer_when_current_checks_fail(
+    tmp_path,
+):
+    base = _copy_fixture(tmp_path)
+    namespace_dir = base / _FIXTURE_NAMESPACE
+    cycle_id = "a" * 32
+    write_json_atomic(
+        namespace_dir / daily_operations_publication.PILOT_AUDIT_FILENAME,
+        {
+            "row_type": "event_market_no_send_pilot_audit",
+            "artifact_namespace": _FIXTURE_NAMESPACE,
+            "attempt_status": "complete",
+            "publication": {"status": "not_published"},
+        },
+    )
+    _publish_prepublication_namespace_pointer(
+        base,
+        _FIXTURE_NAMESPACE,
+        now=_TEST_NOW,
+    )
+    terminal = {
+        "contract_version": 1,
+        "row_type": "decision_radar_daily_operations_cycle",
+        "cycle_id": cycle_id,
+        "recorded_at": _TEST_NOW,
+        "artifact_namespace": _FIXTURE_NAMESPACE,
+        "status": "succeeded",
+        "reason": "published_and_restarted",
+        "provider_call_attempted": True,
+        "provider_request_succeeded": True,
+        "pointer_published": True,
+        "dashboard_restarted": True,
+        "pointer_rolled_back": False,
+        "pointer_invalidated": False,
+        **SAFETY_COUNTERS,
+        "no_send": True,
+        "research_only": True,
+    }
+    write_jsonl(
+        base / daily_operations_publication.CYCLE_LEDGER_FILENAME,
+        [terminal],
+    )
+    write_json_atomic(
+        base / daily_operations_publication.STATE_FILENAME,
+        {
+            "contract_version": 1,
+            "row_type": "decision_radar_daily_operations_state",
+            "updated_at": _TEST_NOW,
+            "last_cycle_id": cycle_id,
+            "last_cycle_status": "succeeded",
+            "last_cycle_reason": "published_and_restarted",
+            "last_cycle_namespace": _FIXTURE_NAMESPACE,
+            "last_successful_namespace": _FIXTURE_NAMESPACE,
+            "last_successful_publication": _TEST_NOW,
+            "last_readiness_check": _TEST_NOW,
+            "live_provider_authorized": True,
+            "provider_call_attempted": True,
+            "pointer_published": True,
+            "dashboard_restarted": True,
+            "pointer_invalidated": False,
+            "scheduler_enabled": False,
+            "scheduler_loaded": False,
+            "scheduler_healthy": True,
+            "scheduler_reason": "not_installed",
+            **SAFETY_COUNTERS,
+            "no_send": True,
+            "research_only": True,
+        },
+    )
+    reconciled = daily_operations_publication.reconcile_current_publication(
+        base,
+        dashboard={
+            "owned": True,
+            "running": True,
+            "reason": "owned_running",
+            "pid": 123,
+        },
+        recorded_at=_TEST_NOW,
+    )
+    assert reconciled.valid is True
+
+    prior_pointer = {
+        "contract_version": 1,
+        "artifact_namespace": "prior-authority",
+        "profile": "no_key_live",
+        "run_id": "prior-run",
+        "revision": 1,
+        "operator_state_sha256": "f" * 64,
+        "generation_authority_status": "authoritative",
+        "authority_checked_at": _TEST_NOW,
+    }
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    write_json_atomic(pointer_path, prior_pointer)
+    prior_raw = pointer_path.read_bytes()
+    state = read_json_object(base / daily_operations_publication.STATE_FILENAME)
+    state["last_successful_namespace"] = "different-authority"
+    write_json_atomic(base / daily_operations_publication.STATE_FILENAME, state)
+
+    with pytest.raises(
+        DashboardReadinessError,
+        match="operations_receipt_current_maintenance_state_mismatch",
+    ):
+        publish_current_namespace_pointer(
+            base,
+            _FIXTURE_NAMESPACE,
+            now=_TEST_NOW,
+        )
+
+    assert pointer_path.read_bytes() == prior_raw
+    assert read_current_namespace_pointer(base) == prior_pointer
+
+
+def test_pointer_startup_accepts_publication_then_requests_wait_for_operations(
+    tmp_path,
+):
+    base = _copy_fixture(tmp_path)
+    namespace_dir = base / _FIXTURE_NAMESPACE
+    write_json_atomic(
+        namespace_dir / daily_operations_publication.PREPUBLICATION_AUDIT_FILENAME,
+        {
+            "row_type": "event_market_no_send_pilot_audit",
+            "artifact_namespace": _FIXTURE_NAMESPACE,
+            "attempt_status": "complete",
+            "publication": {"status": "not_published"},
+        },
+    )
+    _publish_prepublication_namespace_pointer(
+        base,
+        _FIXTURE_NAMESPACE,
+        now=_TEST_NOW,
+    )
+    daily_operations_publication.write_publication_receipt(
+        base,
+        _FIXTURE_NAMESPACE,
+        cycle_id="a" * 32,
+        recorded_at=_TEST_NOW,
+    )
+
+    startup = _resolve_dashboard_startup(base, now=_TEST_NOW)
+    assert startup.snapshot.artifact_namespace == _FIXTURE_NAMESPACE
+    with pytest.raises(
+        DashboardReadinessError,
+        match="current_authority_missing_operations_receipt",
+    ):
+        resolve_authoritative_dashboard(base, now=_TEST_NOW)
+
+    app = RadarDashboardApp(
+        base,
+        _FIXTURE_NAMESPACE,
+        now=_TEST_NOW,
+        generation_binding=DashboardGenerationBinding.from_snapshot(startup.snapshot),
+    )
+    status, body = _request(app)
+    assert status == "503 Service Unavailable"
+    assert "current_authority_missing_operations_receipt" in body
+    assert "Research idea, not a trade instruction" not in body
 
 
 def test_published_pointer_invalidates_when_doctor_result_changes(tmp_path):
@@ -219,6 +550,54 @@ def test_pointer_bound_dashboard_refuses_operator_state_drift_after_startup(tmp_
     assert "Research idea, not a trade instruction" not in drift_body
 
 
+@pytest.mark.parametrize("method", ("GET", "HEAD"))
+def test_pointer_bound_dashboard_returns_exact_authority_headers(
+    tmp_path,
+    method,
+):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    resolved = resolve_authoritative_dashboard(base, now=_TEST_NOW)
+    binding = DashboardGenerationBinding.from_snapshot(resolved.snapshot)
+    app = RadarDashboardApp(
+        base,
+        resolved.snapshot.artifact_namespace,
+        now=_TEST_NOW,
+        generation_binding=binding,
+    )
+    captured: dict[str, object] = {}
+
+    def start_response(status, headers, _exc_info=None):
+        captured["status"] = status
+        captured["headers"] = dict(headers)
+
+    body = b"".join(
+        app(
+            {
+                "REQUEST_METHOD": method,
+                "PATH_INFO": "/",
+                "QUERY_STRING": "",
+            },
+            start_response,
+        )
+    )
+    headers = captured["headers"]
+
+    assert captured["status"] == "200 OK"
+    assert isinstance(headers, dict)
+    assert headers["X-Crypto-Radar-Namespace"] == binding.artifact_namespace
+    assert headers["X-Crypto-Radar-Run-Id"] == binding.run_id
+    assert headers["X-Crypto-Radar-Revision"] == str(binding.revision)
+    assert (
+        headers["X-Crypto-Radar-Operator-State-SHA256"]
+        == binding.operator_state_sha256
+    )
+    if method == "HEAD":
+        assert body == b""
+    else:
+        assert b"Crypto Decision Radar" in body
+
+
 @pytest.mark.parametrize(
     ("field", "replacement"),
     (
@@ -270,6 +649,7 @@ def test_dashboard_cli_binds_pointer_mode_but_preserves_explicit_namespace_mode(
         calls.append(kwargs.get("generation_binding"))
 
     monkeypatch.setattr(dashboard_cli, "resolve_authoritative_dashboard", fake_resolve)
+    monkeypatch.setattr(dashboard_cli, "_resolve_dashboard_startup", fake_resolve)
     monkeypatch.setattr(dashboard_cli, "serve_dashboard", fake_serve)
 
     assert dashboard_cli.main(["--artifact-base", str(base)]) == 0

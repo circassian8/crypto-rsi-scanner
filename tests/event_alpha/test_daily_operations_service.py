@@ -24,6 +24,10 @@ from crypto_rsi_scanner.event_alpha.operations.daily_operations_service import (
 
 UID = 501
 REPO_ROOT = Path(__file__).resolve().parents[2]
+EXPECTED_NAMESPACE = "radar_market_no_send_20260715t120000000000z_deadbeef"
+EXPECTED_RUN_ID = "run-exact-dashboard"
+EXPECTED_REVISION = 12
+EXPECTED_OPERATOR_DIGEST = "a" * 64
 
 
 def _launchctl_text(
@@ -150,6 +154,186 @@ def test_dashboard_ownership_requires_the_complete_expected_argv(tmp_path: Path)
     assert owned.pid == 77858
     assert mismatch.owned is False
     assert mismatch.reason == "dashboard_argv_mismatch"
+
+
+def test_owned_dashboard_probe_retries_until_final_receipt_is_served(tmp_path: Path) -> None:
+    repo, python, base, home, _agents = _paths(tmp_path)
+    fake = _Launchd(repo=repo, python=python, artifact_base=base, home=home)
+    responses = iter((False, True))
+    probes: list[tuple[str, int, float, dict[str, object]]] = []
+    sleeps: list[float] = []
+    ownership_checks = 0
+
+    def delayed_run(argv: tuple[str, ...]) -> CommandResult:
+        nonlocal ownership_checks
+        dashboard = f"gui/{UID}/{service.DASHBOARD_LABEL}"
+        if argv == ("launchctl", "print", dashboard):
+            ownership_checks += 1
+            if ownership_checks == 1:
+                return CommandResult(
+                    0,
+                    _launchctl_text(fake.dashboard_argv, state="waiting", pid=77858),
+                )
+        return fake.run(argv)
+
+    def http_ready(host: str, port: int, timeout: float, **kwargs) -> bool:
+        probes.append((host, port, timeout, dict(kwargs)))
+        return next(responses)
+
+    dependencies = ServiceDependencies(
+        run=delayed_run,
+        http_dashboard_ready=http_ready,
+        sleep=sleeps.append,
+        uid=UID,
+        home=home,
+    )
+
+    assert service.probe_owned_dashboard(
+        artifact_base=base,
+        repo_root_path=repo,
+        python_path=python,
+        expected_namespace=EXPECTED_NAMESPACE,
+        expected_run_id=EXPECTED_RUN_ID,
+        expected_revision=EXPECTED_REVISION,
+        expected_operator_state_sha256=EXPECTED_OPERATOR_DIGEST,
+        attempts=3,
+        delay_seconds=0.05,
+        dependencies=dependencies,
+    ) is True
+    assert len(probes) == 2
+    assert all(
+        kwargs
+        == {
+            "expected_namespace": EXPECTED_NAMESPACE,
+            "expected_run_id": EXPECTED_RUN_ID,
+            "expected_revision": EXPECTED_REVISION,
+            "expected_operator_state_sha256": EXPECTED_OPERATOR_DIGEST,
+        }
+        for _host, _port, _timeout, kwargs in probes
+    )
+    assert sleeps == [0.05, 0.05]
+
+
+def test_owned_dashboard_probe_rejects_pid_change_during_http_check(
+    tmp_path: Path,
+) -> None:
+    repo, python, base, home, _agents = _paths(tmp_path)
+    fake = _Launchd(repo=repo, python=python, artifact_base=base, home=home)
+    ownership_checks = 0
+
+    def changing_pid_run(argv: tuple[str, ...]) -> CommandResult:
+        nonlocal ownership_checks
+        dashboard = f"gui/{UID}/{service.DASHBOARD_LABEL}"
+        if argv == ("launchctl", "print", dashboard):
+            ownership_checks += 1
+            return CommandResult(
+                0,
+                _launchctl_text(
+                    fake.dashboard_argv,
+                    pid=77858 if ownership_checks == 1 else 77859,
+                ),
+            )
+        return fake.run(argv)
+
+    dependencies = ServiceDependencies(
+        run=changing_pid_run,
+        http_dashboard_ready=lambda *_args, **_kwargs: True,
+        sleep=lambda _delay: None,
+        uid=UID,
+        home=home,
+    )
+
+    assert service.probe_owned_dashboard(
+        artifact_base=base,
+        repo_root_path=repo,
+        python_path=python,
+        expected_namespace=EXPECTED_NAMESPACE,
+        expected_run_id=EXPECTED_RUN_ID,
+        expected_revision=EXPECTED_REVISION,
+        expected_operator_state_sha256=EXPECTED_OPERATOR_DIGEST,
+        attempts=1,
+        dependencies=dependencies,
+    ) is False
+    assert ownership_checks == 2
+
+
+def test_http_dashboard_probe_requires_exact_authority_headers(monkeypatch) -> None:
+    exact_headers = {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "X-Crypto-Radar-Namespace": EXPECTED_NAMESPACE,
+        "X-Crypto-Radar-Run-Id": EXPECTED_RUN_ID,
+        "X-Crypto-Radar-Revision": str(EXPECTED_REVISION),
+        "X-Crypto-Radar-Operator-State-SHA256": EXPECTED_OPERATOR_DIGEST,
+    }
+
+    class Response:
+        status = 200
+
+        def read(self, _limit: int) -> bytes:
+            return b"<h1>Crypto Decision Radar</h1>"
+
+        def getheader(self, name: str) -> str | None:
+            return exact_headers.get(name)
+
+    class Connection:
+        def __init__(self, _host: str, _port: int, *, timeout: float) -> None:
+            self.timeout = timeout
+
+        def request(self, method: str, path: str, *, headers) -> None:
+            assert (method, path) == ("GET", "/")
+            assert headers["User-Agent"] == "crypto-radar-daily-operations/1"
+
+        def getresponse(self) -> Response:
+            return Response()
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(service.http.client, "HTTPConnection", Connection)
+    probe_args = {
+        "expected_namespace": EXPECTED_NAMESPACE,
+        "expected_run_id": EXPECTED_RUN_ID,
+        "expected_revision": EXPECTED_REVISION,
+        "expected_operator_state_sha256": EXPECTED_OPERATOR_DIGEST,
+    }
+
+    assert service._http_dashboard_ready("127.0.0.1", 8765, 0.5, **probe_args)
+    exact_headers["X-Crypto-Radar-Run-Id"] = "different-run"
+    assert not service._http_dashboard_ready("127.0.0.1", 8765, 0.5, **probe_args)
+
+
+def test_owned_dashboard_probe_rejects_malformed_expected_identity(
+    tmp_path: Path,
+) -> None:
+    repo, python, base, home, _agents = _paths(tmp_path)
+    fake = _Launchd(repo=repo, python=python, artifact_base=base, home=home)
+
+    assert service.probe_owned_dashboard(
+        artifact_base=base,
+        repo_root_path=repo,
+        python_path=python,
+        expected_namespace=EXPECTED_NAMESPACE,
+        expected_run_id=EXPECTED_RUN_ID,
+        expected_revision=True,
+        expected_operator_state_sha256=EXPECTED_OPERATOR_DIGEST,
+        attempts=1,
+        dependencies=fake.dependencies(),
+    ) is False
+    assert fake.commands == []
+
+
+def test_default_python_path_is_stable_across_caller_interpreters(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo = tmp_path / "repo"
+    project_python = repo / ".venv" / "bin" / "python"
+    project_python.parent.mkdir(parents=True)
+    project_python.touch()
+    monkeypatch.setattr(service, "repository_root", lambda: repo)
+
+    assert service.default_python_path() == project_python.absolute()
 
 
 def test_service_argv_binds_the_configured_scheduler_interval(tmp_path: Path) -> None:

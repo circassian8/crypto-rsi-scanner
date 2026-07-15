@@ -243,6 +243,28 @@ def _calendar_coverage_state(
     rejected_count: float | None,
     has_rows: bool,
 ) -> _CalendarState | None:
+    snapshot_status = _token(metadata.get("snapshot_status"))
+    missing_sources = _calendar_missing_sources(metadata)
+    missing_detail = _calendar_missing_sources_text(missing_sources)
+    if snapshot_status == "partial":
+        detail = (
+            f"{missing_detail} "
+            if missing_detail
+            else "At least one required official source was not observed. "
+        )
+        detail += (
+            "Accepted official events remain visible as context and scheduled risk, but "
+            "zero rows from missing sources does not mean those sources reported no events."
+        )
+        return _CalendarState(
+            "degraded",
+            "Partial official coverage",
+            "warning",
+            "Official calendar coverage is partial",
+            detail,
+            True,
+            metadata,
+        )
     if has_rows:
         if coverage.status == "degraded":
             return _CalendarState(
@@ -325,12 +347,15 @@ def _calendar_coverage_state(
             metadata,
         )
     if coverage.status in {"degraded", "unavailable"}:
+        detail = coverage.detail
+        if missing_detail:
+            detail = f"{missing_detail} {detail}"
         return _CalendarState(
             "unavailable",
             "Coverage incomplete" if coverage.status == "degraded" else "Coverage unavailable",
             "warning",
             "Calendar coverage is incomplete" if coverage.status == "degraded" else "Calendar acquisition is unavailable",
-            coverage.detail,
+            detail,
             True,
             metadata,
         )
@@ -619,8 +644,16 @@ def _calendar_metadata_disclosure(
     canonical_coverage = _calendar_coverage_label(
         metadata.get("canonical_coverage_status")
     )
+    source_coverage = metadata.get("source_coverage")
+    source_coverage_text = _calendar_source_coverage_text(source_coverage)
+    missing_sources_text = _calendar_missing_sources_text(
+        _calendar_missing_sources(metadata)
+    )
     items = (
         ("Recorded status", metadata.get("status") or "Not recorded"),
+        ("Official snapshot status", metadata.get("snapshot_status") or "Not recorded"),
+        ("Official source coverage", source_coverage_text or "Not recorded"),
+        ("Missing official sources", missing_sources_text or "None recorded"),
         ("Coverage receipt", _calendar_receipt_label(metadata)),
         ("Source provider", metadata.get("source_provider") or "Not recorded"),
         (
@@ -702,6 +735,63 @@ def _calendar_receipt_label(metadata: Mapping[str, Any]) -> str:
         if metadata.get(field) is not None:
             parts.append(f"{field}={metadata.get(field)}")
     return "; ".join(parts) or "Not recorded"
+
+
+def _calendar_missing_sources(
+    metadata: Mapping[str, Any],
+) -> tuple[tuple[str, str], ...]:
+    coverage = metadata.get("source_coverage")
+    if not isinstance(coverage, Iterable) or isinstance(
+        coverage, (str, bytes, Mapping)
+    ):
+        return ()
+    missing: list[tuple[str, str]] = []
+    for row in coverage:
+        if not isinstance(row, Mapping):
+            continue
+        status = _token(row.get("status"))
+        if status in {"observed", "no_results"}:
+            continue
+        source = _token(row.get("source"))
+        if source:
+            missing.append((source, status or "unavailable"))
+    return tuple(missing)
+
+
+def _calendar_missing_sources_text(
+    sources: Iterable[tuple[str, str]],
+) -> str:
+    labels = {
+        "bls": "BLS",
+        "federal_reserve": "Federal Reserve",
+        "bea": "BEA",
+    }
+    values = [
+        f"{labels.get(source, humanize_enum(source))} ({humanize_enum(status)})"
+        for source, status in sources
+    ]
+    return f"Missing official sources: {', '.join(values)}." if values else ""
+
+
+def _calendar_source_coverage_text(value: Any) -> str:
+    if not isinstance(value, Iterable) or isinstance(value, (str, bytes, Mapping)):
+        return ""
+    labels = {
+        "bls": "BLS",
+        "federal_reserve": "Federal Reserve",
+        "bea": "BEA",
+    }
+    values = []
+    for row in value:
+        if not isinstance(row, Mapping):
+            continue
+        source = _token(row.get("source"))
+        status = _token(row.get("status"))
+        if source and status:
+            values.append(
+                f"{labels.get(source, humanize_enum(source))}: {humanize_enum(status)}"
+            )
+    return "; ".join(values)
 
 
 def _filter_controls(

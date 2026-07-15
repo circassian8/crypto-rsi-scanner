@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from crypto_rsi_scanner.event_alpha.artifacts import operator_state
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_cli
+from crypto_rsi_scanner.event_alpha.operations import daily_operations_publication
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_campaign_guard
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_audit
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
@@ -390,6 +391,152 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     )
 
 
+def test_final_receipts_reconcile_attempt_publication_operations_and_current(
+    tmp_path,
+    monkeypatch,
+):
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    _fixture(base)
+    namespace = "radar_market_no_send_a"
+    namespace_dir = base / namespace
+    operator_path = namespace_dir / campaign.OPERATOR_STATE_FILENAME
+    operator_path.unlink()
+    run_id = "2026-07-13T15:00:00+00:00|no_key_live"
+    run_ledger = namespace_dir / "event_alpha_runs.jsonl"
+    market_no_send_io.write_jsonl(
+        run_ledger,
+        [{
+            "run_id": run_id,
+            "profile": "no_key_live",
+            "artifact_namespace": namespace,
+            "run_mode": "operational",
+        }],
+    )
+    operator = operator_state.begin_run(
+        namespace_dir,
+        {
+            "run_id": run_id,
+            "profile": "no_key_live",
+            "artifact_namespace": namespace,
+            "run_mode": "operational",
+        },
+        run_ledger_path=run_ledger,
+        updated_at=datetime.fromisoformat("2026-07-13T17:30:00+00:00"),
+    )
+    operator = operator_state.record_doctor_status(
+        namespace_dir,
+        run_id=run_id,
+        profile="no_key_live",
+        artifact_namespace=namespace,
+        expected_revision=int(operator["revision"]),
+        strict=True,
+        schema_only=False,
+        skip_api_checks=False,
+        status="OK",
+        blocker_count=0,
+        warning_count=0,
+        checked_at=datetime.fromisoformat("2026-07-13T17:30:00+00:00"),
+    )
+    pointer = market_no_send_io.read_json_object(base / CURRENT_NAMESPACE_POINTER)
+    pointer["profile"] = operator["profile"]
+    pointer["run_id"] = operator["run_id"]
+    pointer["revision"] = operator["revision"]
+    pointer["operator_state_sha256"] = operator_state.operator_authority_digest(
+        operator
+    )
+    market_no_send_io.write_json_atomic(base / CURRENT_NAMESPACE_POINTER, pointer)
+    audit_path = namespace_dir / campaign.PILOT_AUDIT_FILENAME
+    audit = market_no_send_io.read_json_object(audit_path)
+    audit["publication"]["status"] = "not_published"
+    audit["exact_operator_revision"] = operator["revision"]
+    audit["publication"]["pointer_revision"] = operator["revision"]
+    audit["publication"]["pointer_operator_state_sha256"] = pointer[
+        "operator_state_sha256"
+    ]
+    market_no_send_io.write_json_atomic(audit_path, audit)
+    cycle_id = "c" * 32
+    _write_jsonl(
+        base / daily_operations_publication.CYCLE_LEDGER_FILENAME,
+        [{
+            "contract_version": 1,
+            "row_type": "decision_radar_daily_operations_cycle",
+            "cycle_id": cycle_id,
+            "recorded_at": "2026-07-13T17:31:00+00:00",
+            "artifact_namespace": namespace,
+            "status": "succeeded",
+            "reason": "published_and_restarted",
+            "provider_call_attempted": True,
+            "provider_request_succeeded": True,
+            "pointer_published": True,
+            "dashboard_restarted": True,
+            "pointer_rolled_back": False,
+            "pointer_invalidated": False,
+            **SAFETY_COUNTERS,
+            "no_send": True,
+            "research_only": True,
+        }],
+    )
+    _write_json(
+        base / daily_operations_publication.STATE_FILENAME,
+        {
+            "contract_version": 1,
+            "row_type": "decision_radar_daily_operations_state",
+            "updated_at": "2026-07-13T17:31:00+00:00",
+            "last_cycle_id": cycle_id,
+            "last_cycle_status": "succeeded",
+            "last_cycle_reason": "published_and_restarted",
+            "last_cycle_namespace": namespace,
+            "last_successful_namespace": namespace,
+            "last_successful_publication": "2026-07-13T17:31:00+00:00",
+            "last_readiness_check": "2026-07-13T17:30:00+00:00",
+            "live_provider_authorized": True,
+            "provider_call_attempted": True,
+            "pointer_published": True,
+            "dashboard_restarted": True,
+            "pointer_invalidated": False,
+            "scheduler_enabled": False,
+            "scheduler_loaded": False,
+            "scheduler_healthy": True,
+            "scheduler_reason": "not_installed",
+            **SAFETY_COUNTERS,
+            "no_send": True,
+            "research_only": True,
+        },
+    )
+    daily_operations_publication.reconcile_current_publication(
+        base,
+        dashboard={"owned": True, "running": True, "reason": "owned_running"},
+        recorded_at="2026-07-13T17:32:00+00:00",
+    )
+    monkeypatch.setattr(
+        campaign.market_no_send_history_cache,
+        "cache_readiness",
+        _readiness,
+    )
+    monkeypatch.setattr(
+        campaign.dashboard_readiness,
+        "resolve_authoritative_dashboard",
+        _dashboard_authority,
+    )
+
+    report = campaign.build_campaign_report(base, evaluated_at=_EVALUATED)
+    current = next(
+        row for row in report["authoritative_generations"]
+        if row["artifact_namespace"] == namespace
+    )["publication"]
+
+    assert current["attempt_audit_status"] == "not_published"
+    assert current["publication_status"] == "published"
+    assert current["operations_status"] == "dashboard_restarted"
+    assert current["audit_status"] == "published"
+    assert current["currently_authoritative"] is True
+    assert current["final_publication_receipt_valid"] is True
+    assert current["operations_receipt_valid"] is True
+    assert current["first_authoritative_at"] == "2026-07-13T17:31:00+00:00"
+    assert current["contract_errors"] == []
+
+
 def test_campaign_report_honors_reserved_provider_call_cadence_without_history(
     tmp_path,
 ):
@@ -535,14 +682,21 @@ def test_reaudit_after_pointer_move_preserves_authority_history(
         for row in report["authoritative_generations"]
         if row["artifact_namespace"] == namespace
     )
-    assert prior["publication"] == {
-        "ever_authoritative": True,
-        "first_authoritative_at": "2026-07-13T17:31:00+00:00",
-        "audit_authority_binding_valid": True,
-        "authority_source": "pilot_audit_exact_binding",
-        "audit_status": "not_published",
-        "currently_authoritative": False,
-    }
+    assert prior["publication"]["ever_authoritative"] is True
+    assert prior["publication"]["first_authoritative_at"] == (
+        "2026-07-13T17:31:00+00:00"
+    )
+    assert prior["publication"]["audit_authority_binding_valid"] is True
+    assert prior["publication"]["authority_source"] == (
+        "pilot_audit_exact_binding"
+    )
+    assert prior["publication"]["attempt_audit_status"] == "not_published"
+    assert prior["publication"]["publication_status"] == (
+        "published_legacy_audit"
+    )
+    assert prior["publication"]["audit_status"] == "published_legacy_audit"
+    assert prior["publication"]["operations_status"] == "legacy_not_recorded"
+    assert prior["publication"]["currently_authoritative"] is False
     assert history[namespace]["first_authoritative_at"] == (
         "2026-07-13T17:31:00+00:00"
     )
@@ -600,6 +754,51 @@ def test_copied_or_tampered_audit_cannot_invent_historical_authority(
         row["publication"]["audit_authority_binding_valid"] is False
         for row in tampered["non_authoritative_complete_generations"]
     )
+
+
+def test_canonical_managed_namespace_cannot_fall_back_to_legacy_audit(
+    tmp_path,
+) -> None:
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    _fixture(base)
+    namespace = "radar_market_no_send_a"
+    namespace_dir = base / namespace
+    manifest = market_no_send_io.read_json_object(
+        namespace_dir / campaign.RUN_MANIFEST_FILENAME
+    )
+    audit = market_no_send_io.read_json_object(
+        namespace_dir / campaign.PILOT_AUDIT_FILENAME
+    )
+    operator = market_no_send_io.read_json_object(
+        namespace_dir / campaign.OPERATOR_STATE_FILENAME
+    )
+    pointer = market_no_send_io.read_json_object(base / CURRENT_NAMESPACE_POINTER)
+    _write_jsonl(
+        base / daily_operations_publication.CYCLE_LEDGER_FILENAME,
+        [
+            {
+                "artifact_namespace": namespace,
+                "cycle_id": "managed-cycle",
+                "status": "succeeded",
+            }
+        ],
+    )
+
+    values, artifacts = campaign._generation_publication(
+        namespace_dir,
+        run_id=str(manifest["run_id"]),
+        audit=audit,
+        operator=operator,
+        current_authority=pointer,
+    )
+
+    assert values["audit_authority_binding_valid"] is False
+    assert values["publication_status"] == "missing_final_receipt"
+    assert values["currently_authoritative"] is False
+    assert values["ever_authoritative"] is False
+    assert values["first_authoritative_at"] is None
+    assert artifacts["prepublication_audit"] is None
 
 
 def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(

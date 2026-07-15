@@ -439,7 +439,9 @@ def test_event_alpha_pipeline_routes_monitor_updates_without_new_source():
     assert "watchlist_monitor_material=3" in event_alpha_pipeline.format_event_alpha_pipeline_report(result)
 
 
-def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
+def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies(
+    monkeypatch,
+):
     import contextlib
     import io
     import tempfile
@@ -481,6 +483,14 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
         config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT = 72
         config.EVENT_ALPHA_ROUTER_ENABLED = True
         config.EVENT_ALPHA_FEEDBACK_PATH = Path(tmp) / "feedback.jsonl"
+        monkeypatch.setenv(
+            "RSI_EVENT_WATCHLIST_STATE_PATH",
+            str(config.EVENT_WATCHLIST_STATE_PATH),
+        )
+        monkeypatch.setenv(
+            "RSI_EVENT_ALPHA_FEEDBACK_PATH",
+            str(config.EVENT_ALPHA_FEEDBACK_PATH),
+        )
         try:
             refresh_out = io.StringIO()
             with contextlib.redirect_stdout(refresh_out):

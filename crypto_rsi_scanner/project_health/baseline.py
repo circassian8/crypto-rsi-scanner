@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import source_cache
+from . import artifact_retention
+
 
 BASELINE_SCHEMA_VERSION = "architecture_baseline_v1"
 BASELINE_JSON = "ARCHITECTURE_BASELINE.json"
@@ -95,8 +98,7 @@ def _relative(path: Path, root: Path) -> str:
 def _line_count(path: Path) -> int | None:
     if not path.exists():
         return None
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        return sum(1 for _ in handle)
+    return source_cache.source_line_count(path)
 
 
 def _list_files(root: Path, directory: str, suffixes: tuple[str, ...] = (".py", ".md", ".ini")) -> list[str]:
@@ -200,49 +202,13 @@ def _namespace_status_from_name(namespace: str) -> tuple[str, str]:
 
 
 def _namespace_inventory(root: Path) -> dict[str, Any]:
-    base = root / "event_fade_cache"
-    namespaces: list[dict[str, Any]] = []
-    status_counts: Counter[str] = Counter()
-    if base.exists():
-        for path in sorted(child for child in base.iterdir() if child.is_dir()):
-            status_path = path / "event_alpha_namespace_status.json"
-            marker = _load_json(status_path) if status_path.exists() else {}
-            status, reason = _namespace_status_from_name(path.name)
-            if marker:
-                marker_status = str(marker.get("status") or "")
-                if marker_status not in {"", "active", "unknown"}:
-                    status = marker_status
-                reason = str(marker.get("reason") or reason)
-            artifact_counts = Counter(
-                item.suffix.lstrip(".") or "no_extension"
-                for item in path.iterdir()
-                if item.is_file()
-            )
-            stale = status.startswith("stale")
-            row = {
-                "namespace": path.name,
-                "path": _relative(path, root),
-                "status": status,
-                "reason": reason,
-                "marker_present": status_path.exists(),
-                "safe_for_send_readiness": bool(marker.get("safe_for_send_readiness", False)) and not stale,
-                "stale": stale,
-                "file_count": sum(artifact_counts.values()),
-                "artifact_counts": dict(sorted(artifact_counts.items())),
-            }
-            namespaces.append(row)
-            status_counts[status] += 1
-    return {
-        "base_dir": "event_fade_cache",
-        "namespace_count": len(namespaces),
-        "status_counts": dict(sorted(status_counts.items())),
-        "known_stale_namespaces": [
-            row["namespace"]
-            for row in namespaces
-            if row["stale"]
-        ],
-        "namespaces": namespaces,
-    }
+    report = artifact_retention.build_bounded_retention_report(
+        root / "event_fade_cache",
+        display_base_dir="event_fade_cache",
+    )
+    for row in report["namespaces"]:
+        row["path"] = f"event_fade_cache/{row['namespace']}"
+    return report
 
 
 def _workflow_safety(root: Path, workflows: list[str]) -> dict[str, Any]:

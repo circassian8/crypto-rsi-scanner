@@ -181,10 +181,11 @@ def _generation_table(value: Any) -> list[str]:
     if not rows:
         return ["- None."]
     lines = [
-        "| Namespace | Observed at | Candidates | Routes | Current |",
-        "|---|---|---:|---|---|",
+        "| Namespace | Observed at | Candidates | Routes | Attempt audit | Publication | Operations | Current |",
+        "|---|---|---:|---|---|---|---|---|",
     ]
     for row in rows:
+        publication = _mapping(row.get("publication"))
         routes = ", ".join(
             f"{name}={_int(count)}"
             for name, count in sorted(_mapping(row.get("route_counts")).items())
@@ -192,7 +193,10 @@ def _generation_table(value: Any) -> list[str]:
         lines.append(
             f"| {_md(row.get('artifact_namespace'))} | {_md(row.get('observed_at'))} | "
             f"{_int(row.get('candidate_count'))} | {_md(routes)} | "
-            f"{str(_mapping(row.get('publication')).get('currently_authoritative') is True).lower()} |"
+            f"{_md(publication.get('attempt_audit_status'))} | "
+            f"{_md(publication.get('publication_status'))} | "
+            f"{_md(publication.get('operations_status'))} | "
+            f"{str(publication.get('currently_authoritative') is True).lower()} |"
         )
     return lines
 

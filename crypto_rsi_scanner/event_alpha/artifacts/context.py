@@ -64,7 +64,7 @@ def context_from_profile(
     base_dir: str | Path | None = None,
     artifact_namespace: str | None = None,
 ) -> EventAlphaArtifactContext:
-    """Resolve profile/run-mode artifact paths while honoring explicit env paths."""
+    """Resolve artifact paths, with an explicit call-site base taking priority."""
     from ... import config
 
     profile_key = _clean_token(profile or "default", default="default")
@@ -80,10 +80,15 @@ def context_from_profile(
         or _default_namespace(profile_key, mode),
         default=_default_namespace(profile_key, mode),
     )
-    raw_base = os.getenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR") or base_dir or getattr(
-        config,
-        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
-        getattr(config, "EVENT_DISCOVERY_CACHE_DIR", Path("event_fade_cache")),
+    raw_base = (
+        base_dir
+        if base_dir is not None
+        else os.getenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR")
+        or getattr(
+            config,
+            "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+            getattr(config, "EVENT_DISCOVERY_CACHE_DIR", Path("event_fade_cache")),
+        )
     )
     resolved_base = _resolve_path(raw_base, data_dir=config.DATA_DIR)
     namespace_dir = resolved_base / namespace

@@ -17,6 +17,86 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Harden Daily Operations publication and audit truth v1.1 · Codex
+**Why:** Daily Operations needed one coherent post-publication truth across the
+pointer, strict doctor, operator state, campaign report, dashboard history, and
+maintenance state. Current provider readiness also needed to remain distinct
+from historical cycle authorization, while official calendar acquisition had
+to preserve valid partial coverage instead of collapsing every source failure
+into an empty calendar.
+**Changes:**
+- Added immutable prepublication, final-publication, and owned-dashboard
+  operations receipts. They bind the exact namespace, run, revision,
+  operator-state digest, artifact fingerprints, strict-doctor result, pointer,
+  cycle, and zero-side-effect safety facts. Explicit reconciliation can seal the
+  already-proven revision-12 authority without a provider call or process
+  restart; contradictory or incomplete receipt state now fails closed.
+- Closed the publication transition itself: pointer-mode process startup may
+  bind only a valid final-publication receipt, serves 503 until the operations
+  receipt exists, and must pass an HTTP probe bound to exact authority response
+  headers and the same positive owned PID afterward. Pointer publication,
+  rollback, invalidation, and reconciliation use one descriptor-anchored
+  transaction, so an artifact-root swap cannot redirect pointer I/O; rollback
+  restores only the exact saved bytes bound by the prior receipt. A later failed
+  terminal row for the same cycle invalidates the earlier success receipt.
+- Made same-authority dashboard readiness byte-idempotent and allowed only an
+  equivalent strict-doctor verification-clock refresh. Semantic doctor drift,
+  pointer drift, failed publication, or a missing operations receipt remains a
+  blocker. Campaign and dashboard history now separate attempt, publication,
+  operations, and current-authority status.
+- Added a bounded, credential-free current-readiness receipt with separate
+  historical and current authorization timestamps/statuses. Dashboard GET/HEAD
+  reads that persisted projection only and never inspects the environment.
+- Added calm near-expiry guidance on Today and System Health when maintenance is
+  disabled and a manual observation is eligible. It shows the safe readiness,
+  confirmation-gated install, and rollback commands without installing or
+  running anything.
+- Upgraded official macro acquisition to per-source `observed`, `no_results`,
+  `unavailable`, `missing_configuration`, `parse_error`, and `rate_limited`
+  status, with immutable accepted bytes, exact source fingerprints, and
+  `complete`/`partial`/`unavailable` snapshots. Missing sources are explicit on
+  the calendar page; unavailable zero-row sources never become “no events,” and
+  macro events remain context/risk-only.
+- Isolated Event Alpha tests from cumulative root artifacts, added process-local
+  source/AST memoization, per-file pytest timing reports, and bounded report-only
+  artifact-retention telemetry. Config and process environment roots are both
+  isolated, explicit per-test/call-site artifact bases retain priority, and
+  unreadable retention scans block instead of appearing exact.
+  The 1,200/1,500-line thresholds remain intact;
+  six cohesive files touched here are explicit warning exceptions with concrete
+  split triggers instead of a new architecture pass.
+- Expanded read-only readiness for the intentionally undecided service,
+  calendar authorization, execution venue/spread source, and private/public
+  phone routes. Updated Make targets, tests, AGENTS, README, ROADMAP, DECISIONS,
+  Decision Radar North Star, campaign output, and architecture reports.
+**Verify:** Focused Daily Operations/publication/campaign/dashboard/calendar/
+execution/access/export-security/performance tests passed 390/390. `compileall`,
+JSON duplicate-key validation, `git diff --check`, architecture cleanliness,
+and the strict doctor passed; the current final-publication contract is valid
+with zero errors. Daily Operations readiness/status/dry-run made no provider
+call; official-calendar readiness remained safely blocked with no call;
+execution readiness remained observational; dashboard readiness, 13-page smoke,
+8-page UX smoke, and campaign report passed. The owned dashboard restart and
+exact authority-header/stable-PID probe passed while revision 12 was fresh;
+after its six-hour clock elapsed, Today, Health, Calendar, and Campaign History
+all returned the intended quarantined HTTP 503 with the exact identity headers.
+`make verify-fast PYTHON=python3` passed 1,959 tests plus offline smokes in
+115.41s. Final `make verify PYTHON=python3` passed 1,365/1,365 standalone checks,
+1,959 pytest checks, alert rendering, fixture backtest, and paper scoreboard in
+207.12s.
+**Notes/risks:** The current persisted market authorization status is
+`authorized`/`eligible`, but no live provider request was made in this work.
+Official calendar authorization/contact remain absent; the maintenance service,
+private/public phone routes, execution venue, and spread provider remain
+disabled or unselected. Revision 12's final publication evidence remains valid
+historical truth, but its market generation expired during the final release
+gate; the pointer and dashboard now fail closed until an explicit authorized
+manual cycle or separately confirmed maintenance installation produces a fresh
+strict-clean generation. No refresh call, send, trade, paper trade, normal RSI
+write, execution, or Event Alpha-created `TRIGGERED_FADE` occurred. The official
+macro module is 34 lines below the unchanged 1,500-line blocker and must split
+before another source/status family or any further approach to that limit.
+
 ## 2026-07-15 — Deliver Crypto Decision Radar Daily Operations v1 · Codex
 **Why:** The operator needs a trustworthy all-day dashboard without silently
 turning existing provider authorization into recurring activity, and needs a

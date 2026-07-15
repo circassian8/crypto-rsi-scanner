@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import http.client
 import os
 import plistlib
 import secrets
 import stat
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +27,8 @@ DEFAULT_INTERVAL_SECONDS = 300
 DEFAULT_DASHBOARD_HOST = "127.0.0.1"
 DEFAULT_DASHBOARD_PORT = 8765
 SERVICE_STATE_FILENAME = "event_radar_daily_operations_service.json"
+_DASHBOARD_BODY_MARKER = b"Crypto Decision Radar"
+_DASHBOARD_PROBE_BYTES = 16 * 1024
 
 
 @dataclass(frozen=True)
@@ -103,9 +107,59 @@ def _run_command(argv: tuple[str, ...]) -> CommandResult:
     return CommandResult(completed.returncode, output)
 
 
+def _http_dashboard_ready(
+    host: str,
+    port: int,
+    timeout: float,
+    *,
+    expected_namespace: str,
+    expected_run_id: str,
+    expected_revision: int,
+    expected_operator_state_sha256: str,
+) -> bool:
+    if not _valid_dashboard_probe_identity(
+        expected_namespace=expected_namespace,
+        expected_run_id=expected_run_id,
+        expected_revision=expected_revision,
+        expected_operator_state_sha256=expected_operator_state_sha256,
+    ):
+        return False
+    connection = http.client.HTTPConnection(host, int(port), timeout=timeout)
+    try:
+        connection.request(
+            "GET",
+            "/",
+            headers={"User-Agent": "crypto-radar-daily-operations/1"},
+        )
+        response = connection.getresponse()
+        body = response.read(_DASHBOARD_PROBE_BYTES)
+        cache_directives = {
+            directive.strip().casefold()
+            for directive in (response.getheader("Cache-Control") or "").split(",")
+            if directive.strip()
+        }
+        return bool(
+            response.status == 200
+            and "no-store" in cache_directives
+            and response.getheader("X-Content-Type-Options") == "nosniff"
+            and response.getheader("X-Crypto-Radar-Namespace")
+            == expected_namespace
+            and response.getheader("X-Crypto-Radar-Run-Id") == expected_run_id
+            and response.getheader("X-Crypto-Radar-Revision")
+            == str(expected_revision)
+            and response.getheader("X-Crypto-Radar-Operator-State-SHA256")
+            == expected_operator_state_sha256
+            and _DASHBOARD_BODY_MARKER in body
+        )
+    finally:
+        connection.close()
+
+
 @dataclass(frozen=True)
 class _ServiceDependencies:
     run: Callable[[tuple[str, ...]], CommandResult] = _run_command
+    http_dashboard_ready: Callable[..., bool] = _http_dashboard_ready
+    sleep: Callable[[float], None] = time.sleep
     uid: int = field(default_factory=os.getuid)
     home: Path = field(default_factory=Path.home)
 
@@ -118,6 +172,9 @@ def repository_root() -> Path:
 
 
 def default_python_path() -> Path:
+    project_python = repository_root() / ".venv" / "bin" / "python"
+    if project_python.is_file():
+        return project_python.absolute()
     return Path(sys.executable).expanduser().absolute()
 
 
@@ -241,6 +298,150 @@ def restart_owned_dashboard(
     service = f"gui/{deps.uid}/{DASHBOARD_LABEL}"
     result = deps.run(("launchctl", "kickstart", "-k", service))
     return result.returncode == 0
+
+
+def probe_owned_dashboard(
+    *,
+    artifact_base: str | Path,
+    repo_root_path: str | Path | None = None,
+    python_path: str | Path | None = None,
+    host: str = DEFAULT_DASHBOARD_HOST,
+    port: int = DEFAULT_DASHBOARD_PORT,
+    expected_namespace: str,
+    expected_run_id: str,
+    expected_revision: int,
+    expected_operator_state_sha256: str,
+    attempts: int = 50,
+    delay_seconds: float = 0.1,
+    dependencies: ServiceDependencies | None = None,
+) -> bool:
+    """Prove the exact owned process serves trusted content after final receipt."""
+
+    deps = dependencies or ServiceDependencies()
+    if not _valid_dashboard_probe_identity(
+        expected_namespace=expected_namespace,
+        expected_run_id=expected_run_id,
+        expected_revision=expected_revision,
+        expected_operator_state_sha256=expected_operator_state_sha256,
+    ):
+        return False
+    bounded_attempts = min(max(int(attempts), 1), 150)
+    for attempt in range(bounded_attempts):
+        try:
+            before = inspect_dashboard_ownership(
+                artifact_base=artifact_base,
+                repo_root_path=repo_root_path,
+                python_path=python_path,
+                host=host,
+                port=port,
+                dependencies=deps,
+            )
+            before_pid = before.pid
+            if (
+                before.owned
+                and before.running
+                and isinstance(before_pid, int)
+                and not isinstance(before_pid, bool)
+                and before_pid > 0
+                and deps.http_dashboard_ready(
+                    host,
+                    int(port),
+                    0.5,
+                    expected_namespace=expected_namespace,
+                    expected_run_id=expected_run_id,
+                    expected_revision=expected_revision,
+                    expected_operator_state_sha256=expected_operator_state_sha256,
+                )
+            ):
+                after = inspect_dashboard_ownership(
+                    artifact_base=artifact_base,
+                    repo_root_path=repo_root_path,
+                    python_path=python_path,
+                    host=host,
+                    port=port,
+                    dependencies=deps,
+                )
+                if (
+                    after.owned
+                    and after.running
+                    and after.pid == before_pid
+                ):
+                    return True
+        except Exception:
+            pass
+        if attempt + 1 < bounded_attempts:
+            try:
+                deps.sleep(max(0.0, min(float(delay_seconds), 1.0)))
+            except Exception:
+                return False
+    return False
+
+
+def _valid_dashboard_probe_identity(
+    *,
+    expected_namespace: object,
+    expected_run_id: object,
+    expected_revision: object,
+    expected_operator_state_sha256: object,
+) -> bool:
+    """Validate the closed, header-safe authority identity before probing."""
+
+    def safe_text(value: object) -> bool:
+        return bool(
+            isinstance(value, str)
+            and value
+            and len(value) <= 512
+            and all(32 <= ord(character) < 127 for character in value)
+        )
+
+    return bool(
+        safe_text(expected_namespace)
+        and safe_text(expected_run_id)
+        and isinstance(expected_revision, int)
+        and not isinstance(expected_revision, bool)
+        and expected_revision >= 1
+        and isinstance(expected_operator_state_sha256, str)
+        and len(expected_operator_state_sha256) == 64
+        and all(
+            character in "0123456789abcdef"
+            for character in expected_operator_state_sha256
+        )
+    )
+
+
+def wait_for_owned_dashboard_process(
+    *,
+    artifact_base: str | Path,
+    repo_root_path: str | Path | None = None,
+    python_path: str | Path | None = None,
+    host: str = DEFAULT_DASHBOARD_HOST,
+    port: int = DEFAULT_DASHBOARD_PORT,
+    attempts: int = 50,
+    delay_seconds: float = 0.1,
+    dependencies: ServiceDependencies | None = None,
+) -> DashboardOwnership:
+    """Wait briefly for kickstart to expose the exact owned running process."""
+
+    deps = dependencies or ServiceDependencies()
+    ownership = DashboardOwnership(False, False, False, "dashboard_not_loaded")
+    bounded_attempts = min(max(int(attempts), 1), 150)
+    for attempt in range(bounded_attempts):
+        ownership = inspect_dashboard_ownership(
+            artifact_base=artifact_base,
+            repo_root_path=repo_root_path,
+            python_path=python_path,
+            host=host,
+            port=port,
+            dependencies=deps,
+        )
+        if ownership.owned:
+            return ownership
+        if attempt + 1 < bounded_attempts:
+            try:
+                deps.sleep(max(0.0, min(float(delay_seconds), 1.0)))
+            except Exception:
+                break
+    return ownership
 
 
 def service_plist(
@@ -863,6 +1064,8 @@ __all__ = (
     "inspect_scheduler_health",
     "install_service",
     "restart_owned_dashboard",
+    "probe_owned_dashboard",
     "service_plist",
     "uninstall_service",
+    "wait_for_owned_dashboard_process",
 )

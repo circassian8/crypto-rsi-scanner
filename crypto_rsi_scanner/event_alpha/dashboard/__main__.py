@@ -12,6 +12,7 @@ from .loader import candidate_identifier, load_dashboard_snapshot
 from .models import DashboardGenerationBinding, DashboardLoadError
 from .readiness import (
     DashboardReadinessError,
+    _resolve_dashboard_startup,
     publish_current_namespace_pointer,
     read_current_namespace_pointer,
     resolve_authoritative_dashboard,
@@ -63,11 +64,14 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.artifact_base),
                 namespace_hint,
             )
-        result = resolve_authoritative_dashboard(
-            args.artifact_base,
-            args.namespace,
-            now=effective_smoke_now if args.smoke else None,
-        )
+        if not args.smoke and not str(args.namespace or "").strip():
+            result = _resolve_dashboard_startup(args.artifact_base)
+        else:
+            result = resolve_authoritative_dashboard(
+                args.artifact_base,
+                args.namespace,
+                now=effective_smoke_now if args.smoke else None,
+            )
         namespace = result.snapshot.artifact_namespace
         if args.smoke:
             try:

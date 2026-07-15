@@ -10,7 +10,7 @@ import argparse
 import ast
 import json
 import sys
-from collections import Counter
+from collections import Counter, OrderedDict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +18,7 @@ from typing import Any, Iterable
 
 from . import api_inventory
 from . import architecture_contract
+from . import source_cache
 
 
 REPORT_SCHEMA_VERSION = "architecture_class_ownership_report_v1"
@@ -256,6 +257,11 @@ PROVIDER_CLASS_SPLIT_TARGETS = {
 STORAGE_MIXIN_CLASSES = {"SignalsMixin", "WatchlistMixin", "MigrationsMixin"}
 
 NEAR_THRESHOLD_LINE_FLOOR = 1300
+_OWNERSHIP_ROW_CACHE_LIMIT = 4096
+_OWNERSHIP_ROW_CACHE: OrderedDict[
+    str,
+    tuple[source_cache.FileSignature, tuple["ClassOwnershipRow", ...], tuple["FunctionOwnershipRow", ...]],
+] = OrderedDict()
 
 
 @dataclass(frozen=True)
@@ -580,10 +586,7 @@ def _near_threshold_file_status(package_root: Path, *, repo_root: Path) -> list[
     for path in sorted(package_root.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
-        try:
-            line_count = sum(1 for _line in path.open(encoding="utf-8", errors="replace"))
-        except OSError:
-            continue
+        line_count = source_cache.source_line_count(path)
         if line_count < NEAR_THRESHOLD_LINE_FLOOR or line_count > 1500:
             continue
         rel = path.relative_to(repo_root).as_posix()
@@ -829,14 +832,31 @@ def _collect_source_rows(package_root: Path, *, repo_root: Path) -> tuple[list[C
         if "__pycache__" in path.parts:
             continue
         module = _module_name(path, repo_root=repo_root)
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=path.as_posix())
-        except SyntaxError:
+        cache_key = str(path.absolute())
+        signature = source_cache.source_signature(path)
+        if signature is None:
+            continue
+        cached = _OWNERSHIP_ROW_CACHE.get(cache_key)
+        if cached is not None and cached[0] == signature:
+            _OWNERSHIP_ROW_CACHE.move_to_end(cache_key)
+            classes.extend(cached[1])
+            functions.extend(cached[2])
+            continue
+        tree = source_cache.source_ast(path)
+        if tree is None:
             continue
         visitor = _OwnershipVisitor(module, path.relative_to(repo_root).as_posix())
         visitor.visit(tree)
         classes.extend(visitor.classes)
         functions.extend(visitor.functions)
+        _OWNERSHIP_ROW_CACHE[cache_key] = (
+            signature,
+            tuple(visitor.classes),
+            tuple(visitor.functions),
+        )
+        _OWNERSHIP_ROW_CACHE.move_to_end(cache_key)
+        while len(_OWNERSHIP_ROW_CACHE) > _OWNERSHIP_ROW_CACHE_LIMIT:
+            _OWNERSHIP_ROW_CACHE.popitem(last=False)
     return classes, functions
 
 

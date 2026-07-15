@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
+import hashlib
 import re
 import stat
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,11 +15,17 @@ from ..artifacts import fingerprints as event_alpha_fingerprints
 from ..operations.market_provenance import normalize_market_provenance
 from .loader import _read_regular_file_once, load_dashboard_snapshot
 from .models import DashboardLoadError, DashboardSnapshot
+from .pointer_mutation import (
+    CurrentPointerMutation,
+    CurrentPointerMutationError,
+    current_pointer_mutation_lock,
+)
 
 
 CURRENT_NAMESPACE_POINTER = "radar_current_namespace.json"
 POINTER_CONTRACT_VERSION = 1
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_EXPECTED_POINTER_UNSET = object()
 _POINTER_FIELDS = frozenset(
     {
         "contract_version",
@@ -78,6 +83,48 @@ def resolve_authoritative_dashboard(
 ) -> _DashboardReadinessResult:
     """Resolve an explicit namespace or the exact persisted pointer, then revalidate it."""
 
+    return _resolve_authoritative_dashboard(
+        artifact_base_dir,
+        artifact_namespace,
+        now=now,
+        max_generation_age_hours=max_generation_age_hours,
+        max_doctor_age_hours=max_doctor_age_hours,
+        allow_managed_prepublication=False,
+        require_managed_operations=True,
+    )
+
+
+def _resolve_dashboard_startup(
+    artifact_base_dir: str | Path,
+    *,
+    now: datetime | str | None = None,
+    max_generation_age_hours: float | None = None,
+    max_doctor_age_hours: float | None = None,
+) -> _DashboardReadinessResult:
+    """Bind a pointer-started process after publication but before its ops receipt."""
+
+    return _resolve_authoritative_dashboard(
+        artifact_base_dir,
+        now=now,
+        max_generation_age_hours=max_generation_age_hours,
+        max_doctor_age_hours=max_doctor_age_hours,
+        allow_managed_prepublication=False,
+        require_managed_operations=False,
+    )
+
+
+def _resolve_authoritative_dashboard(
+    artifact_base_dir: str | Path,
+    artifact_namespace: str | None = None,
+    *,
+    now: datetime | str | None = None,
+    max_generation_age_hours: float | None = None,
+    max_doctor_age_hours: float | None = None,
+    allow_managed_prepublication: bool,
+    require_managed_operations: bool,
+) -> _DashboardReadinessResult:
+    """Shared resolver with one private Daily Operations publication transition."""
+
     base = _artifact_base(artifact_base_dir)
     pointer_path = base / CURRENT_NAMESPACE_POINTER
     explicit = str(artifact_namespace or "").strip()
@@ -104,11 +151,53 @@ def resolve_authoritative_dashboard(
     _require_current_counts(snapshot)
     if pointer is not None:
         _require_pointer_matches_snapshot(pointer, snapshot)
+    if not allow_managed_prepublication:
+        _require_daily_operations_publication_contract(
+            base,
+            snapshot,
+            require_current=pointer is not None,
+            require_operations=require_managed_operations,
+        )
     return _DashboardReadinessResult(
         snapshot=snapshot,
         namespace_source=source,
         pointer_path=pointer_path,
     )
+
+
+def _require_daily_operations_publication_contract(
+    base: Path,
+    snapshot: DashboardSnapshot,
+    *,
+    require_current: bool,
+    require_operations: bool = True,
+) -> None:
+    """Fail closed for v1.1-managed authority while allowing legacy reconcile."""
+
+    from ..operations import daily_operations_publication
+
+    try:
+        managed = daily_operations_publication.is_daily_operations_managed_namespace(
+            base,
+            snapshot.artifact_namespace,
+        )
+    except Exception as exc:  # noqa: BLE001 - trust classification fails closed
+        raise DashboardReadinessError(
+            "dashboard final publication contract is unreadable"
+        ) from exc
+    if not managed:
+        return
+    validation = daily_operations_publication.validate_final_publication_contract(
+        base,
+        snapshot.artifact_namespace,
+        require_current=require_current,
+        require_operations=require_operations,
+    )
+    if not validation.valid:
+        detail = validation.errors[0] if validation.errors else "unknown"
+        raise DashboardReadinessError(
+            f"dashboard final publication contract is invalid ({detail})"
+        )
 
 
 def publish_current_namespace_pointer(
@@ -121,30 +210,164 @@ def publish_current_namespace_pointer(
 ) -> _DashboardReadinessResult:
     """Publish the fixed pointer only after the dashboard loader proves authority."""
 
-    result = resolve_authoritative_dashboard(
+    return _publish_current_namespace_pointer(
         artifact_base_dir,
         artifact_namespace,
         now=now,
         max_generation_age_hours=max_generation_age_hours,
         max_doctor_age_hours=max_doctor_age_hours,
+        allow_managed_prepublication=False,
     )
-    snapshot = result.snapshot
-    payload = {
-        "contract_version": POINTER_CONTRACT_VERSION,
-        "artifact_namespace": snapshot.artifact_namespace,
-        "profile": snapshot.profile,
-        "run_id": snapshot.run_id,
-        "revision": snapshot.revision,
-        "operator_state_sha256": snapshot.operator_state_sha256,
-        "generation_authority_status": "authoritative",
-        "authority_checked_at": snapshot.generation_authority_checked_at,
-    }
-    _write_pointer_atomic(result.pointer_path, payload)
-    return _DashboardReadinessResult(
-        snapshot=snapshot,
-        namespace_source=result.namespace_source,
-        pointer_path=result.pointer_path,
+
+
+def _publish_prepublication_namespace_pointer(
+    artifact_base_dir: str | Path,
+    artifact_namespace: str | None = None,
+    *,
+    now: datetime | str | None = None,
+    max_generation_age_hours: float | None = None,
+    max_doctor_age_hours: float | None = None,
+    expected_current_pointer_sha256: str | None | object = _EXPECTED_POINTER_UNSET,
+) -> _DashboardReadinessResult:
+    """Publish only inside the receipt-producing Daily Operations transition."""
+
+    return _publish_current_namespace_pointer(
+        artifact_base_dir,
+        artifact_namespace,
+        now=now,
+        max_generation_age_hours=max_generation_age_hours,
+        max_doctor_age_hours=max_doctor_age_hours,
+        allow_managed_prepublication=True,
+        expected_current_pointer_sha256=expected_current_pointer_sha256,
     )
+
+
+def _publish_current_namespace_pointer(
+    artifact_base_dir: str | Path,
+    artifact_namespace: str | None = None,
+    *,
+    now: datetime | str | None = None,
+    max_generation_age_hours: float | None = None,
+    max_doctor_age_hours: float | None = None,
+    allow_managed_prepublication: bool,
+    expected_current_pointer_sha256: str | None | object = _EXPECTED_POINTER_UNSET,
+) -> _DashboardReadinessResult:
+    """Write the pointer after the selected publication contract is proven."""
+
+    base = _artifact_base(artifact_base_dir)
+    try:
+        with current_pointer_mutation_lock(base) as mutation:
+            if expected_current_pointer_sha256 is not _EXPECTED_POINTER_UNSET:
+                _require_expected_current_pointer(
+                    mutation,
+                    expected_current_pointer_sha256,
+                )
+            result = _resolve_authoritative_dashboard(
+                base,
+                artifact_namespace,
+                now=now,
+                max_generation_age_hours=max_generation_age_hours,
+                max_doctor_age_hours=max_doctor_age_hours,
+                allow_managed_prepublication=allow_managed_prepublication,
+                require_managed_operations=True,
+            )
+            snapshot = result.snapshot
+            payload = {
+                "contract_version": POINTER_CONTRACT_VERSION,
+                "artifact_namespace": snapshot.artifact_namespace,
+                "profile": snapshot.profile,
+                "run_id": snapshot.run_id,
+                "revision": snapshot.revision,
+                "operator_state_sha256": snapshot.operator_state_sha256,
+                "generation_authority_status": "authoritative",
+                "authority_checked_at": snapshot.generation_authority_checked_at,
+            }
+            if _existing_pointer_has_same_authority(
+                mutation,
+                payload,
+            ):
+                return result
+            previous_raw = _read_pointer_raw(mutation)
+            published_raw = _pointer_bytes(payload)
+            try:
+                _write_pointer_atomic(mutation, payload)
+                if not allow_managed_prepublication:
+                    _resolve_authoritative_dashboard(
+                        base,
+                        now=now,
+                        max_generation_age_hours=max_generation_age_hours,
+                        max_doctor_age_hours=max_doctor_age_hours,
+                        allow_managed_prepublication=False,
+                        require_managed_operations=True,
+                    )
+            except Exception:
+                try:
+                    _restore_pointer_after_failed_validation(
+                        mutation,
+                        previous_raw=previous_raw,
+                        published_raw=published_raw,
+                    )
+                except DashboardReadinessError as rollback_exc:
+                    raise DashboardReadinessError(
+                        "current namespace pointer rollback failed after publication validation"
+                    ) from rollback_exc
+                raise
+            return _DashboardReadinessResult(
+                snapshot=snapshot,
+                namespace_source=result.namespace_source,
+                pointer_path=result.pointer_path,
+            )
+    except CurrentPointerMutationError as exc:
+        raise DashboardReadinessError(
+            "current namespace pointer mutation lock is unavailable"
+        ) from exc
+
+
+def _require_expected_current_pointer(
+    mutation: CurrentPointerMutation,
+    expected_sha256: str | None | object,
+) -> None:
+    """Reject a Daily Operations publication if authority changed mid-cycle."""
+
+    try:
+        raw = mutation.read_regular_bytes(
+            CURRENT_NAMESPACE_POINTER,
+            missing_ok=True,
+        )
+    except Exception as exc:
+        raise DashboardReadinessError(
+            "current namespace pointer cannot be compared before publication"
+        ) from exc
+    if expected_sha256 is None:
+        matches = raw is None
+    else:
+        matches = bool(
+            isinstance(expected_sha256, str)
+            and _SHA256_RE.fullmatch(expected_sha256)
+            and raw is not None
+            and hashlib.sha256(raw).hexdigest() == expected_sha256
+        )
+    if not matches:
+        raise DashboardReadinessError(
+            "current namespace pointer changed during Daily Operations publication"
+        )
+
+
+def _existing_pointer_has_same_authority(
+    mutation: CurrentPointerMutation,
+    payload: Mapping[str, Any],
+) -> bool:
+    """Keep publication bytes stable when readiness revalidates the same authority."""
+
+    try:
+        raw = mutation.read_regular_bytes(CURRENT_NAMESPACE_POINTER, missing_ok=True)
+        if raw is None:
+            return False
+        existing = validate_current_namespace_pointer_bytes(raw)
+    except (CurrentPointerMutationError, DashboardReadinessError):
+        return False
+    stable_fields = _POINTER_FIELDS.difference({"authority_checked_at"})
+    return all(existing.get(field) == payload.get(field) for field in stable_fields)
 
 
 def read_current_namespace_pointer(artifact_base_dir: str | Path) -> dict[str, Any]:
@@ -158,6 +381,12 @@ def read_current_namespace_pointer(artifact_base_dir: str | Path) -> dict[str, A
         )
     if read_error or data is None:
         raise DashboardReadinessError("current namespace pointer is unreadable or unsafe")
+    return validate_current_namespace_pointer_bytes(data)
+
+
+def validate_current_namespace_pointer_bytes(data: bytes) -> dict[str, Any]:
+    """Validate one exact pointer buffer already read through a trusted fd."""
+
     try:
         parsed = json.loads(data.decode("utf-8"), object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
@@ -286,35 +515,62 @@ def _artifact_base(value: str | Path) -> Path:
     return base
 
 
-def _write_pointer_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+def _write_pointer_atomic(
+    mutation: CurrentPointerMutation,
+    payload: Mapping[str, Any],
+) -> None:
     try:
-        existing = path.lstat()
-    except FileNotFoundError:
-        existing = None
-    except OSError as exc:
-        raise DashboardReadinessError("current namespace pointer cannot be inspected") from exc
-    if existing is not None and not stat.S_ISREG(existing.st_mode):
-        raise DashboardReadinessError("current namespace pointer target is not a regular file")
-    data = (json.dumps(dict(payload), indent=2, sort_keys=True) + "\n").encode("utf-8")
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor: int | None = None
-    try:
-        descriptor = os.open(temporary, flags, 0o600)
-        with os.fdopen(descriptor, "wb") as handle:
-            descriptor = None
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except OSError as exc:
+        mutation.write_bytes_atomic(CURRENT_NAMESPACE_POINTER, _pointer_bytes(payload))
+    except Exception as exc:
         raise DashboardReadinessError("current namespace pointer update failed") from exc
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        temporary.unlink(missing_ok=True)
+
+
+def _pointer_bytes(payload: Mapping[str, Any]) -> bytes:
+    return (json.dumps(dict(payload), indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+
+
+def _read_pointer_raw(mutation: CurrentPointerMutation) -> bytes | None:
+    try:
+        return mutation.read_regular_bytes(
+            CURRENT_NAMESPACE_POINTER,
+            missing_ok=True,
+        )
+    except Exception as exc:
+        raise DashboardReadinessError(
+            "current namespace pointer cannot be preserved before publication"
+        ) from exc
+
+
+def _restore_pointer_after_failed_validation(
+    mutation: CurrentPointerMutation,
+    *,
+    previous_raw: bytes | None,
+    published_raw: bytes,
+) -> None:
+    """Restore exact prior bytes only when this transaction still owns the leaf."""
+
+    current_raw = _read_pointer_raw(mutation)
+    if current_raw == previous_raw:
+        return
+    if current_raw != published_raw:
+        raise DashboardReadinessError(
+            "current namespace pointer changed during publication rollback"
+        )
+    try:
+        if previous_raw is None:
+            mutation.remove_regular(CURRENT_NAMESPACE_POINTER)
+        else:
+            mutation.write_bytes_atomic(CURRENT_NAMESPACE_POINTER, previous_raw)
+    except Exception as exc:
+        raise DashboardReadinessError(
+            "current namespace pointer could not be restored"
+        ) from exc
+    if _read_pointer_raw(mutation) != previous_raw:
+        raise DashboardReadinessError(
+            "current namespace pointer restoration could not be verified"
+        )
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -340,4 +596,5 @@ __all__ = (
     "publish_current_namespace_pointer",
     "read_current_namespace_pointer",
     "resolve_authoritative_dashboard",
+    "validate_current_namespace_pointer_bytes",
 )

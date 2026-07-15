@@ -10,6 +10,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 from crypto_rsi_scanner.event_alpha.dashboard.calendar_page import (
     render_calendar_page,
 )
@@ -25,6 +27,9 @@ from crypto_rsi_scanner.event_alpha.operations.official_macro_calendar import (
     OfficialMacroHTTPResponse,
     OfficialMacroSourceSpec,
     acquire_official_macro_calendar,
+)
+from crypto_rsi_scanner.event_alpha.operations.market_no_send_models import (
+    MarketNoSendError,
 )
 
 
@@ -80,6 +85,7 @@ def test_official_macro_pack_reaches_fingerprinted_live_generation_and_dashboard
     artifact_base = tmp_path / "radar_artifacts"
     artifact_base.mkdir()
     monkeypatch.setenv(market_no_send.LIVE_AUTH_ENV, "1")
+    monkeypatch.setenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", str(artifact_base))
     monkeypatch.setattr(market_no_send.config, "FIXTURE_DIR", None)
     monkeypatch.setattr(
         market_no_send.config,
@@ -151,6 +157,20 @@ def test_official_macro_pack_reaches_fingerprinted_live_generation_and_dashboard
         run_id=result.run_id,
         safety_counters=market_no_send._SAFETY_COUNTERS,
     )
+    drifted_manifest = json.loads(json.dumps(manifest))
+    drifted_manifest["calendar_snapshot"]["source_coverage"][0][
+        "status"
+    ] = "unavailable"
+    with pytest.raises(
+        MarketNoSendError,
+        match="campaign_calendar_snapshot_source_coverage_invalid",
+    ):
+        market_no_send_calendar_publication.validate_optional_calendar_snapshot(
+            drifted_manifest,
+            namespace_dir=namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
 
     operator_state = json.loads(
         (namespace_dir / "event_alpha_operator_state.json").read_text(
@@ -209,3 +229,128 @@ def test_official_macro_pack_reaches_fingerprinted_live_generation_and_dashboard
     assert result_values["paper_trades_created"] == 0
     assert result_values["normal_rsi_signal_rows_written"] == 0
     assert result_values["triggered_fade_created"] == 0
+
+
+def test_partial_official_macro_pack_remains_explicit_through_publication(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    observed = datetime.now(timezone.utc).replace(microsecond=0)
+    calls: list[str] = []
+
+    def calendar_fetcher(
+        spec: OfficialMacroSourceSpec,
+        _user_agent: str,
+    ) -> OfficialMacroHTTPResponse:
+        calls.append(spec.name)
+        if spec.name == "bls":
+            return OfficialMacroHTTPResponse(
+                body=b"rate limited",
+                status=429,
+                content_type="text/plain",
+                final_url=spec.url,
+            )
+        return _official_response(spec)
+
+    pack = acquire_official_macro_calendar(
+        environ={
+            OFFICIAL_MACRO_LIVE_AUTH_ENV: "1",
+            OFFICIAL_MACRO_CONTACT_ENV: "calendar-operator@example.com",
+        },
+        output_base=tmp_path / "official_macro_acquisition",
+        observed_at=observed,
+        fetcher=calendar_fetcher,
+    )
+    assert pack.status == "partial"
+    assert pack.snapshot_path is not None
+    assert calls == ["bls", "federal_reserve", "bea"]
+
+    artifact_base = tmp_path / "radar_artifacts"
+    artifact_base.mkdir()
+    monkeypatch.setenv(market_no_send.LIVE_AUTH_ENV, "1")
+    monkeypatch.setenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", str(artifact_base))
+    monkeypatch.setattr(market_no_send.config, "FIXTURE_DIR", None)
+    monkeypatch.setattr(
+        market_no_send.config,
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        artifact_base,
+    )
+    monkeypatch.setattr(
+        market_no_send,
+        "_fetch_live_coingecko_rows",
+        lambda _limit: market_no_send._smoke_rows(),
+    )
+    namespace = "partial_official_macro_live_composition"
+    result = market_no_send.run_market_no_send_generation(
+        artifact_base_dir=artifact_base,
+        artifact_namespace=namespace,
+        top_n=5,
+        observed_at=observed,
+        environ={
+            market_no_send.LIVE_AUTH_ENV: "1",
+            market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV: str(
+                pack.snapshot_path
+            ),
+        },
+        fixture_dir=None,
+    )
+    assert result.complete is True
+    namespace_dir = artifact_base / namespace
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    metadata = manifest["calendar_snapshot"]
+    assert metadata["snapshot_status"] == "partial"
+    assert [row["status"] for row in metadata["source_coverage"]] == [
+        "rate_limited",
+        "observed",
+        "observed",
+    ]
+    market_no_send_calendar_publication.validate_optional_calendar_snapshot(
+        manifest,
+        namespace_dir=namespace_dir,
+        run_id=result.run_id,
+        safety_counters=market_no_send._SAFETY_COUNTERS,
+    )
+
+    doctor_env = os.environ.copy()
+    doctor_env.update(
+        {
+            "RSI_EVENT_ALERTS_ENABLED": "0",
+            "RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED": "0",
+            "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR": str(artifact_base),
+            "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE": namespace,
+            "RSI_EVENT_ALPHA_RUN_MODE": "operational",
+            "RSI_EVENT_RESEARCH_NOW": result.observed_at,
+        }
+    )
+    doctor = subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "main.py"),
+            "--event-alpha-artifact-doctor",
+            "--event-alpha-profile",
+            "no_key_live",
+            "--event-alpha-artifact-namespace",
+            namespace,
+            "--event-alpha-artifact-doctor-strict",
+        ],
+        cwd=namespace_dir,
+        env=doctor_env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+
+    checked_at = datetime.now(timezone.utc)
+    published = market_no_send.publish_market_no_send_generation(
+        artifact_base,
+        namespace,
+        now=checked_at,
+    )
+    loaded = load_dashboard_snapshot(artifact_base, namespace, now=checked_at)
+    page = render_calendar_page(loaded, {})
+    assert published.snapshot.generation_authoritative is True
+    assert loaded.generation_authoritative is True
+    assert "Partial official coverage" in page
+    assert "Missing official sources: BLS (Rate limited)." in page
+    assert "Federal Open Market Committee" in page

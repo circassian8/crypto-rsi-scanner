@@ -259,7 +259,7 @@ def _campaign_current_authority(
         ("Run", snapshot.run_id),
         ("Revision", snapshot.revision),
         ("Provider", humanize_enum(ledger.get("provider") or generation.get("provider"))),
-        ("Authorization present", _boolean_badge(authorized)),
+        ("Authorization at generation", _boolean_badge(authorized)),
         ("Data mode", humanize_enum(ledger.get("candidate_source_mode") or generation.get("candidate_source_mode") or generation.get("data_mode"))),
         (
             "Observed",
@@ -775,6 +775,8 @@ def _maintenance_cycle_table(snapshot: DashboardSnapshot) -> str:
             badge(item.get("status")),
             _maintenance_request_summary(item),
             _maintenance_publication_summary(item),
+            _maintenance_operations_summary(item),
+            _maintenance_current_authority(snapshot, item),
             _compact_identity_value(
                 str(item.get("artifact_namespace") or UNAVAILABLE),
                 maximum=30,
@@ -787,9 +789,11 @@ def _maintenance_cycle_table(snapshot: DashboardSnapshot) -> str:
         + str(data_table(
             (
                 "Recorded",
-                "Cycle result",
+                "Attempt status",
                 "Provider request",
                 "Publication",
+                "Operations",
+                "Current authority",
                 "Namespace",
                 "Reason",
             ),
@@ -821,14 +825,32 @@ def _maintenance_publication_summary(item: Mapping[str, Any]) -> HtmlFragment:
         return badge("Authority invalidated", tone="danger")
     if item.get("pointer_rolled_back") is True:
         return badge("Rolled back", tone="warning")
-    if (
-        item.get("pointer_published") is True
-        and item.get("dashboard_restarted") is True
-    ):
-        return badge("Published / restarted", tone="positive")
     if item.get("pointer_published") is True:
-        return badge("Published / restart failed", tone="danger")
+        return badge("Published", tone="positive")
     return badge("Not published", tone="muted")
+
+
+def _maintenance_operations_summary(item: Mapping[str, Any]) -> HtmlFragment:
+    if item.get("dashboard_restarted") is True:
+        return badge("Dashboard restarted", tone="positive")
+    if item.get("pointer_published") is True:
+        return badge("Restart not completed", tone="danger")
+    return badge("Not applicable", tone="muted")
+
+
+def _maintenance_current_authority(
+    snapshot: DashboardSnapshot,
+    item: Mapping[str, Any],
+) -> HtmlFragment:
+    current = bool(
+        snapshot.generation_authoritative
+        and item.get("artifact_namespace") == snapshot.artifact_namespace
+        and item.get("pointer_published") is True
+    )
+    return badge(
+        "Current exact authority" if current else "Historical / not current",
+        tone="positive" if current else "muted",
+    )
 
 
 def _maintenance_metadata_disclosure(snapshot: DashboardSnapshot) -> str:

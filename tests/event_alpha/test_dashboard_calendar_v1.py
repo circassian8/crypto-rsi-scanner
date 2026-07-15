@@ -512,6 +512,55 @@ def test_calendar_receipt_shows_official_pack_source_freshness_and_fingerprint()
     assert "a" * 64 in page
 
 
+def test_calendar_visibly_lists_partial_official_source_coverage() -> None:
+    event = dict(_rich_snapshot().current_calendar_events[0])
+    metadata = {
+        "status": "healthy_nonempty",
+        "configured": True,
+        "source_provider": "official_us_macro",
+        "snapshot_status": "partial",
+        "source_coverage": [
+            {"source": "bls", "status": "rate_limited"},
+            {"source": "federal_reserve", "status": "observed"},
+            {"source": "bea", "status": "missing_configuration"},
+        ],
+        "retained_row_count": 1,
+    }
+
+    page = render_calendar_page(
+        _snapshot(events=(event,), calendar_snapshot=metadata), {}
+    )
+
+    assert "Official calendar coverage is partial" in page
+    assert "Partial official coverage" in page
+    assert "Missing official sources: BLS (Rate limited), BEA (Missing configuration)." in page
+    assert event["title"] in page
+    assert "zero rows from missing sources does not mean" in page
+
+
+def test_partial_zero_row_snapshot_is_not_presented_as_no_events() -> None:
+    page = render_calendar_page(
+        _snapshot(
+            calendar_snapshot={
+                "status": "healthy_empty",
+                "configured": True,
+                "source_provider": "official_us_macro",
+                "snapshot_status": "partial",
+                "source_coverage": [
+                    {"source": "bls", "status": "no_results"},
+                    {"source": "federal_reserve", "status": "unavailable"},
+                    {"source": "bea", "status": "no_results"},
+                ],
+            }
+        ),
+        {},
+    )
+
+    assert "Official calendar coverage is partial" in page
+    assert "Missing official sources: Federal Reserve (Unavailable)." in page
+    assert "The observed calendar is empty" not in page
+
+
 def test_verified_calendar_leads_with_canonical_authority_when_producer_receipt_is_absent():
     event = dict(_rich_snapshot().current_calendar_events[0])
     page = render_calendar_page(_snapshot(events=(event,)), {})

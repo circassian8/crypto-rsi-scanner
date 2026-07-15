@@ -838,6 +838,13 @@ CHECKS: tuple[DoctorCheck, ...] = (
         ("run_id", "artifacts", "notification_preview_path"),
         "Artifacts marked current must exist and carry current-run lineage when embedded lineage is available.",
     ),
+    _check(
+        "namespace.daily_operations_publication_contract",
+        CATEGORY_NAMESPACE,
+        "blocker",
+        ("run_id", "artifact_namespace", "revision", "artifacts", "doctor"),
+        "Daily Operations final publication and owned-dashboard receipts must retain exact authority bindings.",
+    ),
 )
 
 CHECK_BY_ID: dict[str, DoctorCheck] = {check.check_id: check for check in CHECKS}

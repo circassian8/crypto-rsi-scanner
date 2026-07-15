@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-14T22:16:31.195653+00:00` from local artifacts only.
+Generated at `2026-07-15T04:22:51.647284+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -28,28 +28,28 @@ Research and decision support only. This report contains no trade recommendation
 
 ## Authority and pointer
 
-- Pointer status: `authoritative`
+- Pointer status: `invalid_or_untrusted`
 - Current namespace: `radar_market_no_send_20260714t221551304500z_fcd6de29c447`
 - Exact run: `2026-07-14T22:15:51.367228+00:00|no_key_live`
 - Revision: `12`
-- Exact operator binding: `true`
+- Exact operator binding: `false`
 
 ### Authoritative generations
 
-| Namespace | Observed at | Candidates | Routes | Current |
-|---|---|---:|---|---|
-| radar_market_no_send_20260713t190728z | 2026-07-13T19:07:29.084694+00:00 | 0 | none | false |
-| radar_market_no_send_20260714t002940z | 2026-07-14T00:29:40.814498+00:00 | 1 | risk_watch=1 | false |
-| radar_market_no_send_20260714t102122z | 2026-07-14T10:21:23.140944+00:00 | 0 | none | false |
-| radar_market_no_send_20260714t163300z | 2026-07-14T16:33:00.405079+00:00 | 0 | none | false |
-| radar_market_no_send_20260714t221551304500z_fcd6de29c447 | 2026-07-14T22:15:51.367228+00:00 | 0 | none | true |
+| Namespace | Observed at | Candidates | Routes | Attempt audit | Publication | Operations | Current |
+|---|---|---:|---|---|---|---|---|
+| radar_market_no_send_20260713t190728z | 2026-07-13T19:07:29.084694+00:00 | 0 | none | published | published_legacy_audit | legacy_not_recorded | false |
+| radar_market_no_send_20260714t002940z | 2026-07-14T00:29:40.814498+00:00 | 1 | risk_watch=1 | published | published_legacy_audit | legacy_not_recorded | false |
+| radar_market_no_send_20260714t102122z | 2026-07-14T10:21:23.140944+00:00 | 0 | none | published | published_legacy_audit | legacy_not_recorded | false |
+| radar_market_no_send_20260714t163300z | 2026-07-14T16:33:00.405079+00:00 | 0 | none | published | published_legacy_audit | legacy_not_recorded | false |
+| radar_market_no_send_20260714t221551304500z_fcd6de29c447 | 2026-07-14T22:15:51.367228+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
 
 ### Complete but non-authoritative generations
 
-| Namespace | Observed at | Candidates | Routes | Current |
-|---|---|---:|---|---|
-| radar_market_no_send | 2026-07-13T15:17:06.228233+00:00 | 0 | none | false |
-| radar_market_no_send_20260713t152704z | 2026-07-13T15:27:13.330145+00:00 | 1 | risk_watch=1 | false |
+| Namespace | Observed at | Candidates | Routes | Attempt audit | Publication | Operations | Current |
+|---|---|---:|---|---|---|---|---|
+| radar_market_no_send | 2026-07-13T15:17:06.228233+00:00 | 0 | none | not_published | not_published | not_recorded | false |
+| radar_market_no_send_20260713t152704z | 2026-07-13T15:27:13.330145+00:00 | 1 | risk_watch=1 | published | not_published | not_recorded | false |
 
 ## Baseline maturity
 
@@ -106,8 +106,8 @@ Research and decision support only. This report contains no trade recommendation
 ## Next observation
 
 - Next eligible time: `2026-07-14T23:15:51.367228+00:00`
-- Eligible at report time: `false`
-- Exact next safe operator command: `make radar-market-no-send-readiness PYTHON=.venv/bin/python`
+- Eligible at report time: `true`
+- Exact next safe operator command: `make radar-market-no-send PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion

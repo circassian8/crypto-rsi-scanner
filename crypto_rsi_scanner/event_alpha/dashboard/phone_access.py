@@ -409,11 +409,22 @@ def main(
 
 def _format_status(command: str, status: _PhoneAccessStatus) -> str:
     prefix = f"radar_dashboard_phone_access_{command}:"
+    operator = (
+        " implications=private_tailnet_https_to_loopback_dashboard"
+        " next_safe_command='make radar-dashboard-phone-readiness PYTHON=.venv/bin/python'"
+        " authorization_boundary=existing_tailnet_identity_plus_explicit_confirmation"
+        " expected_provider_activity=none"
+        " enable_command='CONFIRM=1 make radar-dashboard-phone-enable PYTHON=.venv/bin/python'"
+        " rollback_disable_command='CONFIRM=1 make radar-dashboard-phone-disable PYTHON=.venv/bin/python'"
+    )
     if not status.ready:
-        return f"{prefix} NOT_READY reason={_first_reason(status)}"
+        return f"{prefix} NOT_READY reason={_first_reason(status)}{operator}"
     state = "enabled" if status.enabled else "disabled"
     url = status.phone_url if status.enabled else "available_after_enable"
-    return f"{prefix} READY state={state} url={url} loopback_origin={LOCAL_DASHBOARD_URL}"
+    return (
+        f"{prefix} READY state={state} url={url} "
+        f"loopback_origin={LOCAL_DASHBOARD_URL}{operator}"
+    )
 
 
 def _format_operation(command: str, operation: _PhoneAccessOperation) -> str:

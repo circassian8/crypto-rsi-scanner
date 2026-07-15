@@ -14,6 +14,7 @@ from ._utils import Messages, ctx_mapping, ctx_value
 from ...artifacts import paths as event_artifact_paths
 from ...artifacts import operator_state as event_alpha_operator_state
 from ...operations import common
+from ...operations import daily_operations_publication
 from ...operations import market_provenance as event_market_provenance
 from ...providers import request_lineage as event_request_lineage
 
@@ -44,6 +45,73 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     _check_archive_manifest(archive_manifest, blockers)
     _check_targeted_market_refresh(ctx, blockers)
     _check_operator_state(ctx, blockers, warnings)
+    _check_daily_operations_publication(ctx, blockers)
+
+
+def _check_daily_operations_publication(
+    ctx: object,
+    blockers: Messages,
+) -> None:
+    """Validate v1.1 receipts only after a namespace enters that contract."""
+
+    namespace_dir_value = ctx_value(ctx, "namespace_dir", None)
+    if not namespace_dir_value:
+        return
+    namespace_dir = Path(str(namespace_dir_value)).expanduser()
+    managed = False
+    for filename in (
+        daily_operations_publication.PREPUBLICATION_AUDIT_FILENAME,
+        daily_operations_publication.PUBLICATION_RECEIPT_FILENAME,
+        daily_operations_publication.OPERATIONS_RECEIPT_FILENAME,
+    ):
+        try:
+            (namespace_dir / filename).lstat()
+        except OSError:
+            continue
+        managed = True
+        break
+    if not managed:
+        try:
+            canonically_managed = (
+                daily_operations_publication.is_daily_operations_managed_namespace(
+                    namespace_dir.parent,
+                    namespace_dir.name,
+                )
+            )
+        except Exception:  # noqa: BLE001 - doctor remains fail closed
+            canonically_managed = True
+        if not canonically_managed:
+            return
+        probe = daily_operations_publication.validate_final_publication_contract(
+            namespace_dir.parent,
+            namespace_dir.name,
+        )
+        # Before publication the new namespace is not current.  Keep that
+        # strict-doctor phase valid even though the root cycle ledger already
+        # identifies it as Daily Operations managed.
+        if not probe.currently_authoritative:
+            return
+        managed = True
+        validation = probe
+    else:
+        validation = daily_operations_publication.validate_final_publication_contract(
+            namespace_dir.parent,
+            namespace_dir.name,
+        )
+    if validation.currently_authoritative:
+        validation = daily_operations_publication.validate_final_publication_contract(
+            namespace_dir.parent,
+            namespace_dir.name,
+            require_current=True,
+            require_operations=True,
+        )
+    for error in validation.errors:
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.daily_operations_publication_contract",
+                error,
+            )
+        )
 
 
 def _check_targeted_market_refresh(ctx: object, blockers: Messages) -> None:

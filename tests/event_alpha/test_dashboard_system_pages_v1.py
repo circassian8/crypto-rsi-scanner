@@ -336,7 +336,7 @@ def test_health_page_exposes_exact_contract_request_quality_and_coverage() -> No
     assert "Trusted" not in page  # The exact status is authoritative, not marketing copy.
     assert "Doctor verified revision" in page
     assert "Provider request" in page
-    assert "Authorization present" in page
+    assert "Authorization at request" in page
     assert "HTTP 200" in page
     assert "1 min" not in page
     assert "1.5 sec" not in page  # Duration intentionally uses concise whole-unit display.
@@ -406,7 +406,7 @@ def test_health_page_exposes_stable_anchors_and_closes_safe_technical_tables() -
     assert page.index("Exact-generation source coverage") > page.index(
         "View source-pack coverage table"
     )
-    assert page.index("Authorization present") > page.index(
+    assert page.index("Authorization at request") > page.index(
         "View exact provider request receipt"
     )
 
@@ -563,7 +563,7 @@ def test_campaign_page_leads_with_exact_current_authority_and_full_run_context()
     assert "2026-07-14T10:00:00+00:00|no_key_live" in page
     assert "Revision" in page
     assert "CoinGecko" in page
-    assert "Authorization present" in page
+    assert "Authorization at generation" in page
     assert "Live / real data · no-send" in page
     assert "Observations / anomalies / canonical candidates / current ideas" in page
     assert "2 / 1 / 1" in page

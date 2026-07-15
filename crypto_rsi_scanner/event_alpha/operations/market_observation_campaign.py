@@ -23,6 +23,7 @@ from ..dashboard import readiness as dashboard_readiness
 from ..dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from ..radar import market_history
 from ..radar.integrated import api as integrated_radar
+from . import daily_operations_publication
 from . import market_no_send_audit, market_no_send_history_cache
 from . import market_no_send_publication
 from . import market_observation_campaign_cadence
@@ -43,6 +44,11 @@ CAMPAIGN_REPORT_MD_FILENAME = "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md"
 CAMPAIGN_OUTCOMES_FILENAME = "event_decision_radar_campaign_outcomes.jsonl"
 RUN_MANIFEST_FILENAME = "event_market_no_send_generation.json"
 PILOT_AUDIT_FILENAME = "event_market_no_send_pilot_audit.json"
+PREPUBLICATION_AUDIT_FILENAME = (
+    daily_operations_publication.PREPUBLICATION_AUDIT_FILENAME
+)
+PUBLICATION_RECEIPT_FILENAME = daily_operations_publication.PUBLICATION_RECEIPT_FILENAME
+OPERATIONS_RECEIPT_FILENAME = daily_operations_publication.OPERATIONS_RECEIPT_FILENAME
 REQUEST_LEDGER_FILENAME = "event_market_no_send_request_ledger.json"
 HISTORY_FILENAME = "event_market_history.jsonl"
 OPERATOR_STATE_FILENAME = "event_alpha_operator_state.json"
@@ -226,7 +232,11 @@ def _load_generations(
     for namespace in _namespace_names(base):
         namespace_dir = safe_existing_namespace_dir(base, namespace)
         manifest = _read_json(namespace_dir / RUN_MANIFEST_FILENAME)
-        audit = _read_json(namespace_dir / PILOT_AUDIT_FILENAME)
+        pilot_audit = _read_json(namespace_dir / PILOT_AUDIT_FILENAME)
+        audit = (
+            _read_json(namespace_dir / PREPUBLICATION_AUDIT_FILENAME)
+            or pilot_audit
+        )
         if not manifest and not audit:
             continue
         if not _is_live_market_attempt(manifest, audit):
@@ -298,14 +308,12 @@ def _generation_row(
     )
     run_id = _text(manifest.get("run_id") or audit.get("exact_run_id"))
     observed_at = _text(manifest.get("observed_at") or audit.get("generated_at"))
-    publication = _mapping(audit.get("publication"))
-    exact_pointer = _current_authority_matches(
-        current_authority,
-        namespace=namespace_dir.name,
+    publication_values, publication_artifacts = _generation_publication(
+        namespace_dir,
         run_id=run_id,
-    )
-    audit_authority_bound = market_no_send_audit.has_bound_publication_authority(
-        audit, operator, namespace=namespace_dir.name, run_id=run_id
+        audit=audit,
+        operator=operator,
+        current_authority=current_authority,
     )
     doctor = _mapping(operator.get("doctor")) or _mapping(audit.get("doctor"))
     quality = _generation_quality(manifest, audit)
@@ -348,36 +356,182 @@ def _generation_row(
             "warning_count": _int(doctor.get("warning_count")),
             "revision": doctor.get("verified_revision") or operator.get("revision"),
         },
-        "publication": {
-            "ever_authoritative": bool(
-                audit_authority_bound or exact_pointer
-            ),
-            "first_authoritative_at": (
-                _safe_timestamp(publication.get("first_authoritative_at"))
-                if audit_authority_bound else None
-            ) or (
-                _safe_timestamp(audit.get("generated_at"))
-                if audit_authority_bound else None
-            ) or (
-                _safe_timestamp(current_authority.get("authority_checked_at"))
-                if exact_pointer else None
-            ),
-            "audit_authority_binding_valid": audit_authority_bound,
-            "authority_source": (
-                "pilot_audit_exact_binding" if audit_authority_bound
-                else "current_pointer_exact_binding" if exact_pointer else None
-            ),
-            "audit_status": _text(publication.get("status")) or "not_recorded",
-            "currently_authoritative": exact_pointer,
-        },
+        "publication": publication_values,
         "safety": _generation_safety(manifest, audit),
         "artifact_names": {
             "manifest": RUN_MANIFEST_FILENAME,
             "pilot_audit": PILOT_AUDIT_FILENAME if audit else None,
+            **publication_artifacts,
             "request_ledger": REQUEST_LEDGER_FILENAME if request else None,
             "outcomes": integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
         },
     }
+
+
+def _generation_publication(
+    namespace_dir: Path,
+    *,
+    run_id: str,
+    audit: Mapping[str, Any],
+    operator: Mapping[str, Any],
+    current_authority: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, str | None]]:
+    attempt = _mapping(audit.get("publication"))
+    exact_pointer = _current_authority_matches(
+        current_authority,
+        namespace=namespace_dir.name,
+        run_id=run_id,
+    )
+    try:
+        managed = daily_operations_publication.is_daily_operations_managed_namespace(
+            namespace_dir.parent,
+            namespace_dir.name,
+        )
+    except Exception:  # noqa: BLE001 - managed authority classification fails closed
+        managed = True
+    prepublication_audit_available = bool(
+        _read_json(namespace_dir / PREPUBLICATION_AUDIT_FILENAME)
+    )
+    legacy_audit = bool(
+        not managed
+        and market_no_send_audit.has_bound_publication_authority(
+            audit, operator, namespace=namespace_dir.name, run_id=run_id
+        )
+    )
+    final = daily_operations_publication.validate_final_publication_contract(
+        namespace_dir.parent,
+        namespace_dir.name,
+        require_operations=exact_pointer,
+    )
+    publication_errors = tuple(
+        error for error in final.errors
+        if error.startswith("publication_receipt")
+        or error == "current_authority_missing_publication_receipt"
+    )
+    operations_errors = tuple(
+        error for error in final.errors
+        if error.startswith("operations_receipt")
+        or error == "current_authority_missing_operations_receipt"
+    )
+    final_valid = final.publication_receipt is not None and not publication_errors
+    operations_valid = bool(
+        final.operations_receipt is not None and not operations_errors
+    )
+    legacy_pointer = bool(
+        exact_pointer and not managed and final.publication_receipt is None
+    )
+    status = _publication_status(
+        final=final,
+        final_valid=final_valid,
+        legacy_audit=legacy_audit,
+        legacy_pointer=legacy_pointer,
+        managed=managed,
+    )
+    current = bool(
+        exact_pointer
+        and ((final_valid and operations_valid) or legacy_audit or legacy_pointer)
+    )
+    values = {
+        "ever_authoritative": bool(
+            final_valid or legacy_audit or legacy_pointer
+        ),
+        "first_authoritative_at": _first_authoritative_at(
+            final=final,
+            final_valid=final_valid,
+            attempt=attempt,
+            audit=audit,
+            legacy_audit=legacy_audit,
+            exact_pointer=legacy_pointer,
+            current_authority=current_authority,
+        ),
+        "audit_authority_binding_valid": legacy_audit,
+        "final_publication_receipt_valid": final_valid,
+        "operations_receipt_valid": operations_valid,
+        "authority_source": (
+            "final_publication_receipt_exact_binding" if final_valid
+            else "pilot_audit_exact_binding" if legacy_audit
+            else "legacy_current_pointer_exact_binding" if legacy_pointer
+            else None
+        ),
+        "attempt_audit_status": _text(attempt.get("status")) or "not_recorded",
+        "publication_status": status,
+        "operations_status": (
+            final.operations_status if operations_valid
+            else "invalid" if final.operations_receipt is not None
+            else "legacy_not_recorded" if legacy_audit or legacy_pointer
+            else "not_recorded"
+        ),
+        "audit_status": status,
+        "currently_authoritative": current,
+        "contract_errors": list(final.errors),
+    }
+    artifacts = {
+        "prepublication_audit": (
+            PREPUBLICATION_AUDIT_FILENAME
+            if prepublication_audit_available else None
+        ),
+        "publication_receipt": (
+            PUBLICATION_RECEIPT_FILENAME
+            if final.publication_receipt is not None else None
+        ),
+        "operations_receipt": (
+            OPERATIONS_RECEIPT_FILENAME if final.operations_receipt is not None else None
+        ),
+    }
+    return values, artifacts
+
+
+def _publication_status(
+    *,
+    final: daily_operations_publication.FinalPublicationValidation,
+    final_valid: bool,
+    legacy_audit: bool,
+    legacy_pointer: bool,
+    managed: bool,
+) -> str:
+    if final_valid:
+        return final.publication_status
+    if legacy_audit:
+        return "published_legacy_audit"
+    if legacy_pointer:
+        return "published_legacy_pointer"
+    if final.publication_receipt is not None:
+        return "invalid_final_receipt"
+    return "missing_final_receipt" if managed else "not_published"
+
+
+def _first_authoritative_at(
+    *,
+    final: daily_operations_publication.FinalPublicationValidation,
+    final_valid: bool,
+    attempt: Mapping[str, Any],
+    audit: Mapping[str, Any],
+    legacy_audit: bool,
+    exact_pointer: bool,
+    current_authority: Mapping[str, Any],
+) -> str | None:
+    operations_time = (
+        _safe_timestamp(
+            _mapping(
+                _mapping(final.operations_receipt).get("maintenance_state")
+            ).get("last_successful_publication")
+        )
+        if final_valid else None
+    )
+    receipt_time = (
+        _safe_timestamp(_mapping(final.publication_receipt).get("recorded_at"))
+        if final_valid else None
+    )
+    legacy_time = (
+        _safe_timestamp(attempt.get("first_authoritative_at"))
+        or _safe_timestamp(audit.get("generated_at"))
+        if legacy_audit else None
+    )
+    pointer_time = (
+        _safe_timestamp(current_authority.get("authority_checked_at"))
+        if exact_pointer else None
+    )
+    return operations_time or receipt_time or legacy_time or pointer_time
 
 
 def _campaign_counting(manifest: Mapping[str, Any]) -> tuple[bool, str, str]:

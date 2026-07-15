@@ -24,6 +24,7 @@ from .layer_coverage import (
     DashboardLayerCoverage,
     dashboard_layer_coverage,
 )
+from .maintenance_guidance import maintenance_expiry_guidance
 from .models import DashboardSnapshot
 from .outcomes_page import render_outcomes_page
 from .presentation import (
@@ -363,8 +364,59 @@ def _current_contract(snapshot: DashboardSnapshot) -> str:
 
 
 def _maintenance_status_section(snapshot: DashboardSnapshot) -> str:
+    context = _maintenance_status_context(snapshot)
+    values = _maintenance_status_values(snapshot, context)
+    maintenance_label = str(context["maintenance_label"])
+    maintenance_tone = str(context["maintenance_tone"])
+    scheduler_healthy = context["scheduler_healthy"]
+    scheduler_label = (
+        "Healthy"
+        if scheduler_healthy is True
+        else "Needs attention"
+        if scheduler_healthy is False
+        else "Not recorded"
+    )
+    overview = (
+        '<div class="chip-row" aria-label="Daily maintenance summary">'
+        + str(badge(maintenance_label, tone=maintenance_tone))
+        + str(
+            badge(
+                scheduler_label,
+                tone=(
+                    "positive"
+                    if scheduler_healthy is True
+                    else "danger"
+                    if scheduler_healthy is False
+                    else "neutral"
+                ),
+            )
+        )
+        + '</div><p class="health-detail-summary">'
+        + escape_html(
+            "Daily Operations uses persisted maintenance telemetry only; this page does not inspect launchd or call a provider."
+        )
+        + "</p>"
+    )
+    return _health_detail_panel(
+        "Daily Operations maintenance",
+        overview
+        + _maintenance_expiry_action(snapshot)
+        + _health_disclosure(
+            "View maintenance schedule and evidence",
+            str(definition_list(values, css_class="definition-grid")),
+            summary=(
+                f"{maintenance_label} · scheduler {scheduler_label.casefold()}"
+            ),
+        ),
+        eyebrow="Artifact-backed automation status",
+        anchor="daily-operations-maintenance",
+    )
+
+
+def _maintenance_status_context(snapshot: DashboardSnapshot) -> dict[str, object]:
     service = snapshot.maintenance_service
     state = snapshot.maintenance_state
+    current = snapshot.maintenance_current_status
     latest_constraint = next(
         (
             row
@@ -401,14 +453,53 @@ def _maintenance_status_section(snapshot: DashboardSnapshot) -> str:
     )
     authority_expiry = _generation_authority_expiry(snapshot)
     clock = snapshot.generation_authority_checked_at
-    values = (
+    historical_authorization = state.get("authorization_at_last_cycle")
+    if not isinstance(historical_authorization, bool):
+        historical_authorization = state.get("live_provider_authorized")
+    current_freshness = str(current.get("current_status_freshness") or "missing")
+    current_authorization = str(
+        current.get("current_authorization_status") or "not_recorded"
+    )
+    if current_freshness == "stale":
+        current_authorization = "unknown_stale_receipt"
+    return {
+        "service": service,
+        "state": state,
+        "current": current,
+        "latest_constraint": latest_constraint,
+        "maintenance_label": maintenance_label,
+        "maintenance_tone": maintenance_tone,
+        "scheduler_healthy": scheduler_healthy,
+        "scheduler_loaded": scheduler_loaded,
+        "scheduler_reason": scheduler_reason,
+        "authority_expiry": authority_expiry,
+        "clock": clock,
+        "historical_authorization": historical_authorization,
+        "current_authorization": current_authorization,
+        "current_freshness": current_freshness,
+    }
+
+
+def _maintenance_status_values(
+    snapshot: DashboardSnapshot,
+    context: Mapping[str, object],
+) -> tuple[tuple[str, object], ...]:
+    service = snapshot.maintenance_service
+    state = snapshot.maintenance_state
+    current = snapshot.maintenance_current_status
+    latest_constraint = context["latest_constraint"]
+    assert isinstance(latest_constraint, Mapping)
+    clock = context["clock"]
+    maintenance_label = str(context["maintenance_label"])
+    maintenance_tone = str(context["maintenance_tone"])
+    return (
         ("Maintenance", badge(maintenance_label, tone=maintenance_tone)),
-        ("Scheduler loaded", _boolean_badge(scheduler_loaded)),
+        ("Scheduler loaded", _boolean_badge(context["scheduler_loaded"])),
         (
             "Scheduler health",
-            _boolean_badge(scheduler_healthy, false_tone="danger"),
+            _boolean_badge(context["scheduler_healthy"], false_tone="danger"),
         ),
-        ("Scheduler detail", humanize_reason(scheduler_reason)),
+        ("Scheduler detail", humanize_reason(context["scheduler_reason"])),
         (
             "Service receipt updated",
             time_element(present_time(service.get("updated_at"), now=clock)),
@@ -437,13 +528,50 @@ def _maintenance_status_section(snapshot: DashboardSnapshot) -> str:
         ),
         (
             "Generation authority expiry",
-            time_element(present_time(authority_expiry, now=clock)),
+            time_element(present_time(context["authority_expiry"], now=clock)),
         ),
         (
-            "Live provider authorized",
+            "Authorization at last cycle",
             _boolean_badge(
-                state.get("live_provider_authorized"),
-                false_tone="warning",
+                context["historical_authorization"], false_tone="warning"
+            ),
+        ),
+        (
+            "Authorization checked at last cycle",
+            time_element(
+                present_time(
+                    state.get("authorization_checked_at_last_cycle")
+                    or state.get("last_readiness_check"),
+                    now=clock,
+                )
+            ),
+        ),
+        (
+            "Current authorization status",
+            badge(
+                humanize_enum(context["current_authorization"]),
+                tone=(
+                    "positive"
+                    if context["current_authorization"] == "authorized"
+                    else "warning"
+                ),
+            ),
+        ),
+        (
+            "Current authorization checked",
+            time_element(
+                present_time(
+                    current.get("current_authorization_checked_at"),
+                    now=clock,
+                )
+            ),
+        ),
+        (
+            "Current provider-call eligibility",
+            humanize_reason(
+                "unknown_stale_receipt"
+                if context["current_freshness"] == "stale"
+                else current.get("current_provider_call_eligibility")
             ),
         ),
         ("Last cycle", badge(state.get("last_cycle_status"))),
@@ -467,46 +595,30 @@ def _maintenance_status_section(snapshot: DashboardSnapshot) -> str:
             _boolean_badge(state.get("research_only"), false_tone="danger"),
         ),
     )
-    scheduler_label = (
-        "Healthy"
-        if scheduler_healthy is True
-        else "Needs attention"
-        if scheduler_healthy is False
-        else "Not recorded"
-    )
-    overview = (
-        '<div class="chip-row" aria-label="Daily maintenance summary">'
-        + str(badge(maintenance_label, tone=maintenance_tone))
-        + str(
-            badge(
-                scheduler_label,
-                tone=(
-                    "positive"
-                    if scheduler_healthy is True
-                    else "danger"
-                    if scheduler_healthy is False
-                    else "neutral"
-                ),
-            )
-        )
-        + '</div><p class="health-detail-summary">'
-        + escape_html(
-            "Daily Operations uses persisted maintenance telemetry only; this page does not inspect launchd or call a provider."
-        )
-        + "</p>"
-    )
-    return _health_detail_panel(
-        "Daily Operations maintenance",
-        overview
-        + _health_disclosure(
-            "View maintenance schedule and evidence",
-            str(definition_list(values, css_class="definition-grid")),
-            summary=(
-                f"{maintenance_label} · scheduler {scheduler_label.casefold()}"
-            ),
-        ),
-        eyebrow="Artifact-backed automation status",
-        anchor="daily-operations-maintenance",
+
+
+def _maintenance_expiry_action(snapshot: DashboardSnapshot) -> str:
+    guidance = maintenance_expiry_guidance(snapshot)
+    if guidance.get("active") is not True:
+        return ""
+    remaining = format_duration(guidance.get("time_until_expiry_seconds"))
+    readiness = str(guidance.get("safe_manual_readiness_command") or "")
+    install = str(guidance.get("installation_command") or "")
+    disable = str(guidance.get("rollback_disable_command") or "")
+    return (
+        '<div class="alert alert-warning maintenance-expiry-action"><div '
+        'class="alert-icon" aria-hidden="true">!</div><div>'
+        '<h3>Manual freshness check approaching</h3><p>Generation authority '
+        f'expires in approximately {escape_html(remaining)} and maintenance is disabled. '
+        'Run the no-provider readiness check before deciding whether to start a cycle.</p>'
+        f'<p><code>{escape_html(readiness)}</code></p>'
+        '<details class="disclosure"><summary>Optional recurring maintenance</summary>'
+        '<div class="disclosure__body"><p>This changes local scheduler state and requires '
+        'explicit confirmation. It does not create provider authorization.</p>'
+        f'<p><code>{escape_html(install)}</code></p>'
+        f'<p>Rollback: <code>{escape_html(disable)}</code></p>'
+        f'<p>{escape_html(guidance.get("provider_activity"))}</p></div></details>'
+        '</div></div>'
     )
 
 
@@ -692,7 +804,7 @@ def _request_ledger_section(
     values = (
         ("Provider", humanize_enum(ledger.get("provider"))),
         (
-            "Authorization present",
+            "Authorization at request",
             _boolean_badge(ledger.get("live_provider_authorized"), false_tone="warning"),
         ),
         ("Provider call attempted", _boolean_badge(ledger.get("provider_call_attempted"))),

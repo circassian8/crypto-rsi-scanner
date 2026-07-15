@@ -22,9 +22,10 @@ and `make radar-dashboard-ux-smoke` for primary-page semantic and responsive
 contracts.
 
 Live generations expire after six hours. The campaign's 60-minute observation
-spacing remains a provider-safety minimum. Daily Operations v1 can maintain
+spacing remains a provider-safety minimum. Daily Operations v1.1 can maintain
 that freshness, but the LaunchAgent is prepared and disabled until explicitly
-installed. Read-only status and one manual cycle are:
+installed. Readiness/status make no provider call and refresh only a bounded,
+credential-free current-status receipt; one manual cycle remains explicit:
 
 ```sh
 make radar-daily-ops-readiness PYTHON=.venv/bin/python
@@ -34,10 +35,44 @@ make radar-daily-ops-cycle PYTHON=.venv/bin/python
 
 Every cycle runs readiness before a possible call, makes at most one already-
 authorized CoinGecko no-send observation when cadence permits, uses a unique
-immutable namespace, strict-doctors before publication, preserves or
-invalidates authority on failure, and restarts only the exact owned dashboard
-after success. A loaded LaunchAgent with a non-zero last exit is reported as
-unhealthy rather than merely “loaded.” Installation remains a separate human action:
+immutable namespace, and strict-doctors before publication. Its immutable
+prepublication attempt audit is followed by a final publication receipt only
+after exact pointer publication, then an operations receipt only after the
+owned dashboard restart and terminal success. Campaign history keeps attempt,
+publication, operations, and current authority separate; contradictory phases
+fail closed. During restart, the exact pointer-started process may bootstrap
+from the publication receipt, but GET/HEAD stays 503 until the operations
+receipt exists; a bounded HTTP probe must then return trusted 200 content with
+the exact namespace/run/revision/operator digest while the same positive owned
+PID remains running before and after the request. Pointer publish, rollback,
+invalidation, and reconciliation share one descriptor-anchored mutation
+transaction, so an artifact-root pathname replacement cannot redirect pointer
+I/O. Rollback restores only prior bytes bound by their immutable receipt, and a
+later failed terminal row for the same cycle invalidates the earlier success
+receipt. The one-time `reconcile-publication` CLI can seal an already-proven
+legacy success only from its exact pointer and unique successful terminal cycle;
+it makes no provider call or restart and is never run by readiness:
+
+```sh
+make radar-daily-ops-reconcile-publication PYTHON=.venv/bin/python
+```
+
+Readiness revalidation preserves the exact publication-pointer bytes. The
+explicit reconciliation command can repair only a historical
+`authority_checked_at`-only rewrite from the pre-v1.1 readiness behavior; any
+other pointer drift remains blocked.
+
+A failed publication/restart/receipt preserves prior authority or invalidates only the
+failed new pointer. A loaded LaunchAgent with a non-zero last exit is reported
+as unhealthy rather than merely “loaded.”
+
+The dashboard labels authorization at the last cycle as historical and reads
+current authorization/call eligibility only from the expiring credential-free
+status receipt; GET/HEAD never inspect environment variables. When maintenance
+is disabled, cadence is eligible, and authority is within 90 minutes of expiry,
+Today and System Health show the remaining time and exact manual readiness,
+confirmed installation, and confirmed disable commands without executing them.
+Installation remains a separate human action:
 `CONFIRM=1 make radar-daily-ops-install PYTHON=.venv/bin/python`; remove only
 that owned job with the corresponding confirmed `radar-daily-ops-uninstall`.
 
@@ -99,27 +134,38 @@ Tailscale Serve as the recommended persistent mode.
 
 Official U.S. macro schedules have a separate guarded producer for Fed FOMC,
 BLS CPI/employment, and BEA PCE/GDP. Readiness makes no call. Live acquisition
-requires the already-present calendar authorization plus an honest BLS contact;
-an explicit local import requires all three operator-downloaded files and their
-real acquisition timestamp. Checked-in fixture/test/mock/replay paths are
-rejected. Successful packs are immutable and hash-attested before Daily
-Operations can attach them to a generation:
+requires the already-present calendar authorization; BLS additionally requires
+an honest contact. Each configured source is attempted at most once and reports
+`observed`, `no_results`, `unavailable`, `missing_configuration`, `parse_error`,
+or `rate_limited`. Accepted raw bytes remain immutable and fingerprinted, so a
+valid Fed or BEA result can survive another source's failure. Snapshot status is
+`complete`, `partial`, or `unavailable`; the Calendar page names missing sources,
+and an unavailable source with zero rows is never presented as “no events.” An
+explicit no-network local import accepts any genuine operator-downloaded source
+subset with its real acquisition timestamp. Checked-in fixture/test/mock/replay
+paths are rejected. Complete and partial successes are hash-attested before
+Daily Operations can attach them to a generation:
 
 ```sh
 make radar-calendar-official-readiness PYTHON=.venv/bin/python
 make radar-calendar-official-acquire PYTHON=.venv/bin/python
 make radar-calendar-official-import-local \
   FED_FOMC_HTML=/path/to/fomc.html \
-  BLS_CALENDAR_ICS=/path/to/bls.ics \
-  BEA_RELEASE_DATES_JSON=/path/to/bea.json \
   OFFICIAL_MACRO_OBSERVED_AT=2026-07-15T00:00:00Z \
   PYTHON=.venv/bin/python
 ```
 
+Add `BLS_CALENDAR_ICS=...` and/or `BEA_RELEASE_DATES_JSON=...` when those genuine
+exports are available. Unlinked macro rows remain context/risk only and never
+manufacture directional bias.
+
 Execution-quality integration is intentionally venue-neutral. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` to compare
-feasible spot, perpetual, and DEX inputs; no adapter is activated until the
-operator selects the intended execution venue.
+feasible spot, perpetual, and DEX inputs. This command is static/no-network;
+currently no venue or spread provider is selected, so no adapter is active and
+there is nothing to disable. The operator must select the intended execution
+venue and instrument mode before any spread/depth adapter is designed; that
+choice still would not authorize orders or execution.
 
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
@@ -159,3 +205,23 @@ bootstrap and CI. Install the pinned dependency tools with
 `make dependency-tools`, update the lock with
 `make lock-dependencies UPGRADE=1`, and run
 `make dependency-verify` before accepting dependency changes.
+
+Artifact-heavy review checkouts use the same gates without recursively walking
+cumulative operational stores during unrelated fixture tests. `test-full` and
+`verify-fast` write cumulative per-file timing reports to
+`.pytest_cache/test_file_timing_report.{json,md}`. The separate
+`make test-artifact-heavy-extracted-checkout PYTHON=python3` guard runs its
+isolated synthetic project-health case with a 5-second default budget and writes
+focused timing reports under `.pytest_cache/artifact_heavy_extracted_checkout_timing.*`.
+For reproducible source-with-artifacts review, run that focused guard in the
+extracted checkout immediately before `make verify-fast PYTHON=python3` and
+retain both timing-report pairs with the release evidence. The practical
+same-machine `verify-fast` review budget is 360 seconds. It is an observational
+release budget, not a hard CI timeout; investigate a run above 360 seconds or
+more than 25% slower than the latest comparable same-machine baseline.
+Project-health retention reporting is bounded to 128 namespaces and 128 direct
+entries per namespace, reads no research payloads beyond the bounded
+namespace-status control marker, and is advisory: it never compacts or deletes
+canonical audit history without a separately approved retention policy. A
+truncated namespace inventory blocks the report instead of claiming complete
+coverage.

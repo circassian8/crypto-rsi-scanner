@@ -16,6 +16,7 @@ from typing import Any
 from . import class_ownership as ownership
 from . import api_inventory
 from . import architecture_contract
+from . import source_cache
 
 
 BASELINE_SCHEMA_VERSION = "architecture_size_baseline_v1"
@@ -590,10 +591,7 @@ def _file_line_rows(repo_root: Path, *, file_line_limit: int) -> list[dict[str, 
 
 
 def _line_count(path: Path) -> int:
-    try:
-        return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
-    except OSError:
-        return 0
+    return source_cache.source_line_count(path)
 
 
 def _generated_at() -> str:

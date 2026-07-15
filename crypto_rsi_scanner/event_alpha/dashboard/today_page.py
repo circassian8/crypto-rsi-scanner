@@ -20,9 +20,11 @@ from .layer_coverage import (
     dashboard_layer_coverage,
     dashboard_layer_coverage_by_key,
 )
+from .maintenance_guidance import maintenance_expiry_guidance
 from .models import DashboardSnapshot
 from .presentation import (
     UNAVAILABLE,
+    format_duration,
     format_percent,
     humanize_enum,
     humanize_reason,
@@ -75,6 +77,64 @@ def render_today_page(
         row for row in visible
         if str(row.get("_dashboard_route") or row.get("radar_route")) != "diagnostic"
     )
+    intro, metric_summary, active_calendar_events = _today_summary(
+        snapshot,
+        review_rows,
+    )
+    warnings = _operator_warnings(snapshot)
+    maintenance_action = _maintenance_expiry_action(snapshot)
+    attention = _attention_sections(
+        review_rows,
+        active_calendar_events=active_calendar_events,
+        clock=snapshot.generation_authority_checked_at,
+    )
+    comparison = render_idea_comparison(
+        visible,
+        now=snapshot.generation_authority_checked_at,
+    )
+    controls = (
+        '<details class="disclosure filter-disclosure"'
+        + (" open" if query else "")
+        + '><summary>Filter and compare current ideas</summary><div class="disclosure__body">'
+        + render_idea_filters(dict(query or {}), action="/")
+        + comparison
+        + '</div></details>'
+    )
+    diagnostics = (
+        _diagnostic_review(
+            visible,
+            now=snapshot.generation_authority_checked_at,
+        )
+        if include_diagnostics
+        else ""
+    )
+    expired = _expired_ideas(
+        snapshot,
+        query,
+        include_diagnostics=include_diagnostics,
+    )
+    return (
+        intro
+        + attention
+        + metric_summary
+        + maintenance_action
+        + warnings
+        + controls
+        + diagnostics
+        + expired
+        + '<div class="two-column">'
+        + _market_snapshot(snapshot)
+        + _calendar_snapshot(snapshot)
+        + _campaign_snapshot(snapshot)
+        + _change_summary(snapshot)
+        + '</div>'
+    )
+
+
+def _today_summary(
+    snapshot: DashboardSnapshot,
+    review_rows: tuple[Mapping[str, Any], ...],
+) -> tuple[str, str, tuple[Mapping[str, Any], ...]]:
     observations = snapshot.current_market_observations
     coverage_by_key = dashboard_layer_coverage_by_key(snapshot)
     market_metric = _layer_metric(
@@ -159,55 +219,29 @@ def render_today_page(
         '<div class="today-metrics" role="region" aria-label="Current generation summary">'
         '<div class="metric-grid">' + "".join(_metric(*item) for item in metrics) + '</div></div>'
     )
-    warnings = _operator_warnings(snapshot)
-    attention = _attention_sections(
-        review_rows,
-        active_calendar_events=active_calendar_events,
-        clock=snapshot.generation_authority_checked_at,
-    )
-    comparison = render_idea_comparison(
-        visible,
-        now=snapshot.generation_authority_checked_at,
-    )
-    controls = (
-        '<details class="disclosure filter-disclosure"'
-        + (" open" if query else "")
-        + '><summary>Filter and compare current ideas</summary><div class="disclosure__body">'
-        + render_idea_filters(dict(query or {}), action="/")
-        + comparison
-        + '</div></details>'
-    )
-    diagnostics = (
-        _diagnostic_review(
-            visible,
-            now=snapshot.generation_authority_checked_at,
-        )
-        if include_diagnostics
-        else ""
-    )
-    expired = _expired_ideas(
-        snapshot,
-        query,
-        include_diagnostics=include_diagnostics,
-    )
-    market = _market_snapshot(snapshot)
-    calendar = _calendar_snapshot(snapshot)
-    campaign = _campaign_snapshot(snapshot)
-    changes = _change_summary(snapshot)
+    return intro, metric_summary, active_calendar_events
+
+
+def _maintenance_expiry_action(snapshot: DashboardSnapshot) -> str:
+    guidance = maintenance_expiry_guidance(snapshot)
+    if guidance.get("active") is not True:
+        return ""
+    remaining = format_duration(guidance.get("time_until_expiry_seconds"))
+    readiness = str(guidance.get("safe_manual_readiness_command") or "")
+    install = str(guidance.get("installation_command") or "")
     return (
-        intro
-        + attention
-        + metric_summary
-        + warnings
-        + controls
-        + diagnostics
-        + expired
-        + '<div class="two-column">'
-        + market
-        + calendar
-        + campaign
-        + changes
-        + '</div>'
+        '<section class="alert alert-warning maintenance-expiry-action">'
+        '<div class="alert-icon" aria-hidden="true">!</div><div>'
+        '<h2>Freshness check due soon</h2>'
+        f'<p>Current authority expires in approximately {escape_html(remaining)}. '
+        'Daily maintenance is disabled, so review readiness manually; this command '
+        'does not call a provider.</p>'
+        f'<p><code>{escape_html(readiness)}</code></p>'
+        '<details class="disclosure"><summary>Optional scheduler installation</summary>'
+        '<div class="disclosure__body"><p>Installation changes recurring local state '
+        'and requires explicit confirmation. It does not authorize a provider.</p>'
+        f'<p><code>{escape_html(install)}</code></p></div></details>'
+        '</div></section>'
     )
 
 

@@ -32,10 +32,12 @@ def build_architecture_completion_map(
     *,
     root: Path | None = None,
     verification_results: dict[str, Any] | None = None,
+    _final_report: dict[str, Any] | None = None,
+    _size_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = (root or repo_root_from_module()).resolve()
-    final = architecture_report.build_architecture_report(root=root)
-    size = size_gates.build_gate_report(root=root)
+    final = _final_report or architecture_report.build_architecture_report(root=root)
+    size = _size_report or size_gates.build_gate_report(root=root)
     verification = _normalize_verification_results(verification_results)
     critical_blockers = _critical_blockers(final, size, verification)
     status = "accepted" if not critical_blockers else "pending_with_blockers"
@@ -179,8 +181,19 @@ def build_release_candidate_report(
     *,
     root: Path | None = None,
     verification_results: dict[str, Any] | None = None,
+    _completion: dict[str, Any] | None = None,
+    _final_report: dict[str, Any] | None = None,
+    _size_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    completion = build_architecture_completion_map(root=root, verification_results=verification_results)
+    resolved_root = (root or repo_root_from_module()).resolve()
+    final = _final_report or architecture_report.build_architecture_report(root=resolved_root)
+    size = _size_report or size_gates.build_gate_report(root=resolved_root)
+    completion = _completion or build_architecture_completion_map(
+        root=resolved_root,
+        verification_results=verification_results,
+        _final_report=final,
+        _size_report=size,
+    )
     status = "accepted" if completion["status"] == "accepted" else "pending_with_documented_architecture_blockers"
     verdict = (
         "Event Alpha architecture accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed."
@@ -197,9 +210,7 @@ def build_release_candidate_report(
         "rc_verdict": verdict,
         "canonical_completion_map": f"research/{COMPLETION_JSON}",
         "canonical_final_report": completion["canonical_final_report"],
-        "line_counts": architecture_report.build_architecture_report(
-            root=(root or repo_root_from_module()).resolve()
-        ).get("line_counts", {}),
+        "line_counts": final.get("line_counts", {}),
         "monolith_size_reductions": _monolith_reductions(completion),
         "migrated_modules": completion["event_alpha_module_map"],
         "shim_summary": completion["event_alpha_module_map"],
@@ -223,8 +234,21 @@ def write_architecture_completion_map(
     root = (root or repo_root_from_module()).resolve()
     output_dir = out_dir or root / "research"
     output_dir.mkdir(parents=True, exist_ok=True)
-    completion = build_architecture_completion_map(root=root, verification_results=verification_results)
-    release = build_release_candidate_report(root=root, verification_results=verification_results)
+    final = architecture_report.build_architecture_report(root=root)
+    size = size_gates.build_gate_report(root=root)
+    completion = build_architecture_completion_map(
+        root=root,
+        verification_results=verification_results,
+        _final_report=final,
+        _size_report=size,
+    )
+    release = build_release_candidate_report(
+        root=root,
+        verification_results=verification_results,
+        _completion=completion,
+        _final_report=final,
+        _size_report=size,
+    )
     paths = {
         "completion_json": output_dir / COMPLETION_JSON,
         "completion_markdown": output_dir / COMPLETION_MD,

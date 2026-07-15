@@ -49,6 +49,13 @@ def test_static_readiness_selects_and_activates_nothing() -> None:
     assert result.network_called is False
     assert result.writes_performed is False
     assert result.research_only is True
+    assert result.operator_decision == "select_execution_venue_and_instrument_mode"
+    assert result.next_safe_command == (
+        "make radar-execution-quality-readiness PYTHON=.venv/bin/python"
+    )
+    assert result.expected_provider_activity == "none_static_readiness_only"
+    assert result.rollback_disable_command == "none_required_no_adapter_or_provider_is_active"
+    assert result.spread_provider_status == "not_selected"
     assert set(result.selection_blockers) == {
         "intended_execution_venue_not_selected",
         "intended_execution_mode_not_selected",
@@ -211,6 +218,9 @@ def test_human_report_is_explicitly_nonselecting_and_no_call() -> None:
     assert "supported_live_adapters=none" in rendered
     assert "provider_call_planned=false provider_call_attempted=false" in rendered
     assert "credentials_read=false network_called=false writes_performed=false" in rendered
+    assert "next_safe_command=make radar-execution-quality-readiness" in rendered
+    assert "expected_provider_activity=none_static_readiness_only" in rendered
+    assert "spread_provider_status=not_selected" in rendered
     assert "No venue is selected" in rendered
     for venue_id in EXPECTED_VENUES:
         assert f"- {venue_id}:" in rendered
@@ -234,6 +244,10 @@ def test_cli_json_is_structured_static_and_secret_free(
     assert payload["provider_call_attempted"] is False
     assert payload["network_called"] is False
     assert payload["credentials_read"] is False
+    assert payload["spread_provider_status"] == "not_selected"
+    assert payload["rollback_disable_command"] == (
+        "none_required_no_adapter_or_provider_is_active"
+    )
     assert "must-not-print" not in output.out
 
 

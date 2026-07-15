@@ -8,14 +8,27 @@ import sys
 from typing import Sequence
 
 from ... import config
-from . import daily_operations, daily_operations_service, market_no_send
+from . import (
+    daily_operations,
+    daily_operations_current_status,
+    daily_operations_publication,
+    daily_operations_service,
+    market_no_send,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the standalone Daily Operations command parser."""
     parser = argparse.ArgumentParser(description=daily_operations.__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("readiness", "status", "cycle", "install", "uninstall"):
+    for name in (
+        "readiness",
+        "status",
+        "cycle",
+        "reconcile-publication",
+        "install",
+        "uninstall",
+    ):
         command = commands.add_parser(name)
         command.add_argument(
             "--artifact-base",
@@ -46,6 +59,11 @@ def run_cli(
     deps = dependencies or daily_operations.DailyOperationsDependencies()
     try:
         if args.command == "status":
+            current = _build_current_readiness(args, deps)
+            daily_operations_current_status.persist_current_status(
+                args.artifact_base,
+                current,
+            )
             payload = daily_operations.daily_operations_status(
                 artifact_base_dir=args.artifact_base,
                 top_n=args.top_n,
@@ -53,20 +71,19 @@ def run_cli(
                 interval_seconds=args.interval_seconds,
                 dependencies=deps,
             )
+            payload["current_readiness"] = current.to_dict()
+            payload.update(_current_report_values(current))
             print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
         if args.command == "readiness":
-            now = daily_operations._as_utc(deps.now())
-            namespace = daily_operations.unique_namespace(now, deps.token_hex(8))
-            result = daily_operations.build_daily_operations_readiness(
-                artifact_base_dir=args.artifact_base,
-                artifact_namespace=namespace,
-                top_n=args.top_n,
-                fetch_limit=args.fetch_limit,
-                interval_seconds=args.interval_seconds,
-                dependencies=deps,
+            result = _build_current_readiness(args, deps)
+            daily_operations_current_status.persist_current_status(
+                args.artifact_base,
+                result,
             )
-            print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+            payload = result.to_dict()
+            payload.update(_current_report_values(result))
+            print(json.dumps(payload, indent=2, sort_keys=True))
             return 0
         if args.command == "cycle":
             result = daily_operations.run_daily_operations_cycle(
@@ -79,6 +96,34 @@ def run_cli(
             )
             print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
             return 0 if result.ok else 1
+        if args.command == "reconcile-publication":
+            dashboard = deps.inspect_dashboard(artifact_base=args.artifact_base)
+            validation = daily_operations_publication.reconcile_current_publication(
+                args.artifact_base,
+                dashboard=dashboard,
+                recorded_at=deps.now(),
+            )
+            deps.refresh_campaign_report(
+                daily_operations._read_only_base(args.artifact_base)
+            )
+            print(
+                json.dumps(
+                    {
+                        "status": "reconciled",
+                        "currently_authoritative": validation.currently_authoritative,
+                        "publication_status": validation.publication_status,
+                        "operations_status": validation.operations_status,
+                        "errors": list(validation.errors),
+                        "provider_calls": 0,
+                        "dashboard_restarts": 0,
+                        "no_send": True,
+                        "research_only": True,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
         operation_args = dict(
             confirm=args.confirm,
             artifact_base=args.artifact_base,
@@ -94,14 +139,60 @@ def run_cli(
         )
         print(json.dumps(operation.to_dict(), indent=2, sort_keys=True))
         return 0 if operation.ok else 1
-    except (daily_operations.DailyOperationsError, ValueError, OSError) as exc:
+    except (
+        daily_operations.DailyOperationsError,
+        daily_operations_publication.DailyOperationsPublicationError,
+        ValueError,
+        OSError,
+    ) as exc:
         reason = (
             str(exc)
-            if isinstance(exc, daily_operations.DailyOperationsError)
+            if isinstance(
+                exc,
+                (
+                    daily_operations.DailyOperationsError,
+                    daily_operations_publication.DailyOperationsPublicationError,
+                ),
+            )
             else type(exc).__name__
         )
         print(f"radar_daily_operations_blocked: {reason}", file=sys.stderr)
         return 1
+
+
+def _build_current_readiness(
+    args: argparse.Namespace,
+    dependencies: daily_operations.DailyOperationsDependencies,
+) -> daily_operations.DailyOperationsReadiness:
+    now = daily_operations._as_utc(dependencies.now())
+    namespace = daily_operations.unique_namespace(now, dependencies.token_hex(8))
+    return daily_operations.build_daily_operations_readiness(
+        artifact_base_dir=args.artifact_base,
+        artifact_namespace=namespace,
+        top_n=args.top_n,
+        fetch_limit=args.fetch_limit,
+        interval_seconds=args.interval_seconds,
+        dependencies=dependencies,
+    )
+
+
+def _current_report_values(
+    readiness: daily_operations.DailyOperationsReadiness,
+) -> dict[str, object]:
+    current = daily_operations_current_status.current_status_values(readiness)
+    fields = (
+        "current_authorization_status",
+        "current_authorization_checked_at",
+        "current_provider_call_eligibility",
+        "implications",
+        "safe_manual_readiness_command",
+        "installation_command",
+        "rollback_disable_command",
+        "installation_requires_confirmation",
+        "authorization_boundary",
+        "expected_provider_activity",
+    )
+    return {field: current[field] for field in fields}
 
 
 __all__ = ("build_parser", "run_cli")

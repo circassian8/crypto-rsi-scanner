@@ -329,7 +329,9 @@ def test_event_alpha_notification_state_is_profile_namespace_scoped():
     assert storage.meta[event_alpha_notifications.LAST_SENT_META_KEYS[event_alpha_notifications.LANE_DAILY_DIGEST]]
 
 
-def test_event_alpha_send_readiness_resolves_namespace_default_when_absolute_stale():
+def test_event_alpha_send_readiness_resolves_namespace_default_when_absolute_stale(
+    monkeypatch,
+):
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
     import crypto_rsi_scanner.event_alpha.notifications.delivery as event_alpha_notification_delivery
@@ -339,6 +341,12 @@ def test_event_alpha_send_readiness_resolves_namespace_default_when_absolute_sta
         old_cwd = os.getcwd()
         try:
             os.chdir(tmp)
+            # This test deliberately exercises the historical project-relative
+            # store rather than the suite-wide isolated artifact root.
+            monkeypatch.setenv(
+                "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+                "event_fade_cache",
+            )
             namespace = "namespace_default_preview"
             preview = Path("event_fade_cache") / namespace / "event_alpha_notification_preview.md"
             preview.parent.mkdir(parents=True, exist_ok=True)

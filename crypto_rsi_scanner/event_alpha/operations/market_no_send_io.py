@@ -70,12 +70,94 @@ def write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
     write_bytes_atomic(path, data)
 
 
+def write_json_immutable(path: Path, payload: Mapping[str, Any]) -> None:
+    """Create one immutable JSON artifact without replacing an existing leaf."""
+
+    data = (json.dumps(dict(payload), indent=2, sort_keys=True) + "\n").encode("utf-8")
+    write_bytes_immutable(path, data)
+
+
 def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     lines = []
     for row in rows:
         stamped = schema_v1.stamp_artifact_row(row, path=path)
         lines.append(json.dumps(stamped, sort_keys=True, separators=(",", ":")))
     write_bytes_atomic(path, (("\n".join(lines) + "\n") if lines else "").encode("utf-8"))
+
+
+def write_bytes_immutable(path: Path, data: bytes) -> None:
+    """Atomically create a regular leaf while refusing replacement.
+
+    A fully written temporary file is hard-linked into the final name through
+    the verified namespace descriptor.  The link operation is atomic and
+    fails when the immutable target already exists.
+    """
+
+    _require_descriptor_directory_support(mutation=True)
+    if os.link not in os.supports_dir_fd:
+        raise MarketNoSendError("immutable artifact creation is unsupported")
+    namespace_dir, leaf = _safe_leaf_name(path)
+    temporary = f".{leaf}.{os.getpid()}.{time.time_ns()}.immutable"
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptor: int | None = None
+    temporary_exists = False
+    try:
+        with _open_verified_namespace_dir(namespace_dir) as anchored:
+            base_fd, namespace_fd, namespace, namespace_identity = anchored
+            try:
+                descriptor = os.open(temporary, flags, 0o600, dir_fd=namespace_fd)
+                temporary_exists = True
+                opened = os.fstat(descriptor)
+                if not stat.S_ISREG(opened.st_mode):
+                    raise OSError(errno.EINVAL, "immutable artifact temporary is not regular")
+                with os.fdopen(descriptor, "wb") as handle:
+                    descriptor = None
+                    handle.write(data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                _assert_namespace_identity(base_fd, namespace, namespace_identity)
+                os.link(
+                    temporary,
+                    leaf,
+                    src_dir_fd=namespace_fd,
+                    dst_dir_fd=namespace_fd,
+                    follow_symlinks=False,
+                )
+                created = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
+                staged = os.stat(temporary, dir_fd=namespace_fd, follow_symlinks=False)
+                if not stat.S_ISREG(created.st_mode) or not _same_file_snapshot(
+                    created, staged
+                ):
+                    raise OSError(errno.EIO, "immutable artifact identity mismatch")
+                os.unlink(temporary, dir_fd=namespace_fd)
+                temporary_exists = False
+                _assert_namespace_identity(base_fd, namespace, namespace_identity)
+                os.fsync(namespace_fd)
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
+                    descriptor = None
+                if temporary_exists:
+                    try:
+                        os.unlink(temporary, dir_fd=namespace_fd)
+                    except FileNotFoundError:
+                        pass
+                    temporary_exists = False
+    except FileExistsError as exc:
+        raise MarketNoSendError("immutable artifact already exists") from exc
+    except MarketNoSendError:
+        raise
+    except OSError as exc:
+        raise MarketNoSendError("immutable artifact write failed") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def write_bytes_atomic(path: Path, data: bytes) -> None:

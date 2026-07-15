@@ -108,7 +108,21 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   is warranted but the duplicate standalone runner is not useful. Use
   `make test-pytest-durations PYTHON=python3` to profile slow tests and
   `make test-pytest-parallel PYTHON=python3 PYTEST_WORKERS=4` when xdist is
-  installed. Run full `make verify` for release-style handoff, risky shared
+  installed. `test-full` (and therefore `verify-fast`) records cumulative
+  setup/call/teardown time by test file in
+  `.pytest_cache/test_file_timing_report.{json,md}` without rerunning tests.
+  `make test-artifact-heavy-extracted-checkout PYTHON=python3` is the focused
+  cumulative-artifact performance guard: its synthetic extracted checkout must
+  stay below `ARTIFACT_HEAVY_TEST_MAX_SECONDS` (5 seconds by default), project
+  health may inspect at most 128 namespaces and 128 direct entries per
+  namespace, may read only the bounded namespace-status control marker, and must
+  never recursively scan research payloads, compact, or delete. Truncating the
+  namespace inventory is an explicit blocker, not a false complete report. The
+  same-machine extracted source-with-artifacts `verify-fast` review budget is
+  360 seconds; it is observational rather than a flaky CI wall-clock gate.
+  Investigate a run above 360 seconds or more than 25% slower than the latest
+  comparable same-machine baseline before release.
+  Run full `make verify` for release-style handoff, risky shared
   code changes, CI/parity checks, before live/provider activation work, after a
   cluster of roughly 5-10 low-risk prompts, or whenever targeted evidence is
   not enough. If you skip full `make verify`, say why and list the targeted gate
@@ -124,7 +138,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   research inputs and writes one reproducible, UTC-safe ZIP timestamp for every
   entry (the ZIP epoch by default, or a wall-clock-safe `SOURCE_DATE_EPOCH`). It
   must retain the descriptor-anchored symlink/TOCTOU and secret-scanning gates;
-  never normalize review archives by mutating input mtimes.
+  never normalize review archives by mutating input mtimes. Tests that do not
+  explicitly verify shipped artifacts use isolated temporary artifact bases;
+  cumulative root stores are excluded from unrelated fixture tests. In an
+  extracted source-with-artifacts review checkout, run `make
+  test-artifact-heavy-extracted-checkout PYTHON=python3` before `make
+  verify-fast PYTHON=python3`; retain both timing-report pairs as release
+  evidence.
 - **Deterministic event research clock:** event fixture/review commands may set
   `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`. Fixture-oriented Make targets
   use `EVENT_FIXTURE_NOW` (default `2026-06-15T16:00:00Z`) so checked-in June
@@ -187,28 +207,67 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   process. A stale/untrusted dashboard, unsafe private Serve state, unowned
   public-process state, malformed public URL, or failed public probe must fail
   closed.
-- **Decision Radar Daily Operations v1:** `make radar-daily-ops-readiness` and
-  `make radar-daily-ops-status` are no-provider observational checks;
+- **Decision Radar Daily Operations v1.1:** `make radar-daily-ops-readiness` and
+  `make radar-daily-ops-status` make no provider call and atomically refresh one
+  bounded, credential-free current-status receipt;
   `make radar-daily-ops-cycle` performs at most one already-authorized,
   cadence-eligible CoinGecko no-send observation. Every attempt gets a unique
   namespace and bounded attempted/terminal journal rows. Publication requires
-  complete operator state and strict doctor success; only then may the exact
-  owned loopback dashboard restart. Any publication, restart, or terminal-state
+  complete operator state and strict doctor success. It preserves the immutable
+  prepublication attempt audit, then writes an immutable final publication
+  receipt after exact pointer publication and an immutable operations receipt
+  only after the exact owned loopback dashboard restart and terminal success.
+  Both final receipts bind the namespace/run/revision, operator-state digest,
+  artifact fingerprints, doctor result, and pointer; the publication receipt
+  also binds the exact prepublication audit digest. Strict doctor and readiness
+  block contradictory phase state. Pointer-started restart may bootstrap after
+  the publication receipt, but GET/HEAD remains 503 until the operations
+  receipt exists. A bounded HTTP probe then requires trusted 200 content, exact
+  namespace/run/revision/operator-digest response headers, and the same positive
+  owned PID before and after the request. Pointer publish, rollback,
+  invalidation, and reconciliation share one descriptor-anchored mutation
+  transaction; replacing the artifact-root pathname cannot redirect its pointer
+  reads, writes, or removals. Rollback requires the prior receipt's exact
+  pointer mapping and digest. A later failed terminal row for the same cycle
+  invalidates the earlier success receipt. Campaign history reports attempt
+  audit, publication, operations, and current authority separately. The
+  explicit `make radar-daily-ops-reconcile-publication
+  PYTHON=.venv/bin/python` command may seal a proven legacy success only
+  when one exact terminal cycle already records pointer publication plus owned
+  restart; it makes no provider call or process restart, and readiness never
+  invokes it automatically. Revalidating the same authority preserves the exact
+  pointer bytes; explicit reconciliation may repair only the historical
+  `authority_checked_at`-only rewrite produced by the pre-v1.1 readiness path.
+  Any publication, restart, probe, receipt, or terminal-state
   failure must restore the prior pointer or invalidate only the failed new
   pointer. Re-read cadence after an actual attempt without crossing the provider
-  boundary again. The LaunchAgent stays prepared/disabled until `CONFIRM=1 make
-  radar-daily-ops-install`; confirmed uninstall removes only the exact owned
-  service. Never embed authorization or credentials in its plist.
+  boundary again. Historical `authorization_at_last_cycle` remains distinct
+  from the expiring persisted `current_authorization_status` and
+  `current_provider_call_eligibility`; dashboard GET/HEAD never inspects the
+  environment. When maintenance is disabled, cadence is eligible, and authority
+  is within 90 minutes of expiry, Today and System Health show the remaining
+  time, the exact no-provider readiness command, and the separately confirmed
+  install/disable commands without running them. The LaunchAgent stays
+  prepared/disabled until `CONFIRM=1 make radar-daily-ops-install`; confirmed
+  uninstall removes only the exact owned service. Never embed authorization or
+  credentials in its plist.
 - **Official Decision Radar macro calendar:** use
   `radar-calendar-official-readiness` before the guarded Fed/BLS/BEA producer.
   Live acquisition is off by default and needs the already-present calendar
-  authorization plus an honest BLS contact. It performs at most one request per
-  required source, accepts only a complete pack, and never follows redirects.
-  Local import is no-network and requires all three operator-downloaded source
-  files plus an explicit real acquisition time; direct fixture/test/mock/replay
-  paths are rejected before writes. Preserve Fed window uncertainty and exact
-  BLS/BEA timezones. Latest success may be consumed only after pointer, receipt,
-  snapshot, and raw-source hash attestation; failure never replaces it.
+  authorization; BLS additionally needs an honest contact. It performs at most
+  one request per configured source and never follows redirects. Each source is
+  independently `observed`, `no_results`, `unavailable`,
+  `missing_configuration`, `parse_error`, or `rate_limited`; accepted source
+  bytes remain immutable and fingerprinted even when another source fails.
+  Snapshot status is `complete`, `partial`, or `unavailable`, and zero rows from
+  an unavailable source never means no events. Local import is no-network,
+  accepts an explicit subset of genuine operator-downloaded sources, and
+  requires a real acquisition time; direct fixture/test/mock/replay paths are
+  rejected before writes. Preserve Fed window uncertainty and exact BLS/BEA
+  timezones. Latest complete or partial success may be consumed only after
+  pointer, receipt, snapshot, source-coverage, and accepted raw-source hash
+  attestation; an unavailable attempt never replaces it. Unlinked calendar
+  events remain context/risk only and cannot manufacture directional bias.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
   feasible spot, perpetual, and DEX venue contracts. Do not select a venue,

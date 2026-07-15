@@ -9,8 +9,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": null,
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": null,
+        "publication_receipt": null,
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send_20260713t190728z",
@@ -62,12 +65,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "published",
         "audit_authority_binding_valid": true,
-        "audit_status": "published",
+        "audit_status": "published_legacy_audit",
         "authority_source": "pilot_audit_exact_binding",
+        "contract_errors": [],
         "currently_authoritative": false,
         "ever_authoritative": true,
-        "first_authoritative_at": "2026-07-13T19:07:36.252663+00:00"
+        "final_publication_receipt_valid": false,
+        "first_authoritative_at": "2026-07-13T19:07:36.252663+00:00",
+        "operations_receipt_valid": false,
+        "operations_status": "legacy_not_recorded",
+        "publication_status": "published_legacy_audit"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -105,8 +114,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": null,
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": null,
+        "publication_receipt": null,
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send_20260714t002940z",
@@ -159,12 +171,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "published",
         "audit_authority_binding_valid": true,
-        "audit_status": "published",
+        "audit_status": "published_legacy_audit",
         "authority_source": "pilot_audit_exact_binding",
+        "contract_errors": [],
         "currently_authoritative": false,
         "ever_authoritative": true,
-        "first_authoritative_at": "2026-07-14T00:29:47.800902+00:00"
+        "final_publication_receipt_valid": false,
+        "first_authoritative_at": "2026-07-14T00:29:47.800902+00:00",
+        "operations_receipt_valid": false,
+        "operations_status": "legacy_not_recorded",
+        "publication_status": "published_legacy_audit"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -204,8 +222,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": null,
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": null,
+        "publication_receipt": null,
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send_20260714t102122z",
@@ -257,12 +278,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "published",
         "audit_authority_binding_valid": true,
-        "audit_status": "published",
+        "audit_status": "published_legacy_audit",
         "authority_source": "pilot_audit_exact_binding",
+        "contract_errors": [],
         "currently_authoritative": false,
         "ever_authoritative": true,
-        "first_authoritative_at": "2026-07-14T10:21:29.513322+00:00"
+        "final_publication_receipt_valid": false,
+        "first_authoritative_at": "2026-07-14T10:21:29.513322+00:00",
+        "operations_receipt_valid": false,
+        "operations_status": "legacy_not_recorded",
+        "publication_status": "published_legacy_audit"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -300,8 +327,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": null,
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": null,
+        "publication_receipt": null,
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send_20260714t163300z",
@@ -353,12 +383,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "published",
         "audit_authority_binding_valid": true,
-        "audit_status": "published",
+        "audit_status": "published_legacy_audit",
         "authority_source": "pilot_audit_exact_binding",
+        "contract_errors": [],
         "currently_authoritative": false,
         "ever_authoritative": true,
-        "first_authoritative_at": "2026-07-14T16:33:07.566592+00:00"
+        "final_publication_receipt_valid": false,
+        "first_authoritative_at": "2026-07-14T16:33:07.566592+00:00",
+        "operations_receipt_valid": false,
+        "operations_status": "legacy_not_recorded",
+        "publication_status": "published_legacy_audit"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -396,8 +432,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": "event_radar_dashboard_operations_receipt.json",
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": "event_market_no_send_prepublication_audit.json",
+        "publication_receipt": "event_radar_publication_receipt.json",
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send_20260714t221551304500z_fcd6de29c447",
@@ -448,12 +487,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "not_published",
         "audit_authority_binding_valid": false,
-        "audit_status": "not_published",
-        "authority_source": "current_pointer_exact_binding",
-        "currently_authoritative": true,
+        "audit_status": "published",
+        "authority_source": "final_publication_receipt_exact_binding",
+        "contract_errors": [],
+        "currently_authoritative": false,
         "ever_authoritative": true,
-        "first_authoritative_at": "2026-07-14T22:16:31.195653+00:00"
+        "final_publication_receipt_valid": true,
+        "first_authoritative_at": "2026-07-14T22:15:57.576094+00:00",
+        "operations_receipt_valid": true,
+        "operations_status": "dashboard_restarted",
+        "publication_status": "published"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -3762,7 +3807,7 @@
     "baseline_warm_asset_count": 0,
     "cache_error": null,
     "cache_status": "valid",
-    "cadence_status": "waiting",
+    "cadence_status": "eligible",
     "minimum_observation_spacing_seconds": 3600,
     "next_eligible_observation_at": "2026-07-14T23:15:51.367228+00:00"
   },
@@ -3817,7 +3862,7 @@
     "baseline_status": "warming",
     "current_authority": {
       "artifact_namespace": "radar_market_no_send_20260714t221551304500z_fcd6de29c447",
-      "exact_operator_binding": true,
+      "exact_operator_binding": false,
       "revision": 12,
       "run_id": "2026-07-14T22:15:51.367228+00:00|no_key_live"
     },
@@ -3851,7 +3896,7 @@
     }
   ],
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-14T22:16:31.195653+00:00",
+  "generated_at": "2026-07-15T04:22:51.647284+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -3866,17 +3911,15 @@
   },
   "next_observation": {
     "authorization_rechecked_by_command": true,
-    "blocking_reasons": [
-      "Decision Radar provider call is reserved until 2026-07-14T23:15:51.367228+00:00"
-    ],
-    "cadence_status": "waiting",
-    "eligible_now": false,
+    "blocking_reasons": [],
+    "cadence_status": "eligible",
+    "eligible_now": true,
     "eligible_run_command": "make radar-market-no-send PYTHON=.venv/bin/python",
     "history_next_eligible_observation_at": "2026-07-14T23:15:51.367228+00:00",
     "next_eligible_observation_at": "2026-07-14T23:15:51.367228+00:00",
-    "next_safe_operator_command": "make radar-market-no-send-readiness PYTHON=.venv/bin/python",
+    "next_safe_operator_command": "make radar-market-no-send PYTHON=.venv/bin/python",
     "provider_backoff_disabled_until": null,
-    "provider_call_reservation_next_at": "2026-07-14T23:15:51.367228+00:00",
+    "provider_call_reservation_next_at": null,
     "rapid_cycles_do_not_advance_warmup": true
   },
   "non_authoritative_complete_generations": [
@@ -3889,8 +3932,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": null,
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": null,
+        "publication_receipt": null,
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send",
@@ -3941,12 +3987,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "not_published",
         "audit_authority_binding_valid": false,
         "audit_status": "not_published",
         "authority_source": null,
+        "contract_errors": [],
         "currently_authoritative": false,
         "ever_authoritative": false,
-        "first_authoritative_at": null
+        "final_publication_receipt_valid": false,
+        "first_authoritative_at": null,
+        "operations_receipt_valid": false,
+        "operations_status": "not_recorded",
+        "publication_status": "not_published"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -3984,8 +4036,11 @@
       },
       "artifact_names": {
         "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": null,
         "outcomes": "event_integrated_radar_outcomes.jsonl",
         "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": null,
+        "publication_receipt": null,
         "request_ledger": "event_market_no_send_request_ledger.json"
       },
       "artifact_namespace": "radar_market_no_send_20260713t152704z",
@@ -4038,12 +4093,18 @@
       "provider_call_attempted": true,
       "provider_request_succeeded": true,
       "publication": {
+        "attempt_audit_status": "published",
         "audit_authority_binding_valid": false,
-        "audit_status": "published",
+        "audit_status": "not_published",
         "authority_source": null,
+        "contract_errors": [],
         "currently_authoritative": false,
         "ever_authoritative": false,
-        "first_authoritative_at": null
+        "final_publication_receipt_valid": false,
+        "first_authoritative_at": null,
+        "operations_receipt_valid": false,
+        "operations_status": "not_recorded",
+        "publication_status": "not_published"
       },
       "request_ledger": {
         "artifact": "event_market_no_send_request_ledger.json",
@@ -4093,14 +4154,14 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260714t221551304500z_fcd6de29c447",
-    "authority_checked_at": "2026-07-14T22:16:31.195653+00:00",
-    "exact_operator_binding": true,
+    "authority_checked_at": "2026-07-14T23:02:48.224332+00:00",
+    "exact_operator_binding": false,
     "generation_authority_status": "authoritative",
-    "readiness_error": null,
-    "readiness_validation": "passed",
+    "readiness_error": "dashboard_generation_is_not_authoritative_(generation:stale)",
+    "readiness_validation": "failed",
     "revision": 12,
     "run_id": "2026-07-14T22:15:51.367228+00:00|no_key_live",
-    "status": "authoritative"
+    "status": "invalid_or_untrusted"
   },
   "pointer_history": [
     {
@@ -4137,11 +4198,11 @@
     },
     {
       "artifact_namespace": "radar_market_no_send_20260714t221551304500z_fcd6de29c447",
-      "currently_authoritative": true,
-      "first_authoritative_at": "2026-07-14T22:16:31.195653+00:00",
+      "currently_authoritative": false,
+      "first_authoritative_at": "2026-07-14T22:15:57.576094+00:00",
       "observed_at": "2026-07-14T22:15:51.367228+00:00",
       "run_id": "2026-07-14T22:15:51.367228+00:00|no_key_live",
-      "source": "current_pointer_exact_binding"
+      "source": "final_publication_receipt_exact_binding"
     }
   ],
   "provider_failed_attempts": [],

@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 from crypto_rsi_scanner.event_alpha.operations import daily_operations
+from crypto_rsi_scanner.event_alpha.operations import daily_operations_pointer
 from crypto_rsi_scanner.event_alpha.operations.daily_operations import (
     CYCLE_LEDGER_FILENAME,
     STATE_FILENAME,
@@ -35,6 +40,24 @@ from crypto_rsi_scanner.event_alpha.operations.market_no_send_models import (
 
 
 NOW = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+
+
+def _pointer_payload(
+    namespace: str,
+    *,
+    checked_at: str,
+    digest_character: str = "a",
+) -> dict[str, object]:
+    return {
+        "contract_version": 1,
+        "artifact_namespace": namespace,
+        "profile": "no_key_live",
+        "run_id": f"run-{namespace}",
+        "revision": 12,
+        "operator_state_sha256": digest_character * 64,
+        "generation_authority_status": "authoritative",
+        "authority_checked_at": checked_at,
+    }
 
 
 def _readiness(
@@ -106,9 +129,17 @@ class _Boundaries:
         self.invalidate_result = True
         self.doctor_failure = False
         self.run_failure = False
+        self.publish_failure = False
         self.calendar_path: Path | None = None
         self.calendar_resolver_failure = False
         self.last_run_environ: dict[str, str] = {}
+        self.publication_receipt_failure = False
+        self.operations_receipt_failure = False
+        self.operations_receipt_overrides: dict[str, object] = {}
+        self.final_validation_failure = False
+        self.dashboard_probe_result = True
+        self.last_probe_kwargs: dict[str, object] = {}
+        self.current_pointer_failure = False
 
     def token_hex(self, size: int) -> str:
         return ("a" if size == 16 else "b") * (size * 2)
@@ -136,6 +167,16 @@ class _Boundaries:
 
     def inspect_dashboard(self, **_kwargs: Any) -> DashboardOwnership:
         self.events.append("dashboard_preflight")
+        return DashboardOwnership(
+            self.dashboard_owned,
+            True,
+            self.dashboard_owned,
+            "owned_running" if self.dashboard_owned else "dashboard_argv_mismatch",
+            321 if self.dashboard_owned else None,
+        )
+
+    def wait_dashboard(self, **_kwargs: Any) -> DashboardOwnership:
+        self.events.append("dashboard_restart_wait")
         return DashboardOwnership(
             self.dashboard_owned,
             True,
@@ -201,16 +242,76 @@ class _Boundaries:
         if self.doctor_failure:
             raise DailyOperationsError("strict_doctor_failed")
 
-    def publish(self, _base: Path, namespace: str) -> object:
+    def publish(
+        self,
+        _base: Path,
+        namespace: str,
+        _previous_pointer: Any,
+    ) -> object:
         self.events.append("publish")
+        if self.publish_failure:
+            raise OSError("sanitized publication failure")
         self.pointer = namespace
         return object()
 
+    def publication_receipt(
+        self, _base: Path, _namespace: str, _cycle_id: str
+    ) -> dict[str, object]:
+        self.events.append("publication_receipt")
+        if self.publication_receipt_failure:
+            raise OSError("sanitized immutable receipt failure")
+        return {"status": "published"}
+
+    def operations_receipt(
+        self,
+        _base: Path,
+        _namespace: str,
+        _cycle_id: str,
+        _dashboard: DashboardOwnership,
+    ) -> dict[str, object]:
+        self.events.append("operations_receipt")
+        if self.operations_receipt_failure:
+            raise OSError("sanitized operations receipt failure")
+        return {
+            "status": "dashboard_restarted",
+            "cycle_id": _cycle_id,
+            "artifact_namespace": _namespace,
+            "run_id": "run-daily-ops",
+            "revision": 12,
+            "operator_state_sha256": "a" * 64,
+            **self.operations_receipt_overrides,
+        }
+
+    def validate_final(self, _base: Path, _namespace: str) -> None:
+        self.events.append("validate_final_publication")
+        if self.final_validation_failure:
+            raise OSError("sanitized final validation failure")
+
+    def refresh_campaign(self, _base: Path) -> None:
+        self.events.append("refresh_campaign_report")
+
+    def probe_dashboard(self, **kwargs: Any) -> bool:
+        self.events.append("dashboard_postreceipt_probe")
+        self.last_probe_kwargs = dict(kwargs)
+        return self.dashboard_probe_result
+
+    def persist_current_status(
+        self, _base: Path, _readiness: Any
+    ) -> None:
+        self.events.append("persist_current_status")
+
     def current(self, _base: Path) -> str:
         self.events.append("current_pointer")
+        if self.current_pointer_failure:
+            raise OSError("sanitized current pointer failure")
         return self.pointer
 
-    def rollback(self, _base: Path, namespace: str) -> bool:
+    def rollback(
+        self,
+        _base: Path,
+        _failed_namespace: str,
+        namespace: str,
+    ) -> bool:
         self.events.append("rollback")
         if self.rollback_result:
             self.pointer = namespace
@@ -244,6 +345,11 @@ class _Boundaries:
             record_attempt=self.record,
             record_boundary_failure=self.boundary_failure,
             write_audit=self.audit,
+            write_publication_receipt=self.publication_receipt,
+            write_operations_receipt=self.operations_receipt,
+            validate_final_publication=self.validate_final,
+            refresh_campaign_report=self.refresh_campaign,
+            persist_current_status=self.persist_current_status,
             generation_status=self.status,
             strict_doctor=self.doctor,
             publish=self.publish,
@@ -254,6 +360,8 @@ class _Boundaries:
             campaign_cadence=self.campaign_cadence,
             inspect_dashboard=self.inspect_dashboard,
             restart_dashboard=self.restart,
+            wait_dashboard_process=self.wait_dashboard,
+            probe_dashboard=self.probe_dashboard,
             scheduler_health=self.scheduler,
         )
 
@@ -367,6 +475,22 @@ def test_eligible_cycle_publishes_then_restarts_exact_owned_dashboard(
     assert fake.events.index("readiness") < fake.events.index("run")
     assert fake.events.index("doctor") < fake.events.index("publish")
     assert fake.events.index("publish") < fake.events.index("restart")
+    assert fake.events.index("operations_receipt") < fake.events.index(
+        "dashboard_postreceipt_probe"
+    )
+    assert fake.events.index("validate_final_publication") < fake.events.index(
+        "dashboard_postreceipt_probe"
+    )
+    assert fake.events.index("dashboard_postreceipt_probe") < fake.events.index(
+        "refresh_campaign_report"
+    )
+    assert fake.last_probe_kwargs == {
+        "artifact_base": tmp_path,
+        "expected_namespace": result.artifact_namespace,
+        "expected_run_id": "run-daily-ops",
+        "expected_revision": 12,
+        "expected_operator_state_sha256": "a" * 64,
+    }
     assert fake.pointer == result.artifact_namespace
     rows = read_jsonl(tmp_path / CYCLE_LEDGER_FILENAME)
     assert [row["status"] for row in rows] == ["attempted", "succeeded"]
@@ -458,6 +582,218 @@ def test_strict_doctor_failure_never_calls_publish_and_preserves_pointer(
     row = read_jsonl(tmp_path / CYCLE_LEDGER_FILENAME)[-1]
     assert row["provider_call_attempted"] is True
     assert row["pointer_published"] is False
+
+
+def test_untrusted_current_pointer_blocks_before_provider_boundary(
+    tmp_path: Path,
+) -> None:
+    fake = _Boundaries()
+    fake.current_pointer_failure = True
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=None,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == "failed"
+    assert result.reason == "current_pointer_unavailable"
+    assert "run" not in fake.events
+    assert "publish" not in fake.events
+    assert "rollback" not in fake.events
+
+
+def test_default_rollback_restores_exact_prior_pointer_bytes_without_receipt_mutation(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    pointer_path = tmp_path / daily_operations.CURRENT_NAMESPACE_POINTER
+    prior_namespace = "prior-authority"
+    failed_namespace = "failed-new-authority"
+    write_json_atomic(
+        pointer_path,
+        _pointer_payload(
+            prior_namespace,
+            checked_at="2026-07-14T22:15:57.576094+00:00",
+        ),
+    )
+    prior_raw = pointer_path.read_bytes()
+    prior_dir = tmp_path / prior_namespace
+    prior_dir.mkdir()
+    receipt_path = prior_dir / "event_radar_publication_receipt.json"
+    write_json_atomic(receipt_path, {"immutable": "prior-publication-receipt"})
+    receipt_raw = receipt_path.read_bytes()
+    snapshot = daily_operations._default_current_namespace(tmp_path)
+    assert snapshot is not None
+
+    write_json_atomic(
+        pointer_path,
+        _pointer_payload(
+            failed_namespace,
+            checked_at="2026-07-15T12:00:00+00:00",
+            digest_character="b",
+        ),
+    )
+    monkeypatch.setattr(
+        daily_operations_pointer,
+        "_prior_pointer_is_still_authoritative",
+        lambda *_args, **_kwargs: True,
+    )
+
+    assert daily_operations._default_rollback(
+        tmp_path,
+        failed_namespace,
+        snapshot,
+    ) is True
+    assert pointer_path.read_bytes() == prior_raw
+    assert read_json_object(pointer_path)["authority_checked_at"] == (
+        "2026-07-14T22:15:57.576094+00:00"
+    )
+    assert receipt_path.read_bytes() == receipt_raw
+
+
+def test_default_rollback_refuses_missing_unsafe_or_drifted_pointer(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    pointer_path = tmp_path / daily_operations.CURRENT_NAMESPACE_POINTER
+    assert daily_operations._default_current_namespace(tmp_path) is None
+
+    unsafe_target = tmp_path / "unsafe-pointer-target.json"
+    write_json_atomic(
+        unsafe_target,
+        _pointer_payload(
+            "unsafe-authority",
+            checked_at="2026-07-15T11:00:00+00:00",
+        ),
+    )
+    pointer_path.symlink_to(unsafe_target)
+    with pytest.raises(DailyOperationsError, match="current_pointer_unavailable"):
+        daily_operations._default_current_namespace(tmp_path)
+    pointer_path.unlink()
+
+    write_json_atomic(
+        pointer_path,
+        _pointer_payload(
+            "prior-authority",
+            checked_at="2026-07-14T22:15:57.576094+00:00",
+        ),
+    )
+    snapshot = daily_operations._default_current_namespace(tmp_path)
+    assert snapshot is not None
+    write_json_atomic(
+        pointer_path,
+        _pointer_payload(
+            "externally-changed-authority",
+            checked_at="2026-07-15T12:01:00+00:00",
+            digest_character="c",
+        ),
+    )
+    drifted_raw = pointer_path.read_bytes()
+    monkeypatch.setattr(
+        daily_operations_pointer,
+        "_prior_pointer_is_still_authoritative",
+        lambda *_args, **_kwargs: True,
+    )
+
+    assert daily_operations._default_rollback(
+        tmp_path,
+        "failed-new-authority",
+        snapshot,
+    ) is False
+    assert pointer_path.read_bytes() == drifted_raw
+
+
+def test_default_rollback_refuses_prior_authority_validation_drift(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    pointer_path = tmp_path / daily_operations.CURRENT_NAMESPACE_POINTER
+    write_json_atomic(
+        pointer_path,
+        _pointer_payload(
+            "prior-authority",
+            checked_at="2026-07-14T22:15:57.576094+00:00",
+        ),
+    )
+    snapshot = daily_operations._default_current_namespace(tmp_path)
+    assert snapshot is not None
+    write_json_atomic(
+        pointer_path,
+        _pointer_payload(
+            "failed-new-authority",
+            checked_at="2026-07-15T12:00:00+00:00",
+            digest_character="b",
+        ),
+    )
+    failed_raw = pointer_path.read_bytes()
+    monkeypatch.setattr(
+        daily_operations_pointer,
+        "_prior_pointer_is_still_authoritative",
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert daily_operations._default_rollback(
+        tmp_path,
+        "failed-new-authority",
+        snapshot,
+    ) is False
+    assert pointer_path.read_bytes() == failed_raw
+
+
+def test_prior_rollback_requires_exact_saved_pointer_receipt_binding(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    pointer = _pointer_payload(
+        "prior-authority",
+        checked_at="2026-07-14T22:15:57.576094+00:00",
+    )
+    raw = (json.dumps(pointer, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    snapshot = daily_operations_pointer.CurrentPointerSnapshot(
+        artifact_namespace="prior-authority",
+        raw=raw,
+        sha256=hashlib.sha256(raw).hexdigest(),
+    )
+    dashboard_snapshot = SimpleNamespace(
+        artifact_namespace="prior-authority",
+        profile=pointer["profile"],
+        run_id=pointer["run_id"],
+        revision=pointer["revision"],
+        operator_state_sha256=pointer["operator_state_sha256"],
+    )
+    monkeypatch.setattr(
+        daily_operations_pointer,
+        "resolve_authoritative_dashboard",
+        lambda *_args, **_kwargs: SimpleNamespace(snapshot=dashboard_snapshot),
+    )
+    receipt = {"pointer": dict(pointer), "pointer_sha256": "0" * 64}
+    validation = SimpleNamespace(valid=True, publication_receipt=receipt)
+    monkeypatch.setattr(
+        daily_operations_pointer.daily_operations_publication,
+        "validate_final_publication_contract",
+        lambda *_args, **_kwargs: validation,
+    )
+
+    assert daily_operations_pointer._prior_pointer_is_still_authoritative(
+        tmp_path,
+        snapshot,
+        pointer,
+    ) is False
+    receipt["pointer_sha256"] = snapshot.sha256
+    receipt["pointer"] = {**pointer, "authority_checked_at": "2026-07-14T22:16:00+00:00"}
+    assert daily_operations_pointer._prior_pointer_is_still_authoritative(
+        tmp_path,
+        snapshot,
+        pointer,
+    ) is False
+    receipt["pointer"] = dict(pointer)
+    assert daily_operations_pointer._prior_pointer_is_still_authoritative(
+        tmp_path,
+        snapshot,
+        pointer,
+    ) is True
 
 
 def test_boundary_exception_recovers_reserved_provider_call_truth(
@@ -557,6 +893,106 @@ def test_restart_failure_rolls_back_previous_pointer(tmp_path: Path) -> None:
     assert fake.events.index("restart") < fake.events.index("rollback")
 
 
+def test_failed_publication_has_no_success_receipt_and_rolls_back(
+    tmp_path: Path,
+) -> None:
+    fake = _Boundaries()
+    fake.publish_failure = True
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=None,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == "failed"
+    assert result.reason == "publication_failed"
+    assert result.pointer_rolled_back is True
+    assert "publication_receipt" not in fake.events
+    assert "operations_receipt" not in fake.events
+    assert fake.events.index("publish") < fake.events.index("rollback")
+    assert fake.events.index("rollback") < fake.events.index("restart")
+    assert fake.pointer == "previous-authority"
+
+
+def test_operations_receipt_failure_rolls_back_current_pointer(tmp_path: Path) -> None:
+    fake = _Boundaries()
+    fake.operations_receipt_failure = True
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=None,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == "failed"
+    assert result.reason == "operations_receipt_failed"
+    assert result.pointer_rolled_back is True
+    assert fake.pointer == "previous-authority"
+    assert fake.events.index("publication_receipt") < fake.events.index("restart")
+    assert fake.events.index("restart") < fake.events.index("operations_receipt")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("artifact_namespace", "other-namespace"),
+        ("cycle_id", "c" * 32),
+        ("run_id", "other-run"),
+        ("revision", True),
+        ("revision", 0),
+        ("operator_state_sha256", "not-a-digest"),
+    ),
+)
+def test_malformed_operations_receipt_never_reaches_dashboard_probe(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    fake = _Boundaries()
+    fake.operations_receipt_overrides[field] = value
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=None,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == "failed"
+    assert result.reason == "operations_receipt_failed"
+    assert result.pointer_rolled_back is True
+    assert "dashboard_postreceipt_probe" not in fake.events
+    assert fake.pointer == "previous-authority"
+
+
+def test_postreceipt_dashboard_probe_failure_rolls_back_current_pointer(
+    tmp_path: Path,
+) -> None:
+    fake = _Boundaries()
+    fake.dashboard_probe_result = False
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=None,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == "failed"
+    assert result.reason == "dashboard_postreceipt_probe_failed"
+    assert result.pointer_rolled_back is True
+    assert fake.pointer == "previous-authority"
+    assert fake.events.index("operations_receipt") < fake.events.index(
+        "dashboard_postreceipt_probe"
+    )
+    assert fake.events.index("dashboard_postreceipt_probe") < fake.events.index(
+        "rollback"
+    )
+
+
 def test_restart_failure_invalidates_new_pointer_when_rollback_fails(
     tmp_path: Path,
 ) -> None:
@@ -577,6 +1013,28 @@ def test_restart_failure_invalidates_new_pointer_when_rollback_fails(
     assert result.pointer_published is False
     assert fake.pointer is None
     assert fake.events.index("rollback") < fake.events.index("invalidate_pointer")
+
+
+def test_restart_failure_with_no_prior_pointer_invalidates_failed_authority(
+    tmp_path: Path,
+) -> None:
+    fake = _Boundaries()
+    fake.pointer = None
+    fake.restart_results = [False]
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=None,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == "failed"
+    assert result.pointer_rolled_back is False
+    assert result.pointer_invalidated is True
+    assert fake.pointer is None
+    assert "rollback" not in fake.events
+    assert "invalidate_pointer" in fake.events
 
 
 def test_restart_exception_rolls_back_and_records_terminal_failure(

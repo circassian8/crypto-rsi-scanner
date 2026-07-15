@@ -317,6 +317,9 @@ def test_cli_status_is_concise_and_never_dumps_node_or_user_metadata(capsys) -> 
     assert "UserID" not in output.out
     assert "secret-node-key" not in output.out
     assert "BackendState" not in output.out
+    assert "next_safe_command='make radar-dashboard-phone-readiness" in output.out
+    assert "expected_provider_activity=none" in output.out
+    assert "rollback_disable_command='CONFIRM=1 make radar-dashboard-phone-disable" in output.out
     assert output.err == ""
 
 

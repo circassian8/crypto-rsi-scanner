@@ -21,6 +21,7 @@ _OBSERVED = "2026-07-12T12:00:00+00:00"
 
 
 def _run_bound_calendar_generation(tmp_path, monkeypatch, *, namespace):
+    monkeypatch.setenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", str(tmp_path))
     monkeypatch.delenv(
         market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV,
         raising=False,

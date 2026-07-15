@@ -741,6 +741,9 @@ def test_cli_output_is_sanitized_and_reveals_url_only_after_confirmed_enable(
     assert main(["readiness"], dependencies=fake.dependencies()) == 0
     readiness = capsys.readouterr()
     assert "trycloudflare.com" not in readiness.out
+    assert "next_safe_command='make radar-dashboard-public-readiness" in readiness.out
+    assert "temporary_unauthenticated_public_https_link" in readiness.out
+    assert "rollback_disable_command='CONFIRM=1 make radar-dashboard-public-disable" in readiness.out
     assert readiness.err == ""
 
     assert main(["enable"], dependencies=fake.dependencies()) == 1

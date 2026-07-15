@@ -111,6 +111,7 @@ def test_readiness_is_read_only_and_reports_missing_explicit_authorization(
     result = official_macro_calendar_readiness(environ={}, output_base=base)
 
     assert result.status == "blocked"
+    assert result.current_status == "blocked_missing_live_authorization"
     assert result.provider_call_attempted is False
     assert result.latest_attempt_status == "none"
     assert result.latest_success_status == "none"
@@ -118,6 +119,38 @@ def test_readiness_is_read_only_and_reports_missing_explicit_authorization(
         "live_calendar_authorization_missing",
         "bls_contact_missing_or_invalid",
     }
+    assert result.next_safe_command == (
+        "make radar-calendar-official-readiness PYTHON=python3"
+    )
+    assert "readiness_never_calls" in result.authorization_boundary
+    assert "never_creates_or_mutates_authorization" in result.authorization_boundary
+    assert "at_most_one_request_per_configured_source" in (
+        result.expected_provider_activity
+    )
+    assert result.rollback_disable_command == (
+        "none_required_program_never_mutates_authorization_or_installs_a_service"
+    )
+    assert result.implications[0].startswith("readiness_is_read_only")
+    assert not base.exists()
+
+
+def test_readiness_explains_partial_bls_configuration_without_calling(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path.resolve() / "calendar"
+
+    result = official_macro_calendar_readiness(
+        environ={OFFICIAL_MACRO_LIVE_AUTH_ENV: "1"},
+        output_base=base,
+    )
+
+    assert result.status == "ready"
+    assert result.current_status == "ready_partial_bls_missing_configuration"
+    assert result.provider_call_attempted is False
+    assert result.next_safe_command == (
+        "make radar-calendar-official-acquire PYTHON=python3"
+    )
+    assert any("must_skip_bls" in item for item in result.implications)
     assert not base.exists()
 
 
@@ -211,31 +244,68 @@ def test_import_cli_requires_observed_at() -> None:
     assert raised.value.code == 2
 
 
-@pytest.mark.parametrize(
-    "environ,reason",
-    (
-        ({OFFICIAL_MACRO_CONTACT_ENV: "calendar-operator@example.com"}, "live_calendar_authorization_missing"),
-        ({OFFICIAL_MACRO_LIVE_AUTH_ENV: "1"}, "bls_contact_missing_or_invalid"),
-    ),
-)
-def test_live_acquisition_blocks_before_artifacts_or_calls_without_full_gate(
-    tmp_path: Path, environ: dict[str, str], reason: str
+def test_live_acquisition_blocks_before_artifacts_or_calls_without_authorization(
+    tmp_path: Path,
 ) -> None:
     base = tmp_path.resolve() / "calendar"
     calls: list[tuple[str, str]] = []
 
     result = acquire_official_macro_calendar(
-        environ=environ,
+        environ={OFFICIAL_MACRO_CONTACT_ENV: "calendar-operator@example.com"},
         output_base=base,
         observed_at=OBSERVED_AT,
         fetcher=_successful_fetcher(calls),
     )
 
     assert result.status == "blocked"
-    assert result.reason_code == reason
+    assert result.reason_code == "live_calendar_authorization_missing"
     assert result.provider_call_count == 0
+    assert [row["status"] for row in result.source_results] == [
+        "missing_configuration",
+        "missing_configuration",
+        "missing_configuration",
+    ]
     assert calls == []
     assert not base.exists()
+
+
+def test_missing_bls_contact_yields_partial_fed_and_bea_coverage(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path.resolve() / "calendar"
+    calls: list[tuple[str, str]] = []
+
+    result = acquire_official_macro_calendar(
+        environ={OFFICIAL_MACRO_LIVE_AUTH_ENV: "1"},
+        output_base=base,
+        observed_at=OBSERVED_AT,
+        fetcher=_successful_fetcher(calls),
+    )
+
+    assert result.status == "partial"
+    assert result.usable is True
+    assert result.provider_call_count == 2
+    assert [name for name, _agent in calls] == ["federal_reserve", "bea"]
+    by_source = {row["source"]: row for row in result.source_results}
+    assert by_source["bls"]["status"] == "missing_configuration"
+    assert by_source["bls"]["request_attempted"] is False
+    assert by_source["federal_reserve"]["status"] == "observed"
+    assert by_source["bea"]["status"] == "observed"
+    assert resolve_latest_official_macro_snapshot(base) == result.snapshot_path
+    assert result.snapshot_path is not None
+    loaded = load_market_no_send_calendar_snapshot(
+        environ={CALENDAR_SNAPSHOT_PATH_ENV: str(result.snapshot_path)},
+        now=OBSERVED_AT,
+        data_mode="live",
+        run_mode="operational",
+    )
+    assert loaded.usable is True
+    assert loaded.snapshot_status == "partial"
+    assert [row["status"] for row in loaded.source_coverage] == [
+        "missing_configuration",
+        "observed",
+        "observed",
+    ]
 
 
 def test_live_acquisition_calls_each_required_source_once_and_emits_compatible_snapshot(
@@ -286,6 +356,119 @@ def test_live_acquisition_calls_each_required_source_once_and_emits_compatible_s
     assert all(len(row["sha256"]) == 64 for row in receipt["source_results"])
 
 
+def test_rate_limited_source_is_explicit_without_discarding_observed_sources(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def fetch(spec: OfficialMacroSourceSpec, _user_agent: str):
+        calls.append(spec.name)
+        if spec.name == "bls":
+            return OfficialMacroHTTPResponse(
+                body=b"rate limited",
+                status=429,
+                content_type="text/plain",
+                final_url=spec.url,
+            )
+        return OfficialMacroHTTPResponse(
+            body=_body_for(spec.name),
+            status=200,
+            content_type=_content_type(spec.name),
+            final_url=spec.url,
+        )
+
+    result = acquire_official_macro_calendar(
+        environ=AUTHORIZED_ENV,
+        output_base=tmp_path.resolve() / "calendar",
+        observed_at=OBSERVED_AT,
+        fetcher=fetch,
+    )
+
+    assert result.status == "partial"
+    assert calls == ["bls", "federal_reserve", "bea"]
+    by_source = {row["source"]: row for row in result.source_results}
+    assert by_source["bls"]["status"] == "rate_limited"
+    assert by_source["bls"]["http_status"] == 429
+    assert by_source["federal_reserve"]["status"] == "observed"
+    assert by_source["bea"]["status"] == "observed"
+
+
+def test_valid_source_with_no_relevant_rows_is_not_missing_coverage(
+    tmp_path: Path,
+) -> None:
+    def fetch(spec: OfficialMacroSourceSpec, _user_agent: str):
+        body = (
+            b"BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n"
+            if spec.name == "bls"
+            else _body_for(spec.name)
+        )
+        return OfficialMacroHTTPResponse(
+            body=body,
+            status=200,
+            content_type=_content_type(spec.name),
+            final_url=spec.url,
+        )
+
+    result = acquire_official_macro_calendar(
+        environ=AUTHORIZED_ENV,
+        output_base=tmp_path.resolve() / "calendar",
+        observed_at=OBSERVED_AT,
+        fetcher=fetch,
+    )
+
+    assert result.complete
+    assert result.event_count == 7
+    assert result.source_results[0]["status"] == "no_results"
+    assert result.source_results[0]["sha256"]
+
+
+def test_complete_all_source_no_results_snapshot_is_a_healthy_empty_observation(
+    tmp_path: Path,
+) -> None:
+    bodies = {
+        "bls": b"BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n",
+        "federal_reserve": b"<html><h3>2026 FOMC Meetings</h3></html>",
+        "bea": json.dumps(
+            {
+                "Gross Domestic Product": {"release_dates": []},
+                "Personal Income and Outlays": {"release_dates": []},
+            }
+        ).encode("utf-8"),
+    }
+
+    def fetch(spec: OfficialMacroSourceSpec, _user_agent: str):
+        return OfficialMacroHTTPResponse(
+            body=bodies[spec.name],
+            status=200,
+            content_type=_content_type(spec.name),
+            final_url=spec.url,
+        )
+
+    result = acquire_official_macro_calendar(
+        environ=AUTHORIZED_ENV,
+        output_base=tmp_path.resolve() / "calendar",
+        observed_at=OBSERVED_AT,
+        fetcher=fetch,
+    )
+
+    assert result.complete
+    assert result.event_count == 0
+    assert [row["status"] for row in result.source_results] == [
+        "no_results",
+        "no_results",
+        "no_results",
+    ]
+    assert result.snapshot_path is not None
+    loaded = load_market_no_send_calendar_snapshot(
+        environ={CALENDAR_SNAPSHOT_PATH_ENV: str(result.snapshot_path)},
+        now=OBSERVED_AT,
+        data_mode="live",
+        run_mode="operational",
+    )
+    assert loaded.status == "healthy_empty"
+    assert loaded.snapshot_status == "complete"
+
+
 def test_explicit_local_import_never_calls_a_provider_and_uses_operator_provenance(
     tmp_path: Path,
 ) -> None:
@@ -306,6 +489,33 @@ def test_explicit_local_import_never_calls_a_provider_and_uses_operator_provenan
     assert len(snapshot["events"]) == 11
     assert all("forecast_value" not in row for row in snapshot["events"])
     assert len(list(base.glob("official_macro_*"))) == 2
+
+
+def test_local_import_can_attest_partial_coverage_without_network(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path.resolve()
+    sources = _operator_exports(root / "operator_exports")
+
+    result = import_official_macro_calendar(
+        federal_reserve_html=sources["federal_reserve"],
+        bls_ics=None,
+        bea_json=sources["bea"],
+        output_base=root / "calendar",
+        observed_at=OBSERVED_AT,
+    )
+
+    assert result.status == "partial"
+    assert result.provider_call_count == 0
+    assert result.source_results[0]["status"] == "missing_configuration"
+    assert result.snapshot_path is not None
+    snapshot = json.loads(result.snapshot_path.read_text(encoding="utf-8"))
+    assert snapshot["snapshot_status"] == "partial"
+    assert [row["status"] for row in snapshot["source_coverage"]] == [
+        "missing_configuration",
+        "observed",
+        "observed",
+    ]
 
 
 def test_latest_success_resolver_attests_pointer_receipt_snapshot_and_sources(
@@ -451,25 +661,64 @@ def test_failed_live_pack_is_not_retried_and_preserves_last_success_pointer(
         fetcher=forbidden_bls,
     )
 
-    assert failure.status == "failed"
+    assert failure.status == "unavailable"
     assert failure.failure_source == "bls"
-    assert failure.reason_code == "source_http_status"
-    assert failure.provider_call_count == 1
+    assert failure.reason_code is None
+    assert failure.provider_call_count == 3
     assert failure.provider_request_succeeded_count == 0
-    assert failed_calls == ["bls"]
+    assert failed_calls == ["bls", "federal_reserve", "bea"]
     assert success_pointer.read_bytes() == preserved
     latest_attempt = json.loads(
         (state / OFFICIAL_MACRO_LATEST_ATTEMPT_FILENAME).read_text(encoding="utf-8")
     )
-    assert latest_attempt["status"] == "failed"
-    assert latest_attempt["snapshot_path"] is None
+    assert latest_attempt["status"] == "unavailable"
+    assert latest_attempt["snapshot_status"] == "unavailable"
+    assert latest_attempt["snapshot_path"] is not None
     assert failure.receipt_path is not None
     receipt = json.loads(failure.receipt_path.read_text(encoding="utf-8"))
     assert receipt["failure_source"] == "bls"
     assert receipt["source_results"][0]["http_status"] == 403
+    assert failure.snapshot_path is not None
+    unavailable = load_market_no_send_calendar_snapshot(
+        environ={CALENDAR_SNAPSHOT_PATH_ENV: str(failure.snapshot_path)},
+        now="2026-07-15T01:00:00Z",
+        data_mode="live",
+        run_mode="operational",
+    )
+    assert unavailable.status == "unavailable"
+    assert unavailable.usable is False
+    assert unavailable.snapshot_status == "unavailable"
+    assert unavailable.raw_rows == ()
 
 
-def test_parse_failure_keeps_immutable_source_digest_and_does_not_publish(
+def test_partial_snapshot_rejects_source_coverage_digest_drift(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path.resolve() / "calendar"
+    result = acquire_official_macro_calendar(
+        environ={OFFICIAL_MACRO_LIVE_AUTH_ENV: "1"},
+        output_base=base,
+        observed_at=OBSERVED_AT,
+        fetcher=_successful_fetcher([]),
+    )
+    assert result.status == "partial" and result.snapshot_path is not None
+    payload = json.loads(result.snapshot_path.read_text(encoding="utf-8"))
+    payload["source_coverage"][0]["status"] = "observed"
+    result.snapshot_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    rejected = load_market_no_send_calendar_snapshot(
+        environ={CALENDAR_SNAPSHOT_PATH_ENV: str(result.snapshot_path)},
+        now=OBSERVED_AT,
+        data_mode="live",
+        run_mode="operational",
+    )
+
+    assert rejected.status == "unavailable"
+    assert rejected.error_class == "live_snapshot_official_source_coverage_invalid"
+    assert rejected.raw_rows == ()
+
+
+def test_parse_failure_keeps_immutable_digest_and_publishes_only_partial_coverage(
     tmp_path: Path,
 ) -> None:
     base = tmp_path.resolve() / "calendar"
@@ -498,21 +747,21 @@ def test_parse_failure_keeps_immutable_source_digest_and_does_not_publish(
         fetcher=malformed,
     )
 
-    assert result.status == "failed"
+    assert result.status == "partial"
     assert result.failure_source == "bls"
-    assert result.reason_code is not None and result.reason_code.startswith("parse_")
-    assert calls == ["bls"]
-    assert result.snapshot_path is None
+    assert result.reason_code is None
+    assert calls == ["bls", "federal_reserve", "bea"]
+    assert result.snapshot_path is not None
     assert result.attempt_dir is not None
     raw_path = result.attempt_dir / "bls_release_calendar.ics"
     assert raw_path.is_file()
     assert result.receipt_path is not None
     receipt = json.loads(result.receipt_path.read_text(encoding="utf-8"))
     source = receipt["source_results"][0]
-    assert source["status"] == "failed"
+    assert source["status"] == "parse_error"
     assert source["raw_filename"] == raw_path.name
     assert source["sha256"]
-    assert not (base / OFFICIAL_MACRO_STATE_DIRNAME / OFFICIAL_MACRO_LATEST_SUCCESS_FILENAME).exists()
+    assert (base / OFFICIAL_MACRO_STATE_DIRNAME / OFFICIAL_MACRO_LATEST_SUCCESS_FILENAME).exists()
 
 
 def test_local_import_rejects_symlink_and_oversized_sources_with_failed_receipts(
@@ -529,9 +778,9 @@ def test_local_import_rejects_symlink_and_oversized_sources_with_failed_receipts
         output_base=root / "calendar-symlink",
         observed_at=OBSERVED_AT,
     )
-    assert symlink_result.status == "failed"
+    assert symlink_result.status == "partial"
     assert symlink_result.failure_source == "federal_reserve"
-    assert symlink_result.reason_code == "local_source_unavailable"
+    assert symlink_result.reason_code is None
     assert symlink_result.provider_call_count == 0
     assert symlink_result.receipt_path is not None
     assert symlink_result.receipt_path.name == OFFICIAL_MACRO_RECEIPT_FILENAME
@@ -545,9 +794,9 @@ def test_local_import_rejects_symlink_and_oversized_sources_with_failed_receipts
         output_base=root / "calendar-oversized",
         observed_at=OBSERVED_AT,
     )
-    assert oversized_result.status == "failed"
+    assert oversized_result.status == "partial"
     assert oversized_result.failure_source == "bls"
-    assert oversized_result.reason_code == "source_body_size_invalid"
+    assert oversized_result.reason_code is None
     assert oversized_result.provider_call_count == 0
 
 
@@ -573,10 +822,10 @@ def test_live_response_redirect_or_wrong_content_type_fails_closed(
         observed_at=OBSERVED_AT,
         fetcher=redirected,
     )
-    assert result.status == "failed"
-    assert result.reason_code == "source_redirect_rejected"
-    assert result.provider_call_count == 1
-    assert calls == ["bls"]
+    assert result.status == "unavailable"
+    assert result.reason_code is None
+    assert result.provider_call_count == 3
+    assert calls == ["bls", "federal_reserve", "bea"]
 
 
 def test_operation_results_keep_all_safety_counters_zero(tmp_path: Path) -> None:

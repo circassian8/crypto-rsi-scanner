@@ -1141,6 +1141,14 @@ def main(
 
 def _format_status(command: str, status: _PublicAccessStatus) -> str:
     prefix = f"radar_dashboard_public_access_{command}:"
+    operator = (
+        " implications=temporary_unauthenticated_public_https_link"
+        " next_safe_command='make radar-dashboard-public-readiness PYTHON=.venv/bin/python'"
+        " authorization_boundary=explicit_confirmation_no_provider_credentials"
+        " expected_provider_activity=cloudflare_tunnel_edge_only_no_market_provider"
+        " enable_command='CONFIRM=1 make radar-dashboard-public-enable PYTHON=.venv/bin/python'"
+        " rollback_disable_command='CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python'"
+    )
     if not status.ready:
         detail = f" process_state={status.process_state}"
         if status.process_state == "expired":
@@ -1148,14 +1156,14 @@ def _format_status(command: str, status: _PublicAccessStatus) -> str:
                 " tunnel_may_still_be_public=true"
                 " next_safe_action=confirmed_public_guard"
             )
-        return f"{prefix} NOT_READY reason={_first_reason(status)}{detail}"
+        return f"{prefix} NOT_READY reason={_first_reason(status)}{detail}{operator}"
     state = "enabled" if status.enabled else "disabled"
     if command == "readiness" and status.enabled:
         url = "redacted_use_status"
     else:
         url = status.public_url if status.enabled else "available_after_confirmed_enable"
     expiry = status.expires_at or "none"
-    return f"{prefix} READY state={state} url={url} expires_at={expiry}"
+    return f"{prefix} READY state={state} url={url} expires_at={expiry}{operator}"
 
 
 def _format_operation(command: str, operation: _PublicAccessOperation) -> str:

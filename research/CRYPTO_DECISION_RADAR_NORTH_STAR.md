@@ -194,17 +194,25 @@ generation.
 
 The official U.S. macro producer begins with Federal Reserve FOMC dates, BLS
 CPI/employment releases, and BEA PCE/GDP releases. Live acquisition is off by
-default and requires pre-existing explicit authorization plus an honest BLS
-contact. It makes at most one request per required official source, does not
-follow redirects, and accepts only an all-required pack. Local import is
-no-network and requires three operator-downloaded source files plus their real,
-explicit acquisition time; direct checked-in fixture/test/mock/replay paths are
-rejected before writes. Fed tentative meeting windows remain windows with no
-invented decision time, while BLS TZIDs and BEA offsets survive normalization.
-Every attempt has a unique directory. A successful pointer is usable only after
-its closed fields, receipt, snapshot, and each raw-source digest are re-attested;
+default and requires pre-existing explicit authorization; BLS additionally
+requires an honest contact. It makes at most one request per configured official
+source and does not follow redirects. Every source independently reports
+`observed`, `no_results`, `unavailable`, `missing_configuration`, `parse_error`,
+or `rate_limited`. Accepted bytes remain immutable and fingerprinted even when
+another source fails. A snapshot is `complete`, `partial`, or `unavailable`;
+partial coverage names its exact observed and missing sources, and zero rows
+from an unavailable source never means that source has no events. Local import
+is no-network, accepts an explicit subset of genuine operator-downloaded source
+files, and requires their real, explicit acquisition time; direct checked-in
+fixture/test/mock/replay paths are rejected before writes. Fed tentative meeting
+windows remain windows with no invented decision time, while BLS TZIDs and BEA
+offsets survive normalization. Every attempt has a unique directory. A complete
+or partial successful pointer is usable only after its closed fields, receipt,
+snapshot, coverage digest, and each accepted raw-source digest are re-attested;
 Daily Operations consumes that verified latest-success path without guessing a
-file. Failed acquisition never replaces the prior successful pointer.
+file. An unavailable acquisition never replaces the prior successful pointer.
+Unlinked macro events remain context/risk only and cannot create directional
+bias or a directional idea.
 
 RSI is a read-only supporting adapter. Its context and artifact references stay
 in the canonical projection and may transparently adjust an existing idea, but
@@ -252,6 +260,14 @@ single read clock. Missing receipt booleans remain tri-state and display as
 `Not recorded`; they are never collapsed into `No`. One operator-label
 projection names all canonical routes consistently while preserving their
 stored route tokens and routing behavior.
+
+Provider authorization at the last cycle is historical evidence, not current
+permission. The dashboard labels it separately from the expiring persisted
+`current_authorization_status`, `current_authorization_checked_at`, and
+`current_provider_call_eligibility` receipt and never inspects environment
+variables on GET/HEAD. Calendar coverage likewise lists unavailable and
+missing-configuration sources rather than turning absent rows into a healthy
+empty claim.
 
 The interface is server-rendered, with its backend loopback-only, responsive
 from wide desktop to narrow mobile, keyboard navigable, and usable without
@@ -449,8 +465,9 @@ the exact complete manifest, so a newly blocked attempt cannot accidentally
 reuse an older complete namespace. Provider health is namespace-local,
 fingerprinted for live authority, and stores only safe error classes.
 
-Each completed cycle writes one final post-doctor pilot audit. Pilot audit
-contract v1 is distinct from market provenance contract v2. The audit records
+Each completed cycle writes a post-doctor pilot audit before publication. Pilot
+audit contract v1 is distinct from market provenance contract v2 and remains
+immutable evidence of that prepublication attempt. The audit records
 the exact namespace/run/revision, canonical pointer binding, request/source/
 history fingerprints, full-universe cold/warming/warm counts and observations
 per asset, direct/proxy feature bases, spread coverage, routes/scores/outcomes,
@@ -464,30 +481,80 @@ network call. Campaign-level evidence is tracked in
 a warm baseline before the required prior observations and time coverage exist.
 `make radar-market-campaign-report` rebuilds that canonical pair from local
 artifacts only, makes no provider call, and reports authoritative and
-non-authoritative generations, failed/blocked attempts, route counts, feature
-maturity, next eligible time, data-quality limits, and pending/mature outcomes.
+non-authoritative generations, failed/blocked attempts, attempt-audit status,
+final-publication status, dashboard-operations status, current authority, route
+counts, feature maturity, next eligible time, data-quality limits, and
+pending/mature outcomes. It cannot claim both current authority and an
+unpublished final state; legacy `audit_status` is only a compatibility alias for
+`publication_status`, not a second authority claim.
 Its Decision campaign totals remain explicitly separate from Event Alpha
 catalyst burn-in.
 
 ## Daily Operations and Execution-Quality Readiness
 
-Daily Operations v1 is a local maintenance coordinator, not a trading system.
+Daily Operations v1.1 is a local maintenance coordinator, not a trading system.
 It is implemented but remains disabled until the operator explicitly confirms
-LaunchAgent installation. A manual or scheduled cycle runs read-only readiness
-before any possible provider call, respects the stable one-hour reservation,
+LaunchAgent installation. Readiness/status perform no provider call and refresh
+only one bounded credential-free current-status receipt. A manual or scheduled
+cycle runs readiness before any possible provider call, respects the stable one-hour reservation,
 makes at most one bounded already-authorized CoinGecko no-send observation, and
 uses a new immutable namespace. It records attempted, skipped, blocked,
 successful, and failed cycles plus last readiness, last attempt, last successful
-publication, post-attempt next eligibility, provider authorization, scheduler
-health, sanitized launchd last-exit/run counts, and skip/block reason. A loaded
-job with a non-zero last exit is unhealthy rather than green by ownership alone.
+publication, post-attempt next eligibility, authorization at the last cycle,
+authorization check time, scheduler health, sanitized launchd last-exit/run
+counts, and skip/block reason. A loaded job with a non-zero last exit is
+unhealthy rather than green by ownership alone.
 
 A complete operator state and zero-blocker strict doctor precede publication.
-Only after the exact pointer changes does the coordinator restart the fully
-owned loopback dashboard job. Publication, restart, or terminal-journal failure
+The immutable `event_market_no_send_prepublication_audit.json` preserves the
+attempt state. After exact pointer publication,
+`event_radar_publication_receipt.json` records `published`; after the exact
+owned loopback dashboard is running and terminal success is journaled,
+`event_radar_dashboard_operations_receipt.json` records
+`dashboard_restarted`. These closed receipts bind the namespace, run, revision,
+operator-state digest, artifact fingerprints, doctor result, and pointer digest.
+The final publication receipt also binds the exact prepublication audit digest.
+Strict doctor, readiness, campaign report, operator state, and dashboard history
+must agree; a current managed generation missing or contradicting either final
+receipt is blocked. Publication, restart, receipt, or terminal-journal failure
 restores the previous trusted authority; if restoration is impossible, only the
-failed new pointer is descriptor-safely invalidated. The dashboard reads these
-bounded receipts without invoking launchd, providers, or writes. No service
+failed new pointer is descriptor-safely invalidated.
+
+The exact pointer-started dashboard process has one narrow bootstrap phase: a
+valid current final-publication receipt may start the process before the
+operations receipt exists, but every GET/HEAD remains 503-closed. After terminal
+state and the operations receipt are written and revalidated, a bounded
+HTTP probe must return trusted dashboard content with the exact namespace, run,
+revision, and operator digest while the same positive owned PID remains running
+before and after the request. Pointer publication, rollback, invalidation, and
+legacy repair share one descriptor-anchored mutation transaction; replacing the
+artifact-root pathname cannot redirect its pointer reads, writes, or removals.
+Rollback restores only the exact saved bytes whose parsed mapping and SHA-256
+match the prior immutable publication receipt. A later failed terminal row for
+the same cycle invalidates the earlier success receipt.
+
+Legacy reconciliation is explicit, not automatic:
+
+```sh
+make radar-daily-ops-reconcile-publication PYTHON=.venv/bin/python
+```
+
+It is allowed only for the exact current pointer plus one unique successful
+terminal cycle that already proves pointer publication and owned restart. It
+makes no provider call and performs no process restart. Revalidating the same
+authority preserves the exact pointer bytes. Explicit reconciliation may
+restore only a receipt-bound pointer whose sole drift is the pre-v1.1
+`authority_checked_at` readiness refresh; every broader drift remains blocked.
+The dashboard reads the bounded receipts without invoking launchd, providers,
+writes, or the process
+environment. A current-status receipt expires after 15 minutes; stale current
+authorization becomes unknown rather than inheriting the last cycle's value.
+
+When the scheduler is disabled, the next observation is eligible, and authority
+is within 90 minutes of expiry, Today and System Health show a prominent but
+non-alarming recovery action: time remaining, `make radar-daily-ops-readiness
+PYTHON=.venv/bin/python`, the separately confirmed install command, and the
+confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
@@ -499,12 +566,57 @@ selected, no live adapter is active, and no execution/order behavior may be
 implemented until the operator identifies the intended venue and instrument
 mode.
 
+The remaining human decisions stay explicit:
+
+- Daily Operations: inspect with `make radar-daily-ops-readiness
+  PYTHON=.venv/bin/python` (no provider call); install only with `CONFIRM=1 make
+  radar-daily-ops-install PYTHON=.venv/bin/python`; roll back with confirmed
+  `radar-daily-ops-uninstall`.
+- Official calendar: inspect with `make radar-calendar-official-readiness
+  PYTHON=.venv/bin/python` (no provider call or write). Acquisition remains
+  blocked without the already-present live authorization; BLS is skipped as
+  `missing_configuration` without an honest contact. An authorized acquire may
+  call each configured Fed/BLS/BEA source at most once and never creates or
+  mutates authorization.
+- Execution quality: inspect with `make radar-execution-quality-readiness
+  PYTHON=.venv/bin/python` (static/no-network). No spread provider or venue is
+  selected, and there is nothing to disable until the operator chooses one.
+- Phone access: private and public readiness/status are non-enabling checks.
+  Either route requires its exact `CONFIRM=1 ...-enable` command and is rolled
+  back only with the matching confirmed disable command; neither is enabled by
+  Daily Operations.
+
 The authoritative pointer uses a stable canonical operator-state digest. A
 strict-doctor rerun against an unchanged revision may refresh only the top-level
 `updated_at` and nested `doctor.verified_at` clocks without changing pointer
 identity. Every substantive doctor value and the complete artifact manifest
 remain fingerprinted; any other operator-state or artifact drift invalidates
 the exact binding and blocks current authority.
+
+## Artifact-Heavy Verification
+
+Fixture tests use isolated temporary artifact bases unless their purpose is to
+verify shipped artifacts. Static project-health checks memoize source/AST work
+within the process and never recursively walk cumulative operational roots for
+unrelated checks. `test-full` and `verify-fast` write cumulative per-file timing
+reports to `.pytest_cache/test_file_timing_report.{json,md}` without rerunning
+tests. `make test-artifact-heavy-extracted-checkout PYTHON=python3` runs the
+focused isolated cumulative-artifact guard with a default five-second budget
+and writes dedicated JSON/Markdown timing reports. In a source-with-artifacts
+review checkout it precedes `make verify-fast PYTHON=python3`; both report pairs
+are retained as reproducible release evidence. The practical same-machine full
+review budget is 360 seconds. This is observational, not a hard CI wall-clock
+gate; a run above 360 seconds or more than 25% slower than the latest comparable
+same-machine baseline requires investigation before release.
+
+The retention inventory is bounded to 128 namespaces and 128 direct entries per
+namespace, reads no research payloads beyond the bounded namespace-status
+control marker, and performs no recursive scan. A truncated namespace inventory
+is a blocker rather than a false complete result. It may name advisory
+compaction candidates, but `retention_policy_authorized`,
+`compaction_performed`, and `deletion_performed` remain false. Canonical audit
+history cannot be compacted or deleted without a separate explicit retention
+policy and operator authorization.
 
 ## Outcomes and Learning
 

@@ -11,7 +11,11 @@ from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 from .loader import load_dashboard_snapshot
 from .models import DashboardGenerationBinding, DashboardLoadError, DashboardSnapshot
-from .readiness import DashboardReadinessError, read_current_namespace_pointer
+from .readiness import (
+    DashboardReadinessError,
+    _require_daily_operations_publication_contract,
+    read_current_namespace_pointer,
+)
 from .render import render_dashboard_page
 
 
@@ -68,7 +72,10 @@ def _handle_dashboard_request(
         status, payload = _render_dashboard_request(app, environ)
     except DashboardLoadError as exc:
         status, payload = _dashboard_unavailable(exc)
-    start_response(status, _dashboard_headers(payload))
+    start_response(
+        status,
+        _dashboard_headers(payload, generation_binding=app.generation_binding),
+    )
     return [b"" if method == "HEAD" else payload]
 
 
@@ -103,6 +110,7 @@ def _render_dashboard_request(
         snapshot,
         app.generation_binding,
     )
+    _require_request_publication_contract(app, snapshot)
     path = unquote(str(environ.get("PATH_INFO") or "/"))
     query = parse_qs(str(environ.get("QUERY_STRING") or ""), keep_blank_values=True)
     include_diagnostics = str((query.get("include_diagnostics") or [""])[0]).casefold() in {
@@ -134,8 +142,12 @@ def _dashboard_unavailable(exc: DashboardLoadError) -> tuple[str, bytes]:
     return "503 Service Unavailable", payload
 
 
-def _dashboard_headers(payload: bytes) -> list[tuple[str, str]]:
-    return [
+def _dashboard_headers(
+    payload: bytes,
+    *,
+    generation_binding: DashboardGenerationBinding | None = None,
+) -> list[tuple[str, str]]:
+    headers = [
         ("Content-Type", "text/html; charset=utf-8"),
         ("Content-Length", str(len(payload))),
         ("Cache-Control", "no-store"),
@@ -153,6 +165,30 @@ def _dashboard_headers(payload: bytes) -> list[tuple[str, str]]:
             "base-uri 'none'; frame-ancestors 'none'",
         ),
     ]
+    if generation_binding is not None:
+        identity_headers = (
+            ("X-Crypto-Radar-Namespace", generation_binding.artifact_namespace),
+            ("X-Crypto-Radar-Run-Id", generation_binding.run_id),
+            ("X-Crypto-Radar-Revision", str(generation_binding.revision)),
+            (
+                "X-Crypto-Radar-Operator-State-SHA256",
+                generation_binding.operator_state_sha256,
+            ),
+        )
+        if all(_safe_header_value(value) for _name, value in identity_headers):
+            headers.extend(identity_headers)
+    return headers
+
+
+def _safe_header_value(value: object) -> bool:
+    """Keep authority headers single-line ASCII or omit the entire identity."""
+
+    return bool(
+        isinstance(value, str)
+        and value
+        and len(value) <= 512
+        and all(32 <= ord(character) < 127 for character in value)
+    )
 
 
 def serve_dashboard(
@@ -270,6 +306,22 @@ def _require_current_pointer_binding(
             "dashboard pointer generation changed after startup; "
             f"refusing request (mismatched {fields})"
         )
+
+
+def _require_request_publication_contract(
+    app: RadarDashboardApp,
+    snapshot: DashboardSnapshot,
+) -> None:
+    """Revalidate immutable publication evidence on every GET and HEAD."""
+
+    try:
+        _require_daily_operations_publication_contract(
+            app.artifact_base_dir,
+            snapshot,
+            require_current=app.generation_binding is not None,
+        )
+    except DashboardReadinessError as exc:
+        raise DashboardLoadError(str(exc)) from exc
 
 
 __all__ = ("DashboardGenerationBinding", "RadarDashboardApp", "serve_dashboard")

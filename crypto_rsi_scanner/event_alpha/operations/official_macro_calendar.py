@@ -1,9 +1,11 @@
 """Guarded producer for an authoritative U.S. macro calendar snapshot.
 
 Live acquisition is off by default and requires explicit, already-present
-authorization plus a contact address for the honest BLS user agent.  One run
-attempts each source exactly once, in a fixed order, and accepts only a complete
-Federal Reserve/BLS/BEA pack.  Local import is an explicit no-network path.
+authorization plus a contact address for the honest BLS request.  One run
+evaluates each source independently and attempts each eligible source exactly
+once.  Valid observed sources can form an explicitly partial snapshot; missing
+coverage never becomes a false no-events claim.  Local import is an explicit
+no-network path.
 
 Every attempted pack gets a new immutable directory.  A failed attempt records
 an allowlisted receipt but never changes the last-success pointer.  The emitted
@@ -61,8 +63,9 @@ from .market_no_send_calendar import (
 from .market_no_send_io import (
     ensure_safe_namespace_dir,
     read_regular_bytes,
-    write_bytes_atomic,
+    write_bytes_immutable,
     write_json_atomic,
+    write_json_immutable,
 )
 from .market_no_send_models import MarketNoSendError
 
@@ -75,13 +78,29 @@ OFFICIAL_MACRO_RECEIPT_FILENAME = "acquisition_receipt.json"
 OFFICIAL_MACRO_STATE_DIRNAME = "state"
 OFFICIAL_MACRO_LATEST_ATTEMPT_FILENAME = "latest_attempt.json"
 OFFICIAL_MACRO_LATEST_SUCCESS_FILENAME = "latest_success.json"
-OFFICIAL_MACRO_CONTRACT_VERSION = 1
+OFFICIAL_MACRO_CONTRACT_VERSION = 2
+
+OFFICIAL_MACRO_SOURCE_STATUSES = frozenset(
+    {
+        "observed",
+        "no_results",
+        "unavailable",
+        "missing_configuration",
+        "parse_error",
+        "rate_limited",
+    }
+)
+OFFICIAL_MACRO_SNAPSHOT_STATUSES = frozenset(
+    {"complete", "partial", "unavailable"}
+)
+_OBSERVED_SOURCE_STATUSES = frozenset({"observed", "no_results"})
 
 _CONTACT_RE = re.compile(r"^[^\s@]{1,120}@[^\s@]{1,120}\.[^\s@]{2,40}$")
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 @dataclass(frozen=True)
 class _OfficialMacroReadiness:
     status: str
+    current_status: str
     live_acquisition_authorized: bool
     contact_configured: bool
     provider_call_attempted: bool = False
@@ -90,7 +109,11 @@ class _OfficialMacroReadiness:
     latest_attempt_status: str = "none"
     latest_success_status: str = "none"
     reason_codes: tuple[str, ...] = ()
+    implications: tuple[str, ...] = ()
     next_safe_command: str = ""
+    authorization_boundary: str = ""
+    expected_provider_activity: str = ""
+    rollback_disable_command: str = ""
     research_only: bool = True
     no_send: bool = True
     strict_alerts_created: int = 0
@@ -107,6 +130,7 @@ class _OfficialMacroReadiness:
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["reason_codes"] = list(self.reason_codes)
+        payload["implications"] = list(self.implications)
         payload["ready"] = self.ready
         return payload
 
@@ -130,6 +154,7 @@ class _OfficialMacroOperationResult:
     snapshot_path: Path | None = None
     receipt_path: Path | None = None
     snapshot_sha256: str | None = None
+    source_coverage_sha256: str | None = None
     provider_authorization_mutated: bool = False
     research_only: bool = True
     no_send: bool = True
@@ -144,6 +169,10 @@ class _OfficialMacroOperationResult:
     def complete(self) -> bool:
         return self.status == "complete"
 
+    @property
+    def usable(self) -> bool:
+        return self.status in {"complete", "partial"}
+
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         for key in ("attempt_dir", "snapshot_path", "receipt_path"):
@@ -151,6 +180,7 @@ class _OfficialMacroOperationResult:
             payload[key] = str(value) if value is not None else None
         payload["source_results"] = [dict(row) for row in self.source_results]
         payload["complete"] = self.complete
+        payload["usable"] = self.usable
         return payload
 
 
@@ -181,21 +211,66 @@ def official_macro_calendar_readiness(
     except OfficialMacroAcquisitionError:
         success_status = "invalid"
     else:
-        success_status = "complete" if success_snapshot is not None else "none"
-    command = (
-        "python -m crypto_rsi_scanner.event_alpha.operations.official_macro_calendar acquire"
-        if authorized and contact_configured
-        else "configure explicit calendar authorization or use import-local"
+        success_status = (
+            _read_pointer_status(
+                base
+                / OFFICIAL_MACRO_STATE_DIRNAME
+                / OFFICIAL_MACRO_LATEST_SUCCESS_FILENAME
+            )
+            if success_snapshot is not None
+            else "none"
+        )
+    current_status = (
+        "blocked_missing_live_authorization"
+        if not authorized
+        else "ready_partial_bls_missing_configuration"
+        if not contact_configured
+        else "ready_all_official_sources_configured"
     )
+    command = (
+        "make radar-calendar-official-acquire PYTHON=python3"
+        if authorized
+        else "make radar-calendar-official-readiness PYTHON=python3"
+    )
+    implications = [
+        "readiness_is_read_only_and_performs_no_provider_call_or_artifact_write",
+        f"latest_usable_snapshot_status={success_status}",
+    ]
+    if not authorized:
+        implications.append(
+            "acquisition_remains_blocked_and_all_sources_are_missing_configuration"
+        )
+    elif not contact_configured:
+        implications.append(
+            "an_acquisition_can_observe_federal_reserve_and_bea_but_must_skip_bls_as_missing_configuration"
+        )
+    else:
+        implications.append(
+            "an_acquisition_may_attempt_each_configured_official_source_once"
+        )
     return OfficialMacroReadiness(
-        status="ready" if not reasons else "blocked",
+        status="ready" if authorized else "blocked",
+        current_status=current_status,
         live_acquisition_authorized=authorized,
         contact_configured=contact_configured,
         output_base=str(base),
         latest_attempt_status=attempt_status,
         latest_success_status=success_status,
         reason_codes=tuple(reasons),
+        implications=tuple(implications),
         next_safe_command=command,
+        authorization_boundary=(
+            "readiness_never_calls; acquisition_requires_already_present_"
+            f"{OFFICIAL_MACRO_LIVE_AUTH_ENV}=1; BLS_also_requires_an_already_present_"
+            f"valid_{OFFICIAL_MACRO_CONTACT_ENV}; the_program_never_creates_or_mutates_authorization"
+        ),
+        expected_provider_activity=(
+            "readiness_none; authorized_acquire_at_most_one_request_per_configured_"
+            "source_and_skips_missing_configuration"
+        ),
+        rollback_disable_command=(
+            "none_required_program_never_mutates_authorization_or_installs_a_service"
+        ),
     )
 
 
@@ -261,20 +336,27 @@ def acquire_official_macro_calendar(
     observed_at: datetime | str | None = None,
     fetcher: OfficialMacroFetcher | None = None,
 ) -> OfficialMacroOperationResult:
-    """Acquire one all-required official pack with at most one call per source."""
+    """Acquire one independently covered official pack with at most one call per source."""
 
     env = os.environ if environ is None else environ
     attempted = _as_utc(observed_at)
     if not _enabled(env.get(OFFICIAL_MACRO_LIVE_AUTH_ENV)):
         return _blocked_result(
-            attempted, mode="live_provider", reason="live_calendar_authorization_missing"
+            attempted,
+            mode="live_provider",
+            reason="live_calendar_authorization_missing",
+            source_results=tuple(
+                _missing_configuration_source_result(spec)
+                for spec in OFFICIAL_MACRO_SOURCES
+            ),
         )
     contact = str(env.get(OFFICIAL_MACRO_CONTACT_ENV) or "").strip()
-    if not _valid_contact(contact):
-        return _blocked_result(
-            attempted, mode="live_provider", reason="bls_contact_missing_or_invalid"
-        )
-    user_agent = f"crypto-rsi-scanner-calendar/1.0 ({contact})"
+    contact_configured = _valid_contact(contact)
+    user_agent = (
+        f"crypto-rsi-scanner-calendar/1.1 ({contact})"
+        if contact_configured
+        else "crypto-rsi-scanner-calendar/1.1"
+    )
     provider = fetcher or _fetch_official_source
 
     def load_source(spec: OfficialMacroSourceSpec) -> OfficialMacroHTTPResponse:
@@ -299,18 +381,19 @@ def acquire_official_macro_calendar(
         acquisition_mode="live_provider",
         source_loader=load_source,
         provider_calls_expected=True,
+        missing_configuration=(frozenset() if contact_configured else frozenset({"bls"})),
     )
 
 
 def import_official_macro_calendar(
     *,
-    federal_reserve_html: str | Path,
-    bls_ics: str | Path,
-    bea_json: str | Path,
+    federal_reserve_html: str | Path | None = None,
+    bls_ics: str | Path | None = None,
+    bea_json: str | Path | None = None,
     output_base: str | Path = DEFAULT_OFFICIAL_MACRO_BASE,
     observed_at: datetime | str | None = None,
 ) -> OfficialMacroOperationResult:
-    """Import an explicit complete local source pack without network access."""
+    """Import explicit local official sources without network access."""
 
     if observed_at is None or str(observed_at).strip() == "":
         return _blocked_result(
@@ -319,10 +402,15 @@ def import_official_macro_calendar(
             reason="local_import_observed_at_required",
         )
     attempted = _as_utc(observed_at)
+    supplied = {
+        "federal_reserve": federal_reserve_html,
+        "bls": bls_ics,
+        "bea": bea_json,
+    }
     paths = {
-        "federal_reserve": Path(federal_reserve_html).expanduser().absolute(),
-        "bls": Path(bls_ics).expanduser().absolute(),
-        "bea": Path(bea_json).expanduser().absolute(),
+        source: Path(value).expanduser().absolute()
+        for source, value in supplied.items()
+        if value is not None and str(value).strip()
     }
     for source, path in paths.items():
         if _checked_in_nonlive_source_path(path):
@@ -340,6 +428,8 @@ def import_official_macro_calendar(
             body = _read_local_source(
                 paths[spec.name], maximum_bytes=spec.maximum_bytes
             )
+        except KeyError:
+            continue
         except OfficialMacroAcquisitionError as exc:
             local_failures[spec.name] = exc
             continue
@@ -368,6 +458,7 @@ def import_official_macro_calendar(
         acquisition_mode="operator_verified_export",
         source_loader=load_source,
         provider_calls_expected=False,
+        missing_configuration=frozenset(set(supplied).difference(paths)),
     )
 
 
@@ -378,6 +469,7 @@ def _produce_pack(
     acquisition_mode: str,
     source_loader: Callable[[OfficialMacroSourceSpec], OfficialMacroHTTPResponse],
     provider_calls_expected: bool,
+    missing_configuration: frozenset[str] = frozenset(),
 ) -> OfficialMacroOperationResult:
     base = Path(output_base).expanduser().absolute()
     try:
@@ -393,53 +485,52 @@ def _produce_pack(
             reason_code="artifact_base_unavailable",
         )
 
-    (
-        parsed_sources,
-        source_results,
-        provider_calls,
-        provider_successes,
-        failure,
-    ) = _load_pack_sources(
+    parsed_sources, source_results, provider_calls, provider_successes = _load_pack_sources(
         attempt_dir=attempt_dir,
         attempted=attempted,
         source_loader=source_loader,
         provider_calls_expected=provider_calls_expected,
+        missing_configuration=missing_configuration,
     )
 
-    if failure is not None:
-        return _finish_attempt(
-            base=base,
-            attempt_dir=attempt_dir,
-            attempt_id=attempt_id,
-            attempted=attempted,
-            acquisition_mode=acquisition_mode,
-            status="failed",
-            reason_code=failure.reason_code,
-            failure_source=failure.source,
-            source_results=source_results,
-            provider_calls=provider_calls,
-            provider_successes=provider_successes,
-        )
-
     try:
-        events = merge_official_macro_sources(parsed_sources)
+        statuses = tuple(str(row["status"]) for row in source_results)
+        observed_count = sum(status in _OBSERVED_SOURCE_STATUSES for status in statuses)
+        snapshot_status = (
+            "complete"
+            if observed_count == len(OFFICIAL_MACRO_SOURCES)
+            else "partial"
+            if observed_count
+            else "unavailable"
+        )
+        events = merge_official_macro_sources(parsed_sources, require_all=False)
+        source_coverage = _source_coverage_projection(source_results)
+        coverage_digest = _source_coverage_sha256(source_coverage)
         snapshot = _snapshot_payload(
             events=events,
             observed_at=attempted,
             acquisition_mode=acquisition_mode,
+            snapshot_status=snapshot_status,
+            source_coverage=source_coverage,
+            source_coverage_sha256=coverage_digest,
         )
         snapshot_bytes = _json_bytes(snapshot)
         snapshot_path = attempt_dir / OFFICIAL_MACRO_SNAPSHOT_FILENAME
-        write_bytes_atomic(snapshot_path, snapshot_bytes)
-        verification = load_market_no_send_calendar_snapshot(
-            environ={CALENDAR_SNAPSHOT_PATH_ENV: str(snapshot_path)},
-            now=attempted,
-            data_mode="live",
-            run_mode="operational",
-        )
-        if not verification.usable:
+        write_bytes_immutable(snapshot_path, snapshot_bytes)
+        if snapshot_status in {"complete", "partial"}:
+            verification = load_market_no_send_calendar_snapshot(
+                environ={CALENDAR_SNAPSHOT_PATH_ENV: str(snapshot_path)},
+                now=attempted,
+                data_mode="live",
+                run_mode="operational",
+            )
+            if not verification.usable:
+                raise OfficialMacroAcquisitionError(
+                    "snapshot_contract_rejected", source=None
+                )
+        elif events:
             raise OfficialMacroAcquisitionError(
-                "snapshot_contract_rejected", source=None
+                "unavailable_snapshot_contains_events", source=None
             )
         snapshot_digest = hashlib.sha256(snapshot_bytes).hexdigest()
     except OfficialMacroAcquisitionError as exc:
@@ -455,6 +546,7 @@ def _produce_pack(
             source_results=source_results,
             provider_calls=provider_calls,
             provider_successes=provider_successes,
+            snapshot_status="unavailable",
         )
     except (OfficialMacroParseError, MarketNoSendError, OSError, ValueError):
         return _finish_attempt(
@@ -469,6 +561,7 @@ def _produce_pack(
             source_results=source_results,
             provider_calls=provider_calls,
             provider_successes=provider_successes,
+            snapshot_status="unavailable",
         )
 
     return _finish_attempt(
@@ -477,15 +570,17 @@ def _produce_pack(
         attempt_id=attempt_id,
         attempted=attempted,
         acquisition_mode=acquisition_mode,
-        status="complete",
+        status=snapshot_status,
         reason_code=None,
-        failure_source=None,
+        failure_source=_first_unobserved_source(source_results),
         source_results=source_results,
         provider_calls=provider_calls,
         provider_successes=provider_successes,
         event_count=len(events),
         snapshot_path=snapshot_path,
         snapshot_sha256=snapshot_digest,
+        source_coverage_sha256=coverage_digest,
+        snapshot_status=snapshot_status,
     )
 
 
@@ -495,26 +590,45 @@ def _load_pack_sources(
     attempted: datetime,
     source_loader: Callable[[OfficialMacroSourceSpec], OfficialMacroHTTPResponse],
     provider_calls_expected: bool,
+    missing_configuration: frozenset[str],
 ) -> tuple[
     list[OfficialMacroParsedSource],
     list[dict[str, Any]],
     int,
     int,
-    OfficialMacroAcquisitionError | None,
 ]:
     parsed_sources: list[OfficialMacroParsedSource] = []
     source_results: list[dict[str, Any]] = []
     provider_calls = 0
     provider_successes = 0
-    failure: OfficialMacroAcquisitionError | None = None
     for spec in OFFICIAL_MACRO_SOURCES:
         source_result: dict[str, Any] = {
             "source": spec.name,
             "source_url": spec.url,
-            "request_attempted": provider_calls_expected,
+            "request_attempted": False,
+            "http_status": None,
+            "content_type": None,
+            "size_bytes": None,
+            "sha256": None,
+            "raw_filename": None,
+            "status": "missing_configuration"
+            if spec.name in missing_configuration
+            else "unavailable",
+            "source_rows_seen": None,
+            "accepted_rows": 0,
+            "rejected_rows": 0,
+            "failure_class": (
+                "source_configuration_missing"
+                if spec.name in missing_configuration
+                else None
+            ),
         }
+        if spec.name in missing_configuration:
+            source_results.append(source_result)
+            continue
         if provider_calls_expected:
             provider_calls += 1
+            source_result["request_attempted"] = True
         try:
             response = source_loader(spec)
             body = _validate_response(spec, response)
@@ -529,50 +643,54 @@ def _load_pack_sources(
                     "raw_filename": spec.raw_filename,
                 }
             )
-            write_bytes_atomic(attempt_dir / spec.raw_filename, body)
+            write_bytes_immutable(attempt_dir / spec.raw_filename, body)
             parsed = _parse_source(spec.name, body, acquired_at=attempted)
             parsed_sources.append(parsed)
             source_result.update(
                 {
-                    "status": "accepted",
+                    "status": "observed" if parsed.rows else "no_results",
                     "source_rows_seen": parsed.source_rows_seen,
                     "accepted_rows": len(parsed.rows),
                     "rejected_rows": parsed.rejected_rows,
+                    "failure_class": None,
                 }
             )
             source_results.append(source_result)
         except OfficialMacroParseError as exc:
-            failure = OfficialMacroAcquisitionError(
-                f"parse_{_safe_code(exc.code)}", source=spec.name
-            )
-        except OfficialMacroAcquisitionError as exc:
-            failure = OfficialMacroAcquisitionError(
-                exc.reason_code,
-                source=exc.source or spec.name,
-                http_status=exc.http_status,
-            )
-        except (MarketNoSendError, OSError, ValueError):
-            failure = OfficialMacroAcquisitionError(
-                "source_artifact_write_failed", source=spec.name
-            )
-        if failure is not None:
             source_result.update(
                 {
-                    "status": "failed",
-                    "failure_class": failure.reason_code,
-                    "http_status": failure.http_status
-                    if failure.http_status is not None
-                    else source_result.get("http_status"),
+                    "status": "parse_error",
+                    "failure_class": f"parse_{_safe_code(exc.code)}",
                 }
             )
+        except OfficialMacroAcquisitionError as exc:
+            source_result.update(
+                {
+                    "status": (
+                        "rate_limited" if exc.http_status == 429 else "unavailable"
+                    ),
+                    "failure_class": exc.reason_code,
+                    "http_status": exc.http_status,
+                }
+            )
+        except (MarketNoSendError, OSError, ValueError):
+            source_result.update(
+                {
+                    "status": "unavailable",
+                    "failure_class": "source_artifact_write_failed",
+                    "content_type": None,
+                    "size_bytes": None,
+                    "sha256": None,
+                    "raw_filename": None,
+                }
+            )
+        if source_result not in source_results:
             source_results.append(source_result)
-            break
     return (
         parsed_sources,
         source_results,
         provider_calls,
         provider_successes,
-        failure,
     )
 
 
@@ -592,6 +710,8 @@ def _finish_attempt(
     event_count: int = 0,
     snapshot_path: Path | None = None,
     snapshot_sha256: str | None = None,
+    source_coverage_sha256: str | None = None,
+    snapshot_status: str,
 ) -> OfficialMacroOperationResult:
     receipt_path = attempt_dir / OFFICIAL_MACRO_RECEIPT_FILENAME
     receipt = {
@@ -609,12 +729,20 @@ def _finish_attempt(
         "event_count": event_count,
         "snapshot_filename": snapshot_path.name if snapshot_path else None,
         "snapshot_sha256": snapshot_sha256,
+        "snapshot_status": snapshot_status,
+        "source_coverage_sha256": source_coverage_sha256,
+        "observed_sources": _sources_with_status(
+            source_results, _OBSERVED_SOURCE_STATUSES
+        ),
+        "missing_sources": _sources_without_status(
+            source_results, _OBSERVED_SOURCE_STATUSES
+        ),
         "all_required_sources_accepted": status == "complete",
         "provider_authorization_mutated": False,
         **_safety_fields(),
     }
     try:
-        write_json_atomic(receipt_path, receipt)
+        write_json_immutable(receipt_path, receipt)
         receipt_digest = hashlib.sha256(read_regular_bytes(receipt_path) or b"").hexdigest()
         pointer = {
             "contract_version": OFFICIAL_MACRO_CONTRACT_VERSION,
@@ -628,13 +756,15 @@ def _finish_attempt(
             "receipt_sha256": receipt_digest,
             "snapshot_path": str(snapshot_path) if snapshot_path else None,
             "snapshot_sha256": snapshot_sha256,
+            "snapshot_status": snapshot_status,
+            "source_coverage_sha256": source_coverage_sha256,
             "provider_call_count": provider_calls,
             "event_count": event_count,
             **_safety_fields(),
         }
         state_dir = base / OFFICIAL_MACRO_STATE_DIRNAME
         write_json_atomic(state_dir / OFFICIAL_MACRO_LATEST_ATTEMPT_FILENAME, pointer)
-        if status == "complete":
+        if status in {"complete", "partial"}:
             success_pointer = dict(pointer)
             success_pointer["row_type"] = "official_macro_calendar_success_pointer"
             write_json_atomic(
@@ -656,6 +786,7 @@ def _finish_attempt(
             snapshot_path=snapshot_path,
             receipt_path=receipt_path,
             snapshot_sha256=snapshot_sha256,
+            source_coverage_sha256=source_coverage_sha256,
         )
     return OfficialMacroOperationResult(
         status=status,
@@ -672,6 +803,7 @@ def _finish_attempt(
         snapshot_path=snapshot_path,
         receipt_path=receipt_path,
         snapshot_sha256=snapshot_sha256,
+        source_coverage_sha256=source_coverage_sha256,
     )
 
 
@@ -680,6 +812,9 @@ def _snapshot_payload(
     events: Sequence[Mapping[str, Any]],
     observed_at: datetime,
     acquisition_mode: str,
+    snapshot_status: str,
+    source_coverage: Sequence[Mapping[str, Any]],
+    source_coverage_sha256: str,
 ) -> dict[str, Any]:
     live = acquisition_mode == "live_provider"
     return {
@@ -690,8 +825,68 @@ def _snapshot_payload(
         ),
         "data_acquisition_mode": acquisition_mode,
         "source_provider": "official_us_macro",
+        "snapshot_status": snapshot_status,
+        "source_coverage": [dict(row) for row in source_coverage],
+        "source_coverage_sha256": source_coverage_sha256,
         "events": [dict(row) for row in events],
     }
+
+
+def _source_coverage_projection(
+    source_results: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    fields = (
+        "source",
+        "status",
+        "request_attempted",
+        "http_status",
+        "content_type",
+        "size_bytes",
+        "sha256",
+        "raw_filename",
+        "source_rows_seen",
+        "accepted_rows",
+        "rejected_rows",
+        "failure_class",
+    )
+    return tuple({field: row.get(field) for field in fields} for row in source_results)
+
+
+def _source_coverage_sha256(rows: Sequence[Mapping[str, Any]]) -> str:
+    encoded = json.dumps(
+        [dict(row) for row in rows],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _sources_with_status(
+    rows: Sequence[Mapping[str, Any]], statuses: frozenset[str]
+) -> list[str]:
+    return [
+        str(row.get("source"))
+        for row in rows
+        if str(row.get("status")) in statuses
+    ]
+
+
+def _sources_without_status(
+    rows: Sequence[Mapping[str, Any]], statuses: frozenset[str]
+) -> list[str]:
+    return [
+        str(row.get("source"))
+        for row in rows
+        if str(row.get("status")) not in statuses
+    ]
+
+
+def _first_unobserved_source(
+    rows: Sequence[Mapping[str, Any]],
+) -> str | None:
+    values = _sources_without_status(rows, _OBSERVED_SOURCE_STATUSES)
+    return values[0] if values else None
 
 
 def _parse_source(
@@ -764,7 +959,11 @@ def _read_pointer_status(path: Path) -> str:
         if not isinstance(parsed, Mapping):
             return "invalid"
         status = str(parsed.get("status") or "").strip()
-        return status if status in {"complete", "failed"} else "invalid"
+        return (
+            status
+            if status in {"complete", "partial", "unavailable", "failed"}
+            else "invalid"
+        )
     except (MarketNoSendError, OSError, ValueError, json.JSONDecodeError):
         return "unavailable"
 
@@ -795,6 +994,8 @@ def _validate_success_pointer(pointer: Mapping[str, Any]) -> None:
         "receipt_sha256",
         "snapshot_path",
         "snapshot_sha256",
+        "snapshot_status",
+        "source_coverage_sha256",
         "provider_call_count",
         "event_count",
         *_safety_fields(),
@@ -807,18 +1008,23 @@ def _validate_success_pointer(pointer: Mapping[str, Any]) -> None:
         set(pointer) != expected_fields
         or pointer.get("contract_version") != OFFICIAL_MACRO_CONTRACT_VERSION
         or pointer.get("row_type") != "official_macro_calendar_success_pointer"
-        or pointer.get("status") != "complete"
+        or pointer.get("status") not in {"complete", "partial"}
+        or pointer.get("snapshot_status") != pointer.get("status")
         or pointer.get("reason_code") is not None
         or not re.fullmatch(
             r"official_macro_\d{8}T\d{12}Z_[0-9a-f]{12}", attempt_id
         )
         or mode not in {"live_provider", "operator_verified_export"}
-        or provider_calls != (3 if mode == "live_provider" else 0)
+        or isinstance(provider_calls, bool)
+        or not isinstance(provider_calls, int)
+        or provider_calls < 0
+        or provider_calls > (3 if mode == "live_provider" else 0)
         or isinstance(event_count, bool)
         or not isinstance(event_count, int)
-        or event_count <= 0
+        or event_count < 0
         or not _valid_sha256(pointer.get("receipt_sha256"))
         or not _valid_sha256(pointer.get("snapshot_sha256"))
+        or not _valid_sha256(pointer.get("source_coverage_sha256"))
         or _as_utc(str(pointer.get("attempted_at") or "")) is None
         or not _valid_safety_attestation(pointer)
     ):
@@ -843,6 +1049,10 @@ def _validate_success_receipt(
         "event_count",
         "snapshot_filename",
         "snapshot_sha256",
+        "snapshot_status",
+        "source_coverage_sha256",
+        "observed_sources",
+        "missing_sources",
         "all_required_sources_accepted",
         "provider_authorization_mutated",
         *_safety_fields(),
@@ -855,6 +1065,8 @@ def _validate_success_receipt(
         "provider_call_count",
         "event_count",
         "snapshot_sha256",
+        "snapshot_status",
+        "source_coverage_sha256",
     )
     source_results = receipt.get("source_results")
     if (
@@ -863,17 +1075,124 @@ def _validate_success_receipt(
         or receipt.get("row_type") != "official_macro_calendar_acquisition_receipt"
         or any(receipt.get(field) != pointer.get(field) for field in linked_fields)
         or receipt.get("reason_code") is not None
-        or receipt.get("failure_source") is not None
+        or (
+            receipt.get("failure_source") is not None
+            and receipt.get("failure_source")
+            not in {spec.name for spec in OFFICIAL_MACRO_SOURCES}
+        )
         or receipt.get("snapshot_filename") != OFFICIAL_MACRO_SNAPSHOT_FILENAME
-        or receipt.get("all_required_sources_accepted") is not True
+        or receipt.get("all_required_sources_accepted")
+        is not (pointer.get("status") == "complete")
         or receipt.get("provider_authorization_mutated") is not False
         or not isinstance(source_results, list)
         or len(source_results) != len(OFFICIAL_MACRO_SOURCES)
-        or receipt.get("provider_request_succeeded_count")
-        != receipt.get("provider_call_count")
+        or not _valid_provider_success_counts(receipt)
+        or not _valid_source_results(receipt)
         or not _valid_safety_attestation(receipt)
     ):
         raise OfficialMacroAcquisitionError("latest_success_receipt_invalid")
+
+
+def _valid_provider_success_counts(receipt: Mapping[str, Any]) -> bool:
+    calls = receipt.get("provider_call_count")
+    successes = receipt.get("provider_request_succeeded_count")
+    return (
+        isinstance(calls, int)
+        and not isinstance(calls, bool)
+        and isinstance(successes, int)
+        and not isinstance(successes, bool)
+        and 0 <= successes <= calls <= 3
+    )
+
+
+def _valid_source_results(receipt: Mapping[str, Any]) -> bool:
+    rows = receipt.get("source_results")
+    if not isinstance(rows, list) or len(rows) != len(OFFICIAL_MACRO_SOURCES):
+        return False
+    expected_fields = {
+        "source",
+        "source_url",
+        "request_attempted",
+        "http_status",
+        "content_type",
+        "size_bytes",
+        "sha256",
+        "raw_filename",
+        "status",
+        "source_rows_seen",
+        "accepted_rows",
+        "rejected_rows",
+        "failure_class",
+    }
+    mode = str(receipt.get("acquisition_mode") or "")
+    for spec, row in zip(OFFICIAL_MACRO_SOURCES, rows, strict=True):
+        if not isinstance(row, Mapping) or set(row) != expected_fields:
+            return False
+        status = str(row.get("status") or "")
+        accepted = row.get("accepted_rows")
+        rejected = row.get("rejected_rows")
+        seen = row.get("source_rows_seen")
+        if any(
+            (
+                row.get("source") != spec.name,
+                row.get("source_url") != spec.url,
+                status not in OFFICIAL_MACRO_SOURCE_STATUSES,
+                not isinstance(row.get("request_attempted"), bool),
+                row.get("request_attempted")
+                is not (mode == "live_provider" and status != "missing_configuration"),
+                isinstance(accepted, bool)
+                or not isinstance(accepted, int)
+                or accepted < 0,
+                isinstance(rejected, bool)
+                or not isinstance(rejected, int)
+                or rejected < 0,
+                seen is not None
+                and (
+                    isinstance(seen, bool)
+                    or not isinstance(seen, int)
+                    or seen < accepted
+                ),
+            )
+        ):
+            return False
+        captured = status in {"observed", "no_results", "parse_error"}
+        if captured != (
+            row.get("raw_filename") == spec.raw_filename
+            and _valid_sha256(row.get("sha256"))
+            and isinstance(row.get("size_bytes"), int)
+            and not isinstance(row.get("size_bytes"), bool)
+            and 0 < int(row.get("size_bytes") or 0) <= spec.maximum_bytes
+        ):
+            return False
+        if status == "observed" and accepted <= 0:
+            return False
+        if status == "no_results" and accepted != 0:
+            return False
+        if status in _OBSERVED_SOURCE_STATUSES:
+            if row.get("failure_class") is not None or seen is None:
+                return False
+        elif not isinstance(row.get("failure_class"), str):
+            return False
+    observed = _sources_with_status(rows, _OBSERVED_SOURCE_STATUSES)
+    missing = _sources_without_status(rows, _OBSERVED_SOURCE_STATUSES)
+    snapshot_status = str(receipt.get("snapshot_status") or "")
+    expected_status = (
+        "complete"
+        if len(observed) == len(OFFICIAL_MACRO_SOURCES)
+        else "partial"
+        if observed
+        else "unavailable"
+    )
+    return all(
+        (
+            receipt.get("observed_sources") == observed,
+            receipt.get("missing_sources") == missing,
+            snapshot_status == expected_status,
+            receipt.get("status") == expected_status,
+            receipt.get("source_coverage_sha256")
+            == _source_coverage_sha256(_source_coverage_projection(rows)),
+        )
+    )
 
 
 def _verify_source_artifacts(
@@ -882,19 +1201,11 @@ def _verify_source_artifacts(
     rows = receipt.get("source_results")
     if not isinstance(rows, list):
         raise OfficialMacroAcquisitionError("latest_success_source_receipts_invalid")
-    mode = str(receipt.get("acquisition_mode") or "")
     for spec, row in zip(OFFICIAL_MACRO_SOURCES, rows, strict=True):
-        if (
-            not isinstance(row, Mapping)
-            or row.get("source") != spec.name
-            or row.get("source_url") != spec.url
-            or row.get("raw_filename") != spec.raw_filename
-            or row.get("status") != "accepted"
-            or not isinstance(row.get("request_attempted"), bool)
-            or row.get("request_attempted") is not (mode == "live_provider")
-            or not _valid_sha256(row.get("sha256"))
-        ):
+        if not isinstance(row, Mapping):
             raise OfficialMacroAcquisitionError("latest_success_source_receipts_invalid")
+        if row.get("status") not in {"observed", "no_results", "parse_error"}:
+            continue
         body = read_regular_bytes(attempt_dir / spec.raw_filename)
         if body is None or hashlib.sha256(body).hexdigest() != row.get("sha256"):
             raise OfficialMacroAcquisitionError("latest_success_source_digest_mismatch")
@@ -920,6 +1231,9 @@ def _validate_success_snapshot(
             "source_mode",
             "data_acquisition_mode",
             "source_provider",
+            "snapshot_status",
+            "source_coverage",
+            "source_coverage_sha256",
             "events",
         }
         or snapshot.get("contract_version") != CALENDAR_SNAPSHOT_CONTRACT_VERSION
@@ -927,10 +1241,54 @@ def _validate_success_snapshot(
         or snapshot.get("source_mode") != expected_source_mode
         or snapshot.get("data_acquisition_mode") != mode
         or snapshot.get("source_provider") != "official_us_macro"
+        or snapshot.get("snapshot_status") != pointer.get("snapshot_status")
+        or snapshot.get("source_coverage_sha256")
+        != pointer.get("source_coverage_sha256")
+        or not _valid_source_coverage_rows(snapshot.get("source_coverage"))
+        or _source_coverage_sha256(snapshot.get("source_coverage") or ())
+        != snapshot.get("source_coverage_sha256")
         or not isinstance(events, list)
         or len(events) != pointer.get("event_count")
     ):
         raise OfficialMacroAcquisitionError("latest_success_snapshot_invalid")
+
+
+def _valid_source_coverage_rows(value: Any) -> bool:
+    if not isinstance(value, list) or len(value) != len(OFFICIAL_MACRO_SOURCES):
+        return False
+    fields = {
+        "source",
+        "status",
+        "request_attempted",
+        "http_status",
+        "content_type",
+        "size_bytes",
+        "sha256",
+        "raw_filename",
+        "source_rows_seen",
+        "accepted_rows",
+        "rejected_rows",
+        "failure_class",
+    }
+    statuses: list[str] = []
+    for spec, row in zip(OFFICIAL_MACRO_SOURCES, value, strict=True):
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != fields
+            or row.get("source") != spec.name
+            or row.get("status") not in OFFICIAL_MACRO_SOURCE_STATUSES
+        ):
+            return False
+        statuses.append(str(row.get("status")))
+    observed = sum(status in _OBSERVED_SOURCE_STATUSES for status in statuses)
+    expected_status = (
+        "complete"
+        if observed == len(OFFICIAL_MACRO_SOURCES)
+        else "partial"
+        if observed
+        else "unavailable"
+    )
+    return expected_status in OFFICIAL_MACRO_SNAPSHOT_STATUSES
 
 
 def _valid_safety_attestation(row: Mapping[str, Any]) -> bool:
@@ -955,6 +1313,7 @@ def _blocked_result(
     mode: str,
     reason: str,
     failure_source: str | None = None,
+    source_results: Sequence[Mapping[str, Any]] = (),
 ) -> OfficialMacroOperationResult:
     return OfficialMacroOperationResult(
         status="blocked",
@@ -962,7 +1321,28 @@ def _blocked_result(
         attempted_at=attempted.isoformat(),
         reason_code=reason,
         failure_source=failure_source,
+        source_results=tuple(dict(row) for row in source_results),
     )
+
+
+def _missing_configuration_source_result(
+    spec: OfficialMacroSourceSpec,
+) -> dict[str, Any]:
+    return {
+        "source": spec.name,
+        "source_url": spec.url,
+        "request_attempted": False,
+        "http_status": None,
+        "content_type": None,
+        "size_bytes": None,
+        "sha256": None,
+        "raw_filename": None,
+        "status": "missing_configuration",
+        "source_rows_seen": None,
+        "accepted_rows": 0,
+        "rejected_rows": 0,
+        "failure_class": "source_configuration_missing",
+    }
 
 
 def _safety_fields() -> dict[str, Any]:
@@ -1033,9 +1413,9 @@ def _parser() -> argparse.ArgumentParser:
         "--output-base", default=str(DEFAULT_OFFICIAL_MACRO_BASE)
     )
     local_import.add_argument("--observed-at", required=True)
-    local_import.add_argument("--federal-reserve-html", required=True)
-    local_import.add_argument("--bls-ics", required=True)
-    local_import.add_argument("--bea-json", required=True)
+    local_import.add_argument("--federal-reserve-html")
+    local_import.add_argument("--bls-ics")
+    local_import.add_argument("--bea-json")
     return parser
 
 
@@ -1048,7 +1428,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         status_ok = result.ready
     elif args.command == "acquire":
         result = acquire_official_macro_calendar(output_base=args.output_base)
-        status_ok = result.complete
+        status_ok = result.usable
     else:
         result = import_official_macro_calendar(
             federal_reserve_html=args.federal_reserve_html,
@@ -1057,7 +1437,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_base=args.output_base,
             observed_at=args.observed_at,
         )
-        status_ok = result.complete
+        status_ok = result.usable
     json.dump(result.to_dict(), sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
     return 0 if status_ok else 2
@@ -1072,6 +1452,8 @@ __all__ = (
     "OFFICIAL_MACRO_CONTACT_ENV",
     "OFFICIAL_MACRO_LIVE_AUTH_ENV",
     "OFFICIAL_MACRO_SOURCES",
+    "OFFICIAL_MACRO_SOURCE_STATUSES",
+    "OFFICIAL_MACRO_SNAPSHOT_STATUSES",
     "OfficialMacroAcquisitionError",
     "OfficialMacroHTTPResponse",
     "OfficialMacroOperationResult",

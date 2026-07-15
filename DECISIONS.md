@@ -16,9 +16,97 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Close Daily Operations publication with phase-specific receipts
+**Status:** accepted
+**Decision:** Daily Operations v1.1 preserves the immutable prepublication
+attempt audit, writes an immutable `published` receipt only after strict-clean
+exact pointer publication, and writes an immutable `dashboard_restarted`
+operations receipt only after the owned dashboard is running and terminal
+success is journaled. All receipts bind namespace/run/revision, operator-state
+digest, artifact fingerprints, doctor result, and pointer digest. Campaign and
+dashboard history must show attempt, publication, operations, and current
+authority as separate facts; a managed current generation with missing or
+contradictory final evidence is blocked. Legacy reconciliation is an explicit
+no-provider/no-restart command limited to one exact prior successful terminal
+cycle and is never automatic from readiness. Revalidating an unchanged
+authority is byte-idempotent for the pointer. Reconciliation may restore an
+older receipt-bound pointer only when every authority field is unchanged and
+the sole drift is the pre-v1.1 readiness refresh of `authority_checked_at`;
+broader pointer drift remains blocked.
+
+The owned dashboard may bootstrap from an exact current pointer after the
+final publication receipt exists but before the operations receipt exists;
+every GET/HEAD remains 503-closed during that narrow transition. Daily
+Operations writes and validates the operations receipt, then requires a
+successful HTTP probe bound to exact namespace/run/revision/operator headers and
+the same positive owned PID before reporting terminal success. Pointer publish,
+rollback, invalidation, and reconciliation share one descriptor-anchored
+mutation transaction, so an artifact-root pathname replacement cannot redirect
+pointer I/O. Rollback restores only the exact saved bytes whose mapping and
+digest match the prior immutable publication receipt. Any later failed terminal
+row for the same cycle invalidates the earlier success receipt.
+
+Authorization at the last cycle is historical. Current authorization and
+provider-call eligibility come only from a bounded credential-free readiness
+receipt that expires after 15 minutes; dashboard GET/HEAD never inspect the
+environment. Readiness/status may refresh only that receipt and make no provider
+call. Expiry guidance appears only when maintenance is disabled, cadence is
+eligible, and authority is within 90 minutes of expiry; it prints the exact safe
+readiness and confirmation-gated install/disable commands but executes nothing.
+The LaunchAgent remains prepared/disabled until `CONFIRM=1 make
+radar-daily-ops-install`; the application never creates authorization or embeds
+credentials in the service.
+**Why:** A prepublication audit cannot truthfully prove later publication or
+restart, and historical authorization cannot safely stand in for current
+permission. Separating these clocks and phases removes contradictory operator
+truth without weakening rollback, provider, or installation boundaries.
+**Revisit when:** Pointer publication is replaced by a transactional external
+store, the authorization receipt source changes, or dashboard ownership moves
+outside the exact local service contract.
+
+## 2026-07-15 - Accept attested partial official macro coverage
+**Status:** accepted
+**Decision:** Fed, BLS, and BEA acquisition are independent. Each source reports
+`observed`, `no_results`, `unavailable`, `missing_configuration`, `parse_error`,
+or `rate_limited`; accepted bytes are immutable and fingerprinted. A snapshot is
+`complete`, `partial`, or `unavailable`, and a complete or partial snapshot may
+be latest success after pointer/receipt/snapshot/coverage/raw-source
+re-attestation. Local no-network import may supply any genuine source subset
+with its real acquisition time. Unavailable zero-row coverage is never called
+“no events,” an unavailable attempt never replaces prior success, and unlinked
+macro events remain context/risk only without directional bias.
+**Why:** Discarding valid official rows because one independent publisher is
+unavailable creates less truthful calendar coverage than preserving an exact,
+visible partial snapshot.
+**Revisit when:** A source becomes transactionally coupled to another source or
+partial coverage cannot be represented without ambiguous event identity.
+
+## 2026-07-15 - Bound artifact-heavy verification without deleting history
+**Status:** accepted
+**Decision:** Unrelated fixture tests use isolated temporary artifact bases;
+an explicit call-site `base_dir` takes precedence over the suite-wide isolation
+environment so deliberate fixture/shipped-artifact tests stay exact;
+project-health source/AST work is process-memoized; cumulative operational roots
+are not recursively scanned. `test-full`/`verify-fast` emit cumulative per-file
+timings, and the focused extracted-checkout project-health guard has a five-
+second default budget. The full same-machine extracted-checkout `verify-fast`
+review budget is an observational 360 seconds rather than a hard CI timeout; a
+run beyond that or more than 25% over the latest comparable baseline requires
+investigation. Retention reporting is metadata-only and bounded to 128
+namespaces plus 128 direct entries per namespace, with no research payload reads
+beyond the bounded namespace-status control marker and no compaction or
+deletion. A truncated namespace inventory is a blocker. Candidates are advisory
+until a separate retention policy and explicit operator authorization exist.
+**Why:** Release verification must stay reproducible when research artifacts
+grow, but performance is not permission to weaken integrity gates or erase
+canonical audit history.
+**Revisit when:** A versioned retention policy is approved, operational history
+moves to an indexed store, or supported reference hardware cannot meet the
+focused guard for a demonstrated non-regression reason.
+
 ## 2026-07-15 - Keep Daily Operations prepared but explicitly opt-in
 **Status:** accepted
-**Decision:** Daily Operations v1 is the only supported recurring Decision
+**Decision:** Daily Operations v1.1 is the only supported recurring Decision
 Radar freshness maintainer. Every possible market call is preceded by readiness,
 uses the enforced campaign reservation, and is limited to one already-authorized
 CoinGecko no-send attempt in a unique namespace. Complete operator state and a
@@ -36,7 +124,7 @@ pointer, no-send, or research-only boundaries.
 publication contract changes; re-review the coordinator before reinstalling.
 
 ## 2026-07-15 - Trust official macro calendars only through attested source packs
-**Status:** accepted
+**Status:** superseded
 **Decision:** The first official live calendar producer covers Federal Reserve
 FOMC dates, BLS CPI/employment releases, and BEA PCE/GDP releases. Live calls are
 off by default and require existing explicit authorization plus an honest BLS
@@ -50,6 +138,9 @@ and provenance survive into the exact generation without fixture laundering or
 invented directional meaning.
 **Revisit when:** A crypto unlock, exchange, or protocol calendar has an equally
 authoritative, bounded, provenance-preserving source contract.
+**Superseded by:** `Accept attested partial official macro coverage` above; the
+source authenticity and timing requirements remain, but all-required packing no
+longer discards independently valid official evidence.
 
 ## 2026-07-15 - Keep execution quality venue-neutral and private phone access preferred
 **Status:** accepted

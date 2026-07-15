@@ -114,27 +114,47 @@
         ]
       },
       "official_us_macro_acquisition": {
-        "all_required_sources": [
+        "sources": [
           "federal_reserve_fomc",
           "bls_cpi_and_employment",
           "bea_pce_and_gdp"
         ],
+        "accepted_source_bytes_immutable_and_fingerprinted": true,
         "direct_fixture_test_mock_replay_import_rejected": true,
         "failed_attempt_preserves_latest_success": true,
+        "independent_source_statuses": [
+          "observed",
+          "no_results",
+          "unavailable",
+          "missing_configuration",
+          "parse_error",
+          "rate_limited"
+        ],
         "live_authorization_env": "RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE",
         "live_calls_by_default": 0,
         "local_import_requires_explicit_acquisition_time": true,
-        "local_import_requires_three_operator_source_files": true,
+        "local_import_accepts_explicit_genuine_source_subset": true,
         "maximum_requests_per_source_per_attempt": 1,
+        "one_source_failure_discards_valid_sources": false,
+        "partial_snapshot_may_be_latest_success": true,
         "redirects_allowed": false,
+        "snapshot_statuses": [
+          "complete",
+          "partial",
+          "unavailable"
+        ],
+        "source_coverage_digest_required": true,
         "source_timezones_preserved": true,
         "successful_snapshot_attestation": [
           "closed latest-success pointer",
           "receipt SHA-256",
           "snapshot SHA-256",
-          "each raw-source SHA-256"
+          "source-coverage SHA-256",
+          "each accepted raw-source SHA-256"
         ],
-        "tentative_fomc_time_invented": false
+        "tentative_fomc_time_invented": false,
+        "unavailable_zero_rows_mean_no_events": false,
+        "unlinked_macro_event_creates_directional_bias": false
       },
       "preserved_fields": [
         "calendar_event_id",
@@ -158,7 +178,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-14T22:19:18+00:00",
+  "generated_at": "2026-07-15T02:36:25+00:00",
   "market_provenance_contract": {
     "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
@@ -382,6 +402,7 @@
     "reports": [
       "authoritative and non-authoritative generations",
       "provider-failed and blocked attempts",
+      "attempt audit publication operations and current-authority states",
       "route counts",
       "feature and time maturity",
       "next eligible observation time and command",
@@ -390,6 +411,21 @@
     ]
   },
   "daily_operations": {
+    "authorization_truth": {
+      "current_receipt_ttl_seconds": 900,
+      "dashboard_environment_inspection": false,
+      "historical_fields": [
+        "authorization_at_last_cycle",
+        "authorization_checked_at_last_cycle"
+      ],
+      "persisted_current_fields": [
+        "current_authorization_status",
+        "current_authorization_checked_at",
+        "current_provider_call_eligibility"
+      ],
+      "readiness_or_status_provider_calls": 0,
+      "stale_current_receipt_behavior": "current authorization becomes unknown"
+    },
     "confirmation_required_for_install_or_uninstall": true,
     "cycle_journal_statuses": [
       "attempted",
@@ -398,10 +434,66 @@
       "succeeded",
       "failed"
     ],
-    "dashboard_restart": "only exact owned job after successful publication",
+    "dashboard_restart": "exact owned job may bootstrap after publication receipt; GET and HEAD remain 503 until operations receipt and an exact-authority stable-PID HTTP probe",
     "enabled_by_default": false,
     "failed_authority_policy": "restore previous pointer or invalidate only failed new pointer",
+    "final_publication_contract": {
+      "campaign_fields": [
+        "attempt_audit_status",
+        "publication_status",
+        "operations_status",
+        "currently_authoritative"
+      ],
+      "contradictory_final_state": "strict doctor and dashboard blocker",
+      "legacy_audit_status": "compatibility alias of publication_status",
+      "operations_receipt": {
+        "artifact": "event_radar_dashboard_operations_receipt.json",
+        "status": "dashboard_restarted"
+      },
+      "prepublication_attempt_audit": "event_market_no_send_prepublication_audit.json",
+      "publication_receipt": {
+        "artifact": "event_radar_publication_receipt.json",
+        "status": "published"
+      },
+      "later_terminal_failure": "a later failed terminal row for the same cycle invalidates the earlier success receipt",
+      "pointer_mutation": "descriptor-anchored transaction across publish rollback invalidation and legacy repair; artifact-root pathname replacement cannot redirect pointer IO",
+      "post_operations_probe": "bounded trusted HTTP 200 with exact namespace run revision and operator-digest headers plus the same positive owned PID before and after",
+      "startup_transition": "publication receipt required; current research remains 503 until operations receipt",
+      "receipt_bindings": [
+        "artifact_namespace",
+        "run_id",
+        "revision",
+        "operator_state_sha256",
+        "artifact_fingerprints_sha256",
+        "doctor_result_sha256",
+        "pointer_sha256",
+        "prepublication_audit_sha256_on_publication_receipt"
+      ]
+    },
+    "legacy_reconciliation": {
+      "automatic_from_readiness": false,
+      "command": "make radar-daily-ops-reconcile-publication PYTHON=.venv/bin/python",
+      "dashboard_restarts": 0,
+      "historical_pointer_repair": "authority_checked_at_only_after_all_other_receipt_bound_authority_fields_match",
+      "pointer_revalidation": "byte_idempotent_for_unchanged_authority",
+      "provider_calls": 0,
+      "requires_exact_current_pointer": true,
+      "requires_unique_successful_terminal_cycle_with_published_pointer_and_owned_restart": true
+    },
     "maximum_market_provider_calls_per_eligible_cycle": 1,
+    "near_expiry_guidance": {
+      "automatic_action": false,
+      "install_command": "CONFIRM=1 make radar-daily-ops-install PYTHON=.venv/bin/python",
+      "manual_readiness_command": "make radar-daily-ops-readiness PYTHON=.venv/bin/python",
+      "maximum_seconds_to_expiry": 5400,
+      "requires_cadence_eligible": true,
+      "requires_scheduler_disabled": true,
+      "rollback_command": "CONFIRM=1 make radar-daily-ops-uninstall PYTHON=.venv/bin/python",
+      "surfaces": [
+        "Today",
+        "System Health"
+      ]
+    },
     "post_attempt_cadence_recomputed_without_provider_call": true,
     "publication_requires_complete_operator_state_and_strict_doctor": true,
     "readiness_precedes_provider_boundary": true,
@@ -416,7 +508,9 @@
     "unique_immutable_namespace_per_attempt": true
   },
   "execution_quality_readiness": {
+    "authorization_boundary": "static readiness only until operator selects venue and instrument mode",
     "final_live_adapter_implemented": false,
+    "next_safe_command": "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
     "operator_venue_required": true,
     "provider_calls": 0,
     "reports": [
@@ -426,7 +520,43 @@
       "request limits",
       "spread depth and price-impact metrics"
     ],
+    "rollback_disable_command": "none; no venue or adapter is active",
     "selected_venue": null
+  },
+  "artifact_heavy_verification": {
+    "artifact_retention_report": {
+      "artifact_payloads_read": 0,
+      "compaction_performed": false,
+      "control_metadata_files_read_maximum": 128,
+      "deletion_performed": false,
+      "direct_entry_scan_limit_per_namespace": 128,
+      "namespace_scan_limit": 128,
+      "namespace_scan_truncated": "blocker",
+      "recursive_scan": false,
+      "retention_policy_authorized": false
+    },
+    "focused_guard": {
+      "default_max_seconds": 5.0,
+      "release_sequence": "run in extracted source-with-artifacts checkout immediately before verify-fast",
+      "target": "test-artifact-heavy-extracted-checkout",
+      "timing_reports": [
+        ".pytest_cache/artifact_heavy_extracted_checkout_timing.json",
+        ".pytest_cache/artifact_heavy_extracted_checkout_timing.md"
+      ]
+    },
+    "full_extracted_verify_fast_review_budget": {
+      "hard_ci_wall_clock_gate": false,
+      "investigate_if_seconds_exceed": 360,
+      "investigate_same_machine_regression_percent_over_latest_comparable_baseline": 25,
+      "maximum_observational_seconds": 360
+    },
+    "project_health_source_and_ast_process_memoized": true,
+    "retain_timing_report_pairs_as_release_evidence": true,
+    "tests_use_isolated_artifact_bases_unless_testing_shipped_artifacts": true,
+    "verify_fast_file_timing_reports": [
+      ".pytest_cache/test_file_timing_report.json",
+      ".pytest_cache/test_file_timing_report.md"
+    ]
   },
   "market_context_lineage": {
     "canonical_fields": [
@@ -445,6 +575,46 @@
     ],
     "downstream_re_evaluation": false,
     "lineage_drift": "doctor blocker"
+  },
+  "operator_decisions": {
+    "daily_operations_installation": {
+      "authorization_boundary": "requires explicit CONFIRM=1 and never embeds provider authorization",
+      "current_status": "prepared_disabled",
+      "expected_provider_activity": "readiness none; eligible installed cycle at most one already-authorized CoinGecko request",
+      "implication": "without installation the operator maintains freshness manually",
+      "next_safe_command": "make radar-daily-ops-readiness PYTHON=.venv/bin/python",
+      "rollback_disable_command": "CONFIRM=1 make radar-daily-ops-uninstall PYTHON=.venv/bin/python"
+    },
+    "execution_venue_and_spread_provider": {
+      "authorization_boundary": "operator must select venue and instrument mode before adapter design",
+      "current_status": "not_selected",
+      "expected_provider_activity": "none",
+      "implication": "spread remains unavailable and cannot qualify actionable or rapid routes",
+      "next_safe_command": "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
+      "rollback_disable_command": "none; no venue or adapter is active"
+    },
+    "official_calendar_acquisition": {
+      "authorization_boundary": "acquire requires already-present RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE=1; BLS also needs an honest contact",
+      "current_status": "not_authorized",
+      "expected_provider_activity": "readiness none; authorized acquire at most one request per configured source",
+      "implication": "calendar remains not configured unless genuine local source exports are imported",
+      "next_safe_command": "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
+      "rollback_disable_command": "none; the program never creates authorization or installs a service"
+    },
+    "phone_access": {
+      "authorization_boundary": "private or public enable requires its exact CONFIRM=1 command",
+      "current_status": "disabled",
+      "expected_provider_activity": "no market provider calls",
+      "implication": "dashboard remains loopback-only",
+      "next_safe_commands": [
+        "make radar-dashboard-phone-readiness PYTHON=.venv/bin/python",
+        "make radar-dashboard-public-readiness PYTHON=.venv/bin/python"
+      ],
+      "rollback_disable_commands": [
+        "CONFIRM=1 make radar-dashboard-phone-disable PYTHON=.venv/bin/python",
+        "CONFIRM=1 make radar-dashboard-public-disable PYTHON=.venv/bin/python"
+      ]
+    }
   },
   "origins": {
     "contributing": [

@@ -158,7 +158,7 @@ def test_bls_parser_preserves_london_source_timezone() -> None:
     }
 
 
-def test_bls_canceled_or_malformed_required_series_does_not_count_as_present() -> None:
+def test_bls_canceled_series_does_not_hide_other_observed_results() -> None:
     payload = _ics(
         _event(
             "cpi-canceled@bls.gov",
@@ -172,8 +172,15 @@ def test_bls_canceled_or_malformed_required_series_does_not_count_as_present() -
             ";TZID=America/New_York:20260807T083000",
         ),
     )
-    with pytest.raises(OfficialMacroParseError, match="bls_required_series_missing:cpi"):
-        parse_bls_release_calendar_ics(payload, acquired_at=ACQUIRED_AT)
+    result = parse_bls_release_calendar_ics(payload, acquired_at=ACQUIRED_AT)
+    assert len(result.rows) == 1
+    assert result.rows[0]["event_kind"] == "employment"
+
+
+def test_bls_valid_empty_calendar_is_an_explicit_no_results_source() -> None:
+    result = parse_bls_release_calendar_ics(_ics(), acquired_at=ACQUIRED_AT)
+    assert result.rows == ()
+    assert result.source_rows_seen == 0
 
 
 def test_bls_conflicting_duplicate_uid_fails_closed() -> None:
@@ -294,3 +301,4 @@ def test_complete_pack_merge_is_deterministic_and_requires_every_source() -> Non
     assert all(row["no_send"] is True for row in merged)
     with pytest.raises(OfficialMacroParseError, match="official_source_missing:bea"):
         merge_official_macro_sources(sources[:2])
+    assert len(merge_official_macro_sources(sources[:2], require_all=False)) == 7

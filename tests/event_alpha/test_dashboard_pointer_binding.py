@@ -9,12 +9,14 @@ import shutil
 
 import pytest
 
+from crypto_rsi_scanner.event_alpha.dashboard import app as dashboard_app
 from crypto_rsi_scanner.event_alpha.dashboard.app import (
     DashboardGenerationBinding,
     RadarDashboardApp,
 )
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
     CURRENT_NAMESPACE_POINTER,
+    DashboardReadinessError,
     publish_current_namespace_pointer,
     read_current_namespace_pointer,
 )
@@ -152,6 +154,41 @@ def test_pointer_bound_head_revalidates_pointer_and_returns_empty_503_body(tmp_p
 
     assert status == "503 Service Unavailable"
     assert body == ""
+
+
+def test_pointer_bound_get_and_head_revalidate_publication_receipts(
+    tmp_path,
+    monkeypatch,
+):
+    _base, app = _bound_app(tmp_path)
+    contract = {"valid": True, "calls": 0}
+
+    def require_contract(_base, _snapshot, *, require_current):
+        contract["calls"] += 1
+        assert require_current is True
+        if not contract["valid"]:
+            raise DashboardReadinessError(
+                "dashboard final publication contract is invalid "
+                "(current_authority_missing_operations_receipt)"
+            )
+
+    monkeypatch.setattr(
+        dashboard_app,
+        "_require_daily_operations_publication_contract",
+        require_contract,
+    )
+    assert _request(app)[0] == "200 OK"
+    assert _request(app, method="HEAD") == ("200 OK", "")
+    assert contract["calls"] == 2
+
+    contract["valid"] = False
+    status, body = _request(app)
+    head_status, head_body = _request(app, method="HEAD")
+
+    assert status == "503 Service Unavailable"
+    assert "current_authority_missing_operations_receipt" in body
+    assert "Research idea, not a trade instruction" not in body
+    assert (head_status, head_body) == ("503 Service Unavailable", "")
 
 
 def test_pointer_authority_timestamp_only_refresh_remains_allowed_and_read_only(tmp_path):

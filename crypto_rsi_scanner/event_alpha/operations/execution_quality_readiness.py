@@ -147,6 +147,13 @@ class _ExecutionQualityReadiness:
     feasible_venues: tuple[ExecutionVenueCapability, ...]
     required_snapshot_fields: tuple[str, ...]
     selection_blockers: tuple[str, ...]
+    operator_decision: str
+    implications: tuple[str, ...]
+    next_safe_command: str
+    authorization_boundary: str
+    expected_provider_activity: str
+    rollback_disable_command: str
+    spread_provider_status: str
     provider_call_planned: bool
     provider_call_attempted: bool
     live_adapter_activated: bool
@@ -166,6 +173,13 @@ class _ExecutionQualityReadiness:
             "feasible_venues": [row.to_dict() for row in self.feasible_venues],
             "required_snapshot_fields": list(self.required_snapshot_fields),
             "selection_blockers": list(self.selection_blockers),
+            "operator_decision": self.operator_decision,
+            "implications": list(self.implications),
+            "next_safe_command": self.next_safe_command,
+            "authorization_boundary": self.authorization_boundary,
+            "expected_provider_activity": self.expected_provider_activity,
+            "rollback_disable_command": self.rollback_disable_command,
+            "spread_provider_status": self.spread_provider_status,
             "provider_call_planned": self.provider_call_planned,
             "provider_call_attempted": self.provider_call_attempted,
             "live_adapter_activated": self.live_adapter_activated,
@@ -354,6 +368,21 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "intended_execution_mode_not_selected",
             "no_live_execution_quality_adapter_implemented",
         ),
+        operator_decision="select_execution_venue_and_instrument_mode",
+        implications=(
+            "venue_selection_defines_the_relevant_spread_depth_and_impact_surface",
+            "public_market_data_access_does_not_imply_trading_eligibility",
+            "selection_will_require_a_separate_read_only_adapter_review",
+        ),
+        next_safe_command=(
+            "make radar-execution-quality-readiness PYTHON=.venv/bin/python"
+        ),
+        authorization_boundary=(
+            "this_report_neither_selects_nor_authorizes_a_venue_provider_or_order_path"
+        ),
+        expected_provider_activity="none_static_readiness_only",
+        rollback_disable_command="none_required_no_adapter_or_provider_is_active",
+        spread_provider_status="not_selected",
         provider_call_planned=False,
         provider_call_attempted=False,
         live_adapter_activated=False,
@@ -375,6 +404,12 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         "provider_call_planned=false provider_call_attempted=false",
         "credentials_read=false network_called=false writes_performed=false",
         "research_only=true",
+        f"operator_decision={result.operator_decision}",
+        f"next_safe_command={result.next_safe_command}",
+        f"authorization_boundary={result.authorization_boundary}",
+        f"expected_provider_activity={result.expected_provider_activity}",
+        f"rollback_disable_command={result.rollback_disable_command}",
+        f"spread_provider_status={result.spread_provider_status}",
         "",
         "Feasible candidates (not selected or activated):",
     ]

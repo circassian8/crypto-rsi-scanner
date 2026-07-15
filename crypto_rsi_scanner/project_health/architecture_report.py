@@ -18,9 +18,11 @@ from typing import Any, Mapping
 
 from . import baseline
 from . import api_inventory
+from . import artifact_retention
 from . import release_report
 from . import transitional_file_check
 from . import size_gates
+from . import source_cache
 from . import architecture_contract
 from .architecture_report_contract import (
     LARGE_EVENT_ALPHA_SPLIT_PATHS,
@@ -37,7 +39,6 @@ from .architecture_report_contract import (
 )
 from ..event_alpha import shims as event_alpha_shims
 from ..event_alpha.doctor import check_registry
-from ..event_alpha.namespace import lifecycle as namespace_lifecycle
 
 def repo_root_from_module() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -45,8 +46,7 @@ def repo_root_from_module() -> Path:
 def _line_count(path: Path) -> int | None:
     if not path.exists():
         return None
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        return sum(1 for _ in handle)
+    return source_cache.source_line_count(path)
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
@@ -86,7 +86,7 @@ def _scanner_bind_scanner_globals_call_sites(root: Path) -> int:
     for path in (root / "crypto_rsi_scanner" / "cli").glob("*.py"):
         if path.name == "_scanner_bindings.py":
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = source_cache.source_text(path) or ""
         total += len(re.findall(r"\bbind_scanner_globals\(", text))
     return total
 
@@ -96,7 +96,7 @@ def _cli_service_bind_scanner_globals_call_sites(root: Path) -> int:
     if not service_dir.exists():
         return total
     for path in sorted(service_dir.glob("*.py")):
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = source_cache.source_text(path) or ""
         for line in text.splitlines():
             if line.lstrip().startswith("def bind_scanner_globals"):
                 continue
@@ -116,9 +116,8 @@ def _scanner_command_body_functions(root: Path) -> list[str]:
     path = root / "crypto_rsi_scanner" / "scanner.py"
     if not path.exists():
         return []
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=path.as_posix())
-    except SyntaxError:
+    tree = source_cache.source_ast(path)
+    if tree is None:
         return []
     prefixes = ("event_alpha_", "event_", "paper_", "backtest_", "export_", "refresh_", "run_")
     names = [
@@ -142,9 +141,8 @@ def _function_line_count(root: Path, relative_path: str, function_name: str) -> 
     path = root / relative_path
     if not path.exists():
         return None
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=path.as_posix())
-    except SyntaxError:
+    tree = source_cache.source_ast(path)
+    if tree is None:
         return None
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == function_name and node.end_lineno:
@@ -159,7 +157,7 @@ def _doctor_plugin_check_counts(root: Path) -> dict[str, int]:
     for path in sorted(checks_dir.glob("*.py")):
         if path.name.startswith("_") or path.name == "__init__.py":
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = source_cache.source_text(path) or ""
         registry_messages = len(re.findall(r"check_registry\.format_check_message\(", text))
         exported_apply_functions = len(re.findall(r"(?m)^def apply_(?!checks\()[a-zA-Z0-9_]*\(", text))
         generic_apply = len(re.findall(r"(?m)^def apply_checks\(", text))
@@ -246,16 +244,26 @@ def _doctor_api_unregistered_details() -> list[dict[str, str]]:
     ]
 
 def _namespace_inventory(root: Path) -> dict[str, Any]:
-    registry = namespace_lifecycle.build_namespace_registry(root / "event_fade_cache")
+    registry = artifact_retention.build_bounded_retention_report(
+        root / "event_fade_cache",
+        display_base_dir="event_fade_cache",
+    )
     rows = registry.get("namespaces") if isinstance(registry, dict) else []
     if not isinstance(rows, list):
         rows = []
-    unknown = [row for row in rows if isinstance(row, dict) and row.get("status") == namespace_lifecycle.STATUS_UNKNOWN]
+    unknown = [row for row in rows if isinstance(row, dict) and row.get("status") == "unknown"]
+    truncated = bool(registry.get("namespace_scan_truncated"))
+    unknown_namespaces = [str(row.get("namespace")) for row in unknown if isinstance(row, dict)]
+    if truncated:
+        unknown_namespaces.append("<namespace-scan-truncated>")
     return {
         "namespace_count": int(registry.get("namespace_count") or 0),
+        "namespace_count_exact": bool(registry.get("namespace_count_exact")),
+        "namespace_scan_truncated": truncated,
         "status_counts": registry.get("status_counts", {}),
-        "unknown_namespace_count": len(unknown),
-        "unknown_namespaces": [str(row.get("namespace")) for row in unknown if isinstance(row, dict)],
+        "unknown_namespace_count": len(unknown_namespaces),
+        "unknown_namespaces": unknown_namespaces,
+        "retention_report": registry,
     }
 
 def _ci_static_safety(root: Path) -> dict[str, Any]:
@@ -270,7 +278,7 @@ def _ci_static_safety(root: Path) -> dict[str, Any]:
     )
     secret_like = re.compile(r"(api[_-]?key|telegram[_-]?bot[_-]?token|secret)\s*:\s*[\"'][^\"']{8,}", re.IGNORECASE)
     for path in sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml")):
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = source_cache.source_text(path) or ""
         rel = path.relative_to(root).as_posix()
         for needle in forbidden:
             if needle in text:
@@ -614,6 +622,11 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "oversized_classes_are_accepted": "pass" if int(final_report.get("remaining_class_ownership_debt_count") or 0) == 0 else "blocked",
         "unresolved_multi_class_modules_zero": "pass" if int(final_report.get("unresolved_multi_class_modules_count") or 0) == 0 else "blocked",
         "doctor_registry_api_unregistered_zero": "pass" if int(final_report.get("api_unregistered") or 0) == 0 else "blocked",
+        "namespace_inventory_complete": (
+            "pass"
+            if final_report.get("namespace_lifecycle_inventory", {}).get("namespace_count_exact") is True
+            else "blocked"
+        ),
         "namespace_unknown_zero": "pass" if int(final_report.get("unknown_namespace_count") or 0) == 0 else "blocked",
         "shim_dependency_status_ok": "pass" if int(final_report.get("old_path_import_allowed_exceptions") or 0) == 0 else "blocked",
         "transitional_file_status_ok": "pass" if final_report.get("transitional_file_status") == "OK" else "blocked",

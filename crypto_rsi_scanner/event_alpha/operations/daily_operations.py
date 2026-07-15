@@ -23,23 +23,24 @@ from typing import Any, Callable, Iterator, Mapping, Sequence
 from ... import config
 from ..dashboard.readiness import (
     CURRENT_NAMESPACE_POINTER,
-    DashboardReadinessError,
-    publish_current_namespace_pointer,
-    read_current_namespace_pointer,
+    _publish_prepublication_namespace_pointer,
 )
 from . import (
+    daily_operations_current_status,
+    daily_operations_pointer,
     daily_operations_service,
+    daily_operations_publication,
     market_no_send,
     market_no_send_attempt,
     market_no_send_calendar,
     market_no_send_campaign_guard,
+    market_observation_campaign,
     official_macro_calendar,
 )
 from .market_no_send_io import (
     _open_verified_namespace_dir,
     read_json_object,
     read_jsonl,
-    remove_regular_artifact,
     write_json_atomic,
     write_jsonl,
 )
@@ -133,6 +134,9 @@ class _DailyOperationsCycleResult:
 DailyOperationsCycleResult = _DailyOperationsCycleResult
 
 
+_CurrentPointerSnapshot = daily_operations_pointer.CurrentPointerSnapshot
+
+
 def _default_strict_doctor(base: Path, namespace: str) -> None:
     namespace_dir = base / namespace
     python = str(Path(sys.executable).expanduser().absolute())
@@ -178,42 +182,113 @@ def _default_audit(
         namespace,
         result=result,
     )
+    daily_operations_publication.seal_prepublication_audit(base, namespace)
 
 
-def _default_current_namespace(base: Path) -> str | None:
+def _default_publication_receipt(
+    base: Path,
+    namespace: str,
+    cycle_id: str,
+) -> Mapping[str, Any]:
+    return daily_operations_publication.write_publication_receipt(
+        base,
+        namespace,
+        cycle_id=cycle_id,
+    )
+
+
+def _default_operations_receipt(
+    base: Path,
+    namespace: str,
+    cycle_id: str,
+    dashboard: daily_operations_service.DashboardOwnership,
+) -> Mapping[str, Any]:
+    return daily_operations_publication.write_operations_receipt(
+        base,
+        namespace,
+        cycle_id=cycle_id,
+        dashboard=dashboard,
+    )
+
+
+def _default_validate_final_publication(
+    base: Path,
+    namespace: str,
+) -> None:
+    validation = daily_operations_publication.validate_final_publication_contract(
+        base,
+        namespace,
+        require_current=True,
+        require_operations=True,
+    )
+    if not validation.valid:
+        raise DailyOperationsError(validation.errors[0])
+
+
+def _default_refresh_campaign_report(base: Path) -> None:
+    output_dir = daily_operations_service.repository_root() / "research"
+    market_observation_campaign.write_campaign_report(
+        base,
+        output_dir,
+        evaluated_at=datetime.now(timezone.utc),
+    )
+
+
+def _default_persist_current_status(
+    base: Path,
+    readiness: DailyOperationsReadiness,
+) -> None:
+    daily_operations_current_status.persist_current_status(base, readiness)
+
+
+def _default_current_namespace(base: Path) -> _CurrentPointerSnapshot | None:
     try:
-        pointer = read_current_namespace_pointer(base)
-    except DashboardReadinessError:
-        return None
-    return str(pointer["artifact_namespace"])
+        return daily_operations_pointer.current_namespace(base)
+    except daily_operations_pointer.DailyOperationsPointerError as exc:
+        raise DailyOperationsError("current_pointer_unavailable") from exc
 
 
-def _default_rollback(base: Path, namespace: str) -> bool:
-    try:
-        publish_current_namespace_pointer(base, namespace)
-    except DashboardReadinessError:
-        return False
-    return True
+def _default_rollback(
+    base: Path,
+    failed_namespace: str,
+    previous_pointer: _CurrentPointerSnapshot | str,
+) -> bool:
+    return daily_operations_pointer.rollback(
+        base,
+        failed_namespace,
+        previous_pointer,
+    )
 
 
 def _default_invalidate_pointer(base: Path, namespace: str) -> bool:
-    """Remove only a pointer that still names the failed new authority."""
+    return daily_operations_pointer.invalidate(base, namespace)
 
-    try:
-        pointer = read_current_namespace_pointer(base)
-    except DashboardReadinessError:
-        return True
-    if pointer.get("artifact_namespace") != namespace:
-        return True
-    try:
-        remove_regular_artifact(base / CURRENT_NAMESPACE_POINTER)
-    except Exception:
-        return False
-    try:
-        read_current_namespace_pointer(base)
-    except DashboardReadinessError:
-        return True
-    return False
+
+def _default_publish(
+    base: Path,
+    namespace: str,
+    previous_pointer: _CurrentPointerSnapshot | str | None,
+) -> Any:
+    if previous_pointer is not None and not isinstance(
+        previous_pointer,
+        _CurrentPointerSnapshot,
+    ):
+        raise DailyOperationsError("current_pointer_unavailable")
+    expected = previous_pointer.sha256 if previous_pointer is not None else None
+
+    def publisher(root: Path, name: str, **kwargs: Any) -> Any:
+        return _publish_prepublication_namespace_pointer(
+            root,
+            name,
+            expected_current_pointer_sha256=expected,
+            **kwargs,
+        )
+
+    return market_no_send.publish_market_no_send_generation(
+        base,
+        namespace,
+        publisher=publisher,
+    )
 
 
 @dataclass(frozen=True)
@@ -232,13 +307,33 @@ class _DailyOperationsDependencies:
     )
     record_boundary_failure: Callable[..., Path] = market_no_send_attempt.record_boundary_failure
     write_audit: Callable[[Path, str, MarketNoSendGenerationResult], None] = _default_audit
+    write_publication_receipt: Callable[[Path, str, str], Mapping[str, Any]] = (
+        _default_publication_receipt
+    )
+    write_operations_receipt: Callable[
+        [Path, str, str, daily_operations_service.DashboardOwnership],
+        Mapping[str, Any],
+    ] = _default_operations_receipt
+    validate_final_publication: Callable[[Path, str], None] = (
+        _default_validate_final_publication
+    )
+    refresh_campaign_report: Callable[[Path], None] = _default_refresh_campaign_report
+    persist_current_status: Callable[[Path, DailyOperationsReadiness], None] = (
+        _default_persist_current_status
+    )
     generation_status: Callable[[Path, str], dict[str, Any]] = (
         market_no_send.market_no_send_generation_status
     )
     strict_doctor: Callable[[Path, str], None] = _default_strict_doctor
-    publish: Callable[[Path, str], Any] = market_no_send.publish_market_no_send_generation
-    current_namespace: Callable[[Path], str | None] = _default_current_namespace
-    rollback: Callable[[Path, str], bool] = _default_rollback
+    publish: Callable[
+        [Path, str, _CurrentPointerSnapshot | str | None], Any
+    ] = _default_publish
+    current_namespace: Callable[
+        [Path], _CurrentPointerSnapshot | str | None
+    ] = _default_current_namespace
+    rollback: Callable[
+        [Path, str, _CurrentPointerSnapshot | str], bool
+    ] = _default_rollback
     invalidate_pointer: Callable[[Path, str], bool] = _default_invalidate_pointer
     resolve_calendar_snapshot: Callable[[str | Path], Path | None] = (
         official_macro_calendar.resolve_latest_official_macro_snapshot
@@ -250,6 +345,10 @@ class _DailyOperationsDependencies:
         daily_operations_service.inspect_dashboard_ownership
     )
     restart_dashboard: Callable[..., bool] = daily_operations_service.restart_owned_dashboard
+    wait_dashboard_process: Callable[..., daily_operations_service.DashboardOwnership] = (
+        daily_operations_service.wait_for_owned_dashboard_process
+    )
+    probe_dashboard: Callable[..., bool] = daily_operations_service.probe_owned_dashboard
     scheduler_health: Callable[..., daily_operations_service.SchedulerHealth] = (
         daily_operations_service.inspect_scheduler_health
     )
@@ -358,6 +457,7 @@ def run_daily_operations_cycle(
                 checked_at=checked.isoformat(),
             )
             _record_terminal(base, result, readiness=None, attempted_observation_at=None)
+            deps.refresh_campaign_report(base)
             return result
         _append_cycle_row(
             base,
@@ -385,6 +485,7 @@ def run_daily_operations_cycle(
                     cycle_id, namespace, "failed", "readiness_failed", checked.isoformat()
                 ),
                 readiness=None,
+                dependencies=deps,
             )
         if not readiness.ready:
             return _finish(
@@ -397,6 +498,7 @@ def run_daily_operations_cycle(
                     readiness.checked_at,
                 ),
                 readiness=readiness,
+                dependencies=deps,
             )
         return _execute_ready_cycle(
             base=base,
@@ -419,7 +521,21 @@ def _execute_ready_cycle(
     fetch_limit: int | None,
     dependencies: DailyOperationsDependencies,
 ) -> DailyOperationsCycleResult:
-    previous_namespace = dependencies.current_namespace(base)
+    try:
+        previous_pointer = dependencies.current_namespace(base)
+    except Exception:
+        return _finish(
+            base,
+            DailyOperationsCycleResult(
+                cycle_id,
+                namespace,
+                "failed",
+                "current_pointer_unavailable",
+                readiness.checked_at,
+            ),
+            readiness=readiness,
+            dependencies=dependencies,
+        )
     attempted_at = _as_utc(dependencies.now()).isoformat()
     try:
         generation_environ = _generation_environ(base, dependencies)
@@ -434,6 +550,7 @@ def _execute_ready_cycle(
                 readiness.checked_at,
             ),
             readiness=readiness,
+            dependencies=dependencies,
         )
     try:
         generation = dependencies.run_generation(
@@ -477,6 +594,7 @@ def _execute_ready_cycle(
             ),
             readiness=readiness,
             attempted_observation_at=attempted_at,
+            dependencies=dependencies,
         )
     if not generation.complete:
         if generation.provider_call_attempted:
@@ -501,6 +619,7 @@ def _execute_ready_cycle(
             ),
             readiness=readiness,
             attempted_observation_at=attempted_at,
+            dependencies=dependencies,
         )
     cadence_refreshed = True
     if generation.provider_call_attempted:
@@ -526,6 +645,7 @@ def _execute_ready_cycle(
             ),
             readiness=readiness,
             attempted_observation_at=attempted_at,
+            dependencies=dependencies,
         )
     return _publish_complete_generation(
         base=base,
@@ -533,7 +653,7 @@ def _execute_ready_cycle(
         cycle_id=cycle_id,
         readiness=readiness,
         attempted_at=attempted_at,
-        previous_namespace=previous_namespace,
+        previous_pointer=previous_pointer,
         generation=generation,
         dependencies=dependencies,
     )
@@ -620,7 +740,7 @@ def _publish_complete_generation(
     cycle_id: str,
     readiness: DailyOperationsReadiness,
     attempted_at: str,
-    previous_namespace: str | None,
+    previous_pointer: _CurrentPointerSnapshot | str | None,
     generation: MarketNoSendGenerationResult,
     dependencies: DailyOperationsDependencies,
 ) -> DailyOperationsCycleResult:
@@ -645,58 +765,95 @@ def _publish_complete_generation(
             **common,
         )
         return _finish(
-            base, result, readiness=readiness, attempted_observation_at=attempted_at
-        )
-    try:
-        dependencies.publish(base, namespace)
-    except Exception:
-        rolled_back, invalidated = _contain_failed_authority(
-            base=base,
-            failed_namespace=namespace,
-            previous_namespace=previous_namespace,
+            base,
+            result,
+            readiness=readiness,
+            attempted_observation_at=attempted_at,
             dependencies=dependencies,
         )
-        if not rolled_back and not invalidated:
-            raise DailyOperationsError("authority_containment_failed")
-        result = DailyOperationsCycleResult(
-            cycle_id,
-            namespace,
-            "failed",
-            "publication_failed",
-            readiness.checked_at,
-            pointer_rolled_back=rolled_back,
-            pointer_invalidated=invalidated,
-            **common,
+    try:
+        dependencies.publish(base, namespace, previous_pointer)
+    except Exception:
+        return _finish_contained_failure(
+            base,
+            namespace=namespace,
+            cycle_id=cycle_id,
+            reason="publication_failed",
+            readiness=readiness,
+            attempted_at=attempted_at,
+            previous_pointer=previous_pointer,
+            common=common,
+            dependencies=dependencies,
         )
-        return _finish(
-            base, result, readiness=readiness, attempted_observation_at=attempted_at
+    try:
+        dependencies.write_publication_receipt(base, namespace, cycle_id)
+    except Exception:
+        return _finish_contained_failure(
+            base,
+            namespace=namespace,
+            cycle_id=cycle_id,
+            reason="publication_receipt_failed",
+            readiness=readiness,
+            attempted_at=attempted_at,
+            previous_pointer=previous_pointer,
+            common=common,
+            dependencies=dependencies,
         )
     try:
         dashboard_restarted = dependencies.restart_dashboard(artifact_base=base)
     except Exception:  # noqa: BLE001 - fail closed without exposing command output
         dashboard_restarted = False
-    if not dashboard_restarted:
-        rolled_back, invalidated = _contain_failed_authority(
-            base=base,
-            failed_namespace=namespace,
-            previous_namespace=previous_namespace,
+    try:
+        dashboard = (
+            dependencies.wait_dashboard_process(artifact_base=base)
+            if dashboard_restarted
+            else None
+        )
+    except Exception:  # noqa: BLE001 - ownership failure is stage-coded below
+        dashboard = None
+    if not (
+        dashboard_restarted and dashboard is not None and dashboard.owned and dashboard.running
+    ):
+        return _finish_contained_failure(
+            base,
+            namespace=namespace,
+            cycle_id=cycle_id,
+            reason="dashboard_restart_failed",
+            readiness=readiness,
+            attempted_at=attempted_at,
+            previous_pointer=previous_pointer,
+            common=common,
             dependencies=dependencies,
         )
-        if not rolled_back and not invalidated:
-            raise DailyOperationsError("authority_containment_failed")
-        result = DailyOperationsCycleResult(
-            cycle_id,
-            namespace,
-            "failed",
-            "dashboard_restart_failed",
-            readiness.checked_at,
-            pointer_rolled_back=rolled_back,
-            pointer_invalidated=invalidated,
-            **common,
-        )
-        return _finish(
-            base, result, readiness=readiness, attempted_observation_at=attempted_at
-        )
+    return _finalize_published_generation(
+        base=base,
+        namespace=namespace,
+        cycle_id=cycle_id,
+        readiness=readiness,
+        attempted_at=attempted_at,
+        previous_pointer=previous_pointer,
+        generation_run_id=generation.run_id,
+        dashboard=dashboard,
+        common=common,
+        dependencies=dependencies,
+    )
+
+
+def _finalize_published_generation(
+    *,
+    base: Path,
+    namespace: str,
+    cycle_id: str,
+    readiness: DailyOperationsReadiness,
+    attempted_at: str,
+    previous_pointer: _CurrentPointerSnapshot | str | None,
+    generation_run_id: object,
+    dashboard: daily_operations_service.DashboardOwnership,
+    common: Mapping[str, Any],
+    dependencies: DailyOperationsDependencies,
+) -> DailyOperationsCycleResult:
+    """Close terminal state, operations evidence, and the exact HTTP probe."""
+
     result = DailyOperationsCycleResult(
         cycle_id,
         namespace,
@@ -707,15 +864,44 @@ def _publish_complete_generation(
         dashboard_restarted=True,
         **common,
     )
+    stage = "postpublication_state_failed"
     try:
-        return _finish(
-            base, result, readiness=readiness, attempted_observation_at=attempted_at
+        _record_terminal(
+            base,
+            result,
+            readiness=readiness,
+            attempted_observation_at=attempted_at,
         )
+        dependencies.persist_current_status(base, readiness)
+        stage = "operations_receipt_failed"
+        operations_receipt = dependencies.write_operations_receipt(
+            base,
+            namespace,
+            cycle_id,
+            dashboard,
+        )
+        probe_identity = _operations_receipt_probe_identity(
+            operations_receipt,
+            namespace=namespace,
+            cycle_id=cycle_id,
+            generation_run_id=generation_run_id,
+        )
+        stage = "final_publication_contract_failed"
+        dependencies.validate_final_publication(base, namespace)
+        stage = "dashboard_postreceipt_probe_failed"
+        if not dependencies.probe_dashboard(
+            artifact_base=base,
+            **probe_identity,
+        ):
+            raise DailyOperationsError(stage)
+        stage = "campaign_report_refresh_failed"
+        dependencies.refresh_campaign_report(base)
+        return result
     except Exception as exc:
         rolled_back, invalidated = _contain_failed_authority(
             base=base,
             failed_namespace=namespace,
-            previous_namespace=previous_namespace,
+            previous_pointer=previous_pointer,
             dependencies=dependencies,
         )
         if not rolled_back and not invalidated:
@@ -724,7 +910,7 @@ def _publish_complete_generation(
             cycle_id,
             namespace,
             "failed",
-            "postpublication_state_failed",
+            stage,
             readiness.checked_at,
             pointer_rolled_back=rolled_back,
             pointer_invalidated=invalidated,
@@ -736,28 +922,115 @@ def _publish_complete_generation(
                 failed,
                 readiness=readiness,
                 attempted_observation_at=attempted_at,
+                dependencies=dependencies,
             )
         except Exception as terminal_exc:
-            raise DailyOperationsError("postpublication_state_failed") from terminal_exc
+            raise DailyOperationsError(stage) from terminal_exc
+
+
+def _operations_receipt_probe_identity(
+    receipt: Mapping[str, Any],
+    *,
+    namespace: str,
+    cycle_id: str,
+    generation_run_id: object,
+) -> dict[str, object]:
+    """Extract one exact, closed dashboard identity or fail the receipt stage."""
+
+    run_id = receipt.get("run_id")
+    revision = receipt.get("revision")
+    digest = receipt.get("operator_state_sha256")
+    if (
+        receipt.get("status") != "dashboard_restarted"
+        or receipt.get("artifact_namespace") != namespace
+        or receipt.get("cycle_id") != cycle_id
+        or not isinstance(generation_run_id, str)
+        or not generation_run_id
+        or run_id != generation_run_id
+        or not isinstance(run_id, str)
+        or not run_id
+        or len(run_id) > 512
+        or not all(32 <= ord(character) < 127 for character in run_id)
+        or not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or revision < 1
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or not all(character in "0123456789abcdef" for character in digest)
+    ):
+        raise DailyOperationsError("operations_receipt_failed")
+    return {
+        "expected_namespace": namespace,
+        "expected_run_id": run_id,
+        "expected_revision": revision,
+        "expected_operator_state_sha256": digest,
+    }
+
+
+def _finish_contained_failure(
+    base: Path,
+    *,
+    namespace: str,
+    cycle_id: str,
+    reason: str,
+    readiness: DailyOperationsReadiness,
+    attempted_at: str,
+    previous_pointer: _CurrentPointerSnapshot | str | None,
+    common: Mapping[str, bool],
+    dependencies: DailyOperationsDependencies,
+) -> DailyOperationsCycleResult:
+    rolled_back, invalidated = _contain_failed_authority(
+        base=base,
+        failed_namespace=namespace,
+        previous_pointer=previous_pointer,
+        dependencies=dependencies,
+    )
+    if not rolled_back and not invalidated:
+        raise DailyOperationsError("authority_containment_failed")
+    result = DailyOperationsCycleResult(
+        cycle_id,
+        namespace,
+        "failed",
+        reason,
+        readiness.checked_at,
+        pointer_rolled_back=rolled_back,
+        pointer_invalidated=invalidated,
+        **common,
+    )
+    return _finish(
+        base,
+        result,
+        readiness=readiness,
+        attempted_observation_at=attempted_at,
+        dependencies=dependencies,
+    )
 
 
 def _contain_failed_authority(
     *,
     base: Path,
     failed_namespace: str,
-    previous_namespace: str | None,
+    previous_pointer: _CurrentPointerSnapshot | str | None,
     dependencies: DailyOperationsDependencies,
 ) -> tuple[bool, bool]:
-    rolled_back = bool(
-        previous_namespace and dependencies.rollback(base, previous_namespace)
-    )
+    try:
+        rolled_back = bool(
+            previous_pointer is not None
+            and dependencies.rollback(base, failed_namespace, previous_pointer)
+        )
+    except Exception:
+        rolled_back = False
     if rolled_back:
         try:
             dependencies.restart_dashboard(artifact_base=base)
         except Exception:  # noqa: BLE001 - the pointer is already contained
             pass
         return True, False
-    return False, dependencies.invalidate_pointer(base, failed_namespace)
+    try:
+        invalidated = dependencies.invalidate_pointer(base, failed_namespace)
+    except Exception:
+        invalidated = False
+    return False, invalidated
 
 
 def daily_operations_status(
@@ -802,6 +1075,7 @@ def _finish(
     *,
     readiness: DailyOperationsReadiness | None,
     attempted_observation_at: str | None = None,
+    dependencies: DailyOperationsDependencies,
 ) -> DailyOperationsCycleResult:
     _record_terminal(
         base,
@@ -809,6 +1083,9 @@ def _finish(
         readiness=readiness,
         attempted_observation_at=attempted_observation_at,
     )
+    if readiness is not None:
+        dependencies.persist_current_status(base, readiness)
+    dependencies.refresh_campaign_report(base)
     return result
 
 
@@ -874,6 +1151,19 @@ def _record_terminal(
             readiness.market.live_provider_authorized
             if readiness is not None
             else previous.get("live_provider_authorized", False)
+        ),
+        "authorization_at_last_cycle": (
+            readiness.market.live_provider_authorized
+            if readiness is not None
+            else previous.get(
+                "authorization_at_last_cycle",
+                previous.get("live_provider_authorized"),
+            )
+        ),
+        "authorization_checked_at_last_cycle": (
+            readiness.checked_at
+            if readiness is not None
+            else previous.get("authorization_checked_at_last_cycle")
         ),
         "provider_call_attempted": result.provider_call_attempted,
         "pointer_published": result.pointer_published,

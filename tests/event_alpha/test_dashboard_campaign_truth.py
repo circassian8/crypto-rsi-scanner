@@ -114,7 +114,7 @@ def test_missing_run_booleans_and_counts_render_as_not_recorded_or_unavailable()
     assert "<dt>Core / cards</dt><dd>Unavailable / Unavailable</dd>" in page
     assert "<dt>Direct / proxy features</dt><dd>Unavailable / Unavailable</dd>" in page
     assert (
-        '<dt>Authorization present</dt><dd><span class="status-badge '
+        '<dt>Authorization at generation</dt><dd><span class="status-badge '
         'status-badge--neutral">Not recorded</span></dd>'
     ) in page
     assert (
@@ -163,7 +163,7 @@ def test_health_contract_does_not_convert_missing_booleans_to_no() -> None:
     for label in (
         "Research only",
         "No-send enforced",
-        "Authorization present",
+        "Authorization at request",
         "Provider call attempted",
         "Request succeeded",
         "No-send",

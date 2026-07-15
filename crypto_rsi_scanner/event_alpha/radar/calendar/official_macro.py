@@ -92,9 +92,11 @@ class _OfficialMacroParsedSource:
     def __post_init__(self) -> None:
         if self.source not in OFFICIAL_MACRO_SOURCE_NAMES:
             raise ValueError("unsupported official macro source")
-        if not self.rows:
-            raise ValueError("official macro source must contain accepted rows")
-        if self.source_rows_seen < len(self.rows) or self.rejected_rows < 0:
+        if (
+            self.source_rows_seen < 0
+            or self.source_rows_seen < len(self.rows)
+            or self.rejected_rows < 0
+        ):
             raise ValueError("official macro source counters are invalid")
 
 
@@ -159,7 +161,7 @@ def parse_federal_reserve_fomc_html(
             source_timezone="America/New_York",
         )
         rows.append(row)
-    if not rows:
+    if not rows and parser.year_heading_count == 0:
         raise OfficialMacroParseError("federal_reserve_fomc_rows_missing")
     return OfficialMacroParsedSource(
         source="federal_reserve",
@@ -181,7 +183,6 @@ def parse_bls_release_calendar_ics(
     calendar_timezone = _calendar_timezone(calendar_properties)
     acquired = _aware_utc(acquired_at)
     rows: list[dict[str, Any]] = []
-    accepted_series: set[str] = set()
     uid_timings: dict[str, str] = {}
     rejected = 0
     for event in events:
@@ -257,18 +258,12 @@ def parse_bls_release_calendar_ics(
                 source_timezone=timing.source_timezone,
             )
             rows.append(row)
-            accepted_series.add(series)
         except OfficialMacroParseError as exc:
             if exc.code == "bls_uid_timing_conflict":
                 raise
             rejected += 1
-    missing = {"cpi", "employment"}.difference(accepted_series)
-    if missing:
-        raise OfficialMacroParseError(
-            "bls_required_series_missing:" + ",".join(sorted(missing))
-        )
-    if not rows:
-        raise OfficialMacroParseError("bls_calendar_rows_missing")
+    if not rows and rejected:
+        raise OfficialMacroParseError("bls_calendar_rows_invalid")
     return OfficialMacroParsedSource(
         source="bls",
         rows=_dedupe_rows(rows, source="bls"),
@@ -301,8 +296,6 @@ def parse_bea_release_dates_json(
         raw_dates = value.get("release_dates")
         if not isinstance(raw_dates, Sequence) or isinstance(raw_dates, (str, bytes)):
             raise OfficialMacroParseError(f"bea_release_dates_invalid:{slug}")
-        if not raw_dates:
-            raise OfficialMacroParseError(f"bea_release_dates_empty:{slug}")
         source_rows_seen += len(raw_dates)
         for raw in raw_dates:
             source_scheduled = _aware_datetime(raw)
@@ -342,8 +335,10 @@ def parse_bea_release_dates_json(
 
 def merge_official_macro_sources(
     sources: Iterable[OfficialMacroParsedSource],
+    *,
+    require_all: bool = True,
 ) -> tuple[dict[str, Any], ...]:
-    """Merge exactly one complete Fed/BLS/BEA pack with strict ID conflicts."""
+    """Merge observed official sources with strict IDs and optional full coverage."""
 
     by_source: dict[str, OfficialMacroParsedSource] = {}
     for source in sources:
@@ -351,13 +346,14 @@ def merge_official_macro_sources(
             raise OfficialMacroParseError(f"official_source_duplicate:{source.source}")
         by_source[source.source] = source
     missing = set(OFFICIAL_MACRO_SOURCE_NAMES).difference(by_source)
-    if missing:
+    if require_all and missing:
         raise OfficialMacroParseError(
             "official_source_missing:" + ",".join(sorted(missing))
         )
     rows = [
         row
         for name in OFFICIAL_MACRO_SOURCE_NAMES
+        if name in by_source
         for row in by_source[name].rows
     ]
     return _dedupe_rows(rows, source="official_macro_pack")
@@ -382,6 +378,7 @@ class _FomcHTMLParser(HTMLParser):
         self._date_parts: list[str] = []
         self._capture: str | None = None
         self._capture_depth: int | None = None
+        self.year_heading_count = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag.casefold() != "div":
@@ -420,6 +417,7 @@ class _FomcHTMLParser(HTMLParser):
         heading = _FOMC_HEADING_RE.search(data)
         if heading:
             self._year = int(heading.group(1))
+            self.year_heading_count += 1
         if self._capture == "month":
             self._month_parts.append(data)
         elif self._capture == "date":
@@ -484,7 +482,7 @@ def _parse_ics(
             continue
         target = current if current is not None else calendar
         target.setdefault(name, []).append(_IcsProperty(value=value, params=params))
-    if not saw_calendar or current is not None or not events:
+    if not saw_calendar or current is not None:
         raise OfficialMacroParseError("bls_ics_container_invalid")
     return calendar, tuple(events)
 
