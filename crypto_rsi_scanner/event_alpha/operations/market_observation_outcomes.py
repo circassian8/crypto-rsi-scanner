@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -18,6 +19,7 @@ from ..outcomes import outcome_eligibility
 from ..outcomes.integrated_radar_outcome_rows import _outcome_placeholder_row
 from ..outcomes.observed_outcome_builder import build_observed_outcome
 from ..radar.decision_model_surfaces import decision_model_values
+from ..radar.decision_models import decision_score_cohort_values
 from . import market_no_send_publication
 from .market_no_send_history_cache import LIVE_HISTORY_CACHE_NAMESPACE
 from .market_no_send_io import read_json_object, read_jsonl, write_jsonl
@@ -29,6 +31,18 @@ _MANIFEST = "event_market_no_send_generation.json"
 _CANDIDATES = "event_integrated_radar_candidates.jsonl"
 _CORE = "event_core_opportunities.jsonl"
 _HISTORY = "event_market_history.jsonl"
+DECISION_SCORE_COHORT_CONTRACT_VERSION = 1
+
+
+@dataclass(frozen=True)
+class CampaignLedgerOutcomeValidation:
+    """Closed validation result for one candidate-bound campaign outcome."""
+
+    valid: bool
+    reasons: tuple[str, ...]
+    score_cohort_status: str
+    score_cohort_reason: str | None
+    canonical_score_cohorts: Mapping[str, str]
 
 
 def refresh_campaign_outcomes(
@@ -124,9 +138,7 @@ def refresh_campaign_outcomes(
                 row["campaign_outcome_refresh_errors"] = list(build_errors)
                 build_error_counts.update(build_errors)
             if projection:
-                row["decision_projection"] = deepcopy(projection)
-                for key, value in projection.items():
-                    row[key] = deepcopy(value)
+                _attach_current_decision_projection(row, projection)
             if core_join_error:
                 prior_errors = row.get("campaign_outcome_refresh_errors")
                 errors = list(prior_errors) if isinstance(prior_errors, list) else []
@@ -229,6 +241,24 @@ def load_campaign_outcomes(artifact_base_dir: str | Path) -> list[dict[str, Any]
     )
 
 
+def canonical_primary_outcome_return(row: Mapping[str, Any]) -> float | None:
+    """Return one finite, internally consistent declared primary return."""
+
+    primary = row.get("primary_horizon")
+    if type(primary) is not str or primary not in outcome_eligibility.OUTCOME_HORIZONS:
+        return None
+    direct = outcome_eligibility.finite_number(row.get("primary_horizon_return"))
+    returns = row.get("return_by_horizon") or row.get("horizons")
+    mapped = (
+        outcome_eligibility.finite_number(returns.get(primary))
+        if isinstance(returns, Mapping)
+        else None
+    )
+    if direct is not None and mapped is not None and direct != mapped:
+        return None
+    return direct if direct is not None else mapped
+
+
 def candidate_pending_campaign_outcome(
     candidate: Mapping[str, Any],
     *,
@@ -266,9 +296,28 @@ def campaign_ledger_outcome_valid(
 ) -> bool:
     """Validate one mutable outcome strictly against its immutable candidate."""
 
+    return campaign_ledger_outcome_validation(
+        row,
+        candidate,
+        namespace=namespace,
+    ).valid
+
+
+def campaign_ledger_outcome_validation(
+    row: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    *,
+    namespace: str,
+) -> CampaignLedgerOutcomeValidation:
+    """Return exact validity plus explicit legacy score-cohort compatibility."""
+
     projection = _canonical_candidate_projection(candidate)
     candidate_identity = outcome_eligibility.canonical_join_identity(candidate)
     declared = row.get("calibration_ineligible_reasons")
+    score_cohort_status, score_cohort_reason, canonical_cohorts = (
+        _campaign_score_cohort_validation(row, projection)
+    )
+    reasons: list[str] = []
     if (
         not projection
         or candidate_identity is None
@@ -276,7 +325,20 @@ def campaign_ledger_outcome_valid(
         or not all(type(reason) is str for reason in declared)
         or declared != sorted(set(declared))
     ):
-        return False
+        reasons.append("campaign_outcome_base_contract_invalid")
+    if score_cohort_status == "invalid":
+        reasons.append(score_cohort_reason or "decision_score_cohort_contract_invalid")
+    if reasons:
+        return CampaignLedgerOutcomeValidation(
+            valid=False,
+            reasons=tuple(sorted(set(reasons))),
+            score_cohort_status=score_cohort_status,
+            score_cohort_reason=score_cohort_reason,
+            canonical_score_cohorts=canonical_cohorts,
+        )
+    assert projection is not None
+    assert candidate_identity is not None
+    assert isinstance(declared, list)
     scope = row.get("campaign_calibration_scope")
     authority = row.get("campaign_outcome_authority")
     expected_pair = {
@@ -296,18 +358,59 @@ def campaign_ledger_outcome_valid(
         decision_model_values(row) != projection,
         not _campaign_safety_valid(row),
     )):
-        return False
+        reasons.append("campaign_outcome_candidate_binding_invalid")
     computed = set(outcome_eligibility.calibration_ineligibility_reasons(row))
     declared_set = set(declared)
     join_only = declared_set - computed
     if not computed.issubset(declared_set) or not join_only.issubset({"unmatched_outcome_identity"}):
-        return False
+        reasons.append("campaign_outcome_calibration_reasons_invalid")
     expected_eligible = not declared_set
     if row.get("calibration_eligible") is not expected_eligible:
-        return False
+        reasons.append("campaign_outcome_calibration_flag_invalid")
     if row.get("include_in_performance") is not expected_eligible:
-        return False
-    return scope != "candidate_only_not_core_joined" or expected_eligible is False
+        reasons.append("campaign_outcome_performance_flag_invalid")
+    if scope == "candidate_only_not_core_joined" and expected_eligible is not False:
+        reasons.append("campaign_outcome_candidate_only_eligible")
+    return CampaignLedgerOutcomeValidation(
+        valid=not reasons,
+        reasons=tuple(sorted(set(reasons))),
+        score_cohort_status=score_cohort_status,
+        score_cohort_reason=score_cohort_reason,
+        canonical_score_cohorts=canonical_cohorts,
+    )
+
+
+def _campaign_score_cohort_validation(
+    row: Mapping[str, Any],
+    projection: Mapping[str, Any] | None,
+) -> tuple[str, str | None, dict[str, str]]:
+    canonical = decision_score_cohort_values(projection or {})
+    if canonical is None:
+        return "invalid", "canonical_decision_scores_invalid", {}
+    actionability = row.get("actionability_score_cohort")
+    evidence = row.get("evidence_confidence_score_cohort")
+    risk = row.get("risk_score_cohort")
+    if actionability != canonical["actionability_score_cohort"]:
+        return "invalid", "actionability_score_cohort_mismatch", canonical
+
+    contract_version = row.get("decision_score_cohort_contract_version")
+    expected_evidence = canonical["evidence_confidence_score_cohort"]
+    expected_risk = canonical["risk_score_cohort"]
+    if contract_version == DECISION_SCORE_COHORT_CONTRACT_VERSION:
+        if evidence != expected_evidence or risk != expected_risk:
+            return "invalid", "versioned_decision_score_cohort_mismatch", canonical
+        return "canonical_exact", None, canonical
+    if contract_version is not None:
+        return "invalid", "unsupported_decision_score_cohort_contract", canonical
+    if evidence is None and risk is None:
+        return (
+            "legacy_null_derived_from_canonical_scores",
+            "legacy_null_evidence_risk_cohorts_derived_from_canonical_scores",
+            canonical,
+        )
+    if evidence == expected_evidence and risk == expected_risk:
+        return "legacy_unversioned_exact", None, canonical
+    return "invalid", "legacy_decision_score_cohort_mismatch", canonical
 
 
 def _real_generation_dirs(
@@ -390,6 +493,23 @@ def _canonical_candidate_projection(
     return projection
 
 
+def _attach_current_decision_projection(
+    row: dict[str, Any],
+    projection: Mapping[str, Any],
+) -> None:
+    """Attach one current projection and its versioned canonical cohorts."""
+
+    row["decision_projection"] = deepcopy(dict(projection))
+    for key, value in projection.items():
+        row[key] = deepcopy(value)
+    score_cohorts = decision_score_cohort_values(projection)
+    if score_cohorts is not None:
+        row.update(score_cohorts)
+        row["decision_score_cohort_contract_version"] = (
+            DECISION_SCORE_COHORT_CONTRACT_VERSION
+        )
+
+
 def _matching_core_rows(
     candidate: Mapping[str, Any],
     core_rows: list[dict[str, Any]],
@@ -405,6 +525,8 @@ def _matching_core_rows(
     if len(identity_matches) != 1:
         return [], "core_authority_count_invalid"
     core = identity_matches[0]
+    if core.get("integrated_candidate_id") != candidate.get("candidate_id"):
+        return [], "core_integrated_candidate_id_mismatch"
     if not projection or decision_model_values(core) != dict(projection):
         return [], "core_decision_projection_mismatch"
     if not outcome_eligibility.valid_core_authority(core):
@@ -526,6 +648,10 @@ def _refresh_preserved_campaign_metadata(
         "campaign_outcome_authority",
         "campaign_core_opportunity_present",
         "campaign_calibration_scope",
+        "decision_score_cohort_contract_version",
+        "actionability_score_cohort",
+        "evidence_confidence_score_cohort",
+        "risk_score_cohort",
         "research_only",
         "no_send_rehearsal",
         "sent",
@@ -644,7 +770,11 @@ def _aware_time(value: datetime | str | None) -> datetime | None:
 
 __all__ = (
     "CAMPAIGN_OUTCOMES_FILENAME",
+    "CampaignLedgerOutcomeValidation",
+    "DECISION_SCORE_COHORT_CONTRACT_VERSION",
     "campaign_ledger_outcome_valid",
+    "campaign_ledger_outcome_validation",
+    "canonical_primary_outcome_return",
     "candidate_pending_campaign_outcome",
     "load_campaign_outcomes",
     "refresh_campaign_outcomes",

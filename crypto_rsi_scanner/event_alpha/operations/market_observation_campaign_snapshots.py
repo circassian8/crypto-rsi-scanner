@@ -7,14 +7,91 @@ import stat
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from ..radar.integrated import api as integrated_radar
 from . import market_no_send_publication
 from .market_no_send_io import (
     parse_jsonl_bytes,
-    read_json_object,
     read_regular_bytes,
 )
 from .market_no_send_models import MarketNoSendError
+
+
+def capture_bound_jsonl_snapshot(
+    namespace_dir: Path,
+    *,
+    manifest: Mapping[str, Any],
+    operator_state: Mapping[str, Any],
+    use_legacy_operator_binding: bool,
+    artifact: str,
+    manifest_prefix: str,
+    manifest_row_count_field: str,
+    operator_artifact_name: str,
+    expected_row_count: int,
+    snapshot_label: str,
+    require_legacy_count: bool = False,
+) -> dict[str, Any]:
+    """Capture one exact JSONL buffer and revalidate its declared binding."""
+
+    if (
+        isinstance(expected_row_count, bool)
+        or not isinstance(expected_row_count, int)
+        or expected_row_count < 0
+    ):
+        raise MarketNoSendError(f"{snapshot_label}_snapshot_row_count_invalid")
+    raw = read_regular_bytes(namespace_dir / artifact)
+    if raw is None:
+        raise MarketNoSendError(f"{snapshot_label}_snapshot_missing")
+    digest = hashlib.sha256(raw).hexdigest()
+    rows = parse_jsonl_bytes(raw)
+    if len(rows) != expected_row_count:
+        raise MarketNoSendError(f"{snapshot_label}_snapshot_row_count_mismatch")
+
+    if use_legacy_operator_binding:
+        _validate_legacy_operator_identity(
+            operator_state,
+            namespace_dir=namespace_dir,
+            manifest=manifest,
+            snapshot_label=snapshot_label,
+        )
+        binding = _mapping(
+            _mapping(operator_state.get("artifacts")).get(operator_artifact_name)
+        )
+        expected_digest = binding.get("sha256")
+        binding_source = f"legacy_operator_{snapshot_label}_binding"
+        if any((
+            binding.get("status") != "current",
+            binding.get("path") != artifact,
+            binding.get("run_id") != manifest.get("run_id"),
+            (
+                binding.get("count") != len(rows)
+                if require_legacy_count or binding.get("count") is not None
+                else False
+            ),
+            binding.get("item_count") != len(rows),
+            binding.get("size_bytes") != len(raw),
+        )):
+            raise MarketNoSendError(
+                f"{snapshot_label}_snapshot_legacy_binding_mismatch"
+            )
+    else:
+        expected_digest = manifest.get(f"{manifest_prefix}_artifact_sha256")
+        binding_source = f"manifest_{manifest_prefix}_artifact_sha256"
+        if manifest.get(f"{manifest_prefix}_artifact") != artifact:
+            raise MarketNoSendError(f"{snapshot_label}_snapshot_artifact_mismatch")
+        if manifest.get(manifest_row_count_field) != len(rows):
+            raise MarketNoSendError(
+                f"{snapshot_label}_snapshot_manifest_row_count_mismatch"
+            )
+    if not _sha256_digest(expected_digest) or expected_digest != digest:
+        raise MarketNoSendError(f"{snapshot_label}_snapshot_digest_mismatch")
+    return {
+        "artifact": artifact,
+        "sha256": digest,
+        "size_bytes": len(raw),
+        "row_count": len(rows),
+        "binding_source": binding_source,
+        "rows": tuple(dict(row) for row in rows),
+        "verified": True,
+    }
 
 
 def capture_candidate_snapshot(
@@ -22,57 +99,71 @@ def capture_candidate_snapshot(
     *,
     manifest: Mapping[str, Any],
     validation: market_no_send_publication.CampaignGenerationValidation,
-    operator_state_filename: str,
+    operator_state: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Read and bind a validated candidate artifact into one immutable snapshot."""
 
-    artifact = integrated_radar.INTEGRATED_CANDIDATES_FILENAME
-    raw = read_regular_bytes(namespace_dir / artifact)
-    if raw is None:
-        raise MarketNoSendError("candidate_snapshot_missing")
-    digest = hashlib.sha256(raw).hexdigest()
-    rows = parse_jsonl_bytes(raw)
-    if len(rows) != validation.candidate_count:
-        raise MarketNoSendError("candidate_snapshot_row_count_mismatch")
-    expected = manifest.get("candidate_artifact_sha256")
-    binding_source = "manifest_candidate_artifact_sha256"
-    if validation.legacy_adapter and expected in (None, ""):
-        operator = _read_json(namespace_dir / operator_state_filename)
-        if any((
-            operator.get("artifact_namespace") != namespace_dir.name,
-            operator.get("run_id") != manifest.get("run_id"),
-            operator.get("profile") != manifest.get("profile"),
-            operator.get("run_mode") != manifest.get("run_mode"),
-            operator.get("market_no_send_provenance")
-            != manifest.get("market_provenance"),
-        )):
-            raise MarketNoSendError(
-                "candidate_snapshot_legacy_operator_identity_mismatch"
-            )
-        binding = _mapping(
-            _mapping(operator.get("artifacts")).get("integrated_candidates")
-        )
-        expected = binding.get("sha256")
-        binding_source = "legacy_operator_candidate_binding"
-        if (
-            binding.get("status") != "current"
-            or binding.get("path") != artifact
-            or binding.get("run_id") != manifest.get("run_id")
-            or binding.get("count") != len(rows)
-            or binding.get("item_count") != len(rows)
-            or binding.get("size_bytes") != len(raw)
-        ):
-            raise MarketNoSendError("candidate_snapshot_legacy_binding_mismatch")
-    elif manifest.get("candidate_artifact") != artifact:
-        raise MarketNoSendError("candidate_snapshot_artifact_mismatch")
-    if not _sha256_digest(expected) or expected != digest:
-        raise MarketNoSendError("candidate_snapshot_digest_mismatch")
+    return capture_bound_jsonl_snapshot(
+        namespace_dir,
+        manifest=manifest,
+        operator_state=operator_state,
+        use_legacy_operator_binding=(
+            validation.legacy_adapter
+            and manifest.get("candidate_artifact_sha256") in (None, "")
+        ),
+        artifact=market_no_send_publication.INTEGRATED_CANDIDATES_FILENAME,
+        manifest_prefix="candidate",
+        manifest_row_count_field="candidate_count",
+        operator_artifact_name="integrated_candidates",
+        expected_row_count=validation.candidate_count,
+        snapshot_label="candidate",
+        require_legacy_count=True,
+    )
+
+
+def capture_generation_snapshots(
+    namespace_dir: Path,
+    *,
+    manifest: Mapping[str, Any],
+    validation: market_no_send_publication.CampaignGenerationValidation,
+    operator_state: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Capture every bound generation JSONL from one operator-state view."""
+
+    candidate = capture_candidate_snapshot(
+        namespace_dir,
+        manifest=manifest,
+        validation=validation,
+        operator_state=operator_state,
+    )
+    core = _supporting_snapshot(
+        namespace_dir,
+        manifest=manifest,
+        operator_state=operator_state,
+        use_legacy_operator_binding=validation.legacy_adapter,
+        bound=validation.core_artifact_bound,
+        expected_row_count=validation.core_artifact_row_count,
+        artifact=market_no_send_publication.CORE_OPPORTUNITIES_FILENAME,
+        manifest_prefix="core",
+        operator_artifact_name="core_opportunities",
+        snapshot_label="core",
+    )
+    integrated_outcome = _supporting_snapshot(
+        namespace_dir,
+        manifest=manifest,
+        operator_state=operator_state,
+        use_legacy_operator_binding=validation.legacy_adapter,
+        bound=validation.integrated_outcome_artifact_bound,
+        expected_row_count=validation.integrated_outcome_artifact_row_count,
+        artifact=market_no_send_publication.INTEGRATED_OUTCOMES_FILENAME,
+        manifest_prefix="integrated_outcome",
+        operator_artifact_name="integrated_outcomes",
+        snapshot_label="integrated_outcome",
+    )
     return {
-        "artifact": artifact,
-        "sha256": digest,
-        "size_bytes": len(raw),
-        "binding_source": binding_source,
-        "rows": tuple(dict(row) for row in rows),
+        "candidate": candidate,
+        "core": core,
+        "integrated_outcome": integrated_outcome,
     }
 
 
@@ -84,26 +175,32 @@ def campaign_outcome_ledger_snapshot(
 ) -> dict[str, Any]:
     """Read the mutable campaign outcome ledger into one exact byte snapshot."""
 
+    if not _safe_path_segment(history_namespace) or not _safe_path_segment(filename):
+        return _ledger_snapshot_metadata(filename=None, status="unavailable")
     path = base / history_namespace / filename
     try:
         parent = path.parent.lstat()
     except FileNotFoundError:
-        return {"rows": (), "status": "missing", "sha256": None}
+        return _ledger_snapshot_metadata(filename=filename, status="missing")
     except OSError:
-        return {"rows": (), "status": "unavailable", "sha256": None}
+        return _ledger_snapshot_metadata(filename=filename, status="unavailable")
     if not stat.S_ISDIR(parent.st_mode) or stat.S_ISLNK(parent.st_mode):
-        return {"rows": (), "status": "unavailable", "sha256": None}
+        return _ledger_snapshot_metadata(filename=filename, status="unavailable")
     try:
         raw = read_regular_bytes(path, missing_ok=True)
         if raw is None:
-            return {"rows": (), "status": "missing", "sha256": None}
+            return _ledger_snapshot_metadata(filename=filename, status="missing")
         rows = parse_jsonl_bytes(raw)
     except (MarketNoSendError, OSError, TypeError, ValueError):
-        return {"rows": (), "status": "unavailable", "sha256": None}
+        return _ledger_snapshot_metadata(filename=filename, status="unavailable")
     return {
         "rows": tuple(dict(row) for row in rows),
         "status": "observed" if rows else "observed_empty",
+        "artifact": filename,
         "sha256": hashlib.sha256(raw).hexdigest(),
+        "size_bytes": len(raw),
+        "row_count": len(rows),
+        "binding_source": "campaign_outcome_ledger_exact_bytes",
     }
 
 
@@ -122,6 +219,29 @@ def generation_candidate_rows(
     return tuple(dict(row) for row in rows)
 
 
+def private_generation_snapshot_fields(
+    snapshots: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Project exact snapshots into private report-construction fields."""
+
+    fields: dict[str, Any] = {}
+    for label in ("candidate", "core", "integrated_outcome"):
+        snapshot = _mapping(snapshots.get(label))
+        rows = snapshot.get("rows")
+        fields.update({
+            f"_{label}_snapshot_rows": tuple(
+                dict(row) for row in rows
+            ) if isinstance(rows, (list, tuple)) else (),
+            f"_{label}_snapshot_artifact": snapshot.get("artifact"),
+            f"_{label}_snapshot_sha256": snapshot.get("sha256"),
+            f"_{label}_snapshot_size_bytes": snapshot.get("size_bytes"),
+            f"_{label}_snapshot_row_count": snapshot.get("row_count"),
+            f"_{label}_snapshot_binding_source": snapshot.get("binding_source"),
+            f"_{label}_snapshot_verified": snapshot.get("verified") is True,
+        })
+    return fields
+
+
 def public_generation_rows(
     rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -131,17 +251,91 @@ def public_generation_rows(
         {
             key: value
             for key, value in row.items()
-            if not (type(key) is str and key.startswith("_candidate_snapshot_"))
+            if not (type(key) is str and key.startswith("_"))
         }
         for row in rows
     ]
 
 
-def _read_json(path: Path) -> dict[str, Any]:
-    try:
-        return read_json_object(path)
-    except (MarketNoSendError, OSError):
-        return {}
+def _supporting_snapshot(
+    namespace_dir: Path,
+    *,
+    manifest: Mapping[str, Any],
+    operator_state: Mapping[str, Any],
+    use_legacy_operator_binding: bool,
+    bound: bool,
+    expected_row_count: int,
+    artifact: str,
+    manifest_prefix: str,
+    operator_artifact_name: str,
+    snapshot_label: str,
+) -> dict[str, Any]:
+    if not bound:
+        return {
+            "artifact": artifact,
+            "sha256": None,
+            "size_bytes": None,
+            "row_count": 0,
+            "binding_source": "not_bound",
+            "rows": (),
+            "verified": False,
+        }
+    return capture_bound_jsonl_snapshot(
+        namespace_dir,
+        manifest=manifest,
+        operator_state=operator_state,
+        use_legacy_operator_binding=use_legacy_operator_binding,
+        artifact=artifact,
+        manifest_prefix=manifest_prefix,
+        manifest_row_count_field=f"{manifest_prefix}_artifact_row_count",
+        operator_artifact_name=operator_artifact_name,
+        expected_row_count=expected_row_count,
+        snapshot_label=snapshot_label,
+    )
+
+
+def _validate_legacy_operator_identity(
+    operator_state: Mapping[str, Any],
+    *,
+    namespace_dir: Path,
+    manifest: Mapping[str, Any],
+    snapshot_label: str,
+) -> None:
+    if any((
+        operator_state.get("artifact_namespace") != namespace_dir.name,
+        operator_state.get("run_id") != manifest.get("run_id"),
+        operator_state.get("profile") != manifest.get("profile"),
+        operator_state.get("run_mode") != manifest.get("run_mode"),
+        operator_state.get("market_no_send_provenance")
+        != manifest.get("market_provenance"),
+    )):
+        raise MarketNoSendError(
+            f"{snapshot_label}_snapshot_legacy_operator_identity_mismatch"
+        )
+
+
+def _ledger_snapshot_metadata(
+    *,
+    filename: str | None,
+    status: str,
+) -> dict[str, Any]:
+    return {
+        "rows": (),
+        "status": status,
+        "artifact": filename,
+        "sha256": None,
+        "size_bytes": None,
+        "row_count": 0,
+        "binding_source": "campaign_outcome_ledger_path",
+    }
+
+
+def _safe_path_segment(value: object) -> bool:
+    return (
+        type(value) is str
+        and value not in {"", ".", ".."}
+        and Path(value).name == value
+    )
 
 
 def _mapping(value: object) -> Mapping[str, Any]:
@@ -158,7 +352,10 @@ def _sha256_digest(value: object) -> bool:
 
 __all__ = (
     "campaign_outcome_ledger_snapshot",
+    "capture_bound_jsonl_snapshot",
     "capture_candidate_snapshot",
+    "capture_generation_snapshots",
     "generation_candidate_rows",
+    "private_generation_snapshot_fields",
     "public_generation_rows",
 )

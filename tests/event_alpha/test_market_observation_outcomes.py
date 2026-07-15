@@ -271,6 +271,7 @@ def test_core_join_requires_exact_candidate_decision_projection(tmp_path: Path):
     )
     assert core is not None
     core["run_id"] = f"{_OBSERVED.isoformat()}|no_key_live"
+    core["integrated_candidate_id"] = candidate["candidate_id"]
     drifted_projection = dict(projection)
     drifted_projection["radar_route"] = "dashboard_watch"
     core["decision_projection"] = drifted_projection
@@ -288,6 +289,36 @@ def test_core_join_requires_exact_candidate_decision_projection(tmp_path: Path):
     assert row["campaign_calibration_scope"] == "candidate_only_not_core_joined"
     assert row["calibration_eligible"] is False
     assert "core_decision_projection_mismatch" in row["campaign_outcome_refresh_errors"]
+
+
+def test_core_join_requires_exact_integrated_candidate_identity(tmp_path: Path):
+    candidate = _candidate()
+    projection = decision_model_values(candidate)
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=projection,
+    )
+    assert core is not None
+    core["run_id"] = f"{_OBSERVED.isoformat()}|no_key_live"
+    core["integrated_candidate_id"] = "different-candidate"
+    _write_campaign_fixture(tmp_path, candidate=candidate, core_rows=(core,))
+
+    result = market_observation_outcomes.refresh_campaign_outcomes(
+        tmp_path,
+        evaluated_at=_OBSERVED + timedelta(days=2),
+    )
+    row = market_observation_outcomes.load_campaign_outcomes(tmp_path)[0]
+
+    assert result["build_error_counts"] == {
+        "core_integrated_candidate_id_mismatch": 1
+    }
+    assert row["campaign_outcome_authority"] == "canonical_decision_candidate"
+    assert row["campaign_core_opportunity_present"] is False
+    assert row["campaign_calibration_scope"] == "candidate_only_not_core_joined"
+    assert row["calibration_eligible"] is False
+    assert "core_integrated_candidate_id_mismatch" in (
+        row["campaign_outcome_refresh_errors"]
+    )
 
 
 def test_campaign_report_rejects_mutable_ledger_projection_drift(tmp_path: Path):
@@ -323,6 +354,90 @@ def test_campaign_report_rejects_mutable_ledger_projection_drift(tmp_path: Path)
     assert metrics["matured"] == 0
     assert metrics["pending"] == 1
     assert metrics["source"] == "canonical_candidate_pending_base"
+
+
+def test_campaign_score_cohorts_are_versioned_and_legacy_null_is_explicit(
+    tmp_path: Path,
+):
+    _write_campaign_fixture(tmp_path)
+    market_observation_outcomes.refresh_campaign_outcomes(
+        tmp_path,
+        evaluated_at=_OBSERVED + timedelta(days=2),
+    )
+    row = market_observation_outcomes.load_campaign_outcomes(tmp_path)[0]
+    candidate = market_no_send_io.read_jsonl(
+        tmp_path / _NAMESPACE / "event_integrated_radar_candidates.jsonl"
+    )[0]
+
+    current = market_observation_outcomes.campaign_ledger_outcome_validation(
+        row,
+        candidate,
+        namespace=_NAMESPACE,
+    )
+    assert current.valid is True
+    assert current.score_cohort_status == "canonical_exact"
+    assert current.score_cohort_reason is None
+    assert row["decision_score_cohort_contract_version"] == 1
+    assert row["actionability_score_cohort"] == "70_84"
+    assert row["evidence_confidence_score_cohort"] == "45_64"
+    assert row["risk_score_cohort"] == "25_44"
+
+    legacy = dict(row)
+    legacy.pop("decision_score_cohort_contract_version")
+    legacy["evidence_confidence_score_cohort"] = None
+    legacy["risk_score_cohort"] = None
+    legacy_result = market_observation_outcomes.campaign_ledger_outcome_validation(
+        legacy,
+        candidate,
+        namespace=_NAMESPACE,
+    )
+    assert legacy_result.valid is True
+    assert (
+        legacy_result.score_cohort_status
+        == "legacy_null_derived_from_canonical_scores"
+    )
+    assert (
+        legacy_result.score_cohort_reason
+        == "legacy_null_evidence_risk_cohorts_derived_from_canonical_scores"
+    )
+    assert legacy_result.canonical_score_cohorts == {
+        "actionability_score_cohort": "70_84",
+        "evidence_confidence_score_cohort": "45_64",
+        "risk_score_cohort": "25_44",
+    }
+
+
+@pytest.mark.parametrize(
+    ("evidence_cohort", "risk_cohort"),
+    (("80_100", "25_44"), (None, "25_44"), ("45_64", None)),
+)
+def test_campaign_score_cohort_legacy_mismatch_fails_closed(
+    tmp_path: Path,
+    evidence_cohort: str | None,
+    risk_cohort: str | None,
+):
+    _write_campaign_fixture(tmp_path)
+    market_observation_outcomes.refresh_campaign_outcomes(
+        tmp_path,
+        evaluated_at=_OBSERVED + timedelta(days=2),
+    )
+    row = market_observation_outcomes.load_campaign_outcomes(tmp_path)[0]
+    candidate = market_no_send_io.read_jsonl(
+        tmp_path / _NAMESPACE / "event_integrated_radar_candidates.jsonl"
+    )[0]
+    row.pop("decision_score_cohort_contract_version")
+    row["evidence_confidence_score_cohort"] = evidence_cohort
+    row["risk_score_cohort"] = risk_cohort
+
+    result = market_observation_outcomes.campaign_ledger_outcome_validation(
+        row,
+        candidate,
+        namespace=_NAMESPACE,
+    )
+
+    assert result.valid is False
+    assert result.score_cohort_status == "invalid"
+    assert result.score_cohort_reason == "legacy_decision_score_cohort_mismatch"
 
 
 def test_invalid_generation_is_excluded_and_stale_mature_row_is_not_preserved(

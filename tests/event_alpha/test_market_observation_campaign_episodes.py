@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -27,6 +28,9 @@ from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
     decision_model_values,
 )
 from tests.event_alpha.campaign_test_support import write_countable_generation
+from tests.event_alpha.test_decision_episode_scorecard import (
+    _outcome as _scorecard_outcome,
+)
 
 
 _START = datetime(2026, 7, 13, 15, tzinfo=timezone.utc)
@@ -149,6 +153,10 @@ def test_campaign_report_adds_episode_shadow_without_changing_headline_counts(
     assert shadow["episodes"][0]["representative"]["artifact_namespace"] == (
         "episode_generation_a"
     )
+    scorecard = report["decision_v2_episode_outcome_scorecard"]
+    assert scorecard["representative_count"] == 1
+    assert scorecard["outcome_state_counts"]["contract_excluded"] == 1
+    assert scorecard["policy_conclusion"] == "insufficient_for_policy_change"
     assert audit["schema_id"] == (
         "event_alpha.shadow_anomaly_episode_input_audit"
     )
@@ -163,10 +171,11 @@ def test_campaign_report_adds_episode_shadow_without_changing_headline_counts(
         episode_value=shadow,
     ) == []
     assert all(
-        not key.startswith("_candidate_snapshot_")
+        not key.startswith("_")
         for group in (
             report["authoritative_generations"],
             report["non_authoritative_complete_generations"],
+            report["excluded_invalid_generations"],
         )
         for row in group
         for key in row
@@ -176,12 +185,76 @@ def test_campaign_report_adds_episode_shadow_without_changing_headline_counts(
     assert "Primary 24h episodes: `1`" in markdown
     assert "Outcome ledger status: `missing`" in markdown
     assert "Structural membership status: `ready`" in markdown
+    assert "## Decision-v2 episode outcomes (shadow)" in markdown
+    assert "Policy conclusion: `insufficient_for_policy_change`" in markdown
     assert "Duplicate outcome identities: groups=`0`, rows=`0`" in markdown
     assert (
         "Cross-candidate outcome collisions: groups=`0`, candidates=`0`, rows=`0`"
         in markdown
     )
     assert before == {path: path.read_bytes() for path in immutable_paths}
+    serialized = repr(report)
+    assert "_candidate_snapshot_" not in serialized
+    assert "_core_snapshot_" not in serialized
+    assert "_integrated_outcome_snapshot_" not in serialized
+
+
+def test_campaign_report_scores_one_exact_primary_representative(tmp_path: Path):
+    namespace = "episode_scorecard_exact"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
+    )
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=decision_model_values(candidate),
+    )
+    assert core is not None
+    core["integrated_candidate_id"] = candidate["candidate_id"]
+    evaluated = _START + timedelta(days=2)
+    outcome = _scorecard_outcome(
+        candidate,
+        core,
+        persisted_evaluated_at=evaluated,
+        primary_price=110.0,
+    )
+    write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        core_rows=[core],
+    )
+    history_dir = tmp_path / LIVE_HISTORY_CACHE_NAMESPACE
+    history_dir.mkdir()
+    market_no_send_io.write_jsonl(
+        history_dir / market_observation_outcomes.CAMPAIGN_OUTCOMES_FILENAME,
+        [outcome],
+    )
+
+    report = market_observation_campaign.build_campaign_report(
+        tmp_path,
+        evaluated_at=evaluated,
+    )
+
+    scorecard = report["decision_v2_episode_outcome_scorecard"]
+    representative = scorecard["representatives"][0]
+    assert scorecard["matured_episode_count"] == 1
+    assert scorecard["scoreable_directional_episode_count"] == 1
+    assert representative["candidate_id"] == candidate["candidate_id"]
+    assert representative["outcome_state"] == "matured"
+    assert representative["direction_alignment"] == "aligned"
+    assert representative["primary_horizon_return"] == pytest.approx(0.10)
+    assert {row["source_role"] for row in scorecard["source_artifact_bindings"]} == {
+        "candidate",
+        "core",
+        "outcome",
+    }
+    assert scorecard["provider_calls"] == scorecard["writes"] == 0
+    markdown = market_observation_campaign.format_campaign_report(report)
+    assert "| episode-token |" in markdown
+    assert "| matured | aligned | 0.10000000 |" in markdown
 
 
 def test_raw_duplicate_outcome_identity_is_explicit_before_legacy_dedup(
@@ -391,6 +464,16 @@ def test_campaign_renderer_rejects_tampered_episode_shadow(tmp_path: Path):
     ):
         market_observation_campaign.format_campaign_report(missing_audit)
 
+    tampered_scorecard = deepcopy(report)
+    tampered_scorecard["decision_v2_episode_outcome_scorecard"][
+        "matured_episode_count"
+    ] += 1
+    with pytest.raises(
+        MarketNoSendError,
+        match="decision episode scorecard report contract invalid",
+    ):
+        market_observation_campaign.format_campaign_report(tampered_scorecard)
+
 
 def test_campaign_distinguishes_observed_empty_outcome_ledger(tmp_path: Path):
     _generation(tmp_path, "episode_empty_ledger", _START)
@@ -417,12 +500,35 @@ def test_campaign_reuses_one_candidate_and_ledger_snapshot_across_surfaces(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    candidate = _generation(tmp_path, "episode_exact_snapshot", _START)
-    candidate_path = (
-        tmp_path
-        / str(candidate["artifact_namespace"])
-        / "event_integrated_radar_candidates.jsonl"
+    namespace = "episode_exact_snapshot"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
     )
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=decision_model_values(candidate),
+    )
+    assert core is not None
+    core["integrated_candidate_id"] = candidate["candidate_id"]
+    integrated_outcome = {
+        "candidate_id": candidate["candidate_id"],
+        "maturation_state": "matured",
+    }
+    manifest_path, _manifest, materialized = write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        core_rows=[core],
+        integrated_outcome_rows=[integrated_outcome],
+    )
+    candidate = materialized[0]
+    namespace_dir = manifest_path.parent
+    candidate_path = namespace_dir / "event_integrated_radar_candidates.jsonl"
+    core_path = namespace_dir / "event_core_opportunities.jsonl"
+    integrated_outcome_path = namespace_dir / "event_integrated_radar_outcomes.jsonl"
     history_dir = tmp_path / LIVE_HISTORY_CACHE_NAMESPACE
     history_dir.mkdir()
     ledger_path = (
@@ -445,7 +551,12 @@ def test_campaign_reuses_one_candidate_and_ledger_snapshot_across_surfaces(
         ],
     )
     original_read = market_observation_campaign_snapshots.read_regular_bytes
-    read_counts = {candidate_path: 0, ledger_path: 0}
+    read_counts = {
+        candidate_path: 0,
+        core_path: 0,
+        integrated_outcome_path: 0,
+        ledger_path: 0,
+    }
 
     def mutate_after_snapshot(path: Path, *, missing_ok: bool = False):
         raw = original_read(path, missing_ok=missing_ok)
@@ -466,15 +577,271 @@ def test_campaign_reuses_one_candidate_and_ledger_snapshot_across_surfaces(
     )
 
     audit = report["shadow_anomaly_episode_input_audit"]
-    assert read_counts == {candidate_path: 1, ledger_path: 1}
-    assert market_no_send_io.read_jsonl(candidate_path) == []
-    assert market_no_send_io.read_jsonl(ledger_path) == []
+    assert all(count == 1 for count in read_counts.values())
+    assert all(market_no_send_io.read_jsonl(path) == [] for path in read_counts)
     assert report["campaign_metrics"]["real_candidates"] == 1
+    generation = report["non_authoritative_complete_generations"][0]
+    assert generation["artifact_authority"] == {
+        "core_bound": True,
+        "core_row_count": 1,
+        "integrated_outcomes_bound": True,
+        "integrated_outcome_row_count": 1,
+    }
+    assert generation["outcomes"]["matured"] == 1
     assert report["outcomes"]["pending"] == 1
     assert report["shadow_anomaly_episodes"]["records_eligible"] == 1
     assert audit["raw_outcome_row_count"] == 2
     assert audit["ambiguous_outcome_join_count"] == 1
     assert audit["outcome_ledger_status"] == "observed"
+    scorecard = report["decision_v2_episode_outcome_scorecard"]
+    assert scorecard["representatives"][0]["outcome_state"] == (
+        "contract_excluded"
+    )
+    bindings = {row["source_role"]: row for row in scorecard["source_artifact_bindings"]}
+    assert bindings["candidate"]["artifact_sha256"] is not None
+    assert bindings["core"]["artifact_sha256"] is not None
+    assert bindings["outcome"]["artifact_sha256"] is not None
+
+
+def test_current_generation_snapshots_retain_exact_private_bindings(tmp_path: Path):
+    namespace = "episode_current_snapshot_bindings"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
+    )
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=decision_model_values(candidate),
+    )
+    assert core is not None
+    core["integrated_candidate_id"] = candidate["candidate_id"]
+    write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        core_rows=[core],
+        integrated_outcome_rows=[{
+            "candidate_id": candidate["candidate_id"],
+            "maturation_state": "pending",
+        }],
+    )
+
+    generations, _attempts, excluded = market_observation_campaign._load_generations(  # noqa: SLF001
+        tmp_path,
+        current_authority={},
+    )
+
+    assert excluded == []
+    generation = generations[0]
+    for label, source in (
+        ("candidate", "manifest_candidate_artifact_sha256"),
+        ("core", "manifest_core_artifact_sha256"),
+        ("integrated_outcome", "manifest_integrated_outcome_artifact_sha256"),
+    ):
+        assert generation[f"_{label}_snapshot_verified"] is True
+        assert generation[f"_{label}_snapshot_binding_source"] == source
+        assert generation[f"_{label}_snapshot_row_count"] == 1
+        assert generation[f"_{label}_snapshot_size_bytes"] > 0
+        assert len(generation[f"_{label}_snapshot_sha256"]) == 64
+        assert len(generation[f"_{label}_snapshot_rows"]) == 1
+    public = market_observation_campaign_snapshots.public_generation_rows(
+        generations
+    )
+    assert all(not key.startswith("_") for key in public[0])
+
+
+def test_legacy_support_snapshots_share_one_operator_view_and_allow_missing_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    namespace = "episode_legacy_support_snapshots"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
+    )
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=decision_model_values(candidate),
+    )
+    assert core is not None
+    core["integrated_candidate_id"] = candidate["candidate_id"]
+    manifest_path, _manifest, _rows = write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        legacy=True,
+        core_rows=[core],
+        integrated_outcome_rows=[{
+            "candidate_id": candidate["candidate_id"],
+            "maturation_state": "pending",
+        }],
+    )
+    operator_path = manifest_path.parent / market_observation_campaign.OPERATOR_STATE_FILENAME
+    operator = market_no_send_io.read_json_object(operator_path)
+    operator["artifacts"]["core_opportunities"].pop("count")
+    operator["artifacts"]["integrated_outcomes"].pop("count")
+    market_no_send_io.write_json_atomic(operator_path, operator)
+    original_read_json = market_observation_campaign._read_json  # noqa: SLF001
+    operator_reads = 0
+
+    def counted_read_json(path: Path):
+        nonlocal operator_reads
+        if path == operator_path:
+            operator_reads += 1
+        return original_read_json(path)
+
+    monkeypatch.setattr(
+        market_observation_campaign,
+        "_read_json",
+        counted_read_json,
+    )
+
+    generations, _attempts, excluded = market_observation_campaign._load_generations(  # noqa: SLF001
+        tmp_path,
+        current_authority={},
+    )
+
+    assert excluded == []
+    assert operator_reads == 1
+    generation = generations[0]
+    assert generation["_candidate_snapshot_binding_source"] == (
+        "legacy_operator_candidate_binding"
+    )
+    assert generation["_core_snapshot_binding_source"] == (
+        "legacy_operator_core_binding"
+    )
+    assert generation["_integrated_outcome_snapshot_binding_source"] == (
+        "legacy_operator_integrated_outcome_binding"
+    )
+
+
+def test_legacy_adapter_candidate_with_manifest_digest_uses_manifest_binding(
+    tmp_path: Path,
+):
+    namespace = "episode_legacy_manifest_candidate_binding"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
+    )
+    manifest_path, manifest, _rows = write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        legacy=True,
+    )
+    candidate_path = manifest_path.parent / "event_integrated_radar_candidates.jsonl"
+    manifest.update({
+        "candidate_artifact": candidate_path.name,
+        "candidate_artifact_sha256": hashlib.sha256(
+            candidate_path.read_bytes()
+        ).hexdigest(),
+    })
+    market_no_send_io.write_json_atomic(manifest_path, manifest)
+    operator_path = manifest_path.parent / market_observation_campaign.OPERATOR_STATE_FILENAME
+    operator = market_no_send_io.read_json_object(operator_path)
+    operator["artifacts"]["integrated_candidates"]["status"] = "stale"
+    market_no_send_io.write_json_atomic(operator_path, operator)
+
+    generations, _attempts, excluded = market_observation_campaign._load_generations(  # noqa: SLF001
+        tmp_path,
+        current_authority={},
+    )
+
+    assert excluded == []
+    assert generations[0]["_candidate_snapshot_binding_source"] == (
+        "manifest_candidate_artifact_sha256"
+    )
+
+
+def test_current_core_snapshot_detects_post_validation_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    namespace = "episode_current_core_snapshot_drift"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
+    )
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=decision_model_values(candidate),
+    )
+    assert core is not None
+    core["integrated_candidate_id"] = candidate["candidate_id"]
+    manifest_path, _manifest, _rows = write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        core_rows=[core],
+    )
+    core_path = manifest_path.parent / "event_core_opportunities.jsonl"
+    original_validate = (
+        market_no_send_publication.validate_countable_campaign_generation
+    )
+    mutated = False
+
+    def validate_then_mutate(*args, **kwargs):
+        nonlocal mutated
+        validation = original_validate(*args, **kwargs)
+        assert validation.valid is True
+        if not mutated:
+            market_no_send_io.write_jsonl(
+                core_path,
+                [{"core_opportunity_id": "post-validation-drift"}],
+            )
+            mutated = True
+        return validation
+
+    monkeypatch.setattr(
+        market_no_send_publication,
+        "validate_countable_campaign_generation",
+        validate_then_mutate,
+    )
+
+    report = market_observation_campaign.build_campaign_report(
+        tmp_path,
+        evaluated_at=_START + timedelta(days=2),
+    )
+
+    assert report["campaign_metrics"]["real_cycles"] == 0
+    assert report["excluded_invalid_generations"][0]["validation_errors"] == [
+        "generation_snapshot:core_snapshot_digest_mismatch"
+    ]
+
+
+def test_campaign_outcome_ledger_snapshot_exposes_exact_binding_metadata(
+    tmp_path: Path,
+):
+    history_dir = tmp_path / LIVE_HISTORY_CACHE_NAMESPACE
+    history_dir.mkdir()
+    ledger_path = (
+        history_dir / market_observation_outcomes.CAMPAIGN_OUTCOMES_FILENAME
+    )
+    market_no_send_io.write_jsonl(
+        ledger_path,
+        [{"candidate_id": "one"}, {"candidate_id": "two"}],
+    )
+
+    snapshot = market_observation_campaign_snapshots.campaign_outcome_ledger_snapshot(
+        tmp_path,
+        history_namespace=LIVE_HISTORY_CACHE_NAMESPACE,
+        filename=market_observation_outcomes.CAMPAIGN_OUTCOMES_FILENAME,
+    )
+
+    assert snapshot["artifact"] == ledger_path.name
+    assert snapshot["status"] == "observed"
+    assert snapshot["size_bytes"] == len(ledger_path.read_bytes())
+    assert snapshot["row_count"] == 2
+    assert snapshot["binding_source"] == "campaign_outcome_ledger_exact_bytes"
+    assert len(snapshot["sha256"]) == 64
 
 
 def test_post_validation_snapshot_failure_remains_explicit_in_episode_audit(
@@ -599,7 +966,7 @@ def test_legacy_snapshot_revalidates_operator_after_initial_validation(
     excluded = report["excluded_invalid_generations"]
     assert len(excluded) == 1
     assert excluded[0]["validation_errors"] == [
-        f"candidate_snapshot:{expected_error}"
+        f"generation_snapshot:{expected_error}"
     ]
     audit = report["shadow_anomaly_episode_input_audit"]
     assert audit["counted_generation_count"] == 1

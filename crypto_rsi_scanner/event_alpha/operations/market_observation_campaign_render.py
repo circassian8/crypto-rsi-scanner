@@ -99,7 +99,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "## Anomaly episodes (shadow)",
         "",
         *_episode_shadow_lines_from_report(report),
-        "",
+        *_decision_episode_scorecard_section(report),
         "## Failed and blocked attempts",
         "",
     ])
@@ -235,6 +235,84 @@ def _episode_shadow_lines(
         "- Shadow only: no route, score, threshold, provider, publication, or authority change.",
     ])
     return lines
+
+
+def _decision_episode_scorecard_lines(value: Mapping[str, Any]) -> list[str]:
+    states = _mapping(value.get("outcome_state_counts"))
+    alignments = _mapping(value.get("direction_alignment_counts"))
+    persistence = _mapping(
+        value.get("outcome_cohort_persistence_status_counts")
+    )
+    lines = [
+        "Only the frozen first member of each primary episode is evaluated; "
+        "outcome maturity never reselects a representative.",
+        f"- Status: `{_text(value.get('status'))}`",
+        f"- Episode representatives: `{_int(value.get('representative_count'))}`",
+        f"- Matured primary outcomes: `{_int(value.get('matured_episode_count'))}`",
+        f"- Scoreable directional outcomes: "
+        f"`{_int(value.get('scoreable_directional_episode_count'))}`",
+        f"- Primary outcome states: `{_counts(states)}`",
+        f"- Direction alignment: `{_counts(alignments)}`",
+        f"- Cohort persistence: `{_counts(persistence)}`",
+        f"- Exact source artifact bindings: "
+        f"`{_int(value.get('source_artifact_binding_count'))}`",
+        f"- Exact outcome validation bindings: "
+        f"`{_int(value.get('outcome_validation_binding_count'))}`",
+        f"- Policy conclusion: `{_text(value.get('policy_conclusion'))}`",
+        "- Direction comes from canonical Decision-v2 bias, not a legacy "
+        "Event Alpha lane; only the declared primary horizon may mature.",
+    ]
+    representatives = [
+        dict(row)
+        for row in value.get("representatives") or ()
+        if isinstance(row, Mapping)
+    ]
+    if not representatives:
+        return [*lines, "- No primary episode representative is available."]
+    lines.extend([
+        "",
+        "| Asset | Route | Bias | State | Alignment | Primary return (fraction) | Score cohorts A/E/R |",
+        "|---|---|---|---|---|---:|---|",
+    ])
+    for row in representatives:
+        primary_return = row.get("primary_horizon_return")
+        rendered_return = (
+            f"{float(primary_return):.8f}"
+            if type(primary_return) in (int, float)
+            else "n/a"
+        )
+        cohorts = "/".join(
+            _text(row.get(field)) or "unknown"
+            for field in (
+                "actionability_score_cohort",
+                "evidence_confidence_score_cohort",
+                "risk_score_cohort",
+            )
+        )
+        lines.append(
+            f"| {_md(row.get('canonical_asset_id'))} | "
+            f"{_md(row.get('radar_route'))} | {_md(row.get('directional_bias'))} | "
+            f"{_md(row.get('outcome_state'))} | "
+            f"{_md(row.get('direction_alignment'))} | {rendered_return} | "
+            f"{_md(cohorts)} |"
+        )
+    lines.append(
+        "- Descriptive only: no route, score, calibration, threshold, or "
+        "authority change is eligible."
+    )
+    return lines
+
+
+def _decision_episode_scorecard_section(report: Mapping[str, Any]) -> list[str]:
+    return [
+        "",
+        "## Decision-v2 episode outcomes (shadow)",
+        "",
+        *_decision_episode_scorecard_lines(
+            _mapping(report.get("decision_v2_episode_outcome_scorecard"))
+        ),
+        "",
+    ]
 
 
 def _feature_maturity_lines(value: Any) -> list[str]:

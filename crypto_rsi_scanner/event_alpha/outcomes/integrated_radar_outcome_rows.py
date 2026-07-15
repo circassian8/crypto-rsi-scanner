@@ -7,6 +7,10 @@ from typing import Any, Iterable, Mapping
 
 from ..operations import market_provenance as event_market_provenance
 from ..radar.decision_model_surfaces import decision_model_values
+from ..radar.decision_models import (
+    evidence_confidence_score_cohort,
+    risk_score_cohort,
+)
 from . import outcome_eligibility
 
 
@@ -97,10 +101,13 @@ def _outcome_placeholder_row(candidate: Mapping[str, Any], *, now: str) -> dict[
         "decision_projection": dict(decision),
         **decision,
         **market_provenance_fields,
-        "evidence_confidence_score_cohort": _score_cohort(
-            decision.get("evidence_confidence_score")
+        "evidence_confidence_score_cohort": (
+            evidence_confidence_score_cohort(
+                decision.get("evidence_confidence_score")
+            )
+            or "unknown"
         ),
-        "risk_score_cohort": _score_cohort(decision.get("risk_score")),
+        "risk_score_cohort": risk_score_cohort(decision.get("risk_score")) or "unknown",
         "preview_time": now,
         "price_at_observation": None,
         "observation_price_source": None,
@@ -148,21 +155,6 @@ def _outcome_placeholder_row(candidate: Mapping[str, Any], *, now: str) -> dict[
         outcome_eligibility.calibration_ineligibility_reasons(row)
     )
     return row
-
-
-def _score_cohort(value: Any) -> str:
-    number = outcome_eligibility.finite_number(value)
-    if number is None:
-        return "unknown"
-    if number < 25:
-        return "0_24"
-    if number < 45:
-        return "25_44"
-    if number < 65:
-        return "45_64"
-    if number < 80:
-        return "65_79"
-    return "80_100"
 
 
 def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
@@ -223,10 +215,13 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         **_calendar_evidence_values(candidate),
         "decision_projection": dict(decision),
         **decision,
-        "evidence_confidence_score_cohort": _score_cohort(
-            decision.get("evidence_confidence_score")
+        "evidence_confidence_score_cohort": (
+            evidence_confidence_score_cohort(
+                decision.get("evidence_confidence_score")
+            )
+            or "unknown"
         ),
-        "risk_score_cohort": _score_cohort(decision.get("risk_score")),
+        "risk_score_cohort": risk_score_cohort(decision.get("risk_score")) or "unknown",
         "preview_time": now,
         "price_at_observation": price,
         "observation_price_source": None,

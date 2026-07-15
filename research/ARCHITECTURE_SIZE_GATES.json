@@ -1469,6 +1469,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+      "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1467,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -1491,15 +1500,6 @@
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
       "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
       "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1453,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-      "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-      "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
       "source_kind": "production"
     },
     {
@@ -1752,7 +1752,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 942,
+  "file_count": 947,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1760,10 +1760,16 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-15T08:50:52.292718+00:00",
+  "generated_at": "2026-07-15T09:37:42.341562+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
+    {
+      "limit": 1500,
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "source_kind": "production"
+    },
     {
       "limit": 1500,
       "line_count": 1467,
@@ -1780,12 +1786,6 @@
       "limit": 1500,
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1453,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "source_kind": "production"
     },
     {
@@ -1952,6 +1952,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1180,
+      "path": "crypto_rsi_scanner/event_alpha/outcomes/decision_episode_scorecard.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1176,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py",
       "source_kind": "production"
@@ -1996,12 +2002,6 @@
       "limit": 1500,
       "line_count": 1149,
       "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1144,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     }
   ],
@@ -2111,6 +2111,12 @@
     {
       "limit": 1500,
       "line_count": 1210,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1210,
       "path": "tests/event_alpha/test_news_providers.py",
       "source_kind": "test"
     },
@@ -2122,13 +2128,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1191,
-      "path": "tests/event_alpha/test_decision_model_v2.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1109,
+      "line_count": 1192,
       "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
@@ -2178,6 +2178,12 @@
       "limit": 1500,
       "line_count": 1028,
       "path": "tests/test_indicators.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1022,
+      "path": "tests/event_alpha/test_market_observation_campaign_episodes.py",
       "source_kind": "test"
     },
     {
@@ -2238,12 +2244,6 @@
       "limit": 1500,
       "line_count": 859,
       "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 831,
-      "path": "tests/event_alpha/test_source_coverage_reports.py",
       "source_kind": "test"
     }
   ],
@@ -3699,6 +3699,13 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1467,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3715,13 +3722,6 @@
     {
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1453,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3835,6 +3835,12 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
+      "line_count": 1496,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1467,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "source_kind": "production"
@@ -3849,12 +3855,6 @@
       "limit": 1500,
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1453,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "source_kind": "production"
     },
     {
@@ -4191,6 +4191,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1496,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1467,
           "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
           "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -4213,15 +4222,6 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
           "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
           "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1453,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
           "source_kind": "production"
         },
         {
@@ -4393,6 +4393,11 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1496,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1467,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
@@ -4405,11 +4410,6 @@
       {
         "line_count": 1465,
         "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1453,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
@@ -4545,6 +4545,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1496,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1467,
             "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
             "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
@@ -4567,15 +4576,6 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
             "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
             "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1453,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
             "source_kind": "production"
           },
           {

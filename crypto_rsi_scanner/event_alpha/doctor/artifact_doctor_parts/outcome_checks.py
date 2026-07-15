@@ -13,6 +13,10 @@ from .integrated_radar_checks import (
     _structured_operator_path_conflict_count,
 )
 from ...radar.decision_model_surfaces import decision_model_values
+from ...radar.decision_models import (
+    evidence_confidence_score_cohort,
+    risk_score_cohort,
+)
 
 
 _OUTCOME_PROVENANCE_FAILURE_REASONS = frozenset({
@@ -346,9 +350,11 @@ def _integrated_outcome_conflicts(
                 row.get("actionability_score_cohort")
                 != expected.get("actionability_score_cohort")
                 or row.get("evidence_confidence_score_cohort")
-                != _decision_score_cohort(expected.get("evidence_confidence_score"))
+                != evidence_confidence_score_cohort(
+                    expected.get("evidence_confidence_score")
+                )
                 or row.get("risk_score_cohort")
-                != _decision_score_cohort(expected.get("risk_score"))
+                != risk_score_cohort(expected.get("risk_score"))
             )
             if _decision_projection_differences(matching_candidates[0], row) or cohort_mismatch:
                 out["integrated_outcome_decision_projection_mismatch"] += 1
@@ -393,21 +399,6 @@ def _integrated_outcome_identity_indexes(
             candidates_by_id[candidate_id].append(candidate)
     outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
     return candidates_by_id, outcome_by_candidate
-
-
-def _decision_score_cohort(value: Any) -> str:
-    number = _safe_float(value)
-    if number is None:
-        return "unknown"
-    if number < 25:
-        return "0_24"
-    if number < 45:
-        return "25_44"
-    if number < 65:
-        return "45_64"
-    if number < 80:
-        return "65_79"
-    return "80_100"
 
 
 def _update_outcome_eligibility_conflicts(

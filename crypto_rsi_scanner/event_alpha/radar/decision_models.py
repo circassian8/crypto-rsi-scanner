@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any, Mapping
@@ -279,10 +280,23 @@ def _runtime_float(value: object, default: object) -> float:
         return float(default)  # type: ignore[arg-type]
 
 
-def actionability_score_cohort(value: object) -> str | None:
+def _bounded_score(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         score = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
+        return None
+    if not math.isfinite(score) or not 0.0 <= score <= 100.0:
+        return None
+    return score
+
+
+def actionability_score_cohort(value: object) -> str | None:
+    """Return the canonical actionability cohort for one bounded v2 score."""
+
+    score = _bounded_score(value)
+    if score is None:
         return None
     if score >= 85:
         return "85_100"
@@ -295,9 +309,57 @@ def actionability_score_cohort(value: object) -> str | None:
     return "0_24"
 
 
+def evidence_confidence_score_cohort(value: object) -> str | None:
+    """Return the canonical evidence-confidence cohort for one v2 score."""
+
+    return _evidence_or_risk_score_cohort(value)
+
+
+def risk_score_cohort(value: object) -> str | None:
+    """Return the canonical risk cohort for one v2 score."""
+
+    return _evidence_or_risk_score_cohort(value)
+
+
+def decision_score_cohort_values(
+    values: Mapping[str, object],
+) -> dict[str, str] | None:
+    """Project all canonical score cohorts, or fail closed as one unit."""
+
+    projected = {
+        "actionability_score_cohort": actionability_score_cohort(
+            values.get("actionability_score")
+        ),
+        "evidence_confidence_score_cohort": evidence_confidence_score_cohort(
+            values.get("evidence_confidence_score")
+        ),
+        "risk_score_cohort": risk_score_cohort(values.get("risk_score")),
+    }
+    if any(value is None for value in projected.values()):
+        return None
+    return {key: str(value) for key, value in projected.items()}
+
+
+def _evidence_or_risk_score_cohort(value: object) -> str | None:
+    score = _bounded_score(value)
+    if score is None:
+        return None
+    if score >= 80:
+        return "80_100"
+    if score >= 65:
+        return "65_79"
+    if score >= 45:
+        return "45_64"
+    if score >= 25:
+        return "25_44"
+    return "0_24"
+
+
 __all__ = (
     "DECISION_MODEL_VERSION", "CatalystStatus", "ConfidenceBand", "DirectionalBias",
     "MarketPhase", "PreferredHorizon", "RadarDecision", "RadarDecisionConfig",
     "RadarResearchRoute", "SpreadStatus", "ThesisOrigin", "TimingState",
     "TradabilityStatus", "actionability_score_cohort",
+    "decision_score_cohort_values", "evidence_confidence_score_cohort",
+    "risk_score_cohort",
 )

@@ -17,6 +17,55 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Grade frozen anomaly episodes with canonical Decision-v2 outcomes · Codex
+**Why:** Fixed-window episodes made repeated detections visible, but the project
+still lacked one closed, primary-horizon scorecard that could measure the
+frozen representative without outcome-aware reselection, legacy-lane direction
+drift, or downstream Candidate/Core/outcome inconsistency.
+**Changes:**
+- Added the closed `event_alpha.decision_v2_episode_outcome_scorecard` v1 and a
+  read-once campaign adapter. The scorecard grades only the chronologically
+  first 24-hour episode member, uses the declared primary horizon and canonical
+  Decision-v2 directional bias, keeps repeats dependent, and reports exact
+  matured/not-due/due-missing/contract-excluded and alignment cohorts.
+- Captured and rebound Candidate, CoreOpportunity, integrated-outcome, and
+  campaign-ledger artifacts with exact namespace/run/basename/SHA-256/size/count
+  authority. Campaign reporting reuses one post-validation snapshot per
+  artifact, strips all private fields, requires
+  `Core.integrated_candidate_id == candidate_id`, and explicitly accounts for
+  malformed, duplicate, orphan, or unrelated ledger rows without invented
+  identities or lossy filtering.
+- Centralized bounded actionability/evidence/risk cohorts and versioned new
+  campaign outcomes. Historical rows with exact actionability but null
+  evidence/risk cohorts remain immutable and receive an explicit narrow
+  `legacy_null_derived_from_canonical_scores` scorecard status; partial,
+  unsupported, nonfinite, out-of-range, or mismatched cohorts fail closed.
+- Added the Decision-v2 outcome section to the canonical campaign JSON/Markdown
+  report and closed validator. The current real DEXE evidence is one matured,
+  aligned `risk_watch` primary representative with one dependent repeat, while
+  the mandatory conclusion remains `insufficient_for_policy_change` until
+  matched controls, dependency-aware uncertainty, and out-of-sample evidence
+  exist.
+- Updated the North Star Markdown/JSON, anomaly-episode research note,
+  `DECISIONS.md`, and `ROADMAP.md` with the exact primary-horizon, source-binding,
+  cohort-compatibility, descriptive-only, and zero-side-effect policies.
+**Verify:** 121 focused Decision/campaign/outcome tests passed; the full Event
+Alpha suite passed 1,878 tests in 94.74 seconds; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make event-alpha-radar-north-star PYTHON=python3`;
+`make architecture-cleanliness-check PYTHON=python3` with zero new size
+violations and zero over-limit functions; `make radar-market-campaign-report
+PYTHON=python3` with seven real cycles, two observations, one frozen episode,
+one repeat, one matured aligned representative, and zero provider calls; `make
+verify-fast PYTHON=python3` passed 2,123 tests in 112.48 seconds plus alert,
+backtest, and paper-scoreboard gates; full `make verify PYTHON=python3` passed
+the 1,375-test standalone compatibility runner, 2,123-test pytest gate in
+111.72 seconds, and all remaining release smokes; `git diff --check`.
+**Notes/risks:** The scorecard is measurement only. It made no live provider
+call, send, trade, paper trade, normal RSI write, Event Alpha
+`TRIGGERED_FADE`, route/priority/score/calibration/threshold change, or
+dashboard-authority mutation. One matured primary episode is not enough to
+justify a policy change.
+
 ## 2026-07-15 — Measure repeated anomalies as closed fixed-window episodes · Codex
 **Why:** Hourly campaign observations reuse rolling 4-hour/24-hour market
 features and overlapping outcome horizons, so counting every repeated detection

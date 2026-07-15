@@ -117,9 +117,11 @@ model, or claim its fixed windows recover independent clusters. The literature
 supports the need to make dependence and declustering explicit; the exact
 24-hour product policy remains a transparent, reviewable engineering choice.
 
-## Evidence required before any promotion
+## Remaining evidence required before any promotion
 
-- Evaluate canonical Decision outcomes on the frozen first representative only.
+- The Decision-v2 episode outcome scorecard now evaluates canonical outcomes on
+  the frozen first representative only, with declared-primary-horizon censoring
+  and exact candidate/Core/ledger bindings.
 - Keep raw observation counts and episode counts side by side.
 - Report missing/duplicate/ambiguous outcome evidence and right-censoring
   separately from directional results.

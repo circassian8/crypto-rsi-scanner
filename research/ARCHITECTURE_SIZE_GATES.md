@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-15T08:50:52.292718+00:00`
+- generated_at: `2026-07-15T09:37:42.341562+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -92,10 +92,10 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1496 |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1467 |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1465 |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1453 |
 | `crypto_rsi_scanner/config.py` | 1450 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1411 |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 |
@@ -123,6 +123,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1185 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1181 |
 | `crypto_rsi_scanner/event_fade.py` | 1181 |
+| `crypto_rsi_scanner/event_alpha/outcomes/decision_episode_scorecard.py` | 1180 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py` | 1176 |
 | `crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py` | 1176 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1175 |
@@ -131,16 +132,15 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1160 |
 | `crypto_rsi_scanner/event_alpha/operations/review_inbox.py` | 1156 |
 | `crypto_rsi_scanner/event_alpha/radar/pipeline.py` | 1149 |
-| `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1144 |
 
 ## Accepted Production Files Over 1200 Lines
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1496 | Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity. | When the campaign report schema changes or another campaign family needs the same aggregation primitives. |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1467 | Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path. | When adding another baseline family or changing the observation-spacing contract. |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary. | Split before adding another source or status family, and before any growth crosses the 1,500-line blocker. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1465 | Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts. | Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases. |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1453 | Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity. | When the campaign report schema changes or another campaign family needs the same aggregation primitives. |
 | `crypto_rsi_scanner/config.py` | 1450 | Central environment/config contract; splitting risks import-time default and env-var behavior drift. | When a dedicated config-v2 migration freeze and env snapshot tests exist. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1411 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 | Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary. | When the live calendar container schema changes or a second publication format is introduced. |
@@ -183,10 +183,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_burn_in_outcomes.py` | 1289 |
 | `tests/event_alpha/test_catalyst_search.py` | 1270 |
 | `tests/event_alpha/test_evidence_acquisition.py` | 1214 |
+| `tests/event_alpha/test_decision_model_v2.py` | 1210 |
 | `tests/event_alpha/test_news_providers.py` | 1210 |
 | `tests/event_alpha/test_watchlist_router.py` | 1207 |
-| `tests/event_alpha/test_decision_model_v2.py` | 1191 |
-| `tests/event_alpha/test_market_observation_campaign.py` | 1109 |
+| `tests/event_alpha/test_market_observation_campaign.py` | 1192 |
 | `tests/event_alpha/test_daily_operations.py` | 1107 |
 | `tests/event_alpha/test_radar_pipeline.py` | 1088 |
 | `tests/event_alpha/test_fade_validation.py` | 1081 |
@@ -195,6 +195,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_llm_radar.py` | 1040 |
 | `tests/event_alpha/test_quality_feedback.py` | 1040 |
 | `tests/test_indicators.py` | 1028 |
+| `tests/event_alpha/test_market_observation_campaign_episodes.py` | 1022 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 993 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 979 |
 | `tests/event_alpha/test_notification_operations.py` | 925 |
@@ -205,7 +206,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_dashboard_readiness.py` | 883 |
 | `tests/event_alpha/test_claim_semantics.py` | 867 |
 | `tests/event_alpha/test_burn_in_candidate_mode.py` | 859 |
-| `tests/event_alpha/test_source_coverage_reports.py` | 831 |
 
 ## Files Over 1500 Lines
 

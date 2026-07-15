@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-15T08:48:00.011843+00:00` from local artifacts only.
+Generated at `2026-07-15T09:36:34.263165+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -114,6 +114,26 @@ Repeated observations are grouped into fixed-start descriptive episodes; they ar
 - `48h` sensitivity: episodes=`1`, repeats=`1`
 - The first observation is frozen as representative before outcome maturity is inspected.
 - Shadow only: no route, score, threshold, provider, publication, or authority change.
+
+## Decision-v2 episode outcomes (shadow)
+
+Only the frozen first member of each primary episode is evaluated; outcome maturity never reselects a representative.
+- Status: `ready`
+- Episode representatives: `1`
+- Matured primary outcomes: `1`
+- Scoreable directional outcomes: `1`
+- Primary outcome states: `contract_excluded=0, due_missing_price=0, matured=1, not_due=0`
+- Direction alignment: `aligned=1, flat=0, non_directional=0, not_evaluated=0, opposed=0`
+- Cohort persistence: `legacy_null_derived_from_canonical_scores=1`
+- Exact source artifact bindings: `5`
+- Exact outcome validation bindings: `2`
+- Policy conclusion: `insufficient_for_policy_change`
+- Direction comes from canonical Decision-v2 bias, not a legacy Event Alpha lane; only the declared primary horizon may mature.
+
+| Asset | Route | Bias | State | Alignment | Primary return (fraction) | Score cohorts A/E/R |
+|---|---|---|---|---|---:|---|
+| dexe | risk_watch | risk | matured | aligned | -0.00949598 | 25_49/45_64/45_64 |
+- Descriptive only: no route, score, calibration, threshold, or authority change is eligible.
 
 ## Failed and blocked attempts
 

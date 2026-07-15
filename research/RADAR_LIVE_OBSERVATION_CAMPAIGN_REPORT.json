@@ -50,9 +50,11 @@
       "observed_at": "2026-07-13T19:07:29.084694+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 0,
         "other": 0,
         "pending": 0,
         "refresh_build_error_count": 0,
@@ -154,16 +156,18 @@
       "observed_at": "2026-07-14T00:29:40.814498+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 1,
         "other": 0,
         "pending": 1,
         "refresh_build_error_count": 0,
         "refresh_build_error_counts": {},
         "source": "canonical_candidate_pending_base",
         "status_counts": {
-          "pending": 1
+          "not_due": 1
         },
         "total": 1
       },
@@ -263,9 +267,11 @@
       "observed_at": "2026-07-14T10:21:23.140944+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 0,
         "other": 0,
         "pending": 0,
         "refresh_build_error_count": 0,
@@ -368,9 +374,11 @@
       "observed_at": "2026-07-14T16:33:00.405079+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 0,
         "other": 0,
         "pending": 0,
         "refresh_build_error_count": 0,
@@ -472,9 +480,11 @@
       "observed_at": "2026-07-14T22:15:51.367228+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 0,
         "other": 0,
         "pending": 0,
         "refresh_build_error_count": 0,
@@ -3896,8 +3906,477 @@
       "detail": "The required feature/time-aware temporal baseline is not globally warm."
     }
   ],
+  "decision_v2_episode_outcome_scorecard": {
+    "alignment_denominator": "aligned_plus_opposed_plus_flat",
+    "authority_changes": 0,
+    "auto_apply": false,
+    "calibration_changes": 0,
+    "calibration_eligible": false,
+    "candidate_input_digest": "7a56b72ee3e58a4aaf2fb2df642da3c3fb08c4a79612e1e9db7b8c3517241c1d",
+    "candidate_rows_supplied": 2,
+    "contract_digest": "f872ee7adf7a827238ef195bf62b75cac089e7bbc006e7372b3966a7e4fbd5b5",
+    "contract_exclusion_reason_counts": {},
+    "core_input_digest": "65672164098f9ab8054b7b1323ca888a3249e0fec4751cb7d2b8320bbbcc8914",
+    "core_rows_supplied": 2,
+    "cross_asset_independence_claim": false,
+    "decision_score_changes": 0,
+    "decision_score_eligible": false,
+    "dependent_uncertainty_estimated": false,
+    "direction_alignment_counts": {
+      "aligned": 1,
+      "flat": 0,
+      "non_directional": 0,
+      "not_evaluated": 0,
+      "opposed": 0
+    },
+    "evaluated_at": "2026-07-15T09:36:34.263165+00:00",
+    "exclusive_cohorts": {
+      "actionability_score_cohort": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "25_49",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "catalyst_status": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "unknown",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "directional_bias": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "risk",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "evidence_confidence_score_cohort": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "45_64",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "market_phase": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "reversal",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "primary_thesis_origin": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "market_led",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "radar_route": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "risk_watch",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "risk_score_cohort": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "45_64",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ],
+      "timing_state": [
+        {
+          "aligned_episode_count": 1,
+          "alignment_rate": 1.0,
+          "direction_alignment_counts": {
+            "aligned": 1,
+            "flat": 0,
+            "non_directional": 0,
+            "not_evaluated": 0,
+            "opposed": 0
+          },
+          "episode_count": 1,
+          "matured_episode_count": 1,
+          "mean_primary_horizon_return": -0.009495982468955444,
+          "median_primary_horizon_return": -0.009495982468955444,
+          "name": "active",
+          "outcome_state_counts": {
+            "contract_excluded": 0,
+            "due_missing_price": 0,
+            "matured": 1,
+            "not_due": 0
+          },
+          "scoreable_directional_episode_count": 1
+        }
+      ]
+    },
+    "input_binding_digest": "8f0a3c2608d9c82a24c787115c2567763980f9804659ab082d330d658dac0ba6",
+    "matched_control_available": false,
+    "matured_episode_count": 1,
+    "method": "frozen_primary_episode_representative_outcome_scorecard",
+    "nonexclusive_thesis_origin_cohorts": [
+      {
+        "aligned_episode_count": 1,
+        "alignment_rate": 1.0,
+        "direction_alignment_counts": {
+          "aligned": 1,
+          "flat": 0,
+          "non_directional": 0,
+          "not_evaluated": 0,
+          "opposed": 0
+        },
+        "episode_count": 1,
+        "matured_episode_count": 1,
+        "mean_primary_horizon_return": -0.009495982468955444,
+        "median_primary_horizon_return": -0.009495982468955444,
+        "name": "market_led",
+        "outcome_state_counts": {
+          "contract_excluded": 0,
+          "due_missing_price": 0,
+          "matured": 1,
+          "not_due": 0
+        },
+        "scoreable_directional_episode_count": 1
+      }
+    ],
+    "out_of_sample_validation_available": false,
+    "outcome_cohort_persistence_status_counts": {
+      "legacy_null_derived_from_canonical_scores": 1
+    },
+    "outcome_input_digest": "7b0cdf4825d7cd004257500b1dab2141d04703d69217c1a0e7799fd9dc21cc9c",
+    "outcome_rows_supplied": 2,
+    "outcome_state_counts": {
+      "contract_excluded": 0,
+      "due_missing_price": 0,
+      "matured": 1,
+      "not_due": 0
+    },
+    "outcome_validation_binding_count": 2,
+    "outcome_validation_binding_digest": "c73e5d0c907140d8867e93c52cf05b67b0c890d5dcba2a4599de1ca33e45415a",
+    "outcome_validation_bindings": [
+      {
+        "artifact_namespace": "radar_market_no_send_20260713t152704z",
+        "candidate_id": "iar:634eae4a52fb",
+        "canonical_score_cohorts": {
+          "actionability_score_cohort": "25_49",
+          "evidence_confidence_score_cohort": "45_64",
+          "risk_score_cohort": "45_64"
+        },
+        "outcome_identity_key": "55c6c8e18a9b57602880fa4b164be1a0cfcc510ac1c24f11682562091435c927",
+        "outcome_row_digest": "377f71a671d1a86d28154ffff7ca1eed10aee53f50b1d34841e4ae855fa50bd4",
+        "reasons": [],
+        "schema_id": "event_alpha.campaign_ledger_outcome_validation_binding",
+        "schema_version": 1,
+        "score_cohort_reason": "legacy_null_evidence_risk_cohorts_derived_from_canonical_scores",
+        "score_cohort_status": "legacy_null_derived_from_canonical_scores",
+        "valid": true
+      },
+      {
+        "artifact_namespace": "radar_market_no_send_20260714t002940z",
+        "candidate_id": "iar:634eae4a52fb",
+        "canonical_score_cohorts": {
+          "actionability_score_cohort": "25_49",
+          "evidence_confidence_score_cohort": "45_64",
+          "risk_score_cohort": "45_64"
+        },
+        "outcome_identity_key": "aa6cee4a9945ade9b8e3449a981fd769913bd3e4c8f42ddd51906503dd941bf7",
+        "outcome_row_digest": "69279ed6804bf4c9279cead7526ee8ddb4d408c39b6a55cfd730e20858a2825b",
+        "reasons": [],
+        "schema_id": "event_alpha.campaign_ledger_outcome_validation_binding",
+        "schema_version": 1,
+        "score_cohort_reason": "legacy_null_evidence_risk_cohorts_derived_from_canonical_scores",
+        "score_cohort_status": "legacy_null_derived_from_canonical_scores",
+        "valid": true
+      }
+    ],
+    "policy_change_eligible": false,
+    "policy_conclusion": "insufficient_for_policy_change",
+    "policy_conclusion_reasons": [
+      "matched_non_idea_controls_unavailable",
+      "dependent_data_uncertainty_not_estimated",
+      "out_of_sample_validation_unavailable"
+    ],
+    "primary_episode_count": 1,
+    "primary_repeat_member_count": 1,
+    "priority_changes": 0,
+    "priority_eligible": false,
+    "provider_calls": 0,
+    "representative_count": 1,
+    "representatives": [
+      {
+        "actionability_score": 42.32,
+        "actionability_score_cohort": "25_49",
+        "artifact_namespace": "radar_market_no_send_20260713t152704z",
+        "candidate_id": "iar:634eae4a52fb",
+        "candidate_row_digest": "6500aca15de1868f20a7d319f2378e8fdb7a61affeb4fedb6326d1391fdcf568",
+        "canonical_asset_id": "dexe",
+        "canonical_score_cohorts": {
+          "actionability_score_cohort": "25_49",
+          "evidence_confidence_score_cohort": "45_64",
+          "risk_score_cohort": "45_64"
+        },
+        "catalyst_status": "unknown",
+        "contract_exclusion_reasons": [],
+        "core_opportunity_id": "agg:634eae4a52fb",
+        "core_row_digest": "c18f1321e82ccde5494a9536be1398e46fd3555a495952d67c719816a77e08db",
+        "decision_projection_digest": "0966591382ef4b47ae70d8a096857e786c70f6bc1d3515a6ffafb5df9349e844",
+        "declared_outcome_cohorts": {
+          "actionability_score_cohort": "25_49",
+          "decision_score_cohort_contract_version": null,
+          "evidence_confidence_score_cohort": null,
+          "risk_score_cohort": null
+        },
+        "direction_alignment": "aligned",
+        "directional_bias": "risk",
+        "episode_digest": "6fe5d1ffb3a81203037f507f6569f9d29b42b6a005fdb8cc5b72fd36b55092c8",
+        "episode_id": "shadow-anomaly-episode-v1:9d69fac633ee2519e28edc545e33c20712c2a844d2296aaedd8b07dfcf8b48b5",
+        "evidence_confidence_score": 52.45,
+        "evidence_confidence_score_cohort": "45_64",
+        "market_phase": "reversal",
+        "observed_at": "2026-07-13T15:27:13.330145+00:00",
+        "outcome_cohort_persistence_reason": "legacy_null_evidence_risk_cohorts_derived_from_canonical_scores",
+        "outcome_cohort_persistence_status": "legacy_null_derived_from_canonical_scores",
+        "outcome_identity_key": "55c6c8e18a9b57602880fa4b164be1a0cfcc510ac1c24f11682562091435c927",
+        "outcome_row_digest": "377f71a671d1a86d28154ffff7ca1eed10aee53f50b1d34841e4ae855fa50bd4",
+        "outcome_state": "matured",
+        "primary_due_at": "2026-07-14T15:27:13.330145+00:00",
+        "primary_horizon": "24h",
+        "primary_horizon_return": -0.009495982468955444,
+        "primary_thesis_origin": "market_led",
+        "radar_route": "risk_watch",
+        "representative_digest": "fb0c936872fd9daadc9cb558fd90ca21032e81e4e6ae31bc833c83c6ba70f68a",
+        "risk_score": 48.0,
+        "risk_score_cohort": "45_64",
+        "run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live",
+        "schema_id": "event_alpha.decision_v2_episode_outcome_representative",
+        "schema_version": 1,
+        "thesis_origins": [
+          "market_led"
+        ],
+        "timing_state": "active"
+      }
+    ],
+    "research_only": true,
+    "routing_changes": 0,
+    "routing_eligible": false,
+    "schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
+    "schema_version": 1,
+    "score_adjustment_eligible": false,
+    "score_adjustments": 0,
+    "scoreable_directional_episode_count": 1,
+    "source_artifact_binding_count": 5,
+    "source_artifact_binding_digest": "b2b63469ba8187bd83af40f7eb65c4fecf1bd8471456ac403cc88f319e02ffac",
+    "source_artifact_bindings": [
+      {
+        "artifact_name": "event_integrated_radar_candidates.jsonl",
+        "artifact_namespace": "radar_market_no_send_20260713t152704z",
+        "artifact_sha256": "1e069ea394fb40607aa9061d46b125929bda7ccada5eda67acd074e81f0a009b",
+        "artifact_size_bytes": 36474,
+        "binding_source": "legacy_operator_candidate_binding",
+        "row_count": 1,
+        "run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live",
+        "source_role": "candidate"
+      },
+      {
+        "artifact_name": "event_integrated_radar_candidates.jsonl",
+        "artifact_namespace": "radar_market_no_send_20260714t002940z",
+        "artifact_sha256": "94df436858de28f18d950df8b95f54727d1174cb4f4f1eae1d791aff3ea67cbc",
+        "artifact_size_bytes": 39554,
+        "binding_source": "manifest_candidate_artifact_sha256",
+        "row_count": 1,
+        "run_id": "2026-07-14T00:29:40.814498+00:00|no_key_live",
+        "source_role": "candidate"
+      },
+      {
+        "artifact_name": "event_core_opportunities.jsonl",
+        "artifact_namespace": "radar_market_no_send_20260713t152704z",
+        "artifact_sha256": "c561513056cf5f2c3f3dc00035689bd449933efca6bdad74879848098e191c96",
+        "artifact_size_bytes": 41761,
+        "binding_source": "legacy_operator_core_binding",
+        "row_count": 1,
+        "run_id": "2026-07-13T15:27:13.330145+00:00|no_key_live",
+        "source_role": "core"
+      },
+      {
+        "artifact_name": "event_core_opportunities.jsonl",
+        "artifact_namespace": "radar_market_no_send_20260714t002940z",
+        "artifact_sha256": "396d0dff18d683e6acb35a83fb71ef1a0e80984f92ae6609d28e72c05ba39598",
+        "artifact_size_bytes": 44874,
+        "binding_source": "manifest_core_artifact_sha256",
+        "row_count": 1,
+        "run_id": "2026-07-14T00:29:40.814498+00:00|no_key_live",
+        "source_role": "core"
+      },
+      {
+        "artifact_name": "event_decision_radar_campaign_outcomes.jsonl",
+        "artifact_namespace": "radar_market_history_cache",
+        "artifact_sha256": "ed36c5b2a4dc4e181693280bc88ab09235af07a956e918d173a7c1d09620c9d6",
+        "artifact_size_bytes": 55468,
+        "binding_source": "campaign_outcome_ledger_exact_bytes",
+        "row_count": 2,
+        "run_id": "campaign-ledger-snapshot:ed36c5b2a4dc4e181693280bc88ab09235af07a956e918d173a7c1d09620c9d6",
+        "source_role": "outcome"
+      }
+    ],
+    "source_episode_contract_digest": "e868dfad2ce5949029387102bccf302d9b28467b7322834a03660d2e49a13451",
+    "source_episode_input_binding_digest": "9d69fac633ee2519e28edc545e33c20712c2a844d2296aaedd8b07dfcf8b48b5",
+    "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
+    "source_episode_schema_version": 1,
+    "statistical_independence_claim": false,
+    "status": "ready",
+    "threshold_change_eligible": false,
+    "threshold_changes": 0,
+    "writes": 0
+  },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-15T08:48:00.011843+00:00",
+  "generated_at": "2026-07-15T09:36:34.263165+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -3973,9 +4452,11 @@
       "observed_at": "2026-07-13T15:17:06.228233+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 0,
         "other": 0,
         "pending": 0,
         "refresh_build_error_count": 0,
@@ -4077,16 +4558,18 @@
       "observed_at": "2026-07-13T15:27:13.330145+00:00",
       "outcomes": {
         "automatic_threshold_changes": false,
+        "due_missing_price": 0,
         "human_feedback_optional": true,
         "matured": 0,
         "missing_data": 0,
+        "not_due": 1,
         "other": 0,
         "pending": 1,
         "refresh_build_error_count": 0,
         "refresh_build_error_counts": {},
         "source": "canonical_candidate_pending_base",
         "status_counts": {
-          "pending": 1
+          "not_due": 1
         },
         "total": 1
       },
@@ -4139,9 +4622,11 @@
   ],
   "outcomes": {
     "automatic_threshold_changes": false,
+    "due_missing_price": 0,
     "human_feedback_optional": true,
     "matured": 1,
     "missing_data": 0,
+    "not_due": 1,
     "other": 0,
     "pending": 1,
     "refresh_build_error_count": 0,
@@ -4149,7 +4634,7 @@
     "source": "campaign_outcome_ledger",
     "status_counts": {
       "matured": 1,
-      "pending": 1
+      "not_due": 1
     },
     "total": 2
   },
@@ -4225,7 +4710,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "25d1e446cfdfd2a6c7bc70041caea83bb7fc889996b01a2033649ca69a4ab42b",
+    "audit_digest": "43ac0602298b486e988c8dd8548773fb9be0c756d3aac6c1857f08629bc18e28",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -4312,7 +4797,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "f492e0ed6654f6f017e40a89a97a6d1b09ab962291f7c4a981c2ed5a864a0480",
+    "episode_contract_digest": "e868dfad2ce5949029387102bccf302d9b28467b7322834a03660d2e49a13451",
     "episode_input_binding_digest": "9d69fac633ee2519e28edc545e33c20712c2a844d2296aaedd8b07dfcf8b48b5",
     "episode_records_supplied": 2,
     "exact_outcome_join_count": 2,
@@ -4353,7 +4838,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "f492e0ed6654f6f017e40a89a97a6d1b09ab962291f7c4a981c2ed5a864a0480",
+    "contract_digest": "e868dfad2ce5949029387102bccf302d9b28467b7322834a03660d2e49a13451",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -4440,7 +4925,7 @@
         "window_end_exclusive_at": "2026-07-14T15:27:13.330145+00:00"
       }
     ],
-    "evaluated_at": "2026-07-15T08:48:00.011843+00:00",
+    "evaluated_at": "2026-07-15T09:36:34.263165+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

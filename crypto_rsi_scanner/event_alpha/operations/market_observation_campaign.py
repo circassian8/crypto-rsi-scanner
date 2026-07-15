@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from ... import config as project_config
+from ..outcomes import outcome_eligibility
 from ..dashboard import readiness as dashboard_readiness
 from ..dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from ..radar import market_history
@@ -29,6 +30,7 @@ from . import market_no_send_publication
 from . import market_observation_campaign_cadence
 from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
+from . import market_observation_campaign_scorecard
 from . import market_observation_campaign_snapshots
 from . import market_observation_outcomes
 from .market_no_send_models import SAFETY_COUNTERS
@@ -63,9 +65,9 @@ _SAFETY_COUNTER_FIELDS = (
     "normal_rsi_signal_rows_written",
     "triggered_fade_created",
 )
-_MATURED_STATES = {"matured", "complete", "completed", "observed", "scored"}
-_PENDING_STATES = {"pending", "not_due"}
-_MISSING_STATES = {"missing", "missing_data", "unavailable"}
+_MATURED_STATES = {"matured", "complete", "completed", "filled", "observed", "scored"}
+_PENDING_STATES = {"pending", "not_due", "partially_matured"}
+_MISSING_STATES = {"due_missing_price", "missing", "missing_data", "missing_price_data", "unavailable"}
 
 
 def build_campaign_report(
@@ -141,6 +143,14 @@ def build_campaign_report(
             outcome_ledger_sha256=ledger_snapshot["sha256"],
         )
     )
+    episode_scorecard = (
+        market_observation_campaign_scorecard.build_campaign_decision_episode_scorecard(
+            episode_shadow,
+            episode_input_generations,
+            ledger_snapshot,
+            evaluated_at=evaluated,
+        )
+    )
     baseline = _baseline_maturity(base, evaluated=evaluated)
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
     metrics["provider_failed_attempts"] = len(provider_failed)
@@ -187,6 +197,7 @@ def build_campaign_report(
         outcome_metrics=outcome_metrics,
         episode_shadow=episode_shadow,
         episode_input_audit=episode_input_audit,
+        episode_scorecard=episode_scorecard,
         limitations=limitations,
         next_observation=next_observation,
         conclusion=conclusion,
@@ -229,7 +240,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
 
 
 def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
-    from ..outcomes import anomaly_episode_shadow
+    from ..outcomes import anomaly_episode_shadow, decision_episode_scorecard
 
     value = _mapping(report.get("shadow_anomaly_episodes"))
     errors = anomaly_episode_shadow.validate_contract(value)
@@ -245,6 +256,15 @@ def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
         raise MarketNoSendError(
             "shadow anomaly episode input audit invalid: "
             + ";".join(audit_errors)
+        )
+    scorecard_errors = decision_episode_scorecard.validate_contract(
+        _mapping(report.get("decision_v2_episode_outcome_scorecard")),
+        episode_value=value,
+    )
+    if scorecard_errors:
+        raise MarketNoSendError(
+            "decision episode scorecard report contract invalid: "
+            + ";".join(scorecard_errors)
         )
 
 
@@ -315,7 +335,7 @@ def _load_generations(
                     manifest.get("observed_at") or audit.get("generated_at")
                 ),
                 "validation_errors": [
-                    "candidate_snapshot:" + _validation_error_code(exc)
+                    "generation_snapshot:" + _validation_error_code(exc)
                 ],
                 "campaign_counting_source": validation.counting_source,
                 "campaign_counting_reason": validation.counting_reason,
@@ -343,18 +363,15 @@ def _generation_row(
     validation: market_no_send_publication.CampaignGenerationValidation,
     current_authority: Mapping[str, Any],
 ) -> dict[str, Any]:
-    candidate_snapshot = market_observation_campaign_snapshots.capture_candidate_snapshot(
+    operator = _read_json(namespace_dir / OPERATOR_STATE_FILENAME)
+    snapshots = market_observation_campaign_snapshots.capture_generation_snapshots(
         namespace_dir,
         manifest=manifest,
         validation=validation,
-        operator_state_filename=OPERATOR_STATE_FILENAME,
+        operator_state=operator,
     )
-    candidates = candidate_snapshot["rows"]
-    outcomes = (
-        read_jsonl(namespace_dir / integrated_radar.INTEGRATED_OUTCOMES_FILENAME)
-        if validation.integrated_outcome_artifact_bound else []
-    )
-    operator = _read_json(namespace_dir / OPERATOR_STATE_FILENAME)
+    candidates = snapshots["candidate"]["rows"]
+    outcomes = snapshots["integrated_outcome"]["rows"]
     request = _read_json(namespace_dir / REQUEST_LEDGER_FILENAME)
     counted = validation.campaign_counted
     source = validation.counting_source
@@ -421,14 +438,9 @@ def _generation_row(
             "request_ledger": REQUEST_LEDGER_FILENAME if request else None,
             "outcomes": integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
         },
-        "_candidate_snapshot_rows": tuple(dict(row) for row in candidates),
-        "_candidate_snapshot_artifact": candidate_snapshot["artifact"],
-        "_candidate_snapshot_sha256": candidate_snapshot["sha256"],
-        "_candidate_snapshot_size_bytes": candidate_snapshot["size_bytes"],
-        "_candidate_snapshot_binding_source": candidate_snapshot[
-            "binding_source"
-        ],
-        "_candidate_snapshot_verified": True,
+        **market_observation_campaign_snapshots.private_generation_snapshot_fields(
+            snapshots
+        ),
     }
 
 
@@ -847,9 +859,13 @@ def _outcome_metrics(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     )
     return {
         "total": len(materialized),
-        "pending": counts["pending"],
+        # Keep the v2 report's existing headline keys while exposing the exact
+        # primary-horizon states in ``status_counts`` and dedicated fields.
+        "pending": counts["not_due"],
         "matured": counts["matured"],
-        "missing_data": counts["missing_data"],
+        "missing_data": counts["due_missing_price"],
+        "not_due": counts["not_due"],
+        "due_missing_price": counts["due_missing_price"],
         "other": counts["other"],
         "status_counts": dict(sorted(counts.items())),
         "source": source,
@@ -861,30 +877,57 @@ def _outcome_metrics(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def _outcome_state(row: Mapping[str, Any]) -> str:
+    primary = row.get("primary_horizon")
+    metadata = row.get("horizon_metadata")
+    if (
+        type(primary) is str
+        and primary in outcome_eligibility.OUTCOME_HORIZONS
+        and isinstance(metadata, Mapping)
+        and isinstance((primary_metadata := metadata.get(primary)), Mapping)
+    ):
+        primary_status = _text(primary_metadata.get("maturity_status")).casefold()
+        if primary_status == "matured":
+            return (
+                "matured"
+                if market_observation_outcomes.canonical_primary_outcome_return(row) is not None
+                else "other"
+            )
+        if primary_status == "pending":
+            return "not_due"
+        if primary_status == "missing_data":
+            return "due_missing_price"
+        # A present canonical primary-horizon record is authoritative.  Do not
+        # let a contradictory top-level or secondary-horizon state promote it.
+        return "other"
+
     state = _text(row.get("maturation_state") or row.get("outcome_status") or row.get("outcome_label")).casefold()
     if state in _MATURED_STATES:
+        if type(primary) is str:
+            return (
+                "matured"
+                if market_observation_outcomes.canonical_primary_outcome_return(row) is not None
+                else "other"
+            )
+        # Historical pre-contract summaries did not persist a primary horizon;
+        # keep their explicit terminal state readable without projecting it as
+        # a current canonical contract.
         return "matured"
     if state in _MISSING_STATES:
-        return "missing_data"
-    metadata = _mapping(row.get("horizon_metadata"))
-    horizon_states = {
-        _text(_mapping(value).get("maturity_status")).casefold()
-        for value in metadata.values()
-    }
-    if horizon_states & _MATURED_STATES:
-        return "matured"
-    if state in _PENDING_STATES or horizon_states & _PENDING_STATES:
-        return "pending"
-    if horizon_states and horizon_states <= _MISSING_STATES:
-        return "missing_data"
-    returns = _mapping(row.get("return_by_horizon") or row.get("horizons"))
-    if any(_number(value) is not None for value in returns.values()):
+        return "due_missing_price"
+    if state in _PENDING_STATES:
+        return "not_due"
+    if market_observation_outcomes.canonical_primary_outcome_return(row) is not None:
         return "matured"
     return "other"
 
 
 def _outcome_rank(row: Mapping[str, Any]) -> tuple[int, str]:
-    rank = {"matured": 3, "missing_data": 2, "pending": 1, "other": 0}[_outcome_state(row)]
+    rank = {
+        "matured": 3,
+        "due_missing_price": 2,
+        "not_due": 1,
+        "other": 0,
+    }[_outcome_state(row)]
     return rank, _text(row.get("outcome_evaluated_at"))
 
 

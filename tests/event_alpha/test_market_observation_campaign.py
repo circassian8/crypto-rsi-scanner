@@ -1003,6 +1003,89 @@ def test_unbound_legacy_supporting_rows_cannot_affect_campaign_outcomes(tmp_path
     assert campaign._outcome_metrics(outcomes)["pending"] == 1
 
 
+def test_campaign_outcome_state_uses_only_canonical_primary_horizon():
+    base = {
+        "primary_horizon": "24h",
+        "horizon_metadata": {
+            "4h": {"maturity_status": "matured"},
+            "24h": {"maturity_status": "pending"},
+        },
+        "maturation_state": "matured",
+        "return_by_horizon": {"4h": 0.12, "24h": None},
+    }
+
+    assert campaign._outcome_state(base) == "not_due"
+    assert campaign._outcome_state({
+        **base,
+        "horizon_metadata": {
+            "4h": {"maturity_status": "matured"},
+            "24h": {"maturity_status": "missing_data"},
+        },
+    }) == "due_missing_price"
+    assert campaign._outcome_state({
+        **base,
+        "horizon_metadata": {
+            "4h": {"maturity_status": "pending"},
+            "24h": {"maturity_status": "matured"},
+        },
+        "return_by_horizon": {"4h": None, "24h": -0.02},
+    }) == "matured"
+
+    metrics = campaign._outcome_metrics((
+        base,
+        {
+            **base,
+            "horizon_metadata": {
+                "4h": {"maturity_status": "matured"},
+                "24h": {"maturity_status": "missing_data"},
+            },
+        },
+    ))
+    assert metrics["pending"] == metrics["not_due"] == 1
+    assert metrics["missing_data"] == metrics["due_missing_price"] == 1
+    assert metrics["matured"] == 0
+    assert metrics["status_counts"] == {
+        "due_missing_price": 1,
+        "not_due": 1,
+    }
+
+
+def test_campaign_outcome_state_preserves_legacy_primary_fallback_only():
+    assert campaign._outcome_state({"maturation_state": "matured"}) == "matured"
+    assert campaign._outcome_state({
+        "primary_horizon": "24h",
+        "return_by_horizon": {"4h": 0.1, "24h": None},
+    }) == "other"
+    assert campaign._outcome_state({
+        "primary_horizon": "24h",
+        "return_by_horizon": {"4h": 0.1, "24h": 0.2},
+    }) == "matured"
+
+
+def test_campaign_outcome_state_rejects_mature_status_without_primary_return():
+    row = {
+        "primary_horizon": "24h",
+        "horizon_metadata": {
+            "4h": {"maturity_status": "matured"},
+            "24h": {"maturity_status": "matured"},
+        },
+        "maturation_state": "matured",
+        "primary_horizon_return": None,
+        "return_by_horizon": {"4h": 0.1, "24h": None},
+    }
+    assert campaign._outcome_state(row) == "other"
+    without_metadata = dict(row)
+    without_metadata.pop("horizon_metadata")
+    assert campaign._outcome_state(without_metadata) == "other"
+    assert campaign._outcome_metrics((row,))["matured"] == 0
+    assert campaign._outcome_metrics((row,))["other"] == 1
+    assert campaign._outcome_state({
+        **row,
+        "primary_horizon_return": 0.2,
+        "return_by_horizon": {"4h": 0.1, "24h": -0.2},
+    }) == "other"
+
+
 def test_legacy_v2_adapter_requires_exact_source_and_request_lineage(tmp_path):
     base = tmp_path / "artifacts"
     base.mkdir()

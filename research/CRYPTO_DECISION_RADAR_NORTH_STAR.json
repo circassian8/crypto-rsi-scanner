@@ -511,6 +511,79 @@
       "https://doi.org/10.1080/01621459.1994.10476870"
     ]
   },
+  "decision_v2_episode_outcome_scorecard_policy": {
+    "schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
+    "schema_version": 1,
+    "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
+    "source_episode_schema_version": 1,
+    "primary_episode_window_hours": 24,
+    "representative": "frozen_chronologically_first_exact_identity",
+    "outcome_aware_reselection_allowed": false,
+    "repeat_member_may_replace_representative": false,
+    "outcome_horizon_policy": "declared_primary_horizon_only",
+    "secondary_horizon_may_promote_primary": false,
+    "outcome_states": [
+      "matured",
+      "not_due",
+      "due_missing_price",
+      "contract_excluded"
+    ],
+    "direction_source": "canonical_decision_v2_directional_bias",
+    "legacy_event_alpha_lane_direction_eligible": false,
+    "direction_alignments": [
+      "aligned",
+      "opposed",
+      "flat",
+      "non_directional",
+      "not_evaluated"
+    ],
+    "source_artifact_binding_fields": [
+      "source_role",
+      "artifact_namespace",
+      "run_id",
+      "artifact_name",
+      "artifact_sha256",
+      "artifact_size_bytes",
+      "row_count",
+      "binding_source"
+    ],
+    "candidate_core_binding": "exact_namespace_run_profile_core_identity_integrated_candidate_id_and_equal_decision_projection",
+    "outcome_binding": "exact_namespace_run_candidate_observed_at_outcome_identity_row_digest_and_campaign_validation",
+    "score_cohort_contract_version": 1,
+    "score_cohort_fields": [
+      "actionability_score_cohort",
+      "evidence_confidence_score_cohort",
+      "risk_score_cohort"
+    ],
+    "score_cohort_compatibility_statuses": [
+      "canonical_exact",
+      "legacy_unversioned_exact",
+      "legacy_null_derived_from_canonical_scores",
+      "invalid"
+    ],
+    "legacy_null_policy": "derive_for_scorecard_only_from_canonical_scores_with_explicit_status_without_historical_rewrite",
+    "invalid_or_mismatched_cohort_policy": "contract_excluded",
+    "policy_conclusion": "insufficient_for_policy_change",
+    "policy_conclusion_reasons": [
+      "matched_non_idea_controls_unavailable",
+      "dependent_data_uncertainty_not_estimated",
+      "out_of_sample_validation_unavailable"
+    ],
+    "matched_control_available": false,
+    "dependent_uncertainty_estimated": false,
+    "out_of_sample_validation_available": false,
+    "statistical_independence_claim": false,
+    "cross_asset_independence_claim": false,
+    "routing_eligible": false,
+    "priority_eligible": false,
+    "decision_score_eligible": false,
+    "score_adjustment_eligible": false,
+    "calibration_eligible": false,
+    "threshold_change_eligible": false,
+    "policy_change_eligible": false,
+    "auto_apply": false,
+    "research_only": true
+  },
   "shadow_temporal_surprise_policy": {
     "schema_id": "event_alpha.shadow_temporal_surprise",
     "schema_version": 1,
@@ -809,6 +882,7 @@
       "primary_thesis_origin",
       "thesis_origins",
       "radar_route",
+      "directional_bias",
       "actionability_score_cohort",
       "evidence_confidence_score_cohort",
       "risk_score_cohort",
@@ -820,7 +894,14 @@
     "campaign_outcome_refresh_provider_calls": 0,
     "human_feedback_is_optional_preference_data": true,
     "immutable_origin_namespaces_rewritten": false,
-    "maturation_policy": "pending until horizon is due and sufficient observed price lineage exists; then mature deterministically",
+    "maturation_policy": "declared canonical primary horizon only; pending until due and sufficient observed price lineage exists, due_missing_price when due without sufficient lineage, then mature deterministically",
+    "secondary_horizon_may_promote_primary": false,
+    "episode_scorecard_outcome_states": [
+      "matured",
+      "not_due",
+      "due_missing_price",
+      "contract_excluded"
+    ],
     "pending_row_for_every_current_idea": true
   },
   "product_layers": {

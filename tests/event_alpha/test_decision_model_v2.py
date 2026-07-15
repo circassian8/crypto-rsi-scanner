@@ -816,6 +816,8 @@ def test_final_reevaluation_applies_catalyst_disproof_before_derived_status():
 def test_actionability_score_cohort_boundaries_are_canonical():
     from crypto_rsi_scanner.event_alpha.radar.decision_models import (
         actionability_score_cohort,
+        evidence_confidence_score_cohort,
+        risk_score_cohort,
     )
 
     assert {
@@ -826,6 +828,23 @@ def test_actionability_score_cohort_boundaries_are_canonical():
         50: "50_69", 69.99: "50_69", 70: "70_84", 84.99: "70_84",
         85: "85_100", 100: "85_100",
     }
+    expected_evidence_risk = {
+        0: "0_24", 24.99: "0_24", 25: "25_44", 44.99: "25_44",
+        45: "45_64", 64.99: "45_64", 65: "65_79", 79.99: "65_79",
+        80: "80_100", 100: "80_100",
+    }
+    assert {
+        score: evidence_confidence_score_cohort(score)
+        for score in expected_evidence_risk
+    } == expected_evidence_risk
+    assert {
+        score: risk_score_cohort(score)
+        for score in expected_evidence_risk
+    } == expected_evidence_risk
+    for invalid in (True, -0.01, 100.01, float("nan"), float("inf"), None):
+        assert actionability_score_cohort(invalid) is None
+        assert evidence_confidence_score_cohort(invalid) is None
+        assert risk_score_cohort(invalid) is None
 
 
 def test_multiple_thesis_origins_preserve_primary_and_contributors():

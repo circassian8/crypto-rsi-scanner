@@ -527,6 +527,31 @@ scores, calibration, thresholds, provider activity, publication, or authority;
 `auto_apply=false`. The detailed contract and research basis are in
 `research/ANOMALY_EPISODE_SHADOW.md`.
 
+The closed `event_alpha.decision_v2_episode_outcome_scorecard` v1 evaluates
+only the frozen, chronologically first representative of each primary 24-hour
+episode. Outcome availability or maturity never changes that representative,
+and a repeat cannot replace it. Only the declared canonical primary horizon
+determines `matured`, `not_due`, `due_missing_price`, or
+`contract_excluded`; maturity at a secondary horizon cannot promote the
+episode. Directional alignment comes from the canonical Decision-v2
+`directional_bias`, never from a legacy Event Alpha `opportunity_type`.
+Candidate, CoreOpportunity, and campaign-ledger rows are joined by exact
+namespace, run, candidate/outcome identity, row digest, equal canonical
+Decision projection, and `Core.integrated_candidate_id == candidate_id`.
+Every source binding retains its role, namespace, run, basename, SHA-256, byte
+size, row count, and binding authority. Score-cohort persistence is explicit as
+`canonical_exact`, `legacy_unversioned_exact`,
+`legacy_null_derived_from_canonical_scores`, or `invalid`. The narrow
+historical-null compatibility derives evidence/risk cohorts only from bounded
+canonical scores for this scorecard, records why, and never rewrites history;
+partial, mismatched, or unsupported declarations fail closed. Cohort results
+remain descriptive with the mandatory conclusion
+`insufficient_for_policy_change`: matched non-idea controls,
+dependency-aware uncertainty, and out-of-sample validation are still absent.
+The scorecard records zero provider calls, writes, routing, priority, Decision
+score, calibration, threshold, publication-authority, or automatic policy
+changes and inherits every Safety Invariant below.
+
 A fixture or mocked smoke generation can prove mechanics but is permanently
 ineligible for Decision campaign counting or real dashboard authority. The fixed
 authoritative pointer changes only after a real, fresh, complete generation has
@@ -712,14 +737,20 @@ a pending outcome placeholder. The shared mutable campaign ledger is
 `radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl`; it is
 rebuilt deterministically from immutable generation candidates/Core rows and
 locally retained observed prices, while origin namespaces and their pointer
-history remain unchanged. Rows stay pending until the configured horizon is due
-and sufficient observed prices exist, then mature with exact price lineage; a
-refresh makes no provider call.
+history remain unchanged. Rows stay pending until the declared canonical
+primary horizon is due and sufficient observed prices exist, then mature with
+exact price lineage; a due primary horizon without sufficient price lineage is
+`due_missing_price`. Secondary-horizon maturity never promotes the primary
+state. A refresh makes no provider call.
 
-Each outcome's origins, route, actionability cohort,
+Each outcome's origins, route, directional bias, actionability cohort,
 evidence-confidence cohort, risk cohort, catalyst status, timing, and phase are
 copied from the canonical projection. Candidate/outcome count mismatch or cohort
-drift is a doctor blocker for the trusted publication profile.
+drift is a doctor blocker for the trusted publication profile. The explicitly
+labeled legacy-null scorecard compatibility derives only missing historical
+evidence/risk cohort labels from the unchanged canonical scores and does not
+rewrite the row; every other partial, unsupported, or mismatched cohort remains
+fail-closed drift.
 
 Outcomes and optional human feedback are measurement evidence only. They do not
 automatically alter thresholds, routes, priors, or notification policy. Any

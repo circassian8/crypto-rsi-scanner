@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-15T05:03:14.226037+00:00`
+- generated_at: `2026-07-15T09:36:54.392077+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`

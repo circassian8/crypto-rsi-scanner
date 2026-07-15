@@ -16,6 +16,35 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Score frozen anomaly representatives with canonical Decision-v2 outcomes
+**Status:** accepted
+**Decision:** Evaluate only the chronologically first representative frozen by
+each fixed-start 24-hour anomaly episode. Repeats never replace that row based
+on outcome availability. Use only the declared canonical primary horizon for
+`matured`, `not_due`, `due_missing_price`, or `contract_excluded`; secondary
+maturity cannot promote it. Grade alignment from canonical Decision-v2
+`directional_bias`, never a legacy Event Alpha lane. Bind the exact candidate,
+CoreOpportunity, and campaign outcome through namespace, run, identity, row and
+artifact digests, equal Decision projection, and exact
+`Core.integrated_candidate_id`. Preserve score cohorts exactly; the sole
+historical compatibility is an explicitly labeled derivation of missing
+evidence/risk cohort labels from unchanged bounded canonical scores, without
+rewriting history. Every other partial, unsupported, or mismatched cohort fails
+closed. The scorecard is descriptive and always concludes
+`insufficient_for_policy_change` while matched non-idea controls,
+dependency-aware uncertainty, or out-of-sample validation are absent. It cannot
+call providers, write source evidence, trade, send, create paper/RSI/fade rows,
+or change routes, priority, Decision scores, calibration, thresholds,
+publication authority, or policy automatically.
+**Why:** Frozen representative selection avoids outcome-conditioned survivorship
+bias, primary-horizon censoring avoids promoting an idea from a convenient
+secondary result, and exact Decision/Core/ledger bindings make cohort evidence
+auditable without silently reinterpreting historical rows.
+**Revisit when:** Enough primary representatives have matured to support
+predeclared matched controls, dependency-aware uncertainty estimates, and a
+genuine out-of-sample comparison. Any runtime use requires a separate versioned
+human decision with frozen thresholds and rollback criteria.
+
 ## 2026-07-15 - Measure repeated anomalies as fixed-start shadow episodes
 **Status:** accepted
 **Decision:** Partition validated market-anomaly candidates from campaign-counted
