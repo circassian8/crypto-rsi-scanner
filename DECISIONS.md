@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Derive catalyst source authority from canonical identity only
+**Status:** accepted
+**Decision:** Official exchange, official project, structured, derivatives,
+supply, market-data, prediction-market, and named-news source classes are
+derived by the canonical source registry from exact provider ids or exact/child
+trusted hostnames. Article text, `source_origin`, caller-provided class hints,
+generic `official` language, shared Medium/GitHub hosting, and suffix look-alike
+domains cannot establish authority. `project_blog_rss` is a transport rather
+than automatic official-project attestation. Evidence-quality scoring reuses
+the registry's authority and confidence cap. A source pack validates an impact
+path only when the registry class is in that pack's declared validator set;
+`can_validate_impact_path` is not a fallback bypass. Unverified claims remain
+capped context with `source_authority_unverified`. Existing historical bytes
+are preserved rather than silently reclassified in place.
+**Why:** Content mentioning an exchange could previously classify an unrelated
+GDELT article as an official exchange source, and arbitrary Medium/GitHub pages
+could become official project evidence. Those labels minted official proof
+tokens and could satisfy deterministic source-pack gates.
+**Revisit when:** A versioned project-domain ownership registry or signed source
+attestation is implemented. Shared-host ownership must be proven explicitly;
+it must never be inferred from article wording or a generic hosting domain.
+
 ## 2026-07-15 - Reject impossible catalyst source clocks before attachment
 **Status:** accepted
 **Decision:** Catalyst-search evidence whose `published_at` or `fetched_at` is

@@ -42,6 +42,22 @@ SOURCE_ACTIVATION_ORDER = (
     "cryptopanic_context",
     "rss_gdelt_context_only",
 )
+SOURCE_AUTHORITY_POLICY: dict[str, Any] = {
+    "canonical_classifier": "event_alpha.providers.source_registry",
+    "authority_inputs": ["exact canonical provider id", "exact or child trusted hostname"],
+    "article_text_may_establish_authority": False,
+    "source_origin_or_source_class_hint_may_establish_authority": False,
+    "shared_hosting_authority": {
+        "medium.com": "context_only_without_separate_ownership_attestation",
+        "github.com": "context_only_without_separate_ownership_attestation",
+    },
+    "lookalike_hostname_policy": "exact-or-child boundary match; sibling and suffix lookalikes fail closed",
+    "project_blog_rss_role": "transport_not_automatic_official_project_attestation",
+    "evidence_quality_reuses_registry_authority": True,
+    "source_pack_impact_validation": "requires membership in declared impact_path_validating_sources",
+    "unverified_authority_claim_action": "retain as capped context with source_authority_unverified",
+    "historical_artifacts_rewritten": False,
+}
 ARCHITECTURE_COMPONENTS: dict[str, dict[str, Any]] = {
     "asset_universe": {
         "role": "Defines the tradable asset universe and filters out quotes, sectors, themes, and proxy-only assets unless explicitly labeled.",
@@ -557,6 +573,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "api_keys_required_for_tests": False,
         "purpose": "Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.",
         "architecture": deepcopy(ARCHITECTURE_COMPONENTS),
+        "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
         "product_layers": deepcopy(PRODUCT_LAYERS),
         "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "market_no_send_generation": deepcopy(MARKET_NO_SEND_GENERATION),
@@ -915,6 +932,25 @@ def _append_decision_model_north_star(
                 lines.append(f"  - {item}")
 
 
+def _append_source_authority_north_star(lines: list[str], payload: Mapping[str, Any]) -> None:
+    source_authority = (
+        payload.get("source_authority_policy")
+        if isinstance(payload.get("source_authority_policy"), Mapping)
+        else {}
+    )
+    lines.extend(["## Catalyst Source Authority", ""])
+    for key, value in source_authority.items():
+        if isinstance(value, Mapping):
+            lines.append(f"- {key}:")
+            for child_key, child in value.items():
+                lines.append(f"  - {child_key}: `{child}`")
+        elif isinstance(value, list):
+            lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
+        else:
+            lines.append(f"- {key}: `{value}`")
+    lines.append("")
+
+
 def format_north_star(payload: Mapping[str, Any]) -> str:
     lines = [
         "# Event Alpha Radar North Star — Catalyst Radar",
@@ -942,6 +978,7 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
                 "",
             ]
         )
+    _append_source_authority_north_star(lines, payload)
     layers = payload.get("product_layers") if isinstance(payload.get("product_layers"), Mapping) else {}
     lines.extend(["## Product Layering", ""])
     for key, value in layers.items():

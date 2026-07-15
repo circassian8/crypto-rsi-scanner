@@ -614,6 +614,50 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
     assert low_quality.evidence_quality_score <= 55
 
 
+def test_evidence_quality_uses_registry_authority_and_contract_caps():
+    import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
+    import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+
+    untrusted = (
+        {
+            "provider": "gdelt",
+            "source_url": "https://reuters.example/story",
+            "title": "Binance will list TEST in an official announcement",
+            "body": "TEST token listing creates a direct trading mechanism.",
+        },
+        {
+            "provider": "gdelt",
+            "source_url": "https://medium.com/@random/test",
+            "title": "Official project TEST listing",
+            "body": "TEST token offers direct pre-IPO exposure.",
+        },
+        {
+            "provider": "gdelt",
+            "source_url": "https://binance.evil.example/story",
+            "title": "TEST listing",
+            "body": "TEST token listing creates a direct trading mechanism.",
+        },
+    )
+    for row in untrusted:
+        registry = event_source_registry.assess_source(row, symbol="TEST", coin_id="test")
+        quality = event_evidence_quality.evaluate_evidence_quality(row, symbol="TEST", coin_id="test")
+        assert registry.source_class == "broad_news"
+        assert quality.source_class == "broad_news"
+        assert quality.evidence_quality_score <= registry.confidence_cap <= 58
+        assert "source_authority_unverified" in quality.reason_codes
+
+    official = {
+        "provider": "official_exchange",
+        "title": "TEST listing",
+        "body": "TEST/USDT trading pair will be listed.",
+    }
+    registry = event_source_registry.assess_source(official, symbol="TEST", coin_id="test")
+    quality = event_evidence_quality.evaluate_evidence_quality(official, symbol="TEST", coin_id="test")
+    assert registry.source_class == "official_exchange"
+    assert quality.source_class == "official_exchange"
+    assert quality.evidence_quality_score <= registry.confidence_cap
+
+
 def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor

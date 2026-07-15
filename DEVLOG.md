@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Close catalyst source-authority spoofing · Codex
+**Why:** The source registry derived official/structured authority from article
+text and substring domains, so an unrelated article mentioning Binance or an
+arbitrary Medium/GitHub page could mint official proof and satisfy a source
+pack. Evidence-quality scoring also had a second, contradictory classifier.
+**Changes:**
+- Made the canonical registry classify authoritative providers from exact
+  internal provider ids or exact/child trusted hostnames. Hostname parsing now
+  ignores userinfo/ports, rejects suffix look-alikes, and treats article text,
+  caller source hints, Medium/GitHub, and generic project RSS as non-authority.
+- Reused the registry in evidence-quality scoring, applied its confidence and
+  catalyst-capability caps to non-fixture evidence, and retained fixture-only
+  route coverage without granting it live authority.
+- Required source-pack impact validation to use each pack's declared validator
+  classes and stopped non-validator assessments from leaking impact-path proof
+  tokens.
+- Replaced the one synthetic `fixture_binance` golden row with the real
+  producer-shaped `binance_announcements` identity and first-party hostname, so
+  fixture route coverage no longer depends on a production-invalid authority
+  alias.
+- Added provider/domain/content-spoof regressions, kept real Binance provider
+  and hostname cases green, and updated both North Star contracts, the durable
+  decision, and the active roadmap.
+**Verify:** `110 passed` across source registry, evidence quality/acquisition,
+impact hypotheses, Core opportunities, radar pipeline, exchange/news providers,
+and North Star health; all 36 signal-quality golden cases pass; `make
+verify-fast PYTHON=python3` passed 1,965 tests plus alert rendering, fixture
+backtest, and paper-scoreboard gates in 111.16 seconds; `python3 -m compileall -q
+crypto_rsi_scanner tests`;
+Decision/Event North Star JSON parsing; `git diff --check`; and `make
+architecture-cleanliness-check PYTHON=python3` passed with zero new size
+violations. A pointer-free integrated fixture cycle in an isolated `/tmp`
+artifact base produced 15 candidates, 12 Core rows/cards, and strict doctor
+`status: OK` with zero blockers/warnings.
+**Notes/risks:** Existing historical artifacts were not rewritten, no dashboard
+pointer was changed, and no provider call, send, trade, paper trade, normal RSI
+write, execution action, or Event Alpha-created `TRIGGERED_FADE` occurred.
+Legitimate projects hosted only on shared Medium/GitHub infrastructure remain
+context until a separate canonical ownership attestation exists.
+
 ## 2026-07-15 — Reject impossible catalyst source clocks · Codex
 **Why:** Catalyst search treated a source published in the future as age zero,
 awarded `fresh_24h`, and could attach it as high-confidence evidence. That made

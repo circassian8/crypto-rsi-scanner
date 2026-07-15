@@ -486,10 +486,7 @@ def evaluate_pack_evidence(
     source_class = assessment.source_class
     context_only = source_class in selected.context_only_sources
     preferred = source_class in selected.preferred_source_classes
-    impact_path_validating = (
-        source_class in selected.impact_path_validating_sources
-        or bool(assessment.can_validate_impact_path and not context_only)
-    )
+    impact_path_validating = source_class in selected.impact_path_validating_sources and not context_only
     missing = []
     if context_only:
         missing.append("source_is_context_only")
@@ -577,6 +574,17 @@ def _met_requirement_tokens(
     tokens.update(str(item) for item in _iter_values(row.get("reason_codes")))
     tokens.update(str(item) for item in _iter_values(row.get("validation_reasons")))
     tokens.update(str(item) for item in _iter_values(row.get("accepted_evidence_reason_codes")))
+    for authority_token in (
+        "official_exchange_source",
+        "official_project_source",
+        "official_source",
+        "structured_unlock_source",
+        "structured_calendar_source",
+    ):
+        tokens.discard(authority_token)
+    if not impact_path_validating:
+        tokens.discard(event_source_registry.SourceMission.IMPACT_PATH_VALIDATION.value)
+        tokens.discard("impact_path_validated")
     identity_confirmed = _row_confirms_asset_identity(row, assessment=assessment)
     identity_can_count = assessment.can_validate_token_identity
     if assessment.source_class in {

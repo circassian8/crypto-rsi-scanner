@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-13T18:57:37.808371+00:00`
+- generated_at: `2026-07-15T05:03:14.226037+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -83,6 +83,22 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - role: Reports lane/provider/source-pack usefulness, noise, and maturation rates as recommendations-only priors.
 - primary_artifacts: `event_integrated_radar_calibration_report.md, event_radar_performance_dashboard.md`
 - north_star_requirement: All prior and threshold suggestions must carry auto_apply=false until a separate explicit decision changes policy.
+
+## Catalyst Source Authority
+
+- canonical_classifier: `event_alpha.providers.source_registry`
+- authority_inputs: exact canonical provider id, exact or child trusted hostname
+- article_text_may_establish_authority: `False`
+- source_origin_or_source_class_hint_may_establish_authority: `False`
+- shared_hosting_authority:
+  - medium.com: `context_only_without_separate_ownership_attestation`
+  - github.com: `context_only_without_separate_ownership_attestation`
+- lookalike_hostname_policy: `exact-or-child boundary match; sibling and suffix lookalikes fail closed`
+- project_blog_rss_role: `transport_not_automatic_official_project_attestation`
+- evidence_quality_reuses_registry_authority: `True`
+- source_pack_impact_validation: `requires membership in declared impact_path_validating_sources`
+- unverified_authority_claim_action: `retain as capped context with source_authority_unverified`
+- historical_artifacts_rewritten: `False`
 
 ## Product Layering
 

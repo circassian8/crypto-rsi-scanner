@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping
-from urllib.parse import urlparse
 
+from crypto_rsi_scanner.event_alpha.providers import source_registry as event_source_registry
 from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from .resolver import clean_text
 
@@ -42,18 +42,6 @@ class EvidenceQualityResult:
     source_reliability_prior: float | None = None
 
 
-_CRYPTO_NEWS_DOMAINS = (
-    "coindesk",
-    "cointelegraph",
-    "decrypt",
-    "theblock",
-    "blockworks",
-    "cryptoslate",
-    "bitcoinist",
-    "newsbtc",
-)
-_OFFICIAL_EXCHANGES = ("binance", "bybit", "coinbase", "okx", "kucoin", "bitget", "kraken")
-_STRUCTURED = ("coinmarketcal", "coindar", "tokenomist", "messari", "unlock")
 _LOW_QUALITY_TERMS = ("price prediction", "market recap", "today's crypto prices", "top gainers", "technical analysis")
 _MECHANISM_TERMS = (
     "offers",
@@ -111,8 +99,6 @@ def evaluate_evidence_quality(
     """Score source hierarchy and whether text explains token-catalyst linkage."""
     raw_map = _raw_mapping(raw)
     provider = clean_text(raw_map.get("provider") or "")
-    source_url = str(raw_map.get("source_url") or "")
-    domain = clean_text(urlparse(source_url).netloc)
     payload = raw_map.get("raw_json") if isinstance(raw_map.get("raw_json"), Mapping) else {}
     source_origin = clean_text(payload.get("source_origin") or payload.get("provider") or "")
     title = str(raw_map.get("title") or "")
@@ -120,7 +106,8 @@ def evaluate_evidence_quality(
     text = clean_text(" ".join(str(value or "") for value in (title, body, source_origin, payload.get("description"))))
     category = clean_text(getattr(hypothesis, "impact_category", "") if hypothesis is not None else "")
 
-    source_class, base, reasons = _classify_source(provider, domain, source_origin, payload, text)
+    registry = event_source_registry.assess_source(raw_map, symbol=symbol, coin_id=coin_id)
+    source_class, base, reasons = _classify_source(registry)
     specificity, specificity_score, specificity_reasons = _specificity(
         text,
         symbol=symbol,
@@ -149,6 +136,17 @@ def evaluate_evidence_quality(
     if specificity == EvidenceSpecificity.SOURCE_NOISE.value:
         score = min(score, 25.0)
         reasons.append("source_noise_capped")
+    fixture_route_coverage = provider == "fixture" or provider.startswith("fixture_")
+    if fixture_route_coverage:
+        reasons.append("fixture_evidence_quality_route_coverage_only")
+    else:
+        contract_cap = registry.confidence_cap
+        if not registry.can_validate_catalyst:
+            contract_cap = min(contract_cap, 55.0)
+            reasons.append("source_cannot_validate_catalyst")
+        if score > contract_cap:
+            score = contract_cap
+            reasons.append("source_registry_confidence_cap_applied")
     prior_value = _prior_score(source_reliability_prior)
     if use_source_reliability_prior and prior_value is not None:
         adjustment = max(-10.0, min(10.0, prior_value - 50.0))
@@ -159,38 +157,33 @@ def evaluate_evidence_quality(
         source_class=source_class,
         evidence_specificity=specificity,
         reason_codes=tuple(dict.fromkeys(reasons)),
-        warnings=tuple(_warnings(source_class, specificity, text)),
+        warnings=tuple(dict.fromkeys((*registry.warnings, *_warnings(source_class, specificity, text)))),
         source_reliability_prior=prior_value if use_source_reliability_prior else None,
     )
 
 
 def _classify_source(
-    provider: str,
-    domain: str,
-    source_origin: str,
-    payload: Mapping[str, Any],
-    text: str,
+    registry: event_source_registry.SourceRegistryAssessment,
 ) -> tuple[str, float, list[str]]:
-    source_text = " ".join((provider, domain, source_origin))
-    if any(term in source_text for term in ("official", "project blog", "medium.com")):
-        return SourceClass.OFFICIAL_PROJECT.value, 82.0, ["official_project_source"]
-    if any(term in source_text for term in _OFFICIAL_EXCHANGES):
-        return SourceClass.OFFICIAL_EXCHANGE.value, 86.0, ["official_exchange_source"]
-    if any(term in source_text for term in _STRUCTURED):
-        return SourceClass.STRUCTURED_EVENT.value, 84.0, ["structured_event_source"]
-    if "cryptopanic" in source_text:
-        tags = payload.get("currencies") or payload.get("currency_tags") or payload.get("tags") or ()
-        score = 72.0 if tags else 62.0
-        return SourceClass.CRYPTOPANIC_TAGGED.value, score, ["cryptopanic_tagged" if tags else "cryptopanic_untagged"]
-    if "polymarket" in source_text or "prediction market" in source_text:
-        return SourceClass.PREDICTION_MARKET.value, 48.0, ["prediction_market_source"]
-    if any(term in text for term in _LOW_QUALITY_TERMS):
-        return SourceClass.MARKET_RECAP.value, 35.0, ["market_recap_source"]
-    if any(term in source_text for term in _CRYPTO_NEWS_DOMAINS):
-        return SourceClass.CRYPTO_NEWS.value, 64.0, ["crypto_news_source"]
-    if "gdelt" in source_text or domain:
-        return SourceClass.BROAD_NEWS.value, 48.0, ["broad_news_source"]
-    return SourceClass.SOCIAL_OR_UNKNOWN.value, 36.0, ["unknown_source"]
+    source_class = registry.source_class
+    reasons = list(registry.reason_codes)
+    mapping = {
+        event_source_registry.SourceClass.OFFICIAL_PROJECT.value: (SourceClass.OFFICIAL_PROJECT.value, 82.0),
+        event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value: (SourceClass.OFFICIAL_EXCHANGE.value, 86.0),
+        event_source_registry.SourceClass.STRUCTURED_CALENDAR.value: (SourceClass.STRUCTURED_EVENT.value, 84.0),
+        event_source_registry.SourceClass.STRUCTURED_UNLOCK.value: (SourceClass.STRUCTURED_EVENT.value, 84.0),
+        event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value: (
+            SourceClass.CRYPTOPANIC_TAGGED.value,
+            72.0 if registry.cryptopanic_currency_tag_match else 62.0,
+        ),
+        event_source_registry.SourceClass.CRYPTO_NEWS.value: (SourceClass.CRYPTO_NEWS.value, 64.0),
+        event_source_registry.SourceClass.BROAD_NEWS.value: (SourceClass.BROAD_NEWS.value, 48.0),
+        event_source_registry.SourceClass.PREDICTION_MARKET.value: (SourceClass.PREDICTION_MARKET.value, 48.0),
+        event_source_registry.SourceClass.MARKET_RECAP.value: (SourceClass.MARKET_RECAP.value, 35.0),
+        event_source_registry.SourceClass.SEO_OR_AFFILIATE.value: (SourceClass.MARKET_RECAP.value, 25.0),
+    }
+    local_class, base = mapping.get(source_class, (SourceClass.SOCIAL_OR_UNKNOWN.value, 36.0))
+    return local_class, base, reasons
 
 
 def _specificity(

@@ -170,6 +170,147 @@ def test_event_source_registry_v2_provider_semantics():
     assert "diagnostic_only_low_quality_source" in seo.warnings
 
 
+def test_source_authority_comes_from_canonical_provider_or_hostname_only():
+    import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry
+
+    untrusted_rows = (
+        {
+            "provider": "gdelt",
+            "source_url": "https://reuters.example/story",
+            "title": "Binance will list TEST in an official announcement",
+        },
+        {
+            "provider": "gdelt",
+            "source_url": "https://binance.evil.example/story",
+            "title": "TEST listing details",
+        },
+        {
+            "provider": "gdelt",
+            "source_url": "https://binance.com@evil.example/story",
+            "title": "TEST listing details",
+        },
+        {
+            "provider": "gdelt",
+            "source_url": "https://medium.com/@random/test",
+            "title": "Official project TEST update",
+        },
+        {
+            "provider": "gdelt",
+            "source_url": "https://github.com/random/test",
+            "title": "Official project TEST update",
+        },
+        {
+            "provider": "project_blog_rss",
+            "source_url": "https://example.test/project-feed",
+            "title": "Official project TEST update",
+        },
+    )
+    for row in untrusted_rows:
+        assessment = event_source_registry.assess_source(row, symbol="TEST", coin_id="test")
+        assert assessment.source_class == "broad_news"
+        assert assessment.confidence_cap <= 58
+        assert "official_confirmation" in assessment.cannot_prove
+        assert "source_authority_unverified" in assessment.reason_codes
+
+    for provider in ("binance_announcements_evil", "tokenomist_evil", "coinalyze_evil"):
+        assessment = event_source_registry.assess_source(
+            {"provider": provider, "title": "Official TEST listing and unlock"},
+            symbol="TEST",
+            coin_id="test",
+        )
+        assert assessment.source_class not in {
+            "official_exchange",
+            "official_project",
+            "structured_calendar",
+            "structured_unlock",
+            "derivatives_data",
+        }
+        assert "official_confirmation" in assessment.cannot_prove
+
+    provider_attested = event_source_registry.assess_source(
+        {"provider": "binance_announcements", "title": "Binance will list TEST"},
+        symbol="TEST",
+        coin_id="test",
+    )
+    hostname_attested = event_source_registry.assess_source(
+        {
+            "provider": "rss",
+            "source_url": "https://www.binance.com/en/support/announcement/test",
+            "title": "TEST listing",
+        },
+        symbol="TEST",
+        coin_id="test",
+    )
+    for assessment in (provider_attested, hostname_attested):
+        assert assessment.source_class == "official_exchange"
+        assert assessment.can_validate_impact_path is True
+        assert "official_confirmation" in assessment.can_prove
+
+
+def test_untrusted_authority_claims_cannot_satisfy_source_packs():
+    import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
+
+    listing = event_source_packs.source_pack_for_playbook("listing_volatility")
+    forged_listing = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "gdelt",
+            "source_url": "https://reuters.example/story",
+            "title": "Binance will list TEST in an official announcement",
+            "announcement_symbols": ("TEST",),
+            "announcement_pairs": ("TEST/USDT",),
+            "symbol": "TEST",
+            "coin_id": "test",
+            "playbook_type": "listing_volatility",
+            "market_confirmation_score": 80,
+            "reason_codes": ("official_exchange_source", "impact_path_validation"),
+            "validation_reasons": ("official_source", "impact_path_validated"),
+        },
+        pack=listing,
+    )
+    assert forged_listing["source_class"] == "broad_news"
+    assert forged_listing["source_pack_impact_path_validating_source"] is False
+    assert forged_listing["source_pack_validated_digest_sufficient"] is False
+    assert forged_listing["source_pack_watchlist_requirements_met"] is False
+    assert "official_exchange_source" not in forged_listing["source_pack_met_requirements"]
+    assert "official_source" not in forged_listing["source_pack_met_requirements"]
+    assert "impact_path_validation" not in forged_listing["source_pack_met_requirements"]
+    assert "impact_path_validated" not in forged_listing["source_pack_met_requirements"]
+
+    proxy = event_source_packs.source_pack_for_playbook(
+        "proxy_attention",
+        impact_path_type="venue_value_capture",
+    )
+    for host in ("medium.com/@random/test", "github.com/random/test"):
+        forged_project = event_source_packs.evaluate_pack_evidence(
+            {
+                "provider": "gdelt",
+                "source_url": f"https://{host}",
+                "title": "Official project TEST offers SpaceX pre-IPO exposure",
+                "body": "TEST token lets users trade synthetic SpaceX exposure.",
+                "symbol": "TEST",
+                "coin_id": "test",
+                "playbook_type": "proxy_attention",
+                "impact_path_type": "venue_value_capture",
+                "market_confirmation_score": 80,
+            },
+            pack=proxy,
+        )
+        assert forged_project["source_class"] == "broad_news"
+        assert forged_project["source_pack_impact_path_validating_source"] is False
+        assert forged_project["source_pack_validated_digest_sufficient"] is False
+        assert "official_project_source" not in forged_project["source_pack_met_requirements"]
+
+
+def test_north_star_records_closed_source_authority_policy():
+    from crypto_rsi_scanner.project_health import radar_north_star
+
+    payload = radar_north_star.build_north_star()
+    policy = payload["source_authority_policy"]
+    assert policy["article_text_may_establish_authority"] is False
+    assert policy["evidence_quality_reuses_registry_authority"] is True
+    assert "## Catalyst Source Authority" in radar_north_star.format_north_star(payload)
+
+
 def test_event_source_packs_and_feed_coverage_semantics():
     import crypto_rsi_scanner.event_alpha.providers.source_packs as event_source_packs
     import crypto_rsi_scanner.event_alpha.providers.source_registry as event_source_registry

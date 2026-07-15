@@ -557,8 +557,8 @@
       "candidate_coin_id": "perp-token",
       "raw_event": {
         "raw_id": "sq_perp_listing",
-        "provider": "fixture_binance",
-        "source_url": "https://binance.example/perp-listing",
+      "provider": "binance_announcements",
+      "source_url": "https://www.binance.com/en/support/announcement/perp-listing",
         "title": "Binance lists PERPUSDT perpetual futures pair",
         "body": "PERP is listed on Binance futures with a new trading pair and derivatives market attention.",
         "source_confidence": 0.95

@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-14T22:19:18+00:00`
+- generated_at: `2026-07-15T05:00:23+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -44,6 +44,18 @@ reject a legitimately future scheduled `event_time`: publication/fetch clocks
 describe when evidence existed, while event time describes when the catalyst is
 expected to occur. Rejected source-clock evidence remains visible in bounded
 search telemetry and never becomes causal confirmation.
+
+Catalyst source authority comes only from the canonical source registry using
+an exact provider identity or an exact/child trusted hostname. Article wording,
+caller-provided source hints, generic `official` language, and look-alike domain
+suffixes cannot establish official exchange, official project, structured, or
+market-data authority. Shared Medium and GitHub hosting and the generic
+`project_blog_rss` transport remain capped context unless a separate canonical
+ownership attestation exists. Evidence-quality scoring reuses this registry
+classification, and a source pack may validate an impact path only when the
+class appears in that pack's declared validator set. Historical bytes are not
+rewritten; current re-evaluation fails closed and records
+`source_authority_unverified`.
 
 ## One Closed Decision Authority
 

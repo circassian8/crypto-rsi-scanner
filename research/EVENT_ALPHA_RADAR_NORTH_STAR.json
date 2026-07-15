@@ -342,7 +342,7 @@
       "percent_points_10_0_normalized_percent": 10.0
     }
   },
-  "generated_at": "2026-07-13T18:57:37.808371+00:00",
+  "generated_at": "2026-07-15T05:03:14.226037+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -952,6 +952,25 @@
     "cryptopanic_context",
     "rss_gdelt_context_only"
   ],
+  "source_authority_policy": {
+    "article_text_may_establish_authority": false,
+    "authority_inputs": [
+      "exact canonical provider id",
+      "exact or child trusted hostname"
+    ],
+    "canonical_classifier": "event_alpha.providers.source_registry",
+    "evidence_quality_reuses_registry_authority": true,
+    "historical_artifacts_rewritten": false,
+    "lookalike_hostname_policy": "exact-or-child boundary match; sibling and suffix lookalikes fail closed",
+    "project_blog_rss_role": "transport_not_automatic_official_project_attestation",
+    "shared_hosting_authority": {
+      "github.com": "context_only_without_separate_ownership_attestation",
+      "medium.com": "context_only_without_separate_ownership_attestation"
+    },
+    "source_origin_or_source_class_hint_may_establish_authority": false,
+    "source_pack_impact_validation": "requires membership in declared impact_path_validating_sources",
+    "unverified_authority_claim_action": "retain as capped context with source_authority_unverified"
+  },
   "strict_alerts_created": 0,
   "telegram_sends": 0,
   "trades_created": 0,

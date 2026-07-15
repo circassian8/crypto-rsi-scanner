@@ -175,8 +175,6 @@ class _SourceDescriptorContext:
     domain: str
     payload: Mapping[str, Any]
     joined: str
-    source_class_hint: str
-    source_identity_joined: str
 
 
 @dataclass(frozen=True)
@@ -189,32 +187,85 @@ class _SourceAssessmentInputs:
     descriptor: SourceDescriptor
 
 
-_OFFICIAL_EXCHANGE_HINTS = ("binance", "bybit", "coinbase", "okx", "kucoin", "bitget", "kraken")
-_STRUCTURED_CALENDAR_HINTS = ("coinmarketcal", "coindar", "messari")
-_UNLOCK_HINTS = ("tokenomist", "unlock", "vesting")
-_DERIVATIVES_HINTS = ("coinalyze", "futures", "funding", "open-interest", "open_interest", "liquidations")
-_SUPPLY_HINTS = ("etherscan", "arkham", "dune", "tokenomist")
-_CRYPTO_NEWS_HINTS = ("coindesk", "cointelegraph", "decrypt", "theblock", "blockworks", "cryptoslate")
-_SEO_HINTS = ("price prediction", "coupon", "invite code", "best crypto to buy", "sponsored")
-_MARKET_RECAP_HINTS = ("market recap", "daily recap", "weekly recap", "top gainers", "crypto prices today")
-_MARKET_DATA_HINTS = (
+_OFFICIAL_EXCHANGE_PROVIDER_IDS = (
+    "official_exchange",
+    "binance",
+    "binance_announcements",
+    "binance_announcements_public_or_fixture",
+    "binance_announcements_signed_listener",
+    "bybit",
+    "bybit_announcements",
+    "bybit_announcements_public",
+    "coinbase",
+    "coinbase_announcements",
+    "okx",
+    "okx_announcements",
+    "kucoin",
+    "kucoin_announcements",
+    "bitget",
+    "bitget_announcements",
+    "kraken",
+    "kraken_announcements",
+)
+_OFFICIAL_EXCHANGE_DOMAIN_ROOTS = (
+    "binance.com",
+    "bybit.com",
+    "coinbase.com",
+    "okx.com",
+    "kucoin.com",
+    "bitget.com",
+    "kraken.com",
+)
+_OFFICIAL_PROJECT_PROVIDER_IDS = ("official_project", "official_project_feed")
+_STRUCTURED_CALENDAR_PROVIDER_IDS = ("coinmarketcal", "coindar", "messari_calendar")
+_STRUCTURED_CALENDAR_DOMAIN_ROOTS = ("coinmarketcal.com", "coindar.org", "messari.io")
+_UNLOCK_PROVIDER_IDS = ("tokenomist", "structured_unlock", "messari_unlocks")
+_UNLOCK_DOMAIN_ROOTS = ("tokenomist.ai",)
+_DERIVATIVES_PROVIDER_IDS = ("coinalyze", "derivatives_data")
+_DERIVATIVES_DOMAIN_ROOTS = ("coinalyze.net",)
+_SUPPLY_PROVIDER_IDS = (
+    "etherscan",
+    "etherscan_supply",
+    "arkham",
+    "arkham_supply",
+    "dune",
+    "dune_supply",
+    "tokenomist_supply",
+    "supply_data",
+)
+_SUPPLY_DOMAIN_ROOTS = ("etherscan.io", "arkhamintelligence.com", "dune.com")
+_MARKET_DATA_PROVIDER_IDS = (
     "coingecko",
+    "coingecko_market_data",
+    "coingecko_universe",
+    "coingecko_dex",
     "coinmarketcap",
     "defillama",
+    "defillama_tvl_fees_revenue",
     "geckoterminal",
-    "tvl",
-    "protocol fees",
-    "protocol revenue",
-    "dex volume",
-    "dex liquidity",
-    "pool liquidity",
-    "price impact",
-    "ohlcv",
-    "klines",
-    "price snapshot",
-    "market data",
+    "market_data",
 )
-
+_MARKET_DATA_DOMAIN_ROOTS = (
+    "coingecko.com",
+    "coinmarketcap.com",
+    "defillama.com",
+    "geckoterminal.com",
+)
+_CRYPTOPANIC_PROVIDER_IDS = ("cryptopanic",)
+_CRYPTOPANIC_DOMAIN_ROOTS = ("cryptopanic.com",)
+_PREDICTION_MARKET_PROVIDER_IDS = ("polymarket", "prediction_market", "prediction_market_events")
+_PREDICTION_MARKET_DOMAIN_ROOTS = ("polymarket.com",)
+_CRYPTO_NEWS_PROVIDER_IDS = ("crypto_news", "cryptopanic_news")
+_CRYPTO_NEWS_DOMAIN_ROOTS = (
+    "coindesk.com",
+    "cointelegraph.com",
+    "decrypt.co",
+    "theblock.co",
+    "blockworks.co",
+    "cryptoslate.com",
+)
+_SEO_HINTS = ("price prediction", "coupon", "invite code", "best crypto to buy", "sponsored")
+_MARKET_RECAP_HINTS = ("market recap", "daily recap", "weekly recap", "top gainers", "crypto prices today")
 _PLAYBOOKS_BY_SOURCE_CLASS: dict[str, tuple[str, ...]] = {
     SourceClass.OFFICIAL_PROJECT.value: (
         "proxy_attention",
@@ -273,39 +324,63 @@ def _source_descriptor_context(
     provider_text = clean_text(provider or "")
     url = str(source_url or "")
     parsed = urlparse(url)
-    domain = clean_text(parsed.netloc)
+    domain = clean_text(parsed.hostname or "").rstrip(".")
     payload = raw_json or {}
     origin = clean_text(payload.get("source_origin") or payload.get("provider") or "")
-    source_class_hint = clean_text(payload.get("source_class") or "")
-    source_kind_hint = clean_text(payload.get("kind") or "")
     joined = " ".join(part for part in (provider_text, domain, origin, clean_text(text or "")) if part)
-    source_identity_joined = " ".join(
-        part for part in (provider_text, domain, origin, source_class_hint, source_kind_hint) if part
-    )
     return _SourceDescriptorContext(
         provider_text=provider_text,
         url=url,
         domain=domain,
         payload=payload,
         joined=joined,
-        source_class_hint=source_class_hint,
-        source_identity_joined=source_identity_joined,
     )
 
 
-def _descriptor(context: _SourceDescriptorContext, reason: str, **kwargs: Any) -> SourceDescriptor:
+def _provider_matches(provider: str, roots: tuple[str, ...]) -> bool:
+    """Match one canonical provider name or one of its explicit variants."""
+    return any(provider == root or provider.startswith(f"{root}_") for root in roots)
+
+
+def _domain_matches(domain: str, roots: tuple[str, ...]) -> bool:
+    """Match an exact registrable domain or its child, never a look-alike suffix."""
+    return any(domain == root or domain.endswith(f".{root}") for root in roots)
+
+
+def _identity_matches(
+    context: _SourceDescriptorContext,
+    *,
+    provider_ids: tuple[str, ...] = (),
+    domain_roots: tuple[str, ...] = (),
+) -> bool:
+    return (
+        context.provider_text in provider_ids
+        or _domain_matches(context.domain, domain_roots)
+    )
+
+
+def _descriptor(
+    context: _SourceDescriptorContext,
+    reason: str,
+    *,
+    extra_reason_codes: tuple[str, ...] = (),
+    **kwargs: Any,
+) -> SourceDescriptor:
     return SourceDescriptor(
         provider=context.provider_text or "unknown",
         source_domain=context.domain,
         source_url=context.url,
-        reason_codes=(reason,),
+        reason_codes=(reason, *extra_reason_codes),
         **kwargs,
     )
 
 
 def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDescriptor | None:
-    joined = context.joined
-    if any(hint in joined for hint in _OFFICIAL_EXCHANGE_HINTS):
+    if _identity_matches(
+        context,
+        provider_ids=_OFFICIAL_EXCHANGE_PROVIDER_IDS,
+        domain_roots=_OFFICIAL_EXCHANGE_DOMAIN_ROOTS,
+    ):
         return _descriptor(
             context,
             "official_exchange_source",
@@ -318,7 +393,7 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             can_validate_impact_path=True,
             can_validate_event_time=True,
         )
-    if any(hint in joined for hint in ("official", "project blog", "github.com", "medium.com")):
+    if _identity_matches(context, provider_ids=_OFFICIAL_PROJECT_PROVIDER_IDS):
         return _descriptor(
             context,
             "official_project_source",
@@ -331,8 +406,10 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             can_validate_impact_path=True,
             can_validate_event_time=True,
         )
-    if context.source_class_hint == SourceClass.STRUCTURED_UNLOCK.value or any(
-        hint in context.source_identity_joined for hint in _UNLOCK_HINTS
+    if _identity_matches(
+        context,
+        provider_ids=_UNLOCK_PROVIDER_IDS,
+        domain_roots=_UNLOCK_DOMAIN_ROOTS,
     ):
         return _descriptor(
             context,
@@ -357,7 +434,11 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             ),
             useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.STRUCTURED_UNLOCK.value],
         )
-    if any(hint in joined for hint in _STRUCTURED_CALENDAR_HINTS):
+    if _identity_matches(
+        context,
+        provider_ids=_STRUCTURED_CALENDAR_PROVIDER_IDS,
+        domain_roots=_STRUCTURED_CALENDAR_DOMAIN_ROOTS,
+    ):
         return _descriptor(
             context,
             "structured_calendar_source",
@@ -381,7 +462,11 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             ),
             useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.STRUCTURED_CALENDAR.value],
         )
-    if any(hint in joined for hint in _DERIVATIVES_HINTS):
+    if _identity_matches(
+        context,
+        provider_ids=_DERIVATIVES_PROVIDER_IDS,
+        domain_roots=_DERIVATIVES_DOMAIN_ROOTS,
+    ):
         return _descriptor(
             context,
             "derivatives_data_source",
@@ -391,7 +476,11 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             confidence_cap=90.0,
             can_validate_catalyst=False,
         )
-    if any(hint in joined for hint in _SUPPLY_HINTS):
+    if _identity_matches(
+        context,
+        provider_ids=_SUPPLY_PROVIDER_IDS,
+        domain_roots=_SUPPLY_DOMAIN_ROOTS,
+    ):
         return _descriptor(
             context,
             "supply_data_source",
@@ -403,7 +492,11 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             can_validate_catalyst=True,
             can_validate_impact_path=True,
         )
-    if any(hint in joined for hint in _MARKET_DATA_HINTS):
+    return _market_or_news_data_descriptor(context)
+
+
+def _market_or_news_data_descriptor(context: _SourceDescriptorContext) -> SourceDescriptor | None:
+    if _identity_matches(context, provider_ids=_MARKET_DATA_PROVIDER_IDS, domain_roots=_MARKET_DATA_DOMAIN_ROOTS):
         return _descriptor(
             context,
             "market_data_source",
@@ -423,7 +516,7 @@ def _structured_source_descriptor(context: _SourceDescriptorContext) -> SourceDe
             ),
             useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.MARKET_DATA.value],
         )
-    if "cryptopanic" in joined:
+    if _identity_matches(context, provider_ids=_CRYPTOPANIC_PROVIDER_IDS, domain_roots=_CRYPTOPANIC_DOMAIN_ROOTS):
         tags = _currency_tags(context.payload)
         return _descriptor(
             context,
@@ -460,7 +553,11 @@ def _news_or_fallback_source_descriptor(context: _SourceDescriptorContext) -> So
             source_quality_prior=32.0,
             confidence_cap=40.0,
         )
-    if "polymarket" in joined or "prediction market" in joined:
+    if _identity_matches(
+        context,
+        provider_ids=_PREDICTION_MARKET_PROVIDER_IDS,
+        domain_roots=_PREDICTION_MARKET_DOMAIN_ROOTS,
+    ):
         return _descriptor(
             context,
             "prediction_market_context_source",
@@ -471,7 +568,11 @@ def _news_or_fallback_source_descriptor(context: _SourceDescriptorContext) -> So
             can_validate_catalyst=True,
             can_validate_event_time=True,
         )
-    if any(hint in joined for hint in _CRYPTO_NEWS_HINTS):
+    if _identity_matches(
+        context,
+        provider_ids=_CRYPTO_NEWS_PROVIDER_IDS,
+        domain_roots=_CRYPTO_NEWS_DOMAIN_ROOTS,
+    ):
         return _descriptor(
             context,
             "crypto_news_source",
@@ -481,10 +582,12 @@ def _news_or_fallback_source_descriptor(context: _SourceDescriptorContext) -> So
             confidence_cap=80.0,
             can_validate_catalyst=True,
         )
-    if "gdelt" in joined or context.domain:
+    if _provider_matches(context.provider_text, ("gdelt", "rss", "project_blog_rss")) or context.domain:
+        unverified = _source_authority_unverified(context)
         return _descriptor(
             context,
             "broad_news_source",
+            extra_reason_codes=("source_authority_unverified",) if unverified else (),
             source_class=SourceClass.BROAD_NEWS.value,
             default_mission=SourceMission.EXTERNAL_CONTEXT.value,
             source_quality_prior=48.0,
@@ -492,6 +595,30 @@ def _news_or_fallback_source_descriptor(context: _SourceDescriptorContext) -> So
             can_validate_catalyst=True,
         )
     return _descriptor(context, "unknown_source")
+
+
+def _source_authority_unverified(context: _SourceDescriptorContext) -> bool:
+    if _domain_matches(context.domain, ("medium.com", "github.com")):
+        return True
+    username = clean_text(urlparse(context.url).username or "")
+    if any(exchange in username for exchange in ("binance", "bybit", "coinbase", "okx", "kucoin", "bitget", "kraken")):
+        return True
+    text = clean_text(context.joined)
+    return any(
+        phrase in text
+        for phrase in (
+            "official announcement",
+            "official project",
+            "project blog",
+            "binance",
+            "bybit",
+            "coinbase",
+            "okx",
+            "kucoin",
+            "bitget",
+            "kraken",
+        )
+    )
 
 
 def assess_source(
@@ -523,6 +650,8 @@ def assess_source(
     mission_value = str(mission.value if isinstance(mission, SourceMission) else mission or descriptor.default_mission)
     reasons = list(descriptor.reason_codes)
     warnings: list[str] = []
+    if "source_authority_unverified" in reasons:
+        warnings.append("source_authority_unverified")
     prior = descriptor.source_quality_prior
     cap = descriptor.confidence_cap
     can_identity = descriptor.can_validate_token_identity
