@@ -387,6 +387,17 @@
       "radar-market-campaign-report"
     ]
   },
+  "catalyst_source_clock_policy": {
+    "future_event_time_allowed": true,
+    "future_source_timestamp_action": "reject_before_attachment",
+    "future_source_timestamp_reason": "source_timestamp_in_future",
+    "future_tolerance_minutes": 5,
+    "source_timestamp_fields": [
+      "published_at",
+      "fetched_at"
+    ],
+    "zero_score_threshold_may_override": false
+  },
   "market_observation_campaign": {
     "artifact_inputs_only": true,
     "event_alpha_catalyst_burn_in": "separate_not_aggregated",

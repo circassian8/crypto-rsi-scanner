@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-15 - Reject impossible catalyst source clocks before attachment
+**Status:** accepted
+**Decision:** Catalyst-search evidence whose `published_at` or `fetched_at` is
+more than five minutes after the explicit evaluation clock receives score zero,
+is rejected before attachment, and records `source_timestamp_in_future` plus the
+offending field. This is a hard validity rule even if the ordinary result-score
+threshold is configured to zero. A future structured `event_time` remains
+valid when the article publication/fetch clock is current because scheduled
+event time and evidence-availability time are separate facts.
+**Why:** Clamping a negative source age to zero converted impossible chronology
+into the strongest freshness bucket and could promote evidence that did not yet
+exist. The five-minute tolerance matches the existing bounded market-clock skew
+policy without weakening identity, provenance, or score gates.
+**Revisit when:** Provider-specific signed timestamps justify a different
+bounded skew tolerance through an explicit source contract; never infer a wider
+tolerance from content or score.
+
 ## 2026-07-15 - Close Daily Operations publication with phase-specific receipts
 **Status:** accepted
 **Decision:** Daily Operations v1.1 preserves the immutable prepublication

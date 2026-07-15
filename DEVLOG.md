@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-15 — Reject impossible catalyst source clocks · Codex
+**Why:** Catalyst search treated a source published in the future as age zero,
+awarded `fresh_24h`, and could attach it as high-confidence evidence. That made
+impossible chronology look stronger instead of failing closed.
+**Changes:**
+- Added a five-minute bounded source-clock tolerance for catalyst-search
+  `published_at` and `fetched_at`. Materially future source clocks now score
+  zero, retain field-specific rejection telemetry, and cannot attach even when
+  the ordinary acceptance threshold is configured to zero.
+- Kept scheduled catalyst time semantically separate: a future structured
+  `event_time` remains valid when publication/fetch evidence is current.
+- Added direct and end-to-end regressions, updated the Decision Radar North Star
+  Markdown/JSON contract and durable decision, and recorded the remaining
+  evidence-quality work in the roadmap.
+**Verify:** `37 passed` across catalyst search, radar pipeline, market
+enrichment, and source-registry tests; `python3 -m compileall -q
+crypto_rsi_scanner tests`; Decision North Star JSON parse; `git diff --check`;
+and `make architecture-cleanliness-check PYTHON=python3` passed with zero new
+size violations and clean transitional/naming/old-import gates.
+**Notes/risks:** No provider call, send, trade, paper trade, normal RSI write,
+execution action, or Event Alpha-created `TRIGGERED_FADE` occurred. Catalyst
+thresholds and routes are unchanged; this only rejects invalid source clocks.
+
 ## 2026-07-15 — Harden Daily Operations publication and audit truth v1.1 · Codex
 **Why:** Daily Operations needed one coherent post-publication truth across the
 pointer, strict doctor, operator state, campaign report, dashboard history, and

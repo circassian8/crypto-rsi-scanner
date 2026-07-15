@@ -67,6 +67,7 @@ def run_catalyst_search(
         )
     accepted_results: list[SearchResultEvent] = []
     rejected_results: list[SearchResultEvent] = list(provider_rejected)
+    result_skip_reasons: dict[str, int] = {}
     seen_content: set[str] = set()
     threshold = _confidence_threshold(cfg.min_result_confidence)
     for result in provider_events:
@@ -79,6 +80,18 @@ def run_catalyst_search(
             reasons = list(score.reason_codes)
         else:
             seen_content.add(content_key)
+        if "source_timestamp_in_future" in reasons:
+            result_skip_reasons["source_timestamp_in_future"] = (
+                result_skip_reasons.get("source_timestamp_in_future", 0) + 1
+            )
+            rejected_results.append(replace(
+                result,
+                raw_event=_annotate_scored_result(result.raw_event, score.score, reasons),
+                result_score=score.score,
+                result_score_reasons=tuple(dict.fromkeys(reasons)),
+                accepted=False,
+            ))
+            continue
         if cfg.require_live_source and _is_fixture_source(result.raw_event, provider_name=getattr(provider, "name", "")):
             reasons.append("fixture_source_rejected")
             rejected_results.append(replace(
@@ -118,7 +131,7 @@ def run_catalyst_search(
         query_count=len(queries),
         result_count=len(accepted_results),
         rejected_count=len(rejected_results),
-        skip_reasons=skip_reasons,
+        skip_reasons=_merge_reason_counts(skip_reasons, result_skip_reasons),
     )
 def run_hypothesis_search(
     hypotheses: Iterable[object],
@@ -181,6 +194,17 @@ def run_hypothesis_search(
             reasons = list(score.reason_codes)
         else:
             seen_content.add(content_key)
+        if "source_timestamp_in_future" in reasons:
+            result_skip_reasons["source_timestamp_in_future"] = (
+                result_skip_reasons.get("source_timestamp_in_future", 0) + 1
+            )
+            rejected_results.append(replace(
+                result,
+                result_score=score.score,
+                result_score_reasons=tuple(dict.fromkeys(reasons)),
+                accepted=False,
+            ))
+            continue
         hypothesis = hypothesis_by_id.get(result.query.anomaly_raw_id)
         query_type = str(getattr(result.query, "query_type", "") or "candidate_validation")
         catalyst_ok = _result_mentions_hypothesis_catalyst(result.raw_event, hypothesis)

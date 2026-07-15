@@ -181,6 +181,169 @@ def test_event_catalyst_search_scaffold_attaches_evidence_without_bypassing_disc
     assert listing_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
 
 
+def test_event_catalyst_search_rejects_future_source_clocks_but_allows_future_event_time():
+    from dataclasses import replace
+    from datetime import datetime, timedelta, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:test:2026-07-15",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="TEST market anomaly",
+        body="No catalyst validated.",
+        raw_json={
+            "market": {"symbol": "TEST", "coin_id": "test-token", "name": "Test Token"},
+            "anomaly": {"score": 95},
+        },
+        source_confidence=0.70,
+        content_hash="market-anomaly-test",
+    )
+    current_source = RawDiscoveredEvent(
+        raw_id="test-listing",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://exchange.example.test/test-listing",
+        title="Official exchange will list Test Token (TEST)",
+        body="TEST spot trading opens tomorrow.",
+        raw_json={
+            "event": {
+                "event_type": "exchange_listing",
+                "event_time": (now + timedelta(days=1)).isoformat(),
+            }
+        },
+        source_confidence=0.95,
+        content_hash="test-listing",
+    )
+    query = event_catalyst_search.generate_search_query_objects_for_anomaly(
+        anomaly,
+        max_queries=1,
+    )[0]
+
+    scheduled_score = event_catalyst_search.score_search_result(
+        current_source,
+        query,
+        anomaly,
+        now=now,
+    )
+    assert scheduled_score.score >= 50
+    assert "fresh_24h" in scheduled_score.reason_codes
+    assert "source_timestamp_in_future" not in scheduled_score.reason_codes
+
+    future_published = replace(
+        current_source,
+        published_at=now + timedelta(minutes=6),
+        content_hash="test-listing-future-published",
+    )
+    future_fetched = replace(
+        current_source,
+        published_at=now,
+        fetched_at=now + timedelta(minutes=6),
+        content_hash="test-listing-future-fetched",
+    )
+    for raw, field_reason in (
+        (future_published, "source_published_at_in_future"),
+        (future_fetched, "source_fetched_at_in_future"),
+    ):
+        score = event_catalyst_search.score_search_result(raw, query, anomaly, now=now)
+        assert score.score == 0
+        assert "source_timestamp_in_future" in score.reason_codes
+        assert field_reason in score.reason_codes
+        assert "fresh_24h" not in score.reason_codes
+
+    tolerated_skew = replace(
+        current_source,
+        published_at=now + timedelta(minutes=5),
+        content_hash="test-listing-tolerated-skew",
+    )
+    tolerated_score = event_catalyst_search.score_search_result(
+        tolerated_skew,
+        query,
+        anomaly,
+        now=now,
+    )
+    assert "source_timestamp_in_future" not in tolerated_score.reason_codes
+
+
+def test_event_catalyst_search_future_source_never_attaches_even_at_zero_threshold():
+    from datetime import datetime, timedelta, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:test:2026-07-15",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="TEST market anomaly",
+        body="No catalyst validated.",
+        raw_json={
+            "market": {"symbol": "TEST", "coin_id": "test-token", "name": "Test Token"},
+            "anomaly": {"score": 95},
+        },
+        source_confidence=0.70,
+        content_hash="market-anomaly-test",
+    )
+    future_source = RawDiscoveredEvent(
+        raw_id="test-listing-future",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now + timedelta(days=7),
+        source_url="https://exchange.example.test/test-listing",
+        title="Official exchange will list Test Token (TEST)",
+        body="TEST spot trading opens tomorrow.",
+        raw_json={"event": {"event_type": "exchange_listing"}},
+        source_confidence=1.0,
+        content_hash="test-listing-future",
+    )
+    query = event_catalyst_search.generate_search_query_objects_for_anomaly(
+        anomaly,
+        max_queries=1,
+    )[0]
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(
+        {query.query: (future_source,)}
+    )
+
+    result = event_catalyst_search.run_catalyst_search(
+        (anomaly,),
+        provider,
+        cfg=event_catalyst_search.EventCatalystSearchConfig(
+            enabled=True,
+            max_anomalies=1,
+            max_queries_per_anomaly=1,
+            max_results_per_query=1,
+            min_anomaly_score=60,
+            min_result_confidence=0.0,
+        ),
+        now=now,
+    )
+
+    assert result.result_count == 0
+    assert result.rejected_count == 1
+    assert result.attached_raw_events[0].raw_id == anomaly.raw_id
+    assert len(result.attached_raw_events) == 1
+    assert result.skip_reasons["source_timestamp_in_future"] == 1
+    rejected = result.rejected_result_events[0]
+    assert rejected.accepted is False
+    assert rejected.result_score == 0
+    assert "source_timestamp_in_future" in rejected.result_score_reasons
+    assert (
+        rejected.raw_event.raw_json["market_anomaly_catalyst_search_source"][
+            "result_score_reasons"
+        ]
+        == list(rejected.result_score_reasons)
+    )
+
+
 def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
     import tempfile
     from dataclasses import replace

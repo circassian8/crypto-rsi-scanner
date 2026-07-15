@@ -89,15 +89,19 @@ def score_search_result(
     if any(hint in text for hint in HIGH_CONFIDENCE_SOURCE_HINTS):
         score += 8
         reasons.append("high_confidence_source_hint")
+    future_timestamp_fields = _future_source_timestamp_fields(raw_event, observed)
     published = raw_event.published_at or raw_event.fetched_at
-    if published is not None:
-        age_hours = max(0.0, (observed - _as_utc(published)).total_seconds() / 3600.0)
+    if published is not None and not future_timestamp_fields:
+        age_hours = (observed - _as_utc(published)).total_seconds() / 3600.0
         if age_hours <= 24:
             score += 8
             reasons.append("fresh_24h")
         elif age_hours > 24 * 14:
             score -= 22
             reasons.append("stale_result_penalty")
+    if future_timestamp_fields:
+        reasons.append("source_timestamp_in_future")
+        reasons.extend(f"source_{field}_in_future" for field in future_timestamp_fields)
     if any(phrase in text for phrase in LOW_QUALITY_PHRASES):
         score -= 28
         reasons.append("market_recap_penalty")
@@ -116,7 +120,33 @@ def score_search_result(
     elif identity_missing and not candidate_discovery_asset:
         score = min(score, 45)
         reasons.append("identity_missing_cap")
+    if future_timestamp_fields:
+        score = 0
     return CatalystSearchScore(max(0, min(100, int(round(score)))), tuple(dict.fromkeys(reasons)))
+
+
+def _future_source_timestamp_fields(
+    raw_event: RawDiscoveredEvent,
+    observed: datetime,
+) -> tuple[str, ...]:
+    """Return impossible source-clock fields without confusing them with event time.
+
+    A future scheduled ``event_time`` is valid catalyst content.  A source's
+    publication or fetch timestamp beyond the bounded clock-skew tolerance is
+    not valid freshness evidence and must fail closed before attachment.
+    """
+
+    cutoff = observed + SOURCE_TIMESTAMP_FUTURE_TOLERANCE
+    fields: list[str] = []
+    for field_name, value in (
+        ("published_at", raw_event.published_at),
+        ("fetched_at", raw_event.fetched_at),
+    ):
+        if value is not None and _as_utc(value) > cutoff:
+            fields.append(field_name)
+    return tuple(fields)
+
+
 def _weighted_term_hits(text: str, weights: Mapping[str, int]) -> tuple[str, ...]:
     return tuple(term for term in weights if term in text)
 def _looks_generic_major_market_article(text: str) -> bool:

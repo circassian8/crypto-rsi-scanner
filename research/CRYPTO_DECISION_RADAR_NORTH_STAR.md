@@ -36,6 +36,15 @@ never be added to Catalyst Radar burn-in thresholds or scorecards. Historical
 market-provenance `burn_in_*` fields remain readable compatibility metadata;
 they do not silently reclassify or rewrite an older row.
 
+Catalyst freshness is source-clock evidence, not a score hint. A search result
+whose `published_at` or `fetched_at` is more than five minutes after the
+evaluation clock is rejected before attachment and cannot earn a freshness
+bonus, even when an operator lowers the ordinary score threshold. This does not
+reject a legitimately future scheduled `event_time`: publication/fetch clocks
+describe when evidence existed, while event time describes when the catalyst is
+expected to occur. Rejected source-clock evidence remains visible in bounded
+search telemetry and never becomes causal confirmation.
+
 ## One Closed Decision Authority
 
 `decision_model_values(raw_row)` returns the canonical, schema-backed Decision

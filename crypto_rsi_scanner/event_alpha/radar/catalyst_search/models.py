@@ -76,6 +76,7 @@ HIGH_CONFIDENCE_SOURCE_HINTS = (
     "gdelt",
     "official",
 )
+SOURCE_TIMESTAMP_FUTURE_TOLERANCE = timedelta(minutes=5)
 COMMON_WORD_SYMBOLS = {
     "HYPE",
     "PRIME",
