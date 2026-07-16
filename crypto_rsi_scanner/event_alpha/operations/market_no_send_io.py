@@ -12,7 +12,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ..artifacts import schema_v1
 from .market_no_send_models import MarketNoSendError
 
 
@@ -78,6 +77,11 @@ def write_json_immutable(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
+    # Schema registration imports provenance helpers that depend on this
+    # low-level I/O module.  Resolve the compatibility facade only when a row
+    # is actually written so either side can be imported first.
+    from ..artifacts import schema_v1
+
     lines = []
     for row in rows:
         stamped = schema_v1.stamp_artifact_row(row, path=path)

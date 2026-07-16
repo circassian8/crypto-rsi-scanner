@@ -49,6 +49,36 @@ def _frame(
     )
 
 
+@pytest.mark.parametrize("unit", ("ns", "us", "ms", "s"))
+def test_timestamp_index_preserves_datetime_dtype_units(unit: str) -> None:
+    expected = pd.date_range(
+        start=_START,
+        periods=4,
+        freq="1D",
+        tz="UTC",
+    ).as_unit(unit)
+
+    observed = empirical_replay_controls._timestamp_index(expected)
+
+    assert list(observed) == list(expected)
+    assert observed[0].year == 2025
+
+
+@pytest.mark.parametrize(
+    ("unit", "scale"),
+    (("s", 1), ("ms", 1_000), ("us", 1_000_000), ("ns", 1_000_000_000)),
+)
+def test_timestamp_index_normalizes_integer_epoch_units(unit: str, scale: int) -> None:
+    seconds = int(_START.timestamp())
+    raw = [seconds * scale, (seconds + 86_400) * scale]
+
+    observed = empirical_replay_controls._timestamp_index(raw)
+
+    assert list(observed) == list(
+        pd.date_range(start=_START, periods=2, freq="1D", tz="UTC")
+    )
+
+
 def _observation(symbol: str, **overrides: object) -> dict[str, object]:
     row: dict[str, object] = {
         "canonical_asset_id": f"asset-{symbol.casefold()}",

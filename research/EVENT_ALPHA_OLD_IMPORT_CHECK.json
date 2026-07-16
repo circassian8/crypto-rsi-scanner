@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 6644,
+          "line": 6671,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-16T08:16:11.416092+00:00",
+  "generated_at": "2026-07-16T08:24:16.134947+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1097,
-  "input_fingerprint": "d16176550d5742dfba547ebcf02903e394d6bc51f947437864de565266133b1f",
+  "input_fingerprint": "286bb0eff52807c8bcbede8cfb5f43715a7bc33f799e778612c4a68b92997ae8",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DEVLOG.md:1784189765",
-    "ROADMAP.md:1784189765",
-    "crypto_rsi_scanner/event_alpha/dashboard/research_lab_page.py:1784189699",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784189552",
-    "research/ARCHITECTURE_SIZE_GATES.md:1784189549"
+    "DEVLOG.md:1784190250",
+    "ROADMAP.md:1784190250",
+    "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py:1784190062",
+    "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py:1784190062",
+    "crypto_rsi_scanner/event_alpha/operations/market_no_send_io.py:1784190066"
   ],
-  "newest_source_mtime": 1784189768.9219205,
+  "newest_source_mtime": 1784190253.8926291,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784189543.5896928,
+  "report_mtime": 1784189771.4173348,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1097,
-    "input_fingerprint": "d16176550d5742dfba547ebcf02903e394d6bc51f947437864de565266133b1f",
+    "input_fingerprint": "286bb0eff52807c8bcbede8cfb5f43715a7bc33f799e778612c4a68b92997ae8",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DEVLOG.md:1784189765",
-      "ROADMAP.md:1784189765",
-      "crypto_rsi_scanner/event_alpha/dashboard/research_lab_page.py:1784189699",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784189552",
-      "research/ARCHITECTURE_SIZE_GATES.md:1784189549"
+      "DEVLOG.md:1784190250",
+      "ROADMAP.md:1784190250",
+      "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py:1784190062",
+      "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py:1784190062",
+      "crypto_rsi_scanner/event_alpha/operations/market_no_send_io.py:1784190066"
     ],
-    "newest_source_mtime": 1784189768.9219205,
+    "newest_source_mtime": 1784190253.8926291,
     "regex_compile_count": 124,
-    "report_mtime": 1784189543.5896928,
-    "scan_duration_seconds": 2.1781,
+    "report_mtime": 1784189771.4173348,
+    "scan_duration_seconds": 1.9996,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 62,
     "scanned_makefile_files": 1,
@@ -2556,7 +2556,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.1781,
+  "scan_duration_seconds": 1.9996,
   "scanned_doc_files": 62,
   "scanned_source_files": 837,
   "scanned_test_files": 194,

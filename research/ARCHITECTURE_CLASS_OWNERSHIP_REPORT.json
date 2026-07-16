@@ -1535,7 +1535,7 @@
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-16T08:16:19.779189+00:00",
+  "generated_at": "2026-07-16T08:24:23.829281+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2989,6 +2989,13 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1496,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -2996,14 +3003,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1487,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1481,
+      "line_count": 1492,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3594,17 +3594,17 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1496,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
-        "line_count": 1487,
-        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1481,
+        "line_count": 1492,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
         "threshold": 1200
       },

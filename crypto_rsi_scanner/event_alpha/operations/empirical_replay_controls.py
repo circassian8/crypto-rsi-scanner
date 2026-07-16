@@ -1337,13 +1337,24 @@ def _endpoint_return(
 
 def _timestamp_index(values: Any) -> pd.DatetimeIndex:
     series = pd.Series(values)
-    numeric = pd.to_numeric(series, errors="coerce")
-    if len(series) and numeric.notna().all():
-        maximum = float(numeric.abs().max())
-        unit = "ns" if maximum >= 1e16 else "ms" if maximum >= 1e11 else "s"
-        result = pd.to_datetime(numeric, unit=unit, utc=True)
-    else:
+    if pd.api.types.is_datetime64_any_dtype(series.dtype):
         result = pd.to_datetime(series, utc=True)
+    else:
+        numeric = pd.to_numeric(series, errors="coerce")
+        if len(series) and numeric.notna().all():
+            maximum = float(numeric.abs().max())
+            unit = (
+                "ns"
+                if maximum >= 1e17
+                else "us"
+                if maximum >= 1e14
+                else "ms"
+                if maximum >= 1e11
+                else "s"
+            )
+            result = pd.to_datetime(numeric, unit=unit, utc=True)
+        else:
+            result = pd.to_datetime(series, utc=True)
     return pd.DatetimeIndex(result)
 
 

@@ -82,6 +82,36 @@ def _benchmarks() -> dict[str, pd.DataFrame]:
     }
 
 
+@pytest.mark.parametrize("unit", ("ns", "us", "ms", "s"))
+def test_timestamp_index_preserves_datetime_dtype_units(unit: str) -> None:
+    expected = pd.date_range(
+        start=_START,
+        periods=4,
+        freq="1D",
+        tz="UTC",
+    ).as_unit(unit)
+
+    observed = empirical_replay_outcomes._timestamp_index(expected)
+
+    assert list(observed) == list(expected)
+    assert observed[0].year == 2025
+
+
+@pytest.mark.parametrize(
+    ("unit", "scale"),
+    (("s", 1), ("ms", 1_000), ("us", 1_000_000), ("ns", 1_000_000_000)),
+)
+def test_timestamp_index_normalizes_integer_epoch_units(unit: str, scale: int) -> None:
+    seconds = int(_START.timestamp())
+    raw = [seconds * scale, (seconds + 86_400) * scale]
+
+    observed = empirical_replay_outcomes._timestamp_index(raw)
+
+    assert list(observed) == list(
+        pd.date_range(start=_START, periods=2, freq="1D", tz="UTC")
+    )
+
+
 def test_primary_and_sensitivity_returns_are_fractional_and_same_bar_is_excluded() -> None:
     asset = _frame(
         [100.0, 110.0, 120.0, 130.0] + [130.0] * 11,

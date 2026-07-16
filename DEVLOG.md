@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Restore locked-runtime replay and schema import parity · Codex
+**Why:** The combined release audit used the hash-pinned `.venv` and exposed two
+bugs hidden by system Python: pandas 3 uses microsecond datetime indexes, and a
+schema/operations import cycle could permanently leave the `schema_v1`
+compatibility facade half initialized. Both invalidate release reproducibility
+even though isolated system-Python tests were green.
+**Changes:**
+- Made both empirical replay timestamp normalizers recognize datetime dtypes
+  before numeric conversion and distinguish seconds, milliseconds,
+  microseconds, and nanoseconds for raw epoch arrays. This preserves pandas
+  2/ns and pandas 3/us inputs without changing the frozen observation clock.
+- Broke the schema initialization cycle at its narrow low-level boundary by
+  resolving `schema_v1` only when `market_no_send_io.write_jsonl()` actually
+  stamps rows. Importing Decision schemas, feedback eligibility, or the schema
+  facade first now yields the same complete 36-schema registry.
+- Added cross-version timestamp-unit regressions and isolated subprocess import
+  order tests so normal pytest ordering cannot mask either defect.
+**Verify:** The locked `.venv` combined empirical/dashboard stack passed 208
+tests after the focused replay/schema/source-store/market stack passed 134.
+System-Python parity passed 71 focused tests; the two timestamp files alone
+passed 56 tests on each pandas version. Both compileall passes, the manual
+schema-order reproducer, and `git diff --check` passed.
+**Notes/risks:** Timestamp normalization is part of the replay code fingerprint.
+The previously published bundle remains valid immutable historical evidence,
+but current-code reproducibility requires a new medium/full selection, sealed
+final test, and seven-report publication before release completion.
+
 ## 2026-07-16 — Close the dashboard Research Lab evidence contract · Codex
 **Why:** The first Research Lab surface still treated four independently parsed
 files as sufficient and could recompute or mislabel partial empirical truth.

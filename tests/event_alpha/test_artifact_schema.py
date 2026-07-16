@@ -2,12 +2,64 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
+import json
+from pathlib import Path
+import subprocess
+import sys
 
 from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 from crypto_rsi_scanner.event_alpha.artifacts.schema import calendar as calendar_schema
 from crypto_rsi_scanner.event_alpha.doctor import check_registry, schema_doctor
+
+
+_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_schema_v1_import_order_is_stable_in_isolated_processes():
+    import_orders = (
+        (
+            "schema_first",
+            (
+                "import crypto_rsi_scanner.event_alpha.artifacts.schema_v1 as schema_v1\n"
+                "import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility\n"
+            ),
+        ),
+        (
+            "feedback_first",
+            (
+                "import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility\n"
+                "import crypto_rsi_scanner.event_alpha.artifacts.schema_v1 as schema_v1\n"
+            ),
+        ),
+        (
+            "decision_schema_first",
+            (
+                "import crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model\n"
+                "import crypto_rsi_scanner.event_alpha.artifacts.schema_v1 as schema_v1\n"
+            ),
+        ),
+    )
+    assertions = (
+        "assert schema_v1.EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION == "
+        "'event_alpha_schema_v1'\n"
+        "assert 'integrated_radar_candidate_v1' in schema_v1.SCHEMAS\n"
+        "assert schema_v1.get_schema('core_opportunity_v1') is "
+        "schema_v1.SCHEMAS['core_opportunity_v1']\n"
+    )
+
+    for label, imports in import_orders:
+        completed = subprocess.run(
+            [sys.executable, "-c", imports + assertions],
+            cwd=_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert completed.returncode == 0, (
+            f"{label} failed:\n{completed.stdout}{completed.stderr}"
+        )
 
 
 def _operator_state_schema_row(artifacts):

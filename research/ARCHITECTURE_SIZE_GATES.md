@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-16T08:16:16.380440+00:00`
+- generated_at: `2026-07-16T08:24:20.668569+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -92,9 +92,9 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 |
 | `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1496 |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1487 |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1481 |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1467 |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1465 |
@@ -160,8 +160,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1487 |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1481 |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1410 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py` | 1389 |
@@ -177,12 +177,12 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_burn_in_operations.py` | 1497 |
 | `tests/event_alpha/test_market_no_send.py` | 1492 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
+| `tests/event_alpha/test_artifact_schema.py` | 1479 |
 | `tests/event_alpha/test_operator_workflows.py` | 1464 |
 | `tests/event_alpha/test_radar_dashboard.py` | 1461 |
 | `tests/event_alpha/test_decision_model_v2.py` | 1460 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1430 |
-| `tests/event_alpha/test_artifact_schema.py` | 1427 |
 | `tests/event_alpha/test_namespace_integrations.py` | 1421 |
 | `tests/event_alpha/test_core_opportunities.py` | 1407 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1309 |
