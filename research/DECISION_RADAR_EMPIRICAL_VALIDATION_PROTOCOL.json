@@ -49,6 +49,7 @@
     "unobserved_cost_label": "assumed_sensitivity_not_observed"
   },
   "episodes": {
+    "boundary_rule": "member_observed_at_lte_episode_start_plus_window",
     "dependent_repeats_counted_as_independent": false,
     "identity": [
       "canonical_asset_id",
@@ -74,7 +75,8 @@
     "sensitivity_window_hours": [
       12,
       48
-    ]
+    ],
+    "window_end_inclusive": true
   },
   "false_positive_and_late_rules": {
     "classification_is_descriptive": true,
@@ -97,7 +99,8 @@
     ],
     "rsi_lookback_days": 14,
     "volatility_lookback_days": 30,
-    "volume_zscore_lookback_days": 90
+    "volume_zscore_lookback_days": 90,
+    "volume_zscore_min_observations": 20
   },
   "frozen_at": "2026-07-16T06:00:00Z",
   "historical_sources": [
@@ -419,4 +422,3 @@
     ]
   }
 }
-

@@ -53,6 +53,7 @@ from .empirical_replay_data_dataset import ReplayDataset
 from .empirical_replay_data_error import ReplayDataError
 from .empirical_replay_data_mode import ReplayDataModeConfig
 from .empirical_replay_data_series import ReplaySeries
+from . import empirical_validation_protocol
 
 
 CATALOG_SCHEMA_ID = "decision_radar.empirical_replay_input_catalog"
@@ -101,9 +102,24 @@ def replay_data_mode_config(mode: str) -> ReplayDataModeConfig:
 
     name = str(mode or "").strip().casefold()
     try:
-        return REPLAY_DATA_MODE_CONFIGS[name]
+        data_mode = REPLAY_DATA_MODE_CONFIGS[name]
     except KeyError as exc:
         raise ReplayDataError(f"replay_data_mode_invalid:{name or 'missing'}") from exc
+    _validate_data_mode_protocol_alignment(data_mode)
+    return data_mode
+
+
+def _validate_data_mode_protocol_alignment(data_mode: ReplayDataModeConfig) -> None:
+    warmup = empirical_validation_protocol.protocol_values()["feature_warmup"]
+    if (
+        data_mode.volume_z_window
+        != int(warmup["volume_zscore_lookback_days"])
+        or data_mode.volume_z_min_observations
+        != int(warmup["volume_zscore_min_observations"])
+    ):
+        raise ReplayDataError(
+            f"replay_data_mode_volume_zscore_protocol_drift:{data_mode.name}"
+        )
 
 
 def load_binance_cache_dataset(

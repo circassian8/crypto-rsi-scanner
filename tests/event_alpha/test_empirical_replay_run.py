@@ -1,20 +1,105 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import socket
 from pathlib import Path
 
 import pytest
 
-from crypto_rsi_scanner.event_alpha.operations.empirical_replay_run import (
-    execute_empirical_replay,
+from crypto_rsi_scanner.event_alpha.operations import (
+    empirical_policy_lab,
+    empirical_replay_persistence,
+    empirical_replay_run,
+    empirical_replay_store,
+    empirical_validation_protocol,
 )
+from crypto_rsi_scanner.event_alpha.operations.empirical_replay_run import execute_empirical_replay
 from crypto_rsi_scanner.event_alpha.operations.empirical_replay_store import (
+    MAX_ARTIFACT_BYTES,
+    MAX_BUNDLE_BYTES,
     load_manifest,
 )
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = PROJECT_ROOT / "fixtures" / "backtest_smoke" / "klines"
+
+
+def _zero_safety() -> dict[str, object]:
+    return {
+        "research_only": True,
+        "auto_apply": False,
+        "provider_calls": 0,
+        "authorization_mutations": 0,
+        "telegram_sends": 0,
+        "trades": 0,
+        "orders": 0,
+        "event_alpha_paper_trades": 0,
+        "normal_rsi_writes": 0,
+        "event_alpha_triggered_fade": 0,
+        "dashboard_authority_mutations": 0,
+    }
+
+
+def _write_bound_selection_run(tmp_path: Path, *, mode: str = "full") -> Path:
+    protocol = empirical_validation_protocol.protocol_values()
+    protocol_sha256 = empirical_validation_protocol.protocol_sha256(protocol)
+    input_sha256 = "b" * 64
+    code_sha256 = empirical_replay_store.code_fingerprint(
+        empirical_replay_run._code_paths()
+    )
+    configuration = {
+        "mode": mode,
+        "partitions": ["development", "validation"],
+        "universe_top_n": 100,
+        "research_only": True,
+        "auto_apply": False,
+    }
+    run_fingerprint = empirical_replay_store.run_fingerprint(
+        protocol_sha256=protocol_sha256,
+        input_sha256=input_sha256,
+        code_sha256=code_sha256,
+        configuration=configuration,
+    )
+    simulation = empirical_policy_lab.simulate_shadow_policies(
+        (),
+        (),
+        partitions=("development", "validation"),
+        protocol=protocol,
+    )
+    seal = empirical_policy_lab.freeze_recommendation_set(
+        simulation,
+        selection_run_binding={
+            "selection_run_fingerprint": run_fingerprint,
+            "input_sha256": input_sha256,
+            "code_sha256": code_sha256,
+            "configuration_sha256": hashlib.sha256(
+                empirical_replay_store.canonical_json_bytes(configuration)
+            ).hexdigest(),
+            "mode": mode,
+            "simulation_artifact": "shadow_policy_simulation.json",
+        },
+    )
+    stored = empirical_replay_store.write_immutable_run(
+        tmp_path / "selection",
+        protocol_version=protocol["protocol_version"],
+        protocol_sha256=protocol_sha256,
+        input_sha256=input_sha256,
+        code_sha256=code_sha256,
+        configuration=configuration,
+        artifacts={
+            "shadow_policy_simulation.json": empirical_replay_store.canonical_json_bytes(
+                simulation
+            ),
+            "recommendation_seal.json": empirical_replay_store.canonical_json_bytes(
+                seal
+            ),
+        },
+        metrics={"idea_count": 0},
+        safety=_zero_safety(),
+    )
+    return stored.run_dir / "recommendation_seal.json"
 
 
 def test_fixture_execution_is_immutable_resumable_bounded_and_authority_neutral(
@@ -61,7 +146,39 @@ def test_fixture_execution_is_immutable_resumable_bounded_and_authority_neutral(
     assert manifest["safety"]["dashboard_authority_mutations"] == 0
     assert manifest["metrics"]["idea_count"] == first.summary["idea_count"]
     assert "replay_controls.json" in manifest["artifacts"]
+    assert "targeted_review_queue.json" in manifest["artifacts"]
     assert manifest["artifacts"]["replay_trace_examples.jsonl"]["size_bytes"] > 0
+    assert empirical_replay_persistence.IDEA_INDEX_FILENAME in manifest["artifacts"]
+    assert empirical_replay_persistence.EPISODE_INDEX_FILENAME in manifest["artifacts"]
+    assert "replay_ideas.jsonl" not in manifest["artifacts"]
+    assert "replay_episode_outcomes.json" not in manifest["artifacts"]
+    assert manifest["configuration"]["persistence_schema_version"] == 1
+    assert manifest["configuration"]["artifact_shard_target_bytes"] == 8 * 1024 * 1024
+    assert "empirical_replay_persistence.py" in empirical_replay_run._code_paths()
+    assert "empirical_review.py" in empirical_replay_run._code_paths()
+    review_queue = json.loads(
+        (first.run_dir / "targeted_review_queue.json").read_text(encoding="utf-8")
+    )
+    assert review_queue["research_only"] is True
+    assert review_queue["auto_apply"] is False
+    assert manifest["metrics"]["targeted_review_item_count"] == review_queue["item_count"]
+    payloads = {
+        name: (first.run_dir / name).read_bytes()
+        for name in manifest["artifacts"]
+    }
+    ideas = empirical_replay_persistence.decode_archive_rows(
+        empirical_replay_persistence.IDEA_INDEX_FILENAME,
+        payloads,
+    )
+    episodes = empirical_replay_persistence.decode_archive_rows(
+        empirical_replay_persistence.EPISODE_INDEX_FILENAME,
+        payloads,
+    )
+    assert len(ideas) == manifest["metrics"]["idea_count"]
+    assert len(episodes) == manifest["metrics"]["episode_count"]
+    assert all(row["decision_projection"]["research_only"] is True for row in ideas)
+    assert max(row["size_bytes"] for row in manifest["artifacts"].values()) <= MAX_ARTIFACT_BYTES
+    assert sum(row["size_bytes"] for row in manifest["artifacts"].values()) <= MAX_BUNDLE_BYTES
 
 
 def test_existing_run_artifact_drift_fails_closed(tmp_path: Path) -> None:
@@ -70,7 +187,13 @@ def test_existing_run_artifact_drift_fails_closed(tmp_path: Path) -> None:
         input_dir=FIXTURES,
         output_root=tmp_path / "lab",
     )
-    (first.run_dir / "runtime_report.json").write_text("{}\n")
+    manifest = load_manifest(first.run_dir)
+    idea_part = next(
+        name
+        for name in manifest["artifacts"]
+        if name.startswith(empirical_replay_persistence.IDEA_PART_PREFIX)
+    )
+    (first.run_dir / idea_part).write_bytes(b"changed\n")
     with pytest.raises(RuntimeError, match="manifest_invalid"):
         execute_empirical_replay(
             mode="fixture-smoke",
@@ -88,15 +211,61 @@ def test_final_test_requires_valid_preexisting_seal_before_input_access(tmp_path
             output_root=tmp_path / "lab",
         )
 
-    fake_seal = tmp_path / "seal.json"
+    fake_seal = tmp_path / "recommendation_seal.json"
     fake_seal.write_text("{}\n")
-    with pytest.raises(ValueError, match="recommendation seal invalid"):
+    with pytest.raises(ValueError, match="recommendation seal unreadable"):
         execute_empirical_replay(
             mode="final-test",
             input_dir=missing_input,
             output_root=tmp_path / "lab",
             recommendation_seal_path=fake_seal,
         )
+
+
+def test_final_test_accepts_only_exact_full_selection_bundle(tmp_path: Path) -> None:
+    seal_path = _write_bound_selection_run(tmp_path)
+    loaded = empirical_replay_run._load_recommendation_seal(seal_path)
+    assert loaded["selection_run_binding"]["mode"] == "full"
+
+    selection_manifest = load_manifest(seal_path.parent)
+    simulation_path = seal_path.parent / "shadow_policy_simulation.json"
+    original = simulation_path.read_bytes()
+    simulation_path.write_bytes(original + b" ")
+    with pytest.raises(ValueError, match="recommendation seal unreadable"):
+        empirical_replay_run._load_recommendation_seal(seal_path)
+    simulation_path.write_bytes(original)
+    assert load_manifest(seal_path.parent) == selection_manifest
+
+    medium_seal_path = _write_bound_selection_run(tmp_path / "medium", mode="medium")
+    with pytest.raises(ValueError, match="selection run binding invalid"):
+        empirical_replay_run._load_recommendation_seal(medium_seal_path)
+
+
+def test_replay_fingerprint_covers_behavior_bearing_dependency_closure() -> None:
+    paths = empirical_replay_run._code_paths()
+    expected = {
+        "empirical_replay_observations.py",
+        "empirical_replay_data_bar.py",
+        "empirical_replay_data_dataset.py",
+        "empirical_replay_data_mode.py",
+        "empirical_replay_statistics.py",
+        "empirical_replay_dimensions.py",
+        "empirical_operator_burden.py",
+        "empirical_replay_persistence.py",
+        "empirical_replay_benchmark_metrics.py",
+        "empirical_missed_attribution.py",
+        "empirical_review.py",
+        "decision_policy.py",
+        "decision_projection_schema.py",
+        "market_units.py",
+        "rsi_technical_context.py",
+        "config.py",
+        "state_features.py",
+        "indicators.py",
+        "signal_registry.py",
+    }
+    assert expected <= set(paths)
+    assert all(path.is_file() and not path.is_symlink() for path in paths.values())
 
 
 def test_non_final_mode_rejects_seal_before_input_access(tmp_path: Path) -> None:

@@ -142,6 +142,22 @@ def write_immutable_run(
 
 
 def load_manifest(run_dir: str | Path) -> dict[str, Any]:
+    """Load one exact manifest after validating every immutable run artifact."""
+
+    manifest, _payloads = load_verified_run(run_dir)
+    return manifest
+
+
+def load_verified_run(
+    run_dir: str | Path,
+) -> tuple[dict[str, Any], dict[str, bytes]]:
+    """Return a complete descriptor-read bundle after exact manifest checks.
+
+    This is intentionally all-or-nothing.  Consumers such as the sealed final-
+    test loader must not validate one receipt while reading its source
+    simulation from a different namespace snapshot.
+    """
+
     supplied = Path(run_dir).expanduser()
     if supplied.is_symlink():
         raise RuntimeError("empirical_replay_run_namespace_unsafe")
@@ -164,7 +180,7 @@ def load_manifest(run_dir: str | Path) -> dict[str, Any]:
     errors = validate_manifest(manifest, payloads, expected_run_fingerprint=directory.name)
     if errors:
         raise RuntimeError("empirical_replay_manifest_invalid:" + ";".join(errors))
-    return manifest
+    return manifest, payloads
 
 
 def validate_manifest(
@@ -341,6 +357,7 @@ __all__ = [
     "canonical_json_bytes",
     "code_fingerprint",
     "load_manifest",
+    "load_verified_run",
     "run_fingerprint",
     "validate_manifest",
     "write_immutable_run",

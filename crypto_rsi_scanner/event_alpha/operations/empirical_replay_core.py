@@ -218,6 +218,14 @@ def _evaluate_observation(
         "chase_risk_score": projection["chase_risk_score"],
         "directional_bias": projection["directional_bias"],
         "hard_blockers": list(projection["hard_blockers"]),
+        "warnings": list(projection["warnings"]),
+        "catalyst_status": projection["catalyst_status"],
+        "spread_status": projection["spread_status"],
+        "rsi_context_present": bool(
+            projection.get("rsi_context_references")
+            or idea.get("rsi_context_references")
+            or idea.get("rsi_context")
+        ),
         "market_snapshot": snapshot,
     }
     return trace, idea

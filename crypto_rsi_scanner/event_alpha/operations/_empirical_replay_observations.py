@@ -234,6 +234,29 @@ def _observation_payload(
         basis == "cross_sectional_proxy" for basis in feature_basis.values()
     )
     return_24h = values["return_24h"]
+    observed_at = _iso(bar.observed_at)
+    rsi_value = values["rsi"]
+    rsi_context_references = []
+    if rsi_value is not None:
+        rsi_context_references.append(
+            {
+                "context_type": "daily_rsi_observation",
+                "context_version": "empirical_daily_rsi_observation_v1",
+                "rsi_value": rsi_value,
+                "rsi_timeframe": "1d",
+                "observed_at": observed_at,
+                "data_basis": "historical_ohlcv",
+                "timing_basis": "point_in_time_completed_daily_bar",
+                "read_only": True,
+                "authoritative": False,
+                "technical_thesis_origin_allowed": False,
+                "score_adjustment_allowed": False,
+                "policy_adjustment_allowed": False,
+                "actionability_adjustment": 0.0,
+                "risk_adjustment": 0.0,
+                "research_only": True,
+            }
+        )
     return {
         "schema_id": OBSERVATION_SCHEMA_ID,
         "schema_version": OBSERVATION_SCHEMA_VERSION,
@@ -258,7 +281,11 @@ def _observation_payload(
         "data_quality_status": "partial" if bar.full_daily_bar else "partial_bar",
         "catalyst_evidence_timing": "unavailable",
         "calendar_evidence_timing": "unavailable",
-        "rsi_context_timing": "temporal_direct" if values["rsi"] is not None else "missing",
+        "rsi_context_timing": (
+            "point_in_time_completed_daily_bar" if rsi_value is not None else "missing"
+        ),
+        "rsi_context_basis": "historical_ohlcv" if rsi_value is not None else "missing",
+        "rsi_context_references": rsi_context_references,
         "direct_proxy_class": "mixed_proxy" if proxy_feature_count else "temporal_direct",
         "direct_feature_count": direct_feature_count,
         "proxy_feature_count": proxy_feature_count,
@@ -269,7 +296,7 @@ def _observation_payload(
         "canonical_asset_id": item.canonical_asset_id,
         "canonical_asset_id_basis": "historical_exchange_symbol",
         "bar_open_at": _iso(bar.bar_open_at),
-        "observed_at": _iso(bar.observed_at),
+        "observed_at": observed_at,
         "bar_duration_seconds": bar.bar_duration_seconds,
         "bar_duration_status": "full_daily" if bar.full_daily_bar else "partial_daily",
         "full_daily_bar": bar.full_daily_bar,
@@ -296,7 +323,7 @@ def _observation_payload(
         "relative_return_vs_btc_24h": relative_btc,
         "relative_return_vs_eth_24h": relative_eth,
         "volume_zscore_24h": values["volume_zscore_24h"],
-        "rsi": values["rsi"],
+        "rsi": rsi_value,
         "market_regime": regime,
         "spread_bps": None,
         "spread_status": "unavailable",

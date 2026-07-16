@@ -60,6 +60,7 @@ def _idea(**overrides: object) -> dict[str, object]:
         "trailing_quote_volume": 4_000_000.0,
         "data_quality_mode": "historical_ohlcv",
         "point_in_time_universe_member": True,
+        "point_in_time_volume_rank": 17,
         "baseline_status": "complete",
         "operator_visible_idea": True,
         "catalyst_evidence_timing": "unavailable",
@@ -252,25 +253,38 @@ def test_fixed_start_episode_freezes_first_representative_and_retains_progressio
         idea_id="boundary",
         observed_at=(_START + timedelta(hours=24)).isoformat(),
     )
-    original_rows = deepcopy([first, dependent, exact_boundary])
+    outside_boundary = _idea(
+        idea_id="outside-boundary",
+        observed_at=(_START + timedelta(hours=24, seconds=1)).isoformat(),
+    )
+    original_rows = deepcopy([first, dependent, exact_boundary, outside_boundary])
     asset_frame = _frame([100.0] * 15, start=_START + timedelta(hours=12))
     original_frame = asset_frame.copy(deep=True)
 
     result = empirical_replay_outcomes.build_empirical_replay_outcomes(
-        [exact_boundary, dependent, first],
+        [outside_boundary, exact_boundary, dependent, first],
         {"AAA": asset_frame},
         evaluated_at=_START + timedelta(days=14),
     )
 
     assert result["episode_count"] == 2
-    assert result["dependent_repeat_count"] == 1
+    assert result["dependent_repeat_count"] == 2
+    assert result["episode_boundary_rule"] == (
+        "member_observed_at_lte_episode_start_plus_window"
+    )
+    assert result["schema_version"] == 2
+    assert result["episodes"][0]["window_end_inclusive_at"] == (
+        "2025-01-02T00:00:00+00:00"
+    )
+    assert "window_end_exclusive_at" not in result["episodes"][0]
     episode = result["episodes"][0]
     assert episode["representative_idea_id"] == "first"
     assert episode["representative_reselected"] is False
     assert episode["representative_outcome"]["status"] == "missing_data"
-    assert episode["member_count"] == 2
+    assert episode["member_count"] == 3
     assert [row["radar_route"] for row in episode["member_progression"]] == [
         "dashboard_watch",
+        "actionable_watch",
         "actionable_watch",
     ]
     assert episode["member_progression"][1]["actionability_score"] == 75.0
@@ -281,6 +295,7 @@ def test_fixed_start_episode_freezes_first_representative_and_retains_progressio
     assert episode["member_progression"][1]["decision_projection"]["marker"] == (
         "dependent"
     )
+    assert episode["representative"]["point_in_time_volume_rank"] == 17.0
     assert episode["representative"]["episode_id"] == episode["episode_id"]
     assert episode["representative_outcome"]["episode_id"] == episode["episode_id"]
     assert episode["representative"]["partition"] == "development"
@@ -289,7 +304,8 @@ def test_fixed_start_episode_freezes_first_representative_and_retains_progressio
     assert episode["representative"]["liquidity_tier"] == "high"
     assert episode["representative"]["data_quality_mode"] == "historical_ohlcv"
     assert episode["representative"]["point_in_time_membership"] is True
-    assert [first, dependent, exact_boundary] == original_rows
+    assert result["episodes"][1]["representative_idea_id"] == "outside-boundary"
+    assert [first, dependent, exact_boundary, outside_boundary] == original_rows
     assert_frame_equal(asset_frame, original_frame)
     assert set(result["safety"].values()) <= {True, False, 0}
     assert result["safety"]["provider_calls"] == 0

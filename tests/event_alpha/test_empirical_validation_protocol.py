@@ -42,8 +42,14 @@ def test_frozen_protocol_closes_primary_outcome_controls_and_missed_move_rule() 
 
     assert values["outcomes"]["primary_horizon_days"] == 3
     assert values["observation"]["same_bar_high_low_for_outcome_forbidden"] is True
+    assert values["feature_warmup"]["volume_zscore_lookback_days"] == 90
+    assert values["feature_warmup"]["volume_zscore_min_observations"] == 20
     assert values["episodes"]["representative"] == "first_eligible_observation"
     assert values["episodes"]["representative_reselection"] == "forbidden"
+    assert values["episodes"]["window_end_inclusive"] is True
+    assert values["episodes"]["boundary_rule"] == (
+        "member_observed_at_lte_episode_start_plus_window"
+    )
     assert values["matched_controls"]["selection_uses_outcomes"] is False
     assert values["missed_opportunity_rule"]["maximum_future_excursion_alone_is_sufficient"] is False
     assert values["missed_opportunity_rule"]["classification_occurs_only_after_maturity"] is True
@@ -75,6 +81,12 @@ def test_protocol_mutations_fail_closed() -> None:
     safety = protocol.protocol_values()
     safety["safety"]["provider_calls"] = 1
     mutation_cases.append(safety)
+    warmup = protocol.protocol_values()
+    warmup["feature_warmup"]["volume_zscore_min_observations"] = 19
+    mutation_cases.append(warmup)
+    episode = protocol.protocol_values()
+    episode["episodes"]["window_end_inclusive"] = False
+    mutation_cases.append(episode)
 
     for values in mutation_cases:
         assert protocol.validate_protocol(values)

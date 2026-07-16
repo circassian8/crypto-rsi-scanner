@@ -9,6 +9,7 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_replay_store import (
     MANIFEST_FILENAME,
     code_fingerprint,
     load_manifest,
+    load_verified_run,
     run_fingerprint,
     write_immutable_run,
 )
@@ -61,6 +62,10 @@ def test_immutable_run_writes_manifest_and_exact_resume(tmp_path: Path) -> None:
     assert manifest["run_fingerprint"] == first.run_fingerprint
     assert manifest["artifacts"]["ideas.jsonl"]["size_bytes"] == len(b'{"id":"one"}\n')
     assert manifest["safety"] == _safety()
+    verified_manifest, payloads = load_verified_run(first.run_dir)
+    assert verified_manifest == manifest
+    assert payloads["ideas.jsonl"] == b'{"id":"one"}\n'
+    assert payloads[MANIFEST_FILENAME] == (first.run_dir / MANIFEST_FILENAME).read_bytes()
 
 
 def test_immutable_run_rejects_mutation_and_extra_files(tmp_path: Path) -> None:

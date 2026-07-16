@@ -2,7 +2,7 @@
 
 - Protocol: `decision_radar_empirical_validation_v1`
 - Frozen at: `2026-07-16T06:00:00Z` before final-test evaluation
-- SHA-256: `ff1de1a64a54e339f753532f712d0514c0344ddd011fa3783ae6d23750661c24`
+- SHA-256: `5a8901865a8b78fae3fac8929d42ee41a9e41eea728f5bf8a9a2163f39347fa5`
 - Validation: `valid`
 - Research-only; recommendations never auto-apply to production.
 
@@ -18,13 +18,13 @@ Final-test outcomes may reject a frozen recommendation, but they may not select 
 
 ## Point-in-time replay
 
-Daily observations are formed at the completed Binance candle close. Universe membership is the trailing 30-day quote-volume rank calculated with data available at that close. Rolling features use current and earlier bars only. The locally cached candidate pool retains a documented delisting-survivorship limitation.
+Daily observations are formed at the completed Binance candle close. Universe membership is the trailing 30-day quote-volume rank calculated with data available at that close. Rolling features use current and earlier bars only. The volume z-score uses a frozen 90-day lookback and requires 20 prior observations. Available daily RSI is retained only as read-only historical-OHLCV, point-in-time observational context; it cannot adjust scores, policy, or thesis origin. The locally cached candidate pool retains a documented delisting-survivorship limitation.
 
 Intraday returns, historical spread/order-book quality, market cap, derivatives, calendar, catalyst, and on-chain context remain explicitly unavailable or missing unless an exact time-valid source is supplied. They are never invented or silently proxied.
 
 ## Outcomes and episodes
 
-The frozen primary horizon is 3 days; 1, 7, and 14 days are sensitivity horizons. Outcome bars begin after the idea bar. Return, BTC/ETH-relative return, MFE, MAE, time-to-extremes, invalidation, continuation/reversal, expiry, and post-expiry behavior are measured. Fixed-start 24-hour episodes freeze the first eligible representative and retain dependent route/score/context progression without inflating sample size.
+The frozen primary horizon is 3 days; 1, 7, and 14 days are sensitivity horizons. Outcome bars begin after the idea bar. Return, BTC/ETH-relative return, MFE, MAE, time-to-extremes, invalidation, continuation/reversal, expiry, and post-expiry behavior are measured. Fixed-start 24-hour episodes use an inclusive window end: an observation exactly 24 hours after the representative remains a dependent repeat. The first eligible representative stays frozen and dependent route/score/context progression is retained without inflating sample size.
 
 ## Controls, costs, and uncertainty
 

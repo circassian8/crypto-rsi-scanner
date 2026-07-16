@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Close empirical replay integrity before final-test access · Codex
+**Why:** A pre-final audit found that daily observations exactly 24 hours apart
+were counted as independent episodes, the recommendation seal did not bind the
+complete selection run, and full top-100 persistence would exceed the bounded
+archive contract. The existing top-30 evidence therefore could not be used to
+open the holdout.
+**Changes:**
+- Corrected the frozen episode rule to an inclusive 24-hour end, aligned
+  matched-control representatives to the same boundary, declared the 90-day /
+  20-observation volume-z warm-up, and retained daily RSI plus point-in-time
+  volume rank as observational context without changing scores or routes.
+- Made final-test seals immutable-run receipts: they now bind the exact full
+  top-100 development/validation manifest, input/code/configuration digests,
+  canonical scenario definitions, simulation bytes, protocol, and artifact
+  set. Descriptor-read bundle verification rejects mutation and no-op scenarios
+  can no longer become policy candidates.
+- Replaced duplicated replay snapshots with canonical Decision-v2 projections,
+  digest-bound episode references, and deterministic 8 MiB plaintext shards;
+  the fixture bundle remains below the 32 MiB per-file / 96 MiB total gates and
+  preserves secret/path scanning.
+- Expanded evidence to closed Decision dimensions, point-in-time asset/provider
+  cohorts, all 1/3/7/14-day paths, expiry/timing, all-eight-baseline robust and
+  cost metrics, closed missed-move attribution, and twelve outcome-blind
+  notification-budget simulations. Missing catalyst/spread/calendar/
+  notification state remains explicitly unavailable.
+- Added a bounded targeted-review queue and a separate confirmation-gated,
+  descriptor-anchored append-only human-label ledger. Feedback is scoped to the
+  exact queue/run/protocol/evidence mode and cannot affect policy automatically.
+**Verify:** 123 focused empirical/live/dashboard tests passed; compileall and
+`git diff --check` passed. `make radar-replay-smoke PYTHON=python3` wrote
+immutable fingerprint `a88806686c0d...` with 1,095 observations, 5 independent
+episodes, 59 predeclared misses, 12 review items, four compact shards, zero
+provider calls, and zero authority mutations. `make
+architecture-cleanliness-check PYTHON=python3` passed with zero new violations.
+**Notes/risks:** The prior top-30 runs remain immutable audit history but are
+superseded for selection because their exclusive boundary inflated independent
+sample size. The final-test partition remains unopened. A corrected medium run
+and then one full top-100 development/validation run must complete before its
+exact seal may be used once on the holdout.
+
 ## 2026-07-16 — Reject behaviorally identical shadow policies · Codex
 **Why:** A shadow scenario that produces no route change or cooldown suppression
 is not an empirical policy candidate, even when its unchanged outcome metrics

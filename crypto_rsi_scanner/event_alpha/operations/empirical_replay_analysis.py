@@ -12,13 +12,14 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import statistics
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable, Mapping, Sequence
 
 from . import empirical_validation_protocol
+from . import empirical_replay_dimensions
+from . import empirical_operator_burden
 from .empirical_replay_statistics import _bootstrap_mean_ci, _mean, _robust_summary
 
 
@@ -36,15 +37,7 @@ ROUTES = (
     "calendar_risk",
     "diagnostic",
 )
-PRIMARY_ORIGINS = (
-    "market_led",
-    "catalyst_led",
-    "technical_led",
-    "derivatives_led",
-    "onchain_led",
-    "fundamental_led",
-    "macro_led",
-)
+PRIMARY_ORIGINS = empirical_replay_dimensions.CONTRIBUTING_ORIGINS
 SCORE_FIELDS = (
     "actionability_score",
     "evidence_confidence_score",
@@ -231,6 +224,15 @@ def _analysis_payload(
         if view.representative.get("analysis_role") == "missed_candidate"
         or _operator_visible_state(view.representative) is False
     ]
+    dimension_analysis = empirical_replay_dimensions.build_empirical_dimension_analysis(
+        (
+            {"episode_id": view.episode_id, "representative": view.representative, "outcome": view.outcome}
+            for view in views
+        ),
+        partition=partition,
+        evidence_mode=evidence_mode,
+        bootstrap_resamples=bootstrap_resamples,
+    )
 
     payload: dict[str, Any] = {
         "schema_id": SCHEMA_ID,
@@ -294,6 +296,7 @@ def _analysis_payload(
             evidence_mode=evidence_mode,
             bootstrap_resamples=bootstrap_resamples,
         ),
+        "dimension_analysis": dimension_analysis,
         "market_catalyst_cohorts": market_catalyst_cohorts,
         "cost_sensitivity": _cost_sensitivity(
             views,
@@ -643,43 +646,13 @@ def operator_burden(
     partition: str,
     evidence_mode: str,
 ) -> dict[str, Any]:
-    """Return deterministic daily and family-level operator-load rows."""
+    """Return the frozen, outcome-blind operator burden simulation."""
 
-    rows = [
-        _flatten_representative(row)
-        for row in representatives
-        if isinstance(row, Mapping)
-    ]
-    rows.sort(key=lambda row: (_text(row.get("observed_at")), _text(row.get("episode_id"))))
-    days: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    families: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
-        days[_date_label(row.get("observed_at"))].append(row)
-        families[_family(row)].append(row)
-    day_rows = [
-        _burden_row("day", name, grouped, partition=partition, evidence_mode=evidence_mode)
-        for name, grouped in sorted(days.items())
-    ]
-    family_rows = [
-        _burden_row("family", name, grouped, partition=partition, evidence_mode=evidence_mode)
-        for name, grouped in sorted(families.items())
-    ]
-    return {
-        "partition": partition,
-        "evidence_mode": evidence_mode,
-        "episode_count": len(rows),
-        "observed_day_count": len(day_rows),
-        "family_count": len(family_rows),
-        "mean_ideas_per_observed_day": (
-            len(rows) / len(day_rows) if day_rows else None
-        ),
-        "daily": day_rows,
-        "families": family_rows,
-        "notification_state_inferred": False,
-        "policy_eligible": False,
-        "research_only": True,
-        "auto_apply": False,
-    }
+    return empirical_operator_burden.build_operator_notification_burden(
+        representatives,
+        partition=partition,
+        evidence_mode=evidence_mode,
+    )
 
 
 def _cohort_row(
@@ -1276,66 +1249,6 @@ def _false_late_issue_sources(row: Mapping[str, Any], symptoms: Sequence[str]) -
     return list(dict.fromkeys(sources))
 
 
-def _burden_row(
-    dimension: str,
-    name: str,
-    rows: Sequence[Mapping[str, Any]],
-    *,
-    partition: str,
-    evidence_mode: str,
-) -> dict[str, Any]:
-    urgent = sum(
-        row.get("operator_urgent") is True
-        or row.get("urgent") is True
-        or _text(row.get("radar_route")) == "rapid_market_anomaly"
-        for row in rows
-    )
-    dependent_repeats = sum(_repeat_count(row) for row in rows)
-    family_counts: dict[str, int] = defaultdict(int)
-    for row in rows:
-        family_counts[_family(row)] += 1
-    independent_family_repeats = sum(
-        max(0, count - 1) for count in family_counts.values()
-    )
-    times = sorted(
-        value for row in rows
-        if (value := _aware_datetime(row.get("observed_at"))) is not None
-    )
-    intervals = [
-        (current - prior).total_seconds() / 3600.0
-        for prior, current in zip(times, times[1:])
-    ]
-    lifetimes = [
-        lifetime for row in rows
-        if (lifetime := _lifetime_hours(row)) is not None
-    ]
-    return {
-        "dimension": dimension,
-        "name": name,
-        "partition": partition,
-        "evidence_mode": evidence_mode,
-        "idea_count": len(rows),
-        "urgent_item_count": urgent,
-        "digest_item_count": sum(row.get("digest_eligible") is True for row in rows),
-        "digest_status_missing_count": sum("digest_eligible" not in row for row in rows),
-        "dependent_repeat_item_count": dependent_repeats,
-        "repeated_family_item_count": (
-            dependent_repeats + independent_family_repeats
-        ),
-        "material_change_interval_sample_size": len(intervals),
-        "median_material_change_interval_hours": statistics.median(intervals) if intervals else None,
-        "idea_lifetime_sample_size": len(lifetimes),
-        "median_idea_lifetime_hours": statistics.median(lifetimes) if lifetimes else None,
-        "review_required_count": sum(row.get("review_required") is True for row in rows),
-        "system_warning_count": sum(row.get("system_warning") is True for row in rows),
-        "calendar_reminder_count": sum(row.get("calendar_reminder") is True for row in rows),
-        "notification_state_inferred": False,
-        "policy_eligible": False,
-        "research_only": True,
-        "auto_apply": False,
-    }
-
-
 def _data_quality_mode(view: _EpisodeView, fallback: str) -> str:
     for source in (view.representative, view.outcome):
         value = _text(
@@ -1376,14 +1289,6 @@ def _repeat_count(row: Mapping[str, Any]) -> int:
     return max(0, members - 1) if type(members) is int and members >= 1 else 0
 
 
-def _lifetime_hours(row: Mapping[str, Any]) -> float | None:
-    observed = _aware_datetime(row.get("observed_at"))
-    expires = _aware_datetime(row.get("expires_at"))
-    if observed is None or expires is None or expires < observed:
-        return None
-    return (expires - observed).total_seconds() / 3600.0
-
-
 def _origin_set(row: Mapping[str, Any]) -> set[str]:
     raw = row.get("thesis_origins")
     origins = {
@@ -1400,21 +1305,6 @@ def _groups(views: Sequence[_EpisodeView], getter: Any) -> dict[str, list[_Episo
     for view in views:
         grouped[getter(view) or "unknown"].append(view)
     return grouped
-
-
-def _family(row: Mapping[str, Any]) -> str:
-    return _text(
-        row.get("anomaly_family")
-        or row.get("family_id")
-        or row.get("episode_family")
-        or row.get("candidate_family_id")
-        or row.get("anomaly_type")
-    ) or "unknown"
-
-
-def _date_label(value: Any) -> str:
-    parsed = _aware_datetime(value)
-    return parsed.date().isoformat() if parsed is not None else "unknown_date"
 
 
 def _aware_datetime(value: Any) -> datetime | None:

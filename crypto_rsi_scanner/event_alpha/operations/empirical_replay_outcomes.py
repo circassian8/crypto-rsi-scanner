@@ -22,8 +22,8 @@ from . import empirical_validation_protocol
 
 
 SCHEMA_ID = "decision_radar.empirical_replay_episode_outcomes"
-SCHEMA_VERSION = 1
-METHOD = "frozen_daily_path_outcomes_with_fixed_start_episodes"
+SCHEMA_VERSION = 2
+METHOD = "frozen_daily_path_outcomes_with_fixed_start_inclusive_episodes"
 TIMING_RESOLUTION = {
     "basis": "daily_ohlcv",
     "minimum_increment_hours": 24,
@@ -131,9 +131,7 @@ def build_empirical_replay_outcomes(
         "sensitivity_horizons": [f"{days}d" for days in _SENSITIVITY_DAYS],
         "horizon_days": {f"{days}d": days for days in _HORIZON_DAYS},
         "episode_window_hours": _EPISODE_WINDOW_HOURS,
-        "episode_boundary_rule": (
-            "member_observed_at_lt_episode_start_plus_window"
-        ),
+        "episode_boundary_rule": _PROTOCOL["episodes"]["boundary_rule"],
         "representative_rule": "first_eligible_observation_never_reselected",
         "timing_resolution": dict(TIMING_RESOLUTION),
         "status": (
@@ -235,7 +233,7 @@ def _episode_value(
         "directional_bias": representative["directional_bias"],
         "anomaly_family": representative["anomaly_family"],
         "episode_start_at": start.isoformat(),
-        "window_end_exclusive_at": (
+        "window_end_inclusive_at": (
             start + timedelta(hours=_EPISODE_WINDOW_HOURS)
         ).isoformat(),
         "representative_rule": "first_eligible_observation_never_reselected",
@@ -769,7 +767,7 @@ def _fixed_start_episode_groups(
         window_end: datetime | None = None
         for snapshot in ordered:
             observed = _required_utc(snapshot["observed_at"], field_name="observed_at")
-            if window_end is None or observed >= window_end:
+            if window_end is None or observed > window_end:
                 if current:
                     episodes.append(tuple(current))
                 current = [snapshot]
@@ -884,6 +882,9 @@ def _idea_snapshot(
         ),
         "point_in_time_universe_member": _optional_bool(
             value("point_in_time_universe_member", "point_in_time_membership")
+        ),
+        "point_in_time_volume_rank": _finite_number(
+            value("point_in_time_volume_rank")
         ),
         "baseline_status": _optional_text(
             value("baseline_status", "baseline_maturity")

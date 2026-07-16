@@ -110,6 +110,7 @@ _PROTOCOL: dict[str, Any] = {
     "feature_warmup": {
         "return_days": [1, 3, 7, 14],
         "volume_zscore_lookback_days": 90,
+        "volume_zscore_min_observations": 20,
         "liquidity_lookback_days": 30,
         "volatility_lookback_days": 30,
         "rsi_lookback_days": 14,
@@ -168,6 +169,8 @@ _PROTOCOL: dict[str, Any] = {
     "episodes": {
         "method": "fixed_start_window",
         "primary_window_hours": 24,
+        "boundary_rule": "member_observed_at_lte_episode_start_plus_window",
+        "window_end_inclusive": True,
         "sensitivity_window_hours": [12, 48],
         "identity": ["canonical_asset_id", "directional_bias", "anomaly_family"],
         "representative": "first_eligible_observation",
@@ -369,6 +372,20 @@ def validate_protocol(value: Mapping[str, Any]) -> list[str]:
     outcomes = value.get("outcomes")
     if not isinstance(outcomes, Mapping) or outcomes.get("primary_horizon_days") != 3:
         errors.append("primary_outcome_drift")
+    warmup = value.get("feature_warmup")
+    if not isinstance(warmup, Mapping) or (
+        warmup.get("volume_zscore_lookback_days") != 90
+        or warmup.get("volume_zscore_min_observations") != 20
+    ):
+        errors.append("volume_zscore_warmup_contract_invalid")
+    episodes = value.get("episodes")
+    if not isinstance(episodes, Mapping) or (
+        episodes.get("primary_window_hours") != 24
+        or episodes.get("boundary_rule")
+        != "member_observed_at_lte_episode_start_plus_window"
+        or episodes.get("window_end_inclusive") is not True
+    ):
+        errors.append("episode_boundary_contract_invalid")
     missed = value.get("missed_opportunity_rule")
     if not isinstance(missed, Mapping) or missed.get("maximum_future_excursion_alone_is_sufficient") is not False:
         errors.append("missed_opportunity_rule_invalid")
@@ -407,13 +424,13 @@ def render_protocol_markdown(value: Mapping[str, Any] | None = None) -> str:
         "",
         "## Point-in-time replay",
         "",
-        "Daily observations are formed at the completed Binance candle close. Universe membership is the trailing 30-day quote-volume rank calculated with data available at that close. Rolling features use current and earlier bars only. The locally cached candidate pool retains a documented delisting-survivorship limitation.",
+        "Daily observations are formed at the completed Binance candle close. Universe membership is the trailing 30-day quote-volume rank calculated with data available at that close. Rolling features use current and earlier bars only. The volume z-score uses a frozen 90-day lookback and requires 20 prior observations. Available daily RSI is retained only as read-only historical-OHLCV, point-in-time observational context; it cannot adjust scores, policy, or thesis origin. The locally cached candidate pool retains a documented delisting-survivorship limitation.",
         "",
         "Intraday returns, historical spread/order-book quality, market cap, derivatives, calendar, catalyst, and on-chain context remain explicitly unavailable or missing unless an exact time-valid source is supplied. They are never invented or silently proxied.",
         "",
         "## Outcomes and episodes",
         "",
-        "The frozen primary horizon is 3 days; 1, 7, and 14 days are sensitivity horizons. Outcome bars begin after the idea bar. Return, BTC/ETH-relative return, MFE, MAE, time-to-extremes, invalidation, continuation/reversal, expiry, and post-expiry behavior are measured. Fixed-start 24-hour episodes freeze the first eligible representative and retain dependent route/score/context progression without inflating sample size.",
+        "The frozen primary horizon is 3 days; 1, 7, and 14 days are sensitivity horizons. Outcome bars begin after the idea bar. Return, BTC/ETH-relative return, MFE, MAE, time-to-extremes, invalidation, continuation/reversal, expiry, and post-expiry behavior are measured. Fixed-start 24-hour episodes use an inclusive window end: an observation exactly 24 hours after the representative remains a dependent repeat. The first eligible representative stays frozen and dependent route/score/context progression is retained without inflating sample size.",
         "",
         "## Controls, costs, and uncertainty",
         "",

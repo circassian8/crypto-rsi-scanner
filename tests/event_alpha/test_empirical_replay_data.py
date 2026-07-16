@@ -6,6 +6,7 @@ import hashlib
 import json
 import socket
 import statistics
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -19,9 +20,27 @@ DAY_MS = 86_400_000
 
 
 def test_mode_universe_sizes_match_frozen_protocol() -> None:
-    assert replay_data.replay_data_mode_config("smoke").universe_top_n == 3
-    assert replay_data.replay_data_mode_config("medium").universe_top_n == 30
-    assert replay_data.replay_data_mode_config("full").universe_top_n == 100
+    for mode, top_n in (("smoke", 3), ("medium", 30), ("full", 100)):
+        config = replay_data.replay_data_mode_config(mode)
+        assert config.universe_top_n == top_n
+        assert config.volume_z_window == 90
+        assert config.volume_z_min_observations == 20
+
+
+def test_data_mode_volume_contract_drift_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    drifted = replace(
+        replay_data.REPLAY_DATA_MODE_CONFIGS["medium"],
+        volume_z_min_observations=19,
+    )
+    monkeypatch.setitem(replay_data.REPLAY_DATA_MODE_CONFIGS, "medium", drifted)
+
+    with pytest.raises(
+        replay_data.ReplayDataError,
+        match="replay_data_mode_volume_zscore_protocol_drift:medium",
+    ):
+        replay_data.replay_data_mode_config("medium")
 
 
 def _kline_rows(
@@ -84,6 +103,9 @@ def _feature_projection(rows: list[dict], *, through: str) -> list[dict]:
         "return_7d",
         "volume_zscore_24h",
         "rsi",
+        "rsi_context_timing",
+        "rsi_context_basis",
+        "rsi_context_references",
     )
     return [
         {field: row[field] for field in fields}
@@ -268,6 +290,42 @@ def test_volume_zscore_baseline_is_shifted_before_current_bar(tmp_path: Path):
     assert latest["volume_baseline_count"] == 20
     assert latest["volume_zscore_24h"] == pytest.approx(expected)
     assert latest["feature_basis"]["volume_zscore_24h"] == "temporal_direct"
+
+
+def test_daily_rsi_is_read_only_point_in_time_observational_context(
+    tmp_path: Path,
+) -> None:
+    cache = tmp_path / "binance_klines"
+    cache.mkdir()
+    _write_json(
+        cache / "AAAUSDT-30d.json",
+        _kline_rows(21, quote_volume=1_000_000),
+    )
+    dataset = replay_data.load_binance_cache_dataset(cache)
+
+    latest = list(replay_data.iter_point_in_time_observations(dataset))[-1]
+    assert latest["rsi"] is not None
+    assert latest["rsi_context_timing"] == "point_in_time_completed_daily_bar"
+    assert latest["rsi_context_basis"] == "historical_ohlcv"
+    assert len(latest["rsi_context_references"]) == 1
+    reference = latest["rsi_context_references"][0]
+    assert reference == {
+        "context_type": "daily_rsi_observation",
+        "context_version": "empirical_daily_rsi_observation_v1",
+        "rsi_value": latest["rsi"],
+        "rsi_timeframe": "1d",
+        "observed_at": latest["observed_at"],
+        "data_basis": "historical_ohlcv",
+        "timing_basis": "point_in_time_completed_daily_bar",
+        "read_only": True,
+        "authoritative": False,
+        "technical_thesis_origin_allowed": False,
+        "score_adjustment_allowed": False,
+        "policy_adjustment_allowed": False,
+        "actionability_adjustment": 0.0,
+        "risk_adjustment": 0.0,
+        "research_only": True,
+    }
 
 
 def test_partial_daily_bar_is_inventoried_but_never_warms_or_enters_universe(

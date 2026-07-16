@@ -25,6 +25,7 @@ from . import empirical_validation_protocol
 SCHEMA_ID = "decision_radar.empirical_policy_simulation"
 SCHEMA_VERSION = 1
 SEAL_SCHEMA_ID = "decision_radar.empirical_recommendation_seal"
+SEAL_SCHEMA_VERSION = 2
 WALK_FORWARD_SCHEMA_ID = "decision_radar.empirical_walk_forward"
 _VISIBLE_ROUTES = {
     "high_confidence_watch",
@@ -61,7 +62,8 @@ def simulate_shadow_policies(
     rows = _episode_representatives(ideas, selected_partitions)
     outcome_index = _outcome_index(outcomes)
     scenario_rows: list[dict[str, Any]] = []
-    for scenario in frozen["shadow_scenarios"]:
+    scenario_definitions = _scenario_definitions(frozen)
+    for scenario in scenario_definitions:
         scenario_rows.append(_simulate_scenario(rows, outcome_index, scenario, frozen))
     production = next(row for row in scenario_rows if row["scenario"] == "production_policy")
     recommendations = [
@@ -76,6 +78,8 @@ def simulate_shadow_policies(
         "protocol_sha256": empirical_validation_protocol.protocol_sha256(frozen),
         "partitions": list(selected_partitions),
         "episode_representatives": len(rows),
+        "frozen_scenarios": scenario_definitions,
+        "scenario_set_sha256": _sha256(_canonical_bytes(scenario_definitions)),
         "scenarios": scenario_rows,
         "recommendations": recommendations,
         "multiple_comparison_warning": frozen["statistics"]["multiple_comparison_policy"],
@@ -87,7 +91,11 @@ def simulate_shadow_policies(
     }
 
 
-def freeze_recommendation_set(simulation: Mapping[str, Any]) -> dict[str, Any]:
+def freeze_recommendation_set(
+    simulation: Mapping[str, Any],
+    *,
+    selection_run_binding: Mapping[str, Any],
+) -> dict[str, Any]:
     """Hash the development/validation recommendation set before final test."""
 
     if simulation.get("schema_id") != SCHEMA_ID:
@@ -96,6 +104,8 @@ def freeze_recommendation_set(simulation: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("recommendation seal requires development and validation only")
     if simulation.get("auto_apply") is not False or simulation.get("research_only") is not True:
         raise ValueError("recommendation simulation safety invalid")
+    scenario_definitions = _scenario_definitions_from_simulation(simulation)
+    binding = _selection_run_binding(selection_run_binding)
     decisions = []
     for row in simulation.get("recommendations", []):
         if not isinstance(row, Mapping):
@@ -109,11 +119,14 @@ def freeze_recommendation_set(simulation: Mapping[str, Any]) -> dict[str, Any]:
     decisions.sort(key=lambda row: row["scenario"])
     body = {
         "schema_id": SEAL_SCHEMA_ID,
-        "schema_version": 1,
+        "schema_version": SEAL_SCHEMA_VERSION,
         "protocol_version": simulation["protocol_version"],
         "protocol_sha256": simulation["protocol_sha256"],
         "selection_partitions": ["development", "validation"],
         "final_test_used_for_selection": False,
+        "selection_run_binding": binding,
+        "frozen_scenarios": scenario_definitions,
+        "scenario_set_sha256": _sha256(_canonical_bytes(scenario_definitions)),
         "recommendations": decisions,
         "simulation_sha256": _sha256(_canonical_bytes(simulation)),
         "research_only": True,
@@ -125,7 +138,10 @@ def freeze_recommendation_set(simulation: Mapping[str, Any]) -> dict[str, Any]:
 
 def validate_recommendation_seal(seal: Mapping[str, Any]) -> list[str]:
     errors: list[str] = []
-    if seal.get("schema_id") != SEAL_SCHEMA_ID or seal.get("schema_version") != 1:
+    if (
+        seal.get("schema_id") != SEAL_SCHEMA_ID
+        or seal.get("schema_version") != SEAL_SCHEMA_VERSION
+    ):
         errors.append("schema_invalid")
     if seal.get("selection_partitions") != ["development", "validation"]:
         errors.append("selection_partitions_invalid")
@@ -138,10 +154,25 @@ def validate_recommendation_seal(seal: Mapping[str, Any]) -> list[str]:
         errors.append("seal_digest_invalid")
     if seal.get("protocol_sha256") != empirical_validation_protocol.protocol_sha256():
         errors.append("protocol_digest_invalid")
+    current_scenarios = _scenario_definitions(
+        empirical_validation_protocol.protocol_values()
+    )
+    frozen_scenarios = seal.get("frozen_scenarios")
+    if frozen_scenarios != current_scenarios:
+        errors.append("scenario_definitions_invalid")
+    if (
+        not isinstance(frozen_scenarios, list)
+        or seal.get("scenario_set_sha256")
+        != _sha256(_canonical_bytes(frozen_scenarios))
+    ):
+        errors.append("scenario_set_digest_invalid")
+    binding = seal.get("selection_run_binding")
+    try:
+        _selection_run_binding(binding if isinstance(binding, Mapping) else {})
+    except ValueError:
+        errors.append("selection_run_binding_invalid")
     expected = {
-        row["name"]
-        for row in empirical_validation_protocol.protocol_values()["shadow_scenarios"]
-        if row["name"] != "production_policy"
+        row["name"] for row in current_scenarios if row["name"] != "production_policy"
     }
     recommendations = seal.get("recommendations")
     if not isinstance(recommendations, list):
@@ -175,7 +206,7 @@ def evaluate_sealed_final_test(
     outcome_index = _outcome_index(outcomes)
     observed = [
         _simulate_scenario(representatives, outcome_index, scenario, frozen)
-        for scenario in frozen["shadow_scenarios"]
+        for scenario in seal["frozen_scenarios"]
         if scenario["name"] == "production_policy" or scenario["name"] in allowed
     ]
     return {
@@ -184,6 +215,8 @@ def evaluate_sealed_final_test(
         "protocol_version": frozen["protocol_version"],
         "protocol_sha256": empirical_validation_protocol.protocol_sha256(frozen),
         "recommendation_seal_sha256": seal["seal_sha256"],
+        "selection_run_binding": dict(seal["selection_run_binding"]),
+        "scenario_set_sha256": seal["scenario_set_sha256"],
         "partition": "final_test",
         "scenario_selection_performed": False,
         "evaluated_scenarios": observed,
@@ -258,7 +291,10 @@ def walk_forward_evaluation(
 
 def _simulate_window(rows: list[Mapping[str, Any]], outcomes: list[Mapping[str, Any]], protocol: Mapping[str, Any]) -> list[dict[str, Any]]:
     index = _outcome_index(outcomes)
-    return [_simulate_scenario(rows, index, scenario, protocol) for scenario in protocol["shadow_scenarios"]]
+    return [
+        _simulate_scenario(rows, index, scenario, protocol)
+        for scenario in _scenario_definitions(protocol)
+    ]
 
 
 def _simulate_scenario(
@@ -531,6 +567,87 @@ def _require_protocol(protocol: Mapping[str, Any]) -> None:
         raise ValueError("empirical protocol invalid:" + ";".join(errors))
 
 
+def _scenario_definitions(protocol: Mapping[str, Any]) -> list[dict[str, Any]]:
+    rows = protocol.get("shadow_scenarios")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("empirical shadow scenarios invalid")
+    try:
+        copied = json.loads(
+            json.dumps(
+                rows,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+                allow_nan=False,
+            )
+        )
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError("empirical shadow scenarios invalid") from exc
+    if not isinstance(copied, list) or any(
+        not isinstance(row, dict) or not str(row.get("name") or "")
+        for row in copied
+    ):
+        raise ValueError("empirical shadow scenarios invalid")
+    names = [str(row["name"]) for row in copied]
+    if len(names) != len(set(names)) or "production_policy" not in names:
+        raise ValueError("empirical shadow scenarios invalid")
+    return copied
+
+
+def _scenario_definitions_from_simulation(
+    simulation: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    rows = simulation.get("frozen_scenarios")
+    if not isinstance(rows, list):
+        raise ValueError("recommendation simulation scenarios invalid")
+    current = _scenario_definitions(empirical_validation_protocol.protocol_values())
+    if rows != current:
+        raise ValueError("recommendation simulation scenarios invalid")
+    expected_digest = _sha256(_canonical_bytes(rows))
+    if simulation.get("scenario_set_sha256") != expected_digest:
+        raise ValueError("recommendation simulation scenario digest invalid")
+    return current
+
+
+def _selection_run_binding(value: Mapping[str, Any]) -> dict[str, Any]:
+    fields = {
+        "selection_run_fingerprint",
+        "input_sha256",
+        "code_sha256",
+        "configuration_sha256",
+        "mode",
+        "simulation_artifact",
+    }
+    if set(value) != fields:
+        raise ValueError("selection run binding invalid")
+    for field in (
+        "selection_run_fingerprint",
+        "input_sha256",
+        "code_sha256",
+        "configuration_sha256",
+    ):
+        if not _is_sha256(value.get(field)):
+            raise ValueError("selection run binding invalid")
+    mode = str(value.get("mode") or "")
+    if mode not in {"medium", "full"}:
+        raise ValueError("selection run binding invalid")
+    if value.get("simulation_artifact") != "shadow_policy_simulation.json":
+        raise ValueError("selection run binding invalid")
+    return {
+        "selection_run_fingerprint": str(value["selection_run_fingerprint"]),
+        "input_sha256": str(value["input_sha256"]),
+        "code_sha256": str(value["code_sha256"]),
+        "configuration_sha256": str(value["configuration_sha256"]),
+        "mode": mode,
+        "simulation_artifact": "shadow_policy_simulation.json",
+    }
+
+
+def _is_sha256(value: Any) -> bool:
+    text = str(value or "")
+    return len(text) == 64 and all(character in "0123456789abcdef" for character in text)
+
+
 def _utc(value: Any) -> datetime:
     if not isinstance(value, str) or not value:
         raise ValueError("timestamp required")
@@ -552,8 +669,17 @@ def _rounded(value: float) -> float:
     return round(float(value), 8)
 
 
-def _canonical_bytes(value: Mapping[str, Any]) -> bytes:
-    return (json.dumps(dict(value), sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False) + "\n").encode()
+def _canonical_bytes(value: Any) -> bytes:
+    return (
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode()
 
 
 def _sha256(payload: bytes) -> str:

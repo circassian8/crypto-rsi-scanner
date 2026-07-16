@@ -16,6 +16,37 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Bind empirical holdout access to one complete selection run
+**Status:** accepted
+**Decision:** An empirical final-test run may load a recommendation seal only
+from a complete immutable `full` top-100 development/validation run. The seal
+must bind that run's fingerprint, input, code, configuration, protocol, exact
+frozen scenario definitions, simulation bytes, and complete artifact manifest.
+The final-test loader reads and verifies the whole run through one no-follow
+bundle contract before it reads the seal, and then requires the final input and
+behavior-bearing code digests to match. A medium run, loose copied seal,
+mutated simulation, behaviorally identical scenario, or partial bundle cannot
+authorize holdout access.
+
+Fixed-start daily episodes include an observation exactly 24 hours after the
+first representative; only a later timestamp starts a new episode. The frozen
+volume-z feature has a 90-day lookback with 20 prior observations required.
+Daily RSI and point-in-time volume rank are retained as observational context,
+not score or route inputs. Historical runs produced under the earlier exclusive
+boundary remain immutable audit artifacts but are superseded for selection.
+
+Persisted replay evidence uses bounded plaintext shards with one canonical
+Decision projection per idea and digest-bound episode references. Targeted
+review is descriptive; optional human labels live in a separate confirmed,
+append-only, exact-queue ledger and never auto-apply to scoring or policy.
+**Why:** Holdout credibility depends on independent episodes and on proving that
+the evaluated recommendation is exactly the one selected before final-test
+inspection. Compact, inspectable persistence keeps the same evidence viable at
+top-100 scale without weakening path, secret, or immutability checks.
+**Revisit when:** A new protocol version freezes a different cadence, episode
+boundary, feature warm-up, selection partition, or holdout before accessing its
+own final test. Historical protocol-v1 evidence must never be rewritten.
+
 ## 2026-07-16 - Keep empirical Research Lab evidence outside production authority
 **Status:** accepted
 **Decision:** Render empirical validation, walk-forward, shadow-policy, and live

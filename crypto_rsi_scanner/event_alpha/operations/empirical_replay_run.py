@@ -20,7 +20,9 @@ from . import (
     empirical_replay_core,
     empirical_replay_data,
     empirical_replay_outcomes,
+    empirical_replay_persistence,
     empirical_replay_store,
+    empirical_review,
     empirical_validation_protocol,
 )
 
@@ -82,6 +84,7 @@ class _ReplayProducts:
     outcomes: dict[str, Any]
     analyses: dict[str, dict[str, Any]]
     controls: dict[str, Any]
+    review_queue: dict[str, Any]
     policy_artifacts: dict[str, Any]
     stage_times: dict[str, float]
 
@@ -147,6 +150,12 @@ def _prepare_replay(
 
     evaluated_at = _evaluated_at(dataset, protocol, run_mode)
     code_sha256 = empirical_replay_store.code_fingerprint(_code_paths())
+    if seal is not None:
+        binding = seal["selection_run_binding"]
+        if str(catalog["catalog_digest"]) != binding["input_sha256"]:
+            raise ValueError("final_test input differs from sealed selection run")
+        if code_sha256 != binding["code_sha256"]:
+            raise ValueError("final_test code differs from sealed selection run")
     configuration = {
         "schema_id": RUN_SCHEMA_ID,
         "schema_version": RUN_SCHEMA_VERSION,
@@ -159,6 +168,8 @@ def _prepare_replay(
         "chunk_size": CHUNK_SIZE,
         "trace_example_limit": TRACE_EXAMPLE_LIMIT,
         "bootstrap_resamples": bootstrap_resamples,
+        "persistence_schema_version": empirical_replay_persistence.PERSISTENCE_SCHEMA_VERSION,
+        "artifact_shard_target_bytes": empirical_replay_persistence.DEFAULT_SHARD_TARGET_BYTES,
         "recommendation_seal_sha256": seal.get("seal_sha256") if seal else None,
         "research_only": True,
         "auto_apply": False,
@@ -276,6 +287,16 @@ def _produce_replay(prepared: _PreparedReplay) -> _ReplayProducts:
         ),
     )
     controls_seconds = time.perf_counter() - controls_started
+
+    review_started = time.perf_counter()
+    review_queue = empirical_review.build_targeted_review_queue(
+        ideas,
+        outcomes,
+        analyses,
+        controls,
+        run_fingerprint=prepared.fingerprint,
+    )
+    review_seconds = time.perf_counter() - review_started
     return _ReplayProducts(
         ideas=ideas,
         trace_summary=trace_summary,
@@ -283,6 +304,7 @@ def _produce_replay(prepared: _PreparedReplay) -> _ReplayProducts:
         outcomes=outcomes,
         analyses=analyses,
         controls=controls,
+        review_queue=review_queue,
         policy_artifacts=policy_artifacts,
         stage_times={
         "input_load_and_catalog": round(prepared.load_seconds, 6),
@@ -290,6 +312,7 @@ def _produce_replay(prepared: _PreparedReplay) -> _ReplayProducts:
         "episode_outcomes": round(outcome_seconds, 6),
         "analysis_and_policy": round(analysis_seconds, 6),
         "controls_benchmarks_and_missed_moves": round(controls_seconds, 6),
+        "targeted_review_selection": round(review_seconds, 6),
         },
     )
 
@@ -309,7 +332,19 @@ def _build_policy_artifacts(
         return {
             "shadow_policy_simulation.json": simulation,
             "recommendation_seal.json": empirical_policy_lab.freeze_recommendation_set(
-                simulation
+                simulation,
+                selection_run_binding={
+                    "selection_run_fingerprint": prepared.fingerprint,
+                    "input_sha256": str(prepared.catalog["catalog_digest"]),
+                    "code_sha256": prepared.code_sha256,
+                    "configuration_sha256": hashlib.sha256(
+                        empirical_replay_store.canonical_json_bytes(
+                            prepared.configuration
+                        )
+                    ).hexdigest(),
+                    "mode": prepared.run_mode,
+                    "simulation_artifact": "shadow_policy_simulation.json",
+                },
             ),
             "walk_forward.json": empirical_policy_lab.walk_forward_evaluation(
                 episode_ideas,
@@ -335,7 +370,16 @@ def _store_replay(
     prepared: _PreparedReplay,
     products: _ReplayProducts,
 ) -> EmpiricalReplayExecution:
-    stage_times = products.stage_times
+    persistence_started = time.perf_counter()
+    persistence = empirical_replay_persistence.build_replay_persistence_archives(
+        products.ideas,
+        products.outcomes,
+    )
+    persistence_seconds = time.perf_counter() - persistence_started
+    stage_times = {
+        **products.stage_times,
+        "archive_projection_and_sharding": round(persistence_seconds, 6),
+    }
     runtime = {
         "schema_id": "decision_radar.empirical_replay_runtime",
         "schema_version": 1,
@@ -347,6 +391,7 @@ def _store_replay(
         "episode_count": products.outcomes["episode_count"],
         "selected_symbol_count": prepared.catalog["selected_symbol_count"],
         "row_count": prepared.catalog["row_count"],
+        "persistence": dict(persistence.metrics),
         "resumed": False,
         "research_only": True,
     }
@@ -362,11 +407,12 @@ def _store_replay(
     )
     artifacts: dict[str, bytes] = {
         "input_catalog.json": empirical_replay_store.canonical_json_bytes(prepared.catalog),
-        "replay_ideas.jsonl": _jsonl_bytes(products.ideas),
         "replay_trace_summary.json": empirical_replay_store.canonical_json_bytes(products.trace_summary),
         "replay_trace_examples.jsonl": _jsonl_bytes(products.trace_examples),
-        "replay_episode_outcomes.json": empirical_replay_store.canonical_json_bytes(products.outcomes),
         "replay_controls.json": empirical_replay_store.canonical_json_bytes(products.controls),
+        "targeted_review_queue.json": empirical_replay_store.canonical_json_bytes(
+            products.review_queue
+        ),
         "replay_analysis.json": empirical_replay_store.canonical_json_bytes({
             "schema_id": "decision_radar.empirical_partition_analyses",
             "schema_version": 1,
@@ -378,6 +424,7 @@ def _store_replay(
         "execution_summary.json": empirical_replay_store.canonical_json_bytes(execution_summary),
         "execution_summary.md": _summary_markdown(execution_summary).encode("utf-8"),
     }
+    artifacts.update(persistence.artifacts)
     artifacts.update({
         name: empirical_replay_store.canonical_json_bytes(value)
         for name, value in products.policy_artifacts.items()
@@ -396,11 +443,13 @@ def _store_replay(
             "episode_count": products.outcomes["episode_count"],
             "matched_control_count": products.controls["matched_non_signal_controls"]["selected_control_count"],
             "missed_opportunity_count": products.controls["missed_move_evaluation"]["missed_opportunity_count"],
+            "targeted_review_item_count": products.review_queue["item_count"],
             "matured_episode_count": sum(
                 row["matured_episode_count"] for row in products.analyses.values()
             ),
             "runtime_seconds": runtime["total_seconds"],
             "bottleneck_stage": runtime["bottleneck_stage"],
+            **persistence.metrics,
         },
         safety=_SAFETY,
     )
@@ -554,6 +603,15 @@ def _control_trace_projection(trace: Mapping[str, Any]) -> dict[str, Any]:
         "operator_visible",
         "radar_route",
         "hard_blockers",
+        "warnings",
+        "actionability_score",
+        "evidence_confidence_score",
+        "risk_score",
+        "urgency_score",
+        "chase_risk_score",
+        "catalyst_status",
+        "spread_status",
+        "rsi_context_present",
     )
     return {field: trace.get(field) for field in fields}
 
@@ -612,37 +670,113 @@ def _load_recommendation_seal(path: str | Path | None) -> dict[str, Any]:
     if path is None:
         raise ValueError("final_test requires a recommendation seal")
     supplied = Path(path).expanduser()
-    if supplied.is_symlink() or not supplied.is_file() or supplied.stat().st_size > 2 * 1024 * 1024:
+    if (
+        supplied.name != "recommendation_seal.json"
+        or supplied.is_symlink()
+        or supplied.parent.is_symlink()
+    ):
         raise ValueError("recommendation seal path invalid")
     try:
-        value = loads_no_duplicate_keys(supplied.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        manifest, payloads = empirical_replay_store.load_verified_run(
+            supplied.parent
+        )
+        raw = payloads.get("recommendation_seal.json")
+        if raw is None or len(raw) > 2 * 1024 * 1024:
+            raise ValueError("recommendation seal missing from immutable run")
+        value = loads_no_duplicate_keys(raw.decode("utf-8"))
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        RuntimeError,
+        ValueError,
+    ) as exc:
         raise ValueError("recommendation seal unreadable") from exc
     if not isinstance(value, Mapping):
         raise ValueError("recommendation seal invalid")
     seal = dict(value)
+    if raw != empirical_replay_store.canonical_json_bytes(seal):
+        raise ValueError("recommendation seal invalid:noncanonical_json")
     errors = empirical_policy_lab.validate_recommendation_seal(seal)
     if errors:
         raise ValueError("recommendation seal invalid:" + ";".join(errors))
+    binding = seal["selection_run_binding"]
+    configuration = manifest.get("configuration")
+    simulation_name = str(binding["simulation_artifact"])
+    simulation = payloads.get(simulation_name)
+    if (
+        binding["mode"] != "full"
+        or manifest.get("run_fingerprint")
+        != binding["selection_run_fingerprint"]
+        or manifest.get("input_sha256") != binding["input_sha256"]
+        or manifest.get("code_sha256") != binding["code_sha256"]
+        or not isinstance(configuration, Mapping)
+        or configuration.get("mode") != "full"
+        or configuration.get("partitions") != ["development", "validation"]
+        or configuration.get("universe_top_n") != 100
+        or hashlib.sha256(
+            empirical_replay_store.canonical_json_bytes(configuration)
+        ).hexdigest()
+        != binding["configuration_sha256"]
+        or not isinstance(simulation, bytes)
+        or hashlib.sha256(simulation).hexdigest() != seal["simulation_sha256"]
+        or manifest.get("protocol_sha256") != seal["protocol_sha256"]
+    ):
+        raise ValueError("recommendation seal selection run binding invalid")
     return seal
 
 
 def _code_paths() -> dict[str, Path]:
     operations = Path(__file__).resolve().parent
     radar = operations.parent / "radar"
+    package = operations.parent.parent
     return {
         "empirical_replay_run.py": Path(__file__),
         "empirical_validation_protocol.py": operations / "empirical_validation_protocol.py",
+        "empirical_replay_observations.py": operations / "_empirical_replay_observations.py",
         "empirical_replay_data.py": operations / "empirical_replay_data.py",
+        "empirical_replay_data_bar.py": operations / "empirical_replay_data_bar.py",
+        "empirical_replay_data_dataset.py": operations / "empirical_replay_data_dataset.py",
+        "empirical_replay_data_error.py": operations / "empirical_replay_data_error.py",
+        "empirical_replay_data_mode.py": operations / "empirical_replay_data_mode.py",
+        "empirical_replay_data_series.py": operations / "empirical_replay_data_series.py",
         "empirical_replay_core.py": operations / "empirical_replay_core.py",
         "empirical_replay_outcomes.py": operations / "empirical_replay_outcomes.py",
+        "empirical_replay_persistence.py": operations / "empirical_replay_persistence.py",
         "empirical_replay_analysis.py": operations / "empirical_replay_analysis.py",
+        "empirical_replay_dimensions.py": operations / "empirical_replay_dimensions.py",
+        "empirical_operator_burden.py": operations / "empirical_operator_burden.py",
+        "empirical_replay_statistics.py": operations / "empirical_replay_statistics.py",
         "empirical_replay_controls.py": operations / "empirical_replay_controls.py",
+        "empirical_missed_attribution.py": operations / "empirical_missed_attribution.py",
+        "empirical_replay_benchmark_metrics.py": operations / "empirical_replay_benchmark_metrics.py",
+        "empirical_review.py": operations / "empirical_review.py",
         "empirical_policy_lab.py": operations / "empirical_policy_lab.py",
+        "empirical_replay_store.py": operations / "empirical_replay_store.py",
+        "market_provenance.py": operations / "market_provenance.py",
         "decision_model.py": radar / "decision_model.py",
         "decision_model_surfaces.py": radar / "decision_model_surfaces.py",
         "decision_models.py": radar / "decision_models.py",
+        "decision_policy.py": radar / "decision_policy.py",
+        "decision_catalyst_policy.py": radar / "decision_catalyst_policy.py",
+        "decision_market_quality.py": radar / "decision_market_quality.py",
+        "decision_safety.py": radar / "decision_safety.py",
+        "decision_results.py": radar / "decision_results.py",
+        "market_units.py": radar / "market_units.py",
+        "rsi_technical_context.py": radar / "rsi_technical_context.py",
+        "catalyst_attribution.py": radar / "catalyst_attribution.py",
+        "source_independence.py": radar / "source_independence.py",
+        "source_independence_store.py": radar / "source_independence_store.py",
         "market_anomaly_scanner.py": radar / "market_anomaly_scanner.py",
+        "market_anomaly_receipt.py": radar / "market_anomaly_receipt.py",
+        "asset_registry.py": radar / "asset_registry.py",
+        "market_state.py": radar / "market_state.py",
+        "decision_projection_schema.py": operations.parent / "artifacts" / "schema" / "decision_model.py",
+        "artifact_json_lines.py": operations.parent / "artifacts" / "json_lines.py",
+        "config.py": package / "config.py",
+        "state_features.py": package / "state_features.py",
+        "indicators.py": package / "indicators.py",
+        "signal_registry.py": package / "signal_registry.py",
     }
 
 

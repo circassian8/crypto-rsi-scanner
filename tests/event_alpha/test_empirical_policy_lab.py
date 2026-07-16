@@ -15,6 +15,23 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_policy_lab import (
 from crypto_rsi_scanner.event_alpha.operations.empirical_replay_core import run_replay_kernel
 
 
+_A = "a" * 64
+_B = "b" * 64
+_C = "c" * 64
+_D = "d" * 64
+
+
+def _selection_binding(*, mode: str = "full") -> dict[str, str]:
+    return {
+        "selection_run_fingerprint": _A,
+        "input_sha256": _B,
+        "code_sha256": _C,
+        "configuration_sha256": _D,
+        "mode": mode,
+        "simulation_artifact": "shadow_policy_simulation.json",
+    }
+
+
 def _idea(
     at: str,
     *,
@@ -84,13 +101,40 @@ def test_recommendation_seal_excludes_final_test_and_is_tamper_evident() -> None
         [_outcome(development), _outcome(validation)],
         partitions=("development", "validation"),
     )
-    seal = freeze_recommendation_set(simulation)
+    seal = freeze_recommendation_set(
+        simulation,
+        selection_run_binding=_selection_binding(),
+    )
     assert validate_recommendation_seal(seal) == []
     assert seal["final_test_used_for_selection"] is False
 
     changed = deepcopy(seal)
     changed["recommendations"][0]["status"] = "candidate"
     assert "seal_digest_invalid" in validate_recommendation_seal(changed)
+
+    changed_scenario = deepcopy(seal)
+    changed_scenario["frozen_scenarios"][0]["changes"] = {"invented": True}
+    changed_scenario_body = {
+        key: value for key, value in changed_scenario.items() if key != "seal_sha256"
+    }
+    # Re-hashing the outer document cannot make a changed scenario definition
+    # match the frozen protocol or its independently closed scenario-set digest.
+    import hashlib
+    import json
+
+    changed_scenario["seal_sha256"] = hashlib.sha256(
+        (
+            json.dumps(
+                changed_scenario_body,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+        ).encode()
+    ).hexdigest()
+    assert "scenario_definitions_invalid" in validate_recommendation_seal(
+        changed_scenario
+    )
 
     final = _idea("2025-06-01T00:00:00Z", partition="final_test")
     final_result = evaluate_sealed_final_test([final], [_outcome(final)], seal=seal)
@@ -99,7 +143,33 @@ def test_recommendation_seal_excludes_final_test_and_is_tamper_evident() -> None
 
     final_simulation = simulate_shadow_policies([final], [_outcome(final)], partitions=("final_test",))
     with pytest.raises(ValueError, match="development and validation only"):
-        freeze_recommendation_set(final_simulation)
+        freeze_recommendation_set(
+            final_simulation,
+            selection_run_binding=_selection_binding(),
+        )
+
+
+def test_recommendation_seal_requires_closed_selection_run_binding() -> None:
+    development = _idea("2022-06-01T00:00:00Z", partition="development")
+    validation = _idea("2024-06-01T00:00:00Z", partition="validation")
+    simulation = simulate_shadow_policies(
+        [development, validation],
+        [_outcome(development), _outcome(validation)],
+        partitions=("development", "validation"),
+    )
+
+    with pytest.raises(ValueError, match="selection run binding invalid"):
+        freeze_recommendation_set(
+            simulation,
+            selection_run_binding={"mode": "full"},
+        )
+
+    seal = freeze_recommendation_set(
+        simulation,
+        selection_run_binding=_selection_binding(mode="medium"),
+    )
+    assert validate_recommendation_seal(seal) == []
+    assert seal["selection_run_binding"]["mode"] == "medium"
 
 
 def test_walk_forward_is_chronological_and_never_accesses_final_test() -> None:

@@ -82,6 +82,74 @@ def test_replay_uses_canonical_production_projection_and_explicit_missing_spread
     assert result.trace_summary["dashboard_authority_mutations"] == 0
 
 
+def test_daily_rsi_observation_survives_projection_without_decision_authority() -> None:
+    reference = {
+        "context_type": "daily_rsi_observation",
+        "context_version": "empirical_daily_rsi_observation_v1",
+        "rsi_value": 68.0,
+        "rsi_timeframe": "1d",
+        "observed_at": "2024-06-01T00:00:00+00:00",
+        "data_basis": "historical_ohlcv",
+        "timing_basis": "point_in_time_completed_daily_bar",
+        "read_only": True,
+        "authoritative": False,
+        "technical_thesis_origin_allowed": False,
+        "score_adjustment_allowed": False,
+        "policy_adjustment_allowed": False,
+        "actionability_adjustment": 0.0,
+        "risk_adjustment": 0.0,
+        "research_only": True,
+    }
+    without_context = run_replay_kernel(
+        [_observation()],
+        mode="medium",
+        artifact_namespace="rsi-context-control",
+        allowed_partitions=("validation",),
+    )
+    with_context = run_replay_kernel(
+        [
+            _observation(
+                rsi=68.0,
+                rsi_context_timing="point_in_time_completed_daily_bar",
+                rsi_context_basis="historical_ohlcv",
+                rsi_context_references=[reference],
+            )
+        ],
+        mode="medium",
+        artifact_namespace="rsi-context-control",
+        allowed_partitions=("validation",),
+    )
+
+    plain = without_context.ideas[0]
+    contextual = with_context.ideas[0]
+    plain_projection = plain["decision_projection"]
+    projection = contextual["decision_projection"]
+    assert contextual["rsi_context_references"] == [reference]
+    assert projection["rsi_context_references"] == [reference]
+    assert projection["rsi_context"] == {}
+    for field in (
+        "primary_thesis_origin",
+        "thesis_origins",
+        "radar_route",
+        "radar_actionable",
+        "actionability_score",
+        "evidence_confidence_score",
+        "risk_score",
+        "urgency_score",
+        "chase_risk_score",
+        "hard_blockers",
+        "soft_penalties",
+    ):
+        assert projection[field] == plain_projection[field]
+    assert projection["primary_thesis_origin"] == "market_led"
+    assert "technical_led" not in projection["thesis_origins"]
+    assert "rsi_context_version" not in contextual
+    assert with_context.trace_summary["provider_calls"] == 0
+    assert with_context.trace_summary["normal_rsi_writes"] == 0
+    assert with_context.trace_summary["event_alpha_paper_trades"] == 0
+    assert with_context.trace_summary["event_alpha_triggered_fade"] == 0
+
+
 def test_replay_ignores_future_and_outcome_fields() -> None:
     base = _observation()
     leaked = {**base, "future_return_3d": 900.0, "outcome": {"return": 900.0}}

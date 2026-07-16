@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 670,
+  "class_count": 672,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 9208,
+  "function_count": 9381,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-16T04:19:13.415015+00:00",
+  "generated_at": "2026-07-16T05:15:19.932271+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2996,13 +2996,6 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1494,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1467,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3052,8 +3045,22 @@
       "status": "accepted_near_threshold"
     },
     {
+      "line_count": 1384,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1349,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3244,7 +3251,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 479,
+  "public_class_count": 480,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3322,6 +3329,7 @@
     "crypto_rsi_scanner.event_alpha.operations.empirical_replay_data_error": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_replay_data_mode": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_replay_data_series": 1,
+    "crypto_rsi_scanner.event_alpha.operations.empirical_replay_persistence": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_replay_run": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_replay_store": 1,
     "crypto_rsi_scanner.event_alpha.operations.market_no_send_calendar": 1,
@@ -3562,11 +3570,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1494,
-        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1467,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
@@ -3602,8 +3605,18 @@
         "threshold": 1200
       },
       {
+        "line_count": 1384,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1371,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1349,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
         "threshold": 1200
       },
       {
@@ -3634,11 +3647,6 @@
       {
         "line_count": 1261,
         "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1258,
-        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
         "threshold": 1200
       },
       {

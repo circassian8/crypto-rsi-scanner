@@ -402,7 +402,11 @@ def test_operator_burden_is_closed_per_day_and_family_without_notification_infer
     assert first_day["repeated_family_item_count"] == 3
     volume = next(row for row in burden["families"] if row["name"] == "volume")
     assert volume["repeated_family_item_count"] == 3
-    assert volume["median_material_change_interval_hours"] == pytest.approx(4.0)
+    assert volume["median_observation_interval_hours"] == pytest.approx(4.0)
+    assert volume["material_change_interval_status"] == (
+        "unavailable_incomplete_progression_evidence"
+    )
+    assert volume["median_material_change_interval_hours"] is None
     assert burden["notification_state_inferred"] is False
     assert burden["auto_apply"] is False
 
@@ -551,3 +555,215 @@ def test_fixture_partition_is_explicit_mechanics_evidence_and_never_policy() -> 
             evidence_mode="historical_replay",
             bootstrap_resamples=25,
         )
+
+
+def test_closed_decision_dimensions_include_multi_origin_and_unknown_rows() -> None:
+    representative = _representative(
+        "dimensions",
+        thesis_origins=["market_led", "technical_led"],
+        directional_bias="risk",
+        catalyst_status="plausible",
+        market_phase="emerging",
+        timing_state="early",
+        preferred_horizon="3d_7d",
+        tradability_status="good",
+        spread_status="verified_good",
+        baseline_status="warm",
+        point_in_time_volume_rank=2,
+        decision_projection={
+            "source_provider_lineage": {
+                "providers": ["binance_historical_ohlcv"],
+                "origins": ["market_anomaly"],
+                "source_packs": ["integrated_radar_pack"],
+            }
+        },
+    )
+
+    dimensions = _build(
+        [representative],
+        [_outcome("dimensions", 0.08)],
+        resamples=25,
+    )["dimension_analysis"]
+    cohorts = dimensions["cohorts"]
+
+    contributing = {
+        row["cohort"]: row for row in cohorts["contributing_origin_cohorts"]
+    }
+    assert contributing["market_led"]["episode_count"] == 1
+    assert contributing["technical_led"]["episode_count"] == 1
+    assert contributing["unknown"]["episode_count"] == 0
+    assert contributing["catalyst_led"]["sample_status"] == "no_sample"
+    assert contributing["market_led"]["membership_is_multi_valued"] is True
+
+    expected = {
+        "directional_bias_cohorts": ("risk", "long"),
+        "catalyst_status_cohorts": ("plausible", "confirmed"),
+        "market_phase_cohorts": ("emerging", "breakout"),
+        "timing_state_cohorts": ("early", "active"),
+        "preferred_horizon_cohorts": ("3d_7d", "intraday"),
+        "tradability_status_cohorts": ("good", "blocked"),
+        "spread_status_cohorts": ("verified_good", "unavailable"),
+        "baseline_maturity_cohorts": ("warm", "cold"),
+        "asset_tier_cohorts": ("top_1_3", "rank_4_30"),
+    }
+    for name, (populated, empty) in expected.items():
+        by_name = {row["cohort"]: row for row in cohorts[name]}
+        assert by_name[populated]["episode_count"] == 1
+        assert by_name[populated]["sample_status"] == "insufficient_sample"
+        assert by_name[empty]["sample_status"] == "no_sample"
+        assert by_name["unknown"]["episode_count"] == 0
+
+    provider = cohorts["provider_source_combination_cohorts"]
+    observed = next(row for row in provider if row["episode_count"] == 1)
+    assert observed["cohort"] == (
+        "providers=binance_historical_ohlcv|sources=market_anomaly"
+    )
+    assert dimensions["provider_source_combination_definitions"][0][
+        "source_packs"
+    ] == ["integrated_radar_pack"]
+    assert dimensions["return_unit"] == "fraction"
+    assert dimensions["research_only"] is True
+    assert dimensions["auto_apply"] is False
+
+
+def test_horizon_timing_classification_and_expiry_summaries_are_closed() -> None:
+    outcome = _outcome(
+        "timing",
+        -0.01,
+        horizons={
+            "1d": {
+                "maturity_status": "matured",
+                "path_status": "complete",
+                "raw_return_fraction": 0.02,
+                "direction_adjusted_return_fraction": 0.02,
+                "direction_adjusted_relative_returns_fraction": {
+                    "BTC": 0.01,
+                    "ETH": 0.015,
+                },
+                "max_favorable_excursion_fraction": 0.04,
+                "max_adverse_excursion_fraction": -0.03,
+                "time_to_mfe_hours": 24.0,
+                "time_to_mae_hours": 24.0,
+                "time_to_invalidation_hours": None,
+                "return_unit": "fraction",
+            },
+            "3d": {
+                "maturity_status": "matured",
+                "path_status": "complete",
+                "raw_return_fraction": -0.01,
+                "direction_adjusted_return_fraction": -0.01,
+                "direction_adjusted_relative_returns_fraction": {
+                    "BTC": -0.02,
+                    "ETH": -0.015,
+                },
+                "max_favorable_excursion_fraction": 0.06,
+                "max_adverse_excursion_fraction": -0.08,
+                "time_to_mfe_hours": 24.0,
+                "time_to_mae_hours": 72.0,
+                "time_to_invalidation_hours": 48.0,
+                "return_unit": "fraction",
+            },
+            "7d": {
+                "maturity_status": "matured",
+                "path_status": "complete",
+                "raw_return_fraction": 0.12,
+                "direction_adjusted_return_fraction": 0.12,
+                "direction_adjusted_relative_returns_fraction": {
+                    "BTC": 0.08,
+                    "ETH": 0.07,
+                },
+                "max_favorable_excursion_fraction": 0.18,
+                "max_adverse_excursion_fraction": -0.08,
+                "time_to_mfe_hours": 144.0,
+                "time_to_mae_hours": 72.0,
+                "time_to_invalidation_hours": 48.0,
+                "return_unit": "fraction",
+            },
+            "14d": {
+                "maturity_status": "matured",
+                "path_status": "complete",
+                "raw_return_fraction": 0.15,
+                "direction_adjusted_return_fraction": 0.15,
+                "direction_adjusted_relative_returns_fraction": {
+                    "BTC": 0.09,
+                    "ETH": 0.08,
+                },
+                "max_favorable_excursion_fraction": 0.22,
+                "max_adverse_excursion_fraction": -0.10,
+                "time_to_mfe_hours": 240.0,
+                "time_to_mae_hours": 72.0,
+                "time_to_invalidation_hours": 48.0,
+                "return_unit": "fraction",
+            },
+        },
+        classifications={
+            "status": "available",
+            "continuation": False,
+            "reversal": True,
+            "breakout_failure": True,
+            "fade_success": None,
+            "risk_event_validation": None,
+        },
+        expiry={
+            "status": "expired_with_directional_resolution",
+            "time_to_expiry_observation_hours": 72.0,
+            "post_expiry_behavior": "continuation",
+            "post_expiry_direction_adjusted_return_fraction": 0.04,
+            "return_unit": "fraction",
+        },
+    )
+
+    dimensions = _build(
+        [_representative("timing", directional_bias="long")],
+        [outcome],
+        resamples=25,
+    )["dimension_analysis"]
+    horizon_rows = {row["horizon"]: row for row in dimensions["horizon_sensitivity"]}
+
+    assert tuple(horizon_rows) == ("1d", "3d", "7d", "14d")
+    assert horizon_rows["14d"]["mean_directional_return_fraction"] == pytest.approx(
+        0.15
+    )
+    assert horizon_rows["3d"]["mean_mae_fraction"] == pytest.approx(0.08)
+    assert horizon_rows["3d"]["time_to_invalidation"]["mean_hours"] == 48.0
+    assert horizon_rows["3d"]["classification_counts"]["reversal"] == 1
+    assert horizon_rows["3d"]["classification_counts"]["breakout_failure"] == 1
+    horizon_classes = {
+        row["classification"]: row
+        for row in horizon_rows["3d"]["classification_summary"]
+    }
+    assert horizon_classes["reversal"]["sample_status"] == "insufficient_sample"
+    assert horizon_classes["reversal"]["uncertainty"]["status"] == (
+        "degenerate_single_episode"
+    )
+    assert horizon_classes["fade_success"]["sample_status"] == "no_sample"
+    assert all(row["return_unit"] == "fraction" for row in horizon_rows.values())
+
+    timing = {row["metric"]: row for row in dimensions["timing_metrics"]}
+    assert timing["time_to_mfe_hours"]["mean_hours"] == 24.0
+    assert timing["time_to_mae_hours"]["mean_hours"] == 72.0
+    assert timing["time_to_invalidation_hours"]["mean_hours"] == 48.0
+    assert timing["time_to_expiry_observation_hours"]["mean_hours"] == 72.0
+    assert timing["time_to_mfe_hours"]["uncertainty"]["timing_unit"] == "hours"
+
+    classifications = {
+        row["classification"]: row
+        for row in dimensions["outcome_classification_summary"]
+    }
+    assert classifications["continuation"]["rate_fraction"] == 0.0
+    assert classifications["reversal"]["rate_fraction"] == 1.0
+    assert classifications["breakout_failure"]["rate_fraction"] == 1.0
+    assert classifications["fade_success"]["sample_status"] == "no_sample"
+    assert classifications["risk_event_validation"]["sample_status"] == "no_sample"
+
+    expiry = {row["cohort"]: row for row in dimensions["expiry_status_cohorts"]}
+    assert expiry["expired_with_directional_resolution"]["episode_count"] == 1
+    assert expiry["expired_without_resolution"]["sample_status"] == "no_sample"
+    post_expiry = {
+        row["cohort"]: row for row in dimensions["post_expiry_status_cohorts"]
+    }
+    assert post_expiry["continuation"][
+        "mean_post_expiry_directional_return_fraction"
+    ] == pytest.approx(0.04)
+    assert post_expiry["reversal"]["sample_status"] == "no_sample"
+    assert dimensions["policy_eligible"] is False

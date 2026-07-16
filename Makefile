@@ -123,6 +123,13 @@ RADAR_RESEARCH_OUTPUT_ROOT ?= event_fade_cache/decision_radar_research_lab
 RADAR_REPLAY_FIXTURE_INPUT_DIR ?= fixtures/backtest_smoke/klines
 RADAR_REPLAY_CACHE_INPUT_DIR ?= backtest_cache/binance_klines
 RADAR_RESEARCH_RECOMMENDATION_SEAL ?=
+RADAR_RESEARCH_RUN_DIR ?=
+RADAR_RESEARCH_FEEDBACK_LEDGER ?= $(RADAR_RESEARCH_OUTPUT_ROOT)/empirical_review_feedback.jsonl
+RADAR_RESEARCH_REVIEW_ITEM_ID ?=
+RADAR_RESEARCH_REVIEW_LABEL ?=
+RADAR_RESEARCH_REVIEW_OBSERVED_AT ?=
+RADAR_RESEARCH_REVIEWER_ALIAS ?= owner
+RADAR_RESEARCH_LABEL_EVENT_ID ?=
 PYTEST_RUNTIME_SECONDS ?=
 STANDALONE_RUNTIME_SECONDS ?=
 COINALYZE_LIVE_PREFLIGHT_ARG = $(if $(filter 1 true yes,$(ALLOW_LIVE_PREFLIGHT)),--event-alpha-coinalyze-allow-live-preflight,)
@@ -249,6 +256,8 @@ help:
 	@echo "  make radar-replay-medium            Run the top-30 development/validation replay from the local cache"
 	@echo "  make radar-replay-full              Run the top-100 development/validation replay from the local cache"
 	@echo "  make radar-replay-final-test RADAR_RESEARCH_RECOMMENDATION_SEAL=...  Evaluate only a pre-frozen recommendation set"
+	@echo "  make radar-research-feedback-report RADAR_RESEARCH_RUN_DIR=...  Read optional review labels without writes"
+	@echo "  CONFIRM=1 make radar-research-feedback-mark RADAR_RESEARCH_RUN_DIR=... RADAR_RESEARCH_REVIEW_ITEM_ID=... RADAR_RESEARCH_REVIEW_LABEL=... RADAR_RESEARCH_REVIEW_OBSERVED_AT=...  Append one optional human label"
 	@echo "  make score    Print paper-trade scoreboard"
 	@echo "  make score-json  Print paper-trade scoreboard as JSON"
 	@echo "  make score-cohorts  Print paper-trade scoreboard with state cohorts"
@@ -827,7 +836,7 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test
+.PHONY: radar-research-protocol-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-feedback-report radar-research-feedback-mark
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
@@ -858,6 +867,30 @@ radar-replay-final-test: radar-research-protocol-check
 		--input-dir "$(RADAR_REPLAY_CACHE_INPUT_DIR)" \
 		--output-root "$(RADAR_RESEARCH_OUTPUT_ROOT)" \
 		--recommendation-seal "$(RADAR_RESEARCH_RECOMMENDATION_SEAL)"
+
+radar-research-feedback-report:
+	@test -n "$(RADAR_RESEARCH_RUN_DIR)" || { echo "RADAR_RESEARCH_RUN_DIR is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_review_feedback_cli \
+		--run-dir "$(RADAR_RESEARCH_RUN_DIR)" \
+		--ledger "$(RADAR_RESEARCH_FEEDBACK_LEDGER)" \
+		report
+
+radar-research-feedback-mark:
+	@test "$(CONFIRM)" = "1" || { echo "CONFIRM=1 is required to append optional review feedback" >&2; exit 2; }
+	@test -n "$(RADAR_RESEARCH_RUN_DIR)" || { echo "RADAR_RESEARCH_RUN_DIR is required" >&2; exit 2; }
+	@test -n "$(RADAR_RESEARCH_REVIEW_ITEM_ID)" || { echo "RADAR_RESEARCH_REVIEW_ITEM_ID is required" >&2; exit 2; }
+	@test -n "$(RADAR_RESEARCH_REVIEW_LABEL)" || { echo "RADAR_RESEARCH_REVIEW_LABEL is required" >&2; exit 2; }
+	@test -n "$(RADAR_RESEARCH_REVIEW_OBSERVED_AT)" || { echo "RADAR_RESEARCH_REVIEW_OBSERVED_AT is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_review_feedback_cli \
+		--run-dir "$(RADAR_RESEARCH_RUN_DIR)" \
+		--ledger "$(RADAR_RESEARCH_FEEDBACK_LEDGER)" \
+		mark \
+		--review-item-id "$(RADAR_RESEARCH_REVIEW_ITEM_ID)" \
+		--label "$(RADAR_RESEARCH_REVIEW_LABEL)" \
+		--observed-at "$(RADAR_RESEARCH_REVIEW_OBSERVED_AT)" \
+		--reviewer-alias "$(RADAR_RESEARCH_REVIEWER_ALIAS)" \
+		$(if $(strip $(RADAR_RESEARCH_LABEL_EVENT_ID)),--label-event-id "$(RADAR_RESEARCH_LABEL_EVENT_ID)",) \
+		--confirm
 
 .PHONY: event-alpha-source-independence-oos-export event-alpha-source-independence-oos-validate event-alpha-source-independence-oos-report event-alpha-source-independence-storage-report
 

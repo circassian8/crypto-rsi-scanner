@@ -155,6 +155,30 @@ def test_matched_control_selection_is_deterministic_outcome_blind_and_excludes_s
     assert selected_assets.isdisjoint({"asset-aaa", "asset-ddd"})
 
 
+def test_control_signal_episode_uses_same_inclusive_daily_boundary() -> None:
+    first = _idea("AAA", idea_id="first")
+    exact_boundary = _idea(
+        "AAA",
+        idea_id="boundary",
+        observed_at=(_START + timedelta(hours=24)).isoformat(),
+    )
+    outside_boundary = _idea(
+        "AAA",
+        idea_id="outside-boundary",
+        observed_at=(_START + timedelta(hours=24, seconds=1)).isoformat(),
+    )
+
+    selected = empirical_replay_controls.select_matched_non_signal_controls(
+        [],
+        [outside_boundary, exact_boundary, first],
+    )
+
+    assert selected["signal_episode_count"] == 2
+    assert [
+        row["signal_representative"]["idea_id"] for row in selected["rows"]
+    ] == ["first", "outside-boundary"]
+
+
 def test_future_price_append_cannot_change_selection_or_matured_three_day_outcome() -> None:
     observations = [_observation("AAA"), _observation("BBB"), _observation("CCC")]
     ideas = [_idea("AAA")]
@@ -243,6 +267,16 @@ def test_missed_moves_require_primary_endpoint_and_retain_trace_failure_stage() 
     assert by_symbol["WIN"]["qualifies_as_missed_opportunity"] is True
     assert by_symbol["DROP"]["directional_bias"] == "risk"
     assert by_symbol["DROP"]["qualifies_as_missed_opportunity"] is True
+    assert by_symbol["WIN"]["primary_reason"] == (
+        "unclassified_decision_suppression"
+    )
+    assert by_symbol["WIN"]["attribution_uses_future_outcome"] is False
+    assert len(missed["missed_reason_counts"]) == len(
+        missed["missed_reason_taxonomy"]
+    )
+    assert {row["reason"] for row in missed["missed_reason_counts"]} == set(
+        missed["missed_reason_taxonomy"]
+    )
     assert by_symbol["ILLIQ"]["qualifies_as_missed_opportunity"] is False
     assert by_symbol["ILLIQ"]["qualification_failure_reasons"] == [
         "minimum_point_in_time_liquidity_not_met"
