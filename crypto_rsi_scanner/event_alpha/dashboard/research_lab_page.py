@@ -17,7 +17,7 @@ from .components import (
 )
 from .models import DashboardSnapshot
 from .presentation import humanize_enum
-from .research_lab_loader import ORIGINS, ROUTES
+from .research_lab_loader import ORIGINS, REPORT_FILENAMES, ROUTES
 from .system_page_support import display_count, render_metric_grid, render_page_intro, render_panel
 
 
@@ -25,21 +25,36 @@ def render_research_lab_page(snapshot: DashboardSnapshot) -> str:
     """Render descriptive evidence without implying a production policy change."""
 
     lab = _mapping(snapshot.research_lab)
-    validation = _projection(lab, "validation")
+    projections = _mapping(lab.get("projections"))
+    validation = _mapping(projections.get("validation"))
     analyses = _mapping_rows(validation.get("analyses"))
-    walk = _projection(lab, "walk_forward")
-    policy = _projection(lab, "policy")
-    live = _projection(lab, "live_campaign")
+    walk = _mapping(projections.get("walk_forward"))
+    policy = _mapping(projections.get("policy"))
+    live = _mapping(projections.get("live"))
+    bundle = _mapping(lab.get("bundle"))
+    intro = render_page_intro(
+        "Decision Radar Research Lab",
+        "Historical replay, live no-send observations, walk-forward checks, and shadow policy comparisons. Evidence here is descriptive and remains outside dashboard authority.",
+        "Learning · read-only",
+    )
+    boundary = _boundary_banner(
+        lab,
+        analyses,
+        live,
+        bundle,
+        generation_authoritative=snapshot.generation_authoritative,
+    )
+    inventory = _report_availability(lab)
+    if lab.get("bundle_status") != "validated":
+        return "".join((intro, boundary, inventory, _bundle_failure_panel(lab)))
 
     return "".join((
-        render_page_intro(
-            "Decision Radar Research Lab",
-            "Historical replay, live no-send observations, walk-forward checks, and shadow policy comparisons. Evidence here is descriptive and remains outside dashboard authority.",
-            "Learning · read-only",
-        ),
-        _boundary_banner(lab, analyses, live),
-        _overview(lab, analyses, walk, policy, live),
-        _report_availability(lab),
+        intro,
+        boundary,
+        _overview(lab, bundle, analyses, walk, policy, live),
+        _bundle_identity_panel(bundle),
+        _final_verdict_panel(validation, bundle),
+        inventory,
         _closed_cohort_panel("Closed route evidence", "Eight routes, including explicit zero-sample cohorts.", analyses, "route_cohorts", ROUTES),
         _closed_cohort_panel("Closed origin evidence", "Seven primary thesis origins, including explicit zero-sample cohorts.", analyses, "primary_origin_cohorts", ORIGINS),
         _monotonicity_panel(analyses),
@@ -58,16 +73,24 @@ def _boundary_banner(
     lab: Mapping[str, Any],
     analyses: list[Mapping[str, Any]],
     live: Mapping[str, Any],
+    bundle: Mapping[str, Any],
+    *,
+    generation_authoritative: bool,
 ) -> str:
     replay_modes = sorted({str(row.get("evidence_mode") or "unknown") for row in analyses})
     badges = [
-        badge("Production policy unchanged", tone="info", icon="shield"),
         badge("Shadow only", tone="neutral"),
         badge("No automatic application", tone="positive"),
         badge(lab.get("status") or "unavailable", tone=_status_tone(lab.get("status"))),
     ]
-    if live:
+    if _production_contract_unchanged(bundle):
+        badges.insert(0, badge("Production policy unchanged", tone="info", icon="shield"))
+    elif lab.get("bundle_status") != "validated":
+        badges.insert(0, badge("Evidence bundle unavailable", tone="warning", icon="warning"))
+    if live.get("available") is True:
         badges.append(badge("Live no-send", tone="info", icon="data"))
+    if not generation_authoritative:
+        badges.append(badge("Historical research · current authority unavailable", tone="warning"))
     if any("fixture" in mode.casefold() for mode in replay_modes):
         badges.append(badge("Fixture evidence", tone="warning"))
     if any(_analysis_is_insufficient(row) for row in analyses) or live.get("evidence_strength") == "insufficient_sample":
@@ -82,23 +105,21 @@ def _boundary_banner(
 
 def _overview(
     lab: Mapping[str, Any],
+    bundle: Mapping[str, Any],
     analyses: list[Mapping[str, Any]],
     walk: Mapping[str, Any],
     policy: Mapping[str, Any],
     live: Mapping[str, Any],
 ) -> str:
-    replay_episodes = sum(_count(row.get("episode_count")) for row in analyses)
-    replay_matured = sum(_count(row.get("matured_episode_count")) for row in analyses)
-    live_episodes = _count(_mapping(live.get("episodes")).get("primary_episode_count"))
-    live_matured = _count(_mapping(live.get("scorecard")).get("matured_episode_count"))
+    by_partition = {str(row.get("partition") or ""): row for row in analyses}
     recommendation_rows = _mapping_rows(policy.get("recommendations"))
     candidate_count = sum(str(row.get("status") or "") == "candidate" for row in recommendation_rows)
     return render_metric_grid((
-        ("Research reports", str(sum(_report_ready(lab, key) for key in ("validation", "walk_forward", "policy", "live_campaign"))) + "/4", "info"),
-        ("Replay episodes", str(replay_episodes), "neutral"),
-        ("Replay matured", str(replay_matured), "neutral"),
-        ("Live no-send episodes", str(live_episodes), "neutral"),
-        ("Live matured", str(live_matured), "neutral"),
+        ("Research reports", f"{sum(_report_ready(lab, name) for name in REPORT_FILENAMES)}/7", "info"),
+        ("Development episodes", _episode_pair(by_partition.get("development")), "neutral"),
+        ("Validation episodes", _episode_pair(by_partition.get("validation")), "neutral"),
+        ("Final-test episodes", _episode_pair(by_partition.get("final_test")), "neutral"),
+        ("Bundle", _short_digest(bundle.get("bundle_id")), "info"),
         ("Nonempty walk-forward folds", display_count(walk.get("nonempty_fold_count")), "neutral"),
         ("Shadow candidates", str(candidate_count), "warning" if candidate_count else "neutral"),
         ("Production changes", "0", "positive"),
@@ -108,29 +129,102 @@ def _overview(
 def _report_availability(lab: Mapping[str, Any]) -> str:
     reports = _mapping(lab.get("reports"))
     rows = []
-    labels = {
-        "validation": "Empirical validation",
-        "walk_forward": "Walk-forward",
-        "policy": "Shadow policy",
-        "live_campaign": "Live campaign",
-    }
-    for key, label in labels.items():
-        record = _mapping(reports.get(key))
+    for filename in REPORT_FILENAMES:
+        record = _mapping(reports.get(filename))
         digest = str(record.get("sha256") or "")
+        read_status = str(record.get("status") or "not configured")
         rows.append((
-            label,
-            badge(record.get("status") or "not configured", tone=_status_tone(record.get("status"))),
+            _report_label(filename),
+            badge(
+                read_status,
+                label="Readable" if read_status == "ready" else humanize_enum(read_status),
+                tone="neutral" if read_status == "ready" else _status_tone(read_status),
+            ),
             display_count(record.get("size_bytes")),
             digest[:12] + "…" if digest else "Not available",
             str(record.get("filename") or ""),
         ))
     body = data_table(
-        ("Report", "State", "Bytes", "SHA-256", "Fixed source"),
+        ("Report", "Read state", "Bytes", "SHA-256", "Fixed source"),
         rows,
         caption="Fixed Research Lab report inventory",
         compact=True,
     )
     return render_panel("Research evidence inventory", str(body), eyebrow="Bounded fixed-path reads")
+
+
+def _bundle_failure_panel(lab: Mapping[str, Any]) -> str:
+    warnings = [str(item) for item in _list(lab.get("warnings")) if str(item)]
+    body = str(empty_state(
+        "Semantic evidence suppressed",
+        "The exact seven-file bundle is incomplete or invalid. No missing value is interpreted as zero evidence, and no research metric is rendered until the whole bundle validates.",
+    ))
+    if warnings:
+        body += str(chips(warnings, humanize=False))
+    return render_panel("Bundle validation failed closed", body, eyebrow="No partial semantics")
+
+
+def _bundle_identity_panel(bundle: Mapping[str, Any]) -> str:
+    selection = _mapping(bundle.get("selection_run"))
+    final = _mapping(bundle.get("final_test_run"))
+    rows = (
+        ("Bundle", str(bundle.get("bundle_id") or "Not available")),
+        ("Protocol", f"{bundle.get('protocol_version') or 'Not available'} · {_short_digest(bundle.get('protocol_sha256'))}"),
+        ("Selection run", str(selection.get("run_fingerprint") or "Not available")),
+        ("Final-test run", str(final.get("run_fingerprint") or "Not available")),
+        ("Recommendation seal", str(bundle.get("recommendation_seal_sha256") or "Not available")),
+    )
+    return render_panel(
+        "Validated evidence identity",
+        str(definition_list(rows)),
+        eyebrow="Exact immutable bindings",
+    )
+
+
+def _final_verdict_panel(
+    validation: Mapping[str, Any],
+    bundle: Mapping[str, Any],
+) -> str:
+    conclusions = _mapping(validation.get("conclusions"))
+    status = str(conclusions.get("final_confirmation_status") or "unavailable")
+    route_gaps = [humanize_enum(item) for item in _list(conclusions.get("routes_with_no_empirical_evidence"))]
+    origin_gaps = [humanize_enum(item) for item in _list(conclusions.get("origins_with_no_empirical_evidence"))]
+    rows = (
+        ("Confirmed candidates", display_count(conclusions.get("confirmed_candidate_count"))),
+        ("Rejected candidates", display_count(conclusions.get("rejected_candidate_count"))),
+        ("Insufficient candidates", display_count(conclusions.get("insufficient_sample_candidate_count"))),
+        (
+            "Policy mutation",
+            "No production change" if _production_contract_unchanged(bundle) else "Unavailable",
+        ),
+    )
+    if status == "no_candidate_recommendations":
+        verdict_copy = (
+            '<p><strong>No candidate recommendations</strong> means development and validation '
+            'sealed no policy hypothesis for holdout confirmation; it is not a holdout pass.</p>'
+        )
+        verdict_eyebrow = "Negative result preserved"
+    else:
+        verdict_copy = (
+            f'<p><strong>{escape_html(humanize_enum(status))}</strong> is the sealed final-test '
+            'result for the preselected candidate set. It does not auto-apply or authorize a '
+            'production change.</p>'
+        )
+        verdict_eyebrow = "Sealed evaluation result"
+    body = (
+        '<div class="badge-row">'
+        + str(badge(status, label=humanize_enum(status), tone="neutral", icon="shield"))
+        + str(badge("Human decision required for any future change", tone="info"))
+        + "</div>"
+        + verdict_copy
+        + str(definition_list(rows))
+        + '<p><strong>No empirical evidence — routes:</strong> '
+        + str(chips(route_gaps, humanize=False))
+        + '</p><p><strong>No empirical evidence — primary origins:</strong> '
+        + str(chips(origin_gaps, humanize=False))
+        + "</p>"
+    )
+    return render_panel("Final empirical verdict", body, eyebrow=verdict_eyebrow)
 
 
 def _closed_cohort_panel(
@@ -151,7 +245,7 @@ def _closed_cohort_panel(
             row = _mapping(by_name.get(name))
             rows.append(_cohort_table_row(partition, name, row))
     table = data_table(
-        ("Evidence", "Cohort", "Episodes", "Matured", "Mean directional", "Hit rate", "MFE", "MAE", "Strength"),
+        ("Evidence", "Cohort", "Episodes", "Matured", "Mean directional", "Hit rate", "MFE", "MAE (signed)", "Strength"),
         rows,
         caption=title,
         empty="The empirical validation report is absent or invalid. No zero counts are inferred from missing evidence.",
@@ -162,6 +256,14 @@ def _closed_cohort_panel(
 
 
 def _cohort_table_row(partition: str, name: str, row: Mapping[str, Any]) -> tuple[object, ...]:
+    sample_state = (
+        badge("No evidence", tone="neutral")
+        if _count(row.get("episode_count")) == 0
+        else badge(
+            row.get("sample_status") or "not reported",
+            tone=_evidence_tone(row.get("sample_status")),
+        )
+    )
     return (
         partition,
         humanize_enum(name),
@@ -171,7 +273,7 @@ def _cohort_table_row(partition: str, name: str, row: Mapping[str, Any]) -> tupl
         _percent(row.get("hit_rate")),
         _percent(row.get("mean_mfe_fraction")),
         _percent(row.get("mean_mae_fraction")),
-        badge(row.get("sample_status") or "not reported", tone=_evidence_tone(row.get("sample_status"))),
+        sample_state,
     )
 
 
@@ -181,16 +283,23 @@ def _monotonicity_panel(analyses: list[Mapping[str, Any]]) -> str:
     for analysis in analyses:
         partition = _partition_label(analysis)
         for item in _mapping_rows(analysis.get("score_monotonicity")):
+            evaluation_status = str(item.get("evaluation_status") or "not_evaluable")
+            violation_count = _count(item.get("violation_count"))
+            if evaluation_status == "not_evaluable":
+                observed = badge("Not evaluable", tone="neutral")
+            elif violation_count:
+                observed = badge("Descriptive violation", tone="warning")
+            else:
+                observed = badge("No observed violation", tone="positive")
             rows.append((
                 partition,
                 humanize_enum(item.get("score_field")),
                 humanize_enum(item.get("expected_relationship")),
                 display_count(item.get("comparable_pair_count")),
-                display_count(item.get("violation_count")),
-                badge(
-                    "No observed violation" if _count(item.get("violation_count")) == 0 else "Descriptive violation",
-                    tone="positive" if _count(item.get("violation_count")) == 0 else "warning",
-                ),
+                display_count(violation_count),
+                observed,
+                humanize_enum(item.get("not_evaluable_reason"))
+                if evaluation_status == "not_evaluable" else "—",
             ))
             bucket_rows = [
                 (
@@ -209,7 +318,7 @@ def _monotonicity_panel(analyses: list[Mapping[str, Any]]) -> str:
                     summary="Unadjusted descriptive check",
                 )))
     table = data_table(
-        ("Evidence", "Score", "Frozen expectation", "Comparable pairs", "Violations", "Observed state"),
+        ("Evidence", "Score", "Frozen expectation", "Comparable pairs", "Violations", "Evaluation", "Reason"),
         rows,
         caption="Score monotonicity checks",
         empty="No score monotonicity report is available.",
@@ -238,13 +347,14 @@ def _segmentation_panel(analyses: list[Mapping[str, Any]]) -> str:
                     dimension,
                     humanize_enum(row.get("cohort")),
                     display_count(row.get("episode_count")),
+                    display_count(row.get("matured_episode_count")),
                     display_count(row.get("sample_size")),
                     _percent(row.get("mean_directional_return_fraction")),
                     _percent(row.get("hit_rate")),
                     badge(row.get("sample_status") or "not reported", tone=_evidence_tone(row.get("sample_status"))),
                 ))
     table = data_table(
-        ("Evidence", "Dimension", "Cohort", "Episodes", "Scoreable", "Mean directional", "Hit rate", "Strength"),
+        ("Evidence", "Dimension", "Cohort", "Episodes", "Matured", "Scoreable", "Mean directional", "Hit rate", "Strength"),
         rows,
         caption="Regime, liquidity, and data-quality cohorts",
         empty="No segmented cohort evidence is available.",
@@ -260,7 +370,7 @@ def _market_catalyst_panel(analyses: list[Mapping[str, Any]]) -> str:
         for row in _mapping_rows(analysis.get("market_catalyst_cohorts")):
             rows.append(_cohort_table_row(partition, str(row.get("cohort") or "unknown"), row))
     table = data_table(
-        ("Evidence", "Market / catalyst cohort", "Episodes", "Matured", "Mean directional", "Hit rate", "MFE", "MAE", "Strength"),
+        ("Evidence", "Market / catalyst cohort", "Episodes", "Matured", "Mean directional", "Hit rate", "MFE", "MAE (signed)", "Strength"),
         rows,
         caption="Market-led and catalyst-context comparison",
         empty="No market-versus-catalyst cohort evidence is available.",
@@ -274,22 +384,33 @@ def _classification_panel(analyses: list[Mapping[str, Any]]) -> str:
     symptoms: Counter[str] = Counter()
     missed_reasons: Counter[str] = Counter()
     for analysis in analyses:
-        missed = _mapping_rows(analysis.get("missed_opportunity_classifications"))
-        false_late = _mapping_rows(analysis.get("false_positive_and_late_classifications"))
-        for row in missed:
-            if row.get("qualifies") is True:
-                missed_reasons.update(str(value) for value in _list(row.get("reason_codes")))
-        for row in false_late:
-            symptoms.update(str(value) for value in _list(row.get("symptom_codes")))
+        missed = _mapping(analysis.get("missed_opportunity_summary"))
+        false_late = _mapping(analysis.get("false_positive_and_late_summary"))
+        missed_counts = _mapping(missed.get("classification_counts"))
+        symptom_counts = _mapping(false_late.get("symptom_counts"))
+        missed_reasons.update({
+            str(key): _count(value)
+            for key, value in _mapping(missed.get("reason_counts")).items()
+        })
+        symptoms.update({
+            str(key): _count(value)
+            for key, value in symptom_counts.items()
+        })
         rows.append((
             _partition_label(analysis),
-            str(sum(row.get("qualifies") is True for row in missed)),
-            str(sum(row.get("false_positive") is True for row in false_late)),
-            str(sum(row.get("late_idea") is True for row in false_late)),
-            str(sum(str(row.get("classification_status")) == "evaluated" for row in false_late)),
+            display_count(missed_counts.get("missed_opportunity")),
+            display_count(symptom_counts.get("failed_quickly")),
+            display_count(symptom_counts.get("late_pre_signal_move")),
+            display_count(false_late.get("row_count")),
         ))
     summary = data_table(
-        ("Evidence", "Missed", "False positive", "Late", "Evaluated"),
+        (
+            "Evidence",
+            "Missed",
+            "Failed quickly symptom",
+            "Late pre-signal symptom",
+            "Rows summarized",
+        ),
         rows,
         empty="No missed/false/late classifications are available.",
         compact=True,
@@ -306,7 +427,7 @@ def _classification_panel(analyses: list[Mapping[str, Any]]) -> str:
         compact=True,
     )
     return render_panel(
-        "Missed, false-positive & late ideas",
+        "Missed moves & false/late symptoms",
         str(summary) + str(disclosure("Classification detail", detail, summary="Frozen descriptive rules")),
         eyebrow="Error analysis",
     )
@@ -315,6 +436,8 @@ def _classification_panel(analyses: list[Mapping[str, Any]]) -> str:
 def _path_and_cost_panel(analyses: list[Mapping[str, Any]]) -> str:
     path_rows = []
     cost_rows = []
+    survivability_rows = []
+    spread_observed = False
     for analysis in analyses:
         partition = _partition_label(analysis)
         for row in _mapping_rows(analysis.get("route_cohorts")):
@@ -328,6 +451,7 @@ def _path_and_cost_panel(analyses: list[Mapping[str, Any]]) -> str:
                 _percent(row.get("downside_5pct_fraction")),
             ))
         costs = _mapping(analysis.get("cost_sensitivity"))
+        spread_observed = spread_observed or costs.get("historical_spread_observed") is True
         for row in _mapping_rows(costs.get("scenarios")):
             survives = row.get("mean_survives_assumed_cost")
             cost_rows.append((
@@ -341,8 +465,23 @@ def _path_and_cost_panel(analyses: list[Mapping[str, Any]]) -> str:
                     tone="positive" if survives is True else "warning" if survives is False else "muted",
                 ),
             ))
+        route_survivability = _mapping(
+            _mapping(analysis.get("survivability")).get("route_cost_survivability")
+        )
+        for row in _mapping_rows(route_survivability.get("routes")):
+            maximum = row.get("maximum_tolerable_round_trip_cost_bps")
+            survivability_rows.append((
+                partition,
+                humanize_enum(row.get("route")),
+                display_count(row.get("episode_count")),
+                humanize_enum(row.get("evidence_status")),
+                f"{float(maximum):.1f} bps"
+                if isinstance(maximum, (int, float)) and not isinstance(maximum, bool)
+                else "Not estimable",
+                humanize_enum(route_survivability.get("historical_spread_observation_status")),
+            ))
     paths = data_table(
-        ("Evidence", "Route", "Sample", "Mean MFE", "Mean MAE", "MFE / MAE", "Downside 5%"),
+        ("Evidence", "Route", "Sample", "Mean MFE", "Mean MAE (signed)", "MFE / MAE", "Downside 5%"),
         path_rows,
         caption="Path-dependent excursion evidence",
         empty="No MFE/MAE path evidence is available.",
@@ -355,9 +494,24 @@ def _path_and_cost_panel(analyses: list[Mapping[str, Any]]) -> str:
         empty="No cost sensitivity evidence is available.",
         compact=True,
     )
+    survivability = data_table(
+        ("Evidence", "Route", "Episodes", "Evidence", "Mean break-even", "Observed spread"),
+        survivability_rows,
+        caption="Route cost survivability",
+        empty="No route survivability evidence is available.",
+        compact=True,
+    )
+    badges = '<div class="badge-row">' + str(badge(
+        "Historical spread observed" if spread_observed else "Historical spread not observed",
+        tone="positive" if spread_observed else "warning",
+    )) + str(badge("Costs are assumed sensitivity, not execution evidence", tone="info")) + "</div>"
     return render_panel(
         "MFE, MAE & assumed costs",
-        str(paths) + str(disclosure("Cost scenarios", costs, summary="Historical spread not inferred")),
+        badges
+        + '<p>MAE is a signed direction-adjusted adverse excursion; negative values are preserved.</p>'
+        + str(paths)
+        + str(disclosure("Assumed cost scenarios", costs, summary="Historical spread is unavailable"))
+        + str(disclosure("Route survivability", survivability, summary="Descriptive, not an execution limit")),
         eyebrow="Path outcomes",
     )
 
@@ -365,6 +519,7 @@ def _path_and_cost_panel(analyses: list[Mapping[str, Any]]) -> str:
 def _walk_forward_panel(walk: Mapping[str, Any]) -> str:
     folds = _mapping_rows(walk.get("folds"))
     rows = []
+    day_rows = []
     for row in folds:
         result = _mapping(row.get("test_result"))
         rows.append((
@@ -378,11 +533,28 @@ def _walk_forward_panel(walk: Mapping[str, Any]) -> str:
             _percent(result.get("hit_rate")),
             humanize_enum(result.get("evidence_strength")),
         ))
+        selected_days = _count(row.get("test_selected_observation_day_count"))
+        active_days = _count(row.get("test_idea_active_day_count"))
+        day_rows.append((
+            display_count(row.get("fold")),
+            display_count(row.get("train_outcome_purged_count")),
+            display_count(row.get("test_outcome_purged_count")),
+            str(selected_days),
+            str(active_days),
+            str(max(0, selected_days - active_days)),
+        ))
     table = data_table(
         ("Fold", "Train window", "Test window", "Train N", "Test N", "Selected shadow", "Test mean", "Test hit", "Strength"),
         rows,
         caption="Chronological rolling train/test folds",
         empty="Walk-forward evidence is absent or has no folds.",
+        compact=True,
+    )
+    days = data_table(
+        ("Fold", "Train outcomes purged", "Test outcomes purged", "Selected days", "Idea-active days", "Zero-idea days"),
+        day_rows,
+        caption="Point-in-time day denominators and outcome purges",
+        empty="No fold denominator evidence is available.",
         compact=True,
     )
     status = badge(walk.get("status") or "unavailable", tone=_evidence_tone(walk.get("status")))
@@ -391,8 +563,25 @@ def _walk_forward_panel(walk: Mapping[str, Any]) -> str:
         tone="positive" if walk and walk.get("final_test_accessed") is not True else "warning",
         icon="shield",
     )
+    selected = _count(walk.get("selected_observation_day_count"))
+    active = _count(walk.get("idea_active_day_count"))
     header = f'<div class="badge-row">{status}{guard}</div>' if walk else ""
-    return render_panel("Chronological walk-forward", header + str(table), eyebrow="Out-of-window stability")
+    summary = definition_list((
+        ("Selected observation days", str(selected)),
+        ("Idea-active days", str(active)),
+        ("Zero-idea days", str(max(0, selected - active))),
+        ("Outcome purge rule", humanize_enum(walk.get("outcome_purge_rule"))),
+        ("Outcome-evaluable folds", display_count(walk.get("outcome_evaluable_fold_count"))),
+    ))
+    return render_panel(
+        "Chronological walk-forward",
+        header + str(summary) + str(table) + str(disclosure(
+            "Fold purges and day denominators",
+            days,
+            summary="Outcome leakage controls",
+        )),
+        eyebrow="Out-of-window stability",
+    )
 
 
 def _policy_and_burden_panel(policy: Mapping[str, Any], analyses: list[Mapping[str, Any]]) -> str:
@@ -423,14 +612,18 @@ def _policy_and_burden_panel(policy: Mapping[str, Any], analyses: list[Mapping[s
     for analysis in analyses:
         burden = _mapping(analysis.get("operator_burden"))
         if burden:
+            selected_days = _count(burden.get("observed_day_count"))
+            active_days = _count(burden.get("idea_active_day_count"))
             burden_rows.append((
                 _partition_label(analysis),
                 display_count(burden.get("episode_count")),
-                display_count(burden.get("observed_day_count")),
+                str(selected_days),
+                str(active_days),
+                str(max(0, selected_days - active_days)),
                 display_count(burden.get("family_count")),
                 _decimal(burden.get("mean_ideas_per_observed_day")),
-                str(sum(_count(row.get("urgent_item_count")) for row in _mapping_rows(burden.get("daily")))),
-                str(sum(_count(row.get("repeated_family_item_count")) for row in _mapping_rows(burden.get("daily")))),
+                display_count(burden.get("urgent_visible_episode_count")),
+                display_count(burden.get("visible_dependent_repeat_item_count")),
             ))
     scenarios = data_table(
         ("Shadow scenario", "Visible", "Matured", "Route changes", "Ideas / active day", "Mean directional", "Quick failures", "Strength"),
@@ -445,14 +638,23 @@ def _policy_and_burden_panel(policy: Mapping[str, Any], analyses: list[Mapping[s
         compact=True,
     )
     burden = data_table(
-        ("Evidence", "Ideas", "Observed days", "Families", "Ideas / day", "Urgent", "Repeated family"),
+        ("Evidence", "Ideas", "Selected days", "Idea-active days", "Zero-idea days", "Families", "Ideas / selected day", "Urgent", "Repeated family"),
         burden_rows,
         empty="No operator-burden summary is available.",
         compact=True,
     )
+    decision_boundary = _mapping(policy.get("decision_boundary"))
+    unchanged = (
+        decision_boundary.get("production_policy_unchanged") is True
+        and decision_boundary.get("automatic_policy_application") is False
+    )
     body = (
         '<div class="badge-row">'
-        + str(badge("Production policy unchanged", tone="info", icon="shield"))
+        + str(badge(
+            "Production policy unchanged" if unchanged else "Production policy state unavailable",
+            tone="info" if unchanged else "warning",
+            icon="shield",
+        ))
         + str(badge("shadow_only", label="Shadow recommendations do not auto-apply", tone="warning"))
         + "</div>"
         + str(scenarios)
@@ -470,7 +672,7 @@ def _live_replay_panel(
     rows = []
     for analysis in analyses:
         rows.append((
-            "Replay / fixture",
+            "Historical replay",
             _partition_label(analysis),
             display_count(analysis.get("episode_count")),
             display_count(analysis.get("matured_episode_count")),
@@ -478,7 +680,7 @@ def _live_replay_panel(
             "No",
             "Separated evidence mode",
         ))
-    if live:
+    if live.get("available") is True:
         episodes = _mapping(live.get("episodes"))
         scorecard = _mapping(live.get("scorecard"))
         rows.append((
@@ -497,11 +699,30 @@ def _live_replay_panel(
         empty="No live or replay evidence is available. Missing evidence is not negative evidence.",
         compact=True,
     )
-    controls = _mapping(validation.get("controls_and_benchmarks"))
-    controls_body = _generic_summary(controls, "No matched-control or benchmark summary is available.")
+    control_rows = []
+    for label, controls in (
+        ("Development + validation", _mapping(validation.get("selection_controls"))),
+        ("Final test", _mapping(validation.get("final_test_controls"))),
+    ):
+        if controls:
+            control_rows.append((
+                label,
+                display_count(controls.get("idea_count")),
+                display_count(_mapping(controls.get("matched_non_signal_controls")).get("selected_control_count")),
+                str(len(_mapping_rows(controls.get("benchmarks")))),
+                "No" if controls.get("matched_control_causal_claim") is False else "Unavailable",
+            ))
+    controls_body = data_table(
+        ("Evidence", "Ideas", "Matched controls", "Benchmarks", "Causal claim"),
+        control_rows,
+        empty="No matched-control or benchmark summary is available.",
+        compact=True,
+    )
     return render_panel(
         "Live no-send vs replay",
-        str(table) + str(disclosure("Controls & benchmarks", controls_body, summary="No causal claim")),
+        '<p>Live no-send evidence is a separate observational lane and is never pooled into historical replay sample sizes.</p>'
+        + str(table)
+        + str(disclosure("Controls & benchmarks", controls_body, summary="No causal claim")),
         eyebrow="Evidence separation",
     )
 
@@ -528,8 +749,9 @@ def _warnings_panel(
         empty="No loader or multiple-comparison warnings were reported.",
         compact=True,
     )
+    conclusion_values = _mapping(validation.get("conclusions"))
     limitations = _generic_summary(
-        validation.get("limitations"),
+        conclusion_values.get("what_is_not_validated"),
         "No validation limitations report is available.",
     )
     live_limitations = _generic_summary(
@@ -537,7 +759,7 @@ def _warnings_panel(
         "No live-campaign limitations report is available.",
     )
     conclusions = _generic_summary(
-        validation.get("conclusions"),
+        conclusion_values,
         "No bounded report conclusions are available.",
     )
     body = (
@@ -591,15 +813,46 @@ def _plain_value(value: Any) -> str:
     return str(value)
 
 
-def _projection(lab: Mapping[str, Any], key: str) -> Mapping[str, Any]:
-    record = _mapping(_mapping(lab.get("reports")).get(key))
-    if record.get("status") != "ready":
-        return {}
-    return _mapping(record.get("projection"))
-
-
 def _report_ready(lab: Mapping[str, Any], key: str) -> int:
     return int(_mapping(_mapping(lab.get("reports")).get(key)).get("status") == "ready")
+
+
+def _production_contract_unchanged(bundle: Mapping[str, Any]) -> bool:
+    contract = _mapping(bundle.get("production_contract"))
+    return bool(contract) and all(
+        contract.get(field) is False
+        for field in (
+            "dashboard_authority_changed",
+            "policy_applied",
+            "routes_changed",
+            "thresholds_changed",
+        )
+    ) and contract.get("human_approval_required") is True
+
+
+def _episode_pair(value: Any) -> str:
+    row = _mapping(value)
+    if not row:
+        return "Not available"
+    return f"{_count(row.get('episode_count'))} / {_count(row.get('matured_episode_count'))}"
+
+
+def _short_digest(value: Any) -> str:
+    digest = str(value or "")
+    return digest[:12] + "…" if digest else "Not available"
+
+
+def _report_label(filename: str) -> str:
+    labels = {
+        REPORT_FILENAMES[0]: "Empirical validation · human",
+        REPORT_FILENAMES[1]: "Empirical validation · machine",
+        REPORT_FILENAMES[2]: "Walk-forward · human",
+        REPORT_FILENAMES[3]: "Walk-forward · machine",
+        REPORT_FILENAMES[4]: "Policy simulation · human",
+        REPORT_FILENAMES[5]: "Policy simulation · machine",
+        REPORT_FILENAMES[6]: "Research limitations",
+    }
+    return labels.get(filename, filename)
 
 
 def _analysis_is_insufficient(value: Mapping[str, Any]) -> bool:

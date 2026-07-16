@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Close the dashboard Research Lab evidence contract · Codex
+**Why:** The first Research Lab surface still treated four independently parsed
+files as sufficient and could recompute or mislabel partial empirical truth.
+The published result is one immutable seven-file bundle, so the dashboard must
+fail closed on the whole contract and render only its validated projection.
+**Changes:**
+- Replaced independent report reads with one descriptor-anchored, bounded,
+  read-once acquisition of the exact seven report files. The loader validates
+  the complete bundle, exact selection/final/seal bindings, safety counters,
+  and embedded live projection before exposing any semantic data; missing,
+  unsafe, oversized, noncanonical, spliced, or drifted inputs retain only a
+  bounded readable-file inventory.
+- Made the page lead with the immutable evidence identity and final empirical
+  verdict, preserve all three partitions and closed route/origin taxonomies,
+  distinguish `not_evaluable` from no violation, label signed MAE and assumed
+  costs correctly, and show walk-forward purges, selected/active/zero-day
+  denominators, route survivability, and separate live no-send evidence.
+- Corrected operator-facing truth discovered during independent review: raw
+  `None` no longer leaks into the page, false/late proxy symptoms are no longer
+  mislabeled as aggregate classifications, urgent/repeated burden uses the
+  persisted scalar totals instead of an omitted daily list, absent live
+  evidence creates neither a badge nor row, and future sealed outcomes do not
+  inherit the current negative-result wording.
+- Expanded fail-closed, tamper/splice, root-swap, bounded-read, semantic,
+  future-status, escaping, GET/HEAD, and no-authority-mutation coverage. Visual
+  browser QA found no console errors or viewport overflow; fixture state stays
+  clearly historical and production policy remains unchanged.
+**Verify:** 138 focused dashboard/surface tests passed; the Research Lab file
+passed with both system Python and the locked `.venv` (12 tests each).
+`make radar-dashboard-smoke`, `make radar-dashboard-ux-smoke`, Python compileall,
+`git diff --check`, and `make architecture-cleanliness-check PYTHON=python3`
+passed with zero new violations.
+**Notes/risks:** A release-stack audit exposed two pre-existing Python/dependency
+parity bugs outside this slice: pandas-3 microsecond timestamp normalization and
+an import-order cycle around `schema_v1`. They remain next before release gates;
+no production authority or live provider state was touched.
+
 ## 2026-07-16 — Publish the audited empirical report bundle · Codex
 **Why:** The trace-only repair required one mechanical replacement replay pair
 before the first Decision Radar empirical conclusion could be published. The
