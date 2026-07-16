@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Add pure Decision-v2 replay, immutable storage, and final-test firewall · Codex
+**Why:** The frozen empirical protocol needed an executable historical Decision
+path and tamper-evident result boundary before large local caches or outcome
+data could be connected. Shadow-policy work also needed a hard separation
+between development/validation selection and final-test confirmation.
+**Changes:**
+- Added a pure point-in-time replay kernel that consumes pre-normalized past-
+  and-current observations, reuses the production anomaly classifier and
+  Decision-v2 evaluator, closes every idea through the canonical idempotent
+  projection, preserves explicit feature/missing-data basis and gate traces,
+  and reports zero provider/authorization/send/trade/paper/RSI/fade/authority
+  side effects. Fixture mechanics and final-test modes are structurally
+  separate.
+- Added fingerprint-addressed immutable replay bundles with exact-byte resume,
+  canonical self-consistent manifests, protocol/input/code/configuration
+  fingerprints, artifact bounds, secret/machine-path rejection, no-follow code
+  reads, symlink/path drift rejection, and no latest/dashboard pointer.
+- Added frozen shadow-policy simulation, episode-representative accounting,
+  operator-volume metrics, chronological rolling walk-forward folds, a
+  tamper-evident development/validation recommendation seal, and final-test
+  evaluation that can inspect only production plus pre-sealed candidate
+  scenarios. Results are recommendations only and never auto-apply.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_empirical_validation_protocol.py
+tests/event_alpha/test_empirical_replay_core.py
+tests/event_alpha/test_empirical_replay_store.py
+tests/event_alpha/test_empirical_policy_lab.py` (24 passed); focused
+`compileall` passed.
+**Notes/risks:** This slice deliberately does not claim historical performance;
+the cache loader, episode outcomes, controls, cohort analysis, and real replay
+runs follow separately. No final-test result was used to select policy.
+
 ## 2026-07-16 — Freeze empirical-validation protocol before final-test replay · Codex
 **Why:** Existing backtest primitives are useful but do not provide a closed
 Decision-v2 replay or a final-test firewall. The research dates, primary
