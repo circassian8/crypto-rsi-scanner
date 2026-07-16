@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Reject behaviorally identical shadow policies · Codex
+**Why:** A shadow scenario that produces no route change or cooldown suppression
+is not an empirical policy candidate, even when its unchanged outcome metrics
+pass the frozen non-inferiority rule.
+**Changes:**
+- Shadow simulations now close route changes and cooldown suppressions into an
+  explicit `material_policy_change_count`.
+- Recommendation selection reports a zero-change scenario as `not_supported`
+  with `scenario_produced_no_observable_policy_change`; sample-size and frozen
+  multi-metric checks continue to govern scenarios that actually change policy.
+- Added a regression proving a behaviorally identical scenario cannot be
+  recommended, while retaining coverage for a real hypothetical route change.
+**Verify:** Focused policy/runner tests passed (10 tests). The corrected immutable
+top-30 replay resumed at fingerprint `7f656bead142...`: 275,949 observations,
+1,019 ideas/episodes, 1,014 matured episodes, 1,000 matched controls, and 7,385
+qualified misses. All eight no-op scenarios are `not_supported`; only the
+material 48-hour family cooldown remains an exploratory candidate. The replay
+recorded zero provider calls and zero dashboard-authority mutations.
+**Notes/risks:** The cooldown result is not a production recommendation. It must
+survive top-100 development/validation, the frozen recommendation seal, and the
+untouched final-test partition; human approval and a separate rollback-backed
+decision would still be required.
+
 ## 2026-07-16 — Make medium empirical replay bounded and complete · Codex
 **Why:** The first real top-30 run exposed two scale/correctness defects that
 fixture tests could not: hypothetical route changes conflicted with the stored

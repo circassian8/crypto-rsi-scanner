@@ -295,14 +295,23 @@ def _simulate_scenario(
     matured = [row for row in visible if row["return_fraction"] is not None]
     returns = [float(row["return_fraction"]) for row in matured]
     days = {str(row["observed_at"])[:10] for row in visible}
+    route_change_count = sum(
+        row["route"] != row["original_route"] for row in evaluated
+    )
+    cooldown_suppressed_count = sum(
+        bool(row.get("cooldown_suppressed")) for row in evaluated
+    )
     return {
         "scenario": name,
         "changes": changes,
         "episode_count": len(rows),
         "visible_episode_count": len(visible),
         "matured_visible_episode_count": len(matured),
-        "route_change_count": sum(row["route"] != row["original_route"] for row in evaluated),
-        "cooldown_suppressed_count": sum(bool(row.get("cooldown_suppressed")) for row in evaluated),
+        "route_change_count": route_change_count,
+        "cooldown_suppressed_count": cooldown_suppressed_count,
+        "material_policy_change_count": (
+            route_change_count + cooldown_suppressed_count
+        ),
         "urgent_item_count": sum(row["urgent"] for row in visible),
         "active_day_count": len(days),
         "ideas_per_active_day": round(len(visible) / len(days), 6) if days else 0.0,
@@ -357,9 +366,14 @@ def _scenario_projection(idea: Mapping[str, Any], original: Mapping[str, Any], c
 def _recommendation(row: Mapping[str, Any], production: Mapping[str, Any], protocol: Mapping[str, Any]) -> dict[str, Any]:
     required = int(protocol["minimum_samples"]["shadow_recommendation_development_validation"])
     n = int(row["matured_visible_episode_count"])
-    status = "insufficient_sample"
-    reason = f"requires_at_least_{required}_matured_visible_episodes"
-    if n >= required:
+    material_changes = int(row.get("material_policy_change_count") or 0)
+    if material_changes == 0:
+        status = "not_supported"
+        reason = "scenario_produced_no_observable_policy_change"
+    elif n < required:
+        status = "insufficient_sample"
+        reason = f"requires_at_least_{required}_matured_visible_episodes"
+    else:
         row_mean = row.get("mean_directional_return_fraction")
         base_mean = production.get("mean_directional_return_fraction")
         row_fail = row.get("quick_failure_rate")
@@ -376,6 +390,7 @@ def _recommendation(row: Mapping[str, Any], production: Mapping[str, Any], proto
         "status": status,
         "reason": reason,
         "sample_size": n,
+        "material_policy_change_count": material_changes,
         "evidence_strength": row["evidence_strength"],
         "human_approval_required": True,
         "auto_apply": False,

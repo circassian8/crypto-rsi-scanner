@@ -149,4 +149,23 @@ def test_shadow_threshold_can_change_route_without_projection_drift() -> None:
         row for row in result["scenarios"] if row["scenario"] == "dashboard_watch_50"
     )
     assert dashboard_50["route_change_count"] == 1
+    assert dashboard_50["material_policy_change_count"] == 1
     assert dashboard_50["visible_episode_count"] == 0
+
+
+def test_behaviorally_identical_shadow_scenario_is_not_recommended() -> None:
+    idea = _idea("2024-06-01T00:00:00Z", partition="validation")
+    result = simulate_shadow_policies(
+        [idea],
+        [_outcome(idea)],
+        partitions=("validation",),
+    )
+    recommendation = next(
+        row
+        for row in result["recommendations"]
+        if row["scenario"] == "actionable_evidence_60"
+    )
+
+    assert recommendation["status"] == "not_supported"
+    assert recommendation["reason"] == "scenario_produced_no_observable_policy_change"
+    assert recommendation["material_policy_change_count"] == 0
