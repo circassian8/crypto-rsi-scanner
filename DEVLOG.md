@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Make medium empirical replay bounded and complete · Codex
+**Why:** The first real top-30 run exposed two scale/correctness defects that
+fixture tests could not: hypothetical route changes conflicted with the stored
+production projection, and controls expanded thousands of independent rows
+through the full episode bundle and exceeded artifact limits.
+**Changes:**
+- Shadow threshold reevaluation now removes only the old nested canonical
+  projection before closing the hypothetical result; production drift checks
+  remain unchanged, while legitimate route changes no longer fail as if a
+  persisted artifact had drifted.
+- Added a flat future-path outcome iterator that normalizes frames once and
+  reuses the frozen return, BTC/ETH-relative, MFE, MAE, timing, expiry, and
+  classification logic without constructing synthetic episode histories.
+- Indexed outcome-blind matched controls by the frozen date/regime/liquidity
+  key. Missed moves compute full paths only after the endpoint/tradability rule
+  prequalifies them. Exact counts and aggregate benchmark metrics remain
+  complete while deterministic review details are capped at 256 rows per
+  section, with truncation and selection semantics explicit.
+- Completed the first immutable medium run: 275,949 observations, 1,019 ideas
+  and fixed-start episodes, 1,014 matured episodes, 1,000 matched controls, and
+  7,385 qualified misses across 51,267 frozen endpoint candidates. Runtime was
+  118.95s; the largest artifact stayed below the 32 MiB gate.
+**Verify:** Focused outcomes/controls/policy/runner tests passed (25 tests), the
+large-detail bound test passed (6 controls tests total), architecture size gate
+passed with zero new violations, and `make radar-replay-medium PYTHON=python3`
+completed with fingerprint `31ef4e776317...`, zero provider calls, and zero
+dashboard-authority mutations.
+**Notes/risks:** Medium evidence is negative/mixed, not alpha: only dashboard,
+risk, and diagnostic routes occurred; all ideas were market-led with unknown
+catalyst. Several shadow scenarios are behaviorally identical to production
+and must be rejected as no-op recommendations before sealing the full run.
+
 ## 2026-07-16 — Add a read-only Research Lab to the existing dashboard · Codex
 **Why:** Empirical results need an operator-facing surface that preserves sample
 and evidence warnings without creating a second application or coupling

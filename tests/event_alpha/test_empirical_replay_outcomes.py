@@ -382,3 +382,31 @@ def test_bounded_row_sequences_from_replay_dataset_are_accepted() -> None:
 
     assert outcome["status"] == "matured"
     assert outcome["primary_horizon_return"] == pytest.approx(0.30)
+
+
+def test_flat_path_iterator_normalizes_frames_once_for_many_independent_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = empirical_replay_outcomes._normalize_price_frames
+    calls = 0
+
+    def counted(frames):
+        nonlocal calls
+        calls += 1
+        return original(frames)
+
+    monkeypatch.setattr(empirical_replay_outcomes, "_normalize_price_frames", counted)
+    outcomes = list(
+        empirical_replay_outcomes.iter_empirical_path_outcomes(
+            (
+                _idea(idea_id="idea-one", candidate_id="candidate-one"),
+                _idea(idea_id="idea-two", candidate_id="candidate-two"),
+            ),
+            {"AAA": _frame([100.0, 110.0, 120.0, 130.0])},
+            evaluated_at=_START + timedelta(days=3),
+        )
+    )
+
+    assert calls == 1
+    assert [row["idea_id"] for row in outcomes] == ["idea-one", "idea-two"]
+    assert all(row["status"] == "matured" for row in outcomes)

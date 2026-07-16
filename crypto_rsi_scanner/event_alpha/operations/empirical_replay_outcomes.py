@@ -163,12 +163,32 @@ def build_empirical_path_outcome(
 ) -> dict[str, Any]:
     """Build one daily path outcome without episode grouping or side effects."""
 
+    return next(
+        iter_empirical_path_outcomes(
+            (idea_row,),
+            price_frames,
+            evaluated_at=evaluated_at,
+        )
+    )
+
+
+def iter_empirical_path_outcomes(
+    idea_rows: Iterable[Mapping[str, Any]],
+    price_frames: Mapping[str, Any],
+    *,
+    evaluated_at: datetime | str,
+) -> Iterable[dict[str, Any]]:
+    """Yield flat path outcomes after normalizing supplied frames exactly once."""
+
     evaluated = _required_utc(evaluated_at, field_name="evaluated_at")
-    snapshot, reasons = _idea_snapshot(dict(idea_row), evaluated_at=evaluated)
-    if snapshot is None:
-        raise ValueError("empirical idea invalid:" + ",".join(reasons))
     frames, _diagnostics = _normalize_price_frames(price_frames)
-    return _path_outcome(snapshot, frames=frames, evaluated_at=evaluated)
+    for raw in idea_rows:
+        if not isinstance(raw, Mapping):
+            continue
+        snapshot, reasons = _idea_snapshot(dict(raw), evaluated_at=evaluated)
+        if snapshot is None:
+            raise ValueError("empirical idea invalid:" + ",".join(reasons))
+        yield _path_outcome(snapshot, frames=frames, evaluated_at=evaluated)
 
 
 def _episode_value(
@@ -1119,4 +1139,5 @@ __all__ = [
     "TIMING_RESOLUTION",
     "build_empirical_path_outcome",
     "build_empirical_replay_outcomes",
+    "iter_empirical_path_outcomes",
 ]

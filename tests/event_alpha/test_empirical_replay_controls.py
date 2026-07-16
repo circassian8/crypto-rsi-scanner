@@ -313,3 +313,32 @@ def test_percent_point_benchmark_features_are_normalized_without_changing_select
     assert raw["selection_metric_value"] == pytest.approx(0.10)
     assert relative["observation"]["symbol"] == "BBB"
     assert relative["selection_metric_value"] == pytest.approx(0.07)
+
+
+def test_large_benchmark_detail_is_bounded_without_changing_exact_counts() -> None:
+    days = 270
+    observations = [
+        _observation(
+            "AAA",
+            observed_at=(_START + timedelta(days=index)).isoformat(),
+        )
+        for index in range(days)
+    ]
+    result = empirical_replay_controls.build_empirical_replay_controls(
+        observations,
+        [],
+        [],
+        {"AAA": _frame([100.0] * (days + 4))},
+        evaluated_at=_START + timedelta(days=days + 3),
+    )
+    raw_mover = next(
+        row
+        for row in result["benchmark_rows"]
+        if row["policy"] == "same_day_top_raw_mover"
+    )
+
+    assert raw_mover["selection_count"] == days
+    assert raw_mover["matured_outcome_count"] == days
+    assert raw_mover["selection_detail_limit"] == 256
+    assert raw_mover["selections_truncated"] is True
+    assert len(raw_mover["selections"]) == 256

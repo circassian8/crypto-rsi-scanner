@@ -15,7 +15,14 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_policy_lab import (
 from crypto_rsi_scanner.event_alpha.operations.empirical_replay_core import run_replay_kernel
 
 
-def _idea(at: str, *, partition: str, symbol: str = "MOVE", episode_id: str | None = None):
+def _idea(
+    at: str,
+    *,
+    partition: str,
+    symbol: str = "MOVE",
+    episode_id: str | None = None,
+    volume_zscore: float = 3.0,
+):
     observation = {
         "symbol": symbol,
         "canonical_asset_id": symbol.casefold(),
@@ -27,7 +34,7 @@ def _idea(at: str, *, partition: str, symbol: str = "MOVE", episode_id: str | No
         "return_7d": 45.0,
         "relative_return_vs_btc_24h": 28.0,
         "relative_return_vs_eth_24h": 25.0,
-        "volume_zscore_24h": 3.0,
+        "volume_zscore_24h": volume_zscore,
         "liquidity_usd": 20_000_000.0,
         "liquidity_tier": "large",
         "market_regime": "bull",
@@ -121,3 +128,25 @@ def test_walk_forward_is_chronological_and_never_accesses_final_test() -> None:
 def test_shadow_policy_rejects_invalid_partition() -> None:
     with pytest.raises(ValueError, match="partitions invalid"):
         simulate_shadow_policies([], [], partitions=("fixture",))
+
+
+def test_shadow_threshold_can_change_route_without_projection_drift() -> None:
+    borderline = _idea(
+        "2024-06-01T00:00:00Z",
+        partition="validation",
+        volume_zscore=2.5,
+    )
+    assert borderline["radar_route"] == "dashboard_watch"
+    assert 45.0 <= borderline["actionability_score"] < 50.0
+
+    result = simulate_shadow_policies(
+        [borderline],
+        [_outcome(borderline)],
+        partitions=("validation",),
+    )
+
+    dashboard_50 = next(
+        row for row in result["scenarios"] if row["scenario"] == "dashboard_watch_50"
+    )
+    assert dashboard_50["route_change_count"] == 1
+    assert dashboard_50["visible_episode_count"] == 0

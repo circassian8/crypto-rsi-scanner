@@ -329,7 +329,16 @@ def _scenario_projection(idea: Mapping[str, Any], original: Mapping[str, Any], c
     projection = dict(original)
     if replacements:
         cfg = replace(cfg, **replacements)
-        evaluated = {**dict(idea), **reevaluate_radar_decision_fields(idea, cfg=cfg)}
+        # The stored canonical projection is the upstream authority for the
+        # production result.  A shadow threshold may legitimately change its
+        # mirrored route, so it must not remain nested while the hypothetical
+        # result is being closed or the normal drift guard will reject it.
+        source = dict(idea)
+        source.pop("decision_projection", None)
+        evaluated = {
+            **source,
+            **reevaluate_radar_decision_fields(source, cfg=cfg),
+        }
         projection = decision_model_values(evaluated)
         if not projection:
             raise ValueError("shadow-policy reevaluation failed")

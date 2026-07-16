@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-16T04:19:10.183048+00:00`
+- generated_at: `2026-07-16T04:34:22.544092+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -98,6 +98,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1465 |
 | `crypto_rsi_scanner/config.py` | 1450 |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1440 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1411 |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
@@ -108,7 +109,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1258 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 |
 | `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1242 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1235 |
@@ -161,7 +161,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1494 |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1258 |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1440 |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 |
 
 ## Largest Test Files

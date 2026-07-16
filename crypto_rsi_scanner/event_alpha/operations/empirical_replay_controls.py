@@ -24,6 +24,7 @@ from . import empirical_replay_outcomes, empirical_validation_protocol
 SCHEMA_ID = "decision_radar.empirical_replay_controls"
 SCHEMA_VERSION = 1
 METHOD = "frozen_outcome_blind_controls_benchmarks_and_missed_moves"
+DETAIL_ROW_LIMIT = 256
 
 _PROTOCOL = empirical_validation_protocol.protocol_values()
 _CONTROL_RULE = _PROTOCOL["matched_controls"]
@@ -94,6 +95,7 @@ def build_empirical_replay_controls(
         price_frames=price_frames,
         evaluated_at=evaluated,
     )
+    public_controls = _bounded_control_rows(controls)
     result: dict[str, Any] = {
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
@@ -105,7 +107,7 @@ def build_empirical_replay_controls(
         "observation_count": len(normalized_observations),
         "trace_count": len(traces),
         "idea_count": len(normalized_ideas),
-        "matched_non_signal_controls": controls,
+        "matched_non_signal_controls": public_controls,
         "missed_move_evaluation": missed,
         "benchmark_rows": benchmarks,
         "benchmark_policy_order": list(_BENCHMARK_POLICIES),
@@ -119,6 +121,23 @@ def build_empirical_replay_controls(
     }
     result["contract_digest"] = _digest(result)
     return result
+
+
+def _bounded_control_rows(value: Mapping[str, Any]) -> dict[str, Any]:
+    output = dict(value)
+    rows = [dict(row) for row in value.get("rows") or () if isinstance(row, Mapping)]
+    rows.sort(
+        key=lambda row: (
+            row.get("status") != "selected",
+            str(row.get("signal_episode_id") or ""),
+            str(row.get("control_id") or ""),
+        )
+    )
+    output["row_count"] = len(rows)
+    output["row_detail_limit"] = DETAIL_ROW_LIMIT
+    output["rows_truncated"] = len(rows) > DETAIL_ROW_LIMIT
+    output["rows"] = rows[:DETAIL_ROW_LIMIT]
+    return output
 
 
 def select_matched_non_signal_controls(
@@ -141,20 +160,23 @@ def _select_controls(
         signal_assets_by_timestamp[str(idea["observed_at"])].add(
             str(idea["canonical_asset_id"])
         )
+    candidate_index: dict[tuple[str, str, str, str], list[Mapping[str, Any]]] = (
+        defaultdict(list)
+    )
+    for row in observations:
+        if (
+            row["point_in_time_universe_member"] is True
+            and row["baseline_warm"] is True
+        ):
+            candidate_index[_control_match_key(row)].append(row)
 
     rows: list[dict[str, Any]] = []
     for representative in representatives:
         observed_at = str(representative["observed_at"])
         candidates = [
             row
-            for row in observations
-            if row["observation_date"] == representative["observation_date"]
-            and row["partition"] == representative["partition"]
-            and row["market_regime"] == representative["market_regime"]
-            and row["liquidity_tier"] == representative["liquidity_tier"]
-            and row["point_in_time_universe_member"] is True
-            and row["baseline_warm"] is True
-            and row["canonical_asset_id"]
+            for row in candidate_index.get(_control_match_key(representative), ())
+            if row["canonical_asset_id"]
             not in signal_assets_by_timestamp.get(observed_at, set())
             and row["canonical_asset_id"]
             != representative["canonical_asset_id"]
@@ -233,6 +255,15 @@ def _select_controls(
     return value
 
 
+def _control_match_key(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(row.get("partition") or ""),
+        str(row.get("observation_date") or str(row.get("observed_at") or "")[:10]),
+        str(row.get("market_regime") or "unknown"),
+        str(row.get("liquidity_tier") or "unknown"),
+    )
+
+
 def _attach_control_outcomes(
     selection: Mapping[str, Any],
     *,
@@ -288,10 +319,64 @@ def _missed_moves(
     ideas_by_key: dict[tuple[str, str], list[Mapping[str, Any]]] = defaultdict(list)
     for idea in ideas:
         ideas_by_key[_identity_key(idea)].append(idea)
+    state_counts, selected = _select_missed_endpoint_candidates(
+        observations,
+        traces,
+        ideas_by_key,
+        close_lookup=close_lookup,
+        evaluated_at=evaluated_at,
+    )
+    scored = _score_missed_endpoint_candidates(
+        selected,
+        price_frames=price_frames,
+        evaluated_at=evaluated_at,
+    )
+    return {
+        "schema_id": "decision_radar.empirical_missed_move_evaluation",
+        "schema_version": 1,
+        "method": "frozen_primary_endpoint_then_trace_failure_attribution",
+        "primary_horizon_days": _PRIMARY_DAYS,
+        "long_endpoint_return_min_fraction": float(
+            _MISSED_RULE["long_endpoint_return_min_fraction"]
+        ),
+        "risk_endpoint_return_max_fraction": float(
+            _MISSED_RULE["risk_endpoint_return_max_fraction"]
+        ),
+        "minimum_trailing_quote_volume_usd": float(
+            _MISSED_RULE["minimum_trailing_quote_volume_usd"]
+        ),
+        "maximum_future_excursion_alone_sufficient": False,
+        "evaluation_state_counts": dict(sorted(state_counts.items())),
+        "endpoint_candidate_count": len(selected),
+        "missed_opportunity_count": scored["missed_opportunity_count"],
+        "failure_stage_counts": scored["failure_stage_counts"],
+        "endpoint_candidates": scored["endpoint_candidates"],
+        "missed_opportunities": scored["missed_opportunities"],
+        "detail_row_limit": DETAIL_ROW_LIMIT,
+        "endpoint_candidates_truncated": len(selected) > DETAIL_ROW_LIMIT,
+        "missed_opportunities_truncated": (
+            scored["missed_opportunity_count"] > DETAIL_ROW_LIMIT
+        ),
+        "full_path_outcomes_computed_for_prequalified_only": True,
+        "nonqualifying_path_outcomes_not_computed": True,
+        "outcomes_joined_after_endpoint_selection": True,
+        "causal_claim": False,
+        "policy_eligible": False,
+        "research_only": True,
+        "auto_apply": False,
+    }
 
+
+def _select_missed_endpoint_candidates(
+    observations: Sequence[Mapping[str, Any]],
+    traces: Mapping[tuple[str, str], Mapping[str, Any]],
+    ideas_by_key: Mapping[tuple[str, str], Sequence[Mapping[str, Any]]],
+    *,
+    close_lookup: Mapping[str, Mapping[datetime, float]],
+    evaluated_at: datetime,
+) -> tuple[Counter[str], list[dict[str, Any]]]:
     state_counts: Counter[str] = Counter()
-    endpoint_candidates: list[dict[str, Any]] = []
-    synthetic: list[dict[str, Any]] = []
+    selected: list[dict[str, Any]] = []
     for observation in observations:
         due = _required_utc(observation["observed_at"], field="observed_at") + timedelta(
             days=_PRIMARY_DAYS
@@ -354,72 +439,106 @@ def _missed_moves(
             "failure_stage": failure_stage,
             "qualification_failure_reasons": failures,
             "qualifies_as_missed_opportunity": not failures,
-            "outcome": None,
         }
-        endpoint_candidates.append(candidate)
-        synthetic.append(
-            _outcome_idea(
-                idea_id=missed_id,
-                observation=observation,
-                direction=direction,
-                family="missed_move_evaluation",
-            )
-        )
+        selected.append(candidate)
+    return state_counts, selected
 
-    outcomes = _outcomes_by_idea_id(
+
+def _score_missed_endpoint_candidates(
+    selected: Sequence[Mapping[str, Any]],
+    *,
+    price_frames: Mapping[str, pd.DataFrame],
+    evaluated_at: datetime,
+) -> dict[str, Any]:
+    endpoint_details: list[dict[str, Any]] = []
+    opportunity_details: list[dict[str, Any]] = []
+    failure_counts: Counter[str] = Counter()
+    prequalified = [
+        dict(row)
+        for row in selected
+        if row.get("qualifies_as_missed_opportunity") is True
+    ]
+    synthetic = (
+        _outcome_idea(
+            idea_id=str(candidate["missed_move_id"]),
+            observation=candidate["observation"],
+            direction=str(candidate["directional_bias"]),
+            family="missed_move_evaluation",
+        )
+        for candidate in prequalified
+    )
+    outcome_rows = empirical_replay_outcomes.iter_empirical_path_outcomes(
         synthetic,
-        price_frames=price_frames,
+        price_frames,
         evaluated_at=evaluated_at,
     )
-    for candidate in endpoint_candidates:
-        outcome = outcomes.get(candidate["missed_move_id"])
-        candidate["outcome"] = outcome
-        observed_return = (
-            _finite(outcome.get("primary_horizon_return"))
-            if isinstance(outcome, Mapping)
-            else None
-        )
+    missed_count = 0
+    for candidate, raw_outcome in zip(prequalified, outcome_rows, strict=True):
+        outcome = _compact_path_outcome(raw_outcome)
+        detail = {**candidate, "outcome": outcome}
+        observed_return = _finite(outcome.get("primary_horizon_return"))
         if observed_return is None or not math.isclose(
             observed_return,
             candidate["primary_endpoint_return_fraction"],
             rel_tol=0.0,
             abs_tol=1e-12,
         ):
-            candidate["qualification_failure_reasons"].append(
+            detail["qualification_failure_reasons"] = [
+                *candidate["qualification_failure_reasons"],
                 "endpoint_outcome_contract_mismatch"
-            )
-            candidate["qualifies_as_missed_opportunity"] = False
-    opportunities = [
-        row for row in endpoint_candidates if row["qualifies_as_missed_opportunity"]
-    ]
-    failure_counts = Counter(row["failure_stage"] for row in opportunities)
+            ]
+            detail["qualifies_as_missed_opportunity"] = False
+        else:
+            missed_count += 1
+            failure_counts[str(detail["failure_stage"])] += 1
+            _retain_missed_detail(opportunity_details, detail)
+        _retain_missed_detail(endpoint_details, detail)
+    for candidate in selected:
+        if candidate.get("qualifies_as_missed_opportunity") is True:
+            continue
+        detail = {
+            **dict(candidate),
+            "outcome": {
+                "status": "not_computed_nonqualifying",
+                "primary_horizon_return": candidate[
+                    "primary_endpoint_return_fraction"
+                ],
+                "return_unit": "fraction",
+            },
+        }
+        _retain_missed_detail(endpoint_details, detail)
+    endpoint_details.sort(key=_missed_detail_rank)
+    opportunity_details.sort(key=_missed_detail_rank)
     return {
-        "schema_id": "decision_radar.empirical_missed_move_evaluation",
-        "schema_version": 1,
-        "method": "frozen_primary_endpoint_then_trace_failure_attribution",
-        "primary_horizon_days": _PRIMARY_DAYS,
-        "long_endpoint_return_min_fraction": float(
-            _MISSED_RULE["long_endpoint_return_min_fraction"]
-        ),
-        "risk_endpoint_return_max_fraction": float(
-            _MISSED_RULE["risk_endpoint_return_max_fraction"]
-        ),
-        "minimum_trailing_quote_volume_usd": float(
-            _MISSED_RULE["minimum_trailing_quote_volume_usd"]
-        ),
-        "maximum_future_excursion_alone_sufficient": False,
-        "evaluation_state_counts": dict(sorted(state_counts.items())),
-        "endpoint_candidate_count": len(endpoint_candidates),
-        "missed_opportunity_count": len(opportunities),
+        "missed_opportunity_count": missed_count,
         "failure_stage_counts": dict(sorted(failure_counts.items())),
-        "endpoint_candidates": endpoint_candidates,
-        "missed_opportunities": opportunities,
-        "outcomes_joined_after_endpoint_selection": True,
-        "causal_claim": False,
-        "policy_eligible": False,
-        "research_only": True,
-        "auto_apply": False,
+        "endpoint_candidates": endpoint_details[:DETAIL_ROW_LIMIT],
+        "missed_opportunities": opportunity_details[:DETAIL_ROW_LIMIT],
     }
+
+
+def _retain_missed_detail(
+    rows: list[dict[str, Any]],
+    detail: Mapping[str, Any],
+) -> None:
+    rows.append(dict(detail))
+    if len(rows) > DETAIL_ROW_LIMIT * 2:
+        rows.sort(key=_missed_detail_rank)
+        del rows[DETAIL_ROW_LIMIT:]
+
+
+def _missed_detail_rank(row: Mapping[str, Any]) -> tuple[Any, ...]:
+    observation = row.get("observation")
+    return (
+        row.get("qualifies_as_missed_opportunity") is not True,
+        -abs(float(row.get("primary_endpoint_return_fraction") or 0.0)),
+        str(
+            observation.get("observed_at")
+            if isinstance(observation, Mapping)
+            else ""
+        ),
+        str(row.get("missed_move_id") or ""),
+    )
 
 
 def _benchmarks(
@@ -722,11 +841,25 @@ def _benchmark_row(
         if pending and not missing
         else "partial"
     )
+    detail_rows = sorted(
+        (dict(row) for row in selections),
+        key=lambda row: (
+            str(
+                row.get("observation", {}).get("observed_at")
+                if isinstance(row.get("observation"), Mapping)
+                else ""
+            ),
+            str(row.get("selection_id") or ""),
+        ),
+    )
     return {
         "policy": policy,
         "status": status,
         "eligible_group_count": eligible_group_count,
         "selection_count": len(selections),
+        "selection_detail_limit": DETAIL_ROW_LIMIT,
+        "selections_truncated": len(selections) > DETAIL_ROW_LIMIT,
+        "selection_detail_policy": "earliest_chronological_no_outcome_rank",
         "matured_outcome_count": len(matured),
         "pending_outcome_count": len(pending),
         "missing_outcome_count": len(missing),
@@ -738,7 +871,7 @@ def _benchmark_row(
         "return_unit": "fraction",
         "selection_uses_outcomes": False,
         "outcomes_joined_after_selection": True,
-        "selections": [dict(row) for row in selections],
+        "selections": detail_rows[:DETAIL_ROW_LIMIT],
         "causal_claim": False,
         "policy_eligible": False,
         "research_only": True,
@@ -754,16 +887,65 @@ def _outcomes_by_idea_id(
 ) -> dict[str, dict[str, Any]]:
     if not ideas:
         return {}
-    produced = empirical_replay_outcomes.build_empirical_replay_outcomes(
-        ideas,
-        price_frames,
-        evaluated_at=evaluated_at,
+    return {
+        str(outcome.get("idea_id") or ""): _compact_path_outcome(outcome)
+        for outcome in empirical_replay_outcomes.iter_empirical_path_outcomes(
+            ideas,
+            price_frames,
+            evaluated_at=evaluated_at,
+        )
+    }
+
+
+def _compact_path_outcome(outcome: Mapping[str, Any]) -> dict[str, Any]:
+    primary_label = str(outcome.get("primary_horizon") or "3d")
+    horizons = outcome.get("horizons")
+    primary = horizons.get(primary_label) if isinstance(horizons, Mapping) else None
+    primary = dict(primary) if isinstance(primary, Mapping) else {}
+    primary_fields = (
+        "maturity_status",
+        "due_at",
+        "raw_return_fraction",
+        "direction_adjusted_return_fraction",
+        "max_favorable_excursion_fraction",
+        "max_adverse_excursion_fraction",
+        "time_to_mfe_hours",
+        "time_to_mae_hours",
+        "time_to_invalidation_hours",
+        "missing_reasons",
+    )
+    fields = (
+        "idea_id",
+        "candidate_id",
+        "canonical_asset_id",
+        "symbol",
+        "observed_at",
+        "directional_bias",
+        "status",
+        "primary_horizon",
+        "primary_horizon_return",
+        "primary_direction_adjusted_return",
+        "primary_relative_return_vs_btc",
+        "primary_relative_return_vs_eth",
+        "max_favorable_excursion",
+        "max_adverse_excursion",
+        "time_to_mfe_hours",
+        "time_to_mae_hours",
+        "time_to_invalidation_hours",
+        "pre_signal_move_7d",
+        "classifications",
+        "expiry",
+        "return_unit",
+        "research_only",
+        "auto_apply",
     )
     return {
-        str(episode["representative"]["idea_id"]): dict(
-            episode["representative_outcome"]
-        )
-        for episode in produced["episodes"]
+        **{field: _json_ready(outcome.get(field)) for field in fields},
+        "horizons": {
+            primary_label: {
+                field: _json_ready(primary.get(field)) for field in primary_fields
+            }
+        },
     }
 
 
