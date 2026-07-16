@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Keep live campaign evidence separate in the empirical lab · Codex
+**Why:** The historical replay and the short real/no-send campaign answer
+different questions and must never be pooled into one apparent sample.
+**Changes:** Added a bounded, duplicate-key-safe, symlink-rejecting read-only
+projection of the existing campaign report. It preserves campaign/baseline,
+fixed-start episode, matured/pending outcome, route/cohort, and data-quality
+truth while stripping authority/provider internals, labeling the evidence
+`live_no_send`, and forcing `policy_eligible=false`, `auto_apply=false`, zero
+provider calls/writes/authorization/authority mutations, and no replay or
+fixture aggregation.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_empirical_live_campaign.py` (3 passed); projection of
+the current tracked campaign report returned 8 cycles, 240 observations, one
+episode, and `insufficient_sample`.
+**Notes/risks:** The current one matured live episode remains descriptive only;
+this adapter does not mature outcomes or alter the campaign ledger.
+
 ## 2026-07-16 — Add pure Decision-v2 replay, immutable storage, and final-test firewall · Codex
 **Why:** The frozen empirical protocol needed an executable historical Decision
 path and tamper-evident result boundary before large local caches or outcome
