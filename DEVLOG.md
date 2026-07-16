@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Freeze Protocol-v2 requirements without opening a holdout · Codex
+**Why:** Protocol v1 cannot evaluate intraday timing, execution quality, or the
+non-market evidence used by the product, but an executable v2 cannot honestly
+be frozen before the owner selects a venue/instrument boundary and every source,
+partition, outcome, cost, universe, episode, and sample rule is sealed.
+**Changes:**
+- Added a static Protocol-v2 pre-registration contract whose required evidence
+  is frozen at digest `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
+  It requires genuine point-in-time 1h/4h, latency, spread/depth, catalyst,
+  official-calendar, derivatives, on-chain, and RSI evidence; missing evidence
+  cannot be invented or proxied.
+- Kept the executable protocol blocked and unfrozen, the holdout undefined and
+  unopened, access count zero, and v2 replay/selection/final targets absent.
+  Protocol-v1 final-test reuse for tuning is explicitly forbidden.
+- Upgraded execution-quality readiness to an explicit v2 human decision
+  contract for venue, spot/perpetual/DEX mode, quote, eligible instruments,
+  jurisdiction/account eligibility, and public/private data boundary, with a
+  copyable template and no requested market-data, order, or trading permission.
+- Added no-read/no-write readiness/check Make targets and operator documentation.
+**Verify:** The Protocol-v2 and execution-readiness files passed 23 focused
+tests under the locked runtime. Both Make surfaces, focused compileall, and
+`git diff --check` passed. Protocol v1 and its seven-file bundle were untouched.
+**Notes/risks:** Human venue/instrument and exact acquisition-annex decisions
+remain required. No provider, source, adapter, service, policy, notification,
+execution path, or dashboard authority was selected or changed.
+
 ## 2026-07-16 — Harden empirical replay and feedback paths portably · Codex
 **Why:** Full-path `O_NOFOLLOW` protected only a final leaf, so a replay input
 root/intermediate symlink could still be followed; a missing feedback ledger

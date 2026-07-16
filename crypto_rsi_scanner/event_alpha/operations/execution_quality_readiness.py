@@ -14,7 +14,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v1"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v2"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 COMMON_METRICS = (
     "best_bid",
@@ -143,6 +143,15 @@ class _ExecutionQualityReadiness:
     status: str
     selected_venue: str | None
     selected_execution_mode: str | None
+    intended_venue: str | None
+    intended_instrument_mode: str | None
+    quote_currency: str | None
+    eligible_instrument_set: tuple[str, ...]
+    jurisdiction_and_account_eligibility_confirmation: str | None
+    jurisdiction_and_account_eligibility_confirmed: bool | None
+    expected_public_private_data_boundary: str | None
+    required_human_decision_fields: tuple[str, ...]
+    human_decision_template: tuple[tuple[str, str], ...]
     supported_live_adapters: tuple[str, ...]
     supported_interface_modes: tuple[str, ...]
     feasible_venues: tuple[ExecutionVenueCapability, ...]
@@ -155,6 +164,10 @@ class _ExecutionQualityReadiness:
     expected_provider_activity: str
     rollback_disable_command: str
     spread_provider_status: str
+    public_market_data_permission_requested: bool
+    private_market_data_permission_requested: bool
+    order_permission_requested: bool
+    trading_permission_requested: bool
     provider_call_planned: bool
     provider_call_attempted: bool
     live_adapter_activated: bool
@@ -169,6 +182,21 @@ class _ExecutionQualityReadiness:
             "status": self.status,
             "selected_venue": self.selected_venue,
             "selected_execution_mode": self.selected_execution_mode,
+            "intended_venue": self.intended_venue,
+            "intended_instrument_mode": self.intended_instrument_mode,
+            "quote_currency": self.quote_currency,
+            "eligible_instrument_set": list(self.eligible_instrument_set),
+            "jurisdiction_and_account_eligibility_confirmation": (
+                self.jurisdiction_and_account_eligibility_confirmation
+            ),
+            "jurisdiction_and_account_eligibility_confirmed": (
+                self.jurisdiction_and_account_eligibility_confirmed
+            ),
+            "expected_public_private_data_boundary": (
+                self.expected_public_private_data_boundary
+            ),
+            "required_human_decision_fields": list(self.required_human_decision_fields),
+            "human_decision_template": dict(self.human_decision_template),
             "supported_live_adapters": list(self.supported_live_adapters),
             "supported_interface_modes": list(self.supported_interface_modes),
             "feasible_venues": [row.to_dict() for row in self.feasible_venues],
@@ -181,6 +209,14 @@ class _ExecutionQualityReadiness:
             "expected_provider_activity": self.expected_provider_activity,
             "rollback_disable_command": self.rollback_disable_command,
             "spread_provider_status": self.spread_provider_status,
+            "public_market_data_permission_requested": (
+                self.public_market_data_permission_requested
+            ),
+            "private_market_data_permission_requested": (
+                self.private_market_data_permission_requested
+            ),
+            "order_permission_requested": self.order_permission_requested,
+            "trading_permission_requested": self.trading_permission_requested,
             "provider_call_planned": self.provider_call_planned,
             "provider_call_attempted": self.provider_call_attempted,
             "live_adapter_activated": self.live_adapter_activated,
@@ -205,7 +241,9 @@ _COMMON_OPERATOR_INPUTS = (
     "intended_execution_mode",
     "exact_instrument_or_pair",
     "quote_currency",
+    "eligible_instrument_set",
     "jurisdiction_and_account_eligibility_confirmation",
+    "expected_public_private_data_boundary",
     "maximum_read_request_budget",
 )
 _COMMON_JURISDICTION = (
@@ -360,6 +398,35 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         status="operator_venue_required",
         selected_venue=None,
         selected_execution_mode=None,
+        intended_venue=None,
+        intended_instrument_mode=None,
+        quote_currency=None,
+        eligible_instrument_set=(),
+        jurisdiction_and_account_eligibility_confirmation=None,
+        jurisdiction_and_account_eligibility_confirmed=None,
+        expected_public_private_data_boundary=None,
+        required_human_decision_fields=(
+            "intended_execution_venue",
+            "instrument_mode_spot_perpetual_or_dex",
+            "quote_currency",
+            "eligible_instrument_set",
+            "jurisdiction_and_account_eligibility_confirmation",
+            "expected_public_private_data_boundary",
+        ),
+        human_decision_template=(
+            ("intended_venue", "<venue_id>"),
+            ("instrument_mode", "<spot|perpetual|dex>"),
+            ("quote_currency", "<quote_asset>"),
+            ("eligible_instrument_set", "<exact bounded instrument ids>"),
+            (
+                "jurisdiction_and_account_eligibility_confirmation",
+                "<confirmed with date and scope>",
+            ),
+            (
+                "expected_public_private_data_boundary",
+                "<public-only reads|private reads required and separately authorized>",
+            ),
+        ),
         supported_live_adapters=(),
         supported_interface_modes=EXECUTION_MODES,
         feasible_venues=VENUE_CAPABILITIES,
@@ -367,6 +434,10 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         selection_blockers=(
             "intended_execution_venue_not_selected",
             "intended_execution_mode_not_selected",
+            "quote_currency_not_selected",
+            "eligible_instrument_set_not_declared",
+            "jurisdiction_and_account_eligibility_not_confirmed",
+            "public_private_data_boundary_not_declared",
             "no_live_execution_quality_adapter_implemented",
         ),
         operator_decision="select_execution_venue_and_instrument_mode",
@@ -384,6 +455,10 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         expected_provider_activity="none_static_readiness_only",
         rollback_disable_command="none_required_no_adapter_or_provider_is_active",
         spread_provider_status="not_selected",
+        public_market_data_permission_requested=False,
+        private_market_data_permission_requested=False,
+        order_permission_requested=False,
+        trading_permission_requested=False,
         provider_call_planned=False,
         provider_call_attempted=False,
         live_adapter_activated=False,
@@ -415,6 +490,10 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         "CRYPTO DECISION RADAR EXECUTION-QUALITY READINESS",
         f"status={result.status}",
         "selected_venue=none selected_execution_mode=none",
+        "intended_venue=none intended_instrument_mode=none",
+        "quote_currency=none eligible_instrument_set=none",
+        "jurisdiction_and_account_eligibility_confirmed=none",
+        "expected_public_private_data_boundary=none",
         "supported_live_adapters=none",
         "read_only=true provider_calls=0 provider_call_planned=false provider_call_attempted=false",
         "credentials_read=false network_called=false writes_performed=false",
@@ -425,6 +504,14 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         f"expected_provider_activity={result.expected_provider_activity}",
         f"rollback_disable_command={result.rollback_disable_command}",
         f"spread_provider_status={result.spread_provider_status}",
+        "public_market_data_permission_requested=false "
+        "private_market_data_permission_requested=false",
+        "order_permission_requested=false trading_permission_requested=false",
+        "required_human_decision_fields="
+        + ",".join(result.required_human_decision_fields),
+        "",
+        "HUMAN EXECUTION-QUALITY DECISION TEMPLATE (copy and complete; no order permission):",
+        *(f"{key}={value}" for key, value in result.human_decision_template),
         "",
         "Supported instrument modes and venue options (human selection required):",
     ]

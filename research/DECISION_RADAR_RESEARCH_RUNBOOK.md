@@ -51,6 +51,46 @@ boundary, change the primary outcome, redefine a missed move, or alter the
 shadow recommendation rule after looking at final-test evidence. A new design
 requires a new protocol version frozen before its own holdout is opened.
 
+## Protocol-v2 pre-registration readiness
+
+Protocol v1 cannot answer the product's intraday, execution-quality, or
+non-market evidence questions. The static Protocol-v2 requirements contract is
+therefore frozen separately from any executable protocol:
+
+```sh
+make radar-research-protocol-v2-readiness PYTHON=.venv/bin/python
+make radar-research-protocol-v2-check PYTHON=.venv/bin/python
+```
+
+The current readiness digest is
+`683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
+It requires point-in-time 1h/4h market observations, exact idea/review latency,
+observed venue spread/depth, catalyst timing, official calendar events,
+derivatives, on-chain, and Wilder-RSI context with immutable lineage. Missing
+required evidence remains unavailable; proxies and retrospective invention are
+forbidden.
+
+This is deliberately not an executable frozen protocol. Activation remains
+blocked until one exact human-approved annex seals the venue and eligible
+instruments, data sources, development/validation/untouched-holdout partitions,
+outcomes, observed/assumed costs, point-in-time universe, unchanged route
+definitions and code digest, episode handling, and minimum samples. The
+Protocol-v2 holdout is undefined and unopened, its access count is zero, and no
+replay, selection, or final-test target exists. Protocol-v1 final-test evidence
+must never be reused to tune v2.
+
+The execution-quality decision remains human-owned. Start with:
+
+```sh
+make radar-execution-quality-readiness PYTHON=.venv/bin/python
+```
+
+Complete the rendered template with an intended venue, `spot`/`perpetual`/`dex`
+mode, quote currency, exact bounded eligible-instrument set, dated
+jurisdiction/account eligibility confirmation, and the expected public/private
+market-data boundary. This grants no provider, private-data, order, or trading
+permission and does not select a spread provider.
+
 ## Inputs and default paths
 
 The Make targets use these defaults:

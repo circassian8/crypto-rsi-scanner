@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Freeze Protocol-v2 evidence requirements before its executable protocol
+**Status:** accepted
+**Decision:** Freeze the static Protocol-v2 required-evidence and annex contract
+at SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`,
+while keeping the executable protocol explicitly unfrozen and blocked. No v2
+replay, selection, or final-test target may exist until a human-approved exact
+annex binds venue/instruments, genuine point-in-time sources, partitions and an
+untouched holdout, outcomes, costs, universe, existing route definitions,
+episode rules, and minimum samples. Protocol-v1 final-test evidence is forbidden
+for v2 tuning. Missing required evidence stays unavailable and cannot be
+invented or proxied.
+**Why:** Calling v2 frozen before the execution venue and exact data sources are
+known would create a changeable protocol disguised as a preregistration. The
+static contract closes what must be decided while preserving a verifiable zero-
+access firewall around a future holdout.
+**Revisit when:** The owner supplies the execution-quality decision template and
+all remaining acquisition/statistical annex sections can be sealed before any
+holdout content is identified or read.
+
 ## 2026-07-16 - Require descriptor-walk security for empirical filesystem inputs
 **Status:** accepted
 **Decision:** Replay input directories, their regular-file leaves, and optional

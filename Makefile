@@ -256,6 +256,8 @@ help:
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
 	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
+	@echo "  make radar-research-protocol-v2-readiness  Inspect blocked Protocol-v2 pre-registration requirements; no reads/calls/writes"
+	@echo "  make radar-research-protocol-v2-check  Validate the static blocked Protocol-v2 readiness contract"
 	@echo "  make radar-replay-smoke             Run the immutable offline replay fixture chain"
 	@echo "  make radar-replay-medium            Run the top-30 development/validation replay from the local cache"
 	@echo "  make radar-replay-full              Run the top-100 development/validation replay from the local cache"
@@ -842,10 +844,16 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-feedback-report radar-research-feedback-mark
+.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-feedback-report radar-research-feedback-mark
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
+
+radar-research-protocol-v2-readiness:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2
+
+radar-research-protocol-v2-check:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 --check
 
 radar-replay-smoke: radar-research-protocol-check
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \

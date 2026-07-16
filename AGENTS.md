@@ -300,9 +300,24 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   events remain context/risk only and cannot manufacture directional bias.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
-  feasible spot, perpetual, and DEX venue contracts. Do not select a venue,
-  activate a live adapter, or add execution/order behavior until the owner names
-  the intended execution venue and instrument mode.
+  feasible spot, perpetual, and DEX venue contracts. Its v2 decision boundary
+  requires the owner to name the intended venue, instrument mode, quote
+  currency, exact bounded eligible-instrument set, current jurisdiction/account
+  eligibility, and expected public/private market-data boundary. It requests no
+  public/private data permission, order permission, or trading permission. Do
+  not select a venue, spread provider, activate a live adapter, or add
+  execution/order behavior on the owner's behalf.
+- **Empirical Protocol-v2 readiness:**
+  `make radar-research-protocol-v2-readiness` renders the frozen/static required
+  evidence and annex contract without reading environment, files, credentials,
+  providers, or holdout data; `make radar-research-protocol-v2-check` validates
+  that exact blocked state. The executable protocol is intentionally not
+  frozen or active until an exact human-approved venue/instrument, source,
+  partition/untouched-holdout, outcome, cost, universe, route, episode, and
+  minimum-sample annex is sealed. Missing 1h/4h, latency, spread/depth,
+  catalyst, official-calendar, derivatives, on-chain, or RSI evidence remains
+  unavailable and cannot be proxied. No v2 replay, selection, or final-test
+  target exists; protocol-v1 final-test evidence is forbidden for tuning.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,

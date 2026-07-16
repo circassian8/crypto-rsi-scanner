@@ -38,9 +38,17 @@ def test_static_readiness_selects_and_activates_nothing() -> None:
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v2"
     assert result.status == "operator_venue_required"
     assert result.selected_venue is None
     assert result.selected_execution_mode is None
+    assert result.intended_venue is None
+    assert result.intended_instrument_mode is None
+    assert result.quote_currency is None
+    assert result.eligible_instrument_set == ()
+    assert result.jurisdiction_and_account_eligibility_confirmation is None
+    assert result.jurisdiction_and_account_eligibility_confirmed is None
+    assert result.expected_public_private_data_boundary is None
     assert result.supported_live_adapters == ()
     assert result.provider_call_planned is False
     assert result.provider_call_attempted is False
@@ -56,9 +64,17 @@ def test_static_readiness_selects_and_activates_nothing() -> None:
     assert result.expected_provider_activity == "none_static_readiness_only"
     assert result.rollback_disable_command == "none_required_no_adapter_or_provider_is_active"
     assert result.spread_provider_status == "not_selected"
+    assert result.public_market_data_permission_requested is False
+    assert result.private_market_data_permission_requested is False
+    assert result.order_permission_requested is False
+    assert result.trading_permission_requested is False
     assert set(result.selection_blockers) == {
         "intended_execution_venue_not_selected",
         "intended_execution_mode_not_selected",
+        "quote_currency_not_selected",
+        "eligible_instrument_set_not_declared",
+        "jurisdiction_and_account_eligibility_not_confirmed",
+        "public_private_data_boundary_not_declared",
         "no_live_execution_quality_adapter_implemented",
     }
 
@@ -115,6 +131,12 @@ def test_every_capability_reports_access_limits_metrics_and_constraints() -> Non
         assert row.required_operator_inputs
         assert "intended_execution_venue" in row.required_operator_inputs
         assert "intended_execution_mode" in row.required_operator_inputs
+        assert "quote_currency" in row.required_operator_inputs
+        assert "eligible_instrument_set" in row.required_operator_inputs
+        assert "jurisdiction_and_account_eligibility_confirmation" in (
+            row.required_operator_inputs
+        )
+        assert "expected_public_private_data_boundary" in row.required_operator_inputs
         assert row.jurisdiction_constraints
         assert "operator_must_confirm_current_venue_and_account_eligibility" in (
             row.jurisdiction_constraints
@@ -216,6 +238,10 @@ def test_human_report_is_explicitly_nonselecting_and_no_call() -> None:
 
     assert "status=operator_venue_required" in rendered
     assert "selected_venue=none selected_execution_mode=none" in rendered
+    assert "intended_venue=none intended_instrument_mode=none" in rendered
+    assert "quote_currency=none eligible_instrument_set=none" in rendered
+    assert "jurisdiction_and_account_eligibility_confirmed=none" in rendered
+    assert "expected_public_private_data_boundary=none" in rendered
     assert "supported_live_adapters=none" in rendered
     assert (
         "read_only=true provider_calls=0 provider_call_planned=false "
@@ -225,6 +251,22 @@ def test_human_report_is_explicitly_nonselecting_and_no_call() -> None:
     assert "next_safe_command=make radar-execution-quality-readiness" in rendered
     assert "expected_provider_activity=none_static_readiness_only" in rendered
     assert "spread_provider_status=not_selected" in rendered
+    assert "public_market_data_permission_requested=false" in rendered
+    assert "private_market_data_permission_requested=false" in rendered
+    assert "order_permission_requested=false trading_permission_requested=false" in rendered
+    assert "HUMAN EXECUTION-QUALITY DECISION TEMPLATE" in rendered
+    assert "intended_venue=<venue_id>" in rendered
+    assert "instrument_mode=<spot|perpetual|dex>" in rendered
+    assert "quote_currency=<quote_asset>" in rendered
+    assert "eligible_instrument_set=<exact bounded instrument ids>" in rendered
+    assert (
+        "jurisdiction_and_account_eligibility_confirmation="
+        "<confirmed with date and scope>"
+    ) in rendered
+    assert (
+        "expected_public_private_data_boundary="
+        "<public-only reads|private reads required and separately authorized>"
+    ) in rendered
     assert "No venue is selected" in rendered
     assert "Supported instrument modes and venue options" in rendered
     assert "- spot: venues=binance,bybit,coinbase_exchange,kraken" in rendered
@@ -284,12 +326,35 @@ def test_cli_json_is_structured_static_and_secret_free(
     assert output.err == ""
     assert payload["status"] == "operator_venue_required"
     assert payload["selected_venue"] is None
+    assert payload["intended_venue"] is None
+    assert payload["intended_instrument_mode"] is None
+    assert payload["quote_currency"] is None
+    assert payload["eligible_instrument_set"] == []
+    assert payload["jurisdiction_and_account_eligibility_confirmation"] is None
+    assert payload["jurisdiction_and_account_eligibility_confirmed"] is None
+    assert payload["expected_public_private_data_boundary"] is None
     assert payload["supported_live_adapters"] == []
     assert payload["provider_call_planned"] is False
     assert payload["provider_call_attempted"] is False
     assert payload["network_called"] is False
     assert payload["credentials_read"] is False
     assert payload["spread_provider_status"] == "not_selected"
+    assert payload["public_market_data_permission_requested"] is False
+    assert payload["private_market_data_permission_requested"] is False
+    assert payload["order_permission_requested"] is False
+    assert payload["trading_permission_requested"] is False
+    assert payload["human_decision_template"] == {
+        "eligible_instrument_set": "<exact bounded instrument ids>",
+        "expected_public_private_data_boundary": (
+            "<public-only reads|private reads required and separately authorized>"
+        ),
+        "instrument_mode": "<spot|perpetual|dex>",
+        "intended_venue": "<venue_id>",
+        "jurisdiction_and_account_eligibility_confirmation": (
+            "<confirmed with date and scope>"
+        ),
+        "quote_currency": "<quote_asset>",
+    }
     assert payload["rollback_disable_command"] == (
         "none_required_no_adapter_or_provider_is_active"
     )
