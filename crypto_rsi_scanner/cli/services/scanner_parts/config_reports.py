@@ -674,9 +674,42 @@ def _event_alpha_notification_pause_state(
 def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles.EventAlphaProfile | None:
     if not profile_name:
         return None
+    from ....event_alpha.radar.evidence.provider_contract import (
+        explicit_live_authorizations,
+    )
+
     profile = event_alpha_profiles.get_profile(profile_name)
+    current_authorizations = explicit_live_authorizations()
+    llm_provider_settings = {
+        "EVENT_LLM_ENABLED": "EVENT_LLM_PROVIDER",
+        "EVENT_LLM_EXTRACTOR_ENABLED": "EVENT_LLM_EXTRACTOR_PROVIDER",
+        "EVENT_LLM_CATALYST_FRAMES_ENABLED": "EVENT_LLM_CATALYST_FRAMES_PROVIDER",
+    }
     for attr, value in profile.config_overrides.items():
         value = _profile_override_value(attr, value)
+        provider_setting = llm_provider_settings.get(attr)
+        provider_name = str(
+            profile.config_overrides.get(
+                provider_setting,
+                getattr(config, provider_setting, "fixture"),
+            )
+            or "fixture"
+        ).strip().casefold() if provider_setting else ""
+        requires_current_authorization = not (
+            provider_setting is not None and provider_name == "fixture"
+        )
+        if (
+            attr in current_authorizations
+            and bool(value)
+            and requires_current_authorization
+        ):
+            # Profiles describe capability and bounded policy; they are not an
+            # authorization surface. A live provider or OpenAI stage can only
+            # remain enabled when the matching opt-in already exists in the
+            # process environment (including values loaded from .env). Offline
+            # fixture LLM evaluation remains available because it crosses no
+            # provider boundary.
+            value = current_authorizations[attr]
         setattr(config, attr, value)
     _apply_event_alpha_artifact_context(profile.name)
     _normalize_profile_paths()

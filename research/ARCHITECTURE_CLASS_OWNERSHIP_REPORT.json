@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 646,
+  "class_count": 659,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 8700,
+  "function_count": 8886,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-15T12:35:37.850247+00:00",
+  "generated_at": "2026-07-16T02:39:18.659740+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3045,7 +3045,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1338,
+      "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3237,7 +3237,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 468,
+  "public_class_count": 471,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3316,6 +3316,8 @@
     "crypto_rsi_scanner.event_alpha.operations.market_observation_outcomes": 1,
     "crypto_rsi_scanner.event_alpha.operations.namespace_policy": 1,
     "crypto_rsi_scanner.event_alpha.operations.review_inbox": 1,
+    "crypto_rsi_scanner.event_alpha.operations.source_independence_oos": 1,
+    "crypto_rsi_scanner.event_alpha.operations.source_independence_storage": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in": 3,
     "crypto_rsi_scanner.event_alpha.outcomes.burn_in_checklist": 1,
     "crypto_rsi_scanner.event_alpha.outcomes.eval": 1,
@@ -3392,6 +3394,7 @@
     "crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts": 1,
     "crypto_rsi_scanner.event_alpha.radar.source_coverage.models": 2,
     "crypto_rsi_scanner.event_alpha.radar.source_enrichment": 9,
+    "crypto_rsi_scanner.event_alpha.radar.source_independence_store": 1,
     "crypto_rsi_scanner.event_alpha.radar.validation.models": 10,
     "crypto_rsi_scanner.event_alpha.radar.watchlist.models": 5,
     "crypto_rsi_scanner.event_alpha.radar.watchlist_enrichment": 9,
@@ -3564,7 +3567,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1338,
+          "line_count": 1371,
           "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
           "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
           "revisit_condition": "When config/report command bodies move to focused service modules.",
@@ -3636,7 +3639,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1231,
+          "line_count": 1235,
           "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
           "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
           "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
@@ -3725,7 +3728,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1338,
+        "line_count": 1371,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "threshold": 1200
       },
@@ -3770,7 +3773,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1231,
+        "line_count": 1235,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
         "threshold": 1200
       }
@@ -3857,7 +3860,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1338,
+            "line_count": 1371,
             "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
             "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
             "revisit_condition": "When config/report command bodies move to focused service modules.",
@@ -3929,7 +3932,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1231,
+            "line_count": 1235,
             "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
             "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
             "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",

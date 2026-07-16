@@ -177,6 +177,11 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _namespace_status_from_name(namespace: str) -> tuple[str, str]:
+    if namespace == "event_source_independence_contracts":
+        return (
+            "manual_review",
+            "immutable digest-addressed source-independence store; not an operator generation",
+        )
     if namespace == "notify_llm_deep":
         return "stale_deprecated", "known pre-canonical namespace"
     if namespace == "integrated_radar_smoke":

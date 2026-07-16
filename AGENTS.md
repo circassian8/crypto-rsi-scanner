@@ -255,6 +255,32 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   prepared/disabled until `CONFIRM=1 make radar-daily-ops-install`; confirmed
   uninstall removes only the exact owned service. Never embed authorization or
   credentials in its plist.
+- **Event Alpha evidence-cycle readiness:**
+  `make event-alpha-evidence-cycle-readiness PROFILE=notify_llm_quality
+  ARTIFACT_NAMESPACE=<namespace>` is read-only, no-network, and no-write. It
+  reports deterministic planner hints separately from HTTP fan-out, persisted
+  plan truth, current source configuration, explicit authorization, credential
+  presence, provider health/backoff, LLM availability, and the next safe
+  command. A profile describes capability; it never creates provider or OpenAI
+  authorization. Relationship, extractor, and catalyst-frame OpenAI stages
+  each require their matching already-present explicit opt-in; readiness's
+  request bound covers evidence-acquisition planner fan-out only. Live-style
+  dispatch has no fixture/default fallback,
+  Coinalyze and sports hints stay unavailable until real adapters exist, and
+  fixture/test/mock/replay local paths are rejected. Offline fixture LLM
+  evaluation remains allowed because it crosses no provider boundary. The
+  writing `event-alpha-evidence-validation-cycle` requires both a passing
+  `--require-cycle-ready` guard and `CONFIRM=1`, uses a unique namespace, keeps
+  alerts disabled, and never sets authorization. Without a currently eligible
+  genuine source, use the reported artifact preview and make no provider call.
+- **Source-independence OOS review:** use the
+  `event-alpha-source-independence-oos-export`, `...-validate`, and `...-report`
+  targets to freeze `development`/`review`/`test` by
+  `event_copy_family_id`. Exact source or normalized-content reuse across
+  partitions is invalid, pending labels return non-success, and reports remain
+  descriptive. Never change the `0.80` Jaccard threshold, 12-token minimum,
+  normalization, scores, or routes from this workflow without enough
+  independent labels and explicit human approval.
 - **Official Decision Radar macro calendar:** use
   `radar-calendar-official-readiness` before the guarded Fed/BLS/BEA producer.
   Live acquisition is off by default and needs the already-present calendar

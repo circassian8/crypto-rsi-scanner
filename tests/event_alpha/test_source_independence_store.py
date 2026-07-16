@@ -74,9 +74,9 @@ def test_intern_is_idempotent_and_resolves_exact_canonical_blob(tmp_path):
         "distinct_origin_count",
     ):
         assert first[field] == contract[field]
-    assert first["syndicated_copy_count"] == max(
-        0,
-        contract["raw_document_count"] - contract["content_cluster_count"],
+    assert first["syndicated_copy_count"] == sum(
+        document["match_kind"] in {"exact", "near_duplicate"}
+        for document in contract["documents"]
     )
     assert artifact.read_bytes() == raw
     assert [path.name for path in artifact.parent.iterdir()] == [expected_name]
@@ -218,6 +218,67 @@ def test_resolve_rejects_reference_summary_tamper(tmp_path):
     tampered = deepcopy(reference)
     tampered["distinct_origin_count"] -= 1
 
+    assert store.validate_reference(tampered) == ()
+    with pytest.raises(store.SourceIndependenceStoreError, match="summary_mismatch"):
+        store.resolve(namespace, tampered)
+
+
+def test_copy_summary_counts_match_kinds_without_misclassifying_rejected_inputs(
+    tmp_path,
+):
+    namespace = _namespace(tmp_path)
+    rejected = source_independence.assess_source_independence(
+        [
+            {
+                **_source("unsafe", "placeholder.example"),
+                "source_url": "https://user:secret@example.com/story",
+            },
+            _source("eligible", "eligible.example"),
+        ]
+    )
+
+    assert rejected["raw_document_count"] == 2
+    assert rejected["content_cluster_count"] == 1
+    assert {row["assessment_status"] for row in rejected["documents"]} == {
+        "eligible",
+        "rejected",
+    }
+    reference = store.intern(namespace, rejected)
+    assert reference["syndicated_copy_count"] == 0
+    assert store.resolve(namespace, reference) == rejected
+
+
+def test_copy_summary_counts_exact_unassessable_copies_and_revalidates_blob(
+    tmp_path,
+):
+    namespace = _namespace(tmp_path)
+    unassessable = source_independence.assess_source_independence(
+        [
+            {
+                **_source("short-a", "a.example"),
+                "title": "same short title",
+                "body": "",
+            },
+            {
+                **_source("short-b", "b.example"),
+                "title": "SAME short title!",
+                "body": "",
+            },
+        ]
+    )
+
+    assert set(unassessable["unassessable_document_ids"]) == {
+        row["document_id"] for row in unassessable["documents"]
+    }
+    assert sorted(row["match_kind"] for row in unassessable["documents"]) == [
+        "exact",
+        "representative",
+    ]
+    reference = store.intern(namespace, unassessable)
+    assert reference["syndicated_copy_count"] == 1
+
+    tampered = deepcopy(reference)
+    tampered["syndicated_copy_count"] = 0
     assert store.validate_reference(tampered) == ()
     with pytest.raises(store.SourceIndependenceStoreError, match="summary_mismatch"):
         store.resolve(namespace, tampered)

@@ -16,6 +16,61 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Treat Event Alpha profiles as capability, never authorization
+**Status:** accepted
+**Decision:** A profile may describe which live source or OpenAI stage it can
+use, but a true profile override is not current authorization. Every live
+provider factory must additionally observe its already-present explicit
+environment/`.env` opt-in at execution time. Readiness must display profile
+capability, current explicit authorization, required credential presence,
+persisted provider health/backoff, and current call eligibility separately,
+without exposing credential values or inspecting Telegram configuration.
+
+Live-style evidence dispatch has no fixture/default fallback. Fixture,
+test, mock, and replay local paths are invalid for live-style evidence;
+Coinalyze and sports planner hints remain unavailable until a real adapter is
+implemented. Eligible providers reuse the existing `event_source` health
+circuit breaker. Relationship analysis, extraction, and catalyst-frame OpenAI
+stages each require their own already-present explicit opt-in; a credential or
+profile capability cannot authorize another stage. Offline fixture LLM
+evaluation does not need live authorization because it crosses no provider
+boundary. The observational readiness command never writes or calls a
+provider. Its HTTP bound covers evidence-acquisition planner fan-out only and
+explicitly excludes discovery, market, enrichment, and LLM work. A writing evidence cycle
+requires a passing bounded readiness guard, at least one currently eligible
+genuine source, a unique namespace, alerts disabled, and explicit `CONFIRM=1`;
+it never creates authorization and unavailable hints fail soft without a call.
+**Why:** Notification-quality profiles previously enabled source flags as a
+convenience, so operator output could describe GDELT/RSS/Polymarket as live
+authorized even when the current environment had granted no such authority.
+That blurred capability with consent and left fixture-backed dispatch paths in
+a supposedly live evidence cycle.
+**Revisit when:** A versioned authorization service replaces environment flags
+with equivalent explicit operator consent, bounded call ledgers, rollback, and
+runtime/readiness parity. Fixture evidence must remain structurally unable to
+become real authority.
+
+## 2026-07-16 - Freeze source-independence OOS partitions by event-copy family
+**Status:** accepted
+**Decision:** Source-independence review corpus split v3 assigns the complete
+`event_copy_family_id` to one deterministic `development`, `review`, or `test`
+partition. Validation rejects family IDs, exact source digests, or exact
+normalized-content digests reused across partitions. Review categories are
+exact syndicated copy, lightly edited cross-domain copy, independently
+reported same-event article, same-domain original update, contradiction, short
+headline, and control. Pending labels can be structurally valid but return
+non-success; a report is complete
+only after independent OOS coverage is complete. Metrics remain descriptive
+and cannot auto-apply policy. Persisted reports use strict non-boolean schema
+integers, closed splits/categories, bounded ratios, and count-closure checks.
+**Why:** Splitting individual article pairs can leak the same syndicated story
+family into development and test, overstating precision and recall. Family-
+indivisible partitions preserve the intended out-of-sample claim.
+**Revisit when:** Enough independently reviewed development/review/test labels
+exist to evaluate the frozen normalization, 12-token minimum, and `0.80`
+Jaccard threshold. Any score, route, threshold, or normalization change still
+requires explicit human approval and a separate rollback-backed decision.
+
 ## 2026-07-16 - Store new source-independence contracts by immutable reference
 **Status:** accepted
 **Decision:** Persist each new validated `event_alpha.source_independence` value

@@ -573,6 +573,56 @@ def test_idea_detail_shows_concise_evidence_verdict_and_hides_contract_payloads(
     assert "normalized_body" not in body
 
 
+def test_idea_detail_distinguishes_unassessed_accepted_evidence_from_measured_zero() -> None:
+    snapshot = load_dashboard_snapshot(
+        "fixtures/event_alpha/radar_dashboard",
+        "current",
+        now=_NOW,
+    )
+
+    without_measurement = tuple(
+        {
+            key: value
+            for key, value in row.items()
+            if key
+            not in {
+                "accepted_evidence_count",
+                "evidence_acquisition_accepted_count",
+            }
+        }
+        if row.get("core_opportunity_id") == "core:alpha"
+        else row
+        for row in snapshot.current_candidates
+    )
+    unassessed = replace(snapshot, current_candidates=without_measurement)
+    status, _title, body = render_idea_detail(unassessed, "core:alpha")
+
+    assert status == 200
+    assert (
+        "<dt>Accepted evidence rows (not corroboration)</dt>"
+        "<dd>Not assessed</dd>"
+    ) in body
+
+    measured_zero = replace(
+        snapshot,
+        current_candidates=tuple(
+            {
+                **row,
+                "evidence_acquisition_accepted_count": 0,
+            }
+            if row.get("core_opportunity_id") == "core:alpha"
+            else row
+            for row in without_measurement
+        ),
+    )
+    status, _title, body = render_idea_detail(measured_zero, "core:alpha")
+
+    assert status == 200
+    assert (
+        "<dt>Accepted evidence rows (not corroboration)</dt><dd>0</dd>"
+    ) in body
+
+
 def test_idea_detail_suppresses_duplicate_coin_id_but_preserves_lineage() -> None:
     snapshot = load_dashboard_snapshot(
         "fixtures/event_alpha/radar_dashboard",

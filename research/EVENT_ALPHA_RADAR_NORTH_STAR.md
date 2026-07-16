@@ -362,6 +362,22 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - Cards lead with Crypto Decision Radar and retain Catalyst Radar Classification as a secondary strict-catalyst section.
 - Dashboard is primary; notifications route attention; every surface remains research-only and human-decision-required.
 
+## Evidence-Cycle Operator Authority
+
+- readiness_target: `event-alpha-evidence-cycle-readiness`
+- guarded_cycle_target: `event-alpha-evidence-validation-cycle`
+- profile_capability_is_current_authorization: `False`
+- current_authorization_source: `already-present explicit environment/.env flags only`
+- readiness_side_effects: `provider_calls=0, network_calls=0, writes=0, sends=0`
+- live_fixture_fallback: `forbidden`
+- rejected_live_local_inputs: `fixture, test, mock, replay`
+- unavailable_until_real_adapter: `coinalyze, sports_fixtures`
+- provider_health: `existing persisted event_source backoff/circuit breaker`
+- LLM_requirement: `optional; relationship, extractor, and catalyst-frame OpenAI stages each need their matching current explicit authorization plus credential presence; fixture LLM stays offline`
+- request_bound_scope: `evidence-acquisition planner fan-out only; excludes discovery, market, enrichment, and LLM requests`
+- guarded_cycle_requirements: `bounded readiness pass, at least one currently eligible genuine source, unique namespace, no-send, CONFIRM=1`
+- absent_authorization_behavior: `blocked before writes with zero provider calls and an artifact-preview next command`
+
 ## Guarded Real/No-Send Market Generation
 
 - targets: radar-market-no-send-readiness, radar-market-no-send, radar-market-no-send-smoke, radar-market-campaign-report

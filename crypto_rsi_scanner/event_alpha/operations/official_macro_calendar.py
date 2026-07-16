@@ -22,6 +22,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import socket
 import stat
 import sys
@@ -68,6 +69,11 @@ from .market_no_send_io import (
     write_json_immutable,
 )
 from .market_no_send_models import MarketNoSendError
+from .official_macro_calendar_readiness_models import (
+    OfficialMacroReadiness,
+    OfficialMacroSourceReadiness,
+    build_official_macro_source_readiness,
+)
 
 
 OFFICIAL_MACRO_LIVE_AUTH_ENV = "RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE"
@@ -97,45 +103,6 @@ _OBSERVED_SOURCE_STATUSES = frozenset({"observed", "no_results"})
 
 _CONTACT_RE = re.compile(r"^[^\s@]{1,120}@[^\s@]{1,120}\.[^\s@]{2,40}$")
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
-@dataclass(frozen=True)
-class _OfficialMacroReadiness:
-    status: str
-    current_status: str
-    live_acquisition_authorized: bool
-    contact_configured: bool
-    provider_call_attempted: bool = False
-    provider_authorization_mutated: bool = False
-    output_base: str = ""
-    latest_attempt_status: str = "none"
-    latest_success_status: str = "none"
-    reason_codes: tuple[str, ...] = ()
-    implications: tuple[str, ...] = ()
-    next_safe_command: str = ""
-    authorization_boundary: str = ""
-    expected_provider_activity: str = ""
-    rollback_disable_command: str = ""
-    research_only: bool = True
-    no_send: bool = True
-    strict_alerts_created: int = 0
-    telegram_sends: int = 0
-    trades_created: int = 0
-    paper_trades_created: int = 0
-    normal_rsi_signal_rows_written: int = 0
-    triggered_fade_created: int = 0
-
-    @property
-    def ready(self) -> bool:
-        return self.status == "ready"
-
-    def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["reason_codes"] = list(self.reason_codes)
-        payload["implications"] = list(self.implications)
-        payload["ready"] = self.ready
-        return payload
-
-
-OfficialMacroReadiness = _OfficialMacroReadiness
 
 
 @dataclass(frozen=True)
@@ -197,6 +164,10 @@ def official_macro_calendar_readiness(
     env = os.environ if environ is None else environ
     authorized = _enabled(env.get(OFFICIAL_MACRO_LIVE_AUTH_ENV))
     contact_configured = _valid_contact(env.get(OFFICIAL_MACRO_CONTACT_ENV))
+    source_readiness = build_official_macro_source_readiness(
+        authorized=authorized,
+        contact_configured=contact_configured,
+    )
     reasons: list[str] = []
     if not authorized:
         reasons.append("live_calendar_authorization_missing")
@@ -238,7 +209,8 @@ def official_macro_calendar_readiness(
     ]
     if not authorized:
         implications.append(
-            "acquisition_remains_blocked_and_all_sources_are_missing_configuration"
+            "live_acquisition_remains_blocked; federal_reserve_and_bea_endpoints_"
+            "are_configured_but_not_request_eligible; bls_also_lacks_contact"
         )
     elif not contact_configured:
         implications.append(
@@ -253,6 +225,33 @@ def official_macro_calendar_readiness(
         current_status=current_status,
         live_acquisition_authorized=authorized,
         contact_configured=contact_configured,
+        source_readiness=source_readiness,
+        live_partial_snapshot_eligible=any(
+            row.request_eligible for row in source_readiness
+        ),
+        local_import_partial_snapshot_supported=True,
+        partial_snapshot_eligibility=(
+            "live_acquisition_can_publish_partial_when_at_least_one_eligible_"
+            "source_is_observed_or_has_no_results"
+            if authorized
+            else "live_acquisition_blocked; local_import_can_publish_partial_after_"
+            "the_operator_supplies_at_least_one_genuine_source_and_its_real_"
+            "acquisition_time"
+        ),
+        local_import_command=(
+            f"OFFICIAL_MACRO_OUTPUT_BASE={shlex.quote(str(base))} "
+            "OFFICIAL_MACRO_OBSERVED_AT=\"$OFFICIAL_MACRO_OBSERVED_AT\" "
+            "FED_FOMC_HTML=\"$FED_FOMC_HTML\" "
+            "BLS_CALENDAR_ICS=\"$BLS_CALENDAR_ICS\" "
+            "BEA_RELEASE_DATES_JSON=\"$BEA_RELEASE_DATES_JSON\" "
+            "make radar-calendar-official-import-local PYTHON=python3"
+        ),
+        local_import_requirements=(
+            "set_OFFICIAL_MACRO_OBSERVED_AT_to_the_real_ISO_8601_acquisition_time_with_timezone",
+            "set_FED_FOMC_HTML_and_or_BEA_RELEASE_DATES_JSON_to_absolute_paths_for_genuine_operator_downloads",
+            "BLS_CALENDAR_ICS_is_optional_for_local_import_and_may_be_added_when_available",
+            "fixture_test_mock_and_replay_paths_or_bytes_are_rejected",
+        ),
         output_base=str(base),
         latest_attempt_status=attempt_status,
         latest_success_status=success_status,
@@ -1458,6 +1457,7 @@ __all__ = (
     "OfficialMacroHTTPResponse",
     "OfficialMacroOperationResult",
     "OfficialMacroReadiness",
+    "OfficialMacroSourceReadiness",
     "OfficialMacroSourceSpec",
     "acquire_official_macro_calendar",
     "import_official_macro_calendar",

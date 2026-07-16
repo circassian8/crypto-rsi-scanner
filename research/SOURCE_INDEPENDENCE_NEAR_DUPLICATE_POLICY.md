@@ -154,3 +154,69 @@ thresholds, false-positive review, dependency-aware uncertainty,
 out-of-sample validation, and rollback criteria. The current replacement is
 auditable research metadata and may only remove duplicate-derived support from
 the existing semantics it replaces.
+
+## Immutable storage and historical compatibility
+
+New contracts are stored once per artifact namespace as immutable canonical
+JSON under `event_source_independence_contracts/`. Downstream rows carry a
+closed reference with the semantic contract digest, exact blob fingerprint and
+size, canonical relative path, validation state, and the bounded count summary.
+Readers must verify the complete reference, anchored blob bytes, canonical JSON,
+semantic digest, and every summary count before treating it as evidence.
+
+Historical inline contracts remain valid input and are not rewritten merely
+because a downstream artifact is normalized or linked to a card. Rewrites
+prepare and validate the complete replacement before atomic publication; a
+missing, mutated, symlinked, or unsafe store cannot truncate the old artifact.
+The read-only storage report is:
+
+```bash
+make event-alpha-source-independence-storage-report \
+  ARTIFACT_NAMESPACE=<exact-namespace> PYTHON=python3
+```
+
+It reports raw bytes, immutable-store growth, bounded resolve performance,
+payload-only compatibility estimates, and an exact deterministic in-memory ZIP
+comparison for the selected namespace. That ZIP comparison is not described as
+the size of the whole project export.
+
+## Frozen out-of-sample review workflow
+
+The labeling contract freezes `development`, `review`, and `test` partitions
+by `event_copy_family_id`, not by individual row. Every exact story/copy family
+therefore remains indivisible. Validation rejects a family id, exact source
+digest, or exact normalized-content digest that appears across partitions.
+This prevents a syndicated story seen during development from reappearing as a
+nominally out-of-sample test row.
+
+The closed review categories are exact syndicated copy, lightly edited
+cross-domain copy, independently reported same-event article, same-domain
+original update, contradiction, short headline, and control. Reports separate
+precision, recall, false merges, and missed copies across the frozen partitions
+and by text length, source type, and provider pair. A structurally valid but
+unlabeled review is `pending`; a fully labeled review without sufficient OOS
+coverage is `incomplete`; only complete independent coverage is `complete`.
+Validation of a structurally sound pending template still exits non-zero so an
+unreviewed corpus cannot be mistaken for a finished gate. Persisted metrics
+fail closed on boolean schema versions, unknown splits/categories, ratio drift,
+or any review/confusion/cohort count mismatch.
+
+```bash
+make event-alpha-source-independence-oos-export \
+  SOURCE_INDEPENDENCE_OOS_INPUT=<input.jsonl> \
+  SOURCE_INDEPENDENCE_OOS_CORPUS=<frozen-corpus.jsonl> \
+  SOURCE_INDEPENDENCE_OOS_TEMPLATE=<review-template.jsonl> \
+  SOURCE_INDEPENDENCE_OOS_SPLIT_SALT=<operator-kept-frozen-salt>
+
+make event-alpha-source-independence-oos-validate \
+  SOURCE_INDEPENDENCE_OOS_CORPUS=<frozen-corpus.jsonl> \
+  SOURCE_INDEPENDENCE_OOS_REVIEWS=<reviewed-labels.jsonl>
+
+make event-alpha-source-independence-oos-report \
+  SOURCE_INDEPENDENCE_OOS_CORPUS=<frozen-corpus.jsonl> \
+  SOURCE_INDEPENDENCE_OOS_REVIEWS=<reviewed-labels.jsonl>
+```
+
+These commands make no provider call and do not alter the `0.80` Jaccard
+threshold, 12-token minimum, normalization, scores, or routes. A policy change
+still requires enough independent labels and explicit human approval.

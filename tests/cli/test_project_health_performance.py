@@ -104,6 +104,24 @@ def test_bounded_retention_report_preserves_marker_policy_fields(tmp_path):
     assert row["retention_policy"] == "retain_for_burn_in_review"
 
 
+def test_bounded_retention_report_keeps_root_contract_store_non_authoritative(tmp_path):
+    store = tmp_path / "event_source_independence_contracts"
+    store.mkdir()
+    (store / "contract.json").write_text("{}\n", encoding="utf-8")
+
+    report = artifact_retention.build_bounded_retention_report(tmp_path)
+    assert report["namespace_count"] == 1
+    row = report["namespaces"][0]
+    assert row["namespace"] == "event_source_independence_contracts"
+    assert row["status"] == "manual_review"
+    assert row["marker_present"] is False
+    assert row["safe_for_send_readiness"] is False
+    assert row["safe_for_burn_in_measurement"] is False
+    assert row["safe_for_calibration"] is False
+    assert "not an operator generation" in row["reason"]
+    assert row["retention_policy"] == "manual_review"
+
+
 def test_bounded_retention_report_does_not_follow_namespace_marker_symlink(tmp_path):
     outside = tmp_path / "outside-marker.json"
     outside.write_text('{"safe_for_send_readiness":true}\n', encoding="utf-8")

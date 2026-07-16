@@ -217,8 +217,13 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert "parallel=" in full_llm_out.getvalue()
         assert "timeouts=" in full_llm_out.getvalue()
         assert "watchlist_monitor:" in profile_out.getvalue()
-        assert "- READY project_blog_rss" in full_llm_out.getvalue()
-        assert "- READY project_blog_rss" in send_out.getvalue()
+        # A profile declares bounded capability, not current live-provider
+        # authorization.  With no explicit RSS opt-in in this test process,
+        # applying either profile must keep the provider disabled.
+        assert "- off   project_blog_rss" in full_llm_out.getvalue()
+        assert "- off   project_blog_rss" in send_out.getvalue()
+        assert "- READY project_blog_rss" not in full_llm_out.getvalue()
+        assert "- READY project_blog_rss" not in send_out.getvalue()
 
         os.environ["RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN"] = "111"
         os.environ["RSI_EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN"] = "222"

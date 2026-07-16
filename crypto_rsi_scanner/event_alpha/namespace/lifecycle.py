@@ -43,6 +43,16 @@ KNOWN_STALE_NAMESPACES = {
     },
 }
 
+# Root-local support stores can sit beside generation namespaces when a legacy
+# or unscoped artifact path is in use.  They are retained research evidence,
+# never operator generations, and therefore must not be treated as an unknown
+# namespace or as eligible authority.
+NON_GENERATION_ARTIFACT_ROOTS = {
+    "event_source_independence_contracts": (
+        "immutable digest-addressed source-independence store; not an operator generation"
+    ),
+}
+
 
 @dataclass(frozen=True)
 class NamespaceLifecycleRow:
@@ -352,6 +362,8 @@ def _classify_namespace(
     if namespace in KNOWN_STALE_NAMESPACES:
         known = KNOWN_STALE_NAMESPACES[namespace]
         return STATUS_STALE_DEPRECATED, known["reason"], known["superseded_by"]
+    if namespace in NON_GENERATION_ARTIFACT_ROOTS:
+        return STATUS_MANUAL_REVIEW, NON_GENERATION_ARTIFACT_ROOTS[namespace], None
     if namespace in {"shim_report", "architecture_final_report", "architecture_baseline"}:
         return STATUS_ACTIVE_ARCHITECTURE_REPORT, "architecture/report namespace", None
     if namespace in {

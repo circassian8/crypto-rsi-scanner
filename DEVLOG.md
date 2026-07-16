@@ -17,6 +17,78 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Deliver operator authority and evidence reality v1 · Codex
+**Why:** Fixture and release workflows could mutate the canonical dashboard
+pointer, while notification-quality profiles blurred source capability with
+current provider authorization. The completed evidence-integrity work also
+needed compact persistence, operator-facing summaries, and a leakage-safe
+out-of-sample validation path before any policy could be reconsidered.
+**Changes:**
+- Separated read-only namespace validation/readiness, current-authority
+  inspection, fixture rendering, guarded real publication, and exact guarded
+  invalidation. Fixture and release targets now preserve the production pointer
+  byte-for-byte; publication is receipt-backed, confirmation-gated where
+  operator initiated, rejects fixture/legacy generations, and preserves prior
+  authority on failure. Classified the immutable source-independence object
+  store as a non-generation artifact root so lifecycle and project-health
+  reports do not misdiagnose it as an unknown generation.
+- Added bounded Event Alpha evidence-cycle readiness and runtime authorization
+  parity. Profiles now describe capability only; every live source and each
+  relationship, extractor, and catalyst-frame OpenAI stage rechecks its own
+  already-present explicit authorization, credentials, and the existing
+  provider-health/backoff state. The readiness HTTP bound is explicitly scoped
+  to evidence-acquisition planner fan-out and excludes other cycle stages.
+  Live-style execution rejects
+  fixture/test/mock/replay inputs, has no fixture fallback, requires a unique
+  namespace plus `CONFIRM=1`, and remains no-send. Current readiness is honestly
+  blocked because no genuine Event Alpha source is authorized.
+- Stored new source-independence contracts once in a descriptor-anchored,
+  immutable digest-addressed namespace store. Compact references carry exact
+  fingerprints and summaries, fail closed on missing/mutated content, preserve
+  legacy inline history and idempotent Decision projection, and resolve to the
+  same evidence across candidates, Core rows, cards, previews, outcomes, and
+  dashboard details. Copy counts derive only from explicit exact/near-duplicate
+  matches, not rejected rows. Primary UI now shows concise source counts,
+  authority, timing, and causal eligibility; a missing measurement renders
+  `Not assessed` while an explicit measured zero remains `0`, and full
+  contracts remain technical detail.
+- Added deterministic family-indivisible source-independence OOS export,
+  validate, and report commands with frozen development/review/test partition
+  v3, cross-split leakage rejection, closed labels, non-success pending
+  validation, strict schema/ratio/count closure, pending/incomplete/complete
+  states, and descriptive precision/recall/false-merge/missed-copy cohorts.
+  Improved independent Fed/BEA/BLS partial-calendar readiness/local import and
+  venue-neutral spot/perpetual/DEX execution-quality guidance without choosing
+  or calling a provider.
+- Exercised the one already-authorized, cadence-eligible Decision Radar market
+  cycle. It made exactly one CoinGecko request and published strict-clean real
+  namespace `radar_market_no_send_20260716t020832349089z_ed303d3217c3` at
+  revision 12; the dashboard restart receipt and final publication receipt are
+  coherent. The campaign now has 8 real cycles, 240 retained observations, 210
+  baseline-counted observations, 30 too-close observations, 0 warm assets, 2
+  historical `risk_watch` ideas, 1 matured outcome, 1 due/missing-price outcome,
+  and 0 current ideas.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`; a final focused
+pytest suite (186 passed); `make architecture-cleanliness-check PYTHON=python3`;
+integrated radar smoke/strict doctor; dashboard smoke, UX smoke, and readiness;
+Daily Operations, evidence-cycle, official-calendar, and execution-quality
+readiness; campaign report; `make verify-fast PYTHON=python3` (2,292 passed plus
+alert/backtest/score smokes); and `make verify PYTHON=python3` (1,390/1,390
+standalone compatibility tests, 2,292 pytest tests, and all release smokes)
+passed. After real publication the pointer SHA-256 was
+`95b35b13e7e7e5d4d4566d7ccbc2dcc440191266796f21efd9d074ce56967d88` and remained
+identical through the complete smoke/release sequence. The fixture measurement
+is 968,372 inline-equivalent bytes versus 929,326 referenced bytes including
+the 8,990-byte store (39,046 bytes / 4.032% smaller); its standalone namespace
+ZIP is 78,916 versus 73,525 bytes (5,391 bytes / 6.831% smaller).
+**Notes/risks:** The sole provider call was the permitted CoinGecko market
+request. Event Alpha evidence and official-calendar readiness made zero calls
+and writes. No authorization, threshold, normalization, route, Telegram send,
+trade, order, execution, paper trade, normal RSI row, or Event Alpha
+`TRIGGERED_FADE` changed or was created. OOS policy evaluation still waits for
+independent human labels; calendar acquisition and venue selection remain
+explicit human decisions.
+
 ## 2026-07-16 — Store source-independence evidence once without rewriting history · Codex
 **Why:** The closed source-independence contract is intentionally detailed, but
 copying it into every candidate, CoreOpportunity, card input, alert, outcome,

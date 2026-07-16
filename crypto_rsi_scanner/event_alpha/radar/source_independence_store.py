@@ -211,9 +211,15 @@ def validate_reference(value: Mapping[str, Any]) -> tuple[str, ...]:
             errors.append("source_independence_reference_summary_relationship_invalid")
         if origin_count > raw_count:
             errors.append("source_independence_reference_summary_relationship_invalid")
-        syndicated = value.get("syndicated_copy_count")
-        if type(syndicated) is not int or syndicated != max(0, raw_count - cluster_count):
-            errors.append("source_independence_reference_syndicated_copy_count_invalid")
+    syndicated = value.get("syndicated_copy_count")
+    if (
+        type(syndicated) is not int
+        or syndicated < 0
+        or syndicated > source_independence.MAX_DOCUMENTS
+    ):
+        errors.append("source_independence_reference_syndicated_copy_count_invalid")
+    elif "raw_document_count" in summaries and syndicated > summaries["raw_document_count"]:
+        errors.append("source_independence_reference_syndicated_copy_count_invalid")
     return tuple(sorted(set(errors)))
 
 
@@ -339,11 +345,7 @@ def resolve_bytes(
             raise SourceIndependenceStoreError(
                 f"source_independence_store_reference_summary_mismatch:{field}"
             )
-    expected_syndicated = max(
-        0,
-        int(normalized["raw_document_count"])
-        - int(normalized["content_cluster_count"]),
-    )
+    expected_syndicated = _syndicated_copy_count(normalized)
     if normalized_reference.get("syndicated_copy_count") != expected_syndicated:
         raise SourceIndependenceStoreError(
             "source_independence_store_reference_summary_mismatch:"
@@ -713,11 +715,7 @@ def _reference_for(contract: Mapping[str, Any], blob: bytes) -> dict[str, Any]:
             "independent_corroboration_count"
         ),
         "distinct_origin_count": contract.get("distinct_origin_count"),
-        "syndicated_copy_count": max(
-            0,
-            int(contract.get("raw_document_count") or 0)
-            - int(contract.get("content_cluster_count") or 0),
-        ),
+        "syndicated_copy_count": _syndicated_copy_count(contract),
         "research_only": True,
     }
     errors = validate_reference(reference)
@@ -726,6 +724,22 @@ def _reference_for(contract: Mapping[str, Any], blob: bytes) -> dict[str, Any]:
             "source_independence_reference_build_failed:" + ",".join(errors)
         )
     return reference
+
+
+def _syndicated_copy_count(contract: Mapping[str, Any]) -> int:
+    """Count only documents explicitly collapsed as exact or near copies."""
+
+    documents = contract.get("documents")
+    if not isinstance(documents, list):
+        raise SourceIndependenceStoreError(
+            "source_independence_store_contract_documents_invalid"
+        )
+    return sum(
+        1
+        for document in documents
+        if isinstance(document, Mapping)
+        and document.get("match_kind") in {"exact", "near_duplicate"}
+    )
 
 
 def _new_budget(*, max_nodes: int, max_depth: int) -> _TraversalBudget:

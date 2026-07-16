@@ -112,7 +112,10 @@ def test_readiness_is_read_only_and_reports_missing_explicit_authorization(
 
     assert result.status == "blocked"
     assert result.current_status == "blocked_missing_live_authorization"
+    assert result.read_only is True
+    assert result.provider_call_count == 0
     assert result.provider_call_attempted is False
+    assert result.writes_performed is False
     assert result.latest_attempt_status == "none"
     assert result.latest_success_status == "none"
     assert set(result.reason_codes) == {
@@ -131,6 +134,37 @@ def test_readiness_is_read_only_and_reports_missing_explicit_authorization(
         "none_required_program_never_mutates_authorization_or_installs_a_service"
     )
     assert result.implications[0].startswith("readiness_is_read_only")
+    source_rows = {row.source: row for row in result.source_readiness}
+    assert tuple(source_rows) == ("federal_reserve", "bea", "bls")
+    assert source_rows["federal_reserve"].official_endpoint_configured is True
+    assert source_rows["federal_reserve"].availability == (
+        "configured_waiting_for_live_authorization"
+    )
+    assert source_rows["bea"].availability == (
+        "configured_waiting_for_live_authorization"
+    )
+    assert source_rows["bls"].availability == (
+        "blocked_missing_live_authorization_and_contact"
+    )
+    assert source_rows["bls"].contact_required is True
+    assert source_rows["bls"].contact_configured is False
+    assert not any(row.request_eligible for row in source_rows.values())
+    assert not any(
+        row.provider_calls_during_readiness for row in source_rows.values()
+    )
+    assert result.live_partial_snapshot_eligible is False
+    assert result.local_import_partial_snapshot_supported is True
+    assert "local_import_can_publish_partial" in result.partial_snapshot_eligibility
+    assert "make radar-calendar-official-import-local" in result.local_import_command
+    assert str(base) in result.local_import_command
+    assert '"$OFFICIAL_MACRO_OBSERVED_AT"' in result.local_import_command
+    assert '"$FED_FOMC_HTML"' in result.local_import_command
+    assert '"$BLS_CALENDAR_ICS"' in result.local_import_command
+    assert '"$BEA_RELEASE_DATES_JSON"' in result.local_import_command
+    assert any(
+        "BLS_CALENDAR_ICS_is_optional" in item
+        for item in result.local_import_requirements
+    )
     assert not base.exists()
 
 
@@ -146,11 +180,64 @@ def test_readiness_explains_partial_bls_configuration_without_calling(
 
     assert result.status == "ready"
     assert result.current_status == "ready_partial_bls_missing_configuration"
+    assert result.read_only is True
+    assert result.provider_call_count == 0
     assert result.provider_call_attempted is False
+    assert result.writes_performed is False
     assert result.next_safe_command == (
         "make radar-calendar-official-acquire PYTHON=python3"
     )
     assert any("must_skip_bls" in item for item in result.implications)
+    source_rows = {row.source: row for row in result.source_readiness}
+    assert source_rows["federal_reserve"].availability == (
+        "available_for_authorized_acquisition"
+    )
+    assert source_rows["bea"].availability == (
+        "available_for_authorized_acquisition"
+    )
+    assert source_rows["bls"].availability == "missing_configuration"
+    assert source_rows["federal_reserve"].request_eligible is True
+    assert source_rows["bea"].request_eligible is True
+    assert source_rows["bls"].request_eligible is False
+    assert source_rows["federal_reserve"].maximum_provider_calls_if_acquire == 1
+    assert source_rows["bea"].maximum_provider_calls_if_acquire == 1
+    assert source_rows["bls"].maximum_provider_calls_if_acquire == 0
+    assert result.live_partial_snapshot_eligible is True
+    assert "live_acquisition_can_publish_partial" in (
+        result.partial_snapshot_eligibility
+    )
+    assert not base.exists()
+
+
+def test_readiness_all_configured_sources_are_individually_visible_without_calling(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path.resolve() / "calendar"
+
+    result = official_macro_calendar_readiness(
+        environ=AUTHORIZED_ENV,
+        output_base=base,
+    )
+
+    assert result.status == "ready"
+    assert result.current_status == "ready_all_official_sources_configured"
+    assert result.provider_call_count == 0
+    assert result.provider_call_attempted is False
+    assert result.writes_performed is False
+    assert [row.source for row in result.source_readiness] == [
+        "federal_reserve",
+        "bea",
+        "bls",
+    ]
+    assert all(row.request_eligible for row in result.source_readiness)
+    assert all(
+        row.availability == "available_for_authorized_acquisition"
+        for row in result.source_readiness
+    )
+    assert sum(
+        row.maximum_provider_calls_if_acquire
+        for row in result.source_readiness
+    ) == 3
     assert not base.exists()
 
 
@@ -877,6 +964,23 @@ def test_official_calendar_make_targets_preserve_explicit_import_contract() -> N
         "BEA_RELEASE_DATES_JSON=/operator/bea.json",
         f"OFFICIAL_MACRO_OBSERVED_AT={OBSERVED_AT}",
     ).stdout
+    partial_import = dry_run(
+        "radar-calendar-official-import-local",
+        "FED_FOMC_HTML=/operator/fed.html",
+        f"OFFICIAL_MACRO_OBSERVED_AT={OBSERVED_AT}",
+    ).stdout
+    missing_sources = subprocess.run(
+        [
+            "make",
+            "radar-calendar-official-import-local",
+            "PYTHON=python3",
+            f"OFFICIAL_MACRO_OBSERVED_AT={OBSERVED_AT}",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
     assert "official_macro_calendar readiness" in readiness
     assert "official_macro_calendar acquire" in acquisition
@@ -888,3 +992,8 @@ def test_official_calendar_make_targets_preserve_explicit_import_contract() -> N
     assert "--federal-reserve-html \"/operator/fed.html\"" in imported
     assert "--bls-ics \"/operator/bls.ics\"" in imported
     assert "--bea-json \"/operator/bea.json\"" in imported
+    assert "--federal-reserve-html \"/operator/fed.html\"" in partial_import
+    assert "--bls-ics" not in partial_import
+    assert "--bea-json" not in partial_import
+    assert missing_sources.returncode != 0
+    assert "At least one of FED_FOMC_HTML" in missing_sources.stderr

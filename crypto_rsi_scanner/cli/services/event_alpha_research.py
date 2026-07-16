@@ -14,6 +14,8 @@ import crypto_rsi_scanner.event_alpha.artifacts.operator_state as _operator_stat
 import crypto_rsi_scanner.event_alpha.namespace.status as _namespace_status
 from crypto_rsi_scanner.event_alpha.radar.llm.provider_runtime import build_shared_openai_inputs
 
+from . import event_alpha_evidence_runtime
+
 
 _SERVICE_FUNCTION_NAMES = (
     'bind_scanner_globals',
@@ -769,6 +771,44 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
     )
 
 
+def _event_source_live_enabled(setting: str) -> bool:
+    """Return true only for config that is backed by an existing env opt-in."""
+
+    from ...event_alpha.radar.evidence.provider_contract import (
+        explicit_live_authorizations,
+    )
+
+    return bool(
+        getattr(config, setting, False)
+        and explicit_live_authorizations().get(setting, False)
+    )
+
+
+def _event_source_local_path(path_value: object) -> object | None:
+    """Return an accepted non-fixture local source path, otherwise ``None``."""
+
+    from ...event_alpha.radar.evidence.provider_contract import (
+        configured_local_path_status,
+    )
+
+    return (
+        path_value
+        if configured_local_path_status(path_value) == "regular_file"
+        else None
+    )
+
+
+def _event_source_health_checked(provider: object) -> object:
+    """Apply the existing persisted event-source circuit breaker."""
+
+    return event_provider_health.HealthCheckedProvider(
+        provider,
+        cfg=_event_provider_health_config_from_runtime(),
+        provider_kind="event_source",
+        provider_role="event_source",
+    )
+
+
 def _event_catalyst_search_provider(
     search_cfg: event_catalyst_search.EventCatalystSearchConfig,
 ):
@@ -786,24 +826,44 @@ def _event_catalyst_search_provider(
                 path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
             ))
         elif provider_name == "gdelt":
+            path = _event_source_local_path(config.EVENT_DISCOVERY_GDELT_PATH)
+            live_enabled = _event_source_live_enabled("EVENT_DISCOVERY_GDELT_LIVE")
+            if path is None and not live_enabled:
+                continue
             providers.append(event_catalyst_search.GdeltCatalystSearchProvider(
-                path=config.EVENT_DISCOVERY_GDELT_PATH,
-                live_enabled=config.EVENT_DISCOVERY_GDELT_LIVE,
+                path=path,
+                live_enabled=live_enabled,
                 base_url=config.EVENT_DISCOVERY_GDELT_BASE_URL,
                 max_records=config.EVENT_DISCOVERY_GDELT_MAX_RECORDS,
                 timeout=config.EVENT_DISCOVERY_GDELT_TIMEOUT,
             ))
         elif provider_name in {"rss", "project_rss", "project_blog_rss"}:
+            path = _event_source_local_path(config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH)
+            live_enabled = _event_source_live_enabled(
+                "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE"
+            )
+            if path is None and not (
+                live_enabled and config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS
+            ):
+                continue
             providers.append(event_catalyst_search.ProjectRssCatalystSearchProvider(
-                path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
-                live_enabled=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
+                path=path,
+                live_enabled=live_enabled,
                 feed_urls=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
                 timeout=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT,
             ))
         elif provider_name == "cryptopanic":
+            path = _event_source_local_path(config.EVENT_DISCOVERY_CRYPTOPANIC_PATH)
+            live_enabled = _event_source_live_enabled(
+                "EVENT_DISCOVERY_CRYPTOPANIC_LIVE"
+            )
+            if path is None and not (
+                live_enabled and config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN
+            ):
+                continue
             providers.append(event_catalyst_search.CryptoPanicCatalystSearchProvider(
-                path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
-                live_enabled=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
+                path=path,
+                live_enabled=live_enabled,
                 api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
                 base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
                 plan=config.EVENT_DISCOVERY_CRYPTOPANIC_PLAN,
@@ -825,23 +885,37 @@ def _event_catalyst_search_provider(
                 max_currencies_per_request=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST,
             ))
         elif provider_name == "polymarket":
+            path = _event_source_local_path(
+                config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
+            )
+            live_enabled = _event_source_live_enabled(
+                "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE"
+            )
+            if path is None and not live_enabled:
+                continue
             providers.append(event_catalyst_search.PolymarketCatalystSearchProvider(
-                path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
-                live_enabled=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE,
+                path=path,
+                live_enabled=live_enabled,
                 base_url=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_BASE_URL,
                 limit=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT,
                 timeout=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT,
             ))
         elif provider_name == "coinmarketcal":
+            path = _event_source_local_path(config.EVENT_DISCOVERY_COINMARKETCAL_PATH)
+            if path is None:
+                continue
             providers.append(event_catalyst_search.EventProviderCatalystSearchProvider(
-                lambda query: CoinMarketCalProvider(config.EVENT_DISCOVERY_COINMARKETCAL_PATH),
+                lambda query, source_path=path: CoinMarketCalProvider(source_path),
                 name="coinmarketcal",
                 filter_by_query=True,
                 max_fetches_per_search=1,
             ))
         elif provider_name == "tokenomist":
+            path = _event_source_local_path(config.EVENT_DISCOVERY_TOKENOMIST_PATH)
+            if path is None:
+                continue
             providers.append(event_catalyst_search.EventProviderCatalystSearchProvider(
-                lambda query: TokenomistProvider(config.EVENT_DISCOVERY_TOKENOMIST_PATH),
+                lambda query, source_path=path: TokenomistProvider(source_path),
                 name="tokenomist",
                 filter_by_query=True,
                 max_fetches_per_search=1,
@@ -872,118 +946,12 @@ def _event_evidence_acquisition_providers_from_runtime(
 ):
     """Return source-pack provider dispatch for evidence acquisition."""
     _refresh_scanner_globals()
-    providers: dict[str, object | None] = {}
-    fixture_provider = event_catalyst_search.FixtureCatalystSearchProvider(
-        path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
-    )
-    if cfg.fixture_only:
-        for key in (
-            "default",
-            "fixture",
-            "cryptopanic",
-            "project_blog_rss",
-            "rss",
-            "polymarket",
-            "official_exchange",
-            "binance_announcements",
-            "bybit_announcements",
-            "coinmarketcal",
-            "tokenomist",
-            "coinalyze",
-            "sports_fixtures",
-        ):
-            providers[key] = fixture_provider
-        return providers
-
-    providers["default"] = fixture_provider
-    providers["fixture"] = fixture_provider
-    providers["cryptopanic"] = event_catalyst_search.CryptoPanicCatalystSearchProvider(
-        path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
-        live_enabled=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
-        api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
-        base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
-        plan=config.EVENT_DISCOVERY_CRYPTOPANIC_PLAN,
-        public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
-        following=config.EVENT_DISCOVERY_CRYPTOPANIC_FOLLOWING,
-        filter_name=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
-        currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
-        regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
-        kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
-        timeout=min(config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT, cfg.timeout_seconds),
+    return event_alpha_evidence_runtime.build_evidence_acquisition_providers(
+        cfg,
+        config_module=config,
+        provider_health_cfg=_event_provider_health_config_from_runtime(),
         request_ledger_path=_cryptopanic_request_ledger_path(),
-        profile=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
-        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
-        weekly_request_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
-        requests_per_run_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT,
-        requests_per_day_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
-        min_seconds_between_requests=config.EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS,
-        max_pages_per_query=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY,
-        max_currencies_per_request=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST,
     )
-    providers["project_blog_rss"] = event_catalyst_search.ProjectRssCatalystSearchProvider(
-        path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
-        live_enabled=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
-        feed_urls=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
-        timeout=min(config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT, cfg.timeout_seconds),
-    )
-    providers["rss"] = providers["project_blog_rss"]
-    providers["polymarket"] = event_catalyst_search.PolymarketCatalystSearchProvider(
-        path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
-        live_enabled=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE,
-        base_url=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_BASE_URL,
-        limit=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT,
-        timeout=min(config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT, cfg.timeout_seconds),
-    )
-    official_exchange = event_catalyst_search.CompositeCatalystSearchProvider((
-        event_catalyst_search.EventProviderCatalystSearchProvider(
-            lambda query: BinanceAnnouncementProvider(
-                config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
-                live_enabled=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE,
-                api_key=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY,
-                api_secret=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET,
-                ws_url=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_WS_URL,
-                topic=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_TOPIC,
-                recv_window_ms=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_RECV_WINDOW_MS,
-                listen_seconds=min(config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS, cfg.timeout_seconds),
-                max_messages=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_MAX_MESSAGES,
-            ),
-            name="binance_announcements",
-            filter_by_query=True,
-            max_fetches_per_search=1,
-        ),
-        event_catalyst_search.EventProviderCatalystSearchProvider(
-            lambda query: BybitAnnouncementProvider(
-                config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
-                live_enabled=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE,
-                base_url=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_BASE_URL,
-                locale=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LOCALE,
-                announcement_type=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TYPE,
-                limit=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIMIT,
-                timeout=min(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TIMEOUT, cfg.timeout_seconds),
-            ),
-            name="bybit_announcements",
-            filter_by_query=True,
-            max_fetches_per_search=1,
-        ),
-    ))
-    providers["official_exchange"] = official_exchange
-    providers["binance_announcements"] = official_exchange
-    providers["bybit_announcements"] = official_exchange
-    providers["coinmarketcal"] = event_catalyst_search.EventProviderCatalystSearchProvider(
-        lambda query: CoinMarketCalProvider(config.EVENT_DISCOVERY_COINMARKETCAL_PATH),
-        name="coinmarketcal",
-        filter_by_query=True,
-        max_fetches_per_search=1,
-    )
-    providers["tokenomist"] = event_catalyst_search.EventProviderCatalystSearchProvider(
-        lambda query: TokenomistProvider(config.EVENT_DISCOVERY_TOKENOMIST_PATH),
-        name="tokenomist",
-        filter_by_query=True,
-        max_fetches_per_search=1,
-    )
-    providers["coinalyze"] = fixture_provider
-    providers["sports_fixtures"] = fixture_provider
-    return providers
 
 
 def _send_event_alpha_routed_digest(

@@ -192,6 +192,7 @@ def test_closed_snapshot_contract_contains_required_lineage_and_quality_fields()
         "block_number",
         "pool_or_router_id",
         "gas_estimate_native",
+        "route_identity",
     } <= snapshot_fields
     assert ExecutionQualitySnapshot.__dataclass_fields__["research_only"].default is True
 
@@ -216,14 +217,58 @@ def test_human_report_is_explicitly_nonselecting_and_no_call() -> None:
     assert "status=operator_venue_required" in rendered
     assert "selected_venue=none selected_execution_mode=none" in rendered
     assert "supported_live_adapters=none" in rendered
-    assert "provider_call_planned=false provider_call_attempted=false" in rendered
+    assert (
+        "read_only=true provider_calls=0 provider_call_planned=false "
+        "provider_call_attempted=false"
+    ) in rendered
     assert "credentials_read=false network_called=false writes_performed=false" in rendered
     assert "next_safe_command=make radar-execution-quality-readiness" in rendered
     assert "expected_provider_activity=none_static_readiness_only" in rendered
     assert "spread_provider_status=not_selected" in rendered
     assert "No venue is selected" in rendered
+    assert "Supported instrument modes and venue options" in rendered
+    assert "- spot: venues=binance,bybit,coinbase_exchange,kraken" in rendered
+    assert "- perpetual: venues=binance,bybit" in rendered
+    assert "- dex: venues=dex_operator_selected" in rendered
+    assert "route_identity" in rendered
+    assert "operator_must_confirm_derivatives_jurisdiction" in rendered
+    assert "RPC_or_quote_access_and_credentials_unknown" in rendered
+    assert "Expected normalized execution-quality fields" in rendered
+    assert "spread=best_bid,best_ask,mid_price,spread_bps" in rendered
+    assert "depth=bid_depth_usd_by_band,ask_depth_usd_by_band" in rendered
+    assert (
+        "impact=buy_price_impact_bps_by_notional,"
+        "sell_price_impact_bps_by_notional"
+    ) in rendered
+    assert "dex_additions=chain_id,block_number,pool_or_router_id" in rendered
     for venue_id in EXPECTED_VENUES:
         assert f"- {venue_id}:" in rendered
+
+
+def test_structured_report_keeps_mode_access_auth_and_quality_distinctions() -> None:
+    payload = build_execution_quality_readiness().to_dict()
+    by_id = {row["venue_id"]: row for row in payload["feasible_venues"]}
+
+    assert by_id["binance"]["execution_modes"] == ("spot", "perpetual")
+    assert by_id["coinbase_exchange"]["execution_modes"] == ("spot",)
+    assert by_id["dex_operator_selected"]["execution_modes"] == ("dex",)
+    assert by_id["binance"]["public_endpoint_expected"] is True
+    assert by_id["binance"]["credentials_required"] == ()
+    assert by_id["dex_operator_selected"]["public_endpoint_expected"] is None
+    assert by_id["dex_operator_selected"]["credentials_required"] == (
+        "provider_specific_if_required",
+    )
+    for venue in by_id.values():
+        assert venue["jurisdiction_constraints"]
+        assert venue["network_constraints"]
+        assert set(COMMON_METRICS) <= set(venue["expected_metrics"])
+    assert {
+        "spread_bps",
+        "bid_depth_usd_by_band",
+        "ask_depth_usd_by_band",
+        "buy_price_impact_bps_by_notional",
+        "sell_price_impact_bps_by_notional",
+    } <= set(payload["required_snapshot_fields"])
 
 
 def test_cli_json_is_structured_static_and_secret_free(

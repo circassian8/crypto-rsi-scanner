@@ -2,8 +2,8 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-15T12:35:37.850247+00:00`
-- public_class_count: `468`
+- generated_at: `2026-07-16T02:39:18.659740+00:00`
+- public_class_count: `471`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
 - production_classes_over_limit: `3`
@@ -100,7 +100,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1411 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1338 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1305 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
 
 ## API Implementation Cores

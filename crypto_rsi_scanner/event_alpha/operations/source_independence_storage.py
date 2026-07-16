@@ -8,7 +8,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 from time import perf_counter_ns
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 import zipfile
 import zlib
 
@@ -95,11 +95,36 @@ def analyze_namespace(
     base = Path(namespace_dir).expanduser().absolute()
     if not base.is_dir():
         raise SourceIndependenceStorageReportError("namespace_missing")
+    raw_files, references, artifacts_scanned = _scan_namespace_artifacts(base)
+    unique_references, resolved, elapsed_ns = _resolve_unique_references(
+        base,
+        references,
+    )
+    hydrated_files = _hydrate_artifact_files(raw_files, resolved)
+    source_store_items, source_store_bytes, store_blobs = _measure_store(
+        base,
+        referenced_contract_count=len(unique_references),
+    )
+    return _build_storage_report(
+        base=base,
+        raw_files=raw_files,
+        hydrated_files=hydrated_files,
+        references=references,
+        unique_reference_count=len(unique_references),
+        artifacts_scanned=artifacts_scanned,
+        elapsed_ns=elapsed_ns,
+        source_store_items=source_store_items,
+        source_store_bytes=source_store_bytes,
+        store_blobs=store_blobs,
+    )
+
+
+def _scan_namespace_artifacts(
+    base: Path,
+) -> tuple[list[tuple[str, bytes]], list[dict[str, Any]], int]:
     raw_files: list[tuple[str, bytes]] = []
-    hydrated_files: list[tuple[str, bytes]] = []
     references: list[dict[str, Any]] = []
     total_input_bytes = 0
-    artifacts_scanned = 0
     for filename in ARTIFACT_FILENAMES:
         path = base / filename
         try:
@@ -130,8 +155,17 @@ def analyze_namespace(
                     "reference_limit_exceeded"
                 )
         raw_files.append((filename, raw))
-        artifacts_scanned += 1
+    return raw_files, references, len(raw_files)
 
+
+def _resolve_unique_references(
+    base: Path,
+    references: Sequence[Mapping[str, Any]],
+) -> tuple[
+    dict[tuple[str, str], dict[str, Any]],
+    dict[tuple[str, str], dict[str, Any]],
+    int,
+]:
     unique_references: dict[tuple[str, str], dict[str, Any]] = {}
     for reference in references:
         errors = source_independence_store.validate_reference(reference)
@@ -157,6 +191,14 @@ def analyze_namespace(
     except source_independence_store.SourceIndependenceStoreError as exc:
         raise SourceIndependenceStorageReportError(str(exc)) from exc
     elapsed_ns = max(0, perf_counter_ns() - started)
+    return unique_references, resolved, elapsed_ns
+
+
+def _hydrate_artifact_files(
+    raw_files: Sequence[tuple[str, bytes]],
+    resolved: Mapping[tuple[str, str], Mapping[str, Any]],
+) -> list[tuple[str, bytes]]:
+    hydrated_files: list[tuple[str, bytes]] = []
     for filename, raw in raw_files:
         rows = market_no_send_io.parse_jsonl_bytes(raw)
         hydrated = [_hydrate_from_cache(row, resolved) for row in rows]
@@ -170,7 +212,14 @@ def analyze_namespace(
                 ).encode("utf-8"),
             )
         )
+    return hydrated_files
 
+
+def _measure_store(
+    base: Path,
+    *,
+    referenced_contract_count: int,
+) -> tuple[int, int, tuple[tuple[str, bytes], ...]]:
     store_dir = base / source_independence_store.STORE_DIRECTORY
     if store_dir.exists():
         try:
@@ -193,11 +242,26 @@ def analyze_namespace(
         source_store_items = 0
         source_store_bytes = 0
         store_blobs = ()
-    if unique_references and source_store_items == 0:
+    if referenced_contract_count and source_store_items == 0:
         raise SourceIndependenceStorageReportError("referenced_store_missing")
-    if source_store_items < len(unique_references):
+    if source_store_items < referenced_contract_count:
         raise SourceIndependenceStorageReportError("store_item_count_incomplete")
+    return source_store_items, source_store_bytes, tuple(store_blobs)
 
+
+def _build_storage_report(
+    *,
+    base: Path,
+    raw_files: Sequence[tuple[str, bytes]],
+    hydrated_files: Sequence[tuple[str, bytes]],
+    references: Sequence[Mapping[str, Any]],
+    unique_reference_count: int,
+    artifacts_scanned: int,
+    elapsed_ns: int,
+    source_store_items: int,
+    source_store_bytes: int,
+    store_blobs: Sequence[tuple[str, bytes]],
+) -> SourceIndependenceStorageReport:
     artifact_bytes = sum(len(raw) for _name, raw in raw_files)
     inline_bytes = sum(len(raw) for _name, raw in hydrated_files)
     total_with_store = artifact_bytes + source_store_bytes
@@ -207,8 +271,8 @@ def analyze_namespace(
     )
     elapsed_ms = elapsed_ns / 1_000_000.0
     reads_per_second = (
-        round(len(unique_references) / (elapsed_ns / 1_000_000_000.0), 3)
-        if elapsed_ns and unique_references
+        round(unique_reference_count / (elapsed_ns / 1_000_000_000.0), 3)
+        if elapsed_ns and unique_reference_count
         else 0.0
     )
     compressed_with_store = sum(
@@ -240,10 +304,10 @@ def analyze_namespace(
         artifact_bytes_with_references=artifact_bytes,
         inline_equivalent_artifact_bytes=inline_bytes,
         reference_occurrences=len(references),
-        unique_contracts=len(unique_references),
+        unique_contracts=unique_reference_count,
         source_store_items=source_store_items,
         source_store_bytes=source_store_bytes,
-        unreferenced_store_items=max(0, source_store_items - len(unique_references)),
+        unreferenced_store_items=max(0, source_store_items - unique_reference_count),
         total_bytes_with_store=total_with_store,
         inline_equivalent_total_bytes=inline_bytes,
         storage_reduction_bytes=reduction,

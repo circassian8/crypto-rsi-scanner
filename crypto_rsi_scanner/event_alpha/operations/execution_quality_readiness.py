@@ -122,6 +122,7 @@ class _ExecutionQualitySnapshot:
     block_number: int | None = None
     pool_or_router_id: str | None = None
     gas_estimate_native: float | None = None
+    route_identity: str | None = None
 
 
 class _ExecutionQualityReader(Protocol):
@@ -396,12 +397,26 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
 def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str:
     """Render concise operator-readable readiness without suggesting a venue."""
 
+    mode_access = {
+        "spot": (
+            "public_order_book_reads_expected_without_credentials",
+            "operator_must_confirm_venue_and_account_eligibility; no_trading_authorization_requested",
+        ),
+        "perpetual": (
+            "public_order_book_reads_expected_without_credentials",
+            "operator_must_confirm_derivatives_jurisdiction_and_account_eligibility; no_trading_authorization_requested",
+        ),
+        "dex": (
+            "RPC_or_quote_access_and_credentials_unknown_until_chain_and_provider_selection",
+            "operator_must_select_chain_tokens_pool_or_router_and_network; no_wallet_or_order_authorization_requested",
+        ),
+    }
     lines = [
         "CRYPTO DECISION RADAR EXECUTION-QUALITY READINESS",
         f"status={result.status}",
         "selected_venue=none selected_execution_mode=none",
         "supported_live_adapters=none",
-        "provider_call_planned=false provider_call_attempted=false",
+        "read_only=true provider_calls=0 provider_call_planned=false provider_call_attempted=false",
         "credentials_read=false network_called=false writes_performed=false",
         "research_only=true",
         f"operator_decision={result.operator_decision}",
@@ -411,16 +426,49 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         f"rollback_disable_command={result.rollback_disable_command}",
         f"spread_provider_status={result.spread_provider_status}",
         "",
-        "Feasible candidates (not selected or activated):",
+        "Supported instrument modes and venue options (human selection required):",
     ]
+    for mode in result.supported_interface_modes:
+        venue_ids = ",".join(
+            venue.venue_id
+            for venue in result.feasible_venues
+            if mode in venue.execution_modes
+        )
+        public_read, authorization = mode_access[mode]
+        lines.extend(
+            (
+                f"- {mode}: venues={venue_ids}",
+                f"  public_read={public_read}",
+                f"  authorization={authorization}",
+            )
+        )
+    lines.extend(
+        (
+            "",
+            "Expected normalized execution-quality fields:",
+            "- spread=best_bid,best_ask,mid_price,spread_bps",
+            "- depth=bid_depth_usd_by_band,ask_depth_usd_by_band",
+            "- impact=buy_price_impact_bps_by_notional,sell_price_impact_bps_by_notional",
+            "- freshness_and_lineage=provider_observed_at,acquired_at,freshness_status,source_url,request_lineage_id",
+            "- dex_additions=chain_id,block_number,pool_or_router_id,gas_estimate_native,route_identity",
+            "",
+            "Feasible candidates (not selected or activated):",
+        )
+    )
     for venue in result.feasible_venues:
         credentials = ",".join(venue.credentials_required) or "none_for_expected_public_market_data"
         sources = ",".join(venue.official_source_urls) or "provider_not_selected"
+        public_endpoint = (
+            "unknown"
+            if venue.public_endpoint_expected is None
+            else str(venue.public_endpoint_expected).casefold()
+        )
         lines.extend(
             (
                 f"- {venue.venue_id}: status={venue.implementation_status} "
                 f"modes={','.join(venue.execution_modes)}",
-                f"  access={venue.market_data_access} credentials={credentials}",
+                f"  access={venue.market_data_access} public_endpoint_expected={public_endpoint} "
+                f"read_credentials={credentials}",
                 f"  limits={';'.join(venue.request_limits)}",
                 f"  metrics={','.join(venue.expected_metrics)}",
                 f"  prerequisites={','.join(venue.required_operator_inputs)}",

@@ -18,6 +18,12 @@ EVENT_FIXTURE_NOW ?= 2026-06-15T16:00:00Z
 EVENT_RESEARCH_NOW ?=
 EVENT_FIXTURE_NOW_ENV = RSI_EVENT_RESEARCH_NOW=$(EVENT_FIXTURE_NOW)
 EVENT_RESEARCH_NOW_ENV = $(if $(strip $(EVENT_RESEARCH_NOW)),RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW),)
+SOURCE_INDEPENDENCE_OOS_INPUT ?=
+SOURCE_INDEPENDENCE_OOS_CORPUS ?=
+SOURCE_INDEPENDENCE_OOS_TEMPLATE ?=
+SOURCE_INDEPENDENCE_OOS_REVIEWS ?=
+SOURCE_INDEPENDENCE_OOS_SPLIT_SALT ?=
+SOURCE_INDEPENDENCE_OOS_SPLIT_VERSION ?= source_independence_oos_split_v3
 EVENT_FADE_SAMPLE_OUT ?= /tmp/event_fade_validation_sample.jsonl
 EVENT_FADE_SAMPLE_IN ?= $(EVENT_FADE_SAMPLE_OUT)
 EVENT_FADE_SAMPLE_FRESH ?= $(EVENT_FADE_SAMPLE_OUT)
@@ -83,6 +89,9 @@ EVENT_ALPHA_INTEGRATED_RADAR_COINALYZE_ARG = $(if $(strip $(EVENT_ALPHA_INTEGRAT
 # --event-alpha-integrated-radar-load-existing
 EVENT_CATALYST_SEARCH_FIXTURE_PATH ?=
 EVENT_ALPHA_ARTIFACT_BASE_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)
+ifndef EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE
+EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE := event_alpha_evidence_validation_$(shell date -u +%Y%m%dt%H%M%Sz)_$(shell od -An -N4 -tx1 /dev/urandom | tr -d ' \n')
+endif
 RADAR_DASHBOARD_EXPLICIT_NAMESPACE := $(if $(filter command line environment override,$(origin ARTIFACT_NAMESPACE)),$(ARTIFACT_NAMESPACE),)
 ARTIFACT_NAMESPACE ?= $(PROFILE)
 EVENT_ALPHA_ARTIFACT_NAMESPACE ?= $(ARTIFACT_NAMESPACE)
@@ -248,11 +257,17 @@ help:
 	@echo "  make event-llm-eval  Run offline LLM shadow eval fixtures"
 	@echo "  make event-llm-extract-eval  Run offline LLM raw-extraction eval fixtures"
 	@echo "  make event-alpha-eval  Run offline Event Alpha route/feedback eval fixtures"
+	@echo "  make event-alpha-source-independence-oos-export  Export frozen development/review/test labels; no providers or threshold/routing changes"
+	@echo "  make event-alpha-source-independence-oos-validate  Read-only reviewed-label/provenance validation; no providers"
+	@echo "  make event-alpha-source-independence-oos-report  Read-only split metrics; no providers or threshold/routing changes"
+	@echo "  make event-alpha-source-independence-storage-report ARTIFACT_NAMESPACE=...  Measure reference/store/export bytes read-only"
 	@echo "  make event-alpha-catalyst-frame-validation-cycle  Run offline LLM catalyst-frame validation fixtures"
 	@echo "  make event-alpha-catalyst-frame-e2e-cycle  Run isolated AAVE/Kraken catalyst-frame e2e artifacts"
 	@echo "  make event-alpha-notify-llm-quality-frame-smoke  Run notify_llm_quality-style fixture frame smoke, no sends"
 	@echo "  make event-alpha-market-refresh-smoke  Run targeted market-refresh fixture proof cycle, no sends"
 	@echo "  make event-alpha-evidence-acquisition-smoke  Run source-pack evidence acquisition fixture proof, no sends"
+	@echo "  make event-alpha-evidence-cycle-readiness PROFILE=notify_llm_quality ARTIFACT_NAMESPACE=...  Inspect evidence plans/provider fan-out with no calls or writes"
+	@echo "  CONFIRM=1 make event-alpha-evidence-validation-cycle PROFILE=notify_llm_quality EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE=...  Guarded unique-namespace no-send cycle; requires exact readiness and existing authorization"
 	@echo "  make event-alpha-frame-quality-loop PROFILE=catalyst_frame_e2e  Run the full frame-quality artifact loop, no sends"
 	@echo "  make event-alpha-signal-quality-eval  Run curated Event Alpha signal-quality benchmark fixtures"
 	@echo "  make event-alpha-quality-review PROFILE=notify_llm  Review latest signal-quality artifact distribution"
@@ -803,6 +818,38 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
+.PHONY: event-alpha-source-independence-oos-export event-alpha-source-independence-oos-validate event-alpha-source-independence-oos-report event-alpha-source-independence-storage-report
+
+event-alpha-source-independence-storage-report:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.source_independence_storage \
+		--namespace-dir "$(EVENT_ALPHA_PROFILE_DIR)"
+
+event-alpha-source-independence-oos-export:
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_INPUT)" || { echo "SOURCE_INDEPENDENCE_OOS_INPUT is required" >&2; exit 2; }
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_CORPUS)" || { echo "SOURCE_INDEPENDENCE_OOS_CORPUS is required" >&2; exit 2; }
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_TEMPLATE)" || { echo "SOURCE_INDEPENDENCE_OOS_TEMPLATE is required" >&2; exit 2; }
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_SPLIT_SALT)" || { echo "SOURCE_INDEPENDENCE_OOS_SPLIT_SALT is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.source_independence_oos export \
+		--input "$(SOURCE_INDEPENDENCE_OOS_INPUT)" \
+		--corpus-out "$(SOURCE_INDEPENDENCE_OOS_CORPUS)" \
+		--template-out "$(SOURCE_INDEPENDENCE_OOS_TEMPLATE)" \
+		--split-salt "$(SOURCE_INDEPENDENCE_OOS_SPLIT_SALT)" \
+		--split-version "$(SOURCE_INDEPENDENCE_OOS_SPLIT_VERSION)"
+
+event-alpha-source-independence-oos-validate:
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_CORPUS)" || { echo "SOURCE_INDEPENDENCE_OOS_CORPUS is required" >&2; exit 2; }
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_REVIEWS)" || { echo "SOURCE_INDEPENDENCE_OOS_REVIEWS is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.source_independence_oos validate \
+		--corpus "$(SOURCE_INDEPENDENCE_OOS_CORPUS)" \
+		--reviews "$(SOURCE_INDEPENDENCE_OOS_REVIEWS)"
+
+event-alpha-source-independence-oos-report:
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_CORPUS)" || { echo "SOURCE_INDEPENDENCE_OOS_CORPUS is required" >&2; exit 2; }
+	@test -n "$(SOURCE_INDEPENDENCE_OOS_REVIEWS)" || { echo "SOURCE_INDEPENDENCE_OOS_REVIEWS is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.source_independence_oos report \
+		--corpus "$(SOURCE_INDEPENDENCE_OOS_CORPUS)" \
+		--reviews "$(SOURCE_INDEPENDENCE_OOS_REVIEWS)"
+
 event-alpha-catalyst-frame-validation-cycle: PROFILE = catalyst_frame_validation
 event-alpha-catalyst-frame-validation-cycle:
 	rm -rf event_fade_cache/$(PROFILE)
@@ -1260,16 +1307,14 @@ radar-calendar-official-acquire:
 		--output-base $(OFFICIAL_MACRO_OUTPUT_BASE)
 
 radar-calendar-official-import-local:
-	@test -n "$(strip $(FED_FOMC_HTML))" || { echo "FED_FOMC_HTML is required" >&2; exit 2; }
-	@test -n "$(strip $(BLS_CALENDAR_ICS))" || { echo "BLS_CALENDAR_ICS is required" >&2; exit 2; }
-	@test -n "$(strip $(BEA_RELEASE_DATES_JSON))" || { echo "BEA_RELEASE_DATES_JSON is required" >&2; exit 2; }
+	@test -n "$(strip $(FED_FOMC_HTML)$(BLS_CALENDAR_ICS)$(BEA_RELEASE_DATES_JSON))" || { echo "At least one of FED_FOMC_HTML, BLS_CALENDAR_ICS, or BEA_RELEASE_DATES_JSON is required" >&2; exit 2; }
 	@test -n "$(strip $(OFFICIAL_MACRO_OBSERVED_AT))" || { echo "OFFICIAL_MACRO_OBSERVED_AT is required" >&2; exit 2; }
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.official_macro_calendar import-local \
 		--output-base $(OFFICIAL_MACRO_OUTPUT_BASE) \
 		--observed-at "$(OFFICIAL_MACRO_OBSERVED_AT)" \
-		--federal-reserve-html "$(FED_FOMC_HTML)" \
-		--bls-ics "$(BLS_CALENDAR_ICS)" \
-		--bea-json "$(BEA_RELEASE_DATES_JSON)"
+		$(if $(strip $(FED_FOMC_HTML)),--federal-reserve-html "$(FED_FOMC_HTML)",) \
+		$(if $(strip $(BLS_CALENDAR_ICS)),--bls-ics "$(BLS_CALENDAR_ICS)",) \
+		$(if $(strip $(BEA_RELEASE_DATES_JSON)),--bea-json "$(BEA_RELEASE_DATES_JSON)",)
 
 radar-execution-quality-readiness:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness
@@ -1400,6 +1445,61 @@ event-alpha-evidence-acquisition-smoke:
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	test -s event_fade_cache/$(PROFILE)/event_evidence_acquisition.jsonl
 	@echo "Evidence-acquisition smoke artifacts under event_fade_cache/$(PROFILE)/."
+
+.PHONY: event-alpha-evidence-cycle-readiness event-alpha-evidence-validation-cycle
+event-alpha-evidence-cycle-readiness: PROFILE = notify_llm_quality
+event-alpha-evidence-cycle-readiness:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.evidence_cycle_readiness \
+		--profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--artifact-base-dir $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--artifact-namespace $(ARTIFACT_NAMESPACE)
+
+event-alpha-evidence-validation-cycle: PROFILE = notify_llm_quality
+event-alpha-evidence-validation-cycle:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.evidence_cycle_readiness \
+		--profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--artifact-base-dir $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--artifact-namespace $(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+		--require-cycle-ready
+	@test "$(CONFIRM)" = "1" || { echo "CONFIRM=1 is required after readiness passes; no provider call was attempted" >&2; exit 2; }
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) main.py --event-alpha-cycle \
+		--event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--event-alpha-artifact-namespace $(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE)
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) main.py --event-alpha-source-coverage-report \
+		--event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--event-alpha-artifact-namespace $(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE)
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) main.py --event-alpha-daily-brief \
+		--event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--event-alpha-artifact-namespace $(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE)
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) main.py --event-alpha-notify-preview-from-artifacts \
+		--event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--event-alpha-artifact-namespace $(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE)
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) main.py --event-alpha-artifact-doctor \
+		--event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) \
+		--event-alpha-artifact-namespace $(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE) \
+		--event-alpha-artifact-doctor-strict
+	@echo "Evidence validation completed in $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_EVIDENCE_VALIDATION_NAMESPACE); no send flag was used."
 
 event-alpha-quality-frame-live-smoke: PROFILE = notify_llm_quality
 event-alpha-quality-frame-live-smoke: NAMESPACE = notify_llm_quality_frame_live_smoke
