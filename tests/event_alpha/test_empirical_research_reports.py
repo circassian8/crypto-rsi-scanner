@@ -479,6 +479,76 @@ def test_builds_exact_closed_deterministic_seven_file_bundle(tmp_path: Path) -> 
     assert empirical_research_reports.validate_report_bundle(first)["bundle_id"] == bundle_id
 
 
+def test_policy_chain_distinguishes_raw_idea_days_from_episode_active_days(
+    tmp_path: Path,
+) -> None:
+    selection_path, _ = _write_runs(tmp_path)
+    loaded = empirical_research_reports._load_run(
+        selection_path,
+        required=empirical_research_reports._SELECTION_ARTIFACTS,
+    )
+    values = deepcopy(loaded.values)
+    values["replay_trace_summary.json"]["idea_observed_day_count"] = 1
+    evidence = empirical_research_reports._RunEvidence(
+        loaded.manifest,
+        loaded.payloads,
+        values,
+        loaded.binding,
+    )
+
+    empirical_research_reports._validate_selection_policy_artifacts(
+        evidence,
+        values["shadow_policy_simulation.json"],
+    )
+
+    values["shadow_policy_simulation.json"]["idea_active_day_count"] = 1
+    values["walk_forward.json"]["idea_active_day_count"] = 1
+    with pytest.raises(ValueError, match="selection policy artifact mismatch"):
+        empirical_research_reports._validate_selection_policy_artifacts(
+            evidence,
+            values["shadow_policy_simulation.json"],
+        )
+
+
+def test_confirmation_distinguishes_raw_idea_days_from_episode_active_days(
+    tmp_path: Path,
+) -> None:
+    selection_path, final_path = _write_runs(tmp_path)
+    selection = empirical_research_reports._load_run(
+        selection_path,
+        required=empirical_research_reports._SELECTION_ARTIFACTS,
+    )
+    final = empirical_research_reports._load_run(
+        final_path,
+        required=empirical_research_reports._FINAL_ARTIFACTS,
+    )
+    values = deepcopy(final.values)
+    values["replay_trace_summary.json"]["idea_observed_day_count"] = 1
+    evidence = empirical_research_reports._RunEvidence(
+        final.manifest,
+        final.payloads,
+        values,
+        final.binding,
+    )
+    seal = selection.values["recommendation_seal.json"]
+
+    empirical_research_reports._validate_confirmation(
+        values["final_test_confirmation.json"],
+        seal,
+        selection,
+        evidence,
+    )
+
+    values["final_test_confirmation.json"]["idea_active_day_count"] = 1
+    with pytest.raises(ValueError, match="final confirmation binding invalid"):
+        empirical_research_reports._validate_confirmation(
+            values["final_test_confirmation.json"],
+            seal,
+            selection,
+            evidence,
+        )
+
+
 def test_validator_rejects_core_tamper_envelope_splice_and_markdown_drift(
     tmp_path: Path,
 ) -> None:

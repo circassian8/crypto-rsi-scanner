@@ -1760,7 +1760,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-16T07:10:55.124229+00:00",
+  "generated_at": "2026-07-16T07:32:54.158823+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1808,6 +1808,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1424,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1411,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
@@ -1834,12 +1840,6 @@
       "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1377,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "source_kind": "production"
     },
     {
@@ -2212,6 +2212,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 981,
+      "path": "tests/event_alpha/test_empirical_research_reports.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 979,
       "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
       "source_kind": "test"
@@ -2226,12 +2232,6 @@
       "limit": 1500,
       "line_count": 918,
       "path": "tests/event_alpha/test_evidence_quality.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 911,
-      "path": "tests/event_alpha/test_empirical_research_reports.py",
       "source_kind": "test"
     },
     {
@@ -3748,6 +3748,13 @@
       "status": "accepted_near_threshold"
     },
     {
+      "line_count": 1424,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1411,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3778,13 +3785,6 @@
     {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1377,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3919,6 +3919,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1424,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1411,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
@@ -3945,12 +3951,6 @@
       "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1377,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "source_kind": "production"
     },
     {
@@ -4232,6 +4232,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1424,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1410,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
       "source_kind": "production"
@@ -4240,12 +4246,6 @@
       "limit": 1500,
       "line_count": 1389,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1377,
-      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "source_kind": "production"
     },
     {
@@ -4391,6 +4391,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1424,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1411,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
@@ -4413,11 +4418,6 @@
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1377,
-        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
         "threshold": 1200
       },
       {

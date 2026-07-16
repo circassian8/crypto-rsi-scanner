@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Supersede the first full replay after trace-integrity audit · Codex
+**Why:** The first top-100 selection and sealed holdout were internally coherent
+for decisions and outcomes, but an independent audit found a contradiction in
+their diagnostic trace summary: rejected projection counts were aggregated
+across chunks while their error-code histogram retained only the first chunk.
+**Changes:**
+- Preserved immutable selection `f39e3b9ed1f3...`, holdout `5e19691fc3f6...`,
+  and report bundle `c0223426c157...` as superseded audit evidence; none is a
+  current empirical-report authority and no production conclusion was applied.
+- Added exact cross-chunk aggregation for bounded projection-validation error
+  codes, including a regression whose invalid code appears only in a later
+  chunk. The unchanged frozen protocol and scenario set remain the only inputs
+  permitted for the replacement selection and holdout audit.
+- Fixed the report validator's first real-data integration defect: canonical
+  idea-active days and episode-representative active days are different units.
+  They now reconcile exactly to the replay trace and matching partition
+  analyses instead of being incorrectly forced equal.
+**Verify:** 34 focused replay/report tests passed, including later-chunk code
+aggregation and distinct-unit reconciliation. The independent audit otherwise
+verified manifest hashes, partition isolation, outcome signs/units, controls,
+missed-move population closure, fold purges, exact selected-day digests, seal
+recomputation, and all-zero safety counters.
+**Notes/risks:** Replacement full and final-test audit runs are required before
+publishing final reports. Final data cannot nominate or tune a scenario; the
+candidate set remains frozen and empty. The mechanical trace repair does not
+change Decision v2 evaluation, ideas, outcomes, or production policy.
+
 ## 2026-07-16 — Close pre-holdout empirical truth and survivability · Codex
 **Why:** The first corrected medium replay still exposed outcome-tail leakage,
 an active-day-only operator-burden denominator, partial missed-move accounting,

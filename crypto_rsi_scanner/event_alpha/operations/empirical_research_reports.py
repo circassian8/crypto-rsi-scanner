@@ -313,6 +313,7 @@ def _validate_selection_policy_artifacts(
 ) -> None:
     walk = selection.values["walk_forward.json"]
     trace = selection.values["replay_trace_summary.json"]
+    analyses = selection.values["replay_analysis.json"]
     protocol = empirical_validation_protocol.protocol_values()
     scenario_names = [
         str(row.get("scenario") or "")
@@ -324,6 +325,19 @@ def _validate_selection_policy_artifacts(
         for row in simulation.get("frozen_scenarios", [])
         if isinstance(row, Mapping)
     ]
+    analysis_partitions = analyses.get("partitions")
+    analysis_active_day_count = 0
+    if not isinstance(analysis_partitions, Mapping):
+        raise ValueError("empirical selection policy artifact mismatch")
+    for partition in ("development", "validation"):
+        analysis = analysis_partitions.get(partition)
+        burden = analysis.get("operator_burden") if isinstance(analysis, Mapping) else None
+        active_days = burden.get("idea_active_day_count") if isinstance(burden, Mapping) else None
+        if not isinstance(active_days, int) or isinstance(active_days, bool) or active_days < 0:
+            raise ValueError("empirical selection policy artifact mismatch")
+        analysis_active_day_count += active_days
+    simulation_active_days = simulation.get("idea_active_day_count")
+    trace_active_days = trace.get("idea_observed_day_count")
     if (
         simulation.get("schema_id") != empirical_policy_lab.SCHEMA_ID
         or simulation.get("schema_version") != empirical_policy_lab.SCHEMA_VERSION
@@ -332,7 +346,13 @@ def _validate_selection_policy_artifacts(
         or simulation.get("episode_representatives") != selection.manifest["metrics"]["episode_count"]
         or simulation.get("selected_observation_day_count")
         != trace.get("selected_partition_observed_day_count")
-        or simulation.get("idea_active_day_count") != trace.get("idea_observed_day_count")
+        or not isinstance(simulation_active_days, int)
+        or isinstance(simulation_active_days, bool)
+        or simulation_active_days != analysis_active_day_count
+        or not isinstance(trace_active_days, int)
+        or isinstance(trace_active_days, bool)
+        or trace_active_days < simulation_active_days
+        or trace_active_days > simulation.get("selected_observation_day_count", -1)
         or simulation.get("observed_day_denominator_basis")
         != trace.get("selected_partition_observed_day_basis")
         or scenario_names != frozen_names
@@ -384,6 +404,25 @@ def _validate_confirmation(
     evaluated_names = [str(row.get("scenario") or "") for row in scenario_rows]
     expected_evaluated = ["production_policy", *candidate_names]
     trace = final.values["replay_trace_summary.json"]
+    analyses = final.values["replay_analysis.json"]
+    analysis_partitions = analyses.get("partitions")
+    final_analysis = (
+        analysis_partitions.get("final_test")
+        if isinstance(analysis_partitions, Mapping)
+        else None
+    )
+    final_burden = (
+        final_analysis.get("operator_burden")
+        if isinstance(final_analysis, Mapping)
+        else None
+    )
+    analysis_active_days = (
+        final_burden.get("idea_active_day_count")
+        if isinstance(final_burden, Mapping)
+        else None
+    )
+    confirmation_active_days = value.get("idea_active_day_count")
+    trace_active_days = trace.get("idea_observed_day_count")
     protocol = empirical_validation_protocol.protocol_values()
     if (
         value.get("schema_id") != "decision_radar.empirical_final_test_confirmation"
@@ -411,7 +450,15 @@ def _validate_confirmation(
         != seal.get("final_test_confirmation_rule_sha256")
         or value.get("selected_observation_day_count")
         != trace.get("selected_partition_observed_day_count")
-        or value.get("idea_active_day_count") != trace.get("idea_observed_day_count")
+        or not isinstance(analysis_active_days, int)
+        or isinstance(analysis_active_days, bool)
+        or not isinstance(confirmation_active_days, int)
+        or isinstance(confirmation_active_days, bool)
+        or confirmation_active_days != analysis_active_days
+        or not isinstance(trace_active_days, int)
+        or isinstance(trace_active_days, bool)
+        or trace_active_days < confirmation_active_days
+        or trace_active_days > value.get("selected_observation_day_count", -1)
         or value.get("observed_day_denominator_basis")
         != trace.get("selected_partition_observed_day_basis")
         or value.get("selected_observation_days_sha256")

@@ -513,6 +513,7 @@ def _run_kernel_chunked(
     control_traces: list[dict[str, Any]] = []
     status_counts: Counter[str] = Counter()
     failure_counts: Counter[str] = Counter()
+    projection_error_counts: Counter[str] = Counter()
     route_counts: Counter[str] = Counter()
     partition_counts: Counter[str] = Counter()
     selected_observation_days: set[str] = set()
@@ -544,6 +545,9 @@ def _run_kernel_chunked(
         operator_visible += result.trace_summary["operator_visible_idea_count"]
         status_counts.update(result.trace_summary["trace_status_counts"])
         failure_counts.update(result.trace_summary["failure_stage_counts"])
+        projection_error_counts.update(
+            result.trace_summary["projection_validation_error_code_counts"]
+        )
         route_counts.update(result.trace_summary["route_counts"])
         partition_counts.update(result.trace_summary["partition_counts"])
         ideas.extend(dict(row) for row in result.ideas)
@@ -606,6 +610,9 @@ def _run_kernel_chunked(
         "operator_visible_idea_count": operator_visible,
         "trace_status_counts": dict(sorted(status_counts.items())),
         "failure_stage_counts": dict(sorted(failure_counts.items())),
+        "projection_validation_error_code_counts": dict(
+            sorted(projection_error_counts.items())
+        ),
         "route_counts": dict(sorted(route_counts.items())),
         "route_counting_unit": "canonical_idea_rows",
         "partition_counts": dict(sorted(partition_counts.items())),

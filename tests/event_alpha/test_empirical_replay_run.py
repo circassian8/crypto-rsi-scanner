@@ -372,6 +372,77 @@ def test_replay_fingerprint_covers_behavior_bearing_dependency_closure() -> None
     assert all(path.is_file() and not path.is_symlink() for path in paths.values())
 
 
+def test_chunked_kernel_aggregates_projection_error_codes_from_later_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_kernel(observations, **_kwargs):
+        nonlocal calls
+        row = dict(tuple(observations)[0])
+        calls += 1
+        errors = {"return_percent_implausible": 1} if calls == 2 else {}
+        trace = {
+            "canonical_asset_id": row["canonical_asset_id"],
+            "symbol": row["symbol"],
+            "observed_at": row["observed_at"],
+            "partition": "development",
+            "failure_stage": "canonical_projection_invalid",
+            "projection_validation_error_codes": list(errors),
+        }
+        return empirical_replay_run.empirical_replay_core.ReplayKernelResult(
+            ideas=(),
+            trace_rows=(trace,),
+            trace_summary={
+                "observation_count": 1,
+                "operator_visible_idea_count": 0,
+                "trace_status_counts": {"rejected": 1},
+                "failure_stage_counts": {"canonical_projection_invalid": 1},
+                "projection_validation_error_code_counts": errors,
+                "route_counts": {},
+                "partition_counts": {},
+                "research_only": True,
+                "auto_apply": False,
+            },
+        )
+
+    monkeypatch.setattr(empirical_replay_run, "CHUNK_SIZE", 1)
+    monkeypatch.setattr(
+        empirical_replay_run.empirical_replay_core,
+        "run_replay_kernel",
+        fake_kernel,
+    )
+    observations = [
+        {
+            "canonical_asset_id": "asset:a",
+            "symbol": "AAAUSDT",
+            "observed_at": "2022-01-01T00:00:00Z",
+        },
+        {
+            "canonical_asset_id": "asset:b",
+            "symbol": "BBBUSDT",
+            "observed_at": "2022-01-02T00:00:00Z",
+        },
+    ]
+
+    _ideas, summary, _examples, _observations, _traces = (
+        empirical_replay_run._run_kernel_chunked(
+            observations,
+            mode="medium",
+            artifact_namespace="chunked-projection-errors",
+            allowed_partitions=("development",),
+            protocol=empirical_validation_protocol.protocol_values(),
+        )
+    )
+
+    assert summary["failure_stage_counts"] == {
+        "canonical_projection_invalid": 2
+    }
+    assert summary["projection_validation_error_code_counts"] == {
+        "return_percent_implausible": 1
+    }
+
+
 def test_non_final_mode_rejects_seal_before_input_access(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="only for final_test"):
         execute_empirical_replay(

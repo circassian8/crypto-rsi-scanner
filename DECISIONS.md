@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Keep Decision Radar production policy unchanged after protocol-v1 validation
+**Status:** accepted
+**Decision:** Apply none of the nine frozen shadow-policy changes evaluated by
+Decision Radar empirical-validation protocol v1. The full top-100 development
+and validation selection found every material scenario `not_supported`; the
+pre-frozen final-test candidate set was therefore empty. The final-test lane may
+only report `no_candidate_recommendations`, not perform a post-hoc policy
+search. An initial selection/holdout pair with a trace-histogram aggregation
+defect is retained but superseded; its results cannot tune the unchanged
+replacement run. Thresholds, routes, dashboard authority, notifications,
+execution, and provider authorization remain unchanged.
+**Why:** The complete selection run produced useful descriptive evidence for
+market-led `dashboard_watch`, `risk_watch`, and `diagnostic` ideas, but no frozen
+policy scenario satisfied the multi-metric selection rule. Five routes and six
+primary origins still have zero empirical episodes, historical spread and
+intraday execution are unavailable, and live no-send evidence remains an
+insufficient-sample observational lane. A policy change would exceed the
+evidence and violate the frozen holdout contract.
+**Revisit when:** A new protocol version is frozen before accessing its holdout
+and adds genuinely independent evidence, especially observed execution quality,
+intraday timing, and point-in-time catalyst/calendar/derivatives/on-chain data.
+Any later change still requires a separate explicit human decision.
+
 ## 2026-07-16 - Quarantine partition tails before opening the empirical holdout
 **Status:** accepted
 **Decision:** Treat each partition's maximum 14-day outcome tail as an
