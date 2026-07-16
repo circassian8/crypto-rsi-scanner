@@ -43,6 +43,10 @@ _SECRET_MARKER = re.compile(
     re.IGNORECASE,
 )
 
+_OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+_STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
+_STAT_SUPPORTS_FOLLOW_SYMLINKS = os.stat in os.supports_follow_symlinks
+
 _FORBIDDEN_COUNTERS = (
     "provider_calls",
     "authorization_mutations",
@@ -230,11 +234,15 @@ def append_feedback_event(
         flags = (
             os.O_RDWR
             | os.O_APPEND
-            | os.O_CREAT
             | getattr(os, "O_CLOEXEC", 0)
             | _required_flag("O_NOFOLLOW")
         )
-        descriptor = os.open(path.name, flags, 0o600, dir_fd=parent_fd)
+        if before is None:
+            flags |= os.O_CREAT | os.O_EXCL
+        try:
+            descriptor = os.open(path.name, flags, 0o600, dir_fd=parent_fd)
+        except OSError as exc:
+            raise RuntimeError("empirical_feedback_ledger_unsafe") from exc
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode) or (
             before is not None and _identity(before) != _identity(opened)
@@ -242,6 +250,9 @@ def append_feedback_event(
             raise RuntimeError("empirical_feedback_ledger_unsafe")
         fcntl.flock(descriptor, fcntl.LOCK_EX)
         payload = _read_descriptor(descriptor)
+        read_complete = os.fstat(descriptor)
+        if not _same_snapshot(opened, read_complete):
+            raise RuntimeError("empirical_feedback_ledger_identity_drift")
         rows, row_payloads = _parse_ledger(payload, queue)
         event_id = str(event["label_event_id"])
         if event_id in row_payloads:
@@ -288,14 +299,21 @@ def read_feedback_ledger(
         if not stat.S_ISREG(before.st_mode):
             raise RuntimeError("empirical_feedback_ledger_unsafe")
         flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | _required_flag("O_NOFOLLOW")
-        descriptor = os.open(path.name, flags, dir_fd=parent_fd)
+        try:
+            descriptor = os.open(path.name, flags, dir_fd=parent_fd)
+        except OSError as exc:
+            raise RuntimeError("empirical_feedback_ledger_unsafe") from exc
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode) or _identity(before) != _identity(opened):
             raise RuntimeError("empirical_feedback_ledger_unsafe")
         payload = _read_descriptor(descriptor)
         after = os.fstat(descriptor)
         named = _entry_stat(parent_fd, path.name)
-        if named is None or _identity(named) != _identity(after):
+        if (
+            not _same_snapshot(opened, after)
+            or named is None
+            or not _same_snapshot(after, named)
+        ):
             raise RuntimeError("empirical_feedback_ledger_identity_drift")
         rows, _payloads = _parse_ledger(payload, queue)
         return tuple(rows)
@@ -501,25 +519,67 @@ def _ledger_path(value: str | Path) -> Path:
     path = Path(value).expanduser().absolute()
     if not _SAFE_FILENAME.fullmatch(path.name):
         raise ValueError("empirical feedback ledger filename invalid")
-    if not path.parent.exists():
-        raise ValueError("empirical feedback ledger parent missing")
     return path
 
 
 def _open_parent(path: Path) -> int:
+    _require_descriptor_path_support()
+    value = Path(path).expanduser().absolute()
+    if (
+        not value.is_absolute()
+        or not value.anchor
+        or any(part in {"", ".", ".."} for part in value.parts[1:])
+    ):
+        raise RuntimeError("empirical_feedback_ledger_parent_unsafe")
     flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
         | _required_flag("O_DIRECTORY")
         | _required_flag("O_NOFOLLOW")
     )
+    descriptor: int | None = None
     try:
-        descriptor = os.open(path, flags)
+        root_before = os.stat(value.anchor, follow_symlinks=False)
+        if not stat.S_ISDIR(root_before.st_mode):
+            raise OSError("feedback filesystem root is not a directory")
+        descriptor = os.open(value.anchor, flags)
+        root_opened = os.fstat(descriptor)
+        if not stat.S_ISDIR(root_opened.st_mode) or not _same_identity(
+            root_before, root_opened
+        ):
+            raise OSError("feedback filesystem root changed while opening")
+        for component in value.parts[1:]:
+            before = os.stat(
+                component,
+                dir_fd=descriptor,
+                follow_symlinks=False,
+            )
+            if not stat.S_ISDIR(before.st_mode):
+                raise OSError("feedback parent component is not a directory")
+            next_descriptor = os.open(component, flags, dir_fd=descriptor)
+            try:
+                opened = os.fstat(next_descriptor)
+                named = os.stat(
+                    component,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISDIR(opened.st_mode)
+                    or not _same_identity(before, opened)
+                    or not _same_identity(opened, named)
+                ):
+                    raise OSError("feedback parent component changed while opening")
+            except BaseException:
+                os.close(next_descriptor)
+                raise
+            os.close(descriptor)
+            descriptor = next_descriptor
     except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
         raise RuntimeError("empirical_feedback_ledger_parent_unsafe") from exc
-    opened = os.fstat(descriptor)
-    if not stat.S_ISDIR(opened.st_mode):
-        os.close(descriptor)
+    if descriptor is None:
         raise RuntimeError("empirical_feedback_ledger_parent_unsafe")
     return descriptor
 
@@ -556,6 +616,30 @@ def _write_all(descriptor: int, payload: bytes) -> None:
 
 def _identity(value: os.stat_result) -> tuple[int, int]:
     return value.st_dev, value.st_ino
+
+
+def _same_identity(left: os.stat_result, right: os.stat_result) -> bool:
+    return _identity(left) == _identity(right)
+
+
+def _same_snapshot(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        _same_identity(left, right)
+        and left.st_size == right.st_size
+        and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
+    )
+
+
+def _require_descriptor_path_support() -> None:
+    if not (
+        _OPEN_SUPPORTS_DIR_FD
+        and _STAT_SUPPORTS_DIR_FD
+        and _STAT_SUPPORTS_FOLLOW_SYMLINKS
+        and hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+    ):
+        raise RuntimeError("empirical_feedback_descriptor_features_unavailable")
 
 
 def _required_flag(name: str) -> int:

@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Harden empirical replay and feedback paths portably · Codex
+**Why:** Full-path `O_NOFOLLOW` protected only a final leaf, so a replay input
+root/intermediate symlink could still be followed; a missing feedback ledger
+could also race to a symlink between inspection and `O_CREAT`.
+**Changes:**
+- Made replay input directories and feedback-ledger parents walk every absolute
+  component through descriptor-relative no-follow stat/open/fstat checks, bind
+  device/inode identity before and after each open, reject wrong types and
+  symlinks, and fail closed when the required platform features are absent.
+- Bound replay leaves to pre-open, opened, post-read, and still-named snapshots
+  so symlink, regular-file, and during-read replacement cannot substitute bytes.
+- Made new feedback-ledger creation exclusive and bound existing ledger reads
+  and appends to the opened leaf snapshot.
+- Added portable regressions for ordinary paths, root/intermediate/final
+  symlinks, directory and file swaps, outside-root redirection, feedback parent
+  replacement, a missing-leaf symlink race, and unsupported descriptor APIs.
+**Verify:** The new security file plus existing replay-data and feedback tests
+passed 31/31 under the locked runtime; the full empirical test family passed
+203 tests in 20.82s. Focused compileall and `git diff --check` passed.
+**Notes/risks:** Unsupported platforms now fail explicitly instead of skipping
+the security boundary. Protocol-v1 runs, reports, production policy, provider
+state, notifications, execution, and dashboard authority were not changed.
+
 ## 2026-07-16 — Complete Empirical Validation Lab v1 release · Codex
 **Why:** The empirical lab was not complete until the locked runtime, security
 boundary, dashboard surface, artifact-heavy checkout, broad package gate, and

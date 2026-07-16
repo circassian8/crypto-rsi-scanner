@@ -96,6 +96,11 @@ REPLAY_DATA_MODE_CONFIGS: Mapping[str, ReplayDataModeConfig] = {
     ),
 }
 
+_OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+_STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
+_STAT_SUPPORTS_FOLLOW_SYMLINKS = os.stat in os.supports_follow_symlinks
+_LISTDIR_SUPPORTS_FD = os.listdir in os.supports_fd
+
 
 def replay_data_mode_config(mode: str) -> ReplayDataModeConfig:
     """Return the frozen smoke/medium/full configuration, failing on aliases."""
@@ -435,15 +440,64 @@ def iter_point_in_time_observations(
 
 def _open_directory(path: str | Path) -> int:
     value = Path(path).expanduser()
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    value = value.absolute()
+    _require_descriptor_path_support()
+    if (
+        not value.is_absolute()
+        or not value.anchor
+        or any(part in {"", ".", ".."} for part in value.parts[1:])
+    ):
+        raise ReplayDataError("input_directory_unavailable_or_unsafe")
+    flags = (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptor: int | None = None
     try:
-        descriptor = os.open(value, flags)
+        root_before = os.stat(value.anchor, follow_symlinks=False)
+        if not stat.S_ISDIR(root_before.st_mode):
+            raise OSError("input filesystem root is not a directory")
+        descriptor = os.open(value.anchor, flags)
+        root_opened = os.fstat(descriptor)
+        if not stat.S_ISDIR(root_opened.st_mode) or not _same_identity(
+            root_before, root_opened
+        ):
+            raise OSError("input filesystem root changed while opening")
+        for component in value.parts[1:]:
+            before = os.stat(
+                component,
+                dir_fd=descriptor,
+                follow_symlinks=False,
+            )
+            if not stat.S_ISDIR(before.st_mode):
+                raise OSError("input path component is not a directory")
+            next_descriptor = os.open(component, flags, dir_fd=descriptor)
+            try:
+                opened = os.fstat(next_descriptor)
+                named = os.stat(
+                    component,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISDIR(opened.st_mode)
+                    or not _same_identity(before, opened)
+                    or not _same_identity(opened, named)
+                ):
+                    raise OSError("input path component changed while opening")
+            except BaseException:
+                os.close(next_descriptor)
+                raise
+            os.close(descriptor)
+            descriptor = next_descriptor
     except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
         raise ReplayDataError("input_directory_unavailable_or_unsafe") from exc
-    file_stat = os.fstat(descriptor)
-    if not stat.S_ISDIR(file_stat.st_mode):
-        os.close(descriptor)
-        raise ReplayDataError("input_path_not_directory")
+    if descriptor is None:
+        raise ReplayDataError("input_directory_unavailable_or_unsafe")
     return descriptor
 
 
@@ -474,14 +528,22 @@ def _read_regular_file(
 ) -> tuple[bytes, os.stat_result]:
     if Path(name).name != name or name in {".", ".."}:
         raise ReplayDataError("input_relative_path_invalid")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    _require_descriptor_path_support()
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     try:
+        path_before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if not stat.S_ISREG(path_before.st_mode):
+            raise ReplayDataError(f"input_file_not_regular:{name}")
         descriptor = os.open(name, flags, dir_fd=directory_fd)
+    except ReplayDataError:
+        raise
     except OSError as exc:
         raise ReplayDataError(f"input_file_open_failed:{name}") from exc
     try:
         before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode):
+        if not stat.S_ISREG(before.st_mode) or not _same_snapshot(
+            path_before, before
+        ):
             raise ReplayDataError(f"input_file_not_regular:{name}")
         if before.st_size < 1 or before.st_size > max_bytes:
             raise ReplayDataError(f"input_file_size_invalid:{name}")
@@ -496,13 +558,50 @@ def _read_regular_file(
             if total > max_bytes:
                 raise ReplayDataError(f"input_file_size_invalid:{name}")
         after = os.fstat(descriptor)
-        identity_before = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        identity_after = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        if identity_before != identity_after or total != before.st_size:
+        try:
+            path_after = os.stat(
+                name,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except OSError as exc:
+            raise ReplayDataError(
+                f"input_file_changed_while_reading:{name}"
+            ) from exc
+        if (
+            not _same_snapshot(before, after)
+            or not _same_snapshot(after, path_after)
+            or total != before.st_size
+        ):
             raise ReplayDataError(f"input_file_changed_while_reading:{name}")
         return b"".join(chunks), after
     finally:
         os.close(descriptor)
+
+
+def _require_descriptor_path_support() -> None:
+    if not (
+        _OPEN_SUPPORTS_DIR_FD
+        and _STAT_SUPPORTS_DIR_FD
+        and _STAT_SUPPORTS_FOLLOW_SYMLINKS
+        and _LISTDIR_SUPPORTS_FD
+        and hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+    ):
+        raise ReplayDataError("descriptor_relative_no_follow_access_unsupported")
+
+
+def _same_identity(left: os.stat_result, right: os.stat_result) -> bool:
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
+def _same_snapshot(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        _same_identity(left, right)
+        and left.st_size == right.st_size
+        and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
+    )
 
 
 def _parse_binance_rows(raw: bytes, *, max_rows: int) -> tuple[ReplayBar, ...]:

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Require descriptor-walk security for empirical filesystem inputs
+**Status:** accepted
+**Decision:** Replay input directories, their regular-file leaves, and optional
+feedback-ledger parents/leaves must be reached by descriptor-relative traversal
+from the filesystem root. Every component is no-follow stated, type-checked,
+opened relative to the verified parent descriptor, fstat-checked, and compared
+by device/inode; leaves additionally bind size and modification snapshots across
+reads. Missing feedback ledgers use exclusive creation. A supported runtime
+without the required descriptor-relative/no-follow facilities fails closed and
+must not skip the regression.
+**Why:** A no-follow flag on one full pathname does not protect symlinked parent
+components, and non-exclusive create leaves a check/create substitution window.
+Empirical evidence and human preference data cannot be trustworthy if either
+path may be redirected outside the operator-selected tree.
+**Revisit when:** The project adopts an equally strict shared secure-path API
+whose supported-platform behavior and component/leaf replacement regressions
+are proven in both locked local and Linux source-with-artifacts verification.
+
 ## 2026-07-16 - Treat the empirical lab as bounded research debt, not a generation namespace
 **Status:** accepted
 **Decision:** Keep the 1,200-line production target and 1,500-line blocker
