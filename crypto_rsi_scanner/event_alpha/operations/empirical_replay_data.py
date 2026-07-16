@@ -40,7 +40,6 @@ import stat
 import statistics
 from collections import defaultdict, deque
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -49,7 +48,11 @@ import pandas as pd
 
 from ... import config
 from ...indicators import wilder_rsi
-from ...state_features import liquidity_bucket
+from .empirical_replay_data_bar import ReplayBar
+from .empirical_replay_data_dataset import ReplayDataset
+from .empirical_replay_data_error import ReplayDataError
+from .empirical_replay_data_mode import ReplayDataModeConfig
+from .empirical_replay_data_series import ReplaySeries
 
 
 CATALOG_SCHEMA_ID = "decision_radar.empirical_replay_input_catalog"
@@ -72,28 +75,6 @@ _CACHE_NAME_RE = re.compile(
     r"^(?P<symbol>[A-Z0-9]{1,30}USDT)-(?P<days>[1-9][0-9]{0,4})d\.json$"
 )
 _FIXTURE_NAME_RE = re.compile(r"^(?P<symbol>[A-Z0-9]{1,30}USDT)\.csv$")
-_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-
-
-class ReplayDataError(ValueError):
-    """Raised when an offline replay input fails a bounded safety contract."""
-
-
-@dataclass(frozen=True)
-class ReplayDataModeConfig:
-    """Frozen resource and feature limits for one replay input mode."""
-
-    name: str
-    max_symbols: int
-    universe_top_n: int
-    max_rows_per_symbol: int = 4_096
-    max_file_bytes: int = 16 * 1024 * 1024
-    membership_window_days: int = 30
-    volume_z_window: int = 90
-    volume_z_min_observations: int = 20
-    final_test_evaluation_enabled: bool = False
-
-
 REPLAY_DATA_MODE_CONFIGS: Mapping[str, ReplayDataModeConfig] = {
     "smoke": ReplayDataModeConfig(
         name="smoke",
@@ -113,92 +94,6 @@ REPLAY_DATA_MODE_CONFIGS: Mapping[str, ReplayDataModeConfig] = {
         universe_top_n=100,
     ),
 }
-
-
-@dataclass(frozen=True)
-class ReplayBar:
-    """One completed daily bar; ``observed_at`` is the daily close boundary."""
-
-    bar_open_at: datetime
-    observed_at: datetime
-    open: float | None
-    high: float | None
-    low: float | None
-    close: float
-    base_volume: float
-    quote_volume: float
-    bar_duration_seconds: int
-    full_daily_bar: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-shaped copy suitable for outcome-path calculations."""
-
-        return {
-            "bar_open_at": _iso(self.bar_open_at),
-            "observed_at": _iso(self.observed_at),
-            "open": self.open,
-            "high": self.high,
-            "low": self.low,
-            "close": self.close,
-            "base_volume": self.base_volume,
-            "quote_volume": self.quote_volume,
-            "bar_duration_seconds": self.bar_duration_seconds,
-            "full_daily_bar": self.full_daily_bar,
-        }
-
-
-@dataclass(frozen=True)
-class ReplaySeries:
-    """One selected symbol file plus its immutable content identity."""
-
-    symbol: str
-    canonical_asset_id: str
-    relative_path: str
-    declared_days: int | None
-    byte_size: int
-    content_sha256: str
-    quote_volume_basis: str
-    bars: tuple[ReplayBar, ...]
-
-    def __post_init__(self) -> None:
-        if not _SHA256_RE.fullmatch(self.content_sha256):
-            raise ReplayDataError("source_content_sha256_invalid")
-        if not self.bars:
-            raise ReplayDataError("source_rows_empty")
-
-    def frame_rows(self) -> tuple[dict[str, Any], ...]:
-        """Return completed OHLCV rows without any future-derived values."""
-
-        return tuple(bar.to_dict() for bar in self.bars)
-
-
-@dataclass(frozen=True)
-class ReplayDataset:
-    """Closed offline dataset selected under one bounded replay mode."""
-
-    mode: ReplayDataModeConfig
-    source_kind: str
-    candidate_files_discovered: int
-    candidate_symbols_discovered: int
-    series: tuple[ReplaySeries, ...]
-    residual_survivorship_present: bool
-    residual_survivorship_disclosure: str
-
-    def __post_init__(self) -> None:
-        if not self.series:
-            raise ReplayDataError("dataset_series_empty")
-        if len(self.series) > self.mode.max_symbols:
-            raise ReplayDataError("dataset_symbol_bound_exceeded")
-        symbols = [item.symbol for item in self.series]
-        if symbols != sorted(symbols) or len(symbols) != len(set(symbols)):
-            raise ReplayDataError("dataset_symbol_order_or_identity_invalid")
-        if self.mode.final_test_evaluation_enabled:
-            raise ReplayDataError("final_test_evaluation_forbidden")
-
-    def frames(self) -> dict[str, tuple[dict[str, Any], ...]]:
-        """Return symbol-keyed daily rows for downstream outcome calculations."""
-
-        return {item.symbol: item.frame_rows() for item in self.series}
 
 
 def replay_data_mode_config(mode: str) -> ReplayDataModeConfig:
@@ -336,6 +231,7 @@ def build_replay_catalog(dataset: ReplayDataset) -> dict[str, Any]:
     files = []
     first_open = min(item.bars[0].bar_open_at for item in dataset.series)
     last_open = max(item.bars[-1].bar_open_at for item in dataset.series)
+    last_observed = max(item.bars[-1].observed_at for item in dataset.series)
     total_rows = 0
     partial_bar_count = 0
     for item in dataset.series:
@@ -377,7 +273,8 @@ def build_replay_catalog(dataset: ReplayDataset) -> dict[str, Any]:
         "row_count": total_rows,
         "partial_bar_count": partial_bar_count,
         "data_start_at": _iso(first_open),
-        "data_end_at": _iso(last_open),
+        "last_bar_open_at": _iso(last_open),
+        "data_end_at": _iso(last_observed),
         "files": files,
         "residual_survivorship_present": dataset.residual_survivorship_present,
         "residual_survivorship_disclosure": (
@@ -501,218 +398,23 @@ def iter_point_in_time_observations(
     top_n: int | None = None,
     membership_window: int | None = None,
 ) -> Iterator[dict[str, Any]]:
-    """Yield point-in-time replay observations in deterministic symbol/date order.
+    """Yield deterministic observations through the private bounded assembler.
 
     Optional partitions are half-open ``[start, end)`` UTC ranges and may name
-    only ``development`` and ``validation``.  ``final_test`` is deliberately
-    rejected in this input slice so loading data cannot accidentally open the
-    frozen holdout.  Volume z-score baselines exclude the current observation;
-    returns, RSI, ranks, and market regime use data no later than the completed
-    current bar.
+    only ``development`` and ``validation``.  ``final_test`` remains rejected,
+    and all feature values remain point-in-time.
     """
 
-    ranges = _partition_ranges(partitions)
-    membership_by_key, _limit, _window = _point_in_time_membership_index(
-        dataset,
-        top_n=top_n,
-        window_days=membership_window,
+    from ._empirical_replay_observations import (
+        _iter_point_in_time_observations,
     )
-    benchmark_returns = _benchmark_return_maps(dataset)
-    market_regime = _btc_market_regime(dataset)
-    for item in dataset.series:
-        per_open = _series_analytics(item, dataset.mode)
-        for bar in item.bars:
-            partition = _partition_for(bar.observed_at, ranges)
-            if ranges and partition is None:
-                continue
-            values = per_open[bar.bar_open_at]
-            rank, in_universe, trailing_volume, membership_status = (
-                membership_by_key[(item.symbol, bar.observed_at)]
-            )
-            return_24h = values["return_24h"]
-            btc_24h = benchmark_returns["BTC"].get(bar.bar_open_at)
-            eth_24h = benchmark_returns["ETH"].get(bar.bar_open_at)
-            relative_btc = _relative_return(return_24h, btc_24h)
-            relative_eth = _relative_return(return_24h, eth_24h)
-            regime = market_regime.get(bar.bar_open_at)
-            baseline_status = _combined_baseline_status(
-                volume_status=str(values["volume_baseline_status"]),
-                membership_status=membership_status,
-            )
-            missing: list[str] = [
-                "return_15m",
-                "return_1h",
-                "return_4h",
-                "relative_return_vs_btc_4h",
-                "relative_return_vs_eth_4h",
-                "spread_bps",
-                "order_book_depth",
-                "funding",
-                "open_interest",
-                "catalyst_evidence_timing",
-                "calendar_evidence_timing",
-            ]
-            optional_values = {
-                "open": bar.open,
-                "high": bar.high,
-                "low": bar.low,
-                "return_24h": return_24h,
-                "return_72h": values["return_72h"],
-                "return_7d": values["return_7d"],
-                "relative_return_vs_btc_24h": relative_btc,
-                "relative_return_vs_eth_24h": relative_eth,
-                "volume_zscore_24h": values["volume_zscore_24h"],
-                "rsi": values["rsi"],
-                "market_regime": regime,
-            }
-            missing.extend(key for key, value in optional_values.items() if value is None)
-            if not bar.full_daily_bar:
-                missing.append("daily_bar_complete")
-            feature_basis = {
-                "open": "historical_ohlcv" if bar.open is not None else "missing",
-                "high": "historical_ohlcv" if bar.high is not None else "missing",
-                "low": "historical_ohlcv" if bar.low is not None else "missing",
-                "close": "historical_ohlcv",
-                "quote_volume": item.quote_volume_basis,
-                "liquidity_usd": item.quote_volume_basis,
-                "volume_membership": "point_in_time_volume_universe",
-                "volume_zscore_24h": (
-                    (
-                        "cross_sectional_proxy"
-                        if item.quote_volume_basis == "cross_sectional_proxy"
-                        else "temporal_direct"
-                    )
-                    if values["volume_zscore_24h"] is not None
-                    else "missing"
-                ),
-                "return_24h": "historical_ohlcv" if return_24h is not None else "missing",
-                "return_72h": (
-                    "historical_ohlcv"
-                    if values["return_72h"] is not None
-                    else "missing"
-                ),
-                "return_7d": (
-                    "historical_ohlcv"
-                    if values["return_7d"] is not None
-                    else "missing"
-                ),
-                "relative_return_vs_btc_24h": (
-                    "historical_ohlcv" if relative_btc is not None else "missing"
-                ),
-                "relative_return_vs_eth_24h": (
-                    "historical_ohlcv" if relative_eth is not None else "missing"
-                ),
-                "rsi": "historical_ohlcv" if values["rsi"] is not None else "missing",
-                "market_regime": "historical_ohlcv" if regime is not None else "missing",
-                "intraday_returns": "missing",
-                "spread_bps": "unavailable",
-                "order_book_depth": "unavailable",
-                "catalyst_evidence_timing": "unavailable",
-                "calendar_evidence_timing": "unavailable",
-            }
-            direct_feature_count = sum(
-                basis
-                in {
-                    "historical_ohlcv",
-                    "point_in_time_volume_universe",
-                    "provider_observed",
-                    "temporal_direct",
-                }
-                for basis in feature_basis.values()
-            )
-            proxy_feature_count = sum(
-                basis == "cross_sectional_proxy"
-                for basis in feature_basis.values()
-            )
-            yield {
-                    "schema_id": OBSERVATION_SCHEMA_ID,
-                    "schema_version": OBSERVATION_SCHEMA_VERSION,
-                    "source_mode": "artifact_replay",
-                    "source_kind": dataset.source_kind,
-                    "market_data_source": (
-                        "binance_historical_ohlcv"
-                        if dataset.source_kind == "binance_daily_klines_cache"
-                        else "checked_fixture_historical_ohlcv"
-                    ),
-                    "data_quality_mode": (
-                        "cross_sectional_proxy"
-                        if item.quote_volume_basis == "cross_sectional_proxy"
-                        else "historical_ohlcv"
-                    ),
-                    "market_data_basis": "historical_ohlcv",
-                    "volume_anomaly_basis": feature_basis["volume_zscore_24h"],
-                    "liquidity_basis": item.quote_volume_basis,
-                    "spread_basis": "unavailable",
-                    "intraday_basis": "missing",
-                    "baseline_maturity": baseline_status,
-                    "data_quality_status": (
-                        "partial" if bar.full_daily_bar else "partial_bar"
-                    ),
-                    "catalyst_evidence_timing": "unavailable",
-                    "calendar_evidence_timing": "unavailable",
-                    "rsi_context_timing": (
-                        "temporal_direct" if values["rsi"] is not None else "missing"
-                    ),
-                    "direct_proxy_class": (
-                        "mixed_proxy" if proxy_feature_count else "temporal_direct"
-                    ),
-                    "direct_feature_count": direct_feature_count,
-                    "proxy_feature_count": proxy_feature_count,
-                    "volume_zscore_basis": feature_basis["volume_zscore_24h"],
-                    "mode": dataset.mode.name,
-                    "partition": partition or "unassigned",
-                    "symbol": item.symbol,
-                    "canonical_asset_id": item.canonical_asset_id,
-                    "canonical_asset_id_basis": "historical_exchange_symbol",
-                    "bar_open_at": _iso(bar.bar_open_at),
-                    "observed_at": _iso(bar.observed_at),
-                    "bar_duration_seconds": bar.bar_duration_seconds,
-                    "bar_duration_status": (
-                        "full_daily" if bar.full_daily_bar else "partial_daily"
-                    ),
-                    "full_daily_bar": bar.full_daily_bar,
-                    "open": bar.open,
-                    "high": bar.high,
-                    "low": bar.low,
-                    "close": bar.close,
-                    "base_volume": bar.base_volume,
-                    "quote_volume": bar.quote_volume,
-                    "liquidity_usd": bar.quote_volume,
-                    "liquidity_tier": liquidity_bucket(bar.quote_volume, None),
-                    "in_universe": in_universe,
-                    "volume_rank": rank,
-                    "point_in_time_universe_member": in_universe,
-                    "point_in_time_volume_rank": rank,
-                    "trailing_quote_volume": trailing_volume,
-                    "membership_status": membership_status,
-                    "baseline_status": baseline_status,
-                    "volume_baseline_status": values["volume_baseline_status"],
-                    "volume_baseline_count": values["volume_baseline_count"],
-                    "return_24h": return_24h,
-                    "return_72h": values["return_72h"],
-                    "return_7d": values["return_7d"],
-                    "relative_return_vs_btc_24h": relative_btc,
-                    "relative_return_vs_eth_24h": relative_eth,
-                    "volume_zscore_24h": values["volume_zscore_24h"],
-                    "rsi": values["rsi"],
-                    "market_regime": regime,
-                    "spread_bps": None,
-                    "spread_status": "unavailable",
-                    "intraday_status": "missing",
-                    "return_unit": "percent_points",
-                    "feature_basis": feature_basis,
-                    "feature_quality_modes": sorted(set(feature_basis.values())),
-                    "missing_features": sorted(set(missing)),
-                    "source_file": item.relative_path,
-                    "source_file_sha256": item.content_sha256,
-                    "residual_survivorship_present": (
-                        dataset.residual_survivorship_present
-                    ),
-                    "research_only": True,
-                    "provider_calls": 0,
-                    "network_access": False,
-                    "final_test_evaluated": False,
-                }
+
+    yield from _iter_point_in_time_observations(
+        dataset,
+        partitions=partitions,
+        top_n=top_n,
+        membership_window=membership_window,
+    )
 
 
 def _open_directory(path: str | Path) -> int:

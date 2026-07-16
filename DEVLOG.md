@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Add reproducible replay runs, controls, and benchmarks · Codex
+**Why:** The validated point-in-time feature and outcome primitives needed one
+bounded offline execution path plus outcome-blind comparison policies before a
+real medium/full study could be interpreted.
+**Changes:**
+- Added a fingerprint-addressed smoke/medium/full/sealed-final replay runner
+  that streams the production anomaly and canonical Decision-v2 kernel in
+  bounded chunks, writes immutable manifests and result artifacts, resumes only
+  exact bytes, records runtime bottlenecks, and never updates a latest or
+  dashboard-authority pointer.
+- Added deterministic same-date/regime/liquidity non-signal controls, the eight
+  frozen simple benchmarks, and the predeclared 3-day endpoint missed-move
+  evaluator. Selection occurs before outcomes are joined, MFE alone cannot
+  define a miss, every unavailable benchmark remains an explicit closed row,
+  and no simple control is presented as causal evidence.
+- Wired controls, missed moves, episode outcomes, score/cohort analysis,
+  shadow-policy simulation, recommendation sealing, and final-test confirmation
+  into the same run. Added offline Make targets for fixture, top-30 medium,
+  top-100 full, and explicitly sealed final-test modes.
+- Split replay data value objects, observation construction, and robust
+  statistics into focused modules so the new lab passes the existing file,
+  function, and class-ownership gates without an exception or baseline waiver.
+**Verify:** Combined empirical tests passed (53 tests); `make
+radar-replay-smoke PYTHON=python3` completed 1,095 fixture observations, five
+ideas/episodes, two matched controls, and 59 mechanics-only endpoint misses in
+5.48s; `make architecture-cleanliness-check PYTHON=python3` passed with zero
+new size violations. The run made zero provider calls or authority mutations.
+**Notes/risks:** Fixture values validate mechanics, not edge. Historical spread,
+intraday timing, catalyst/calendar context, and delisted-pair coverage remain
+explicit limitations. Medium/full evidence and final reports are next.
+
 ## 2026-07-16 — Close offline PIT data, episode outcomes, and empirical cohorts · Codex
 **Why:** Historical Decision-v2 evaluation needed a direct, auditable path from
 bounded local daily bars through point-in-time features, fixed episodes, future-

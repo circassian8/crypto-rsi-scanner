@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import random
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass
@@ -20,6 +19,7 @@ from datetime import datetime
 from typing import Any, Iterable, Mapping, Sequence
 
 from . import empirical_validation_protocol
+from .empirical_replay_statistics import _bootstrap_mean_ci, _mean, _robust_summary
 
 
 SCHEMA_ID = "decision_radar.empirical_replay_analysis"
@@ -121,53 +121,102 @@ def build_empirical_replay_analysis(
     or ``live_no_send``; it does not change any computation.
     """
 
+    protocol, evidence_mode, resamples, views = _analysis_context(
+        representatives,
+        outcomes,
+        partition=partition,
+        evidence_mode=evidence_mode,
+        bootstrap_resamples=bootstrap_resamples,
+    )
+    payload = _analysis_payload(
+        views,
+        protocol=protocol,
+        partition=partition,
+        evidence_mode=evidence_mode,
+        bootstrap_resamples=resamples,
+    )
+    payload["analysis_digest"] = _digest(payload)
+    return payload
+
+
+def _analysis_context(
+    representatives: Iterable[Mapping[str, Any]],
+    outcomes: Iterable[Mapping[str, Any]],
+    *,
+    partition: str,
+    evidence_mode: str,
+    bootstrap_resamples: int | None,
+) -> tuple[Mapping[str, Any], str, int, list[_EpisodeView]]:
     protocol = empirical_validation_protocol.protocol_values()
-    protocol_errors = empirical_validation_protocol.validate_protocol(protocol)
-    if protocol_errors:
-        raise ValueError("frozen_protocol_invalid:" + ";".join(protocol_errors))
-    allowed_partitions = {
-        str(row["name"])
-        for row in protocol["partitions"]
-    }
+    errors = empirical_validation_protocol.validate_protocol(protocol)
+    if errors:
+        raise ValueError("frozen_protocol_invalid:" + ";".join(errors))
     if not isinstance(evidence_mode, str) or not evidence_mode.strip():
         raise ValueError("evidence_mode_required")
-    evidence_mode = evidence_mode.strip()
-    fixture_partition = partition == "fixture" and "fixture" in evidence_mode.casefold()
-    if partition not in allowed_partitions and not fixture_partition:
+    selected_mode = evidence_mode.strip()
+    allowed = {str(row["name"]) for row in protocol["partitions"]}
+    fixture = partition == "fixture" and "fixture" in selected_mode.casefold()
+    if partition not in allowed and not fixture:
         raise ValueError("partition_not_frozen_protocol_partition")
     resamples = _bootstrap_resamples(bootstrap_resamples, protocol)
     views = _episode_views(representatives, outcomes, partition=partition)
+    return protocol, selected_mode, resamples, views
 
+
+def _fixed_cohort_sections(
+    views: Sequence[_EpisodeView],
+    *,
+    partition: str,
+    evidence_mode: str,
+    bootstrap_resamples: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     route_groups = _groups(views, lambda row: _text(row.representative.get("radar_route")))
     origin_groups = _groups(
         views,
         lambda row: _text(row.representative.get("primary_thesis_origin")),
     )
-    route_cohorts = [
-        _cohort_row(
-            "radar_route",
-            name,
-            route_groups.get(name, ()),
-            partition=partition,
-            evidence_mode=evidence_mode,
-            bootstrap_resamples=resamples,
-        )
-        for name in ROUTES
-    ]
-    primary_origin_cohorts = [
-        _cohort_row(
-            "primary_thesis_origin",
-            name,
-            origin_groups.get(name, ()),
-            partition=partition,
-            evidence_mode=evidence_mode,
-            bootstrap_resamples=resamples,
-        )
-        for name in PRIMARY_ORIGINS
-    ]
     market_catalyst_groups = _groups(
         views,
         lambda row: classify_market_catalyst_category(row.representative)["category"],
+    )
+    def rows(cohort_type: str, names: Sequence[str], groups: Mapping[str, Any]) -> list[dict[str, Any]]:
+        return [
+            _cohort_row(
+                cohort_type,
+                name,
+                groups.get(name, ()),
+                partition=partition,
+                evidence_mode=evidence_mode,
+                bootstrap_resamples=bootstrap_resamples,
+            )
+            for name in names
+        ]
+    return (
+        rows("radar_route", ROUTES, route_groups),
+        rows("primary_thesis_origin", PRIMARY_ORIGINS, origin_groups),
+        rows(
+            "market_catalyst_category",
+            MARKET_CATALYST_CATEGORIES,
+            market_catalyst_groups,
+        ),
+    )
+
+
+def _analysis_payload(
+    views: Sequence[_EpisodeView],
+    *,
+    protocol: Mapping[str, Any],
+    partition: str,
+    evidence_mode: str,
+    bootstrap_resamples: int,
+) -> dict[str, Any]:
+    route_cohorts, origin_cohorts, market_catalyst_cohorts = (
+        _fixed_cohort_sections(
+            views,
+            partition=partition,
+            evidence_mode=evidence_mode,
+            bootstrap_resamples=bootstrap_resamples,
+        )
     )
     false_late = [
         classify_false_positive_and_late(
@@ -193,7 +242,7 @@ def build_empirical_replay_analysis(
         "evidence_mode": evidence_mode,
         "return_unit": "fraction",
         "bootstrap_unit": "episode",
-        "bootstrap_resamples": resamples,
+        "bootstrap_resamples": bootstrap_resamples,
         "episode_count": len(views),
         "matured_episode_count": sum(_is_matured(view) for view in views),
         "directional_return_sample_size": len(_directional_returns(views)),
@@ -210,14 +259,14 @@ def build_empirical_replay_analysis(
             _has_invalid_declared_return_unit(view) for view in views
         ),
         "route_cohorts": route_cohorts,
-        "primary_origin_cohorts": primary_origin_cohorts,
+        "primary_origin_cohorts": origin_cohorts,
         "score_monotonicity": [
             _score_monotonicity(
                 views,
                 score_field=field,
                 partition=partition,
                 evidence_mode=evidence_mode,
-                bootstrap_resamples=resamples,
+                bootstrap_resamples=bootstrap_resamples,
             )
             for field in SCORE_FIELDS
         ],
@@ -227,7 +276,7 @@ def build_empirical_replay_analysis(
             getter=lambda row: _text(row.representative.get("market_regime")),
             partition=partition,
             evidence_mode=evidence_mode,
-            bootstrap_resamples=resamples,
+            bootstrap_resamples=bootstrap_resamples,
         ),
         "liquidity_tier_cohorts": _dynamic_cohorts(
             views,
@@ -235,7 +284,7 @@ def build_empirical_replay_analysis(
             getter=lambda row: _text(row.representative.get("liquidity_tier")),
             partition=partition,
             evidence_mode=evidence_mode,
-            bootstrap_resamples=resamples,
+            bootstrap_resamples=bootstrap_resamples,
         ),
         "data_quality_cohorts": _dynamic_cohorts(
             views,
@@ -243,24 +292,14 @@ def build_empirical_replay_analysis(
             getter=lambda row: _data_quality_mode(row, evidence_mode),
             partition=partition,
             evidence_mode=evidence_mode,
-            bootstrap_resamples=resamples,
+            bootstrap_resamples=bootstrap_resamples,
         ),
-        "market_catalyst_cohorts": [
-            _cohort_row(
-                "market_catalyst_category",
-                name,
-                market_catalyst_groups.get(name, ()),
-                partition=partition,
-                evidence_mode=evidence_mode,
-                bootstrap_resamples=resamples,
-            )
-            for name in MARKET_CATALYST_CATEGORIES
-        ],
+        "market_catalyst_cohorts": market_catalyst_cohorts,
         "cost_sensitivity": _cost_sensitivity(
             views,
             partition=partition,
             evidence_mode=evidence_mode,
-            bootstrap_resamples=resamples,
+            bootstrap_resamples=bootstrap_resamples,
             cost_bps=protocol["cost_scenarios"]["round_trip_cost_bps"],
             assumed_label=protocol["cost_scenarios"]["unobserved_cost_label"],
         ),
@@ -282,7 +321,6 @@ def build_empirical_replay_analysis(
         "auto_apply": False,
         "safety": dict(_ZERO_SAFETY),
     }
-    payload["analysis_digest"] = _digest(payload)
     return payload
 
 
@@ -1144,64 +1182,6 @@ def _directional_value(representative: Mapping[str, Any], value: float | None) -
     return value * sign if sign is not None else None
 
 
-def _robust_summary(values: Sequence[float]) -> dict[str, float | None]:
-    ordered = sorted(values)
-    return {
-        "mean": _mean(ordered),
-        "median": statistics.median(ordered) if ordered else None,
-        "trimmed_mean_10pct": _trimmed_mean(ordered, 0.10),
-        "downside_5pct": _quantile(ordered, 0.05),
-    }
-
-
-def _bootstrap_mean_ci(
-    values: Sequence[float], *, resamples: int, label: str
-) -> dict[str, Any]:
-    if not values:
-        return {
-            "status": "not_estimable_no_sample",
-            "method": "deterministic_episode_bootstrap_mean_percentile",
-            "confidence_level": 0.95,
-            "resamples": resamples,
-            "sample_size": 0,
-            "lower_fraction": None,
-            "upper_fraction": None,
-            "return_unit": "fraction",
-        }
-    if len(values) == 1:
-        value = float(values[0])
-        return {
-            "status": "degenerate_single_episode",
-            "method": "deterministic_episode_bootstrap_mean_percentile",
-            "confidence_level": 0.95,
-            "resamples": resamples,
-            "sample_size": 1,
-            "lower_fraction": value,
-            "upper_fraction": value,
-            "return_unit": "fraction",
-        }
-    seed_material = (
-        f"{empirical_validation_protocol.DETERMINISTIC_SEED}\0{label}"
-    ).encode("utf-8")
-    seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:8], "big")
-    rng = random.Random(seed)
-    n = len(values)
-    means = sorted(
-        sum(values[rng.randrange(n)] for _ in range(n)) / n
-        for _ in range(resamples)
-    )
-    return {
-        "status": "estimated_exploratory",
-        "method": "deterministic_episode_bootstrap_mean_percentile",
-        "confidence_level": 0.95,
-        "resamples": resamples,
-        "sample_size": n,
-        "lower_fraction": _quantile(means, 0.025),
-        "upper_fraction": _quantile(means, 0.975),
-        "return_unit": "fraction",
-    }
-
-
 def _sample_evidence(sample_size: int) -> tuple[str, str]:
     if sample_size == 0:
         return "no_sample", "no_evidence"
@@ -1465,32 +1445,6 @@ def _bootstrap_resamples(value: int | None, protocol: Mapping[str, Any]) -> int:
     if type(selected) is not int or not 1 <= selected <= 100_000:
         raise ValueError("bootstrap_resamples_out_of_bounds")
     return selected
-
-
-def _trimmed_mean(values: Sequence[float], fraction: float) -> float | None:
-    if not values:
-        return None
-    trim = math.floor(len(values) * fraction)
-    retained = values[trim:len(values) - trim] if trim else values
-    return _mean(retained)
-
-
-def _quantile(values: Sequence[float], probability: float) -> float | None:
-    if not values:
-        return None
-    if len(values) == 1:
-        return float(values[0])
-    position = (len(values) - 1) * probability
-    lower = math.floor(position)
-    upper = math.ceil(position)
-    if lower == upper:
-        return float(values[lower])
-    weight = position - lower
-    return float(values[lower] * (1.0 - weight) + values[upper] * weight)
-
-
-def _mean(values: Sequence[float]) -> float | None:
-    return sum(values) / len(values) if values else None
 
 
 def _score(value: Any) -> float | None:

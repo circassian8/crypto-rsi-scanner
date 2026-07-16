@@ -119,6 +119,10 @@ OFFICIAL_MACRO_OBSERVED_AT ?=
 RADAR_MARKET_CAMPAIGN_OUTPUT_DIR ?= research
 RADAR_MARKET_CAMPAIGN_EVALUATED_AT ?=
 RADAR_MARKET_CAMPAIGN_EVALUATED_AT_ARG = $(if $(strip $(RADAR_MARKET_CAMPAIGN_EVALUATED_AT)),--evaluated-at $(RADAR_MARKET_CAMPAIGN_EVALUATED_AT),)
+RADAR_RESEARCH_OUTPUT_ROOT ?= event_fade_cache/decision_radar_research_lab
+RADAR_REPLAY_FIXTURE_INPUT_DIR ?= fixtures/backtest_smoke/klines
+RADAR_REPLAY_CACHE_INPUT_DIR ?= backtest_cache/binance_klines
+RADAR_RESEARCH_RECOMMENDATION_SEAL ?=
 PYTEST_RUNTIME_SECONDS ?=
 STANDALONE_RUNTIME_SECONDS ?=
 COINALYZE_LIVE_PREFLIGHT_ARG = $(if $(filter 1 true yes,$(ALLOW_LIVE_PREFLIGHT)),--event-alpha-coinalyze-allow-live-preflight,)
@@ -241,6 +245,10 @@ help:
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
 	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
+	@echo "  make radar-replay-smoke             Run the immutable offline replay fixture chain"
+	@echo "  make radar-replay-medium            Run the top-30 development/validation replay from the local cache"
+	@echo "  make radar-replay-full              Run the top-100 development/validation replay from the local cache"
+	@echo "  make radar-replay-final-test RADAR_RESEARCH_RECOMMENDATION_SEAL=...  Evaluate only a pre-frozen recommendation set"
 	@echo "  make score    Print paper-trade scoreboard"
 	@echo "  make score-json  Print paper-trade scoreboard as JSON"
 	@echo "  make score-cohorts  Print paper-trade scoreboard with state cohorts"
@@ -819,10 +827,37 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check
+.PHONY: radar-research-protocol-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
+
+radar-replay-smoke: radar-research-protocol-check
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \
+		--mode fixture-smoke \
+		--input-dir "$(RADAR_REPLAY_FIXTURE_INPUT_DIR)" \
+		--output-root "$(RADAR_RESEARCH_OUTPUT_ROOT)"
+
+radar-replay-medium: radar-research-protocol-check
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \
+		--mode medium \
+		--input-dir "$(RADAR_REPLAY_CACHE_INPUT_DIR)" \
+		--output-root "$(RADAR_RESEARCH_OUTPUT_ROOT)"
+
+radar-replay-full: radar-research-protocol-check
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \
+		--mode full \
+		--input-dir "$(RADAR_REPLAY_CACHE_INPUT_DIR)" \
+		--output-root "$(RADAR_RESEARCH_OUTPUT_ROOT)"
+
+radar-replay-final-test: radar-research-protocol-check
+	@test -n "$(RADAR_RESEARCH_RECOMMENDATION_SEAL)" || { echo "RADAR_RESEARCH_RECOMMENDATION_SEAL is required" >&2; exit 2; }
+	@test -f "$(RADAR_RESEARCH_RECOMMENDATION_SEAL)" || { echo "recommendation seal file not found" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \
+		--mode final-test \
+		--input-dir "$(RADAR_REPLAY_CACHE_INPUT_DIR)" \
+		--output-root "$(RADAR_RESEARCH_OUTPUT_ROOT)" \
+		--recommendation-seal "$(RADAR_RESEARCH_RECOMMENDATION_SEAL)"
 
 .PHONY: event-alpha-source-independence-oos-export event-alpha-source-independence-oos-validate event-alpha-source-independence-oos-report event-alpha-source-independence-storage-report
 

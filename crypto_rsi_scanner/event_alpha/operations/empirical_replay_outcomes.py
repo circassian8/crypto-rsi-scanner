@@ -297,6 +297,8 @@ def _path_outcome(
         "schema_id": "decision_radar.empirical_replay_path_outcome",
         "schema_version": SCHEMA_VERSION,
         "idea_id": idea["idea_id"],
+        "candidate_id": idea.get("candidate_id"),
+        "core_opportunity_id": idea.get("core_opportunity_id"),
         "canonical_asset_id": idea["canonical_asset_id"],
         "symbol": symbol,
         "observed_at": observed.isoformat(),

@@ -407,7 +407,12 @@ def _outcome_index(outcomes: Iterable[Mapping[str, Any]]) -> dict[str, Mapping[s
     for row in outcomes:
         if not isinstance(row, Mapping):
             continue
-        key = str(row.get("candidate_id") or row.get("representative_candidate_id") or "")
+        key = str(
+            row.get("candidate_id")
+            or row.get("idea_id")
+            or row.get("representative_candidate_id")
+            or ""
+        )
         if key:
             result[key] = row
     return result
@@ -417,10 +422,21 @@ def _directional_return(idea: Mapping[str, Any], outcomes: Mapping[str, Mapping[
     outcome = outcomes.get(str(idea.get("candidate_id") or ""))
     if not outcome or str(outcome.get("outcome_status") or outcome.get("status") or "") not in {"matured", "complete"}:
         return None
-    for field in ("primary_directional_return_fraction", "directional_return_fraction", "primary_return_fraction", "return_3d_fraction"):
+    for field in (
+        "primary_directional_return_fraction",
+        "directional_return_fraction",
+        "primary_direction_adjusted_return",
+        "primary_return_fraction",
+        "primary_horizon_return",
+        "return_3d_fraction",
+    ):
         value = _finite(outcome.get(field))
         if value is not None:
-            if field in {"primary_directional_return_fraction", "directional_return_fraction"}:
+            if field in {
+                "primary_directional_return_fraction",
+                "directional_return_fraction",
+                "primary_direction_adjusted_return",
+            }:
                 return value
             bias = str(decision_model_values(idea).get("directional_bias") or "long")
             return -value if bias in {"risk", "fade_short_review"} else value

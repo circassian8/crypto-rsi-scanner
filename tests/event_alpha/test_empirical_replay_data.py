@@ -115,6 +115,12 @@ def test_cache_loader_is_zero_network_selects_longest_and_catalogs_content(
     assert aaa.relative_path == "AAAUSDT-60d.json"
     assert len(aaa.bars) == 35
     assert dataset.frames()["AAAUSDT"][-1]["close"] == pytest.approx(134.0)
+    aaa_frame = dataset.price_frames(["AAAUSDT"])["AAAUSDT"]
+    assert list(aaa_frame.columns) == [
+        "open", "high", "low", "close", "base_volume", "quote_volume"
+    ]
+    assert aaa_frame.iloc[-1]["close"] == pytest.approx(134.0)
+    assert set(dataset.price_frames(["AAAUSDT"])) == {"AAAUSDT"}
 
     catalog = replay_data.build_replay_catalog(dataset)
     expected = hashlib.sha256((cache / "AAAUSDT-60d.json").read_bytes()).hexdigest()
