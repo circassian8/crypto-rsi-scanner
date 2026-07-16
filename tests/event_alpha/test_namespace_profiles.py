@@ -28,6 +28,7 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
     for namespace in (
         "catalyst_frame_e2e",
         "catalyst_frame_validation",
+        "decision_radar_research_lab",
         "quality_validation",
         "research_send",
         "shim_report",
@@ -44,6 +45,7 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
     for namespace in (
         "catalyst_frame_e2e",
         "catalyst_frame_validation",
+        "decision_radar_research_lab",
         "quality_validation",
         "research_send",
         "source_enrichment",

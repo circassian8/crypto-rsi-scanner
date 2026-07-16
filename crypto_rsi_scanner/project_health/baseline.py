@@ -177,6 +177,11 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _namespace_status_from_name(namespace: str) -> tuple[str, str]:
+    if namespace == "decision_radar_research_lab":
+        return (
+            "manual_review",
+            "immutable Decision Radar empirical replay and report store; not an operator generation",
+        )
     if namespace == "event_source_independence_contracts":
         return (
             "manual_review",

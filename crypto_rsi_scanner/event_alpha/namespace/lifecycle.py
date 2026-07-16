@@ -48,6 +48,9 @@ KNOWN_STALE_NAMESPACES = {
 # never operator generations, and therefore must not be treated as an unknown
 # namespace or as eligible authority.
 NON_GENERATION_ARTIFACT_ROOTS = {
+    "decision_radar_research_lab": (
+        "immutable Decision Radar empirical replay and report store; not an operator generation"
+    ),
     "event_source_independence_contracts": (
         "immutable digest-addressed source-independence store; not an operator generation"
     ),

@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Reconcile empirical research with architecture gates · Codex
+**Why:** The first broad locked-runtime `verify-fast` run exposed two release
+accounting gaps that focused feature tests could not see: seven new files over
+the 1,200-line target were not documented, and the immutable empirical run root
+was misclassified as an unknown Event Alpha generation.
+**Changes:**
+- Added path-specific accepted-warning records and concrete split/revisit
+  conditions for six frozen empirical modules plus the shared dashboard
+  renderer. The 1,200-line target and 1,500-line blocker are unchanged.
+- Classified only the exact `decision_radar_research_lab` root as
+  non-generation, non-authoritative `manual_review` storage in both namespace
+  lifecycle and bounded project-health retention logic.
+- Expanded namespace and artifact-heavy project-health regressions and
+  regenerated the current architecture reports.
+**Verify:** The two originally failing architecture tests, the v3 snapshot, and
+both namespace regressions passed (5 tests). Architecture cleanliness passed;
+the size report now has 25 over-target files, 25 documented exceptions, zero
+unresolved files, no file over 1,500 lines, no function over 150 lines, and v3
+`accepted_with_documented_exceptions`. `git diff --check` passed.
+**Notes/risks:** These are bounded target-gap exceptions, not a raised limit.
+Any growth or new behavior in the near-1,500-line replay files requires a split
+before landing. The lab remains research-only and cannot publish authority.
+
 ## 2026-07-16 — Republish empirical evidence under the locked runtime · Codex
 **Why:** Fixing pandas-3 timestamp normalization necessarily changed the replay
 code fingerprint. The prior report bundle remained valid historical evidence,

@@ -100,9 +100,37 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
         "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
     },
+    "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py": {
+        "reason": "Pure frozen shadow-policy, recommendation-seal, final-test, and chronological walk-forward evaluation with no production-policy mutation path.",
+        "revisit_condition": "Split before adding another scenario family or changing the recommendation-seal or walk-forward schemas, and before any growth crosses the 1,500-line blocker.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py": {
+        "reason": "Pure descriptive episode analysis keeps fixed cohort, cost, monotonicity, operator-burden, and failure classification semantics together under one frozen protocol.",
+        "revisit_condition": "Split when the analysis schema changes or another cohort family is added, using digest-stable replay fixtures before moving helpers.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py": {
+        "reason": "Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes.",
+        "revisit_condition": "Split before adding another control or benchmark family and before any further growth reaches the 1,500-line blocker, with selection-digest parity tests in place.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py": {
+        "reason": "Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol.",
+        "revisit_condition": "Split before adding intraday outcomes, another horizon family, or a schema revision, and before any further growth reaches the 1,500-line blocker.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py": {
+        "reason": "Closed seven-file research-report projection centralizes exact run bindings, cross-report validation, anchored reads, bounded summaries, and byte-stable rendering.",
+        "revisit_condition": "Split when report schema v2 or another report family is introduced, preserving whole-bundle and byte-for-byte validation fixtures.",
+    },
+    "crypto_rsi_scanner/event_alpha/operations/empirical_review.py": {
+        "reason": "Pure bounded targeted-review selection keeps outcome-aware categories, evidence bindings, deterministic ranking, and queue finalization in one policy-neutral path.",
+        "revisit_condition": "Split when another review category family or feedback-ledger integration is proposed, with frozen queue-digest fixtures first.",
+    },
     "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py": {
         "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
         "revisit_condition": "When the calendar page gains a new interaction family and has byte-stable page-section fixtures.",
+    },
+    "crypto_rsi_scanner/event_alpha/dashboard/render.py": {
+        "reason": "Central escaped dashboard route renderer preserves shared candidate filtering, exact authority badges, and fail-closed response layout across the read-only surface.",
+        "revisit_condition": "Split the remaining candidate and authority helpers when a dashboard interaction family changes, using page-level golden render fixtures.",
     },
     "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py": {
         "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",

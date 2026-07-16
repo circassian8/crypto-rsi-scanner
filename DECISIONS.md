@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Treat the empirical lab as bounded research debt, not a generation namespace
+**Status:** accepted
+**Decision:** Keep the 1,200-line production target and 1,500-line blocker
+unchanged. The six frozen empirical implementation modules and the shared
+dashboard renderer that currently fall between those limits are documented
+target-gap exceptions with path-specific reasons and mandatory split
+conditions. The exact `decision_radar_research_lab` artifact root is an
+immutable, non-authoritative research store with `manual_review` retention; it
+is not an Event Alpha operator generation and cannot become authority.
+**Why:** Release verification correctly exposed that the new research modules
+had not been reconciled with the existing architecture contract and that the
+artifact inventory mistook the lab's run store for an unknown generation.
+Splitting frozen replay logic after opening the sealed holdout would change its
+behavior-bearing code digest and force a new protocol evidence chain. Explicit
+bounded exceptions preserve the measured evidence while keeping every file
+below the unchanged hard blocker and every function below its blocker.
+**Revisit when:** Any accepted file grows further, crosses 1,500 lines, adds a
+new behavior or schema family, or gains digest-stable extraction fixtures; then
+split it before the feature lands. Revisit the artifact-root classification
+only if the lab is intentionally redesigned as an operator generation, which
+would require a separate authority contract.
+
 ## 2026-07-16 - Keep Decision Radar production policy unchanged after protocol-v1 validation
 **Status:** accepted
 **Decision:** Apply none of the nine frozen shadow-policy changes evaluated by
