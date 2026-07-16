@@ -291,6 +291,37 @@ def test_analysis_surface_delegates_to_closed_simulator() -> None:
     assert integrated["schema_id"] == empirical_operator_burden.SCHEMA_ID
 
 
+def test_asset_specific_family_and_urgent_route_semantics_match_policy_lab() -> None:
+    rows = [
+        _row(
+            "asset-a",
+            canonical_asset_id="binance-usdt:a",
+            radar_route="risk_watch",
+        ),
+        _row(
+            "asset-b",
+            canonical_asset_id="binance-usdt:b",
+            radar_route="risk_watch",
+        ),
+    ]
+
+    result = empirical_operator_burden.build_operator_notification_burden(
+        rows,
+        partition="development",
+        evidence_mode="historical_replay",
+    )
+
+    assert result["family_count"] == 2
+    assert result["urgent_visible_episode_count"] == 2
+    assert result["simulations"]["one_item_per_visible_family"][
+        "suppressed_count"
+    ] == 0
+    assert all(
+        row["suppressed_count"] == 0
+        for row in result["simulations"]["family_cooldown"]
+    )
+
+
 def test_empty_input_is_closed_and_all_scenarios_are_bounded() -> None:
     result = empirical_operator_burden.build_operator_notification_burden(
         [],
@@ -303,3 +334,39 @@ def test_empty_input_is_closed_and_all_scenarios_are_bounded() -> None:
     assert result["simulation_scenario_count"] == 12
     assert result["simulations"]["one_item_per_visible_family"]["status"] == "no_sample"
     assert result["simulations"]["material_change_only"]["available"] is False
+
+
+def test_exact_selected_days_keep_zero_idea_days_in_primary_burden_rate() -> None:
+    rows = [_row("a"), _row("b")]
+    selected_days = [f"2022-01-{day:02d}" for day in range(1, 11)]
+
+    result = empirical_operator_burden.build_operator_notification_burden(
+        rows,
+        partition="development",
+        evidence_mode="historical_replay",
+        selected_observation_days=selected_days,
+    )
+
+    assert result["observed_day_count"] == 10
+    assert result["selected_observation_day_count"] == 10
+    assert result["idea_active_day_count"] == 1
+    assert result["zero_idea_observed_day_count"] == 9
+    assert result["mean_ideas_per_observed_day"] == pytest.approx(0.2)
+    assert result["mean_ideas_per_idea_active_day"] == pytest.approx(2.0)
+    assert result["daily_rows_scope"] == "idea_active_days_only"
+    denominator = result["observed_day_denominator"]
+    assert denominator["basis"] == "exact_selected_observation_utc_days"
+    assert denominator["includes_zero_idea_days"] is True
+    assert denominator["day_count"] == 10
+
+
+def test_exact_selected_days_fail_closed_when_an_idea_day_is_missing() -> None:
+    with pytest.raises(
+        ValueError, match="idea_active_day_outside_selected_observation_days"
+    ):
+        empirical_operator_burden.build_operator_notification_burden(
+            [_row("a")],
+            partition="development",
+            evidence_mode="historical_replay",
+            selected_observation_days=["2022-01-02"],
+        )

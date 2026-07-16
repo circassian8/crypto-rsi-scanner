@@ -396,10 +396,14 @@ def _cohort_row(
         "mae_sample_size": len(mae),
         "mean_mae_fraction": _mean(mae),
         "mfe_to_mae_ratio_of_means": (
-            _mean(mfe) / _mean(mae)
+            _mean(mfe) / abs(_mean(mae))
             if _mean(mfe) is not None and _mean(mae) not in (None, 0.0)
             else None
         ),
+        "excursion_sign_convention": {
+            "mfe": "nonnegative_direction_adjusted_fraction",
+            "mae": "nonpositive_direction_adjusted_fraction",
+        },
         "uncertainty": _bootstrap_mean_ci(
             directional,
             resamples=bootstrap_resamples,
@@ -459,6 +463,10 @@ def _horizon_row(
         "mean_directional_relative_return_vs_eth_fraction": _mean(relative_eth),
         "mean_mfe_fraction": _mean(mfe),
         "mean_mae_fraction": _mean(mae),
+        "excursion_sign_convention": {
+            "mfe": "nonnegative_direction_adjusted_fraction",
+            "mae": "nonpositive_direction_adjusted_fraction",
+        },
         "time_to_mfe": _horizon_timing_summary(
             matured, "time_to_mfe_hours", partition, evidence_mode, horizon, bootstrap_resamples
         ),
@@ -866,7 +874,7 @@ def _primary_mae(row: _Episode) -> float | None:
     value = _horizon_mae(_primary_horizon(row))
     if value is None:
         value = _fraction_field(row.outcome, "max_adverse_excursion")
-    return abs(value) if value is not None else None
+    return -abs(value) if value is not None else None
 
 
 def _horizon_directional(row: _Episode, value: Mapping[str, Any]) -> float | None:
@@ -897,7 +905,7 @@ def _horizon_mfe(value: Mapping[str, Any]) -> float | None:
 
 def _horizon_mae(value: Mapping[str, Any]) -> float | None:
     result = _fraction_field(value, "max_adverse_excursion_fraction")
-    return abs(result) if result is not None else None
+    return -abs(result) if result is not None else None
 
 
 def _primary_classifications(row: _Episode) -> dict[str, bool | None]:

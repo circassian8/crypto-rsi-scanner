@@ -56,11 +56,38 @@ _TOKEN_REASONS = (
     (("schema", "projection", "unit", "feature"), "feature_bug"),
 )
 _PRIMARY_ORDER = REASON_TAXONOMY
+_QUALIFICATION_REASON = {
+    "minimum_point_in_time_liquidity_not_met": "liquidity_gate",
+    "point_in_time_membership_not_proven": "universe_exclusion",
+    "warm_baseline_not_proven": "insufficient_history",
+}
+_PROJECTION_VALIDATION_CODES = {
+    "return_unit_metadata_invalid",
+    "return_unit_field_unknown",
+    "return_unit_missing",
+    "return_value_invalid",
+    "return_fraction_implausible",
+    "return_percent_implausible",
+    "decision_field_missing",
+    "decision_field_type_invalid",
+    "decision_enum_invalid",
+    "decision_score_or_expiry_invalid",
+    "decision_actionability_contract_invalid",
+    "decision_route_contract_invalid",
+    "decision_calendar_contract_invalid",
+    "decision_projection_contract_invalid",
+    "decision_safety_contract_invalid",
+    "decision_provenance_contract_invalid",
+    "decision_contract_invalid_other",
+    "canonical_projection_idempotence_failed",
+}
 
 
 def classify_missed_attribution(
     trace: Mapping[str, Any] | None,
     observation: Mapping[str, Any] | None = None,
+    *,
+    qualification_failure_reasons: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Return closed reason codes without consulting any future outcome."""
 
@@ -71,6 +98,33 @@ def classify_missed_attribution(
     stage = _text(row.get("failure_stage"))
     if stage in _STAGE_REASONS:
         _add(reasons, evidence, _STAGE_REASONS[stage], "failure_stage", stage)
+    qualification_failures = [
+        value
+        for value in _strings(qualification_failure_reasons)
+        if value in _QUALIFICATION_REASON
+    ]
+    for failure in qualification_failures:
+        _add(
+            reasons,
+            evidence,
+            _QUALIFICATION_REASON[failure],
+            "qualification_failure",
+            failure,
+        )
+
+    validation_error_codes = [
+        code
+        for code in _strings(row.get("projection_validation_error_codes"))
+        if code in _PROJECTION_VALIDATION_CODES
+    ][:16]
+    for code in validation_error_codes:
+        _add(
+            reasons,
+            evidence,
+            "feature_bug",
+            "projection_validation_error_code",
+            code,
+        )
 
     blockers = _strings(row.get("hard_blockers"))
     warnings = _strings(row.get("warnings"))
@@ -133,6 +187,12 @@ def classify_missed_attribution(
             stage or "missing",
         )
     ordered = [reason for reason in _PRIMARY_ORDER if reason in reasons]
+    concern_class = _text(row.get("projection_validation_concern_class"))
+    if concern_class not in {
+        "data_quality_feature_contract",
+        "canonical_projection_contract",
+    }:
+        concern_class = "none"
     return {
         "primary_reason": ordered[0],
         "reason_codes": ordered,
@@ -141,6 +201,8 @@ def classify_missed_attribution(
             key=lambda item: (item["reason"], item["source"], item["value"]),
         ),
         "reason_taxonomy": list(REASON_TAXONOMY),
+        "projection_validation_error_codes": validation_error_codes,
+        "diagnostic_concern_class": concern_class,
         "uses_future_outcome": False,
         "causal_claim": False,
         "research_only": True,

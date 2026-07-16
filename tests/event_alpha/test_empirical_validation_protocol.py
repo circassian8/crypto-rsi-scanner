@@ -28,8 +28,26 @@ def test_frozen_protocol_has_closed_chronological_final_test_firewall() -> None:
         "validation",
         "final_test",
     ]
-    assert values["partitions"][0]["end_exclusive"] == values["partitions"][1]["start_inclusive"]
-    assert values["partitions"][1]["end_exclusive"] == values["partitions"][2]["start_inclusive"]
+    assert values["partitions"][0]["outcome_end_exclusive"] == values["partitions"][1]["start_inclusive"]
+    assert values["partitions"][1]["outcome_end_exclusive"] == values["partitions"][2]["start_inclusive"]
+    assert values["partition_embargoes"] == [
+        {
+            "after_partition": "development",
+            "before_partition": "validation",
+            "start_inclusive": "2023-01-01T00:00:00Z",
+            "end_exclusive": "2023-01-15T00:00:00Z",
+            "idea_evaluation_allowed": False,
+            "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+        },
+        {
+            "after_partition": "validation",
+            "before_partition": "final_test",
+            "start_inclusive": "2025-01-01T00:00:00Z",
+            "end_exclusive": "2025-01-15T00:00:00Z",
+            "idea_evaluation_allowed": False,
+            "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+        },
+    ]
     assert values["partitions"][2]["policy_selection_allowed"] is False
     assert values["walk_forward"]["selection_partitions"] == ["development", "validation"]
     assert values["walk_forward"]["confirmation_partition"] == "final_test"
@@ -65,6 +83,18 @@ def test_frozen_protocol_declares_missing_data_and_safety_without_proxies() -> N
     assert set(values["safety"].values()) == {0}
     assert values["policy_change_rules"]["production_mutation_allowed"] is False
     assert values["policy_change_rules"]["threshold_lowering_to_create_ideas"] is False
+    for rule_name in (
+        "shadow_recommendation_rule",
+        "final_test_confirmation_rule",
+    ):
+        rule = values[rule_name]
+        assert rule["rule_id"] == (
+            "noninferior_return_failure_selected_day_burden_v1"
+        )
+        assert rule["ideas_per_selected_observation_day_check"] == (
+            "candidate_lte_1_2x_production"
+        )
+        assert "ideas_per_active_day_check" not in rule
 
 
 def test_protocol_mutations_fail_closed() -> None:
@@ -100,3 +130,17 @@ def test_protocol_values_are_defensive_copies() -> None:
     assert second == protocol.protocol_values()
     assert first != second
     assert deepcopy(second) == second
+
+
+def test_selected_observation_day_digest_is_order_and_duplicate_independent() -> None:
+    expected = protocol.selected_observation_days_sha256(
+        ["2025-01-15", "2025-01-16"]
+    )
+
+    assert protocol.selected_observation_days_sha256(
+        ["2025-01-16", "2025-01-15", "2025-01-16"]
+    ) == expected
+    assert protocol.selected_observation_days_sha256([]) == (
+        "e3b0c44298fc1c149afbf4c8996fb924"
+        "27ae41e4649b934ca495991b7852b855"
+    )

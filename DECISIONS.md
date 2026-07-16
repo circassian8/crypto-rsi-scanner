@@ -16,6 +16,33 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Quarantine partition tails before opening the empirical holdout
+**Status:** accepted
+**Decision:** Treat each partition's maximum 14-day outcome tail as an
+outcome-only embargo in which no new ideas may be evaluated. Development ideas
+end on 2023-01-01 and may mature only through 2023-01-15; validation ideas begin
+on 2023-01-15, end on 2025-01-01, and may mature only through 2025-01-15; the
+clean final-test idea window begins on 2025-01-15. The nominal 2025-01-01 through
+2025-01-14 tail is quarantined from final evidence because an early validation
+sensitivity pass indirectly read those prices before the firewall audit, even
+though no per-idea final-test result was inspected.
+
+Every outcome horizon must be due strictly before its partition outcome
+boundary. Walk-forward training and test sets purge primary outcomes whose due
+time reaches the fold boundary, and omit a final fold shorter than the frozen
+180-day test length. Recommendation seals bind one deterministic
+`noninferior_return_failure_selected_day_burden_v1` selection rule over the
+exact selected UTC-day denominator, including zero-idea days. The final test may
+only confirm, reject, or report insufficient sample for those sealed candidates.
+All earlier medium runs remain immutable but are superseded for selection.
+**Why:** A nominal date label is not an effective holdout when validation
+sensitivity outcomes can read its prices. Explicit embargoes and outcome-time
+purges restore a testable no-lookahead boundary without concealing the discovered
+contamination or silently discarding historical audit evidence.
+**Revisit when:** A new protocol version freezes different idea/outcome
+boundaries before accessing any of its own confirmation data. Protocol v1 must
+retain this quarantine permanently.
+
 ## 2026-07-16 - Bind empirical holdout access to one complete selection run
 **Status:** accepted
 **Decision:** An empirical final-test run may load a recommendation seal only
@@ -71,7 +98,7 @@ authority-separation guarantees.
 **Decision:** Use `decision_radar_empirical_validation_v1` as the immutable
 research protocol for the first Decision-v2 historical replay. It fixes the
 daily completed-candle observation clock, trailing 30-day point-in-time quote-
-volume universe, 2021-06-12 through 2026-06-01 idea window, contiguous
+volume universe, 2021-06-12 through 2026-06-01 idea window, embargo-separated
 development/validation/final-test partitions, 3-day primary outcome, 1/7/14-day
 sensitivity outcomes, fixed-start 24-hour episodes, outcome-blind matched
 controls, predeclared missed/false/late rules, deterministic episode bootstrap,

@@ -43,6 +43,12 @@ _MATERIAL_CHANGE_BOOL_FIELDS = (
     "operator_material_change",
     "material_change",
 )
+_URGENT_ROUTES = frozenset(
+    str(value)
+    for value in empirical_validation_protocol.protocol_values()[
+        "operator_burden"
+    ]["urgent_routes"]
+)
 
 
 def build_operator_notification_burden(
@@ -50,6 +56,7 @@ def build_operator_notification_burden(
     *,
     partition: str,
     evidence_mode: str,
+    selected_observation_days: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Describe current burden and simulate the frozen notification budgets."""
 
@@ -71,6 +78,11 @@ def build_operator_notification_burden(
     descriptive_minimum = int(protocol["minimum_samples"]["descriptive"])
 
     days = _group(rows, lambda row: row["_day"])
+    observed_days, day_denominator = _observation_day_denominator(
+        selected_observation_days,
+        active_days=days,
+    )
+    visible_active_days = {str(row["_day"]) for row in visible}
     families = _group(rows, lambda row: row["_family"])
     daily = [
         _burden_row(
@@ -122,11 +134,30 @@ def build_operator_notification_burden(
         "urgent_status_missing_count": sum(
             row["_urgent"] is None for row in visible
         ),
-        "observed_day_count": len(daily),
+        "observed_day_count": len(observed_days),
+        "selected_observation_day_count": len(observed_days),
+        "idea_active_day_count": len(daily),
+        "visible_idea_active_day_count": len(visible_active_days),
+        "zero_idea_observed_day_count": max(0, len(observed_days) - len(daily)),
+        "observed_day_denominator": day_denominator,
+        "daily_rows_scope": "idea_active_days_only",
         "family_count": len(family_rows),
-        "mean_ideas_per_observed_day": len(rows) / len(daily) if daily else None,
+        "mean_ideas_per_observed_day": (
+            len(rows) / len(observed_days) if observed_days else None
+        ),
         "mean_visible_ideas_per_observed_day": (
+            len(visible) / len(observed_days) if observed_days else None
+        ),
+        "mean_ideas_per_idea_active_day": (
+            len(rows) / len(daily) if daily else None
+        ),
+        "mean_visible_ideas_per_idea_active_day": (
             len(visible) / len(daily) if daily else None
+        ),
+        "mean_visible_ideas_per_visible_active_day": (
+            len(visible) / len(visible_active_days)
+            if visible_active_days
+            else None
         ),
         "dependent_repeat_item_count": sum(row["_dependent_repeats"] for row in rows),
         "visible_dependent_repeat_item_count": sum(
@@ -152,38 +183,8 @@ def build_operator_notification_burden(
             "material_change_only": bool(budgets["material_change_only"]),
             "cooldown_hours": list(budgets["cooldown_hours"]),
         },
-        "simulations": {
-            "urgent_per_cycle": [
-                _cap_simulation(
-                    urgent,
-                    limit=int(limit),
-                    scope="observation_cycle",
-                    key=lambda row: row["_cycle"],
-                )
-                for limit in budgets["urgent_per_cycle"]
-            ],
-            "urgent_per_day": [
-                _cap_simulation(
-                    urgent,
-                    limit=int(limit),
-                    scope="calendar_day_utc",
-                    key=lambda row: row["_day"],
-                )
-                for limit in budgets["urgent_per_day"]
-            ],
-            "one_item_per_visible_family": _one_family_per_cycle(visible),
-            "family_cooldown": [
-                _cooldown_simulation(visible, hours=int(hours))
-                for hours in budgets["cooldown_hours"]
-            ],
-            "material_change_only": _material_change_simulation(visible),
-        },
-        "simulation_scenario_count": (
-            len(budgets["urgent_per_cycle"])
-            + len(budgets["urgent_per_day"])
-            + len(budgets["cooldown_hours"])
-            + 2
-        ),
+        "simulations": _notification_simulations(urgent, visible, budgets),
+        "simulation_scenario_count": _simulation_scenario_count(budgets),
         "outcomes_used_for_selection": 0,
         "outcome_fields_read": [],
         "notification_state_inferred": False,
@@ -195,6 +196,48 @@ def build_operator_notification_burden(
         "safety": dict(_ZERO_SAFETY),
     }
     return result
+
+
+def _notification_simulations(
+    urgent: Sequence[Mapping[str, Any]],
+    visible: Sequence[Mapping[str, Any]],
+    budgets: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "urgent_per_cycle": [
+            _cap_simulation(
+                urgent,
+                limit=int(limit),
+                scope="observation_cycle",
+                key=lambda row: row["_cycle"],
+            )
+            for limit in budgets["urgent_per_cycle"]
+        ],
+        "urgent_per_day": [
+            _cap_simulation(
+                urgent,
+                limit=int(limit),
+                scope="calendar_day_utc",
+                key=lambda row: row["_day"],
+            )
+            for limit in budgets["urgent_per_day"]
+        ],
+        "one_item_per_visible_family": _one_family_per_cycle(visible),
+        "family_cooldown": [
+            _cooldown_simulation(visible, hours=int(hours))
+            for hours in budgets["cooldown_hours"]
+        ],
+        "material_change_only": _material_change_simulation(visible),
+    }
+
+
+def _simulation_scenario_count(budgets: Mapping[str, Any]) -> int:
+    return (
+        len(budgets["urgent_per_cycle"])
+        + len(budgets["urgent_per_day"])
+        + len(budgets["cooldown_hours"])
+        + 2
+    )
 
 
 def _frozen_protocol() -> dict[str, Any]:
@@ -211,10 +254,7 @@ def _normalize_row(row: Mapping[str, Any], *, position: int) -> dict[str, Any]:
     if isinstance(projection, Mapping):
         for key, item in projection.items():
             value.setdefault(str(key), item)
-    aliases = {
-        "operator_visible_idea": "operator_visible",
-        "anomaly_family": "candidate_family_id",
-    }
+    aliases = {"operator_visible_idea": "operator_visible"}
     for target, source in aliases.items():
         if target not in value and source in value:
             value[target] = value[source]
@@ -636,7 +676,7 @@ def _urgent_state(row: Mapping[str, Any]) -> tuple[bool | None, str]:
         return explicit, "explicit_operator_urgent_state"
     route = _text(row.get("radar_route"))
     if route:
-        return route == "rapid_market_anomaly", "frozen_route_semantics"
+        return route in _URGENT_ROUTES, "frozen_route_semantics"
     return None, "unavailable"
 
 
@@ -658,15 +698,21 @@ def _repeat_count(row: Mapping[str, Any]) -> int:
 
 def _family(row: Mapping[str, Any]) -> str:
     for field in (
-        "anomaly_family",
+        "candidate_family_id",
         "family_id",
         "episode_family",
-        "candidate_family_id",
-        "anomaly_type",
     ):
         value = _text(row.get(field))
         if value:
             return value
+    canonical = _text(row.get("canonical_asset_id"))
+    anomaly = _text(row.get("anomaly_family")) or _text(row.get("anomaly_type"))
+    if canonical and anomaly:
+        return f"{canonical}|{anomaly}"
+    if canonical:
+        return canonical
+    if anomaly:
+        return anomaly
     return "unknown"
 
 
@@ -687,6 +733,52 @@ def _group(rows: Sequence[Mapping[str, Any]], key: Any) -> dict[str, list[Mappin
     for row in rows:
         groups[str(key(row))].append(row)
     return groups
+
+
+def _observation_day_denominator(
+    supplied_days: Iterable[str] | None,
+    *,
+    active_days: Mapping[str, Any],
+) -> tuple[set[str], dict[str, Any]]:
+    active = set(active_days)
+    if supplied_days is None:
+        selected = set(active)
+        basis = "fallback_episode_active_utc_days_only"
+        includes_zero = False
+    else:
+        selected = {_utc_day(value) for value in supplied_days}
+        if not active <= selected:
+            raise ValueError("idea_active_day_outside_selected_observation_days")
+        basis = "exact_selected_observation_utc_days"
+        includes_zero = True
+    return selected, {
+        "basis": basis,
+        "status": "exact" if supplied_days is not None else "fallback_active_days_only",
+        "includes_zero_idea_days": includes_zero,
+        "day_count": len(selected),
+        "first_day": min(selected) if selected else None,
+        "last_day": max(selected) if selected else None,
+        "days_sha256": (
+            empirical_validation_protocol.selected_observation_days_sha256(selected)
+        ),
+        "timezone": "UTC",
+    }
+
+
+def _utc_day(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("selected_observation_day_invalid")
+    raw = value.strip()
+    if len(raw) == 10:
+        try:
+            parsed = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError("selected_observation_day_invalid") from exc
+        return parsed.date().isoformat()
+    parsed = _aware_datetime(raw)
+    if parsed is None:
+        raise ValueError("selected_observation_day_invalid")
+    return parsed.date().isoformat()
 
 
 def _row_order(row: Mapping[str, Any]) -> tuple[datetime, str, str]:

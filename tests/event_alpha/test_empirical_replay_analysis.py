@@ -98,6 +98,11 @@ def test_zero_input_closes_all_routes_and_primary_origins() -> None:
     assert set(result["safety"].values()) == {0}
     assert result["causal_claim"] is False
     assert result["production_policy_claim"] is False
+    assert all(
+        row["evaluation_status"] == "not_evaluable"
+        and row["probabilistic_calibration_claim"] is False
+        for row in result["score_monotonicity"]
+    )
 
 
 def test_insufficient_sample_is_distinct_from_negative_descriptive_result() -> None:
@@ -158,7 +163,7 @@ def test_robust_metrics_trim_outliers_and_keep_mfe_mae_as_fractions() -> None:
     assert row["trimmed_mean_10pct_directional_return_fraction"] == pytest.approx(
         0.01
     )
-    assert row["mean_mae_fraction"] == pytest.approx(0.05)
+    assert row["mean_mae_fraction"] == pytest.approx(-0.05)
     assert row["mfe_to_mae_ratio_of_means"] is not None
     assert row["return_unit"] == "fraction"
 
@@ -189,6 +194,7 @@ def test_score_bucket_monotonicity_reports_violations_without_model_change() -> 
 
     for field in analysis.SCORE_FIELDS:
         assert by_field[field]["violation_count"] == 1
+        assert by_field[field]["evaluation_status"] == "evaluated"
         assert by_field[field]["comparisons"][0]["violation"] is True
         assert by_field[field]["model_changed"] is False
         assert by_field[field]["auto_apply"] is False
@@ -392,21 +398,21 @@ def test_operator_burden_is_closed_per_day_and_family_without_notification_infer
 
     assert burden["episode_count"] == 3
     assert burden["observed_day_count"] == 2
-    assert burden["family_count"] == 2
+    assert burden["family_count"] == 3
     assert burden["mean_ideas_per_observed_day"] == pytest.approx(1.5)
     first_day = burden["daily"][0]
     assert first_day["idea_count"] == 2
-    assert first_day["urgent_item_count"] == 1
+    assert first_day["urgent_item_count"] == 2
     assert first_day["digest_item_count"] == 1
     assert first_day["dependent_repeat_item_count"] == 2
-    assert first_day["repeated_family_item_count"] == 3
-    volume = next(row for row in burden["families"] if row["name"] == "volume")
-    assert volume["repeated_family_item_count"] == 3
-    assert volume["median_observation_interval_hours"] == pytest.approx(4.0)
-    assert volume["material_change_interval_status"] == (
+    assert first_day["repeated_family_item_count"] == 2
+    asset_a = next(row for row in burden["families"] if row["name"] == "a|volume")
+    assert asset_a["repeated_family_item_count"] == 2
+    assert asset_a["median_observation_interval_hours"] is None
+    assert asset_a["material_change_interval_status"] == (
         "unavailable_incomplete_progression_evidence"
     )
-    assert volume["median_material_change_interval_hours"] is None
+    assert asset_a["median_material_change_interval_hours"] is None
     assert burden["notification_state_inferred"] is False
     assert burden["auto_apply"] is False
 
@@ -471,7 +477,7 @@ def test_generic_outcome_completion_status_defers_to_primary_horizon_maturity() 
     assert result["matured_episode_count"] == 1
     assert row["mean_directional_return_fraction"] == pytest.approx(0.08)
     assert row["mean_mfe_fraction"] == pytest.approx(0.12)
-    assert row["mean_mae_fraction"] == pytest.approx(0.04)
+    assert row["mean_mae_fraction"] == pytest.approx(-0.04)
 
 
 def test_episode_adapter_binds_representative_outcome_by_episode_identity() -> None:
@@ -724,7 +730,7 @@ def test_horizon_timing_classification_and_expiry_summaries_are_closed() -> None
     assert horizon_rows["14d"]["mean_directional_return_fraction"] == pytest.approx(
         0.15
     )
-    assert horizon_rows["3d"]["mean_mae_fraction"] == pytest.approx(0.08)
+    assert horizon_rows["3d"]["mean_mae_fraction"] == pytest.approx(-0.08)
     assert horizon_rows["3d"]["time_to_invalidation"]["mean_hours"] == 48.0
     assert horizon_rows["3d"]["classification_counts"]["reversal"] == 1
     assert horizon_rows["3d"]["classification_counts"]["breakout_failure"] == 1

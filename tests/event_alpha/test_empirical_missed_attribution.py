@@ -61,3 +61,38 @@ def test_stage_mapping_and_closed_zero_counts_are_explicit() -> None:
     assert by_reason["feature_bug"]["primary_count"] == 1
     assert by_reason["duplicate_suppression"]["sample_status"] == "zero_sample"
     assert by_reason["outcome_outside_supported_horizon"]["contributing_count"] == 0
+
+
+def test_projection_unit_failure_is_explicit_feature_contract_concern() -> None:
+    result = empirical_missed_attribution.classify_missed_attribution(
+        {
+            "failure_stage": "canonical_projection_invalid",
+            "projection_validation_error_codes": [
+                "return_fraction_implausible",
+                "not_a_closed_code:secret-value",
+            ],
+            "projection_validation_concern_class": (
+                "data_quality_feature_contract"
+            ),
+        },
+        {
+            "point_in_time_universe_member": True,
+            "baseline_status": "warm",
+        },
+    )
+
+    assert result["primary_reason"] == "feature_bug"
+    assert result["projection_validation_error_codes"] == [
+        "return_fraction_implausible"
+    ]
+    assert result["diagnostic_concern_class"] == (
+        "data_quality_feature_contract"
+    )
+    assert any(
+        row == {
+            "reason": "feature_bug",
+            "source": "projection_validation_error_code",
+            "value": "return_fraction_implausible",
+        }
+        for row in result["reason_evidence"]
+    )

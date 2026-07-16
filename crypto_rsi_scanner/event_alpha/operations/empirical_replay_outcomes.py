@@ -22,8 +22,8 @@ from . import empirical_validation_protocol
 
 
 SCHEMA_ID = "decision_radar.empirical_replay_episode_outcomes"
-SCHEMA_VERSION = 2
-METHOD = "frozen_daily_path_outcomes_with_fixed_start_inclusive_episodes"
+SCHEMA_VERSION = 3
+METHOD = "partition_bounded_daily_path_outcomes_with_fixed_start_inclusive_episodes"
 TIMING_RESOLUTION = {
     "basis": "daily_ohlcv",
     "minimum_increment_hours": 24,
@@ -39,6 +39,19 @@ _SENSITIVITY_DAYS = tuple(
 _HORIZON_DAYS = tuple(sorted({_PRIMARY_DAYS, *_SENSITIVITY_DAYS}))
 _PRIMARY_HORIZON = f"{_PRIMARY_DAYS}d"
 _EPISODE_WINDOW_HOURS = int(_PROTOCOL["episodes"]["primary_window_hours"])
+_SENSITIVITY_EPISODE_WINDOW_HOURS = tuple(
+    int(value) for value in _PROTOCOL["episodes"]["sensitivity_window_hours"]
+)
+_PARTITION_BOUNDARY_REASON = "horizon_crosses_partition_outcome_boundary"
+_PARTITION_BOUNDARY_RULE = str(
+    _PROTOCOL["outcomes"].get(
+        "partition_outcome_boundary_rule",
+        "horizon_due_at_lt_outcome_end_exclusive",
+    )
+)
+_PARTITION_OBSERVATION_READ_RULE = (
+    "outcome_observation_at_lt_partition_outcome_end_exclusive"
+)
 _INVALIDATION_RETURN = -abs(
     float(
         _PROTOCOL["false_positive_and_late_rules"][
@@ -113,7 +126,10 @@ def build_empirical_replay_outcomes(
         else:
             eligible.append(snapshot)
 
-    episode_groups = _fixed_start_episode_groups(eligible)
+    episode_groups = _fixed_start_episode_groups(
+        eligible,
+        window_hours=_EPISODE_WINDOW_HOURS,
+    )
     episodes = [
         _episode_value(group, frames=frames, evaluated_at=evaluated)
         for group in episode_groups
@@ -133,6 +149,8 @@ def build_empirical_replay_outcomes(
         "episode_window_hours": _EPISODE_WINDOW_HOURS,
         "episode_boundary_rule": _PROTOCOL["episodes"]["boundary_rule"],
         "representative_rule": "first_eligible_observation_never_reselected",
+        "partition_outcome_boundary_rule": _partition_boundary_contract(),
+        "partition_outcome_boundaries": _bundle_partition_boundaries(eligible),
         "timing_resolution": dict(TIMING_RESOLUTION),
         "status": (
             "empty" if not supplied else "partial" if excluded else "ready"
@@ -144,6 +162,10 @@ def build_empirical_replay_outcomes(
         "episode_count": len(episodes),
         "dependent_repeat_count": len(eligible) - len(episodes),
         "episodes": episodes,
+        "episode_window_sensitivity": _episode_window_sensitivity(
+            eligible,
+            primary_groups=episode_groups,
+        ),
         "price_frame_diagnostics": frame_diagnostics,
         "research_only": True,
         "auto_apply": False,
@@ -197,6 +219,7 @@ def _episode_value(
 ) -> dict[str, Any]:
     representative = members[0]
     start = _required_utc(representative["observed_at"], field_name="observed_at")
+    boundary = _partition_outcome_boundary(representative)
     identity = {
         "canonical_asset_id": representative["canonical_asset_id"],
         "directional_bias": representative["directional_bias"],
@@ -230,6 +253,10 @@ def _episode_value(
         "episode_id": episode_id,
         "episode_identity": identity,
         "canonical_asset_id": representative["canonical_asset_id"],
+        "candidate_family_id": representative["candidate_family_id"],
+        "replay_partition": boundary["partition"],
+        "outcome_end_exclusive": boundary["outcome_end_exclusive"],
+        "partition_outcome_boundary": boundary,
         "directional_bias": representative["directional_bias"],
         "anomaly_family": representative["anomaly_family"],
         "episode_start_at": start.isoformat(),
@@ -262,7 +289,9 @@ def _path_outcome(
     symbol = str(idea["symbol"])
     direction = str(idea["directional_bias"])
     sign = _DIRECTION_SIGN.get(direction)
-    frame = frames.get(symbol.upper())
+    boundary = _partition_outcome_boundary(idea)
+    bounded_frames = _frames_before_boundary(frames, boundary["outcome_end_exclusive"])
+    frame = bounded_frames.get(symbol.upper())
     entry_price = _exact_close(frame, observed)
     entry_missing_reason = (
         "asset_price_frame_missing"
@@ -282,8 +311,9 @@ def _path_outcome(
             entry_price=entry_price,
             entry_missing_reason=entry_missing_reason,
             frame=frame,
-            benchmark_frames=frames,
+            benchmark_frames=bounded_frames,
             direction_sign=sign,
+            partition_boundary=boundary,
         )
 
     primary = horizons[_PRIMARY_HORIZON]
@@ -301,6 +331,7 @@ def _path_outcome(
         frame=frame,
         horizons=horizons,
         direction_sign=sign,
+        partition_boundary=boundary,
     )
     classifications = _classifications(
         direction=direction,
@@ -318,12 +349,17 @@ def _path_outcome(
         "candidate_id": idea.get("candidate_id"),
         "core_opportunity_id": idea.get("core_opportunity_id"),
         "canonical_asset_id": idea["canonical_asset_id"],
+        "candidate_family_id": idea["candidate_family_id"],
         "symbol": symbol,
         "observed_at": observed.isoformat(),
         "evaluated_at": evaluated_at.isoformat(),
         "directional_bias": direction,
         "direction_sign": sign,
         "direction_status": "scoreable" if sign is not None else "not_scoreable",
+        "replay_partition": boundary["partition"],
+        "partition": boundary["partition"],
+        "outcome_end_exclusive": boundary["outcome_end_exclusive"],
+        "partition_outcome_boundary": boundary,
         "entry_price": entry_price,
         "entry_bar_at": observed.isoformat() if entry_price is not None else None,
         "primary_horizon": _PRIMARY_HORIZON,
@@ -370,8 +406,16 @@ def _horizon_value(
     frame: pd.DataFrame | None,
     benchmark_frames: Mapping[str, pd.DataFrame],
     direction_sign: float | None,
+    partition_boundary: Mapping[str, Any],
 ) -> dict[str, Any]:
     due = observed_at + timedelta(days=days)
+    cutoff = _optional_utc(partition_boundary.get("outcome_end_exclusive"))
+    if cutoff is not None and due >= cutoff:
+        return _withheld_horizon_value(
+            days=days,
+            due_at=due,
+            partition_boundary=partition_boundary,
+        )
     missing: list[str] = []
     if entry_price is None:
         maturity = "missing_data"
@@ -471,10 +515,177 @@ def _horizon_value(
         "relative_returns_fraction": relative,
         "direction_adjusted_relative_returns_fraction": direction_relative,
         **path,
+        "partition_outcome_boundary_status": (
+            "within_boundary" if cutoff is not None else "not_applicable"
+        ),
         "return_unit": "fraction",
         "timing_resolution_hours": 24,
         "same_idea_bar_excluded": True,
     }
+
+
+def _withheld_horizon_value(
+    *,
+    days: int,
+    due_at: datetime,
+    partition_boundary: Mapping[str, Any],
+) -> dict[str, Any]:
+    benchmark_values = {benchmark: None for benchmark in ("BTC", "ETH")}
+    benchmark_status = {
+        benchmark: "withheld_partition_boundary" for benchmark in ("BTC", "ETH")
+    }
+    benchmark_reasons = {
+        benchmark: [_PARTITION_BOUNDARY_REASON]
+        for benchmark in ("BTC", "ETH")
+    }
+    return {
+        "horizon": f"{days}d",
+        "horizon_days": days,
+        "due_at": due_at.isoformat(),
+        "maturity_status": "withheld_partition_boundary",
+        "missing_reasons": [_PARTITION_BOUNDARY_REASON],
+        "exit_bar_at": None,
+        "exit_price": None,
+        "raw_return_fraction": None,
+        "direction_adjusted_return_fraction": None,
+        "benchmark_returns_fraction": dict(benchmark_values),
+        "benchmark_status": benchmark_status,
+        "benchmark_missing_reasons": benchmark_reasons,
+        "relative_returns_fraction": dict(benchmark_values),
+        "direction_adjusted_relative_returns_fraction": dict(benchmark_values),
+        "path_status": "withheld_partition_boundary",
+        "path_missing_reasons": [_PARTITION_BOUNDARY_REASON],
+        "path_bar_count": 0,
+        "expected_path_bar_count": days,
+        "max_favorable_excursion_fraction": None,
+        "max_adverse_excursion_fraction": None,
+        "time_to_mfe_hours": None,
+        "time_to_mae_hours": None,
+        "time_to_invalidation_hours": None,
+        "invalidation_threshold_fraction": _INVALIDATION_RETURN,
+        "partition_outcome_boundary_status": "withheld_partition_boundary",
+        "return_unit": "fraction",
+        "timing_resolution_hours": 24,
+        "same_idea_bar_excluded": True,
+    }
+
+
+def _partition_outcome_boundary(idea: Mapping[str, Any]) -> dict[str, Any]:
+    replay_partition = _optional_text(idea.get("replay_partition"))
+    partition = _optional_text(idea.get("partition"))
+    if (
+        replay_partition is not None
+        and partition is not None
+        and replay_partition != partition
+    ):
+        raise ValueError("empirical idea replay partition fields disagree")
+    selected = replay_partition or partition
+    protocol_row = next(
+        (
+            row
+            for row in _PROTOCOL.get("partitions", ())
+            if isinstance(row, Mapping) and row.get("name") == selected
+        ),
+        None,
+    )
+    if selected not in (None, "fixture") and not isinstance(
+        protocol_row, Mapping
+    ):
+        raise ValueError("empirical idea claimed replay partition unknown")
+    if isinstance(protocol_row, Mapping):
+        observed = _required_utc(
+            idea.get("observed_at"), field_name="observed_at"
+        )
+        start = _required_utc(
+            protocol_row.get("start_inclusive"),
+            field_name="partition.start_inclusive",
+        )
+        end = _required_utc(
+            protocol_row.get("end_exclusive"),
+            field_name="partition.end_exclusive",
+        )
+        if not start <= observed < end:
+            raise ValueError(
+                "empirical idea observed_at outside claimed frozen partition"
+            )
+    raw_cutoff = (
+        protocol_row.get("outcome_end_exclusive")
+        if isinstance(protocol_row, Mapping)
+        else None
+    )
+    cutoff = (
+        _required_utc(raw_cutoff, field_name="outcome_end_exclusive")
+        if raw_cutoff not in (None, "")
+        else None
+    )
+    status = (
+        "enforced"
+        if cutoff is not None
+        else "not_applicable"
+        if selected in (None, "fixture")
+        else "not_configured"
+    )
+    return {
+        "partition": selected,
+        "status": status,
+        "outcome_end_exclusive": cutoff.isoformat() if cutoff is not None else None,
+        "cutoff_source": (
+            "frozen_protocol_partition.outcome_end_exclusive"
+            if cutoff is not None
+            else None
+        ),
+        "rule": _PARTITION_BOUNDARY_RULE,
+        "observation_read_rule": _PARTITION_OBSERVATION_READ_RULE,
+        "due_at_equal_cutoff": "withheld_partition_boundary",
+        "withheld_reason": _PARTITION_BOUNDARY_REASON,
+    }
+
+
+def _frames_before_boundary(
+    frames: Mapping[str, pd.DataFrame],
+    raw_cutoff: Any,
+) -> Mapping[str, pd.DataFrame]:
+    cutoff = _optional_utc(raw_cutoff)
+    if cutoff is None:
+        return frames
+    timestamp = pd.Timestamp(cutoff)
+    return {
+        symbol: frame.loc[frame.index < timestamp]
+        for symbol, frame in frames.items()
+    }
+
+
+def _partition_boundary_contract() -> dict[str, Any]:
+    return {
+        "partition_field_precedence": ["replay_partition", "partition"],
+        "protocol_cutoff_field": "outcome_end_exclusive",
+        "rule": _PARTITION_BOUNDARY_RULE,
+        "observation_read_rule": _PARTITION_OBSERVATION_READ_RULE,
+        "due_at_equal_cutoff": "withheld_partition_boundary",
+        "withheld_reason": _PARTITION_BOUNDARY_REASON,
+        "fixture_without_cutoff": "not_applicable",
+    }
+
+
+def _bundle_partition_boundaries(
+    snapshots: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    unique: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
+    for snapshot in snapshots:
+        boundary = _partition_outcome_boundary(snapshot)
+        key = (
+            boundary["partition"],
+            boundary["outcome_end_exclusive"],
+            boundary["status"],
+        )
+        unique[key] = boundary
+    return [
+        unique[key]
+        for key in sorted(
+            unique,
+            key=lambda item: tuple("" if value is None else str(value) for value in item),
+        )
+    ]
 
 
 def _path_metrics(
@@ -603,19 +814,48 @@ def _expiry_assessment(
     frame: pd.DataFrame | None,
     horizons: Mapping[str, Mapping[str, Any]],
     direction_sign: float | None,
+    partition_boundary: Mapping[str, Any],
 ) -> dict[str, Any]:
     raw_expiry = idea.get("expires_at")
+    cutoff = _optional_utc(partition_boundary.get("outcome_end_exclusive"))
     if raw_expiry in (None, ""):
-        return _empty_expiry("not_configured", expires_at=None)
+        return _empty_expiry(
+            "not_configured",
+            expires_at=None,
+            partition_boundary=partition_boundary,
+        )
     expiry = _optional_utc(raw_expiry)
     if expiry is None:
-        return _empty_expiry("invalid_expiry", expires_at=str(raw_expiry))
+        return _empty_expiry(
+            "invalid_expiry",
+            expires_at=str(raw_expiry),
+            partition_boundary=partition_boundary,
+        )
     if expiry <= observed_at:
-        return _empty_expiry("invalid_expiry", expires_at=expiry.isoformat())
+        return _empty_expiry(
+            "invalid_expiry",
+            expires_at=expiry.isoformat(),
+            partition_boundary=partition_boundary,
+        )
+    if cutoff is not None and expiry >= cutoff:
+        return _empty_expiry(
+            "withheld_partition_boundary",
+            expires_at=expiry.isoformat(),
+            missing_reasons=[_PARTITION_BOUNDARY_REASON],
+            partition_boundary=partition_boundary,
+        )
     if evaluated_at < expiry:
-        return _empty_expiry("not_expired", expires_at=expiry.isoformat())
+        return _empty_expiry(
+            "not_expired",
+            expires_at=expiry.isoformat(),
+            partition_boundary=partition_boundary,
+        )
     if frame is None or entry_price is None or direction_sign is None:
-        return _empty_expiry("missing_data", expires_at=expiry.isoformat())
+        return _empty_expiry(
+            "missing_data",
+            expires_at=expiry.isoformat(),
+            partition_boundary=partition_boundary,
+        )
 
     expiry_row = frame.loc[
         (frame.index > pd.Timestamp(observed_at))
@@ -623,11 +863,31 @@ def _expiry_assessment(
         & (frame.index <= pd.Timestamp(evaluated_at))
     ]
     if expiry_row.empty:
-        return _empty_expiry("missing_data", expires_at=expiry.isoformat())
+        boundary_prevents_observation = (
+            cutoff is not None and evaluated_at >= cutoff
+        )
+        return _empty_expiry(
+            (
+                "withheld_partition_boundary"
+                if boundary_prevents_observation
+                else "missing_data"
+            ),
+            expires_at=expiry.isoformat(),
+            missing_reasons=(
+                [_PARTITION_BOUNDARY_REASON]
+                if boundary_prevents_observation
+                else []
+            ),
+            partition_boundary=partition_boundary,
+        )
     expiry_at = expiry_row.index[0]
     expiry_close = _finite_number(expiry_row.iloc[0]["close"])
     if expiry_close is None or expiry_close <= 0:
-        return _empty_expiry("missing_data", expires_at=expiry.isoformat())
+        return _empty_expiry(
+            "missing_data",
+            expires_at=expiry.isoformat(),
+            partition_boundary=partition_boundary,
+        )
     at_expiry = direction_sign * (expiry_close / entry_price - 1.0)
     without_resolution = at_expiry <= 0.0
 
@@ -678,12 +938,23 @@ def _expiry_assessment(
         "post_expiry_reversal": (
             post_return < 0 if post_return is not None else None
         ),
+        "missing_reasons": [],
+        "partition_outcome_boundary_status": (
+            "within_boundary" if cutoff is not None else "not_applicable"
+        ),
         "timing_resolution_hours": 24,
         "return_unit": "fraction",
     }
 
 
-def _empty_expiry(status: str, *, expires_at: str | None) -> dict[str, Any]:
+def _empty_expiry(
+    status: str,
+    *,
+    expires_at: str | None,
+    missing_reasons: Sequence[str] = (),
+    partition_boundary: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    boundary = dict(partition_boundary or {})
     return {
         "status": status,
         "expires_at": expires_at,
@@ -697,6 +968,14 @@ def _empty_expiry(status: str, *, expires_at: str | None) -> dict[str, Any]:
         "post_expiry_direction_adjusted_return_fraction": None,
         "post_expiry_continuation": None,
         "post_expiry_reversal": None,
+        "missing_reasons": list(missing_reasons),
+        "partition_outcome_boundary_status": (
+            "withheld_partition_boundary"
+            if status == "withheld_partition_boundary"
+            else "within_boundary"
+            if boundary.get("outcome_end_exclusive") is not None
+            else "not_applicable"
+        ),
         "timing_resolution_hours": 24,
         "return_unit": "fraction",
     }
@@ -747,6 +1026,8 @@ def _classifications(
 
 def _fixed_start_episode_groups(
     snapshots: Iterable[dict[str, Any]],
+    *,
+    window_hours: int,
 ) -> list[tuple[dict[str, Any], ...]]:
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for snapshot in snapshots:
@@ -771,7 +1052,7 @@ def _fixed_start_episode_groups(
                 if current:
                     episodes.append(tuple(current))
                 current = [snapshot]
-                window_end = observed + timedelta(hours=_EPISODE_WINDOW_HOURS)
+                window_end = observed + timedelta(hours=window_hours)
             else:
                 current.append(snapshot)
         if current:
@@ -780,6 +1061,56 @@ def _fixed_start_episode_groups(
         episodes,
         key=lambda group: (group[0]["observed_at"], group[0]["idea_id"]),
     )
+
+
+def _episode_window_sensitivity(
+    snapshots: Sequence[dict[str, Any]],
+    *,
+    primary_groups: Sequence[Sequence[dict[str, Any]]],
+) -> dict[str, Any]:
+    windows: list[dict[str, Any]] = []
+    requested = tuple(
+        sorted({_EPISODE_WINDOW_HOURS, *_SENSITIVITY_EPISODE_WINDOW_HOURS})
+    )
+    for window_hours in requested:
+        groups = (
+            primary_groups
+            if window_hours == _EPISODE_WINDOW_HOURS
+            else _fixed_start_episode_groups(
+                snapshots,
+                window_hours=window_hours,
+            )
+        )
+        representative_ids = [str(group[0]["idea_id"]) for group in groups]
+        windows.append(
+            {
+                "window_hours": window_hours,
+                "is_primary": window_hours == _EPISODE_WINDOW_HOURS,
+                "boundary_rule": _PROTOCOL["episodes"]["boundary_rule"],
+                "window_end_inclusive": True,
+                "counting_unit": "fixed_start_episode_representative",
+                "episode_count": len(groups),
+                "representative_count": len(representative_ids),
+                "dependent_repeat_count": len(snapshots) - len(groups),
+                "representative_idea_ids_digest": _digest(representative_ids),
+                "representative_reselection": False,
+                "outcomes_used_for_grouping": False,
+                "outcomes_computed_for_sensitivity": False,
+            }
+        )
+    value: dict[str, Any] = {
+        "schema_id": "decision_radar.empirical_episode_window_sensitivity",
+        "schema_version": 1,
+        "primary_window_hours": _EPISODE_WINDOW_HOURS,
+        "sensitivity_window_hours": list(_SENSITIVITY_EPISODE_WINDOW_HOURS),
+        "grouping_inputs": "eligible_idea_identity_and_observed_at_only",
+        "representative_rule": "first_eligible_observation_never_reselected",
+        "outcomes_used": False,
+        "windows": windows,
+        "research_only": True,
+    }
+    value["sensitivity_digest"] = _digest(value)
+    return value
 
 
 def _idea_snapshot(
@@ -829,6 +1160,9 @@ def _idea_snapshot(
     idea_id = value("idea_id", "candidate_id", "observation_id")
     if not isinstance(idea_id, str) or not idea_id.strip():
         idea_id = "derived:" + _digest(provisional)
+    candidate_family_id = _optional_text(value("candidate_family_id")) or (
+        f"{canonical_asset_id.strip()}|{anomaly_family}"
+    )
     snapshot: dict[str, Any] = {
         "idea_id": idea_id.strip(),
         **provisional,
@@ -903,9 +1237,12 @@ def _idea_snapshot(
         "catalyst_timing_vs_market_reaction": _optional_text(
             value("catalyst_timing_vs_market_reaction")
         ),
-        "candidate_family_id": _optional_text(value("candidate_family_id")),
+        "candidate_family_id": candidate_family_id,
         "decision_projection": _json_ready(projection),
     }
+    boundary = _partition_outcome_boundary(snapshot)
+    snapshot["outcome_end_exclusive"] = boundary["outcome_end_exclusive"]
+    snapshot["partition_outcome_boundary_status"] = boundary["status"]
     return snapshot, ()
 
 

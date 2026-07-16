@@ -124,6 +124,10 @@ RADAR_REPLAY_FIXTURE_INPUT_DIR ?= fixtures/backtest_smoke/klines
 RADAR_REPLAY_CACHE_INPUT_DIR ?= backtest_cache/binance_klines
 RADAR_RESEARCH_RECOMMENDATION_SEAL ?=
 RADAR_RESEARCH_RUN_DIR ?=
+RADAR_RESEARCH_SELECTION_RUN ?=
+RADAR_RESEARCH_FINAL_TEST_RUN ?=
+RADAR_RESEARCH_LIVE_CAMPAIGN_REPORT ?= research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json
+RADAR_RESEARCH_REPORT_OUTPUT_DIR ?= research
 RADAR_RESEARCH_FEEDBACK_LEDGER ?= $(RADAR_RESEARCH_OUTPUT_ROOT)/empirical_review_feedback.jsonl
 RADAR_RESEARCH_REVIEW_ITEM_ID ?=
 RADAR_RESEARCH_REVIEW_LABEL ?=
@@ -256,6 +260,8 @@ help:
 	@echo "  make radar-replay-medium            Run the top-30 development/validation replay from the local cache"
 	@echo "  make radar-replay-full              Run the top-100 development/validation replay from the local cache"
 	@echo "  make radar-replay-final-test RADAR_RESEARCH_RECOMMENDATION_SEAL=...  Evaluate only a pre-frozen recommendation set"
+	@echo "  make radar-research-reports RADAR_RESEARCH_SELECTION_RUN=... RADAR_RESEARCH_FINAL_TEST_RUN=...  Publish the closed empirical report bundle"
+	@echo "  make radar-research-reports-check RADAR_RESEARCH_SELECTION_RUN=... RADAR_RESEARCH_FINAL_TEST_RUN=...  Byte-check the closed empirical report bundle"
 	@echo "  make radar-research-feedback-report RADAR_RESEARCH_RUN_DIR=...  Read optional review labels without writes"
 	@echo "  CONFIRM=1 make radar-research-feedback-mark RADAR_RESEARCH_RUN_DIR=... RADAR_RESEARCH_REVIEW_ITEM_ID=... RADAR_RESEARCH_REVIEW_LABEL=... RADAR_RESEARCH_REVIEW_OBSERVED_AT=...  Append one optional human label"
 	@echo "  make score    Print paper-trade scoreboard"
@@ -836,7 +842,7 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-feedback-report radar-research-feedback-mark
+.PHONY: radar-research-protocol-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-feedback-report radar-research-feedback-mark
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
@@ -867,6 +873,25 @@ radar-replay-final-test: radar-research-protocol-check
 		--input-dir "$(RADAR_REPLAY_CACHE_INPUT_DIR)" \
 		--output-root "$(RADAR_RESEARCH_OUTPUT_ROOT)" \
 		--recommendation-seal "$(RADAR_RESEARCH_RECOMMENDATION_SEAL)"
+
+radar-research-reports:
+	@test -n "$(RADAR_RESEARCH_SELECTION_RUN)" || { echo "RADAR_RESEARCH_SELECTION_RUN is required" >&2; exit 2; }
+	@test -n "$(RADAR_RESEARCH_FINAL_TEST_RUN)" || { echo "RADAR_RESEARCH_FINAL_TEST_RUN is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_research_reports \
+		--selection-run "$(RADAR_RESEARCH_SELECTION_RUN)" \
+		--final-test-run "$(RADAR_RESEARCH_FINAL_TEST_RUN)" \
+		--live-campaign-report "$(RADAR_RESEARCH_LIVE_CAMPAIGN_REPORT)" \
+		--output-dir "$(RADAR_RESEARCH_REPORT_OUTPUT_DIR)"
+
+radar-research-reports-check:
+	@test -n "$(RADAR_RESEARCH_SELECTION_RUN)" || { echo "RADAR_RESEARCH_SELECTION_RUN is required" >&2; exit 2; }
+	@test -n "$(RADAR_RESEARCH_FINAL_TEST_RUN)" || { echo "RADAR_RESEARCH_FINAL_TEST_RUN is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_research_reports \
+		--selection-run "$(RADAR_RESEARCH_SELECTION_RUN)" \
+		--final-test-run "$(RADAR_RESEARCH_FINAL_TEST_RUN)" \
+		--live-campaign-report "$(RADAR_RESEARCH_LIVE_CAMPAIGN_REPORT)" \
+		--output-dir "$(RADAR_RESEARCH_REPORT_OUTPUT_DIR)" \
+		--check
 
 radar-research-feedback-report:
 	@test -n "$(RADAR_RESEARCH_RUN_DIR)" || { echo "RADAR_RESEARCH_RUN_DIR is required" >&2; exit 2; }

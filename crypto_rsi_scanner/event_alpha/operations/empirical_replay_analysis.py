@@ -20,6 +20,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from . import empirical_validation_protocol
 from . import empirical_replay_dimensions
 from . import empirical_operator_burden
+from . import empirical_survivability
 from .empirical_replay_statistics import _bootstrap_mean_ci, _mean, _robust_summary
 
 
@@ -105,6 +106,7 @@ def build_empirical_replay_analysis(
     partition: str,
     evidence_mode: str,
     bootstrap_resamples: int | None = None,
+    selected_observation_days: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Build one deterministic, closed, descriptive replay analysis.
 
@@ -127,6 +129,7 @@ def build_empirical_replay_analysis(
         partition=partition,
         evidence_mode=evidence_mode,
         bootstrap_resamples=resamples,
+        selected_observation_days=selected_observation_days,
     )
     payload["analysis_digest"] = _digest(payload)
     return payload
@@ -202,6 +205,7 @@ def _analysis_payload(
     partition: str,
     evidence_mode: str,
     bootstrap_resamples: int,
+    selected_observation_days: Iterable[str] | None,
 ) -> dict[str, Any]:
     route_cohorts, origin_cohorts, market_catalyst_cohorts = (
         _fixed_cohort_sections(
@@ -310,6 +314,13 @@ def _analysis_payload(
             (view.representative for view in views),
             partition=partition,
             evidence_mode=evidence_mode,
+            selected_observation_days=selected_observation_days,
+        ),
+        "survivability": empirical_survivability.build_empirical_survivability(
+            (view.representative for view in views),
+            (view.outcome for view in views),
+            partition=partition,
+            evidence_mode=evidence_mode,
         ),
         "missed_opportunity_classifications": missed,
         "false_positive_and_late_classifications": false_late,
@@ -333,6 +344,7 @@ def build_empirical_replay_analysis_from_episodes(
     partition: str,
     evidence_mode: str,
     bootstrap_resamples: int | None = None,
+    selected_observation_days: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Adapt the replay outcome producer's bound episode dictionaries.
 
@@ -388,6 +400,7 @@ def build_empirical_replay_analysis_from_episodes(
         partition=partition,
         evidence_mode=evidence_mode,
         bootstrap_resamples=bootstrap_resamples,
+        selected_observation_days=selected_observation_days,
     )
 
 
@@ -565,7 +578,9 @@ def classify_false_positive_and_late(
     primary = _directional_return(view)
     mfe = _mfe(view)
     mae = _mae(view)
-    asymmetry = mfe / mae if mfe is not None and mae not in (None, 0.0) else None
+    asymmetry = (
+        mfe / abs(mae) if mfe is not None and mae not in (None, 0.0) else None
+    )
     pre_signal = _pre_signal_directional_move(view)
     chase = _score(representative.get("chase_risk_score"))
     failed_quickly = (
@@ -645,6 +660,7 @@ def operator_burden(
     *,
     partition: str,
     evidence_mode: str,
+    selected_observation_days: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Return the frozen, outcome-blind operator burden simulation."""
 
@@ -652,6 +668,7 @@ def operator_burden(
         representatives,
         partition=partition,
         evidence_mode=evidence_mode,
+        selected_observation_days=selected_observation_days,
     )
 
 
@@ -709,10 +726,14 @@ def _cohort_row(
         "median_mae_fraction": mae_summary["median"],
         "trimmed_mean_10pct_mae_fraction": mae_summary["trimmed_mean_10pct"],
         "mfe_to_mae_ratio_of_means": (
-            mfe_summary["mean"] / mae_summary["mean"]
+            mfe_summary["mean"] / abs(mae_summary["mean"])
             if mfe_summary["mean"] is not None and mae_summary["mean"] not in (None, 0.0)
             else None
         ),
+        "excursion_sign_convention": {
+            "mfe": "nonnegative_direction_adjusted_fraction",
+            "mae": "nonpositive_direction_adjusted_fraction",
+        },
         "uncertainty": uncertainty,
         "return_basis": "direction_aligned_primary_horizon_return",
         "return_unit": "fraction",
@@ -776,8 +797,13 @@ def _score_monotonicity(
         "buckets": buckets,
         "comparable_pair_count": len(comparisons),
         "violation_count": sum(row["violation"] for row in comparisons),
+        "evaluation_status": "evaluated" if comparisons else "not_evaluable",
+        "not_evaluable_reason": (
+            None if comparisons else "fewer_than_two_populated_score_buckets"
+        ),
         "comparisons": comparisons,
         "interpretation": "descriptive_unadjusted_monotonicity_check",
+        "probabilistic_calibration_claim": False,
         "model_changed": False,
         "policy_eligible": False,
         "research_only": True,
@@ -995,12 +1021,12 @@ def _mae(view: _EpisodeView) -> float | None:
     for field in ("mae_fraction", "max_adverse_excursion", "maximum_adverse_excursion"):
         value = _fraction_from_view(view, field)
         if value is not None:
-            return abs(value)
+            return -abs(value)
     nested = _primary_horizon_values(view)
     for field in ("mae_fraction", "max_adverse_excursion_fraction"):
         value = _fraction_from_mapping(nested, field)
         if value is not None:
-            return abs(value)
+            return -abs(value)
     return None
 
 

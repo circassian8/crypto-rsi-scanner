@@ -17,6 +17,59 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Close pre-holdout empirical truth and survivability · Codex
+**Why:** The first corrected medium replay still exposed outcome-tail leakage,
+an active-day-only operator-burden denominator, partial missed-move accounting,
+unsigned adverse excursion, and a controls stage too slow for a practical full
+run. None of its evidence could safely authorize final-test access.
+**Changes:**
+- Added 14-day outcome-only partition embargoes, strict due-time and claimed-
+  partition validation, fold outcome purging, partial-fold omission, exact
+  selected-day denominators, and a nonempty/evaluable-fold distinction. Seals
+  and final confirmation now reject fallback, empty, or forged day bases.
+- Closed all 50,917 predeclared endpoint moves into 7,298 qualified misses and
+  43,619 explicit exclusions, retained rare reasons beyond bounded detail rows,
+  separated raw-mover from relative-strength dependence, and made candidate
+  families asset-specific.
+- Added signed MAE, explicit monotonicity `not_evaluable` state, 12/24/48-hour
+  episode-count sensitivity, and route cost, delay, liquidity-capacity,
+  daily/simultaneous-cap, fixed-stop, trailing-stop, and holding-period
+  survivability. Historical spread remains unavailable and costs stay labeled
+  assumptions.
+- Simulated the frozen 24-hour expiry policy without mutating canonical ideas,
+  counted risk-watch as urgent, and separated the 1,284 selected observation
+  days from 358 idea-active days and 926 zero-idea days.
+- Defined one canonical selected-observation-day digest and bound the replay
+  trace, partition analyses, shadow simulation, walk-forward result, and
+  recommendation seal to the exact same 1,284-day union.
+- Batched controls by asset plus BTC/ETH, reducing the controls stage from
+  232.6 to about 45 seconds while preserving its exact bytes. Split oversized
+  policy and control helpers, bound both new modules into the replay code
+  fingerprint, and restored architecture cleanliness without changing output.
+- Added a bounded, descriptor-anchored seven-report publisher/checker that
+  recomputes the exact recommendation seal, closes final-confirmation and
+  cross-artifact counts/safety, and keeps canonical live campaign evidence
+  explicitly separate from replay evidence. It cannot publish until the one
+  full selection and one final-test run both exist and reconcile.
+**Verify:** 116 focused empirical tests and 24 closed-report tests passed; the
+architecture-sensitive subset passed 56 tests; compileall, `git diff --check`,
+protocol check, the export parent-symlink/TOCTOU regression, and `make
+architecture-cleanliness-check PYTHON=python3` passed with zero new violations.
+Smoke fingerprint `4daf5c0b2915...` produced 1,095 observations,
+5 episodes, 59 misses, and zero side effects. Medium fingerprint
+`a64cd81d5b56...` completed in 144.4 seconds with 273,177 observations, 1,013
+ideas, 924 episodes, 922 matured outcomes, 905 controls, 7,298 qualified misses,
+three evaluable walk-forward folds, zero boundary violations, and zero provider
+or authority mutations; controls, analysis, shadow policy, and walk-forward
+bytes matched the prior healthy run exactly, while normalized idea and outcome
+rows differed only in immutable run provenance and its derived digests.
+**Notes/risks:** The medium sample contains only market-led dashboard-watch,
+risk-watch, and diagnostic evidence. Five routes and six origins have no sample,
+all frozen shadow changes remain unsupported, and no alpha or production-policy
+claim is made. Earlier medium namespaces remain immutable but superseded. The
+final-test partition remains unopened until one exact full top-100 selection is
+sealed.
+
 ## 2026-07-16 — Close empirical replay integrity before final-test access · Codex
 **Why:** A pre-final audit found that daily observations exactly 24 hours apart
 were counted as independent episodes, the recommendation seal did not bind the

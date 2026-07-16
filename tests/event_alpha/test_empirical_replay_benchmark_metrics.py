@@ -13,7 +13,7 @@ from crypto_rsi_scanner.event_alpha.operations import (
 )
 
 
-_START = datetime(2025, 1, 1, tzinfo=timezone.utc)
+_START = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
 
 def _horizon(
@@ -152,6 +152,21 @@ def test_empty_benchmark_keeps_every_metric_and_sensitivity_explicit() -> None:
         item["status"] == "unavailable"
         for item in row["holding_period_sensitivity"]["horizons"]
     )
+
+
+def test_relative_strength_discloses_same_day_raw_mover_rank_dependency() -> None:
+    row = empirical_replay_benchmark_metrics.build_benchmark_row(
+        "top_relative_strength",
+        [_selection(0, 0.05)],
+        {},
+        eligible_group_count=1,
+        detail_row_limit=256,
+    )
+
+    dependency = row["cross_policy_dependency"]
+    assert dependency["dependent_policy"] == "same_day_top_raw_mover"
+    assert dependency["ranking_equivalence"] is True
+    assert dependency["independent_evidence_claim"] is False
 
 
 def test_non_fraction_outcome_is_not_silently_converted() -> None:

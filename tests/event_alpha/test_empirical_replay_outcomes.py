@@ -51,7 +51,7 @@ def _idea(**overrides: object) -> dict[str, object]:
         "spread_status": "unavailable",
         "derivatives_status": "unavailable",
         "expires_at": (_START + timedelta(days=2)).isoformat(),
-        "partition": "development",
+        "partition": "fixture",
         "primary_thesis_origin": "market_led",
         "thesis_origins": ["market_led", "technical_led"],
         "market_regime": "bull",
@@ -272,7 +272,7 @@ def test_fixed_start_episode_freezes_first_representative_and_retains_progressio
     assert result["episode_boundary_rule"] == (
         "member_observed_at_lte_episode_start_plus_window"
     )
-    assert result["schema_version"] == 2
+    assert result["schema_version"] == 3
     assert result["episodes"][0]["window_end_inclusive_at"] == (
         "2025-01-02T00:00:00+00:00"
     )
@@ -296,9 +296,16 @@ def test_fixed_start_episode_freezes_first_representative_and_retains_progressio
         "dependent"
     )
     assert episode["representative"]["point_in_time_volume_rank"] == 17.0
+    assert episode["candidate_family_id"] == "asset-alpha|breakout"
+    assert episode["representative"]["candidate_family_id"] == (
+        "asset-alpha|breakout"
+    )
+    assert episode["representative_outcome"]["candidate_family_id"] == (
+        "asset-alpha|breakout"
+    )
     assert episode["representative"]["episode_id"] == episode["episode_id"]
     assert episode["representative_outcome"]["episode_id"] == episode["episode_id"]
-    assert episode["representative"]["partition"] == "development"
+    assert episode["representative"]["partition"] == "fixture"
     assert episode["representative"]["primary_thesis_origin"] == "market_led"
     assert episode["representative"]["market_regime"] == "bull"
     assert episode["representative"]["liquidity_tier"] == "high"
@@ -310,6 +317,19 @@ def test_fixed_start_episode_freezes_first_representative_and_retains_progressio
     assert set(result["safety"].values()) <= {True, False, 0}
     assert result["safety"]["provider_calls"] == 0
     assert result["safety"]["writes"] == 0
+    sensitivity = result["episode_window_sensitivity"]
+    assert sensitivity["outcomes_used"] is False
+    assert [row["window_hours"] for row in sensitivity["windows"]] == [12, 24, 48]
+    assert [row["episode_count"] for row in sensitivity["windows"]] == [2, 2, 1]
+    assert [row["dependent_repeat_count"] for row in sensitivity["windows"]] == [2, 2, 3]
+    assert all(
+        row["representative_reselection"] is False
+        and row["outcomes_used_for_grouping"] is False
+        and row["outcomes_computed_for_sensitivity"] is False
+        and row["representative_count"] == row["episode_count"]
+        and len(row["representative_idea_ids_digest"]) == 64
+        for row in sensitivity["windows"]
+    )
 
 
 def test_pending_missing_exit_and_missing_benchmarks_remain_distinct() -> None:
@@ -426,3 +446,202 @@ def test_flat_path_iterator_normalizes_frames_once_for_many_independent_rows(
     assert calls == 1
     assert [row["idea_id"] for row in outcomes] == ["idea-one", "idea-two"]
     assert all(row["status"] == "matured" for row in outcomes)
+
+
+def test_partition_embargo_keeps_valid_horizons_within_boundary() -> None:
+    observed = datetime(2022, 12, 31, tzinfo=timezone.utc)
+    cutoff = "2023-01-15T00:00:00+00:00"
+    outcome = empirical_replay_outcomes.build_empirical_path_outcome(
+        _idea(
+            observed_at=observed.isoformat(),
+            partition="development",
+            replay_partition="development",
+            expires_at="2023-01-15T00:00:00Z",
+        ),
+        {
+            "AAA": _frame([100.0] + [500.0] * 19, start=observed),
+            "BTC": _frame([100.0] + [400.0] * 19, start=observed),
+            "ETH": _frame([100.0] + [300.0] * 19, start=observed),
+        },
+        evaluated_at=observed + timedelta(days=19),
+    )
+
+    assert outcome["outcome_end_exclusive"] == cutoff
+    assert outcome["partition_outcome_boundary"]["status"] == "enforced"
+    for label in ("1d", "3d", "7d", "14d"):
+        horizon = outcome["horizons"][label]
+        assert horizon["maturity_status"] == "matured"
+        assert horizon["missing_reasons"] == []
+        assert horizon["exit_price"] == pytest.approx(500.0)
+        assert horizon["raw_return_fraction"] == pytest.approx(4.0)
+        assert horizon["path_status"] == "complete"
+        assert horizon["benchmark_status"] == {
+            "BTC": "matured",
+            "ETH": "matured",
+        }
+    assert outcome["horizons"]["14d"]["due_at"] < cutoff
+    assert outcome["status"] == "matured"
+    assert outcome["expiry"]["status"] == "withheld_partition_boundary"
+    assert outcome["expiry"]["expiry_price"] is None
+    assert outcome["expiry"]["missing_reasons"] == [
+        "horizon_crosses_partition_outcome_boundary"
+    ]
+
+
+def test_values_at_or_after_partition_cutoff_cannot_change_outcome() -> None:
+    observed = datetime(2022, 12, 31, tzinfo=timezone.utc)
+    before_cutoff = [100.0, 110.0] + [120.0] * 13
+    baseline = before_cutoff + [130.0] * 5
+    changed = before_cutoff + [9_999.0, 0.01, 8_888.0, 0.02, 7_777.0]
+    idea = _idea(
+        observed_at=observed.isoformat(),
+        partition="development",
+        replay_partition="development",
+        expires_at="2023-01-15T00:00:00Z",
+    )
+
+    first = empirical_replay_outcomes.build_empirical_path_outcome(
+        idea,
+        {
+            "AAA": _frame(baseline, start=observed),
+            "BTC": _frame(baseline, start=observed),
+            "ETH": _frame(baseline, start=observed),
+        },
+        evaluated_at=observed + timedelta(days=19),
+    )
+    replaced = empirical_replay_outcomes.build_empirical_path_outcome(
+        idea,
+        {
+            "AAA": _frame(changed, start=observed),
+            "BTC": _frame(changed, start=observed),
+            "ETH": _frame(changed, start=observed),
+        },
+        evaluated_at=observed + timedelta(days=19),
+    )
+
+    assert first == replaced
+    assert first["horizons"]["1d"]["raw_return_fraction"] == pytest.approx(0.10)
+    assert first["horizons"]["3d"]["maturity_status"] == "matured"
+    assert first["expiry"]["status"] == "withheld_partition_boundary"
+    assert first["expiry"]["expiry_price_observed_at"] is None
+
+
+def test_in_boundary_outcome_and_fixture_without_cutoff_remain_unchanged() -> None:
+    observed = datetime(2022, 12, 29, tzinfo=timezone.utc)
+    production = empirical_replay_outcomes.build_empirical_path_outcome(
+        _idea(
+            observed_at=observed.isoformat(),
+            partition="development",
+            replay_partition="development",
+            candidate_family_id="asset-alpha|custom-breakout",
+            expires_at=None,
+        ),
+        {"AAA": _frame([100.0, 110.0, 120.0, 130.0], start=observed)},
+        evaluated_at=observed + timedelta(days=3),
+    )
+    fixture = empirical_replay_outcomes.build_empirical_path_outcome(
+        _idea(expires_at=None),
+        {"AAA": _frame([100.0, 110.0, 120.0, 130.0])},
+        evaluated_at=_START + timedelta(days=3),
+    )
+
+    assert production["horizons"]["3d"]["maturity_status"] == "matured"
+    assert production["primary_horizon_return"] == pytest.approx(0.30)
+    assert production["candidate_family_id"] == "asset-alpha|custom-breakout"
+    assert production["horizons"]["3d"]["path_status"] == "complete"
+    assert production["horizons"]["3d"]["partition_outcome_boundary_status"] == (
+        "within_boundary"
+    )
+    assert fixture["partition_outcome_boundary"]["status"] == "not_applicable"
+    assert fixture["outcome_end_exclusive"] is None
+    assert fixture["primary_horizon_return"] == pytest.approx(0.30)
+
+
+def test_claimed_frozen_partition_enforces_start_and_end_bounds() -> None:
+    start = datetime(2021, 6, 12, tzinfo=timezone.utc)
+    accepted = empirical_replay_outcomes.build_empirical_path_outcome(
+        _idea(
+            observed_at=start.isoformat(),
+            partition="development",
+            replay_partition="development",
+            expires_at=None,
+        ),
+        {"AAA": _frame([100.0, 110.0, 120.0, 130.0], start=start)},
+        evaluated_at=start + timedelta(days=3),
+    )
+    assert accepted["partition"] == "development"
+
+    for observed in (
+        datetime(2023, 1, 1, tzinfo=timezone.utc),
+        datetime(2023, 1, 10, tzinfo=timezone.utc),
+    ):
+        with pytest.raises(
+            ValueError, match="observed_at outside claimed frozen partition"
+        ):
+            empirical_replay_outcomes.build_empirical_path_outcome(
+                _idea(
+                    observed_at=observed.isoformat(),
+                    partition="development",
+                    replay_partition="development",
+                    expires_at=None,
+                ),
+                {"AAA": _frame([100.0], start=observed)},
+                evaluated_at=observed,
+            )
+
+
+def test_unknown_nonfixture_partition_is_rejected() -> None:
+    with pytest.raises(ValueError, match="claimed replay partition unknown"):
+        empirical_replay_outcomes.build_empirical_path_outcome(
+            _idea(partition="invented", expires_at=None),
+            {"AAA": _frame([100.0])},
+            evaluated_at=_START,
+        )
+
+
+def test_bundle_exposes_exact_partition_boundary_contract() -> None:
+    observed = datetime(2022, 12, 31, tzinfo=timezone.utc)
+    result = empirical_replay_outcomes.build_empirical_replay_outcomes(
+        [
+            _idea(
+                observed_at=observed.isoformat(),
+                partition="development",
+                replay_partition="development",
+                expires_at=None,
+            )
+        ],
+        {"AAA": _frame([100.0] * 20, start=observed)},
+        evaluated_at=observed + timedelta(days=19),
+    )
+
+    assert result["partition_outcome_boundary_rule"] == {
+        "partition_field_precedence": ["replay_partition", "partition"],
+        "protocol_cutoff_field": "outcome_end_exclusive",
+        "rule": "horizon_due_at_lt_outcome_end_exclusive",
+        "observation_read_rule": (
+            "outcome_observation_at_lt_partition_outcome_end_exclusive"
+        ),
+        "due_at_equal_cutoff": "withheld_partition_boundary",
+        "withheld_reason": "horizon_crosses_partition_outcome_boundary",
+        "fixture_without_cutoff": "not_applicable",
+    }
+    assert result["partition_outcome_boundaries"] == [
+        {
+            "partition": "development",
+            "status": "enforced",
+            "outcome_end_exclusive": "2023-01-15T00:00:00+00:00",
+            "cutoff_source": "frozen_protocol_partition.outcome_end_exclusive",
+            "rule": "horizon_due_at_lt_outcome_end_exclusive",
+            "observation_read_rule": (
+                "outcome_observation_at_lt_partition_outcome_end_exclusive"
+            ),
+            "due_at_equal_cutoff": "withheld_partition_boundary",
+            "withheld_reason": "horizon_crosses_partition_outcome_boundary",
+        }
+    ]
+    episode = result["episodes"][0]
+    assert episode["replay_partition"] == "development"
+    assert episode["outcome_end_exclusive"] == "2023-01-15T00:00:00+00:00"
+    assert episode["representative"]["outcome_end_exclusive"] == (
+        "2023-01-15T00:00:00+00:00"
+    )

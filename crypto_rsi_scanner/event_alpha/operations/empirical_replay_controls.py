@@ -21,8 +21,12 @@ import pandas as pd
 from . import (
     empirical_missed_attribution,
     empirical_replay_benchmark_metrics,
-    empirical_replay_outcomes,
     empirical_validation_protocol,
+)
+from .empirical_replay_outcome_join import (
+    _outcome_frames_for_symbol,
+    outcome_idea as _outcome_idea,
+    outcomes_by_idea_id as _outcomes_by_idea_id,
 )
 
 
@@ -48,6 +52,19 @@ _VISIBLE_ROUTES = {
     "calendar_risk",
 }
 _DIRECTION_VALUES = {"long", "fade_short_review", "risk", "neutral"}
+_QUALIFICATION_FAILURES = (
+    "minimum_point_in_time_liquidity_not_met",
+    "point_in_time_membership_not_proven",
+    "warm_baseline_not_proven",
+    "operator_visible_idea_present",
+    "endpoint_outcome_contract_mismatch",
+)
+_QUALIFICATION_STATES = (
+    "qualified_missed_opportunity",
+    "economic_move_excluded_research_or_tradability",
+    "economic_move_already_operator_visible",
+    "economic_move_excluded_outcome_contract",
+)
 _SAFETY = {
     "provider_calls": 0,
     "authorization_mutations": 0,
@@ -353,12 +370,34 @@ def _missed_moves(
         "maximum_future_excursion_alone_sufficient": False,
         "evaluation_state_counts": dict(sorted(state_counts.items())),
         "endpoint_candidate_count": len(selected),
+        "endpoint_economic_move_count": len(selected),
         "missed_opportunity_count": scored["missed_opportunity_count"],
+        "qualified_missed_opportunity_count": scored["missed_opportunity_count"],
+        "economic_move_excluded_count": scored["economic_move_excluded_count"],
+        "qualification_state_counts": scored["qualification_state_counts"],
+        "qualification_failure_counts": scored["qualification_failure_counts"],
+        "qualification_population_reconciled": scored[
+            "qualification_population_reconciled"
+        ],
         "failure_stage_counts": scored["failure_stage_counts"],
         "missed_reason_taxonomy": list(
             empirical_missed_attribution.REASON_TAXONOMY
         ),
         "missed_reason_counts": scored["missed_reason_counts"],
+        "missed_reason_count_scope": "all_endpoint_threshold_economic_moves",
+        "missed_reason_population_reconciled": scored[
+            "missed_reason_population_reconciled"
+        ],
+        "qualified_missed_reason_counts": scored[
+            "qualified_missed_reason_counts"
+        ],
+        "reason_representative_examples": scored[
+            "reason_representative_examples"
+        ],
+        "qualification_failure_representative_examples": scored[
+            "qualification_failure_representative_examples"
+        ],
+        "representative_example_limit_per_reason": 1,
         "endpoint_candidates": scored["endpoint_candidates"],
         "missed_opportunities": scored["missed_opportunities"],
         "detail_row_limit": DETAIL_ROW_LIMIT,
@@ -431,6 +470,7 @@ def _select_missed_endpoint_candidates(
         attribution = empirical_missed_attribution.classify_missed_attribution(
             trace,
             observation,
+            qualification_failure_reasons=failures,
         )
         missed_id = "missed-move-v1:" + _digest(
             {
@@ -453,9 +493,16 @@ def _select_missed_endpoint_candidates(
             "primary_reason": attribution["primary_reason"],
             "reason_codes": attribution["reason_codes"],
             "reason_evidence": attribution["reason_evidence"],
+            "projection_validation_error_codes": attribution[
+                "projection_validation_error_codes"
+            ],
+            "diagnostic_concern_class": attribution[
+                "diagnostic_concern_class"
+            ],
             "attribution_uses_future_outcome": False,
             "qualification_failure_reasons": failures,
             "qualifies_as_missed_opportunity": not failures,
+            "qualification_state": _qualification_state(failures),
         }
         selected.append(candidate)
     return state_counts, selected
@@ -470,31 +517,152 @@ def _score_missed_endpoint_candidates(
     endpoint_details: list[dict[str, Any]] = []
     opportunity_details: list[dict[str, Any]] = []
     attribution_rows: list[dict[str, Any]] = []
+    qualified_attribution_rows: list[dict[str, Any]] = []
+    reason_representatives: dict[str, dict[str, Any]] = {}
+    qualification_representatives: dict[str, dict[str, Any]] = {}
+    qualification_failure_counts: Counter[str] = Counter()
+    qualification_state_counts: Counter[str] = Counter()
     failure_counts: Counter[str] = Counter()
     prequalified = [
         dict(row)
         for row in selected
         if row.get("qualifies_as_missed_opportunity") is True
     ]
-    synthetic = (
+    scored_prequalified = _join_prequalified_missed_outcomes(
+        prequalified,
+        price_frames,
+        evaluated_at=evaluated_at,
+    )
+    for candidate in selected:
+        detail = scored_prequalified.get(str(candidate["missed_move_id"]))
+        if detail is None:
+            detail = {
+                **dict(candidate),
+                "qualification_state": _qualification_state(
+                    candidate.get("qualification_failure_reasons") or ()
+                ),
+                "outcome": {
+                    "status": "not_computed_nonqualifying",
+                    "primary_horizon_return": candidate[
+                        "primary_endpoint_return_fraction"
+                    ],
+                    "return_unit": "fraction",
+                },
+            }
+        state = str(detail["qualification_state"])
+        qualification_state_counts[state] += 1
+        attribution = {
+            "primary_reason": detail["primary_reason"],
+            "reason_codes": list(detail["reason_codes"]),
+        }
+        attribution_rows.append(attribution)
+        for failure in detail.get("qualification_failure_reasons") or ():
+            if str(failure) in _QUALIFICATION_FAILURES:
+                qualification_failure_counts[str(failure)] += 1
+                _retain_representative(
+                    qualification_representatives,
+                    str(failure),
+                    detail,
+                )
+        for reason in detail.get("reason_codes") or ():
+            if str(reason) in empirical_missed_attribution.REASON_TAXONOMY:
+                _retain_representative(reason_representatives, str(reason), detail)
+        if detail.get("qualifies_as_missed_opportunity") is True:
+            failure_counts[str(detail["failure_stage"])] += 1
+            qualified_attribution_rows.append(attribution)
+            _retain_missed_detail(opportunity_details, detail)
+        _retain_missed_detail(endpoint_details, detail)
+
+    missed_count = qualification_state_counts["qualified_missed_opportunity"]
+    endpoint_rows = _bounded_details_with_representatives(
+        endpoint_details,
+        [
+            *reason_representatives.values(),
+            *qualification_representatives.values(),
+        ],
+    )
+    opportunity_rows = _bounded_details_with_representatives(
+        opportunity_details,
+        [
+            detail
+            for detail in reason_representatives.values()
+            if detail.get("qualifies_as_missed_opportunity") is True
+        ],
+    )
+    closed_states = {
+        state: qualification_state_counts[state] for state in _QUALIFICATION_STATES
+    }
+    closed_failures = {
+        failure: qualification_failure_counts[failure]
+        for failure in _QUALIFICATION_FAILURES
+    }
+    all_reason_counts = empirical_missed_attribution.closed_reason_counts(
+        attribution_rows
+    )
+    return {
+        "missed_opportunity_count": missed_count,
+        "economic_move_excluded_count": len(selected) - missed_count,
+        "qualification_state_counts": closed_states,
+        "qualification_failure_counts": closed_failures,
+        "qualification_population_reconciled": (
+            sum(closed_states.values()) == len(selected)
+            and missed_count + (len(selected) - missed_count) == len(selected)
+        ),
+        "failure_stage_counts": dict(sorted(failure_counts.items())),
+        "missed_reason_counts": all_reason_counts,
+        "missed_reason_population_reconciled": (
+            sum(row["primary_count"] for row in all_reason_counts)
+            == len(selected)
+        ),
+        "qualified_missed_reason_counts": (
+            empirical_missed_attribution.closed_reason_counts(
+                qualified_attribution_rows
+            )
+        ),
+        "reason_representative_examples": [
+            {
+                "reason": reason,
+                "candidate": reason_representatives[reason],
+            }
+            for reason in empirical_missed_attribution.REASON_TAXONOMY
+            if reason in reason_representatives
+        ],
+        "qualification_failure_representative_examples": [
+            {
+                "qualification_failure": failure,
+                "candidate": qualification_representatives[failure],
+            }
+            for failure in _QUALIFICATION_FAILURES
+            if failure in qualification_representatives
+        ],
+        "endpoint_candidates": endpoint_rows,
+        "missed_opportunities": opportunity_rows,
+    }
+
+
+def _join_prequalified_missed_outcomes(
+    candidates: Sequence[Mapping[str, Any]],
+    price_frames: Mapping[str, pd.DataFrame],
+    *,
+    evaluated_at: datetime,
+) -> dict[str, dict[str, Any]]:
+    synthetic = [
         _outcome_idea(
             idea_id=str(candidate["missed_move_id"]),
             observation=candidate["observation"],
             direction=str(candidate["directional_bias"]),
             family="missed_move_evaluation",
         )
-        for candidate in prequalified
-    )
-    outcome_rows = empirical_replay_outcomes.iter_empirical_path_outcomes(
+        for candidate in candidates
+    ]
+    outcomes = _outcomes_by_idea_id(
         synthetic,
-        price_frames,
+        price_frames=price_frames,
         evaluated_at=evaluated_at,
     )
-    missed_count = 0
-    for candidate, raw_outcome in zip(prequalified, outcome_rows, strict=True):
-        outcome = empirical_replay_benchmark_metrics.compact_joined_path_outcome(
-            raw_outcome
-        )
+    output: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        outcome = outcomes[str(candidate["missed_move_id"])]
         detail = {**candidate, "outcome": outcome}
         observed_return = _finite(outcome.get("primary_horizon_return"))
         if observed_return is None or not math.isclose(
@@ -505,45 +673,16 @@ def _score_missed_endpoint_candidates(
         ):
             detail["qualification_failure_reasons"] = [
                 *candidate["qualification_failure_reasons"],
-                "endpoint_outcome_contract_mismatch"
+                "endpoint_outcome_contract_mismatch",
             ]
             detail["qualifies_as_missed_opportunity"] = False
-        else:
-            missed_count += 1
-            failure_counts[str(detail["failure_stage"])] += 1
-            attribution_rows.append(
-                {
-                    "primary_reason": detail["primary_reason"],
-                    "reason_codes": list(detail["reason_codes"]),
-                }
+            detail["qualification_state"] = (
+                "economic_move_excluded_outcome_contract"
             )
-            _retain_missed_detail(opportunity_details, detail)
-        _retain_missed_detail(endpoint_details, detail)
-    for candidate in selected:
-        if candidate.get("qualifies_as_missed_opportunity") is True:
-            continue
-        detail = {
-            **dict(candidate),
-            "outcome": {
-                "status": "not_computed_nonqualifying",
-                "primary_horizon_return": candidate[
-                    "primary_endpoint_return_fraction"
-                ],
-                "return_unit": "fraction",
-            },
-        }
-        _retain_missed_detail(endpoint_details, detail)
-    endpoint_details.sort(key=_missed_detail_rank)
-    opportunity_details.sort(key=_missed_detail_rank)
-    return {
-        "missed_opportunity_count": missed_count,
-        "failure_stage_counts": dict(sorted(failure_counts.items())),
-        "missed_reason_counts": empirical_missed_attribution.closed_reason_counts(
-            attribution_rows
-        ),
-        "endpoint_candidates": endpoint_details[:DETAIL_ROW_LIMIT],
-        "missed_opportunities": opportunity_details[:DETAIL_ROW_LIMIT],
-    }
+        else:
+            detail["qualification_state"] = "qualified_missed_opportunity"
+        output[str(candidate["missed_move_id"])] = detail
+    return output
 
 
 def _retain_missed_detail(
@@ -554,6 +693,53 @@ def _retain_missed_detail(
     if len(rows) > DETAIL_ROW_LIMIT * 2:
         rows.sort(key=_missed_detail_rank)
         del rows[DETAIL_ROW_LIMIT:]
+
+
+def _retain_representative(
+    rows: dict[str, dict[str, Any]],
+    key: str,
+    detail: Mapping[str, Any],
+) -> None:
+    current = rows.get(key)
+    candidate = dict(detail)
+    if current is None or _missed_detail_rank(candidate) < _missed_detail_rank(current):
+        rows[key] = candidate
+
+
+def _bounded_details_with_representatives(
+    top_rows: Sequence[Mapping[str, Any]],
+    representative_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    required: dict[str, dict[str, Any]] = {}
+    for row in representative_rows:
+        required[str(row.get("missed_move_id") or "")] = dict(row)
+    required.pop("", None)
+    ordered_required = sorted(required.values(), key=_missed_detail_rank)
+    remaining = {
+        str(row.get("missed_move_id") or ""): dict(row) for row in top_rows
+    }
+    for identifier in required:
+        remaining.pop(identifier, None)
+    ordered_remaining = sorted(remaining.values(), key=_missed_detail_rank)
+    return [
+        *ordered_required[:DETAIL_ROW_LIMIT],
+        *ordered_remaining[: max(0, DETAIL_ROW_LIMIT - len(ordered_required))],
+    ]
+
+
+def _qualification_state(failures: Sequence[Any]) -> str:
+    values = {str(value) for value in failures}
+    if "endpoint_outcome_contract_mismatch" in values:
+        return "economic_move_excluded_outcome_contract"
+    if values.intersection({
+        "minimum_point_in_time_liquidity_not_met",
+        "point_in_time_membership_not_proven",
+        "warm_baseline_not_proven",
+    }):
+        return "economic_move_excluded_research_or_tradability"
+    if "operator_visible_idea_present" in values:
+        return "economic_move_already_operator_visible"
+    return "qualified_missed_opportunity"
 
 
 def _missed_detail_rank(row: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -825,62 +1011,6 @@ def _attach_benchmark_outcomes(
             selection["outcome"] = outcomes.get(selection["selection_id"])
 
 
-def _outcomes_by_idea_id(
-    ideas: Sequence[Mapping[str, Any]],
-    *,
-    price_frames: Mapping[str, pd.DataFrame],
-    evaluated_at: datetime,
-) -> dict[str, dict[str, Any]]:
-    if not ideas:
-        return {}
-    return {
-        str(outcome.get("idea_id") or ""): (
-            empirical_replay_benchmark_metrics.compact_joined_path_outcome(outcome)
-        )
-        for outcome in empirical_replay_outcomes.iter_empirical_path_outcomes(
-            ideas,
-            price_frames,
-            evaluated_at=evaluated_at,
-        )
-    }
-
-
-def _outcome_idea(
-    *,
-    idea_id: str,
-    observation: Mapping[str, Any],
-    direction: str,
-    family: str,
-) -> dict[str, Any]:
-    return {
-        "idea_id": idea_id,
-        "canonical_asset_id": observation["canonical_asset_id"],
-        "symbol": observation["symbol"],
-        "observed_at": observation["observed_at"],
-        "directional_bias": direction if direction in _DIRECTION_VALUES else "neutral",
-        "anomaly_family": family,
-        "radar_route": "diagnostic",
-        "partition": observation.get("partition"),
-        "market_regime": observation.get("market_regime"),
-        "liquidity_tier": observation.get("liquidity_tier"),
-        "liquidity_usd": observation.get("liquidity_usd"),
-        "trailing_quote_volume_usd": observation.get(
-            "trailing_quote_volume_usd"
-        ),
-        "data_quality_mode": observation.get("data_quality_mode"),
-        "point_in_time_universe_member": observation.get(
-            "point_in_time_universe_member"
-        ),
-        "baseline_status": observation.get("baseline_status"),
-        "operator_visible_idea": False,
-        "decision_projection": {
-            "radar_route": "diagnostic",
-            "directional_bias": direction,
-            "research_only": True,
-        },
-    }
-
-
 def _observations(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -1045,6 +1175,14 @@ def _traces(
                 raw.get("rsi_context_present")
                 if isinstance(raw.get("rsi_context_present"), bool)
                 else None
+            ),
+            "projection_validation_error_codes": [
+                str(item)
+                for item in raw.get("projection_validation_error_codes") or ()
+                if str(item)
+            ][:16],
+            "projection_validation_concern_class": str(
+                raw.get("projection_validation_concern_class") or ""
             ),
         }
         key = _identity_key(value)

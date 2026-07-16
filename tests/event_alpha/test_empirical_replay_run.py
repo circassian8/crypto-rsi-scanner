@@ -67,6 +67,10 @@ def _write_bound_selection_run(tmp_path: Path, *, mode: str = "full") -> Path:
         (),
         partitions=("development", "validation"),
         protocol=protocol,
+        selected_observation_days_by_partition={
+            "development": {"2022-06-01"},
+            "validation": {"2024-06-01"},
+        },
     )
     seal = empirical_policy_lab.freeze_recommendation_set(
         simulation,
@@ -132,6 +136,23 @@ def test_fixture_execution_is_immutable_resumable_bounded_and_authority_neutral(
     assert first.run_dir == second.run_dir
     assert first.summary["idea_count"] > 0
     assert first.summary["episode_count"] > 0
+    assert first.summary["input_data_window_semantics"] == "completed_daily_bar_cache_window_inclusive"
+    assert first.summary["observation_counting_unit"] == "input_observation_rows"
+    assert first.summary["selected_partition_observation_count"] == first.summary["observation_count"]
+    assert first.summary["selected_partition_observed_day_count"] > 0
+    assert first.summary["selected_partition_observation_start_at"]
+    assert first.summary["selected_partition_observation_end_at"]
+    assert first.summary["candidate_pool_symbol_count"] == first.summary[
+        "selected_symbol_count"
+    ]
+    assert first.summary["selected_symbol_count_semantics"] == (
+        "legacy_alias_candidate_pool_symbol_count"
+    )
+    assert first.summary["point_in_time_universe_top_n"] == 3
+    assert first.summary["idea_counting_unit"] == "canonical_idea_rows"
+    assert first.summary["route_counting_unit"] == "canonical_idea_rows"
+    assert first.summary["idea_observed_day_count"] > 0
+    assert first.summary["idea_count_per_selected_observed_day"] > 0
     assert first.summary["matched_control_count"] >= 0
     assert first.summary["missed_endpoint_candidate_count"] >= 0
     assert sum(first.summary["benchmark_status_counts"].values()) == 8
@@ -179,6 +200,89 @@ def test_fixture_execution_is_immutable_resumable_bounded_and_authority_neutral(
     assert all(row["decision_projection"]["research_only"] is True for row in ideas)
     assert max(row["size_bytes"] for row in manifest["artifacts"].values()) <= MAX_ARTIFACT_BYTES
     assert sum(row["size_bytes"] for row in manifest["artifacts"].values()) <= MAX_BUNDLE_BYTES
+    analysis = json.loads(
+        (first.run_dir / "replay_analysis.json").read_text(encoding="utf-8")
+    )
+    trace_summary = json.loads(
+        (first.run_dir / "replay_trace_summary.json").read_text(encoding="utf-8")
+    )
+    burden = analysis["partitions"]["fixture"]["operator_burden"]
+    assert burden["observed_day_count"] == first.summary[
+        "selected_partition_observed_day_count"
+    ]
+    assert burden["observed_day_denominator"]["basis"] == (
+        "exact_selected_observation_utc_days"
+    )
+    assert trace_summary["selected_partition_observed_days_sha256"] == (
+        burden["observed_day_denominator"]["days_sha256"]
+    )
+    markdown = (first.run_dir / "execution_summary.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Candidate-pool inputs:" in markdown
+    assert "Point-in-time universe: top 3 assets per observation" in markdown
+
+
+def test_execution_summary_separates_candidate_pool_from_point_in_time_top_n() -> None:
+    summary = empirical_replay_run._execution_summary(
+        run_mode="medium",
+        fingerprint="f" * 64,
+        catalog={
+            "data_start_at": "2021-01-01T00:00:00Z",
+            "data_end_at": "2025-01-01T00:00:00Z",
+            "selected_symbol_count": 419,
+            "row_count": 10_000,
+            "partial_bar_count": 0,
+            "residual_survivorship_present": True,
+        },
+        configuration={"universe_top_n": 100},
+        trace_summary={
+            "observation_count": 1_000,
+            "observation_counting_unit": "input_observation_rows",
+            "selected_partition_observation_count": 1_000,
+            "selected_partition_observed_day_count": 100,
+            "selected_partition_observed_day_count_by_partition": {
+                "development": 100
+            },
+            "selected_partition_observed_day_basis": (
+                "exact_selected_observation_utc_days"
+            ),
+            "selected_partition_observation_start_at": "2021-01-01T00:00:00Z",
+            "selected_partition_observation_end_at": "2021-04-10T00:00:00Z",
+            "idea_count": 4,
+            "idea_counting_unit": "canonical_idea_rows",
+            "idea_observed_day_count": 3,
+            "idea_count_per_selected_observed_day": 0.04,
+            "route_counts": {"dashboard_watch": 4},
+            "route_counting_unit": "canonical_idea_rows",
+        },
+        outcomes={"episode_count": 4, "dependent_repeat_count": 0},
+        analyses={
+            "development": {"matured_episode_count": 4, "route_cohorts": []}
+        },
+        controls={
+            "matched_non_signal_controls": {
+                "selected_control_count": 0,
+                "unavailable_control_count": 0,
+            },
+            "missed_move_evaluation": {
+                "missed_opportunity_count": 0,
+                "endpoint_candidate_count": 0,
+            },
+            "benchmark_rows": [],
+        },
+        runtime={"total_seconds": 1.0, "bottleneck_stage": "decision_replay"},
+    )
+
+    assert summary["candidate_pool_symbol_count"] == 419
+    assert summary["point_in_time_universe_top_n"] == 100
+    assert summary["selected_symbol_count"] == 419
+    assert summary["selected_symbol_count_semantics"] == (
+        "legacy_alias_candidate_pool_symbol_count"
+    )
+    markdown = empirical_replay_run._summary_markdown(summary)
+    assert "Candidate-pool inputs: 419 cached symbols" in markdown
+    assert "Point-in-time universe: top 100 assets per observation" in markdown
 
 
 def test_existing_run_artifact_drift_fails_closed(tmp_path: Path) -> None:

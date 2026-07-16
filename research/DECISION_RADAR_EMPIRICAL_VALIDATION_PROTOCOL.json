@@ -18,7 +18,38 @@
   ],
   "cost_scenarios": {
     "break_even_cost_reported": true,
+    "component_profiles": [
+      {
+        "adverse_selection_bps": 0,
+        "fee_bps": 20,
+        "name": "fees_only",
+        "slippage_bps": 0,
+        "spread_bps": 0
+      },
+      {
+        "adverse_selection_bps": 0,
+        "fee_bps": 20,
+        "name": "fees_plus_assumed_spread",
+        "slippage_bps": 0,
+        "spread_bps": 30
+      },
+      {
+        "adverse_selection_bps": 0,
+        "fee_bps": 20,
+        "name": "fees_spread_slippage",
+        "slippage_bps": 50,
+        "spread_bps": 30
+      },
+      {
+        "adverse_selection_bps": 100,
+        "fee_bps": 20,
+        "name": "stressed_adverse_selection",
+        "slippage_bps": 50,
+        "spread_bps": 30
+      }
+    ],
     "historical_spread_observation_status": "unavailable",
+    "intraday_path_order_status": "unavailable_from_daily_ohlcv",
     "maximum_daily_ideas": [
       1,
       3,
@@ -45,6 +76,16 @@
       50,
       100,
       200
+    ],
+    "stop_loss_fraction_scenarios": [
+      0.03,
+      0.05,
+      0.1
+    ],
+    "trailing_stop_fraction_scenarios": [
+      0.03,
+      0.05,
+      0.1
     ],
     "unobserved_cost_label": "assumed_sensitivity_not_observed"
   },
@@ -102,7 +143,24 @@
     "volume_zscore_lookback_days": 90,
     "volume_zscore_min_observations": 20
   },
-  "frozen_at": "2026-07-16T06:00:00Z",
+  "final_test_confirmation_rule": {
+    "candidate_set": "sealed_development_validation_candidates_only",
+    "ideas_per_selected_observation_day_check": "candidate_lte_1_2x_production",
+    "mean_directional_return_check": "candidate_gte_production",
+    "minimum_matured_visible_episodes": 30,
+    "minimum_sample_key": "final_test_confirmation",
+    "missing_required_metric_status": "rejected",
+    "quick_failure_rate_check": "candidate_lte_production",
+    "requires_material_policy_change": true,
+    "rule_id": "noninferior_return_failure_selected_day_burden_v1",
+    "scenario_selection_allowed": false,
+    "statuses": [
+      "confirmed",
+      "rejected",
+      "insufficient_sample"
+    ]
+  },
+  "frozen_at": "2026-07-16T05:30:00Z",
   "historical_sources": [
     {
       "fields": [
@@ -223,6 +281,12 @@
       "review_queue_size",
       "system_warning_volume",
       "calendar_reminder_volume"
+    ],
+    "urgent_routes": [
+      "high_confidence_watch",
+      "actionable_watch",
+      "rapid_market_anomaly",
+      "risk_watch"
     ]
   },
   "outcomes": {
@@ -240,6 +304,8 @@
     "mfe_basis": "future_high_after_idea_bar",
     "outcome_before_maturity": "pending",
     "outcome_data_visible_to_scoring": false,
+    "partition_embargo_days": 14,
+    "partition_outcome_boundary_rule": "horizon_due_at_lt_outcome_end_exclusive",
     "primary_horizon_days": 3,
     "relative_benchmarks": [
       "BTC",
@@ -259,24 +325,45 @@
       "pre_signal_move_7d"
     ]
   },
+  "partition_embargoes": [
+    {
+      "after_partition": "development",
+      "before_partition": "validation",
+      "end_exclusive": "2023-01-15T00:00:00Z",
+      "idea_evaluation_allowed": false,
+      "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+      "start_inclusive": "2023-01-01T00:00:00Z"
+    },
+    {
+      "after_partition": "validation",
+      "before_partition": "final_test",
+      "end_exclusive": "2025-01-15T00:00:00Z",
+      "idea_evaluation_allowed": false,
+      "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+      "start_inclusive": "2025-01-01T00:00:00Z"
+    }
+  ],
   "partitions": [
     {
       "end_exclusive": "2023-01-01T00:00:00Z",
       "name": "development",
+      "outcome_end_exclusive": "2023-01-15T00:00:00Z",
       "policy_selection_allowed": true,
       "start_inclusive": "2021-06-12T00:00:00Z"
     },
     {
       "end_exclusive": "2025-01-01T00:00:00Z",
       "name": "validation",
+      "outcome_end_exclusive": "2025-01-15T00:00:00Z",
       "policy_selection_allowed": true,
-      "start_inclusive": "2023-01-01T00:00:00Z"
+      "start_inclusive": "2023-01-15T00:00:00Z"
     },
     {
       "end_exclusive": "2026-06-01T00:00:00Z",
       "name": "final_test",
+      "outcome_end_exclusive": "2026-06-18T00:00:00Z",
       "policy_selection_allowed": false,
-      "start_inclusive": "2025-01-01T00:00:00Z"
+      "start_inclusive": "2025-01-15T00:00:00Z"
     }
   ],
   "point_in_time_universe": {
@@ -325,6 +412,17 @@
   },
   "schema_id": "decision_radar.empirical_validation_protocol",
   "schema_version": 1,
+  "shadow_recommendation_rule": {
+    "candidate_status": "candidate",
+    "ideas_per_selected_observation_day_check": "candidate_lte_1_2x_production",
+    "mean_directional_return_check": "candidate_gte_production",
+    "minimum_sample_key": "shadow_recommendation_development_validation",
+    "missing_required_metric_status": "not_supported",
+    "quick_failure_rate_check": "candidate_lte_production",
+    "requires_material_policy_change": true,
+    "rule_id": "noninferior_return_failure_selected_day_burden_v1",
+    "scenario_selection_allowed": true
+  },
   "shadow_scenarios": [
     {
       "changes": {},
@@ -412,6 +510,8 @@
     "confirmation_partition": "final_test",
     "final_test_used_for_tuning": false,
     "minimum_folds": 3,
+    "outcome_purge_rule": "primary_horizon_due_at_lt_fold_boundary",
+    "partial_test_fold_policy": "omit_fold_shorter_than_rolling_test_days",
     "recommendation_set_must_be_hashed_before_final_test": true,
     "rolling_test_days": 180,
     "rolling_train_days": 730,

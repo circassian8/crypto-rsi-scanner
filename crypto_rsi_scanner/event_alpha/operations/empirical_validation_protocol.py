@@ -14,13 +14,13 @@ import json
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 
 SCHEMA_ID = "decision_radar.empirical_validation_protocol"
 SCHEMA_VERSION = 1
 PROTOCOL_VERSION = "decision_radar_empirical_validation_v1"
-FROZEN_AT = "2026-07-16T06:00:00Z"
+FROZEN_AT = "2026-07-16T05:30:00Z"
 DETERMINISTIC_SEED = 20260716
 
 
@@ -72,19 +72,40 @@ _PROTOCOL: dict[str, Any] = {
             "name": "development",
             "start_inclusive": "2021-06-12T00:00:00Z",
             "end_exclusive": "2023-01-01T00:00:00Z",
+            "outcome_end_exclusive": "2023-01-15T00:00:00Z",
             "policy_selection_allowed": True,
         },
         {
             "name": "validation",
-            "start_inclusive": "2023-01-01T00:00:00Z",
+            "start_inclusive": "2023-01-15T00:00:00Z",
             "end_exclusive": "2025-01-01T00:00:00Z",
+            "outcome_end_exclusive": "2025-01-15T00:00:00Z",
             "policy_selection_allowed": True,
         },
         {
             "name": "final_test",
-            "start_inclusive": "2025-01-01T00:00:00Z",
+            "start_inclusive": "2025-01-15T00:00:00Z",
             "end_exclusive": "2026-06-01T00:00:00Z",
+            "outcome_end_exclusive": "2026-06-18T00:00:00Z",
             "policy_selection_allowed": False,
+        },
+    ],
+    "partition_embargoes": [
+        {
+            "after_partition": "development",
+            "before_partition": "validation",
+            "start_inclusive": "2023-01-01T00:00:00Z",
+            "end_exclusive": "2023-01-15T00:00:00Z",
+            "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+            "idea_evaluation_allowed": False,
+        },
+        {
+            "after_partition": "validation",
+            "before_partition": "final_test",
+            "start_inclusive": "2025-01-01T00:00:00Z",
+            "end_exclusive": "2025-01-15T00:00:00Z",
+            "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+            "idea_evaluation_allowed": False,
         },
     ],
     "point_in_time_universe": {
@@ -165,6 +186,8 @@ _PROTOCOL: dict[str, Any] = {
         ],
         "outcome_before_maturity": "pending",
         "outcome_data_visible_to_scoring": False,
+        "partition_outcome_boundary_rule": "horizon_due_at_lt_outcome_end_exclusive",
+        "partition_embargo_days": 14,
     },
     "episodes": {
         "method": "fixed_start_window",
@@ -235,6 +258,39 @@ _PROTOCOL: dict[str, Any] = {
         "position_liquidity_fraction_scenarios": [0.0001, 0.001, 0.005],
         "maximum_simultaneous_ideas": [1, 3, 5],
         "maximum_daily_ideas": [1, 3, 5, 10],
+        "component_profiles": [
+            {
+                "name": "fees_only",
+                "fee_bps": 20,
+                "spread_bps": 0,
+                "slippage_bps": 0,
+                "adverse_selection_bps": 0,
+            },
+            {
+                "name": "fees_plus_assumed_spread",
+                "fee_bps": 20,
+                "spread_bps": 30,
+                "slippage_bps": 0,
+                "adverse_selection_bps": 0,
+            },
+            {
+                "name": "fees_spread_slippage",
+                "fee_bps": 20,
+                "spread_bps": 30,
+                "slippage_bps": 50,
+                "adverse_selection_bps": 0,
+            },
+            {
+                "name": "stressed_adverse_selection",
+                "fee_bps": 20,
+                "spread_bps": 30,
+                "slippage_bps": 50,
+                "adverse_selection_bps": 100,
+            },
+        ],
+        "stop_loss_fraction_scenarios": [0.03, 0.05, 0.10],
+        "trailing_stop_fraction_scenarios": [0.03, 0.05, 0.10],
+        "intraday_path_order_status": "unavailable_from_daily_ohlcv",
     },
     "statistics": {
         "confidence_level": 0.95,
@@ -269,6 +325,12 @@ _PROTOCOL: dict[str, Any] = {
         {"name": "family_cooldown_48h", "changes": {"family_cooldown_hours": 48}},
     ],
     "operator_burden": {
+        "urgent_routes": [
+            "high_confidence_watch",
+            "actionable_watch",
+            "rapid_market_anomaly",
+            "risk_watch",
+        ],
         "metrics": [
             "ideas_per_day",
             "urgent_items_per_day",
@@ -295,8 +357,38 @@ _PROTOCOL: dict[str, Any] = {
         "rolling_train_days": 730,
         "rolling_test_days": 180,
         "minimum_folds": 3,
+        "outcome_purge_rule": "primary_horizon_due_at_lt_fold_boundary",
+        "partial_test_fold_policy": "omit_fold_shorter_than_rolling_test_days",
         "scenario_set_frozen_with_protocol": True,
         "recommendation_set_must_be_hashed_before_final_test": True,
+    },
+    "shadow_recommendation_rule": {
+        "rule_id": "noninferior_return_failure_selected_day_burden_v1",
+        "minimum_sample_key": "shadow_recommendation_development_validation",
+        "requires_material_policy_change": True,
+        "mean_directional_return_check": "candidate_gte_production",
+        "quick_failure_rate_check": "candidate_lte_production",
+        "ideas_per_selected_observation_day_check": (
+            "candidate_lte_1_2x_production"
+        ),
+        "missing_required_metric_status": "not_supported",
+        "candidate_status": "candidate",
+        "scenario_selection_allowed": True,
+    },
+    "final_test_confirmation_rule": {
+        "rule_id": "noninferior_return_failure_selected_day_burden_v1",
+        "candidate_set": "sealed_development_validation_candidates_only",
+        "minimum_sample_key": "final_test_confirmation",
+        "minimum_matured_visible_episodes": 30,
+        "requires_material_policy_change": True,
+        "mean_directional_return_check": "candidate_gte_production",
+        "quick_failure_rate_check": "candidate_lte_production",
+        "ideas_per_selected_observation_day_check": (
+            "candidate_lte_1_2x_production"
+        ),
+        "missing_required_metric_status": "rejected",
+        "statuses": ["confirmed", "rejected", "insufficient_sample"],
+        "scenario_selection_allowed": False,
     },
     "policy_change_rules": {
         "production_mutation_allowed": False,
@@ -335,6 +427,18 @@ def protocol_sha256(value: Mapping[str, Any] | None = None) -> str:
     return hashlib.sha256(canonical_protocol_bytes(value)).hexdigest()
 
 
+def selected_observation_days_sha256(days: Iterable[str]) -> str:
+    """Return the canonical digest for an exact set of selected UTC days."""
+
+    selected: set[str] = set()
+    for value in days:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("selected_observation_day_invalid")
+        selected.add(value.strip())
+    payload = ("\n".join(sorted(selected)) + ("\n" if selected else "")).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 def validate_protocol(value: Mapping[str, Any]) -> list[str]:
     """Validate the closed rules that protect final-test isolation."""
 
@@ -345,33 +449,21 @@ def validate_protocol(value: Mapping[str, Any]) -> list[str]:
         errors.append("protocol_not_frozen")
     if value.get("research_only") is not True or value.get("auto_apply") is not False:
         errors.append("research_safety_invalid")
-    partitions = value.get("partitions")
-    if not isinstance(partitions, list) or [row.get("name") for row in partitions if isinstance(row, Mapping)] != [
-        "development", "validation", "final_test"
-    ]:
-        errors.append("partition_order_invalid")
-    else:
-        prior_end: datetime | None = None
-        for row in partitions:
-            try:
-                start = _utc(row["start_inclusive"])
-                end = _utc(row["end_exclusive"])
-            except (KeyError, TypeError, ValueError):
-                errors.append("partition_time_invalid")
-                continue
-            if start >= end:
-                errors.append("partition_empty")
-            if prior_end is not None and start != prior_end:
-                errors.append("partition_gap_or_overlap")
-            prior_end = end
-        if partitions[-1].get("policy_selection_allowed") is not False:
-            errors.append("final_test_selection_not_blocked")
+    errors.extend(_validate_partition_contract(value))
     walk = value.get("walk_forward")
     if not isinstance(walk, Mapping) or walk.get("final_test_used_for_tuning") is not False:
         errors.append("final_test_firewall_invalid")
     outcomes = value.get("outcomes")
     if not isinstance(outcomes, Mapping) or outcomes.get("primary_horizon_days") != 3:
         errors.append("primary_outcome_drift")
+    elif (
+        outcomes.get("partition_embargo_days") != max(
+            outcomes.get("sensitivity_horizons_days") or [0]
+        )
+        or outcomes.get("partition_outcome_boundary_rule")
+        != "horizon_due_at_lt_outcome_end_exclusive"
+    ):
+        errors.append("partition_outcome_firewall_invalid")
     warmup = value.get("feature_warmup")
     if not isinstance(warmup, Mapping) or (
         warmup.get("volume_zscore_lookback_days") != 90
@@ -389,10 +481,136 @@ def validate_protocol(value: Mapping[str, Any]) -> list[str]:
     missed = value.get("missed_opportunity_rule")
     if not isinstance(missed, Mapping) or missed.get("maximum_future_excursion_alone_is_sufficient") is not False:
         errors.append("missed_opportunity_rule_invalid")
+    confirmation = value.get("final_test_confirmation_rule")
+    shadow_recommendation = value.get("shadow_recommendation_rule")
+    minimum_samples = value.get("minimum_samples")
+    if not isinstance(confirmation, Mapping) or not isinstance(
+        minimum_samples, Mapping
+    ):
+        errors.append("final_test_confirmation_rule_invalid")
+    elif (
+        confirmation.get("minimum_sample_key") != "final_test_confirmation"
+        or confirmation.get("minimum_matured_visible_episodes")
+        != minimum_samples.get("final_test_confirmation")
+        or confirmation.get("scenario_selection_allowed") is not False
+        or confirmation.get("statuses")
+        != ["confirmed", "rejected", "insufficient_sample"]
+        or confirmation.get("ideas_per_selected_observation_day_check")
+        != "candidate_lte_1_2x_production"
+        or "ideas_per_active_day_check" in confirmation
+    ):
+        errors.append("final_test_confirmation_rule_invalid")
+    if (
+        not isinstance(shadow_recommendation, Mapping)
+        or shadow_recommendation.get(
+            "ideas_per_selected_observation_day_check"
+        )
+        != "candidate_lte_1_2x_production"
+        or "ideas_per_active_day_check" in shadow_recommendation
+    ):
+        errors.append("shadow_recommendation_rule_invalid")
+    operator_burden = value.get("operator_burden")
+    if not isinstance(operator_burden, Mapping) or operator_burden.get(
+        "urgent_routes"
+    ) != [
+        "high_confidence_watch",
+        "actionable_watch",
+        "rapid_market_anomaly",
+        "risk_watch",
+    ]:
+        errors.append("operator_urgent_route_contract_invalid")
+    costs = value.get("cost_scenarios")
+    if not isinstance(costs, Mapping) or [
+        sum(
+            int(row.get(field) or 0)
+            for field in (
+                "fee_bps",
+                "spread_bps",
+                "slippage_bps",
+                "adverse_selection_bps",
+            )
+        )
+        for row in costs.get("component_profiles", [])
+        if isinstance(row, Mapping)
+    ] != [20, 50, 100, 200]:
+        errors.append("cost_component_profile_contract_invalid")
     safety = value.get("safety")
     if not isinstance(safety, Mapping) or any(type(item) is not int or item != 0 for item in safety.values()):
         errors.append("safety_counter_invalid")
     return list(dict.fromkeys(errors))
+
+
+def _validate_partition_contract(value: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    partitions = value.get("partitions")
+    expected_names = ["development", "validation", "final_test"]
+    if not isinstance(partitions, list) or [
+        row.get("name") for row in partitions if isinstance(row, Mapping)
+    ] != expected_names:
+        return ["partition_order_invalid"]
+    parsed: list[tuple[str, datetime, datetime, datetime]] = []
+    for row in partitions:
+        try:
+            start = _utc(row["start_inclusive"])
+            end = _utc(row["end_exclusive"])
+            outcome_end = _utc(row["outcome_end_exclusive"])
+        except (KeyError, TypeError, ValueError):
+            errors.append("partition_time_invalid")
+            continue
+        if start >= end:
+            errors.append("partition_empty")
+        if outcome_end < end:
+            errors.append("partition_outcome_window_invalid")
+        parsed.append((str(row["name"]), start, end, outcome_end))
+    if partitions[-1].get("policy_selection_allowed") is not False:
+        errors.append("final_test_selection_not_blocked")
+    embargoes = value.get("partition_embargoes")
+    if not isinstance(embargoes, list):
+        errors.append("partition_embargoes_invalid")
+    elif len(parsed) == len(partitions):
+        errors.extend(_validate_partition_embargoes(value, parsed, embargoes))
+    return errors
+
+
+def _validate_partition_embargoes(
+    value: Mapping[str, Any],
+    parsed: list[tuple[str, datetime, datetime, datetime]],
+    embargoes: list[Any],
+) -> list[str]:
+    errors: list[str] = []
+    expected: list[dict[str, Any]] = []
+    outcomes = value.get("outcomes")
+    embargo_days = int(outcomes.get("partition_embargo_days") or 0) if isinstance(
+        outcomes, Mapping
+    ) else 0
+    for prior, current in zip(parsed, parsed[1:]):
+        prior_name, _prior_start, prior_end, prior_outcome_end = prior
+        current_name, current_start, _current_end, _current_outcome_end = current
+        if current_start <= prior_end:
+            errors.append("partition_gap_or_overlap")
+            continue
+        if prior_outcome_end != current_start:
+            errors.append("partition_outcome_embargo_alignment_invalid")
+        if (current_start - prior_end).days != embargo_days:
+            errors.append("partition_embargo_duration_invalid")
+        expected.append({
+            "after_partition": prior_name,
+            "before_partition": current_name,
+            "start_inclusive": prior_end.isoformat().replace("+00:00", "Z"),
+            "end_exclusive": current_start.isoformat().replace("+00:00", "Z"),
+            "purpose": "outcome_only_maximum_sensitivity_horizon_purge",
+            "idea_evaluation_allowed": False,
+        })
+    if embargoes != expected:
+        errors.append("partition_embargoes_invalid")
+    try:
+        analysis_end = _utc(value["analysis_window"]["outcome_data_end_exclusive"])
+    except (KeyError, TypeError, ValueError):
+        errors.append("analysis_outcome_window_invalid")
+    else:
+        if parsed[-1][3] != analysis_end:
+            errors.append("final_outcome_window_invalid")
+    return errors
 
 
 def render_protocol_markdown(value: Mapping[str, Any] | None = None) -> str:
@@ -410,17 +628,20 @@ def render_protocol_markdown(value: Mapping[str, Any] | None = None) -> str:
         "",
         "## Chronological partitions",
         "",
-        "| Partition | Start inclusive | End exclusive | May select policy? |",
-        "|---|---|---|---|",
+        "| Partition | Idea start | Idea end | Outcome end | May select policy? |",
+        "|---|---|---|---|---|",
     ]
     for row in partitions:
         lines.append(
             f"| {row['name']} | `{row['start_inclusive']}` | `{row['end_exclusive']}` | "
+            f"`{row['outcome_end_exclusive']}` | "
             f"`{str(row['policy_selection_allowed']).lower()}` |"
         )
     lines.extend([
         "",
-        "Final-test outcomes may reject a frozen recommendation, but they may not select or tune one.",
+        "Fourteen-day outcome-only embargoes separate idea partitions. They permit already-observed ideas to mature through the frozen sensitivity horizon without allowing new ideas into the next partition. The clean final-test idea window begins `2025-01-15T00:00:00Z`; earlier nominal holdout-tail dates are quarantined and are not final-test evidence.",
+        "",
+        "Final-test outcomes may reject a frozen recommendation, but they may not select or tune one. Every final verdict uses the sealed `noninferior_return_failure_selected_day_burden_v1` rule and requires at least 30 matured visible episodes. Its burden check uses the same complete set of selected UTC observation days for production and every shadow scenario, including days with zero ideas; active-idea-day rates remain descriptive only.",
         "",
         "## Point-in-time replay",
         "",
@@ -430,11 +651,11 @@ def render_protocol_markdown(value: Mapping[str, Any] | None = None) -> str:
         "",
         "## Outcomes and episodes",
         "",
-        "The frozen primary horizon is 3 days; 1, 7, and 14 days are sensitivity horizons. Outcome bars begin after the idea bar. Return, BTC/ETH-relative return, MFE, MAE, time-to-extremes, invalidation, continuation/reversal, expiry, and post-expiry behavior are measured. Fixed-start 24-hour episodes use an inclusive window end: an observation exactly 24 hours after the representative remains a dependent repeat. The first eligible representative stays frozen and dependent route/score/context progression is retained without inflating sample size.",
+        "The frozen primary horizon is 3 days; 1, 7, and 14 days are sensitivity horizons. Outcome bars begin after the idea bar. A horizon is readable only when its due time is strictly before the partition's frozen outcome boundary. Return, BTC/ETH-relative return, MFE, MAE, time-to-extremes, invalidation, continuation/reversal, expiry, and post-expiry behavior are measured. Fixed-start 24-hour episodes use an inclusive window end: an observation exactly 24 hours after the representative remains a dependent repeat. The first eligible representative stays frozen and dependent route/score/context progression is retained without inflating sample size; 12-hour and 48-hour grouping counts are reported as sensitivity only.",
         "",
         "## Controls, costs, and uncertainty",
         "",
-        "Matched non-signal controls use date, regime, and liquidity and are selected by an outcome-blind deterministic hash. Simple raw-mover, volume, RSI, relative-strength, BTC/ETH, and late-fade benchmarks remain descriptive. Historical spread is unavailable; 0/20/50/100/200 bps round-trip costs are labeled assumptions. Episode bootstrap intervals are exploratory, and cohort tables carry multiple-comparison warnings.",
+        "Matched non-signal controls use date, regime, and liquidity and are selected by an outcome-blind deterministic hash. Simple raw-mover, volume, RSI, relative-strength, BTC/ETH, and late-fade benchmarks remain descriptive. Historical spread is unavailable; fee, spread, slippage, adverse-selection, 0/20/50/100/200 bps round-trip, delay, capacity, daily/simultaneous-budget, stop, and holding-period scenarios are labeled assumptions. Trailing-stop results remain unavailable when daily bars cannot establish intraday high/low order. Episode bootstrap intervals are exploratory, and cohort tables carry multiple-comparison warnings.",
         "",
         "## Evidence and approval boundaries",
         "",
@@ -509,5 +730,6 @@ __all__ = [
     "protocol_sha256",
     "protocol_values",
     "render_protocol_markdown",
+    "selected_observation_days_sha256",
     "validate_protocol",
 ]

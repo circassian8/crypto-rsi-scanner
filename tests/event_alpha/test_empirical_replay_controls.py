@@ -8,10 +8,14 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pytest
 
-from crypto_rsi_scanner.event_alpha.operations import empirical_replay_controls
+from crypto_rsi_scanner.event_alpha.operations import (
+    empirical_replay_benchmark_metrics,
+    empirical_replay_controls,
+    empirical_replay_outcomes,
+)
 
 
-_START = datetime(2025, 1, 1, tzinfo=timezone.utc)
+_START = datetime(2025, 1, 15, tzinfo=timezone.utc)
 _BENCHMARK_POLICIES = [
     "matched_non_signal",
     "same_day_top_raw_mover",
@@ -219,6 +223,72 @@ def test_future_price_append_cannot_change_selection_or_matured_three_day_outcom
     assert first["outcome"]["horizons"]["3d"] == second["outcome"]["horizons"]["3d"]
 
 
+def test_symbol_bounded_outcome_batches_are_exactly_equivalent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    normalized = empirical_replay_controls._observations(
+        [
+            _observation("AAA", partition="fixture"),
+            _observation("BBB", partition="fixture"),
+        ]
+    )
+    ideas = [
+        empirical_replay_controls._outcome_idea(
+            idea_id=f"outcome-{row['symbol'].casefold()}",
+            observation=row,
+            direction="long" if row["symbol"] == "AAA" else "risk",
+            family="equivalence_test",
+        )
+        for row in normalized
+    ]
+    frames = {
+        "AAA": _price_frames()["AAA"],
+        "BBB": _price_frames()["BBB"],
+        "BTCUSDT": _price_frames()["BTC"],
+        "ETHUSDT": _price_frames()["ETH"],
+        "UNRELATED": _price_frames()["CCC"],
+    }
+    expected = {
+        str(row["idea_id"]): (
+            empirical_replay_benchmark_metrics.compact_joined_path_outcome(row)
+        )
+        for row in empirical_replay_outcomes.iter_empirical_path_outcomes(
+            ideas,
+            frames,
+            evaluated_at=_START + timedelta(days=14),
+        )
+    }
+    original = empirical_replay_outcomes.iter_empirical_path_outcomes
+    supplied_frame_keys: list[set[str]] = []
+
+    def recording_iterator(
+        rows: object,
+        supplied_frames: dict[str, pd.DataFrame],
+        *,
+        evaluated_at: object,
+    ) -> object:
+        supplied_frame_keys.append({str(key).upper() for key in supplied_frames})
+        return original(rows, supplied_frames, evaluated_at=evaluated_at)
+
+    monkeypatch.setattr(
+        empirical_replay_outcomes,
+        "iter_empirical_path_outcomes",
+        recording_iterator,
+    )
+    actual = empirical_replay_controls._outcomes_by_idea_id(
+        ideas,
+        price_frames=frames,
+        evaluated_at=_START + timedelta(days=14),
+    )
+
+    assert actual == expected
+    assert supplied_frame_keys == [
+        {"AAA", "BTCUSDT", "ETHUSDT"},
+        {"BBB", "BTCUSDT", "ETHUSDT"},
+    ]
+    assert all("UNRELATED" not in keys for keys in supplied_frame_keys)
+
+
 def test_missed_moves_require_primary_endpoint_and_retain_trace_failure_stage() -> None:
     observations = [
         _observation("MFE"),
@@ -280,6 +350,71 @@ def test_missed_moves_require_primary_endpoint_and_retain_trace_failure_stage() 
     assert by_symbol["ILLIQ"]["qualifies_as_missed_opportunity"] is False
     assert by_symbol["ILLIQ"]["qualification_failure_reasons"] == [
         "minimum_point_in_time_liquidity_not_met"
+    ]
+
+
+def test_missed_move_counts_reconcile_full_population_and_keep_rare_reasons() -> None:
+    observations = [_observation(f"S{index:03d}") for index in range(270)]
+    observations[-3]["point_in_time_universe_member"] = False
+    observations[-2]["trailing_quote_volume_usd"] = 1_000.0
+    observations[-1]["baseline_status"] = "insufficient_history"
+    traces = [_trace(f"S{index:03d}") for index in range(270)]
+    traces[-3]["failure_stage"] = "universe_exclusion"
+    traces[-1]["failure_stage"] = "insufficient_history"
+    frames = {
+        f"S{index:03d}": _frame([100.0, 105.0, 110.0, 120.0])
+        for index in range(270)
+    }
+
+    missed = empirical_replay_controls.build_empirical_replay_controls(
+        observations,
+        traces,
+        [],
+        frames,
+        evaluated_at=_START + timedelta(days=3),
+    )["missed_move_evaluation"]
+    repeated = empirical_replay_controls.build_empirical_replay_controls(
+        list(reversed(observations)),
+        list(reversed(traces)),
+        [],
+        frames,
+        evaluated_at=_START + timedelta(days=3),
+    )["missed_move_evaluation"]
+
+    assert missed["endpoint_economic_move_count"] == 270
+    assert missed["qualified_missed_opportunity_count"] == 267
+    assert missed["economic_move_excluded_count"] == 3
+    assert sum(missed["qualification_state_counts"].values()) == 270
+    assert missed["qualification_failure_counts"] == {
+        "minimum_point_in_time_liquidity_not_met": 1,
+        "point_in_time_membership_not_proven": 1,
+        "warm_baseline_not_proven": 1,
+        "operator_visible_idea_present": 0,
+        "endpoint_outcome_contract_mismatch": 0,
+    }
+    assert missed["qualification_population_reconciled"] is True
+    assert sum(
+        row["primary_count"] for row in missed["missed_reason_counts"]
+    ) == 270
+    assert missed["missed_reason_population_reconciled"] is True
+    assert missed["endpoint_candidates_truncated"] is True
+    assert len(missed["endpoint_candidates"]) == 256
+    retained_symbols = {
+        row["observation"]["symbol"] for row in missed["endpoint_candidates"]
+    }
+    assert {"S267", "S268", "S269"} <= retained_symbols
+    reason_examples = {
+        row["reason"]: row["candidate"]["observation"]["symbol"]
+        for row in missed["reason_representative_examples"]
+    }
+    assert reason_examples["universe_exclusion"] == "S267"
+    assert reason_examples["liquidity_gate"] == "S268"
+    assert reason_examples["insufficient_history"] == "S269"
+    assert repeated["reason_representative_examples"] == missed[
+        "reason_representative_examples"
+    ]
+    assert repeated["qualification_failure_counts"] == missed[
+        "qualification_failure_counts"
     ]
 
 

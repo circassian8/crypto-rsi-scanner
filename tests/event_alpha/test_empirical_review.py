@@ -116,6 +116,8 @@ def _episode(
             "operator_visible_idea",
             "data_quality_mode",
             "replay_data_quality_mode",
+            "projection_validation_error_codes",
+            "projection_validation_concern_class",
             "decision_projection",
         )
         if key in idea
@@ -308,8 +310,14 @@ def test_queue_selects_all_requested_example_categories_and_binds_evidence() -> 
     )
 
     by_category = {row["category"]: row for row in queue["categories"]}
-    assert all(by_category[name]["eligible_count"] >= 1 for name in CATEGORY_ORDER)
-    assert all(by_category[name]["selected_count"] >= 1 for name in CATEGORY_ORDER)
+    expected_categories = set(CATEGORY_ORDER) - {
+        "economic_move_qualification_exclusion"
+    }
+    assert all(by_category[name]["eligible_count"] >= 1 for name in expected_categories)
+    assert all(by_category[name]["selected_count"] >= 1 for name in expected_categories)
+    assert by_category["economic_move_qualification_exclusion"][
+        "selection_status"
+    ] == "zero_sample"
     assert queue["item_count"] <= MAX_QUEUE_ITEMS
     assert queue["protocol_version"] == PROTOCOL_VERSION
     assert queue["protocol_sha256"] == PROTOCOL_SHA256
@@ -393,6 +401,63 @@ def test_missing_data_is_not_mislabeled_as_inconsistent_data() -> None:
 
     assert row["eligible_count"] == 0
     assert row["selection_status"] == "zero_sample"
+
+
+def test_rare_exclusions_and_projection_errors_reach_targeted_review() -> None:
+    projection_error = _missed(3)
+    projection_error.update({
+        "primary_reason": "feature_bug",
+        "reason_codes": ["feature_bug"],
+        "projection_validation_error_codes": ["return_fraction_implausible"],
+        "diagnostic_concern_class": "data_quality_feature_contract",
+    })
+    excluded = _missed(4)
+    excluded.update({
+        "primary_reason": "universe_exclusion",
+        "reason_codes": ["universe_exclusion"],
+        "qualification_failure_reasons": [
+            "point_in_time_membership_not_proven"
+        ],
+        "qualification_state": (
+            "economic_move_excluded_research_or_tradability"
+        ),
+        "qualifies_as_missed_opportunity": False,
+    })
+    controls = _controls([projection_error])
+    controls["missed_move_evaluation"].update({
+        "reason_representative_examples": [
+            {"reason": "universe_exclusion", "candidate": excluded},
+            {"reason": "feature_bug", "candidate": projection_error},
+        ],
+    })
+
+    queue = _build([], [], controls=controls)
+    categories = {row["category"]: row for row in queue["categories"]}
+    assert categories["economic_move_qualification_exclusion"][
+        "selected_count"
+    ] == 1
+    assert categories["inconsistent_data_quality"]["selected_count"] == 1
+    excluded_item = next(
+        item
+        for item in queue["items"]
+        if "economic_move_qualification_exclusion" in item["categories"]
+    )
+    assert excluded_item["symbol"] == "M4"
+    assert excluded_item["selection_reasons"][
+        "economic_move_qualification_exclusion"
+    ]["classified_as_missed_opportunity"] is False
+    projection_item = next(
+        item
+        for item in queue["items"]
+        if "inconsistent_data_quality" in item["categories"]
+    )
+    assert set(projection_item["categories"]) >= {
+        "missed_opportunity",
+        "inconsistent_data_quality",
+    }
+    assert projection_item["selection_reasons"]["inconsistent_data_quality"][
+        "projection_validation_error_codes"
+    ] == ["return_fraction_implausible"]
 
 
 def test_invalid_identity_and_protocol_drift_fail_closed() -> None:

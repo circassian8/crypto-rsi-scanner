@@ -182,10 +182,40 @@ def test_replay_trace_preserves_no_idea_and_gate_failures() -> None:
     }
 
 
+def test_projection_failure_emits_closed_feature_contract_diagnostics() -> None:
+    result = run_replay_kernel(
+        [
+            _observation(
+                return_24h=400.0,
+                return_72h=400.0,
+                return_7d=400.0,
+            )
+        ],
+        mode="medium",
+        artifact_namespace="projection-diagnostics",
+        allowed_partitions=("validation",),
+    )
+
+    assert result.ideas == ()
+    trace = result.trace_rows[0]
+    assert trace["failure_stage"] == "canonical_projection_invalid"
+    assert trace["projection_validation_error_codes"] == [
+        "return_percent_implausible"
+    ]
+    assert trace["projection_validation_concern_class"] == (
+        "data_quality_feature_contract"
+    )
+    assert "400" not in str(trace["projection_validation_error_codes"])
+    assert result.trace_summary["projection_validation_error_code_counts"] == {
+        "return_percent_implausible": 1
+    }
+
+
 def test_replay_partition_selection_is_chronological_and_final_test_is_guarded() -> None:
     assert partition_for_timestamp("2022-01-01T00:00:00Z") == "development"
     assert partition_for_timestamp("2024-01-01T00:00:00Z") == "validation"
-    assert partition_for_timestamp("2025-01-01T00:00:00Z") == "final_test"
+    assert partition_for_timestamp("2025-01-01T00:00:00Z") == "outside_protocol_window"
+    assert partition_for_timestamp("2025-01-15T00:00:00Z") == "final_test"
     assert partition_for_timestamp("2026-06-01T00:00:00Z") == "outside_protocol_window"
 
     with pytest.raises(ValueError, match="sealed final_test"):

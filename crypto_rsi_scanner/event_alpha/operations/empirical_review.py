@@ -32,6 +32,7 @@ CATEGORY_ORDER = (
     "unknown_catalyst_winner",
     "confirmed_catalyst_loser",
     "missed_opportunity",
+    "economic_move_qualification_exclusion",
     "manipulation_concern_candidate",
     "late_idea",
     "inconsistent_data_quality",
@@ -71,6 +72,9 @@ _CATEGORY_RULES = {
     "missed_opportunity": (
         "predeclared missed-move evaluator row that qualifies as a missed opportunity"
     ),
+    "economic_move_qualification_exclusion": (
+        "endpoint-threshold economic move excluded by predeclared research, tradability, visibility, or outcome-contract requirements"
+    ),
     "manipulation_concern_candidate": (
         "explicit manipulation warning, or low-liquidity high-chase false-positive pattern; concern candidate only"
     ),
@@ -81,6 +85,26 @@ _CATEGORY_RULES = {
 }
 
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_PROJECTION_VALIDATION_ERROR_CODES = {
+    "return_unit_metadata_invalid",
+    "return_unit_field_unknown",
+    "return_unit_missing",
+    "return_value_invalid",
+    "return_fraction_implausible",
+    "return_percent_implausible",
+    "decision_field_missing",
+    "decision_field_type_invalid",
+    "decision_enum_invalid",
+    "decision_score_or_expiry_invalid",
+    "decision_actionability_contract_invalid",
+    "decision_route_contract_invalid",
+    "decision_calendar_contract_invalid",
+    "decision_projection_contract_invalid",
+    "decision_safety_contract_invalid",
+    "decision_provenance_contract_invalid",
+    "decision_contract_invalid_other",
+    "canonical_projection_idempotence_failed",
+}
 _SCORE_BUCKETS = {
     "0_19": (0.0, 20.0),
     "20_39": (20.0, 40.0),
@@ -467,93 +491,181 @@ def _add_missed_candidates(
         for row in _mapping_rows(missed.get("missed_opportunities") or ())
         if row.get("qualifies_as_missed_opportunity") is True
     ]
+    representative_rows = [
+        wrapper.get("candidate")
+        for wrapper in _mapping_rows(
+            missed.get("reason_representative_examples") or ()
+        )
+        if isinstance(wrapper.get("candidate"), Mapping)
+    ]
+    representative_ids = {
+        str(row.get("missed_move_id") or "") for row in representative_rows
+    }
+    source_rows: dict[str, Mapping[str, Any]] = {}
+    for row in [*details, *representative_rows]:
+        identity = str(row.get("missed_move_id") or _digest_value(row))
+        source_rows[identity] = row
     controls_contract_digest = _declared_digest(
         controls.get("contract_digest"),
         fallback=_digest_value({
             "missed_opportunity_count": missed.get("missed_opportunity_count"),
             "missed_details": details,
+            "reason_representatives": representative_rows,
         }),
         field="controls_contract_digest",
     )
     eligible_count = _nonnegative_int(missed.get("missed_opportunity_count"))
     if eligible_count < len(details):
         eligible_count = len(details)
-    for row in details:
-        observation = row.get("observation") if isinstance(row.get("observation"), Mapping) else {}
-        outcome = row.get("outcome") if isinstance(row.get("outcome"), Mapping) else {}
-        target_id = str(row.get("missed_move_id") or "")
-        if not target_id:
-            target_id = "missed-move-v1:" + _digest_value({
-                "observation": observation,
-                "directional_bias": row.get("directional_bias"),
-                "primary_endpoint_return_fraction": row.get(
-                    "primary_endpoint_return_fraction"
-                ),
-            })
-        directional = _finite(
-            outcome.get("primary_direction_adjusted_return")
-            if outcome.get("primary_direction_adjusted_return") is not None
-            else row.get("primary_endpoint_return_fraction")
+    qualified_available = 0
+    for row in source_rows.values():
+        item, target_id, directional, observation = _missed_review_item(
+            row,
+            controls=controls,
+            controls_contract_digest=controls_contract_digest,
         )
-        item = {
-            "target_kind": "missed_move",
-            "target_id": target_id,
-            "episode_id": None,
-            "paired_episode_ids": [],
-            "partition": str(observation.get("partition") or ""),
-            "evidence_mode": str(controls.get("evidence_mode") or "historical_replay"),
-            "observed_at": str(observation.get("observed_at") or ""),
-            "symbol": str(observation.get("symbol") or ""),
-            "canonical_asset_id": str(observation.get("canonical_asset_id") or ""),
-            "radar_route": "not_operator_visible",
-            "primary_thesis_origin": "unclassified_missed_move",
-            "catalyst_status": "unavailable",
-            "directional_bias": str(row.get("directional_bias") or ""),
-            "scores": {},
-            "outcome": _outcome_projection(outcome, directional),
-            "data_quality": {
-                "data_quality_mode": str(observation.get("data_quality_mode") or ""),
-                "baseline_status": str(observation.get("baseline_status") or ""),
-                "liquidity_tier": str(observation.get("liquidity_tier") or ""),
-                "spread_status": "unavailable",
-            },
-            "pair_examples": [],
-            "selection_reasons": {
-                "missed_opportunity": {
-                    "failure_stage": str(row.get("failure_stage") or ""),
-                    "trace_status": str(row.get("trace_status") or ""),
-                    "endpoint_rule_crossed": row.get("endpoint_rule_crossed") is True,
-                    "maximum_future_excursion_alone_sufficient": False,
-                    "qualification_failure_reasons": _strings(
-                        row.get("qualification_failure_reasons"), 16
+        qualified = row.get("qualifies_as_missed_opportunity") is True
+        shared_reason = {
+            "failure_stage": str(row.get("failure_stage") or ""),
+            "trace_status": str(row.get("trace_status") or ""),
+            "endpoint_rule_crossed": row.get("endpoint_rule_crossed") is True,
+            "maximum_future_excursion_alone_sufficient": False,
+            "primary_reason": str(row.get("primary_reason") or ""),
+            "reason_codes": _strings(row.get("reason_codes"), 32),
+            "qualification_state": str(row.get("qualification_state") or ""),
+            "qualification_failure_reasons": _strings(
+                row.get("qualification_failure_reasons"), 16
+            ),
+        }
+        is_representative = target_id in representative_ids
+        if qualified:
+            qualified_available += 1
+            qualified_item = _json_value(item)
+            qualified_item["selection_reasons"] = {
+                "missed_opportunity": shared_reason
+            }
+            candidates["missed_opportunity"].append({
+                "target_key": target_id,
+                "rank": (
+                    0 if is_representative else 1,
+                    str(row.get("primary_reason") or ""),
+                    -abs(directional or 0.0),
+                    str(observation.get("observed_at") or ""),
+                    target_id,
+                ),
+                "item": qualified_item,
+            })
+        elif is_representative:
+            excluded_item = _json_value(item)
+            excluded_item["selection_reasons"] = {
+                "economic_move_qualification_exclusion": {
+                    **shared_reason,
+                    "classified_as_missed_opportunity": False,
+                }
+            }
+            candidates["economic_move_qualification_exclusion"].append({
+                "target_key": target_id,
+                "rank": (
+                    str(row.get("primary_reason") or ""),
+                    str(observation.get("observed_at") or ""),
+                    target_id,
+                ),
+                "item": excluded_item,
+            })
+        validation_codes = _strings(
+            row.get("projection_validation_error_codes"), 16
+        )
+        if validation_codes:
+            inconsistent_item = _json_value(item)
+            inconsistent_item["selection_reasons"] = {
+                "inconsistent_data_quality": {
+                    "inconsistency_codes": [
+                        "canonical_projection_validation_failed"
+                    ],
+                    "projection_validation_error_codes": validation_codes,
+                    "diagnostic_concern_class": str(
+                        row.get("diagnostic_concern_class") or ""
                     ),
                 }
-            },
-            "source_identity": {
-                "missed_move_id": target_id,
-                "observation_digest": str(observation.get("observation_digest") or ""),
-                "controls_contract_digest": controls_contract_digest,
-            },
-            "review_status": "unlabeled",
-            "causal_claim": False,
-            "policy_eligible": False,
-            "research_only": True,
-            "auto_apply": False,
-        }
-        candidates["missed_opportunity"].append({
-            "target_key": target_id,
-            "rank": (
-                -abs(directional or 0.0),
-                str(observation.get("observed_at") or ""),
-                target_id,
-            ),
-            "item": item,
-        })
+            }
+            candidates["inconsistent_data_quality"].append({
+                "target_key": target_id,
+                "rank": (
+                    -len(validation_codes),
+                    str(observation.get("observed_at") or ""),
+                    target_id,
+                ),
+                "item": inconsistent_item,
+            })
     source_truncated = (
         missed.get("missed_opportunities_truncated") is True
-        or eligible_count > len(details)
+        or eligible_count > qualified_available
     )
-    return eligible_count, len(details), source_truncated
+    return eligible_count, qualified_available, source_truncated
+
+
+def _missed_review_item(
+    row: Mapping[str, Any],
+    *,
+    controls: Mapping[str, Any],
+    controls_contract_digest: str,
+) -> tuple[dict[str, Any], str, float | None, Mapping[str, Any]]:
+    observation = (
+        row.get("observation")
+        if isinstance(row.get("observation"), Mapping)
+        else {}
+    )
+    outcome = row.get("outcome") if isinstance(row.get("outcome"), Mapping) else {}
+    target_id = str(row.get("missed_move_id") or "")
+    if not target_id:
+        target_id = "missed-move-v1:" + _digest_value({
+            "observation": observation,
+            "directional_bias": row.get("directional_bias"),
+            "primary_endpoint_return_fraction": row.get(
+                "primary_endpoint_return_fraction"
+            ),
+        })
+    directional = _finite(
+        outcome.get("primary_direction_adjusted_return")
+        if outcome.get("primary_direction_adjusted_return") is not None
+        else row.get("primary_endpoint_return_fraction")
+    )
+    item = {
+        "target_kind": "missed_move",
+        "target_id": target_id,
+        "episode_id": None,
+        "paired_episode_ids": [],
+        "partition": str(observation.get("partition") or ""),
+        "evidence_mode": str(controls.get("evidence_mode") or "historical_replay"),
+        "observed_at": str(observation.get("observed_at") or ""),
+        "symbol": str(observation.get("symbol") or ""),
+        "canonical_asset_id": str(observation.get("canonical_asset_id") or ""),
+        "radar_route": "not_operator_visible",
+        "primary_thesis_origin": "unclassified_missed_move",
+        "catalyst_status": "unavailable",
+        "directional_bias": str(row.get("directional_bias") or ""),
+        "scores": {},
+        "outcome": _outcome_projection(outcome, directional),
+        "data_quality": {
+            "data_quality_mode": str(observation.get("data_quality_mode") or ""),
+            "baseline_status": str(observation.get("baseline_status") or ""),
+            "liquidity_tier": str(observation.get("liquidity_tier") or ""),
+            "spread_status": "unavailable",
+        },
+        "pair_examples": [],
+        "selection_reasons": {},
+        "source_identity": {
+            "missed_move_id": target_id,
+            "observation_digest": str(observation.get("observation_digest") or ""),
+            "controls_contract_digest": controls_contract_digest,
+        },
+        "review_status": "unlabeled",
+        "causal_claim": False,
+        "policy_eligible": False,
+        "research_only": True,
+        "auto_apply": False,
+    }
+    return item, target_id, directional, observation
 
 
 def _append_episode_candidate(
@@ -794,6 +906,9 @@ def _data_quality_inconsistency_codes(episode: Mapping[str, Any]) -> list[str]:
         )
     ):
         codes.append("decision_source_safety_conflict")
+    for error_code in _strings(row.get("projection_validation_error_codes"), 16):
+        if error_code in _PROJECTION_VALIDATION_ERROR_CODES:
+            codes.append(f"canonical_projection:{error_code}")
     return codes
 
 

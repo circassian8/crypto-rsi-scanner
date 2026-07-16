@@ -106,11 +106,20 @@ def _write_reports(root: Path, *, malicious: str = "") -> None:
         "auto_apply": False,
         "production_policy_mutations": 0,
     }
-    walk = walk_forward_evaluation([], [])
+    selected_days = {
+        "development": {"2022-06-01"},
+        "validation": {"2024-06-01"},
+    }
+    walk = walk_forward_evaluation(
+        [],
+        [],
+        selected_observation_days_by_partition=selected_days,
+    )
     simulation = simulate_shadow_policies(
         [],
         [],
         partitions=("development", "validation"),
+        selected_observation_days_by_partition=selected_days,
     )
     policy = {
         "schema_id": "decision_radar.empirical_policy_report",

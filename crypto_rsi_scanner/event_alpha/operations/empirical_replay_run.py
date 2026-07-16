@@ -8,6 +8,7 @@ import json
 import time
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from itertools import islice
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -258,18 +259,30 @@ def _produce_replay(prepared: _PreparedReplay) -> _ReplayProducts:
     outcome_seconds = time.perf_counter() - outcome_started
 
     analysis_started = time.perf_counter()
+    selected_days_by_partition = _selected_observation_days_by_partition(
+        control_observations,
+        partitions=prepared.partitions,
+    )
+    _bind_selected_observation_day_summary(
+        trace_summary,
+        selected_days_by_partition,
+    )
     analyses = {
         partition: empirical_replay_analysis.build_empirical_replay_analysis_from_episodes(
             {"episodes": _episodes_for_partition(outcomes, partition)},
             partition=partition,
             evidence_mode="fixture_mechanics_only" if partition == "fixture" else "historical_replay",
             bootstrap_resamples=prepared.bootstrap_resamples,
+            selected_observation_days=selected_days_by_partition[partition],
         )
         for partition in prepared.partitions
     }
     episode_ideas, representative_outcomes = _episode_policy_rows(ideas, outcomes)
     policy_artifacts = _build_policy_artifacts(
-        prepared, episode_ideas, representative_outcomes
+        prepared,
+        episode_ideas,
+        representative_outcomes,
+        selected_days_by_partition=selected_days_by_partition,
     )
     analysis_seconds = time.perf_counter() - analysis_started
 
@@ -321,6 +334,8 @@ def _build_policy_artifacts(
     prepared: _PreparedReplay,
     episode_ideas: list[dict[str, Any]],
     representative_outcomes: list[dict[str, Any]],
+    *,
+    selected_days_by_partition: Mapping[str, set[str]],
 ) -> dict[str, Any]:
     if prepared.run_mode in {"medium", "full"}:
         simulation = empirical_policy_lab.simulate_shadow_policies(
@@ -328,6 +343,9 @@ def _build_policy_artifacts(
             representative_outcomes,
             partitions=_SELECTION_PARTITIONS,
             protocol=prepared.protocol,
+            selected_observation_days_by_partition=(
+                selected_days_by_partition
+            ),
         )
         return {
             "shadow_policy_simulation.json": simulation,
@@ -350,6 +368,9 @@ def _build_policy_artifacts(
                 episode_ideas,
                 representative_outcomes,
                 protocol=prepared.protocol,
+                selected_observation_days_by_partition=(
+                    selected_days_by_partition
+                ),
             ),
         }
     if prepared.run_mode == "final_test":
@@ -361,6 +382,9 @@ def _build_policy_artifacts(
                 representative_outcomes,
                 seal=prepared.seal,
                 protocol=prepared.protocol,
+                selected_observation_days_by_partition=(
+                    selected_days_by_partition
+                ),
             ),
         }
     return {}
@@ -389,7 +413,12 @@ def _store_replay(
         "observation_count": products.trace_summary["observation_count"],
         "idea_count": len(products.ideas),
         "episode_count": products.outcomes["episode_count"],
+        "candidate_pool_symbol_count": prepared.catalog["selected_symbol_count"],
+        "point_in_time_universe_top_n": prepared.configuration["universe_top_n"],
         "selected_symbol_count": prepared.catalog["selected_symbol_count"],
+        "selected_symbol_count_semantics": (
+            "legacy_alias_candidate_pool_symbol_count"
+        ),
         "row_count": prepared.catalog["row_count"],
         "persistence": dict(persistence.metrics),
         "resumed": False,
@@ -399,6 +428,7 @@ def _store_replay(
         run_mode=prepared.run_mode,
         fingerprint=prepared.fingerprint,
         catalog=prepared.catalog,
+        configuration=prepared.configuration,
         trace_summary=products.trace_summary,
         outcomes=products.outcomes,
         analyses=products.analyses,
@@ -485,6 +515,10 @@ def _run_kernel_chunked(
     failure_counts: Counter[str] = Counter()
     route_counts: Counter[str] = Counter()
     partition_counts: Counter[str] = Counter()
+    selected_observation_days: set[str] = set()
+    idea_observation_days: set[str] = set()
+    selected_observation_start_at: str | None = None
+    selected_observation_end_at: str | None = None
     observation_count = 0
     operator_visible = 0
     example_by_stage: dict[str, dict[str, Any]] = {}
@@ -513,11 +547,28 @@ def _run_kernel_chunked(
         route_counts.update(result.trace_summary["route_counts"])
         partition_counts.update(result.trace_summary["partition_counts"])
         ideas.extend(dict(row) for row in result.ideas)
+        for idea in result.ideas:
+            observed_at = str(idea.get("observed_at") or "")
+            if observed_at:
+                idea_observation_days.add(observed_at[:10])
         if len(result.trace_rows) != len(ordered_chunk):
             raise RuntimeError("empirical_replay_trace_observation_count_mismatch")
         for raw, trace in zip(ordered_chunk, result.trace_rows, strict=True):
             if str(trace.get("partition") or "") not in allowed_partitions:
                 continue
+            observed_at = str(trace.get("observed_at") or "")
+            if observed_at:
+                selected_observation_days.add(observed_at[:10])
+                if (
+                    selected_observation_start_at is None
+                    or observed_at < selected_observation_start_at
+                ):
+                    selected_observation_start_at = observed_at
+                if (
+                    selected_observation_end_at is None
+                    or observed_at > selected_observation_end_at
+                ):
+                    selected_observation_end_at = observed_at
             control_observations.append(_control_observation_projection(raw, trace))
             control_traces.append(_control_trace_projection(trace))
         for trace in result.trace_rows:
@@ -539,11 +590,24 @@ def _run_kernel_chunked(
     ideas.sort(key=lambda row: (str(row.get("observed_at") or ""), str(row.get("candidate_id") or "")))
     template.update({
         "observation_count": observation_count,
+        "observation_counting_unit": "input_observation_rows",
+        "selected_partition_observation_count": len(control_traces),
+        "selected_partition_observed_day_count": len(selected_observation_days),
+        "selected_partition_observation_start_at": selected_observation_start_at,
+        "selected_partition_observation_end_at": selected_observation_end_at,
         "idea_count": len(ideas),
+        "idea_counting_unit": "canonical_idea_rows",
+        "idea_observed_day_count": len(idea_observation_days),
+        "idea_count_per_selected_observed_day": (
+            len(ideas) / len(selected_observation_days)
+            if selected_observation_days
+            else None
+        ),
         "operator_visible_idea_count": operator_visible,
         "trace_status_counts": dict(sorted(status_counts.items())),
         "failure_stage_counts": dict(sorted(failure_counts.items())),
         "route_counts": dict(sorted(route_counts.items())),
+        "route_counting_unit": "canonical_idea_rows",
         "partition_counts": dict(sorted(partition_counts.items())),
         "trace_rows_persisted": False,
         "trace_examples_bounded": True,
@@ -591,6 +655,58 @@ def _control_observation_projection(
         "partition": trace.get("partition"),
         **{field: raw.get(field) for field in fields},
     }
+
+
+def _selected_observation_days_by_partition(
+    observations: Iterable[Mapping[str, Any]],
+    *,
+    partitions: Iterable[str],
+) -> dict[str, set[str]]:
+    output = {str(partition): set() for partition in partitions}
+    for row in observations:
+        partition = str(row.get("partition") or "")
+        if partition not in output:
+            raise RuntimeError("selected_observation_partition_mismatch")
+        output[partition].add(_utc_day(row.get("observed_at")))
+    return output
+
+
+def _bind_selected_observation_day_summary(
+    trace_summary: dict[str, Any],
+    day_sets: Mapping[str, set[str]],
+) -> None:
+    union = set().union(*day_sets.values()) if day_sets else set()
+    trace_summary["selected_partition_observed_day_count"] = len(union)
+    trace_summary["idea_count_per_selected_observed_day"] = (
+        int(trace_summary.get("idea_count") or 0) / len(union)
+        if union
+        else None
+    )
+    trace_summary["selected_partition_observed_day_count_by_partition"] = {
+        partition: len(days) for partition, days in sorted(day_sets.items())
+    }
+    trace_summary["selected_partition_observed_days_sha256_by_partition"] = {
+        partition: empirical_validation_protocol.selected_observation_days_sha256(days)
+        for partition, days in sorted(day_sets.items())
+    }
+    trace_summary["selected_partition_observed_days_sha256"] = (
+        empirical_validation_protocol.selected_observation_days_sha256(union)
+    )
+    trace_summary["selected_partition_observed_day_basis"] = (
+        "exact_selected_observation_utc_days"
+    )
+
+
+def _utc_day(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError("selected_observation_timestamp_invalid")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise RuntimeError("selected_observation_timestamp_invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise RuntimeError("selected_observation_timestamp_timezone_required")
+    return parsed.astimezone(timezone.utc).date().isoformat()
 
 
 def _control_trace_projection(trace: Mapping[str, Any]) -> dict[str, Any]:
@@ -742,16 +858,19 @@ def _code_paths() -> dict[str, Path]:
         "empirical_replay_data_series.py": operations / "empirical_replay_data_series.py",
         "empirical_replay_core.py": operations / "empirical_replay_core.py",
         "empirical_replay_outcomes.py": operations / "empirical_replay_outcomes.py",
+        "empirical_replay_outcome_join.py": operations / "empirical_replay_outcome_join.py",
         "empirical_replay_persistence.py": operations / "empirical_replay_persistence.py",
         "empirical_replay_analysis.py": operations / "empirical_replay_analysis.py",
         "empirical_replay_dimensions.py": operations / "empirical_replay_dimensions.py",
         "empirical_operator_burden.py": operations / "empirical_operator_burden.py",
+        "empirical_survivability.py": operations / "empirical_survivability.py",
         "empirical_replay_statistics.py": operations / "empirical_replay_statistics.py",
         "empirical_replay_controls.py": operations / "empirical_replay_controls.py",
         "empirical_missed_attribution.py": operations / "empirical_missed_attribution.py",
         "empirical_replay_benchmark_metrics.py": operations / "empirical_replay_benchmark_metrics.py",
         "empirical_review.py": operations / "empirical_review.py",
         "empirical_policy_lab.py": operations / "empirical_policy_lab.py",
+        "empirical_policy_metrics.py": operations / "empirical_policy_metrics.py",
         "empirical_replay_store.py": operations / "empirical_replay_store.py",
         "market_provenance.py": operations / "market_provenance.py",
         "decision_model.py": radar / "decision_model.py",
@@ -785,6 +904,7 @@ def _execution_summary(
     run_mode: str,
     fingerprint: str,
     catalog: Mapping[str, Any],
+    configuration: Mapping[str, Any],
     trace_summary: Mapping[str, Any],
     outcomes: Mapping[str, Any],
     analyses: Mapping[str, Mapping[str, Any]],
@@ -801,14 +921,47 @@ def _execution_summary(
         "schema_version": RUN_SCHEMA_VERSION,
         "mode": run_mode,
         "run_fingerprint": fingerprint,
+        "input_data_window_semantics": "completed_daily_bar_cache_window_inclusive",
         "data_start_at": catalog["data_start_at"],
         "data_end_at": catalog["data_end_at"],
+        "candidate_pool_symbol_count": catalog["selected_symbol_count"],
+        "point_in_time_universe_top_n": configuration["universe_top_n"],
         "selected_symbol_count": catalog["selected_symbol_count"],
+        "selected_symbol_count_semantics": (
+            "legacy_alias_candidate_pool_symbol_count"
+        ),
         "input_row_count": catalog["row_count"],
         "partial_bar_count": catalog["partial_bar_count"],
         "observation_count": trace_summary["observation_count"],
+        "observation_counting_unit": trace_summary["observation_counting_unit"],
+        "selected_partition_observation_count": trace_summary[
+            "selected_partition_observation_count"
+        ],
+        "selected_partition_observed_day_count": trace_summary[
+            "selected_partition_observed_day_count"
+        ],
+        "selected_partition_observed_day_count_by_partition": dict(
+            trace_summary[
+                "selected_partition_observed_day_count_by_partition"
+            ]
+        ),
+        "selected_partition_observed_day_basis": trace_summary[
+            "selected_partition_observed_day_basis"
+        ],
+        "selected_partition_observation_start_at": trace_summary[
+            "selected_partition_observation_start_at"
+        ],
+        "selected_partition_observation_end_at": trace_summary[
+            "selected_partition_observation_end_at"
+        ],
         "idea_count": trace_summary["idea_count"],
+        "idea_counting_unit": trace_summary["idea_counting_unit"],
+        "idea_observed_day_count": trace_summary["idea_observed_day_count"],
+        "idea_count_per_selected_observed_day": trace_summary[
+            "idea_count_per_selected_observed_day"
+        ],
         "route_counts": dict(trace_summary["route_counts"]),
+        "route_counting_unit": trace_summary["route_counting_unit"],
         "episode_count": outcomes["episode_count"],
         "dependent_repeat_count": outcomes["dependent_repeat_count"],
         "matched_control_count": matched["selected_control_count"],
@@ -844,10 +997,13 @@ def _summary_markdown(summary: Mapping[str, Any]) -> str:
         "",
         f"- Mode: `{summary['mode']}`",
         f"- Fingerprint: `{summary['run_fingerprint']}`",
-        f"- Data: `{summary['data_start_at']}` through `{summary['data_end_at']}`",
-        f"- Inputs: {summary['selected_symbol_count']} symbols / {summary['input_row_count']} bars / {summary['partial_bar_count']} partial bars",
-        f"- Replay: {summary['observation_count']} observations / {summary['idea_count']} ideas / {summary['episode_count']} independent episodes",
-        f"- Routes: {route_counts}",
+        f"- Input cache: `{summary['data_start_at']}` through `{summary['data_end_at']}` (inclusive completed daily bars)",
+        f"- Selected partitions: `{summary['selected_partition_observation_start_at']}` through `{summary['selected_partition_observation_end_at']}` / {summary['selected_partition_observation_count']} observation rows / {summary['selected_partition_observed_day_count']} observed UTC days",
+        f"- Candidate-pool inputs: {summary['candidate_pool_symbol_count']} cached symbols / {summary['input_row_count']} bars / {summary['partial_bar_count']} partial bars",
+        f"- Point-in-time universe: top {summary['point_in_time_universe_top_n']} assets per observation (the candidate-pool symbol count is not the daily universe size)",
+        f"- Replay: {summary['observation_count']} input observation rows / {summary['idea_count']} canonical idea rows / {summary['episode_count']} independent episodes",
+        f"- Idea burden: {summary['idea_observed_day_count']} active idea days / {summary['idea_count_per_selected_observed_day'] or 0.0:.4f} ideas per selected observed day",
+        f"- Routes (canonical idea rows): {route_counts}",
         f"- Controls: {summary['matched_control_count']} matched / {summary['matched_control_unavailable_count']} unavailable",
         f"- Missed opportunities: {summary['missed_opportunity_count']} of {summary['missed_endpoint_candidate_count']} frozen endpoint candidates",
         f"- Runtime: {summary['runtime']['total_seconds']:.3f}s; bottleneck `{summary['runtime']['bottleneck_stage']}`",

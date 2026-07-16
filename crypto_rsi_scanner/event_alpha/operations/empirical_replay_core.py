@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
+from ..artifacts.schema.decision_model import (
+    validate_contract as validate_decision_contract,
+)
 from ..radar import market_anomaly_scanner
 from ..radar.decision_model import reevaluate_radar_decision_fields
 from ..radar.decision_model_surfaces import DECISION_MODEL_FIELD_NAMES, decision_model_values
@@ -37,6 +40,27 @@ _VISIBLE_ROUTES = {
     "risk_watch",
     "calendar_risk",
 }
+_PROJECTION_VALIDATION_ERROR_LIMIT = 16
+_PROJECTION_VALIDATION_ERROR_CODES = (
+    "return_unit_metadata_invalid",
+    "return_unit_field_unknown",
+    "return_unit_missing",
+    "return_value_invalid",
+    "return_fraction_implausible",
+    "return_percent_implausible",
+    "decision_field_missing",
+    "decision_field_type_invalid",
+    "decision_enum_invalid",
+    "decision_score_or_expiry_invalid",
+    "decision_actionability_contract_invalid",
+    "decision_route_contract_invalid",
+    "decision_calendar_contract_invalid",
+    "decision_projection_contract_invalid",
+    "decision_safety_contract_invalid",
+    "decision_provenance_contract_invalid",
+    "decision_contract_invalid_other",
+    "canonical_projection_idempotence_failed",
+)
 
 
 @dataclass(frozen=True)
@@ -175,11 +199,24 @@ def _evaluate_observation(
     }
     projection = decision_model_values(evaluated)
     if not projection or decision_model_values(projection) != projection:
+        validation_error_codes = _projection_validation_error_codes(evaluated)
+        if projection and decision_model_values(projection) != projection:
+            validation_error_codes = list(dict.fromkeys([
+                *validation_error_codes,
+                "canonical_projection_idempotence_failed",
+            ]))[:_PROJECTION_VALIDATION_ERROR_LIMIT]
+        concern_class = (
+            "data_quality_feature_contract"
+            if any(code.startswith("return_") for code in validation_error_codes)
+            else "canonical_projection_contract"
+        )
         return {
             **base,
             "trace_status": "rejected",
             "failure_stage": "canonical_projection_invalid",
             "anomaly_type": anomaly_type,
+            "projection_validation_error_codes": validation_error_codes,
+            "projection_validation_concern_class": concern_class,
         }, None
     idea = dict(evaluated)
     idea["decision_projection"] = projection
@@ -428,6 +465,12 @@ def _trace_summary(
     failures = Counter(str(row.get("failure_stage") or "none") for row in traces)
     routes = Counter(str(row.get("radar_route") or "diagnostic") for row in ideas)
     partitions = Counter(str(row.get("replay_partition") or "unknown") for row in ideas)
+    projection_errors = Counter(
+        str(code)
+        for row in traces
+        for code in row.get("projection_validation_error_codes") or ()
+        if str(code) in _PROJECTION_VALIDATION_ERROR_CODES
+    )
     return {
         "schema_id": TRACE_SCHEMA_ID,
         "schema_version": TRACE_SCHEMA_VERSION,
@@ -440,6 +483,9 @@ def _trace_summary(
         "operator_visible_idea_count": sum(1 for row in ideas if row.get("operator_visible") is True),
         "trace_status_counts": dict(sorted(statuses.items())),
         "failure_stage_counts": dict(sorted(failures.items())),
+        "projection_validation_error_code_counts": dict(
+            sorted(projection_errors.items())
+        ),
         "route_counts": dict(sorted(routes.items())),
         "partition_counts": dict(sorted(partitions.items())),
         "research_only": True,
@@ -454,6 +500,54 @@ def _trace_summary(
         "event_alpha_triggered_fade": 0,
         "dashboard_authority_mutations": 0,
     }
+
+
+def _projection_validation_error_codes(value: Mapping[str, Any]) -> list[str]:
+    """Map contract errors to a bounded secret-safe closed diagnostic set."""
+
+    raw_errors = validate_decision_contract(value)
+    codes: list[str] = []
+    for raw in raw_errors:
+        error = str(raw or "")
+        if error.startswith("decision_model_invalid_return_unit_metadata:"):
+            code = "return_unit_metadata_invalid"
+        elif error.startswith("decision_model_unknown_return_unit_field:"):
+            code = "return_unit_field_unknown"
+        elif error.startswith("decision_model_return_unit_missing:"):
+            code = "return_unit_missing"
+        elif error.startswith("decision_model_invalid_return_value:"):
+            code = "return_value_invalid"
+        elif error.startswith("decision_model_implausible_fraction_return:"):
+            code = "return_fraction_implausible"
+        elif error.startswith("decision_model_implausible_percent_return:"):
+            code = "return_percent_implausible"
+        elif "missing_field" in error:
+            code = "decision_field_missing"
+        elif "invalid_type" in error:
+            code = "decision_field_type_invalid"
+        elif "invalid_enum" in error or "invalid_thesis_origins" in error:
+            code = "decision_enum_invalid"
+        elif any(token in error for token in ("score", "expiry", "expires")):
+            code = "decision_score_or_expiry_invalid"
+        elif any(token in error for token in ("actionable", "actionability", "confidence_band")):
+            code = "decision_actionability_contract_invalid"
+        elif any(token in error for token in ("route", "hard_blocker")):
+            code = "decision_route_contract_invalid"
+        elif "calendar" in error:
+            code = "decision_calendar_contract_invalid"
+        elif any(token in error for token in ("projection", "alias")):
+            code = "decision_projection_contract_invalid"
+        elif any(token in error for token in ("safety", "research_only", "secret", "path")):
+            code = "decision_safety_contract_invalid"
+        elif any(token in error for token in ("provenance", "lineage", "source_independence")):
+            code = "decision_provenance_contract_invalid"
+        else:
+            code = "decision_contract_invalid_other"
+        if code not in codes:
+            codes.append(code)
+        if len(codes) >= _PROJECTION_VALIDATION_ERROR_LIMIT:
+            break
+    return codes or ["decision_contract_invalid_other"]
 
 
 def canonical_idea_bytes(idea: Mapping[str, Any]) -> bytes:

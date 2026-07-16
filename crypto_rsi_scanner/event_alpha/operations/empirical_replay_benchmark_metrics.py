@@ -149,11 +149,36 @@ def build_benchmark_row(
         "cost_unit": "basis_points",
         "selection_uses_outcomes": False,
         "outcomes_joined_after_selection": True,
+        "cross_policy_dependency": _cross_policy_dependency(policy),
         "selections": detail_rows[:detail_row_limit],
         "causal_claim": False,
         "policy_eligible": False,
         "research_only": True,
         "auto_apply": False,
+    }
+
+
+def _cross_policy_dependency(policy: str) -> dict[str, Any]:
+    if policy not in {"same_day_top_raw_mover", "top_relative_strength"}:
+        return {
+            "dependent_policy": None,
+            "ranking_equivalence": False,
+            "independent_evidence_claim": True,
+        }
+    other = (
+        "top_relative_strength"
+        if policy == "same_day_top_raw_mover"
+        else "same_day_top_raw_mover"
+    )
+    return {
+        "dependent_policy": other,
+        "ranking_equivalence": True,
+        "equivalence_condition": (
+            "within one observation date, subtracting the same BTC return "
+            "from every available asset preserves cross-sectional rank"
+        ),
+        "missing_benchmark_values_may_change_eligibility": True,
+        "independent_evidence_claim": False,
     }
 
 
