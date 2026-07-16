@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 
+from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+from crypto_rsi_scanner.event_alpha.radar import source_independence
 from crypto_rsi_scanner.event_alpha.dashboard.ideas_page import (
     render_idea_comparison,
     render_idea_detail,
@@ -461,6 +463,114 @@ def test_idea_detail_prioritizes_thesis_and_collapses_supporting_context() -> No
         assert body.index(heading) > coverage_at
     assert "No exact-generation calendar event is attached to this idea." in body
     assert "No exact RSI context is attached." in body
+
+
+def test_idea_detail_shows_concise_evidence_verdict_and_hides_contract_payloads() -> None:
+    snapshot = load_dashboard_snapshot(
+        "fixtures/event_alpha/radar_dashboard",
+        "current",
+        now=_NOW,
+    )
+    original_body = (
+        "PumpX token holders can trade synthetic exposure to SpaceX before the "
+        "initial public offering opens for qualified crypto market participants"
+    )
+    independent_body = (
+        "Independent analysts confirm PumpX settlement contracts reference SpaceX "
+        "private market exposure with separate custody documentation for participants"
+    )
+    contract = source_independence.assess_source_independence(
+        [
+            {
+                "source_id": "original",
+                "source_url": "https://one.example/story",
+                "title": "Initial catalyst evidence",
+                "body": original_body,
+                "published_at": "2026-07-12T05:00:00Z",
+            },
+            {
+                "source_id": "syndicated",
+                "source_url": "https://two.example/story",
+                "title": "Initial catalyst evidence",
+                "body": original_body,
+                "published_at": "2026-07-12T05:01:00Z",
+            },
+            {
+                "source_id": "independent",
+                "source_url": "https://three.example/story",
+                "title": "Independent catalyst analysis",
+                "body": independent_body,
+                "published_at": "2026-07-12T05:02:00Z",
+            },
+        ]
+    )
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "anomaly-dashboard-verdict",
+            "observed_at": "2026-07-12T06:00:00Z",
+        },
+        {
+            "raw_id": "official-dashboard-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/dashboard-verdict",
+            "content_hash": "b" * 64,
+            "published_at": "2026-07-12T05:30:00Z",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+    candidates = tuple(
+        {
+            **row,
+            "source_independence": contract,
+            "source_independence_status": "assessed",
+            "source_independence_errors": [],
+            "independent_source_count": 2,
+            "independent_corroboration_count": 1,
+            "source_content_cluster_count": 2,
+            "source_update_count": 3,
+            "evidence_acquisition_accepted_count": 3,
+            "catalyst_attribution": attribution,
+        }
+        if row.get("core_opportunity_id") == "core:alpha"
+        else row
+        for row in snapshot.current_candidates
+    )
+    snapshot = replace(snapshot, current_candidates=candidates)
+
+    status, _title, body = render_idea_detail(snapshot, "core:alpha")
+
+    assert status == 200
+    assert "Evidence verdict" in body
+    assert "Accepted evidence is a validation count, not independent corroboration." in body
+    for label, value in (
+        ("Raw sources", "3"),
+        ("Accepted evidence rows (not corroboration)", "3"),
+        ("Content clusters", "2"),
+        ("Independent evidence units", "2"),
+        ("Additional independent corroborations", "1"),
+        ("Syndicated copies collapsed", "1"),
+        ("Catalyst timing", "Antecedent"),
+        ("Causal eligibility", "Eligible"),
+        ("Source authority", "Official"),
+    ):
+        assert f"<dt>{label}</dt><dd>{value}</dd>" in body
+    verdict = body[
+        body.index('<section class="panel evidence-verdict">') : body.index(
+            "</section>", body.index('<section class="panel evidence-verdict">')
+        )
+    ]
+    assert contract["contract_digest"] not in verdict
+    assert attribution["attribution_digest"] not in verdict
+    assert contract["contract_digest"] in body
+    assert attribution["attribution_digest"] in body
+    assert body.index(contract["contract_digest"]) > body.index(
+        "Technical lineage, contract digests, and raw identifiers"
+    )
+    assert "normalized_body" not in body
 
 
 def test_idea_detail_suppresses_duplicate_coin_id_but_preserves_lineage() -> None:

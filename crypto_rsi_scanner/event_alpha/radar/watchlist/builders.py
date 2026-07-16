@@ -14,6 +14,7 @@ import crypto_rsi_scanner.event_alpha.artifacts.alerts as event_alerts
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 from crypto_rsi_scanner.event_alpha.radar.source_independence import validated_source_independence_container
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -544,9 +545,16 @@ def _append_entries(path: Path, entries: Iterable[EventWatchlistEntry]) -> int:
     if not data:
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
+    persisted_rows = [
+        event_source_independence_store.externalize(
+            path.parent,
+            _json_ready(asdict(entry)),
+        )
+        for entry in data
+    ]
     with path.open("a", encoding="utf-8") as fh:
-        for entry in data:
-            fh.write(json.dumps(_json_ready(asdict(entry)), sort_keys=True, separators=(",", ":")))
+        for persisted in persisted_rows:
+            fh.write(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
             fh.write("\n")
     return len(data)
 

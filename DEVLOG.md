@@ -17,6 +17,51 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Store source-independence evidence once without rewriting history · Codex
+**Why:** The closed source-independence contract is intentionally detailed, but
+copying it into every candidate, CoreOpportunity, card input, alert, outcome,
+cache, and operator artifact amplified one evidence object across the whole
+namespace. Downstream rewrites also needed to remain safe when a new reference
+store could not be created.
+**Changes:**
+- Added a namespace-local immutable, digest-addressed contract store with a
+  closed reference schema, canonical relative paths, exact byte fingerprints,
+  semantic/count closure, bounded descriptor-anchored reads/writes, and strict
+  rejection of missing, mutated, symlinked, or summary-divergent references.
+- New artifacts persist compact references while readers retain validated
+  legacy-inline compatibility. Decision projection remains idempotent for both
+  forms; candidates, CoreOpportunity, cards, dashboard, alerts, outcomes,
+  evidence acquisition, discovery cache, incidents, hypotheses, and watchlist
+  rows resolve the same contract. Operator state and strict doctor bind the
+  exact canonical store and fail closed on path or reference drift.
+- Made all affected rewrite paths prepare and validate complete output before
+  descriptor-anchored atomic replacement. Historical inline contracts remain
+  inline, existing JSONL prefixes are preserved on append, and unsafe-store
+  failures cannot truncate prior artifacts. Append-only stores also externalize
+  complete batches before touching their row artifact.
+- Replaced default full-contract UI dumps with concise evidence counts and
+  source-authority/catalyst-attribution summaries, leaving digests and the full
+  contract under technical details. Added a read-only storage report covering
+  artifact bytes, store growth, resolution performance, and ZIP/export effect.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q` over the
+store/projection/storage/dashboard/cache suite (79 passed), the atomic/core/
+evidence/fixture-route suite (82 passed), and the broader readiness/OOS/calendar
+suite (94 passed); `make event-alpha-integrated-radar-smoke PYTHON=python3`
+completed with 15 candidates, 12 cores/cards, strict doctor zero blockers and
+warnings, dashboard smoke `writes=0`, and an unchanged absent authority pointer;
+`make architecture-cleanliness-check PYTHON=python3` passed; `git diff --check`.
+The current fixture measurement is 968,372 inline-equivalent bytes versus
+929,326 referenced-artifact-plus-store bytes: 39,046 bytes / 4.032% smaller,
+with one 8,990-byte immutable store object and zero provider calls or writes
+during measurement. Its deterministic in-memory namespace ZIP is 78,916 bytes
+inline versus 73,525 bytes referenced, a measured 5,391-byte / 6.831% reduction
+including member/header overhead (explicitly namespace-only, not the whole
+project archive).
+**Notes/risks:** No historical inline row was deleted or reinterpreted. No
+provider authorization, policy threshold, route, send, trade, paper trade,
+normal RSI row, execution path, dashboard authority, or Event Alpha
+`TRIGGERED_FADE` changed.
+
 ## 2026-07-16 — Separate dashboard validation from authority mutation · Codex
 **Why:** The integrated fixture smoke called a mutating command named
 `radar-dashboard-readiness`, replacing real dashboard authority with a fixture

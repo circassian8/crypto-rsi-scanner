@@ -490,7 +490,7 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
     )
     assert card.found is True
     assert "CHZ Event Research Card" in card.markdown
-    assert "Evidence Sources" in card.markdown
+    assert "Evidence Verdict" in card.markdown
     assert "Cluster Context" in card.markdown
     assert "Accepted links by kind: proxy=CHZ/chiliz" in card.markdown
     assert "Rejected/noise links: BTC/bitcoin:publisher/source noise" in card.markdown

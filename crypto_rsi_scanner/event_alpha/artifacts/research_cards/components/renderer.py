@@ -360,7 +360,7 @@ def _append_research_card_evidence_sections(lines: list[str], context: Mapping[s
         f"- External asset: {_value(entry, alert, 'external_asset', 'external_asset') or 'unknown'}",
         f"- Event time: {_value(entry, alert, 'event_time', 'event_time') or 'unknown'}",
         "",
-        "## Evidence Sources",
+        "## Evidence Verdict",
     ])
     lines.extend(_source_lines(entry, alert))
     official_exchange_lines = _official_exchange_evidence_lines(entry, alert)
@@ -375,13 +375,16 @@ def _append_research_card_evidence_sections(lines: list[str], context: Mapping[s
     if derivatives_lines:
         lines.extend(["", "## Derivatives / Crowding"])
         lines.extend(derivatives_lines)
-    lines.extend(["", "## Source Coverage / Evidence Acquisition"])
+    lines.extend(["", "## Technical Evidence Acquisition Detail"])
     lines.extend(_source_acquisition_lines(
         entry,
         alert,
         card_path=context["card_path"],
         lineage_context=context["lineage_context"],
     ))
+    lines.extend(["", "<details>", "<summary>Technical evidence identifiers</summary>", ""])
+    lines.extend(_technical_evidence_lines(entry, alert))
+    lines.extend(["", "</details>"])
     lines.extend([
         "",
         "## Accepted / Rejected Asset Links",

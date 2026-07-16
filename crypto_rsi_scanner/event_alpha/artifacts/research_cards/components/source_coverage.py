@@ -4,10 +4,28 @@ from __future__ import annotations
 
 from .runtime import *
 from ....radar.decision_model_surfaces import decision_model_values
+from ....radar import catalyst_attribution as event_catalyst_attribution
 from ....radar import source_independence as event_source_independence
 
+_MAX_EVIDENCE_VERDICT_ERRORS = 4
+_EVIDENCE_CONTRACT_FIELDS = (
+    "source_independence",
+    "source_independence_status",
+    "source_independence_errors",
+    "independent_source_count",
+    "independent_corroboration_count",
+    "source_content_cluster_count",
+    "catalyst_attribution",
+    "catalyst_attributions",
+    "catalyst_attribution_rejected",
+    "catalyst_attribution_rejection_reasons",
+)
+
+
 def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
-    components = _card_components(entry, alert)
+    """Render the concise operator evidence verdict, never the full contracts."""
+
+    components = _evidence_components(entry, alert)
     sample = _first_accepted_evidence_sample(components)
     official_event = components.get("official_exchange_event") if isinstance(components.get("official_exchange_event"), Mapping) else {}
     scheduled_event = components.get("scheduled_catalyst_event") if isinstance(components.get("scheduled_catalyst_event"), Mapping) else {}
@@ -28,7 +46,11 @@ def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         or (sample.get("source_url") if sample else None)
     )
     source_title = components.get("latest_source_title") or structured_event.get("title") or structured_event.get("event_name") or (sample.get("title") if sample else None)
-    accepted_count = _int_value(components.get("evidence_acquisition_accepted_count")) or len(_accepted_evidence_samples(components))
+    accepted_count = _int_value(
+        components.get("evidence_acquisition_accepted_count")
+    )
+    if accepted_count is None or accepted_count < 0:
+        accepted_count = len(_accepted_evidence_samples(components))
     source_count = _int_value(components.get("source_update_count")) or _int_value(
         components.get("source_count")
     ) or (entry.source_count if entry is not None else 0)
@@ -45,10 +67,18 @@ def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
     content_cluster_count = _int_value(
         source_independence.get("content_cluster_count")
     )
-    reported_errors = _list_strings(components.get("source_independence_errors"))
+    raw_document_count = _int_value(source_independence.get("raw_document_count"))
+    collapsed_copy_count = _collapsed_copy_count(source_independence)
+    attribution = _validated_catalyst_attribution(components)
+    reported_errors = _evidence_verdict_errors(
+        components,
+        source_independence=source_independence,
+        attribution=attribution,
+    )
     independence_status = (
         "rejected"
-        if reported_errors or components.get("source_independence_status") == "rejected"
+        if _list_strings(components.get("source_independence_errors"))
+        or components.get("source_independence_status") == "rejected"
         else "assessed"
         if independence_assessed
         else "unassessed"
@@ -57,28 +87,195 @@ def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         independent_display = str(independent_count)
         corroboration_display = str(corroboration_count)
         cluster_display = str(content_cluster_count)
+        collapsed_display = str(collapsed_copy_count)
     else:
         independent_display = "not assessed"
         corroboration_display = "not assessed"
         cluster_display = "not assessed"
+        collapsed_display = "not assessed"
+    raw_display = (
+        str(raw_document_count)
+        if raw_document_count is not None
+        else str(source_count)
+        if source_count
+        else "not available"
+    )
     lines: list[str] = [
-        f"- Latest source: {latest_source or 'not available'}",
-        f"- Raw source updates: {source_count if source_count else 'not available'}",
-        f"- Source independence status: {independence_status}",
+        f"- Evidence assessment: {independence_status}",
+        f"- Raw sources: {raw_display}",
         f"- Independent evidence units: {independent_display}",
         f"- Additional independent corroborations: {corroboration_display}",
         f"- Content clusters: {cluster_display}",
+        f"- Syndicated copies collapsed: {collapsed_display}",
+        f"- Accepted evidence rows (not corroboration): {accepted_count}",
+        f"- Catalyst timing: {_catalyst_timing_label(attribution)}",
+        f"- Causal eligibility: {_causal_eligibility_label(attribution)}",
+        f"- Source authority: {_source_authority_label(attribution)}",
+        f"- Evidence errors: {_bounded_evidence_errors(reported_errors)}",
+        f"- Latest source: {latest_source or 'not available'}",
     ]
-    if accepted_count:
-        lines.append(f"- Accepted evidence count: {accepted_count}")
     if source_title:
         lines.append(f"- Latest evidence title: {source_title}")
     if source_url:
         lines.append(f"- URL: {source_url}")
-    provider = _display_text(components.get("source_provider")) or _display_text(sample.get("provider") if sample else None)
-    if provider:
-        lines.append(f"- Provider: {provider}")
     return lines
+
+
+def _technical_evidence_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    """Expose only identifiers for exact artifacts in the secondary detail area."""
+
+    components = _evidence_components(entry, alert)
+    independence = event_source_independence.validated_source_independence_container(
+        components
+    )
+    attribution = _validated_catalyst_attribution(components)
+    return [
+        "- Full evidence contracts: omitted from the operator summary; retained in exact-generation artifacts.",
+        "- Source-independence contract digest: "
+        + str(independence.get("contract_digest") or "not available"),
+        "- Catalyst-attribution digest: "
+        + str(attribution.get("attribution_digest") or "not available"),
+    ]
+
+
+def _collapsed_copy_count(contract: Mapping[str, Any]) -> int:
+    documents = contract.get("documents")
+    if not isinstance(documents, list):
+        return 0
+    return sum(
+        1
+        for document in documents
+        if isinstance(document, Mapping)
+        and document.get("match_kind") in {"exact", "near_duplicate"}
+    )
+
+
+def _evidence_components(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Preserve closed empty status/error fields that generic card merging skips."""
+
+    components = _card_components(entry, alert)
+    containers: list[Mapping[str, Any]] = []
+    if entry is not None and isinstance(entry.latest_score_components, Mapping):
+        containers.append(entry.latest_score_components)
+    if alert is not None:
+        for field in ("score_components", "latest_score_components"):
+            value = alert.get(field)
+            if isinstance(value, Mapping):
+                containers.append(value)
+        containers.append(alert)
+    for container in containers:
+        for field in _EVIDENCE_CONTRACT_FIELDS:
+            if field in container:
+                components[field] = container[field]
+    return components
+
+
+def _validated_catalyst_attribution(
+    components: Mapping[str, Any],
+) -> dict[str, Any]:
+    if (
+        components.get("catalyst_attribution_rejected") is True
+        or _list_strings(components.get("catalyst_attribution_rejection_reasons"))
+    ):
+        return {}
+    supplied: list[Mapping[str, Any]] = []
+    single = components.get("catalyst_attribution")
+    if single not in (None, "", {}, []):
+        if not isinstance(single, Mapping):
+            return {}
+        supplied.append(single)
+    multiple = components.get("catalyst_attributions")
+    if multiple not in (None, "", {}, []):
+        if not isinstance(multiple, Iterable) or isinstance(
+            multiple, (str, bytes, Mapping)
+        ):
+            return {}
+        for value in multiple:
+            if not isinstance(value, Mapping):
+                return {}
+            supplied.append(value)
+    if not supplied or any(
+        event_catalyst_attribution.validate_contract(value) for value in supplied
+    ):
+        return {}
+    return dict(supplied[0])
+
+
+def _catalyst_timing_label(attribution: Mapping[str, Any]) -> str:
+    return str(attribution.get("temporal_relation") or "not assessed").replace(
+        "_", " "
+    )
+
+
+def _causal_eligibility_label(attribution: Mapping[str, Any]) -> str:
+    if not attribution:
+        return "not assessed"
+    if attribution.get("causal_eligible") is True:
+        return "eligible"
+    if attribution.get("evidence_use") == "disproof":
+        return "disproof"
+    return "context only"
+
+
+def _source_authority_label(attribution: Mapping[str, Any]) -> str:
+    if not attribution:
+        return "unassessed"
+    source_class = str(attribution.get("source_class") or "").casefold()
+    if attribution.get("source_authority_verified") is True:
+        if source_class.startswith("official_"):
+            return "official"
+        if source_class.startswith("structured_"):
+            return "structured"
+    return "context"
+
+
+def _evidence_verdict_errors(
+    components: Mapping[str, Any],
+    *,
+    source_independence: Mapping[str, Any],
+    attribution: Mapping[str, Any],
+) -> list[str]:
+    values = [
+        *_list_strings(components.get("source_independence_errors")),
+        *_list_strings(components.get("catalyst_attribution_rejection_reasons")),
+    ]
+    if (
+        not source_independence
+        and components.get("source_independence") not in (None, "", {}, [])
+        and not _list_strings(components.get("source_independence_errors"))
+        and "source_independence_invalid" not in values
+    ):
+        values.append("source_independence_invalid")
+    if (
+        not attribution
+        and (
+            components.get("catalyst_attribution") not in (None, "", {}, [])
+            or components.get("catalyst_attributions") not in (None, "", {}, [])
+        )
+        and "catalyst_attribution_invalid" not in values
+    ):
+        values.append("catalyst_attribution_invalid")
+    return list(dict.fromkeys(values))
+
+
+def _bounded_evidence_errors(values: Iterable[str]) -> str:
+    clean = [
+        " ".join(str(value).split())[:160]
+        for value in values
+        if str(value).strip()
+    ]
+    if not clean:
+        return "none"
+    visible = clean[:_MAX_EVIDENCE_VERDICT_ERRORS]
+    hidden = len(clean) - len(visible)
+    suffix = f"; +{hidden} more" if hidden else ""
+    return "; ".join(visible) + suffix
 
 def _official_exchange_evidence_lines(
     entry: event_watchlist.EventWatchlistEntry | None,
@@ -585,6 +782,15 @@ def _human_contract_value(value: object) -> str:
 
 __all__ = (
     '_source_lines',
+    '_technical_evidence_lines',
+    '_collapsed_copy_count',
+    '_evidence_components',
+    '_validated_catalyst_attribution',
+    '_catalyst_timing_label',
+    '_causal_eligibility_label',
+    '_source_authority_label',
+    '_evidence_verdict_errors',
+    '_bounded_evidence_errors',
     '_official_exchange_evidence_lines',
     '_scheduled_catalyst_lines',
     '_derivatives_crowding_lines',

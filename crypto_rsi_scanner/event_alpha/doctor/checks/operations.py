@@ -12,11 +12,13 @@ from typing import Any
 from .. import check_registry
 from ._utils import Messages, ctx_mapping, ctx_value
 from ...artifacts import paths as event_artifact_paths
+from ...artifacts import fingerprints as event_alpha_fingerprints
 from ...artifacts import operator_state as event_alpha_operator_state
 from ...operations import common
 from ...operations import daily_operations_publication
 from ...operations import market_provenance as event_market_provenance
 from ...providers import request_lineage as event_request_lineage
+from ...radar import source_independence_store as event_source_independence_store
 
 
 _PROVIDER_REHEARSAL_REPORTS = {
@@ -45,7 +47,131 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     _check_archive_manifest(archive_manifest, blockers)
     _check_targeted_market_refresh(ctx, blockers)
     _check_operator_state(ctx, blockers, warnings)
+    _check_source_independence_store(ctx, blockers)
     _check_daily_operations_publication(ctx, blockers)
+
+
+def _check_source_independence_store(
+    ctx: object,
+    blockers: Messages,
+) -> None:
+    """Resolve every bounded persisted reference before strict authority."""
+
+    namespace_dir_value = ctx_value(ctx, "namespace_dir", None)
+    if not namespace_dir_value:
+        return
+    namespace_dir = Path(str(namespace_dir_value)).expanduser()
+    references: list[Mapping[str, Any]] = []
+    for filename in (
+        "event_integrated_radar_candidates.jsonl",
+        "event_integrated_radar_outcomes.jsonl",
+        "event_core_opportunities.jsonl",
+        "event_integrated_radar_notification_deliveries.jsonl",
+        "event_alpha_alerts.jsonl",
+        "event_evidence_acquisition.jsonl",
+        "event_impact_hypotheses.jsonl",
+        "event_incidents.jsonl",
+        "event_watchlist_state.jsonl",
+    ):
+        for row in common.read_jsonl(namespace_dir / filename):
+            try:
+                references.extend(_source_independence_references(row))
+            except ValueError as exc:
+                blockers.append(
+                    check_registry.format_check_message(
+                        "namespace.operator_artifact_coherence",
+                        f"source_independence_reference_scan_failed={filename}:{exc}",
+                    )
+                )
+                return
+    if not references:
+        return
+    loaded = event_alpha_operator_state.load_operator_state(namespace_dir)
+    artifacts = (
+        loaded.state.get("artifacts")
+        if loaded.valid
+        and isinstance(loaded.state, Mapping)
+        and isinstance(loaded.state.get("artifacts"), Mapping)
+        else {}
+    )
+    store_entry = artifacts.get("source_independence_contract_store")
+    if not isinstance(store_entry, Mapping) or store_entry.get("status") != "current":
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.operator_artifact_coherence",
+                "source_independence_store_not_bound_to_operator_state",
+            )
+        )
+    elif store_entry.get("path") != event_source_independence_store.STORE_DIRECTORY:
+        blockers.append(
+            check_registry.format_check_message(
+                "namespace.operator_artifact_coherence",
+                "source_independence_store_operator_path_mismatch",
+            )
+        )
+    seen: set[bytes] = set()
+    for reference in references:
+        reference_errors = event_source_independence_store.validate_reference(
+            reference
+        )
+        if reference_errors:
+            blockers.append(
+                check_registry.format_check_message(
+                    "namespace.operator_artifact_coherence",
+                    "source_independence_reference_invalid="
+                    + ",".join(reference_errors)[:240],
+                )
+            )
+            continue
+        try:
+            key = event_alpha_fingerprints.canonical_json_bytes(dict(reference))
+        except event_alpha_fingerprints.FingerprintError:
+            blockers.append(
+                check_registry.format_check_message(
+                    "namespace.operator_artifact_coherence",
+                    "source_independence_reference_canonicalization_failed",
+                )
+            )
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            event_source_independence_store.resolve(namespace_dir, reference)
+        except event_source_independence_store.SourceIndependenceStoreError as exc:
+            blockers.append(
+                check_registry.format_check_message(
+                    "namespace.operator_artifact_coherence",
+                    "source_independence_reference_unresolvable="
+                    + str(exc)[:240],
+                )
+            )
+
+
+def _source_independence_references(
+    value: Any,
+    *,
+    max_nodes: int = 100_000,
+) -> list[Mapping[str, Any]]:
+    found: list[Mapping[str, Any]] = []
+    stack = [value]
+    visited = 0
+    while stack:
+        current = stack.pop()
+        visited += 1
+        if visited > max_nodes:
+            raise ValueError("node_limit_exceeded")
+        if isinstance(current, Mapping):
+            if (
+                current.get("schema_id")
+                == event_source_independence_store.REFERENCE_SCHEMA_ID
+            ):
+                found.append(current)
+                continue
+            stack.extend(current.values())
+        elif isinstance(current, (list, tuple)):
+            stack.extend(current)
+    return found
 
 
 def _check_daily_operations_publication(

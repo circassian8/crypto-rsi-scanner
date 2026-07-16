@@ -10,10 +10,16 @@ from typing import Any
 import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_market_provenance
 import crypto_rsi_scanner.event_alpha.radar.catalyst_attribution as event_catalyst_attribution
 import crypto_rsi_scanner.event_alpha.radar.source_independence as event_source_independence
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
 
 
 DECISION_MODEL_VERSION = "crypto_radar_decision_model_v2"
-DECISION_PROJECTION_SCHEMA_VERSION = "crypto_radar_decision_projection_v1"
+LEGACY_DECISION_PROJECTION_SCHEMA_VERSION = "crypto_radar_decision_projection_v1"
+DECISION_PROJECTION_SCHEMA_VERSION = "crypto_radar_decision_projection_v2"
+SUPPORTED_DECISION_PROJECTION_SCHEMA_VERSIONS = (
+    LEGACY_DECISION_PROJECTION_SCHEMA_VERSION,
+    DECISION_PROJECTION_SCHEMA_VERSION,
+)
 ALLOWED_THESIS_ORIGINS = (
     "market_led", "catalyst_led", "technical_led", "derivatives_led", "onchain_led",
     "fundamental_led", "macro_led", "mixed",
@@ -282,7 +288,8 @@ def _validate_contract(row: Mapping[str, Any]) -> list[str]:
 
 def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
     errors: list[str] = []
-    if row.get("decision_projection_schema_version") != DECISION_PROJECTION_SCHEMA_VERSION:
+    projection_version = row.get("decision_projection_schema_version")
+    if projection_version not in SUPPORTED_DECISION_PROJECTION_SCHEMA_VERSIONS:
         errors.append("decision_projection_schema_version_unsupported")
     required = (
         "hard_blockers", "soft_penalties", "warnings", "why_now", "supporting_facts",
@@ -482,6 +489,25 @@ def _validate_projection_source_independence(
 
     if status != "assessed" or _items(raw_errors):
         errors.append("decision_projection_source_independence_contract_status_mismatch")
+
+    if contract.get("schema_id") == event_source_independence_store.REFERENCE_SCHEMA_ID:
+        if (
+            row.get("decision_projection_schema_version")
+            != DECISION_PROJECTION_SCHEMA_VERSION
+        ):
+            errors.append(
+                "decision_projection_source_independence_reference_requires_v2"
+            )
+        errors.extend(
+            f"decision_projection_source_independence_reference:{error}"
+            for error in event_source_independence_store.validate_reference(contract)
+        )
+        for field, contract_field in count_fields.items():
+            if row.get(field) != contract.get(contract_field):
+                errors.append(
+                    f"decision_projection_source_independence_alias_mismatch:{field}"
+                )
+        return errors
 
     errors.extend(
         f"decision_projection_source_independence:{error}"
@@ -751,6 +777,7 @@ __all__ = (
     "ALLOWED_MARKET_PHASES", "ALLOWED_PREFERRED_HORIZONS", "ALLOWED_RADAR_ROUTES",
     "ALLOWED_SPREAD_STATUSES", "ALLOWED_THESIS_ORIGINS", "ALLOWED_TIMING_STATES",
     "ALLOWED_TRADABILITY_STATUSES", "DECISION_MODEL_VERSION",
-    "DECISION_PROJECTION_SCHEMA_VERSION", "ENUMS", "FIELDS",
+    "DECISION_PROJECTION_SCHEMA_VERSION", "LEGACY_DECISION_PROJECTION_SCHEMA_VERSION",
+    "SUPPORTED_DECISION_PROJECTION_SCHEMA_VERSIONS", "ENUMS", "FIELDS",
     "TYPES", "validate_contract",
 )

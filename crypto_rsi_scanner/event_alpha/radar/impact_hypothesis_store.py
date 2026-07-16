@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_quality_fields
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
 
 
 IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION = "event_impact_hypothesis_store_v1"
@@ -79,9 +80,16 @@ def write_impact_hypotheses(
             path.parent.mkdir(parents=True, exist_ok=True)
             return EventImpactHypothesisStoreWriteResult(path=path, attempted=True, success=True, rows_written=0)
         path.parent.mkdir(parents=True, exist_ok=True)
+        persisted_rows = [
+            event_source_independence_store.externalize(
+                path.parent,
+                _json_ready(row),
+            )
+            for row in rows
+        ]
         with path.open("a", encoding="utf-8") as fh:
-            for row in rows:
-                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+            for persisted in persisted_rows:
+                fh.write(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
                 fh.write("\n")
         return EventImpactHypothesisStoreWriteResult(path=path, attempted=True, success=True, rows_written=len(rows))
     except Exception as exc:  # noqa: BLE001 - artifact writes must fail soft.
@@ -958,7 +966,9 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             except json.JSONDecodeError:
                 continue
             if isinstance(row, Mapping):
-                rows.append(dict(row))
+                rows.append(
+                    dict(event_source_independence_store.hydrate(path.parent, row))
+                )
     return rows
 
 

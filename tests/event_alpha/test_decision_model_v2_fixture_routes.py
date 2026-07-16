@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
+
+import pytest
 
 
 def _fixture_cycle_rows() -> tuple[list[dict], list[dict]]:
@@ -145,3 +148,112 @@ def test_fraction_value_that_looks_like_percent_points_fails_unit_validation():
 
     assert "implausible_fraction_return:relative_return_vs_btc_4h" in warnings
     assert "implausible_normalized_return:relative_return_vs_btc_4h" in snapshot["unit_warnings"]
+
+
+def test_integrated_fixture_uses_one_exact_source_independence_blob_end_to_end():
+    from crypto_rsi_scanner.event_alpha.artifacts import context as artifact_context
+    from crypto_rsi_scanner.event_alpha.artifacts import operator_state
+    from crypto_rsi_scanner.event_alpha.outcomes import integrated_radar_outcomes
+    from crypto_rsi_scanner.event_alpha.radar import core_opportunity_store
+    from crypto_rsi_scanner.event_alpha.radar import integrated_radar
+    from crypto_rsi_scanner.event_alpha.radar import source_independence_store
+
+    with TemporaryDirectory() as tmp:
+        context = artifact_context.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=tmp,
+            artifact_namespace="pytest_source_store",
+        )
+        result = integrated_radar.run_integrated_radar_cycle(
+            context=context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        namespace = Path(context.namespace_dir)
+        artifact_paths = (
+            result.integrated_candidates_path,
+            context.core_opportunity_store_path,
+            namespace / integrated_radar.INTEGRATED_OUTCOMES_FILENAME,
+        )
+        references = []
+        persisted_bytes = 0
+        for path in artifact_paths:
+            persisted_bytes += path.stat().st_size
+            for line in path.read_text(encoding="utf-8").splitlines():
+                references.extend(_source_store_references(json.loads(line)))
+
+        assert len(references) >= 6
+        assert len(
+            {
+                (
+                    ref["contract_digest"],
+                    ref["blob_fingerprint"]["sha256"],
+                )
+                for ref in references
+            }
+        ) == 1
+        store_files = tuple(
+            (namespace / source_independence_store.STORE_DIRECTORY).iterdir()
+        )
+        assert len(store_files) == 1
+        assert store_files[0].stat().st_size == references[0]["blob_fingerprint"][
+            "size_bytes"
+        ]
+
+        core_rows = core_opportunity_store.load_core_opportunities(
+            context.core_opportunity_store_path,
+            latest_run=True,
+        ).rows
+        outcome_rows = integrated_radar_outcomes.load_integrated_radar_outcomes(
+            namespace
+        )
+        testhigh_core = next(row for row in core_rows if row["symbol"] == "TESTHIGH")
+        testhigh_outcome = next(
+            row for row in outcome_rows if row["symbol"] == "TESTHIGH"
+        )
+        assert testhigh_core["source_independence"]["schema_id"] == (
+            "event_alpha.source_independence"
+        )
+        assert (
+            testhigh_core["source_independence"]["contract_digest"]
+            == testhigh_outcome["source_independence"]["contract_digest"]
+            == references[0]["contract_digest"]
+        )
+        measured = source_independence_store.measurement_stats(
+            [testhigh_core, testhigh_outcome]
+        )
+        assert measured.inline_contract_occurrences >= 4
+        assert measured.projected_inline_savings_bytes > 0
+        assert persisted_bytes > 0
+
+        state = operator_state.load_operator_state(namespace)
+        assert state.valid is True
+        assert state.state["artifacts"][
+            "source_independence_contract_store"
+        ]["status"] == "current"
+
+        store_files[0].unlink()
+        with pytest.raises(
+            source_independence_store.SourceIndependenceStoreError,
+            match="blob_unreadable",
+        ):
+            core_opportunity_store.load_core_opportunities(
+                context.core_opportunity_store_path,
+                latest_run=True,
+            )
+
+
+def _source_store_references(value: object) -> list[dict]:
+    references: list[dict] = []
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            if current.get("schema_id") == "event_alpha.source_independence_reference":
+                references.append(current)
+            else:
+                stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return references

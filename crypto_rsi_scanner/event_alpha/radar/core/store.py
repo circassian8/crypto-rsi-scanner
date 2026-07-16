@@ -15,9 +15,11 @@ import crypto_rsi_scanner.event_alpha.notifications.router as event_alpha_router
 import crypto_rsi_scanner.event_alpha.outcomes.feedback_eligibility as event_feedback_eligibility
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 from ...artifacts import paths as event_artifact_paths
+from ...operations import market_no_send_io
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
+from .. import source_independence_store as event_source_independence_store
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -55,13 +57,16 @@ def write_core_opportunities(
             # A successful zero-row generation still needs a canonical artifact.
             # Operator-state fingerprinting uses the empty JSONL file to
             # distinguish an exact clean zero from a missing/failed store.
-            with path.open("a", encoding="utf-8"):
-                pass
+            existing = market_no_send_io.read_regular_bytes(path, missing_ok=True)
+            if existing is None:
+                market_no_send_io.write_bytes_atomic(path, b"")
             return EventCoreOpportunityStoreWriteResult(path=path, attempted=True, success=True, rows_written=0)
-        with path.open("a", encoding="utf-8") as fh:
-            for row in out_rows:
-                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
-                fh.write("\n")
+        suffix = _persisted_jsonl_bytes(path, out_rows)
+        existing = market_no_send_io.read_regular_bytes(path, missing_ok=True) or b""
+        market_no_send_io.write_bytes_atomic(
+            path,
+            _append_jsonl_suffix(existing, suffix),
+        )
         return EventCoreOpportunityStoreWriteResult(path=path, attempted=True, success=True, rows_written=len(out_rows))
     except Exception as exc:  # noqa: BLE001 - research artifacts must fail soft.
         return EventCoreOpportunityStoreWriteResult(
@@ -151,7 +156,14 @@ def normalize_core_opportunity_store(
     """Rewrite current-run core rows so raw artifacts match canonical verdicts."""
     p = Path(path).expanduser()
     try:
-        rows = _read_jsonl(p)
+        persisted_rows = market_no_send_io.read_jsonl(p)
+        preserve_inline_digests = event_source_independence_store.inline_contract_digests(
+            persisted_rows
+        )
+        rows = [
+            dict(event_source_independence_store.hydrate(p.parent, row))
+            for row in persisted_rows
+        ]
         core_rows = [row for row in rows if row.get("row_type") == "event_core_opportunity"]
         if not rows or not core_rows:
             return EventCoreOpportunityStoreNormalizeResult(
@@ -207,11 +219,12 @@ def normalize_core_opportunity_store(
             new_rows.append(row)
         if not inserted:
             new_rows.extend(normalized)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("w", encoding="utf-8") as fh:
-            for row in new_rows:
-                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
-                fh.write("\n")
+        payload = _persisted_jsonl_bytes(
+            p,
+            new_rows,
+            preserve_inline_digests=preserve_inline_digests,
+        )
+        market_no_send_io.write_bytes_atomic(p, payload)
         return EventCoreOpportunityStoreNormalizeResult(
             path=p,
             attempted=True,
@@ -246,7 +259,14 @@ def update_core_opportunity_card_links(
     if not card_by_core:
         return EventCoreOpportunityCardLinkUpdateResult(path=p, attempted=True, success=True, rows_updated=0)
     try:
-        rows = _read_jsonl(p)
+        persisted_rows = market_no_send_io.read_jsonl(p)
+        preserve_inline_digests = event_source_independence_store.inline_contract_digests(
+            persisted_rows
+        )
+        rows = [
+            dict(event_source_independence_store.hydrate(p.parent, row))
+            for row in persisted_rows
+        ]
         updated = 0
         for row in rows:
             if row.get("row_type") != "event_core_opportunity":
@@ -269,11 +289,12 @@ def update_core_opportunity_card_links(
             row.setdefault("feedback_target_type", "core_opportunity_id")
             updated += 1
         if updated:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            with p.open("w", encoding="utf-8") as fh:
-                for row in rows:
-                    fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
-                    fh.write("\n")
+            payload = _persisted_jsonl_bytes(
+                p,
+                rows,
+                preserve_inline_digests=preserve_inline_digests,
+            )
+            market_no_send_io.write_bytes_atomic(p, payload)
         return EventCoreOpportunityCardLinkUpdateResult(path=p, attempted=True, success=True, rows_updated=updated)
     except Exception as exc:  # noqa: BLE001 - research artifacts must fail soft.
         return EventCoreOpportunityCardLinkUpdateResult(
@@ -283,6 +304,31 @@ def update_core_opportunity_card_links(
             rows_updated=0,
             block_reason=f"{type(exc).__name__}: {exc}",
         )
+
+
+def _persisted_jsonl_bytes(
+    path: Path,
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    preserve_inline_digests: frozenset[str] = frozenset(),
+) -> bytes:
+    lines: list[str] = []
+    for row in rows:
+        persisted = event_source_independence_store.externalize(
+            path.parent,
+            _json_ready(row),
+            preserve_inline_digests=preserve_inline_digests,
+        )
+        lines.append(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
+    return (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
+
+
+def _append_jsonl_suffix(existing: bytes, suffix: bytes) -> bytes:
+    if not suffix:
+        return existing
+    if existing and not existing.endswith(b"\n"):
+        raise ValueError("existing core opportunity JSONL lacks a trailing newline")
+    return existing + suffix
 
 
 def load_canonical_core_opportunity_view(

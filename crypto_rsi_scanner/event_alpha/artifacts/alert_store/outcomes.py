@@ -18,6 +18,8 @@ import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
+from ...operations import market_no_send_io
 from ....event_alpha.notifications import delivery as event_alpha_notification_delivery
 from .models import *  # noqa: F403
 
@@ -63,10 +65,20 @@ def fill_alert_outcomes(
         out_rows.append(filled)
     out = Path(out_path).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", encoding="utf-8") as fh:
-        for row in out_rows:
-            fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
-            fh.write("\n")
+    existing_rows = market_no_send_io.read_jsonl(out)
+    preserve_inline_digests = event_source_independence_store.inline_contract_digests(
+        existing_rows
+    )
+    lines: list[str] = []
+    for row in out_rows:
+        persisted = event_source_independence_store.externalize(
+            out.parent,
+            _json_ready(row),
+            preserve_inline_digests=preserve_inline_digests,
+        )
+        lines.append(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
+    payload = (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
+    market_no_send_io.write_bytes_atomic(out, payload)
     return EventAlphaOutcomeFillResult(
         source_path=Path(source_path).expanduser() if source_path else Path(""),
         price_path=Path(price_fixture_path).expanduser(),

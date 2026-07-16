@@ -76,6 +76,7 @@ OPTIONAL_ARTIFACTS = (
     "market_anomaly_catalyst_search_queue",
     "integrated_candidates",
     "integrated_outcomes",
+    "source_independence_contract_store",
     "provider_health",
 )
 
@@ -910,6 +911,9 @@ def _initial_artifact_entry(
                 path = candidate
         if path is None and (paths or cards_written):
             path = base / "research_cards"
+    elif name == "source_independence_contract_store":
+        candidate = base / "event_source_independence_contracts"
+        path = candidate if candidate.is_dir() else None
     else:
         path = next(
             (run_row.get(field) for field in _RUN_PATH_FIELDS.get(name, ()) if run_row.get(field)),

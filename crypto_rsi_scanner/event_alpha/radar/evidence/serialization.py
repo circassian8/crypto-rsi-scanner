@@ -17,10 +17,12 @@ from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
 from ..resolver import clean_text
 from ...providers import source_packs as event_source_packs
 from ...providers import source_registry as event_source_registry
+from ...operations import market_no_send_io
 from .. import catalyst_search as event_catalyst_search
 from .. import core_opportunities as event_core_opportunities
 from .. import impact_hypotheses as event_impact_hypotheses
 from .. import source_enrichment as event_source_enrichment
+from .. import source_independence_store as event_source_independence_store
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -37,10 +39,17 @@ def write_acquisition_results(
     p = Path(path).expanduser()
     rows = [_artifact_row(result, context=context, observed_at=observed) for result in results]
     p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a", encoding="utf-8") as fh:
-        for row in rows:
-            fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
-            fh.write("\n")
+    if not rows:
+        existing = market_no_send_io.read_regular_bytes(p, missing_ok=True)
+        if existing is None:
+            market_no_send_io.write_bytes_atomic(p, b"")
+        return 0
+    suffix = _persisted_jsonl_bytes(p, rows)
+    existing = market_no_send_io.read_regular_bytes(p, missing_ok=True) or b""
+    market_no_send_io.write_bytes_atomic(
+        p,
+        _append_jsonl_suffix(existing, suffix),
+    )
     return len(rows)
 
 
@@ -59,7 +68,9 @@ def load_acquisition_results(path: str | Path, *, limit: int | None = None) -> l
             except json.JSONDecodeError:
                 continue
             if isinstance(row, dict) and row.get("row_type") == "event_evidence_acquisition":
-                rows.append(row)
+                rows.append(
+                    dict(event_source_independence_store.hydrate(p.parent, row))
+                )
     rows.sort(key=lambda row: str(row.get("observed_at") or ""), reverse=True)
     return rows[:limit] if limit and limit > 0 else rows
 
@@ -81,22 +92,14 @@ def reconcile_acquisition_core_ids(
     p = Path(path).expanduser()
     if not p.exists():
         return 0
-    rows: list[dict[str, Any]] = []
     changed = 0
     try:
-        with p.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                text = line.strip()
-                if not text:
-                    continue
-                try:
-                    raw = json.loads(text)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(raw, dict):
-                    rows.append(raw)
-    except OSError:
+        rows = market_no_send_io.read_jsonl(p)
+    except (OSError, RuntimeError):
         return 0
+    preserve_inline_digests = event_source_independence_store.inline_contract_digests(
+        rows
+    )
     core_rows = tuple(_row_from_object(item) for item in core_opportunity_rows)
     core_by_id = {
         str(row.get("core_opportunity_id") or "").strip(): row
@@ -134,11 +137,13 @@ def reconcile_acquisition_core_ids(
             row["warnings"] = list(dict.fromkeys([*existing, *resolution.warnings]))
     if changed:
         try:
-            with p.open("w", encoding="utf-8") as fh:
-                for row in rows:
-                    fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
-                    fh.write("\n")
-        except OSError:
+            payload = _persisted_jsonl_bytes(
+                p,
+                rows,
+                preserve_inline_digests=preserve_inline_digests,
+            )
+            market_no_send_io.write_bytes_atomic(p, payload)
+        except (OSError, RuntimeError):
             return 0
     return changed
 
@@ -428,3 +433,28 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, (list, tuple, set)):
         return [_json_ready(item) for item in value]
     return value
+
+
+def _persisted_jsonl_bytes(
+    path: Path,
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    preserve_inline_digests: frozenset[str] = frozenset(),
+) -> bytes:
+    lines: list[str] = []
+    for row in rows:
+        persisted = event_source_independence_store.externalize(
+            path.parent,
+            _json_ready(row),
+            preserve_inline_digests=preserve_inline_digests,
+        )
+        lines.append(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
+    return (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
+
+
+def _append_jsonl_suffix(existing: bytes, suffix: bytes) -> bytes:
+    if not suffix:
+        return existing
+    if existing and not existing.endswith(b"\n"):
+        raise ValueError("existing evidence acquisition JSONL lacks a trailing newline")
+    return existing + suffix

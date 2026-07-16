@@ -5,6 +5,10 @@ from __future__ import annotations
 from copy import deepcopy
 
 from crypto_rsi_scanner.event_alpha.radar import decision_model
+from crypto_rsi_scanner.event_alpha.radar import source_independence_store
+from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import (
+    LEGACY_DECISION_PROJECTION_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
     decision_model_values,
 )
@@ -260,6 +264,9 @@ def test_distinct_nested_event_contracts_are_combined_into_one_canonical_scope()
 def test_shipped_projection_v1_without_source_extension_remains_idempotent():
     current = decision_model_values(_candidate())
     legacy = deepcopy(current)
+    legacy["decision_projection_schema_version"] = (
+        LEGACY_DECISION_PROJECTION_SCHEMA_VERSION
+    )
     for field in (
         "source_independence",
         "independent_source_count",
@@ -271,3 +278,62 @@ def test_shipped_projection_v1_without_source_extension_remains_idempotent():
         legacy.pop(field)
 
     assert decision_model_values(legacy) == legacy
+
+
+def test_projection_v2_reference_is_idempotent_and_hydrates_exact_contract(
+    tmp_path,
+):
+    contract = _independence_contract()
+    projection = decision_model_values(
+        _candidate(
+            source_independence=contract,
+            source_independence_status="assessed",
+            source_independence_errors=[],
+            independent_source_count=2,
+            independent_corroboration_count=1,
+            source_content_cluster_count=2,
+        )
+    )
+
+    persisted = source_independence_store.externalize(tmp_path, projection)
+
+    assert persisted["source_independence"]["schema_id"] == (
+        source_independence_store.REFERENCE_SCHEMA_ID
+    )
+    assert decision_model_values(persisted) == persisted
+    assert source_independence_store.hydrate(tmp_path, persisted) == projection
+
+
+def test_shipped_projection_v1_inline_contract_remains_idempotent():
+    legacy = decision_model_values(
+        _candidate(
+            source_independence=_independence_contract(),
+            source_independence_status="assessed",
+            source_independence_errors=[],
+            independent_source_count=2,
+            independent_corroboration_count=1,
+            source_content_cluster_count=2,
+        )
+    )
+    legacy["decision_projection_schema_version"] = (
+        LEGACY_DECISION_PROJECTION_SCHEMA_VERSION
+    )
+
+    assert decision_model_values(legacy) == legacy
+
+
+def test_projection_reference_summary_tamper_fails_closed(tmp_path):
+    projection = decision_model_values(
+        _candidate(
+            source_independence=_independence_contract(),
+            source_independence_status="assessed",
+            source_independence_errors=[],
+            independent_source_count=2,
+            independent_corroboration_count=1,
+            source_content_cluster_count=2,
+        )
+    )
+    persisted = source_independence_store.externalize(tmp_path, projection)
+    persisted["source_independence"]["independent_evidence_count"] = 1
+
+    assert decision_model_values(persisted) == {}

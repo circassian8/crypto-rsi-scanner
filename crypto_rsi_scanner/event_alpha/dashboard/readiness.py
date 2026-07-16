@@ -74,13 +74,17 @@ class _DashboardReadinessResult:
 
 
 @dataclass(frozen=True)
-class DashboardAuthorityInspection:
+class _DashboardAuthorityInspection:
     """Credential-free current-authority status from persisted artifacts only."""
 
     status: str
     artifact_namespace: str
     pointer_sha256: str
     reason: str
+
+
+# Public compatibility alias while keeping one public class owner in this module.
+DashboardAuthorityInspection = _DashboardAuthorityInspection
 
 
 def resolve_authoritative_dashboard(

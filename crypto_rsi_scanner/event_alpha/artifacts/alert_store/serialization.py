@@ -159,7 +159,9 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             continue
         if isinstance(parsed, dict):
-            rows.append(parsed)
+            from ...radar import source_independence_store
+
+            rows.append(dict(source_independence_store.hydrate(path.parent, parsed)))
     return rows
 def _optional_str(value: object) -> str | None:
     if value in (None, ""):

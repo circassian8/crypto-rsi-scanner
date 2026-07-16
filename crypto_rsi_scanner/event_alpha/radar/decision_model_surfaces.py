@@ -16,10 +16,12 @@ import crypto_rsi_scanner.event_alpha.operations.market_provenance as event_mark
 
 from ..artifacts.schema.decision_model import (
     DECISION_PROJECTION_SCHEMA_VERSION,
+    SUPPORTED_DECISION_PROJECTION_SCHEMA_VERSIONS,
     validate_contract,
 )
 from . import decision_catalyst_policy
 from . import source_independence as event_source_independence
+from . import source_independence_store as event_source_independence_store
 from .decision_models import actionability_score_cohort
 
 
@@ -200,7 +202,10 @@ def _nested_projection_matches_row(
 ) -> bool:
     """Fail closed when a stored projection drifts from its top-level mirror."""
 
-    if projection.get("decision_projection_schema_version") != DECISION_PROJECTION_SCHEMA_VERSION:
+    if (
+        projection.get("decision_projection_schema_version")
+        not in SUPPORTED_DECISION_PROJECTION_SCHEMA_VERSIONS
+    ):
         return False
     if validate_contract(projection):
         return False
@@ -478,7 +483,12 @@ def _closed_projection_values(
     rsi_references = _rsi_context_references(source, rsi_context)
     source_independence = _source_independence_projection_values(source)
     closed = {
-        "decision_projection_schema_version": DECISION_PROJECTION_SCHEMA_VERSION,
+        "decision_projection_schema_version": (
+            source.get("decision_projection_schema_version")
+            if source.get("decision_projection_schema_version")
+            in SUPPORTED_DECISION_PROJECTION_SCHEMA_VERSIONS
+            else DECISION_PROJECTION_SCHEMA_VERSION
+        ),
         "hard_blockers": blockers,
         "soft_penalties": penalties,
         "warnings": warnings,
@@ -518,43 +528,9 @@ def _source_independence_projection_values(
 ) -> dict[str, Any]:
     """Close one exact independence contract without legacy count fallbacks."""
 
-    count_aliases = {
-        "independent_source_count": "independent_evidence_count",
-        "independent_corroboration_count": "independent_corroboration_count",
-        "source_content_cluster_count": "content_cluster_count",
-    }
-    empty = {
-        "source_independence": {},
-        "independent_source_count": 0,
-        "independent_corroboration_count": 0,
-        "source_content_cluster_count": 0,
-        "source_independence_status": "unassessed",
-        "source_independence_errors": [],
-    }
-    nested_containers = [
-        value
-        for field in ("latest_score_components", "score_components", "data_quality")
-        if isinstance((value := source.get(field)), Mapping)
-    ]
-    status_values = [
-        str(container.get("source_independence_status") or "").strip().casefold()
-        for container in (source, *nested_containers)
-        if "source_independence_status" in container
-    ]
-    errors = list(dict.fromkeys(
-        str(item).strip()[:160]
-        for container in (source, *nested_containers)
-        for item in _items(container.get("source_independence_errors"))
-        if str(item).strip()
-    ))[:16]
-    errors.extend(
-        "source_independence_status_invalid"
-        for status in status_values
-        if status not in {"assessed", "unassessed", "rejected"}
+    count_aliases, empty, nested_containers, status_values, errors = (
+        _source_independence_projection_context(source)
     )
-    if "rejected" in status_values and not errors:
-        errors.append("source_independence_rejected_without_error")
-    errors = list(dict.fromkeys(errors))[:16]
     if errors:
         empty["source_independence_status"] = "rejected"
         empty["source_independence_errors"] = errors
@@ -580,6 +556,20 @@ def _source_independence_projection_values(
         return empty
     if errors:
         return empty
+    reference_items = [
+        item
+        for item in nonempty
+        if isinstance(item[1], Mapping)
+        and item[1].get("schema_id")
+        == event_source_independence_store.REFERENCE_SCHEMA_ID
+    ]
+    if reference_items:
+        return _source_independence_reference_projection(
+            reference_items,
+            nonempty_count=len(nonempty),
+            count_aliases=count_aliases,
+            empty=empty,
+        )
     invalid_item = next(
         (
             item
@@ -655,6 +645,120 @@ def _source_independence_projection_values(
             }
     return {
         "source_independence": contract,
+        "source_independence_status": "assessed",
+        "source_independence_errors": [],
+        **expected,
+    }
+
+
+def _source_independence_projection_context(
+    source: Mapping[str, Any],
+) -> tuple[
+    dict[str, str],
+    dict[str, Any],
+    list[Mapping[str, Any]],
+    list[str],
+    list[str],
+]:
+    """Collect bounded status and alias inputs for one projection."""
+
+    count_aliases = {
+        "independent_source_count": "independent_evidence_count",
+        "independent_corroboration_count": "independent_corroboration_count",
+        "source_content_cluster_count": "content_cluster_count",
+    }
+    empty = {
+        "source_independence": {},
+        "independent_source_count": 0,
+        "independent_corroboration_count": 0,
+        "source_content_cluster_count": 0,
+        "source_independence_status": "unassessed",
+        "source_independence_errors": [],
+    }
+    nested_containers = [
+        value
+        for field in ("latest_score_components", "score_components", "data_quality")
+        if isinstance((value := source.get(field)), Mapping)
+    ]
+    status_values = [
+        str(container.get("source_independence_status") or "").strip().casefold()
+        for container in (source, *nested_containers)
+        if "source_independence_status" in container
+    ]
+    errors = list(dict.fromkeys(
+        str(item).strip()[:160]
+        for container in (source, *nested_containers)
+        for item in _items(container.get("source_independence_errors"))
+        if str(item).strip()
+    ))[:16]
+    errors.extend(
+        "source_independence_status_invalid"
+        for status in status_values
+        if status not in {"assessed", "unassessed", "rejected"}
+    )
+    if "rejected" in status_values and not errors:
+        errors.append("source_independence_rejected_without_error")
+    return (
+        count_aliases,
+        empty,
+        nested_containers,
+        status_values,
+        list(dict.fromkeys(errors))[:16],
+    )
+
+
+def _source_independence_reference_projection(
+    reference_items: list[tuple[Mapping[str, Any], Any]],
+    *,
+    nonempty_count: int,
+    count_aliases: Mapping[str, str],
+    empty: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Close summary aliases around one exact unresolved store reference."""
+
+    if len(reference_items) != nonempty_count:
+        return {
+            **empty,
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_inline_reference_mixture"
+            ],
+        }
+    references = [dict(value) for _container, value in reference_items]
+    if any(
+        event_source_independence_store.validate_reference(reference)
+        for reference in references
+    ) or any(reference != references[0] for reference in references[1:]):
+        return {
+            **empty,
+            "source_independence": deepcopy(references[0]),
+            "source_independence_status": "rejected",
+            "source_independence_errors": [
+                "source_independence_reference_invalid_or_ambiguous"
+            ],
+        }
+    reference = deepcopy(references[0])
+    expected = {
+        alias: reference.get(contract_field)
+        for alias, contract_field in count_aliases.items()
+    }
+    for container, _value in reference_items:
+        for alias, expected_value in expected.items():
+            observed = container.get(alias)
+            if alias in container and (
+                type(observed) is not type(expected_value)
+                or observed != expected_value
+            ):
+                return {
+                    **empty,
+                    "source_independence": reference,
+                    "source_independence_status": "rejected",
+                    "source_independence_errors": [
+                        "source_independence_reference_alias_mismatch"
+                    ],
+                }
+    return {
+        "source_independence": reference,
         "source_independence_status": "assessed",
         "source_independence_errors": [],
         **expected,

@@ -20,6 +20,7 @@ import crypto_rsi_scanner.event_alpha.artifacts.research_cards as event_research
 import crypto_rsi_scanner.event_alpha.radar.watchlist as event_watchlist
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 import crypto_rsi_scanner.event_alpha.radar.playbooks as event_playbooks
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
 from ....event_alpha.notifications import delivery as event_alpha_notification_delivery
 from .models import *  # noqa: F403
 
@@ -73,13 +74,21 @@ def write_alert_snapshots(
         sampled_controls_limit=cfg.sampled_controls_limit,
         route_context=route_context,
     )
-    cfg.path.expanduser().parent.mkdir(parents=True, exist_ok=True)
-    with cfg.path.expanduser().open("a", encoding="utf-8") as fh:
-        for row in rows:
-            fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+    path = cfg.path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    persisted_rows = [
+        event_source_independence_store.externalize(
+            path.parent,
+            _json_ready(row),
+        )
+        for row in rows
+    ]
+    with path.open("a", encoding="utf-8") as fh:
+        for persisted in persisted_rows:
+            fh.write(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
             fh.write("\n")
     return EventAlphaAlertStoreWriteResult(
-        path=cfg.path.expanduser(),
+        path=path,
         observed_at=observed.isoformat(),
         rows_written=len(rows),
         attempted=True,

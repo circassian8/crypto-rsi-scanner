@@ -833,7 +833,16 @@ def _contains_unredacted_cryptopanic_secret(text: str) -> bool:
         value = match.group(1)
         if value not in {"<redacted>", "%3Credacted%3E", "[redacted]"}:
             return True
-    if re.search(r"\b[A-Fa-f0-9]{32,}\b", text):
+    # Canonical evidence digests are deliberately operator-visible technical
+    # metadata, not credentials.  Remove only exact, fully labelled digest
+    # lines before retaining the conservative generic hex-secret check.
+    secret_scan_text = re.sub(
+        r"(?mi)^\s*-?\s*(?:Catalyst-attribution|Source-independence contract) "
+        r"digest:\s*[a-f0-9]{64}\s*$",
+        "",
+        text,
+    )
+    if re.search(r"\b[A-Fa-f0-9]{32,}\b", secret_scan_text):
         return True
     return False
 

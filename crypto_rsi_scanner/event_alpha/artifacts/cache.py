@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult
 
 CACHE_SCHEMA_VERSION = "event_discovery_cache_v1"
@@ -213,9 +214,16 @@ def _append_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
     if not data:
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
+    persisted_rows = [
+        event_source_independence_store.externalize(
+            path.parent,
+            _json_ready(row),
+        )
+        for row in data
+    ]
     with path.open("a", encoding="utf-8") as fh:
-        for row in data:
-            fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+        for row in persisted_rows:
+            fh.write(json.dumps(row, sort_keys=True, separators=(",", ":")))
             fh.write("\n")
     return len(data)
 
@@ -233,7 +241,9 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             continue
         if isinstance(row, dict):
-            rows.append(row)
+            rows.append(
+                dict(event_source_independence_store.hydrate(path.parent, row))
+            )
     return rows
 
 

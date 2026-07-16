@@ -14,6 +14,7 @@ from crypto_rsi_scanner.event_alpha.radar import discovery as event_discovery
 from crypto_rsi_scanner.event_alpha.radar import incident_graph
 from crypto_rsi_scanner.event_alpha.radar import incidents as event_incidents
 from crypto_rsi_scanner.event_alpha.radar import opportunity_verdict
+from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 from crypto_rsi_scanner.event_alpha.radar import source_independence
 from crypto_rsi_scanner.event_alpha.radar import watchlist as event_watchlist
 from crypto_rsi_scanner.event_alpha.radar.incidents import canonical as incident_canonical
@@ -334,6 +335,92 @@ def test_positive_consumers_reject_a_valid_inner_contract_with_invalid_wrapper()
     assert fields["source_independence"] == {}
     assert fields["independent_source_count"] == 0
     assert fields["independent_corroboration_count"] == 0
+
+
+def test_card_evidence_verdict_keeps_accepted_rows_distinct_from_corroboration():
+    contract = source_independence.assess_source_independence(
+        [
+            {
+                "source_id": "original",
+                "source_url": "https://one.example/story",
+                "title": "Initial catalyst evidence",
+                "body": BASE_COPY,
+                "published_at": NOW,
+            },
+            {
+                "source_id": "syndicated",
+                "source_url": "https://two.example/story",
+                "title": "Initial catalyst evidence",
+                "body": BASE_COPY,
+                "published_at": NOW + timedelta(minutes=1),
+            },
+            {
+                "source_id": "independent",
+                "source_url": "https://three.example/story",
+                "title": "Independent catalyst analysis",
+                "body": INDEPENDENT_COPY,
+                "published_at": NOW + timedelta(minutes=2),
+            },
+        ]
+    )
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "anomaly-card-verdict",
+            "observed_at": NOW.isoformat(),
+        },
+        {
+            "raw_id": "official-card-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/card-verdict",
+            "content_hash": "a" * 64,
+            "published_at": (NOW - timedelta(minutes=30)).isoformat(),
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+    components = {
+        **_wrapped(contract),
+        "source_update_count": 3,
+        "evidence_acquisition_accepted_count": 3,
+        "latest_source": "official_exchange",
+        "latest_source_url": "https://exchange.example/notices/card-verdict",
+        "catalyst_attribution": attribution,
+    }
+
+    verdict = "\n".join(source_coverage._source_lines(None, components))
+    technical = "\n".join(
+        source_coverage._technical_evidence_lines(None, components)
+    )
+
+    assert "Raw sources: 3" in verdict
+    assert "Content clusters: 2" in verdict
+    assert "Independent evidence units: 2" in verdict
+    assert "Additional independent corroborations: 1" in verdict
+    assert "Syndicated copies collapsed: 1" in verdict
+    assert "Accepted evidence rows (not corroboration): 3" in verdict
+    assert "Catalyst timing: antecedent" in verdict
+    assert "Causal eligibility: eligible" in verdict
+    assert "Source authority: official" in verdict
+    assert contract["contract_digest"] not in verdict
+    assert attribution["attribution_digest"] not in verdict
+    assert contract["contract_digest"] in technical
+    assert attribution["attribution_digest"] in technical
+    assert "normalized_body" not in technical
+
+    rejected = {
+        **components,
+        "source_independence_status": "rejected",
+        "source_independence_errors": [f"evidence_error_{index}" for index in range(6)],
+    }
+    rejected_verdict = "\n".join(source_coverage._source_lines(None, rejected))
+    assert "Independent evidence units: not assessed" in rejected_verdict
+    assert "evidence_error_0" in rejected_verdict
+    assert "evidence_error_3" in rejected_verdict
+    assert "evidence_error_4" not in rejected_verdict
+    assert "+2 more" in rejected_verdict
 
 
 def test_oversized_source_group_fails_closed_without_crashing_discovery_cycle():

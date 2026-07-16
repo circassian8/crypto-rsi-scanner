@@ -18,6 +18,7 @@ from ...artifacts import json_lines as artifact_json_lines
 from .. import core_opportunities as event_core_opportunities
 from .. import market_reaction as event_market_reaction
 from .. import opportunity_verdict as event_opportunity_verdict
+from .. import source_independence_store as event_source_independence_store
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -715,7 +716,10 @@ def _market_context_rank(item: Mapping[str, Any]) -> tuple[int, int, int, int, i
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return list(artifact_json_lines.read_jsonl(path).rows)
+    return [
+        dict(event_source_independence_store.hydrate(path.parent, row))
+        for row in artifact_json_lines.read_jsonl(path).rows
+    ]
 
 
 def _text_or_none(value: Any) -> str | None:

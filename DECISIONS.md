@@ -16,6 +16,44 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Store new source-independence contracts by immutable reference
+**Status:** accepted
+**Decision:** Persist each new validated `event_alpha.source_independence` value
+once in the exact artifact namespace under
+`event_source_independence_contracts/<semantic-digest>.<blob-sha256>.json` and
+copy only the closed `event_alpha.source_independence_reference` v1 value into
+new downstream rows. A reference must carry the schema/version, canonical
+store directory and relative path, semantic digest, exact file fingerprint and
+byte size, validation state, research-only flag, and the raw/cluster/
+independent/corroboration/origin/copy count summary. Resolve it only after
+descriptor-anchored no-follow reading, complete reference validation, exact
+fingerprint/canonical-byte verification, semantic digest verification, and
+summary equality. Bind the canonical store directory and fingerprint into
+operator state and strict doctor whenever references exist; alternate store
+paths, missing objects, symlinks, mutation, or ambiguous summaries are
+blockers. Cache only references whose complete canonical reference bytes are
+identical.
+
+Keep validated historical inline contracts readable and idempotent, and never
+silently migrate their representation during an unrelated artifact rewrite.
+Prepare all externalization/serialization before atomically replacing a row
+artifact so a store failure cannot truncate prior evidence. Full contract and
+technical digests remain available in technical details; primary cards and
+dashboard surfaces lead with the bounded evidence-count summary. This storage
+decision changes neither the source-independence algorithm nor any score,
+threshold, route, publication, provider, or safety policy.
+**Why:** One self-validating evidence object was copied across many canonical
+surfaces, increasing artifact/export size and read work while creating a new
+failure point for historical rewrites. Content-addressed namespace-local
+storage preserves exact evidence reality and cross-artifact consistency with a
+smaller operator footprint, while explicit inline compatibility protects audit
+history.
+**Revisit when:** A versioned store migration has independent corruption,
+performance, export, and rollback evidence and an explicit policy for
+historical representation changes. Garbage collection or deletion requires a
+separate retention decision and must never infer that an old inline/reference
+contract is disposable from current routes alone.
+
 ## 2026-07-15 - Count independent catalyst evidence by origin-aware content units
 **Status:** accepted
 **Decision:** Measure source independence with the closed

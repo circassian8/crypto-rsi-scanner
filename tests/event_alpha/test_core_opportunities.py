@@ -426,7 +426,7 @@ def test_event_near_miss_source_pack_and_operator_surfaces():
     assert "## Analyst Summary" in card.markdown
     assert "Why surfaced: VELVET surfaced" in card.markdown
     assert "What would upgrade: source/evidence proof:" in card.markdown
-    assert "## Source Coverage / Evidence Acquisition" in card.markdown
+    assert "## Technical Evidence Acquisition Detail" in card.markdown
     assert "Source pack: proxy_preipo_rwa_pack" in card.markdown
     assert "Coverage status: degraded" in card.markdown
     assert "Source can prove:" in card.markdown

@@ -6,6 +6,10 @@ import os
 
 from .runtime import *
 from ... import market_anomaly_receipt as event_market_anomaly_receipt
+from ... import source_independence as event_source_independence
+from ... import source_independence_store as event_source_independence_store
+from ....operations import market_no_send_io
+from .utilities import _json_ready
 
 
 def _load_rsi_signal_context_rows(path: Path | None) -> tuple[dict[str, Any], ...]:
@@ -733,9 +737,12 @@ def _run_fixture_sidecars(
             smoke_mode=True,
             now=observed_at,
         )
+    official_rows = _fixture_source_independence_rows(
+        _official_exchange_integration_rows(official.events, official.candidates)
+    )
     return {
         "market_anomaly": market.anomalies,
-        "official_exchange": _official_exchange_integration_rows(official.events, official.candidates),
+        "official_exchange": official_rows,
         "scheduled_catalyst": scheduled.scheduled_events,
         "unlock": scheduled.unlock_candidates,
         "derivatives": derivatives.candidate_rows,
@@ -743,6 +750,82 @@ def _run_fixture_sidecars(
         "dex_pool_anomaly": dex_onchain.dex_pool_anomaly_rows,
         "protocol_fundamentals": dex_onchain.protocol_fundamental_rows,
     }
+
+
+def _fixture_source_independence_rows(
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Attach one realistic assessed fixture contract for end-to-end storage."""
+
+    contract = event_source_independence.assess_source_independence(
+        (
+            {
+                "source_id": "binance-testhigh-official",
+                "source_url": (
+                    "https://www.binance.com/en/support/announcement/testhigh"
+                ),
+                "source_provider": "binance_announcements",
+                "source_class": "official_exchange",
+                "published_at": "2026-06-15T13:15:00Z",
+                "title": "Binance Will List TestHigh (TESTHIGH)",
+                "body": (
+                    "Binance will open TESTHIGH spot trading after deposits and "
+                    "market-maker liquidity checks complete for the listed pairs."
+                ),
+            },
+            {
+                "source_id": "syndicated-testhigh-copy",
+                "source_url": "https://syndication.example/testhigh-listing",
+                "source_provider": "public_rss",
+                "source_class": "broad_news",
+                "published_at": "2026-06-15T13:16:00Z",
+                "title": "Binance Will List TestHigh (TESTHIGH)",
+                "body": (
+                    "Binance will open TESTHIGH spot trading after deposits and "
+                    "market-maker liquidity checks complete for the listed pairs."
+                ),
+            },
+            {
+                "source_id": "independent-testhigh-report",
+                "source_url": "https://independent.example/testhigh-market-report",
+                "source_provider": "public_rss",
+                "source_class": "broad_news",
+                "published_at": "2026-06-15T13:25:00Z",
+                "title": "Independent desks prepare for TESTHIGH spot launch",
+                "body": (
+                    "Independent market desks reported deposit activation and "
+                    "order-book preparation for TESTHIGH ahead of the announced "
+                    "spot launch, while noting that execution liquidity remains "
+                    "the main uncertainty."
+                ),
+            },
+        )
+    )
+    out: list[dict[str, Any]] = []
+    attached = False
+    for raw in rows:
+        row = dict(raw)
+        symbol = str(row.get("symbol") or row.get("validated_symbol") or "").upper()
+        if not attached and symbol == "TESTHIGH":
+            row.update(
+                {
+                    "source_independence": contract,
+                    "source_independence_status": "assessed",
+                    "source_independence_errors": [],
+                    "independent_source_count": contract[
+                        "independent_evidence_count"
+                    ],
+                    "independent_corroboration_count": contract[
+                        "independent_corroboration_count"
+                    ],
+                    "source_content_cluster_count": contract[
+                        "content_cluster_count"
+                    ],
+                }
+            )
+            attached = True
+        out.append(row)
+    return tuple(out)
 
 def _fixture_market_rows() -> tuple[dict[str, Any], ...]:
     return (
@@ -1004,10 +1087,21 @@ def _best_text(rows: list[Mapping[str, Any]], *keys: str) -> str | None:
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            stamped = schema_v1.stamp_artifact_row(row, path=path)
-            handle.write(json.dumps(_json_ready(stamped), sort_keys=True, separators=(",", ":")) + "\n")
+    existing_rows = market_no_send_io.read_jsonl(path)
+    preserve_inline_digests = event_source_independence_store.inline_contract_digests(
+        existing_rows
+    )
+    lines: list[str] = []
+    for row in rows:
+        stamped = schema_v1.stamp_artifact_row(row, path=path)
+        persisted = event_source_independence_store.externalize(
+            path.parent,
+            _json_ready(stamped),
+            preserve_inline_digests=preserve_inline_digests,
+        )
+        lines.append(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
+    payload = (("\n".join(lines) + "\n") if lines else "").encode("utf-8")
+    market_no_send_io.write_bytes_atomic(path, payload)
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
@@ -1022,13 +1116,18 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             except json.JSONDecodeError:
                 continue
             if isinstance(value, Mapping):
-                rows.append(dict(value))
+                hydrated = event_source_independence_store.hydrate(
+                    path.parent,
+                    value,
+                )
+                rows.append(dict(hydrated))
     return rows
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     stamped = schema_v1.stamp_artifact_payload(payload, path=path)
-    path.write_text(json.dumps(_json_ready(stamped), sort_keys=True), encoding="utf-8")
+    data = json.dumps(_json_ready(stamped), sort_keys=True).encode("utf-8")
+    market_no_send_io.write_bytes_atomic(path, data)
 
 __all__ = (
     '_candidate_seed_sidecars',

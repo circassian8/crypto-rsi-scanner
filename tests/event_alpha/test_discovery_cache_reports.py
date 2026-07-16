@@ -49,6 +49,7 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
             "classifications.jsonl",
             "candidate_snapshots.jsonl",
             "discovery_runs.jsonl",
+            "event_source_independence_contracts",
         }
         assert expected_files == {path.name for path in cache_dir.iterdir()}
 
@@ -73,6 +74,31 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
             json.loads(line)
             for line in (cache_dir / "candidate_snapshots.jsonl").read_text(encoding="utf-8").splitlines()
         ]
+        stack = list(snapshot_rows)
+        references = []
+        inline_contracts = []
+        while stack:
+            value = stack.pop()
+            if isinstance(value, dict):
+                if value.get("schema_id") == "event_alpha.source_independence_reference":
+                    references.append(value)
+                    continue
+                if value.get("schema_id") == "event_alpha.source_independence":
+                    inline_contracts.append(value)
+                    continue
+                stack.extend(value.values())
+            elif isinstance(value, list):
+                stack.extend(value)
+        assert references
+        assert inline_contracts == []
+        assert len(
+            list((cache_dir / "event_source_independence_contracts").iterdir())
+        ) == len(
+            {
+                (row["contract_digest"], row["blob_fingerprint"]["sha256"])
+                for row in references
+            }
+        )
         velvet = next(row for row in snapshot_rows if row["asset_symbol"] == "TESTVELVET")
         assert velvet["row_type"] == "candidate_snapshot"
         assert velvet["schema_version"] == event_cache.CACHE_SCHEMA_VERSION
@@ -119,6 +145,9 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
         assert latest_velvet["first_watchlisted_at"] == "2026-06-16T12:30:00+00:00"
         assert latest_velvet["first_armed_at"] == "2026-06-16T12:30:00+00:00"
         assert latest_velvet["first_triggered_at"] == "2026-06-16T12:00:00+00:00"
+        assert latest_velvet["data_quality"]["source_independence"]["schema_id"] == (
+            "event_alpha.source_independence"
+        )
 
 
 def test_event_discovery_scanner_report_uses_local_fixtures():

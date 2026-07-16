@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_semantics
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
+import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
 
@@ -84,9 +85,16 @@ def write_incidents(
             )
         ]
         path.parent.mkdir(parents=True, exist_ok=True)
+        persisted_rows = [
+            event_source_independence_store.externalize(
+                path.parent,
+                _json_ready(row),
+            )
+            for row in rows_to_write
+        ]
         with path.open("a", encoding="utf-8") as fh:
-            for row in rows_to_write:
-                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+            for persisted in persisted_rows:
+                fh.write(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
                 fh.write("\n")
         return EventIncidentStoreWriteResult(path=path, attempted=True, success=True, rows_written=len(rows_to_write))
     except Exception as exc:  # noqa: BLE001 - artifact writes must fail soft.
@@ -162,7 +170,14 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
                 except json.JSONDecodeError:
                     continue
                 if isinstance(value, Mapping):
-                    rows.append(dict(value))
+                    rows.append(
+                        dict(
+                            event_source_independence_store.hydrate(
+                                path.parent,
+                                value,
+                            )
+                        )
+                    )
     except OSError:
         return []
     return rows

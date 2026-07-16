@@ -32,7 +32,10 @@ _JSONL_ARTIFACTS = {
     "integrated_candidates",
     "integrated_outcomes",
 }
-_DIRECTORY_ARTIFACTS = {"research_cards"}
+_DIRECTORY_ARTIFACTS = {
+    "research_cards",
+    "source_independence_contract_store",
+}
 _RUN_ROW_IDENTITY_FIELDS = ("run_id", "profile", "artifact_namespace")
 _COMMON_FINGERPRINT_FIELDS = FINGERPRINT_FIELDS
 _RUN_ROW_FINGERPRINT_FIELDS = ("run_row_identity", "run_row_match_count")

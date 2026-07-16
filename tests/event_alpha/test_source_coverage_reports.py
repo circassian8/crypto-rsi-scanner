@@ -25,6 +25,24 @@ def test_source_coverage_canonical_import_paths_resolve_same_objects():
     assert direct_source_coverage.LIVE_PROVIDER_READINESS_JSON == new_source_coverage.LIVE_PROVIDER_READINESS_JSON
 
 
+def test_cryptopanic_secret_scan_distinguishes_evidence_digests_from_tokens():
+    from crypto_rsi_scanner.event_alpha.doctor.artifact_doctor_parts import (
+        source_coverage_checks,
+    )
+
+    digest = "a" * 64
+    assert not source_coverage_checks._contains_unredacted_cryptopanic_secret(
+        f"- Catalyst-attribution digest: {digest}\n"
+        f"- Source-independence contract digest: {digest}\n"
+    )
+    assert source_coverage_checks._contains_unredacted_cryptopanic_secret(
+        f"unexpected opaque value: {digest}"
+    )
+    assert source_coverage_checks._contains_unredacted_cryptopanic_secret(
+        "https://cryptopanic.example/?auth_token=not-redacted"
+    )
+
+
 def test_source_coverage_cryptopanic_exact_run_semantics():
     import json
     from pathlib import Path
