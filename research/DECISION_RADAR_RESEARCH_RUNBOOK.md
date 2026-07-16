@@ -220,25 +220,65 @@ seal, final confirmation, live projection, report-core digests, and rendered
 Markdown/JSON agreement. Missing, extra, unsafe, oversized, changed, or spliced
 bytes fail the whole semantic bundle.
 
+## Publish and verify the separate hardening supplement
+
+The operator-first conclusion, route-conditioned score diagnostics, and
+market-wide risk grouping are published in one separately attested file. They
+do not expand or rewrite the closed seven-file Protocol-v1 bundle:
+
+```sh
+make radar-research-hardening-supplement \
+  RADAR_RESEARCH_SELECTION_RUN=event_fade_cache/decision_radar_research_lab/runs/8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489 \
+  PYTHON=.venv/bin/python
+
+make radar-research-hardening-supplement-check \
+  RADAR_RESEARCH_SELECTION_RUN=event_fade_cache/decision_radar_research_lab/runs/8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489 \
+  PYTHON=.venv/bin/python
+```
+
+The fixed output is
+`research/DECISION_RADAR_EMPIRICAL_HARDENING_SUPPLEMENT.json`. It is capped at
+4 MiB, canonically encoded, bound to the exact seven report hashes, the exact
+selection manifest/configuration/archive hashes, and the exact diagnostics
+implementation contract, and written only while all seven v1 report bytes
+remain guarded. Its current supplement id is
+`670bfa10b5b74ce2f213a5f6c07ace0333ae72880d62dddaee59622349eb7343`;
+the current file is 3,139,732 bytes with SHA-256
+`46987963a7b62abb1acdd285743705f48143c9544d2079e49e15bea630ced718`.
+An identical existing file is resumed without rewriting its inode or times. A
+different existing file fails closed and requires a separately reviewed,
+explicitly versioned revision; the command never replaces it in place.
+
+The new score and risk diagnostics read development and validation only. They
+reject final-test/nonselection rows before reading outcomes. The concise
+operator summary may copy already-sealed Protocol-v1 final-test summaries for
+display only; it records that raw final-test access and holdout access are
+false, and it cannot use those summaries for scenario selection. All results
+remain descriptive, `policy_eligible=false`, and `auto_apply=false`.
+
 ## Interpret the Research Lab
 
 Open the dashboard's Research Lab after the report check passes. Read the page
 in this order:
 
-1. bundle/protocol/selection/final/seal identity;
-2. final verdict and production boundary;
-3. partition idea, episode, and matured-outcome counts;
-4. route and primary-origin coverage;
-5. score monotonicity;
-6. MFE, signed MAE, missed/false/late analysis, and matched controls;
-7. assumed costs and route survivability;
+1. research boundary and operator-first negative conclusion;
+2. current-policy aggregate, route/regime dependence, assumed costs, score
+   monotonicity, peak operator burden, evidence gaps, and missing data;
+3. bundle/protocol/selection/final/seal identity;
+4. sealed final verdict and production boundary;
+5. partition idea, episode, and matured-outcome counts;
+6. route and primary-origin coverage;
+7. MFE, signed MAE, missed/false/late analysis, and matched controls;
 8. walk-forward purges, selected scenarios, and zero-idea days;
 9. operator burden and shadow-policy recommendations;
 10. separate live no-send evidence and explicit limitations.
 
-The dashboard acquires all seven files through one descriptor-anchored read and
-renders semantic tables only after whole-bundle validation. If validation fails,
-only the bounded inventory and failure state may remain. Research can remain
+The dashboard acquires all seven files and the optional fixed supplement through
+one descriptor-anchored read. The seven-report inventory and `7/7` bundle state
+remain unchanged. It renders v1 semantics only after whole-bundle validation,
+then independently validates the supplement against those exact bytes and keeps
+only a bounded allowlisted operator projection. A missing, invalid, unsafe, or
+oversized supplement suppresses only supplement semantics. Research can remain
 visible when production authority is stale because it is historical and
 non-authoritative; it never restores a current idea.
 
@@ -294,6 +334,7 @@ bytes, scoring, selection, production policy, or dashboard authority.
 - final-test run: `3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72`;
 - report bundle: `267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`;
 - recommendation seal: `3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639`;
+- hardening supplement id: `670bfa10b5b74ce2f213a5f6c07ace0333ae72880d62dddaee59622349eb7343`;
 - final status: `no_candidate_recommendations`;
 - production policy: unchanged.
 
@@ -304,6 +345,17 @@ spread and intraday execution remain unavailable, and the live no-send lane is
 still an insufficient separate observational sample. Preserve earlier runs and
 bundles as immutable superseded audit evidence; never use them as the current
 selection input.
+
+Within-route diagnostics do not justify retuning: `dashboard_watch` has no
+evaluable adjacent score-bucket pair in either selection partition, while
+`risk_watch` actionability has one descriptive violation among two evaluable
+adjacent pairs in both development and validation. Outcome-blind daily grouping
+finds 2,412 selection-period risk items across 411 partition-specific UTC days;
+130 partition-days contain at least three distinct affected assets. Development
+and validation are never pooled even if their date labels overlap.
+Correlated-family suppression remains
+explicitly not evaluable because the replay lacks the required correlation and
+family lineage.
 
 ## Failure handling
 

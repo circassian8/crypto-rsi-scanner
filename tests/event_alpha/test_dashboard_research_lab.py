@@ -23,6 +23,9 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_research_reports import
     REPORT_FILENAMES,
     validate_report_bundle,
 )
+from crypto_rsi_scanner.event_alpha.operations import (
+    empirical_hardening_supplement,
+)
 from crypto_rsi_scanner.event_alpha.operations.empirical_replay_store import (
     canonical_json_bytes,
 )
@@ -51,6 +54,24 @@ def _write_reports(root: Path) -> None:
 def _restore_reports(root: Path) -> None:
     for name, payload in _report_payloads().items():
         (root / name).write_bytes(payload)
+
+
+def _supplement_payload() -> bytes:
+    reports = _report_payloads()
+    payload = (
+        _ROOT / "research" / empirical_hardening_supplement.SUPPLEMENT_FILENAME
+    ).read_bytes()
+    empirical_hardening_supplement.parse_and_validate_hardening_supplement(
+        payload,
+        report_payloads=reports,
+    )
+    return payload
+
+
+def _write_supplement(root: Path) -> bytes:
+    payload = _supplement_payload()
+    (root / empirical_hardening_supplement.SUPPLEMENT_FILENAME).write_bytes(payload)
+    return payload
 
 
 def _request(app: RadarDashboardApp, path: str, *, method: str = "GET") -> tuple[str, bytes]:
@@ -100,6 +121,226 @@ def test_research_lab_loads_only_fixed_bounded_reports(tmp_path: Path) -> None:
     assert "DO_NOT_READ.secret" not in json.dumps(lab)
     assert lab["provider_calls"] == lab["writes"] == 0
     assert lab["dashboard_authority_mutations"] == 0
+
+
+def test_hardening_supplement_uses_same_anchored_fixed_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    research = tmp_path / "research"
+    _write_reports(research)
+    payload = _write_supplement(research)
+    original_read = secure_reader.AnchoredNamespaceReader.read_bytes
+    original_parse = (
+        empirical_hardening_supplement.parse_and_validate_hardening_supplement
+    )
+    reads: list[tuple[int, str, int | None]] = []
+    parsed: list[bytes] = []
+
+    def observed_read(self, relative, *, max_bytes=None):
+        reads.append((id(self), str(relative), max_bytes))
+        return original_read(self, relative, max_bytes=max_bytes)
+
+    def observed_parse(value, *, report_payloads):
+        assert report_payloads == _report_payloads()
+        parsed.append(value)
+        return original_parse(value, report_payloads=report_payloads)
+
+    monkeypatch.setattr(
+        secure_reader.AnchoredNamespaceReader,
+        "read_bytes",
+        observed_read,
+    )
+    monkeypatch.setattr(
+        empirical_hardening_supplement,
+        "parse_and_validate_hardening_supplement",
+        observed_parse,
+    )
+
+    lab = load_research_lab_snapshot(research)
+
+    assert [row[1] for row in reads] == [
+        *REPORT_FILENAMES,
+        empirical_hardening_supplement.SUPPLEMENT_FILENAME,
+    ]
+    assert len({row[0] for row in reads}) == 1
+    assert reads[-1][2] == empirical_hardening_supplement.MAX_SUPPLEMENT_BYTES
+    assert parsed == [payload]
+    assert lab["status"] == "ready"
+    assert lab["bundle_status"] == "validated"
+    assert tuple(lab["reports"]) == REPORT_FILENAMES
+    assert len(lab["reports"]) == 7
+    hardening = lab["hardening_supplement"]
+    assert set(hardening) == {"status", "record", "projection", "warnings"}
+    assert hardening["status"] == "ready"
+    assert hardening["record"]["filename"] == (
+        empirical_hardening_supplement.SUPPLEMENT_FILENAME
+    )
+    assert hardening["record"]["size_bytes"] == len(payload)
+    assert hardening["record"]["maximum_size_bytes"] == (
+        empirical_hardening_supplement.MAX_SUPPLEMENT_BYTES
+    )
+    assert hardening["projection"]["negative_conclusion"] is True
+    assert hardening["projection"]["unsupported_shadow_alternative_count"] == 9
+    route_conditioned = hardening["projection"]["route_conditioned_calibration"]
+    assert tuple(route_conditioned["score_fields"]) == (
+        "actionability_score",
+        "evidence_confidence_score",
+        "risk_score",
+        "urgency_score",
+        "chase_risk_score",
+    )
+    assert len(route_conditioned["rows"]) == 16
+    assert [
+        (
+            row["partition"],
+            row["route"],
+            row["evaluated_pair_count"],
+            row["violation_count"],
+        )
+        for row in route_conditioned["rows"]
+        if row["route"] in {"dashboard_watch", "risk_watch"}
+    ] == [
+        ("development", "dashboard_watch", 0, 0),
+        ("development", "risk_watch", 2, 1),
+        ("validation", "dashboard_watch", 0, 0),
+        ("validation", "risk_watch", 2, 1),
+    ]
+    market_wide = hardening["projection"]["market_wide_risk_diagnostics"]
+    assert (
+        market_wide["risk_item_count"],
+        market_wide["partition_day_count"],
+        market_wide["market_wide_group_count"],
+    ) == (2412, 411, 130)
+    assert market_wide["correlated_family_suppression_status"] == (
+        "not_evaluable_missing_correlation_and_family_lineage"
+    )
+    assert market_wide["peak_group"] == {
+        "utc_day": "2022-05-12",
+        "risk_item_count": 94,
+        "distinct_asset_count": 94,
+        "partition": "development",
+        "market_regime_status": "consistent",
+        "top_assets": [
+            "binance-usdt:luna",
+            "binance-usdt:people",
+            "binance-usdt:spell",
+            "binance-usdt:alpine",
+            "binance-usdt:astr",
+            "binance-usdt:tlm",
+            "binance-usdt:slp",
+            "binance-usdt:gala",
+            "binance-usdt:mask",
+            "binance-usdt:rose",
+        ],
+    }
+    frozen_costs = hardening["projection"]["frozen_cost_sensitivity"]
+    assert tuple(frozen_costs["cost_bps"]) == (0, 20, 50, 100, 200)
+    assert [
+        (
+            row["partition"],
+            row["sealed_final_display_only"],
+            [scenario["round_trip_cost_bps"] for scenario in row["scenarios"]],
+        )
+        for row in frozen_costs["partitions"]
+    ] == [
+        ("development", False, [0, 20, 50, 100, 200]),
+        ("validation", False, [0, 20, 50, 100, 200]),
+        ("final_test", True, [0, 20, 50, 100, 200]),
+    ]
+    assert {
+        row["partition"]: [
+            (
+                scenario["round_trip_cost_bps"],
+                scenario["mean_net_directional_return_fraction"],
+                scenario["net_hit_rate"],
+            )
+            for scenario in row["scenarios"]
+        ]
+        for row in frozen_costs["partitions"]
+    } == {
+        "development": [
+            (0, -0.000571035194965149, 0.5319622012229016),
+            (20, -0.0025710351949651505, 0.5241801000555865),
+            (50, -0.005571035194965151, 0.5169538632573653),
+            (100, -0.010571035194965151, 0.49972206781545303),
+            (200, -0.02057103519496515, 0.47192884936075596),
+        ],
+        "validation": [
+            (0, -0.007347436929152366, 0.5294117647058824),
+            (20, -0.009347436929152369, 0.5203619909502263),
+            (50, -0.01234743692915237, 0.5090497737556561),
+            (100, -0.017347436929152367, 0.4894419306184012),
+            (200, -0.02734743692915237, 0.45324283559577677),
+        ],
+        "final_test": [
+            (0, -0.004513142441460612, 0.5038650737877723),
+            (20, -0.006513142441460613, 0.49402670414617006),
+            (50, -0.009513142441460615, 0.48067463106113845),
+            (100, -0.014513142441460614, 0.4680252986647927),
+            (200, -0.024513142441460613, 0.43359100491918484),
+        ],
+    }
+    snapshot_text = json.dumps(hardening, sort_keys=True)
+    assert "route_conditioned_calibration" in snapshot_text
+    assert "market_wide_risk_diagnostics" in snapshot_text
+    assert "daily_risk_groups" not in snapshot_text
+    assert "ranked_asset_evidence" not in snapshot_text
+    assert "between_route_bucket_composition" not in snapshot_text
+    assert "supplement_id" not in snapshot_text
+    assert len(snapshot_text) < 24_000
+
+
+@pytest.mark.parametrize(
+    ("failure_mode", "expected_status"),
+    (("missing", "missing"), ("invalid", "invalid"), ("oversized", "oversized")),
+)
+def test_hardening_supplement_failures_suppress_only_supplement_semantics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_mode: str,
+    expected_status: str,
+) -> None:
+    research = tmp_path / "research"
+    _write_reports(research)
+    supplement_path = (
+        research / empirical_hardening_supplement.SUPPLEMENT_FILENAME
+    )
+    if failure_mode == "invalid":
+        supplement_path.write_bytes(b"{}")
+    elif failure_mode == "oversized":
+        monkeypatch.setattr(research_lab_loader, "MAX_SUPPLEMENT_BYTES", 32)
+        supplement_path.write_bytes(_supplement_payload())
+
+    lab = load_research_lab_snapshot(research)
+
+    assert lab["status"] == "ready"
+    assert lab["bundle_status"] == "validated"
+    assert tuple(lab["reports"]) == REPORT_FILENAMES
+    assert len(lab["reports"]) == 7
+    assert lab["bundle"]["report_artifacts"] == REPORT_FILENAMES
+    assert lab["projections"]["validation"]["analyses"]
+    hardening = lab["hardening_supplement"]
+    assert hardening["status"] == expected_status
+    assert hardening["record"]["status"] == expected_status
+    assert hardening["projection"] == {}
+    assert hardening["warnings"] == (f"hardening_supplement_{expected_status}",)
+    assert lab["warnings"] == ()
+
+    snapshot = load_dashboard_snapshot(
+        _FIXTURE_BASE,
+        _FIXTURE_NAMESPACE,
+        now=_NOW,
+        research_root=research,
+    )
+    page = render_dashboard_page(snapshot, "/research-lab")
+    assert page.status_code == 200
+    assert "Empirical hardening supplement" in page.body
+    assert "Hardening supplement unavailable" in page.body
+    assert "Seven file v1 evidence remains available" in page.body
+    assert f"hardening_supplement_{expected_status}" in page.body
+    assert "Final empirical verdict" in page.body
+    assert "Closed route evidence" in page.body
 
 
 def test_research_lab_missing_and_unsafe_reports_fail_soft(tmp_path: Path) -> None:
@@ -291,6 +532,125 @@ def test_research_lab_render_is_explicit_descriptive_and_escaped(tmp_path: Path)
     assert "Historical research · current authority unavailable" in historical_page.body
 
 
+def test_hardening_operator_panel_leads_with_negative_conclusion(
+    tmp_path: Path,
+) -> None:
+    research = tmp_path / "research"
+    _write_reports(research)
+    _write_supplement(research)
+    snapshot = load_dashboard_snapshot(
+        _FIXTURE_BASE,
+        _FIXTURE_NAMESPACE,
+        now=_NOW,
+        research_root=research,
+    )
+
+    page = render_dashboard_page(snapshot, "/research-lab")
+
+    assert page.status_code == 200
+    boundary_index = page.body.index("Research boundary")
+    operator_index = page.body.index("Operator conclusion")
+    overview_index = page.body.index("Research reports")
+    identity_index = page.body.index("Validated evidence identity")
+    sealed_index = page.body.index("Final empirical verdict")
+    assert boundary_index < operator_index < overview_index < identity_index
+    assert operator_index < sealed_index
+    for text in (
+        "No supported production policy change.",
+        "9 unsupported shadow alternatives",
+        "Risk watch",
+        "Dashboard watch",
+        "Descriptive results vary by regime",
+        "Historical spread not observed",
+        "10 descriptive violations",
+        "91 items in one day",
+        "Matured visible episodes</span><strong>1378",
+        "Current policy mean</span><strong>-0.64%",
+        "Current policy hit rate</span><strong>49.56%",
+        "Quick-failure rate</span><strong>34.69%",
+        "Routes with no empirical evidence",
+        "Origins with no empirical evidence",
+        "Missing data most needed",
+        "Live evidence insufficient",
+        "Insufficient for policy change",
+        "Sealed v1 final-test summary only",
+        "did not access raw final-test data",
+        "did not use the holdout for scenario selection",
+        "Within-route score diagnostics",
+        "closed 16-route matrix",
+        "older global mixed-route monotonicity result is confounded by route composition",
+        "Dashboard-watch and risk-watch score detail",
+        "Outcome-blind market-wide risk grouping",
+        "Risk items</span><strong>2,412",
+        "Partition-days</span><strong>411",
+        "Market-wide groups</span><strong>130",
+        "2022-05-12",
+        "binance-usdt:luna",
+        "binance-usdt:people",
+        "binance-usdt:spell",
+        "Correlated-family suppression is not evaluable",
+        "correlation and family-lineage evidence are missing",
+        "Exact frozen Protocol-v1 cost sensitivity",
+        "0 / 20 / 50 / 100 / 200 bps",
+        "Final test · sealed display only",
+        "-0.06%",
+        "53.20%",
+        "-0.73%",
+        "52.94%",
+        "-0.45%",
+        "50.39%",
+        "Not execution evidence",
+    ):
+        assert text in page.body
+    assert "Final empirical verdict" in page.body
+    assert "No candidate recommendations" in page.body
+    assert page.body.count("7/7") >= 1
+
+
+def test_hardening_operator_panel_escapes_every_projected_value(
+    tmp_path: Path,
+) -> None:
+    research = tmp_path / "research"
+    _write_reports(research)
+    _write_supplement(research)
+    snapshot = load_dashboard_snapshot(
+        _FIXTURE_BASE,
+        _FIXTURE_NAMESPACE,
+        now=_NOW,
+        research_root=research,
+    )
+    research_lab = deepcopy(dict(snapshot.research_lab))
+    hardening = deepcopy(dict(research_lab["hardening_supplement"]))
+    projection = deepcopy(dict(hardening["projection"]))
+    projection["regime_dependence"] = '<script>alert("regime")</script>'
+    projection["missing_data"] = ['<img src=x onerror="alert(1)">']
+    projection["route_level_result"]["risk_watch"][
+        "evidence_status"
+    ] = '<svg onload="alert(2)">'
+    projection["market_wide_risk_diagnostics"]["peak_group"][
+        "top_assets"
+    ][0] = '<a href="javascript:alert(3)">asset</a>'
+    hardening["projection"] = projection
+    research_lab["hardening_supplement"] = hardening
+
+    page = render_dashboard_page(
+        replace(snapshot, research_lab=research_lab),
+        "/research-lab",
+    )
+
+    assert '<script>alert("regime")</script>' not in page.body
+    assert '<img src=x onerror="alert(1)">' not in page.body
+    assert '<svg onload="alert(2)">' not in page.body
+    assert '<a href="javascript:alert(3)">asset</a>' not in page.body
+    assert "&lt;script&gt;alert(&quot;regime&quot;)&lt;/script&gt;" in page.body
+    assert "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;" in page.body
+    assert "&lt;svg onload=&quot;alert(2)&quot;&gt;" in page.body
+    assert (
+        "&lt;a href=&quot;javascript:alert(3)&quot;&gt;asset&lt;/a&gt;"
+        in page.body
+    )
+
+
 def test_research_lab_hides_absent_live_projection_and_renders_future_sealed_status(
     tmp_path: Path,
 ) -> None:
@@ -389,6 +749,7 @@ def test_research_lab_renderer_escapes_validated_projection_text(tmp_path: Path)
 def test_research_lab_get_head_are_read_only_and_do_not_change_authority(tmp_path: Path) -> None:
     research = tmp_path / "research"
     _write_reports(research)
+    _write_supplement(research)
     before = _hashes(research)
     app = RadarDashboardApp(
         _FIXTURE_BASE,
@@ -403,6 +764,7 @@ def test_research_lab_get_head_are_read_only_and_do_not_change_authority(tmp_pat
 
     assert get_status == "200 OK"
     assert b"Decision Radar Research Lab" in get_body
+    assert b"No supported production policy change" in get_body
     assert head_status == "200 OK" and head_body == b""
     assert post_status == "405 Method Not Allowed"
     assert post_body == b"Method Not Allowed\n"

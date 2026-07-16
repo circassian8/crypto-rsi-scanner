@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Publish the operator-first empirical hardening supplement · Codex
+**Why:** The sealed Protocol-v1 result was correct but its negative conclusion,
+within-route score limitations, and market-wide operator burden were too easy to
+miss, while adding those diagnostics to the immutable report bundle would have
+broken its empirical firewall.
+**Changes:**
+- Added one closed, separately attested supplement bound to the exact seven v1
+  report bytes, canonical selection evidence, and nine-component implementation
+  contract. Its bounded descriptor-walk inputs reject nonselection/final-test
+  runs before non-manifest reads, and immutable publication resumes identical
+  bytes while refusing replacement.
+- Added strict development/validation-only calibration diagnostics within route,
+  direction, regime, liquidity tier, and data-quality mode, with sample sizes,
+  composition, insufficiency, canonical return units, and full reconciliation.
+- Added outcome-blind, partition-safe UTC-day market-risk grouping and bounded
+  strongest-asset display. Correlated-family suppression stays explicitly not
+  evaluable because the required lineage is absent.
+- Made the Research Lab lead with the unchanged negative result, exact assumed
+  cost sensitivity, route/regime dependence, evidence gaps, and operator burden;
+  the original seven-file inventory remains exactly `7/7`.
+- Documented the immutable supplement contract and operator reading order. The
+  current supplement id is `670bfa10b5b7...`; Protocol-v1 bundle
+  `267a1c6d3048...` remains unchanged.
+**Verify:** The combined diagnostics, supplement, and Research Lab surface tests
+passed 64/64 under the locked runtime. Focused compileall, `git diff --check`,
+the immutable supplement byte check, and architecture cleanliness passed with
+no new size or function violations.
+**Notes/risks:** All nine alternatives remain unsupported and production policy
+is unchanged. Global mixed-route monotonicity is confounded; the new diagnostics
+are descriptive only and cannot auto-retune or access raw final-test evidence.
+
 ## 2026-07-16 — Restore the execution-readiness architecture gate · Codex
 **Why:** Expanding the explicit human venue decision contract made the immutable
 readiness dataclass exceed the project class-size limit even though its behavior

@@ -17,6 +17,7 @@ from .components import (
 )
 from .models import DashboardSnapshot
 from .presentation import humanize_enum
+from .research_lab_hardening_panel import render_hardening_conclusion_panel
 from .research_lab_loader import ORIGINS, REPORT_FILENAMES, ROUTES
 from .system_page_support import display_count, render_metric_grid, render_page_intro, render_panel
 
@@ -51,6 +52,7 @@ def render_research_lab_page(snapshot: DashboardSnapshot) -> str:
     return "".join((
         intro,
         boundary,
+        render_hardening_conclusion_panel(lab),
         _overview(lab, bundle, analyses, walk, policy, live),
         _bundle_identity_panel(bundle),
         _final_verdict_panel(validation, bundle),
@@ -735,6 +737,12 @@ def _warnings_panel(
     live: Mapping[str, Any],
 ) -> str:
     warnings = [str(value) for value in _list(lab.get("warnings")) if str(value)]
+    supplement = _mapping(lab.get("hardening_supplement"))
+    warnings.extend(
+        str(value)
+        for value in _list(supplement.get("warnings"))
+        if str(value)
+    )
     warnings.extend(
         str(row.get("multiple_comparison_warning"))
         for row in analyses

@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Publish empirical hardening only as a separate closed supplement
+**Status:** accepted
+**Decision:** Keep the seven Protocol-v1 reports and their bundle identifier
+immutable. Publish route-conditioned calibration, development/validation
+market-risk grouping, and the operator-first negative conclusion only in one
+separately attested supplement bound to the exact selection run, exact seven
+report bytes, and a deterministic diagnostics-code contract. The supplement
+must reject nonselection/final-test inputs before opening any non-manifest run
+leaf, use bounded descriptor-walk I/O, validate a closed schema, and resume only
+identical existing bytes; a different fixed output fails without clobbering.
+Raw Protocol-v1 final-test data remains unopened by this workflow. Already
+sealed v1 final summaries may be copied for clearly labeled display only and
+may not select a scenario. Diagnostics remain descriptive, outcome-blind where
+specified, `policy_eligible=false`, and never auto-apply.
+**Why:** The requested calibration and operator-readability improvements are
+useful, but rewriting the sealed v1 evidence or letting a self-attested/open
+extension read the holdout would invalidate the empirical firewall. A closed,
+separate, immutable supplement adds reproducible diagnostics while preserving
+the measured negative result and production policy.
+**Revisit when:** A human approves a fully sealed new protocol with genuinely
+new evidence and an untouched holdout, or the supplement itself needs a new
+explicitly versioned revision rather than an in-place rewrite.
+
 ## 2026-07-16 - Freeze Protocol-v2 evidence requirements before its executable protocol
 **Status:** accepted
 **Decision:** Freeze the static Protocol-v2 required-evidence and annex contract

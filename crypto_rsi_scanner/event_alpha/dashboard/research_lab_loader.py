@@ -15,7 +15,12 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..artifacts.json_lines import loads_no_duplicate_keys
-from ..operations import empirical_research_reports
+from ..operations import empirical_hardening_supplement, empirical_research_reports
+from .research_lab_hardening_projection import (
+    ORIGINS,
+    ROUTES,
+    project_hardening_operator_summary,
+)
 from .secure_reader import _DashboardNamespaceReadError, open_anchored_namespace
 
 
@@ -23,26 +28,8 @@ REPORT_FILENAMES = empirical_research_reports.REPORT_FILENAMES
 VALIDATION_REPORT = REPORT_FILENAMES[1]
 WALK_FORWARD_REPORT = REPORT_FILENAMES[3]
 POLICY_REPORT = REPORT_FILENAMES[5]
-
-ROUTES = (
-    "high_confidence_watch",
-    "actionable_watch",
-    "rapid_market_anomaly",
-    "dashboard_watch",
-    "fade_exhaustion_review",
-    "risk_watch",
-    "calendar_risk",
-    "diagnostic",
-)
-ORIGINS = (
-    "market_led",
-    "catalyst_led",
-    "technical_led",
-    "derivatives_led",
-    "onchain_led",
-    "fundamental_led",
-    "macro_led",
-)
+SUPPLEMENT_FILENAME = empirical_hardening_supplement.SUPPLEMENT_FILENAME
+MAX_SUPPLEMENT_BYTES = empirical_hardening_supplement.MAX_SUPPLEMENT_BYTES
 
 _REPORT_FILES = {
     filename: empirical_research_reports.MAX_REPORT_BYTES
@@ -83,6 +70,8 @@ def load_research_lab_snapshot(research_root: str | Path | None) -> dict[str, An
     root = Path(research_root).expanduser()
     records: dict[str, dict[str, Any]] = {}
     payloads: dict[str, bytes] = {}
+    supplement_record = _supplement_record(status="not_configured")
+    supplement_payload: bytes | None = None
     try:
         with open_anchored_namespace(root) as reader:
             for filename in REPORT_FILENAMES:
@@ -94,6 +83,7 @@ def load_research_lab_snapshot(research_root: str | Path | None) -> dict[str, An
                 records[filename] = record
                 if data is not None:
                     payloads[filename] = data
+            supplement_record, supplement_payload = _read_supplement_file(reader)
     except _DashboardNamespaceReadError:
         return _unavailable_snapshot(
             "research_root_unavailable_or_unsafe",
@@ -112,6 +102,9 @@ def load_research_lab_snapshot(research_root: str | Path | None) -> dict[str, An
             bundle_status="incomplete",
             reports=records,
             warnings=warnings or ("research_report_bundle_incomplete",),
+            hardening_supplement=_supplement_without_valid_reports(
+                supplement_record
+            ),
         )
 
     try:
@@ -133,7 +126,16 @@ def load_research_lab_snapshot(research_root: str | Path | None) -> dict[str, An
             bundle_status="invalid",
             reports=records,
             warnings=("research_report_bundle_invalid",),
+            hardening_supplement=_supplement_without_valid_reports(
+                supplement_record
+            ),
         )
+    hardening_supplement = _load_hardening_supplement(
+        supplement_record,
+        supplement_payload,
+        report_payloads=payloads,
+        validation_projection=projections["validation"],
+    )
     return _snapshot(
         status="ready",
         bundle_status="validated",
@@ -141,6 +143,7 @@ def load_research_lab_snapshot(research_root: str | Path | None) -> dict[str, An
         bundle=bundle,
         projections=projections,
         warnings=(),
+        hardening_supplement=hardening_supplement,
     )
 
 
@@ -168,6 +171,7 @@ def _snapshot(
     warnings: tuple[str, ...],
     bundle: Mapping[str, Any] | None = None,
     projections: Mapping[str, Any] | None = None,
+    hardening_supplement: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "status": status,
@@ -175,6 +179,13 @@ def _snapshot(
         "reports": {filename: dict(reports[filename]) for filename in REPORT_FILENAMES},
         "bundle": dict(bundle or {}),
         "projections": dict(projections or {}),
+        "hardening_supplement": dict(
+            hardening_supplement
+            or _supplement_state(
+                _supplement_record(status="not_configured"),
+                warnings=("hardening_supplement_not_configured",),
+            )
+        ),
         "warnings": warnings,
         "research_only": True,
         "auto_apply": False,
@@ -200,6 +211,108 @@ def _read_report_file(
     if len(data) > maximum:
         return _report_record(filename, status="oversized"), None
     return _report_record(filename, status="ready", data=data), data
+
+
+def _read_supplement_file(
+    reader: Any,
+) -> tuple[dict[str, Any], bytes | None]:
+    data, read_error = reader.read_bytes(
+        SUPPLEMENT_FILENAME,
+        max_bytes=MAX_SUPPLEMENT_BYTES,
+    )
+    if read_error == "artifact_missing":
+        return _supplement_record(status="missing"), None
+    if read_error == "artifact_too_large":
+        return _supplement_record(status="oversized"), None
+    if read_error or data is None:
+        return _supplement_record(status="unsafe_or_unreadable"), None
+    if len(data) > MAX_SUPPLEMENT_BYTES:
+        return _supplement_record(status="oversized"), None
+    return _supplement_record(status="read", data=data), data
+
+
+def _supplement_record(
+    *,
+    status: str,
+    data: bytes | None = None,
+) -> dict[str, Any]:
+    return {
+        "filename": SUPPLEMENT_FILENAME,
+        "status": status,
+        "sha256": hashlib.sha256(data).hexdigest() if data is not None else None,
+        "size_bytes": len(data) if data is not None else None,
+        "maximum_size_bytes": MAX_SUPPLEMENT_BYTES,
+    }
+
+
+def _supplement_state(
+    record: Mapping[str, Any],
+    *,
+    status: str | None = None,
+    projection: Mapping[str, Any] | None = None,
+    warnings: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    return {
+        "status": status or str(record.get("status") or "unavailable"),
+        "record": dict(record),
+        "projection": dict(projection or {}),
+        "warnings": warnings,
+    }
+
+
+def _supplement_without_valid_reports(
+    record: Mapping[str, Any],
+) -> dict[str, Any]:
+    observed = str(record.get("status") or "unavailable")
+    if observed == "read":
+        return _supplement_state(
+            record,
+            status="suppressed",
+            warnings=("hardening_supplement_exact_reports_unavailable",),
+        )
+    return _supplement_state(
+        record,
+        warnings=(f"hardening_supplement_{observed}",),
+    )
+
+
+def _load_hardening_supplement(
+    record: Mapping[str, Any],
+    payload: bytes | None,
+    *,
+    report_payloads: Mapping[str, bytes],
+    validation_projection: Mapping[str, Any],
+) -> dict[str, Any]:
+    observed = str(record.get("status") or "unavailable")
+    if observed != "read" or payload is None:
+        return _supplement_state(
+            record,
+            warnings=(f"hardening_supplement_{observed}",),
+        )
+    try:
+        validated = (
+            empirical_hardening_supplement.parse_and_validate_hardening_supplement(
+                payload,
+                report_payloads=report_payloads,
+            )
+        )
+        projection = project_hardening_operator_summary(
+            validated,
+            validation_projection=validation_projection,
+        )
+    except (KeyError, RuntimeError, TypeError, UnicodeError, ValueError):
+        invalid_record = {**dict(record), "status": "invalid"}
+        return _supplement_state(
+            invalid_record,
+            status="invalid",
+            warnings=("hardening_supplement_invalid",),
+        )
+    ready_record = {**dict(record), "status": "ready"}
+    return _supplement_state(
+        ready_record,
+        status="ready",
+        projection=projection,
+    )
 
 
 def _report_record(
@@ -788,10 +901,12 @@ def _number(value: Any) -> float | None:
 
 
 __all__ = (
+    "MAX_SUPPLEMENT_BYTES",
     "ORIGINS",
     "POLICY_REPORT",
     "REPORT_FILENAMES",
     "ROUTES",
+    "SUPPLEMENT_FILENAME",
     "VALIDATION_REPORT",
     "WALK_FORWARD_REPORT",
     "load_research_lab_snapshot",

@@ -318,6 +318,21 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   catalyst, official-calendar, derivatives, on-chain, or RSI evidence remains
   unavailable and cannot be proxied. No v2 replay, selection, or final-test
   target exists; protocol-v1 final-test evidence is forbidden for tuning.
+- **Empirical hardening supplement:**
+  `make radar-research-hardening-supplement
+  RADAR_RESEARCH_SELECTION_RUN=<exact-selection-run>` creates or identically
+  resumes the fixed, separately attested development/validation supplement;
+  the matching `...-check` target is the normal verification surface. It binds
+  the exact seven immutable v1 reports, selection manifest/artifacts, and
+  diagnostics implementation. Selection and report paths use bounded
+  descriptor-relative component traversal; a nonselection/final-test manifest
+  is rejected before any non-manifest leaf is opened. The supplement schema and
+  diagnostic reconciliations are closed. Different existing output bytes fail
+  without replacement. Route-conditioned score checks and partition-specific
+  market-risk groups are descriptive only; the v1 final-test may appear only
+  as an already-sealed display summary and is never read or used for selection
+  here. Do not treat mixed-route monotonicity as calibration, auto-retune scores,
+  or change production policy from this artifact.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,

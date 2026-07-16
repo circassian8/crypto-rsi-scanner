@@ -264,6 +264,8 @@ help:
 	@echo "  make radar-replay-final-test RADAR_RESEARCH_RECOMMENDATION_SEAL=...  Evaluate only a pre-frozen recommendation set"
 	@echo "  make radar-research-reports RADAR_RESEARCH_SELECTION_RUN=... RADAR_RESEARCH_FINAL_TEST_RUN=...  Publish the closed empirical report bundle"
 	@echo "  make radar-research-reports-check RADAR_RESEARCH_SELECTION_RUN=... RADAR_RESEARCH_FINAL_TEST_RUN=...  Byte-check the closed empirical report bundle"
+	@echo "  make radar-research-hardening-supplement RADAR_RESEARCH_SELECTION_RUN=...  Publish the separate development/validation-only hardening supplement"
+	@echo "  make radar-research-hardening-supplement-check RADAR_RESEARCH_SELECTION_RUN=...  Byte-check the separate hardening supplement"
 	@echo "  make radar-research-feedback-report RADAR_RESEARCH_RUN_DIR=...  Read optional review labels without writes"
 	@echo "  CONFIRM=1 make radar-research-feedback-mark RADAR_RESEARCH_RUN_DIR=... RADAR_RESEARCH_REVIEW_ITEM_ID=... RADAR_RESEARCH_REVIEW_LABEL=... RADAR_RESEARCH_REVIEW_OBSERVED_AT=...  Append one optional human label"
 	@echo "  make score    Print paper-trade scoreboard"
@@ -844,7 +846,7 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-feedback-report radar-research-feedback-mark
+.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-hardening-supplement radar-research-hardening-supplement-check radar-research-feedback-report radar-research-feedback-mark
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
@@ -899,6 +901,19 @@ radar-research-reports-check:
 		--final-test-run "$(RADAR_RESEARCH_FINAL_TEST_RUN)" \
 		--live-campaign-report "$(RADAR_RESEARCH_LIVE_CAMPAIGN_REPORT)" \
 		--output-dir "$(RADAR_RESEARCH_REPORT_OUTPUT_DIR)" \
+		--check
+
+radar-research-hardening-supplement:
+	@test -n "$(RADAR_RESEARCH_SELECTION_RUN)" || { echo "RADAR_RESEARCH_SELECTION_RUN is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_hardening_supplement \
+		--selection-run "$(RADAR_RESEARCH_SELECTION_RUN)" \
+		--report-dir "$(RADAR_RESEARCH_REPORT_OUTPUT_DIR)"
+
+radar-research-hardening-supplement-check:
+	@test -n "$(RADAR_RESEARCH_SELECTION_RUN)" || { echo "RADAR_RESEARCH_SELECTION_RUN is required" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_hardening_supplement \
+		--selection-run "$(RADAR_RESEARCH_SELECTION_RUN)" \
+		--report-dir "$(RADAR_RESEARCH_REPORT_OUTPUT_DIR)" \
 		--check
 
 radar-research-feedback-report:
