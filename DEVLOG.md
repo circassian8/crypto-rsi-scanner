@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Restore the execution-readiness architecture gate · Codex
+**Why:** Expanding the explicit human venue decision contract made the immutable
+readiness dataclass exceed the project class-size limit even though its behavior
+remained static.
+**Changes:**
+- Moved only the readiness dictionary projection into a private module helper,
+  leaving the public result, serialized fields, output, and no-network/no-write
+  safety boundary unchanged.
+- Regenerated the project-health reports after the class returned below the
+  limit; no new architecture violation remains.
+**Verify:** The execution-quality readiness tests passed 14/14, focused
+compileall and `git diff --check` passed, and
+`make architecture-cleanliness-check PYTHON=.venv/bin/python` passed with zero
+new violations.
+**Notes/risks:** This is an architecture-only repair. It does not select a
+venue, authorize data, add a provider, or change any execution behavior.
+
 ## 2026-07-16 — Freeze Protocol-v2 requirements without opening a holdout · Codex
 **Why:** Protocol v1 cannot evaluate intraday timing, execution quality, or the
 non-market evidence used by the product, but an executable v2 cannot honestly

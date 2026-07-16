@@ -177,54 +177,7 @@ class _ExecutionQualityReadiness:
     research_only: bool
 
     def to_dict(self) -> dict[str, object]:
-        return {
-            "contract_version": self.contract_version,
-            "status": self.status,
-            "selected_venue": self.selected_venue,
-            "selected_execution_mode": self.selected_execution_mode,
-            "intended_venue": self.intended_venue,
-            "intended_instrument_mode": self.intended_instrument_mode,
-            "quote_currency": self.quote_currency,
-            "eligible_instrument_set": list(self.eligible_instrument_set),
-            "jurisdiction_and_account_eligibility_confirmation": (
-                self.jurisdiction_and_account_eligibility_confirmation
-            ),
-            "jurisdiction_and_account_eligibility_confirmed": (
-                self.jurisdiction_and_account_eligibility_confirmed
-            ),
-            "expected_public_private_data_boundary": (
-                self.expected_public_private_data_boundary
-            ),
-            "required_human_decision_fields": list(self.required_human_decision_fields),
-            "human_decision_template": dict(self.human_decision_template),
-            "supported_live_adapters": list(self.supported_live_adapters),
-            "supported_interface_modes": list(self.supported_interface_modes),
-            "feasible_venues": [row.to_dict() for row in self.feasible_venues],
-            "required_snapshot_fields": list(self.required_snapshot_fields),
-            "selection_blockers": list(self.selection_blockers),
-            "operator_decision": self.operator_decision,
-            "implications": list(self.implications),
-            "next_safe_command": self.next_safe_command,
-            "authorization_boundary": self.authorization_boundary,
-            "expected_provider_activity": self.expected_provider_activity,
-            "rollback_disable_command": self.rollback_disable_command,
-            "spread_provider_status": self.spread_provider_status,
-            "public_market_data_permission_requested": (
-                self.public_market_data_permission_requested
-            ),
-            "private_market_data_permission_requested": (
-                self.private_market_data_permission_requested
-            ),
-            "order_permission_requested": self.order_permission_requested,
-            "trading_permission_requested": self.trading_permission_requested,
-            "provider_call_planned": self.provider_call_planned,
-            "provider_call_attempted": self.provider_call_attempted,
-            "live_adapter_activated": self.live_adapter_activated,
-            "credentials_read": self.credentials_read,
-            "network_called": self.network_called,
-            "writes_performed": self.writes_performed,
-            "research_only": self.research_only,
-        }
+        return _execution_quality_readiness_dict(self)
 
 
 # Stable public API aliases keep existing imports and annotations intact while
@@ -234,6 +187,61 @@ ExecutionQualityRequest = _ExecutionQualityRequest
 ExecutionQualitySnapshot = _ExecutionQualitySnapshot
 ExecutionQualityReader = _ExecutionQualityReader
 ExecutionQualityReadiness = _ExecutionQualityReadiness
+
+
+def _execution_quality_readiness_dict(
+    value: _ExecutionQualityReadiness,
+) -> dict[str, object]:
+    """Project the large immutable contract without inflating its model class."""
+
+    return {
+        "contract_version": value.contract_version,
+        "status": value.status,
+        "selected_venue": value.selected_venue,
+        "selected_execution_mode": value.selected_execution_mode,
+        "intended_venue": value.intended_venue,
+        "intended_instrument_mode": value.intended_instrument_mode,
+        "quote_currency": value.quote_currency,
+        "eligible_instrument_set": list(value.eligible_instrument_set),
+        "jurisdiction_and_account_eligibility_confirmation": (
+            value.jurisdiction_and_account_eligibility_confirmation
+        ),
+        "jurisdiction_and_account_eligibility_confirmed": (
+            value.jurisdiction_and_account_eligibility_confirmed
+        ),
+        "expected_public_private_data_boundary": (
+            value.expected_public_private_data_boundary
+        ),
+        "required_human_decision_fields": list(value.required_human_decision_fields),
+        "human_decision_template": dict(value.human_decision_template),
+        "supported_live_adapters": list(value.supported_live_adapters),
+        "supported_interface_modes": list(value.supported_interface_modes),
+        "feasible_venues": [row.to_dict() for row in value.feasible_venues],
+        "required_snapshot_fields": list(value.required_snapshot_fields),
+        "selection_blockers": list(value.selection_blockers),
+        "operator_decision": value.operator_decision,
+        "implications": list(value.implications),
+        "next_safe_command": value.next_safe_command,
+        "authorization_boundary": value.authorization_boundary,
+        "expected_provider_activity": value.expected_provider_activity,
+        "rollback_disable_command": value.rollback_disable_command,
+        "spread_provider_status": value.spread_provider_status,
+        "public_market_data_permission_requested": (
+            value.public_market_data_permission_requested
+        ),
+        "private_market_data_permission_requested": (
+            value.private_market_data_permission_requested
+        ),
+        "order_permission_requested": value.order_permission_requested,
+        "trading_permission_requested": value.trading_permission_requested,
+        "provider_call_planned": value.provider_call_planned,
+        "provider_call_attempted": value.provider_call_attempted,
+        "live_adapter_activated": value.live_adapter_activated,
+        "credentials_read": value.credentials_read,
+        "network_called": value.network_called,
+        "writes_performed": value.writes_performed,
+        "research_only": value.research_only,
+    }
 
 
 _COMMON_OPERATOR_INPUTS = (
