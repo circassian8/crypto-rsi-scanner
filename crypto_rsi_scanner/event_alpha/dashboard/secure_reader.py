@@ -39,8 +39,13 @@ class AnchoredNamespaceReader:
             self.namespace_identity,
         )
 
-    def read_bytes(self, relative: str | Path) -> tuple[bytes | None, str | None]:
-        return _read_relative_bytes(self, relative)
+    def read_bytes(
+        self,
+        relative: str | Path,
+        *,
+        max_bytes: int | None = None,
+    ) -> tuple[bytes | None, str | None]:
+        return _read_relative_bytes(self, relative, max_bytes=max_bytes)
 
     def fingerprint_directory(
         self,
@@ -93,6 +98,8 @@ def open_anchored_namespace(namespace_dir: Path) -> Iterator[AnchoredNamespaceRe
 def _read_relative_bytes(
     reader: AnchoredNamespaceReader,
     relative: str | Path,
+    *,
+    max_bytes: int | None = None,
 ) -> tuple[bytes | None, str | None]:
     parts, path_error = _relative_parts(relative)
     if path_error:
@@ -103,7 +110,7 @@ def _read_relative_bytes(
         parent_fd, parent_error = _open_relative_parent(reader.namespace_fd, parts[:-1])
         if parent_error or parent_fd is None:
             return None, parent_error
-        data, read_error = _read_file_at(parent_fd, parts[-1])
+        data, read_error = _read_file_at(parent_fd, parts[-1], max_bytes=max_bytes)
         reader.assert_current()
         return data, read_error
     except OSError:
@@ -286,7 +293,12 @@ def _open_directory_at(parent_fd: int, name: str) -> tuple[int | None, str | Non
     return descriptor, None
 
 
-def _read_file_at(parent_fd: int, leaf: str) -> tuple[bytes | None, str | None]:
+def _read_file_at(
+    parent_fd: int,
+    leaf: str,
+    *,
+    max_bytes: int | None = None,
+) -> tuple[bytes | None, str | None]:
     descriptor: int | None = None
     try:
         before = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
@@ -294,16 +306,22 @@ def _read_file_at(parent_fd: int, leaf: str) -> tuple[bytes | None, str | None]:
             return None, "artifact_symlink_not_allowed"
         if not stat.S_ISREG(before.st_mode):
             return None, "artifact_kind_mismatch"
+        if max_bytes is not None and (max_bytes < 0 or before.st_size > max_bytes):
+            return None, "artifact_too_large"
         descriptor = os.open(leaf, _file_flags(), dir_fd=parent_fd)
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode) or not _same_snapshot(before, opened):
             return None, "artifact_changed_during_read"
         chunks: list[bytes] = []
+        total_size = 0
         while True:
             chunk = os.read(descriptor, 1024 * 1024)
             if not chunk:
                 break
             chunks.append(chunk)
+            total_size += len(chunk)
+            if max_bytes is not None and total_size > max_bytes:
+                return None, "artifact_too_large"
         after_fd = os.fstat(descriptor)
         after_path = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
         data = b"".join(chunks)

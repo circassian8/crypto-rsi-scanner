@@ -25,6 +25,7 @@ NAV_GROUPS = (
         "Learning & operations",
         (
             ("/outcomes", "Outcomes"),
+            ("/research-lab", "Research Lab"),
             ("/campaign-history", "Run history"),
             ("/health", "Health"),
         ),

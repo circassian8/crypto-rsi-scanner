@@ -12,7 +12,7 @@ import math
 import os
 import re
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dataclass_replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -30,6 +30,7 @@ from ._source_independence_loader import (
 )
 from .history import load_dashboard_history, read_unverified_json_object_bytes
 from .models import DashboardLoadError, DashboardSnapshot, build_dashboard_snapshot
+from .research_lab_loader import load_research_lab_snapshot
 from .secure_reader import (
     AnchoredNamespaceReader,
     _DashboardNamespaceReadError,
@@ -168,6 +169,7 @@ def load_dashboard_snapshot(
     now: datetime | str | None = None,
     max_generation_age_hours: float | None = None,
     max_doctor_age_hours: float | None = None,
+    research_root: str | Path | None = None,
 ) -> DashboardSnapshot:
     """Load one exact operator generation, retrying only a concurrent revision."""
 
@@ -188,7 +190,7 @@ def load_dashboard_snapshot(
     for _attempt in range(attempts):
         try:
             with open_anchored_namespace(namespace_dir) as reader:
-                return _load_once(
+                snapshot = _load_once(
                     namespace_dir,
                     reader=reader,
                     state_loader=state_loader,
@@ -196,6 +198,10 @@ def load_dashboard_snapshot(
                     max_generation_age_hours=generation_age_limit,
                     max_doctor_age_hours=doctor_age_limit,
                 )
+            return dataclass_replace(
+                snapshot,
+                research_lab=load_research_lab_snapshot(research_root),
+            )
         except _GenerationChanged as exc:
             last_error = str(exc)
         except _DashboardNamespaceReadError as exc:

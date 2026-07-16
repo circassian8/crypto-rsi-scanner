@@ -19,7 +19,7 @@ def test_dashboard_ux_smoke_covers_primary_operator_surface(capsys) -> None:
     assert run_ux_smoke(_BASE, _NAMESPACE, now=_NOW) == 0
 
     output = capsys.readouterr().out
-    assert "pages=8" in output
+    assert "pages=9" in output
     assert "semantic_shell=ok" in output
     assert "responsive_css_contract=ok" in output
     assert "writes=0" in output

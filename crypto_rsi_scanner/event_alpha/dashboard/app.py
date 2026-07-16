@@ -43,6 +43,7 @@ class RadarDashboardApp:
         max_generation_age_hours: float | None = None,
         max_doctor_age_hours: float | None = None,
         generation_binding: DashboardGenerationBinding | None = None,
+        research_root: str | Path | None = None,
     ) -> None:
         self.artifact_base_dir = Path(artifact_base_dir).expanduser()
         self.artifact_namespace = str(artifact_namespace)
@@ -55,6 +56,7 @@ class RadarDashboardApp:
         self.max_generation_age_hours = max_generation_age_hours
         self.max_doctor_age_hours = max_doctor_age_hours
         self.generation_binding = generation_binding
+        self.research_root = Path(research_root).expanduser() if research_root is not None else None
 
     def __call__(self, environ: dict[str, object], start_response: StartResponse) -> Iterable[bytes]:
         return _handle_dashboard_request(self, environ, start_response)
@@ -97,12 +99,14 @@ def _render_dashboard_request(
     app: RadarDashboardApp,
     environ: dict[str, object],
 ) -> tuple[str, bytes]:
+    path = unquote(str(environ.get("PATH_INFO") or "/"))
     snapshot = load_dashboard_snapshot(
         app.artifact_base_dir,
         app.artifact_namespace,
         now=app.now,
         max_generation_age_hours=app.max_generation_age_hours,
         max_doctor_age_hours=app.max_doctor_age_hours,
+        research_root=app.research_root if path == "/research-lab" else None,
     )
     _require_generation_binding(snapshot, app.generation_binding)
     _require_current_pointer_binding(
@@ -111,7 +115,6 @@ def _render_dashboard_request(
         app.generation_binding,
     )
     _require_request_publication_contract(app, snapshot)
-    path = unquote(str(environ.get("PATH_INFO") or "/"))
     query = parse_qs(str(environ.get("QUERY_STRING") or ""), keep_blank_values=True)
     include_diagnostics = str((query.get("include_diagnostics") or [""])[0]).casefold() in {
         "1",
@@ -198,6 +201,7 @@ def serve_dashboard(
     host: str = "127.0.0.1",
     port: int = 8765,
     generation_binding: DashboardGenerationBinding | None = None,
+    research_root: str | Path | None = None,
 ) -> None:
     """Serve the loopback-only dashboard until interrupted."""
 
@@ -207,6 +211,7 @@ def serve_dashboard(
         artifact_base_dir,
         artifact_namespace,
         generation_binding=generation_binding,
+        research_root=research_root,
     )
     with _make_dashboard_server(host, int(port), app) as server:
         print(f"Crypto Radar dashboard: http://{host}:{int(port)}/")

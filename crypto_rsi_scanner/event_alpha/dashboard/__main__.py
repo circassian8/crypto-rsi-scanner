@@ -22,12 +22,16 @@ from .readiness import (
 from .render import render_dashboard_page
 
 
+_DEFAULT_RESEARCH_ROOT = Path(__file__).resolve().parents[3] / "research"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Serve the local read-only Event Alpha radar dashboard.")
     parser.add_argument("--artifact-base", default="event_fade_cache")
     parser.add_argument("--namespace", default=None)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--research-root", default=str(_DEFAULT_RESEARCH_ROOT))
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument(
         "--smoke",
@@ -143,7 +147,12 @@ def main(argv: list[str] | None = None) -> int:
         namespace = result.snapshot.artifact_namespace
         if args.smoke:
             try:
-                return _smoke(Path(args.artifact_base), namespace, now=effective_smoke_now)
+                return _smoke(
+                    Path(args.artifact_base),
+                    namespace,
+                    now=effective_smoke_now,
+                    research_root=Path(args.research_root),
+                )
             except SystemExit as exc:
                 raise DashboardReadinessError(str(exc)) from exc
         generation_binding = (
@@ -157,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
             host=args.host,
             port=args.port,
             generation_binding=generation_binding,
+            research_root=Path(args.research_root),
         )
         return 0
     except (DashboardReadinessError, DashboardLoadError, OSError, ValueError) as exc:
@@ -165,9 +175,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
-def _smoke(artifact_base: Path, namespace: str, *, now: str | None = None) -> int:
+def _smoke(
+    artifact_base: Path,
+    namespace: str,
+    *,
+    now: str | None = None,
+    research_root: str | Path | None = None,
+) -> int:
     smoke_now = now or _fixture_smoke_now(artifact_base, namespace)
-    snapshot = load_dashboard_snapshot(artifact_base, namespace, now=smoke_now)
+    snapshot = load_dashboard_snapshot(
+        artifact_base,
+        namespace,
+        now=smoke_now,
+        research_root=research_root,
+    )
     if not snapshot.generation_authoritative:
         reasons = ",".join(snapshot.generation_authority_reasons) or "unknown"
         raise SystemExit(f"dashboard smoke failed: generation is not authoritative ({reasons})")
@@ -179,6 +200,7 @@ def _smoke(artifact_base: Path, namespace: str, *, now: str | None = None) -> in
         "/health",
         "/outcomes",
         "/campaign-history",
+        "/research-lab",
         "/anomalies",
         "/catalysts",
         "/fade-risk",

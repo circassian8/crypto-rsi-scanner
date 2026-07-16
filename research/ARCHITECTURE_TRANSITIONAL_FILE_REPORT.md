@@ -2,7 +2,7 @@
 
 Research artifact only. This static gate checks migration-era file names and flat Event Alpha modules. It does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-16T04:15:52.140436+00:00`
+- generated_at: `2026-07-16T04:19:02.455297+00:00`
 - status: `OK`
 - transitional_named_files_count: `0`
 - transitional_named_files_remaining: `0`

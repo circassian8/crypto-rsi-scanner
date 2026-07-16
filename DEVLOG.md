@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Add a read-only Research Lab to the existing dashboard · Codex
+**Why:** Empirical results need an operator-facing surface that preserves sample
+and evidence warnings without creating a second application or coupling
+research files to production dashboard authority.
+**Changes:**
+- Added `/research-lab` to the current server-rendered dashboard with validation
+  overview, all route/origin cohorts, score monotonicity, regime/liquidity/data-
+  quality slices, market-vs-catalyst context, missed/false/late classifications,
+  MFE/MAE and assumed costs, walk-forward, shadow policy/operator burden, live-
+  versus-replay separation, and explicit limitations.
+- The loader reads only four fixed filenames from `research/`, through one
+  descriptor-anchored directory, with duplicate-key rejection, schema/safety
+  projection, pre-read byte caps, symlink rejection, and fail-soft partial/
+  missing states. It never enumerates arbitrary research files.
+- Research remains available as labeled historical/descriptive evidence even
+  when production authority is stale, while GET/HEAD cannot write, call a
+  provider, inspect environment authorization, change policy, or mutate the
+  authoritative pointer. POST remains rejected.
+**Verify:** Focused Research Lab, UX, base dashboard, pointer-binding, and
+readiness tests passed (136 tests in 10.13s); the broader dashboard suite run by
+the implementation slice passed 310 tests; compile and diff checks passed.
+**Notes/risks:** Until the three empirical reports are generated, the page
+honestly renders partial state alongside the separately available live campaign
+report. It never treats a missing report as zero evidence.
+
 ## 2026-07-16 — Add reproducible replay runs, controls, and benchmarks · Codex
 **Why:** The validated point-in-time feature and outcome primitives needed one
 bounded offline execution path plus outcome-blind comparison policies before a

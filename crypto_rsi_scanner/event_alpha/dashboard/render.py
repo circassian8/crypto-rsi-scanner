@@ -34,6 +34,7 @@ from .models import (
 from .calendar_page import render_calendar_page
 from .ideas_page import render_idea_detail, render_ideas_page
 from .market_page import render_market_page
+from .research_lab_page import render_research_lab_page
 from .shell import render_shell
 from .system_pages import (
     render_campaign_page,
@@ -158,6 +159,13 @@ def render_dashboard_page(
             "Run history",
             path,
             render_campaign_page(snapshot, query),
+        )
+    if path == "/research-lab":
+        return _product_response(
+            snapshot,
+            "Research Lab",
+            path,
+            render_research_lab_page(snapshot),
         )
     if path.startswith("/ideas/"):
         identifier = path.removeprefix("/ideas/")

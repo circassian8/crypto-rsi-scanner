@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
 
-from .__main__ import _fixture_smoke_now
+from .__main__ import _DEFAULT_RESEARCH_ROOT, _fixture_smoke_now
 from .loader import candidate_identifier, load_dashboard_snapshot
 from .render import render_dashboard_page
 
@@ -20,6 +20,7 @@ _PRIMARY_ROUTES = (
     "/health",
     "/outcomes",
     "/campaign-history",
+    "/research-lab",
 )
 
 
@@ -60,6 +61,7 @@ def run_ux_smoke(
     namespace: str,
     *,
     now: str | None = None,
+    research_root: str | Path | None = None,
 ) -> int:
     """Render the primary product surface and fail on semantic shell drift."""
 
@@ -68,6 +70,7 @@ def run_ux_smoke(
         base,
         namespace,
         now=now or _fixture_smoke_now(base, namespace),
+        research_root=research_root,
     )
     if not snapshot.generation_authoritative:
         raise SystemExit("radar dashboard UX smoke requires an authoritative generation")
@@ -128,8 +131,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact-base", default="event_fade_cache")
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--now", default=None)
+    parser.add_argument("--research-root", default=str(_DEFAULT_RESEARCH_ROOT))
     args = parser.parse_args(argv)
-    return run_ux_smoke(args.artifact_base, args.namespace, now=args.now)
+    return run_ux_smoke(
+        args.artifact_base,
+        args.namespace,
+        now=args.now,
+        research_root=args.research_root,
+    )
 
 
 if __name__ == "__main__":

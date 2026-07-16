@@ -116,6 +116,7 @@ class DashboardSnapshot(_DashboardSnapshotViews):
     provider_health_read_at: str | None = None
     provider_health_sha256: str | None = None
     provider_health_error: str | None = None
+    research_lab: Mapping[str, Any] = field(default_factory=dict)
 
 
 def is_canonical_diagnostic_candidate(row: Mapping[str, Any]) -> bool:

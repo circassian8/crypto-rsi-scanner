@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Keep empirical Research Lab evidence outside production authority
+**Status:** accepted
+**Decision:** Render empirical validation, walk-forward, shadow-policy, and live
+no-send evidence inside the existing Decision Radar dashboard, but read it from
+four fixed, bounded, descriptor-anchored report files as an authority-independent
+research projection. Research can remain inspectable when a production
+generation is stale, provided it is labeled descriptive/historical and never
+restores or implies current actionability. Missing, invalid, unsafe, or
+oversized reports produce explicit partial/unavailable state; they never become
+zero evidence. GET/HEAD cannot write, inspect provider authorization, change a
+threshold/route, or mutate dashboard authority, and shadow recommendations do
+not auto-apply.
+**Why:** Operators need one coherent product surface for empirical evidence,
+including negative and insufficient results, without allowing research files or
+stale production data to bypass exact-generation publication safeguards.
+**Revisit when:** Research evidence is moved to another immutable store with
+equivalent fixed-source, byte-bound, schema, no-follow, read-only, and
+authority-separation guarantees.
+
 ## 2026-07-16 - Freeze Decision Radar empirical-validation protocol v1 before final-test evaluation
 **Status:** accepted
 **Decision:** Use `decision_radar_empirical_validation_v1` as the immutable
