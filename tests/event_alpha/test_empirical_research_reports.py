@@ -461,6 +461,17 @@ def test_builds_exact_closed_deterministic_seven_file_bundle(tmp_path: Path) -> 
         "market_led", "catalyst_led", "technical_led", "derivatives_led",
         "onchain_led", "fundamental_led", "macro_led",
     }
+    assert validation["conclusions"]["origins_with_no_empirical_evidence"] == [
+        origin
+        for origin in empirical_research_reports._ORIGINS
+        if validation["conclusions"]["origin_findings"][origin]["evidence_status"]
+        == "no_empirical_evidence"
+    ]
+    validation_markdown = first["DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.md"]
+    limitations_markdown = first["DECISION_RADAR_RESEARCH_LIMITATIONS.md"]
+    assert b"## Origin evidence" in validation_markdown
+    assert b"Primary thesis origins:" in limitations_markdown
+    assert b"`macro_led`" in limitations_markdown
     assert validation["conclusions"]["walk_forward_stability"][
         "outcome_evaluable_fold_count"
     ] == 0
@@ -935,6 +946,22 @@ def test_validator_rejects_resigned_production_contract_contradiction(
 
     forged = _resign_publication_bundle(payloads, forge)
     with pytest.raises(RuntimeError, match="publication_contract_invalid"):
+        empirical_research_reports.validate_report_bundle(forged)
+
+
+def test_validator_rejects_resigned_no_evidence_origin_drift(
+    tmp_path: Path,
+) -> None:
+    selection, final = _write_runs(tmp_path)
+    _bundle_id, payloads = empirical_research_reports.build_report_bundle(
+        selection_run=selection, final_test_run=final
+    )
+
+    def forge(validation, _walk, _policy, _envelope):
+        validation["conclusions"]["origins_with_no_empirical_evidence"] = []
+
+    forged = _resign_publication_bundle(payloads, forge)
+    with pytest.raises(RuntimeError, match="conclusions_invalid"):
         empirical_research_reports.validate_report_bundle(forged)
 
 

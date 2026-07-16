@@ -1760,7 +1760,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-16T07:32:54.158823+00:00",
+  "generated_at": "2026-07-16T07:49:12.381655+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1808,7 +1808,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1424,
+      "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "source_kind": "production"
     },
@@ -2206,14 +2206,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 987,
-      "path": "tests/event_alpha/test_impact_hypotheses.py",
+      "line_count": 992,
+      "path": "tests/event_alpha/test_empirical_research_reports.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 981,
-      "path": "tests/event_alpha/test_empirical_research_reports.py",
+      "line_count": 987,
+      "path": "tests/event_alpha/test_impact_hypotheses.py",
       "source_kind": "test"
     },
     {
@@ -3748,7 +3748,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1424,
+      "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3919,7 +3919,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1424,
+      "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "source_kind": "production"
     },
@@ -4232,7 +4232,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1424,
+      "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "source_kind": "production"
     },
@@ -4391,7 +4391,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1424,
+        "line_count": 1449,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
         "threshold": 1200
       },

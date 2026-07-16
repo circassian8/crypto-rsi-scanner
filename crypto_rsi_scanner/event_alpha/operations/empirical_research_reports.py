@@ -77,6 +77,7 @@ _ROUTES = (
     "calendar_risk",
     "diagnostic",
 )
+_ORIGINS = empirical_research_report_conclusions.ORIGINS
 _SAFETY = {
     "research_only": True,
     "auto_apply": False,
@@ -938,6 +939,9 @@ def _limitations_core(validation: Mapping[str, Any]) -> dict[str, Any]:
         "routes_with_no_empirical_evidence": conclusion.get(
             "routes_with_no_empirical_evidence", []
         ),
+        "origins_with_no_empirical_evidence": conclusion.get(
+            "origins_with_no_empirical_evidence", []
+        ),
         "no_evidence_is_not_validation": True,
         "next_human_boundary": "review sealed confirmation with sample size, regime coverage, data quality, cost survivability, and operator burden before any explicit policy decision",
         "production_policy_unchanged": True,
@@ -1231,13 +1235,29 @@ def _validation_markdown(report: Mapping[str, Any]) -> str:
         "",
         "## Route evidence",
         "",
-        "| Route | Development | Validation | Final test |",
+        "| Route | Development matured | Validation matured | Final-test matured |",
         "|---|---:|---:|---:|",
     ]
     for route in _ROUTES:
         samples = conclusion["route_matured_episode_samples"].get(route, {})
         lines.append(
             f"| `{route}` | {samples.get('development', 0)} | {samples.get('validation', 0)} | {samples.get('final_test', 0)} |"
+        )
+    lines += [
+        "",
+        "## Origin evidence",
+        "",
+        "| Primary thesis origin | Development matured | Validation matured | Final-test matured |",
+        "|---|---:|---:|---:|",
+    ]
+    for origin in _ORIGINS:
+        finding = conclusion["origin_findings"].get(origin, {})
+        partitions = finding.get("partitions", {})
+        lines.append(
+            f"| `{origin}` | "
+            f"{partitions.get('development', {}).get('matured_episode_count', 0) or 0} | "
+            f"{partitions.get('validation', {}).get('matured_episode_count', 0) or 0} | "
+            f"{partitions.get('final_test', {}).get('matured_episode_count', 0) or 0} |"
         )
     walk = conclusion.get("walk_forward_stability", {})
     monotonicity = conclusion.get("score_monotonicity", {})
@@ -1349,14 +1369,19 @@ def _limitations_markdown(
         "11. No final-test result can nominate a new policy scenario.",
         "12. No thresholds, routes, sends, trades, execution, paper trades, RSI writes, or dashboard authority changed.",
         "",
-        "## Explicit no-evidence routes",
+        "## Explicit no-evidence cohorts",
+        "",
+        "Routes:",
         "",
     ]
     zero_routes = limitations.get("routes_with_no_empirical_evidence", [])
     lines.append(", ".join(f"`{route}`" for route in zero_routes) if zero_routes else "None in the closed route taxonomy.")
+    lines += ["", "Primary thesis origins:", ""]
+    zero_origins = limitations.get("origins_with_no_empirical_evidence", [])
+    lines.append(", ".join(f"`{origin}`" for origin in zero_origins) if zero_origins else "None in the closed origin taxonomy.")
     lines += [
         "",
-        "A zero-sample route is unvalidated; it is not evidence of safety, weakness, or strength.",
+        "A zero-sample route or origin is unvalidated; it is not evidence of safety, weakness, or strength.",
         "",
         "## Next human boundary",
         "",

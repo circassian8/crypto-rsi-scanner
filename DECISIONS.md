@@ -25,8 +25,14 @@ pre-frozen final-test candidate set was therefore empty. The final-test lane may
 only report `no_candidate_recommendations`, not perform a post-hoc policy
 search. An initial selection/holdout pair with a trace-histogram aggregation
 defect is retained but superseded; its results cannot tune the unchanged
-replacement run. Thresholds, routes, dashboard authority, notifications,
-execution, and provider authorization remain unchanged.
+replacement run. The replacement evidence is selection
+`e906229597af15c6dc3caf3cb37a1846b5d273776c8477bc4637453a78ab7cec`,
+final test
+`c4361588a7bc6165bf780e7dcd90ba81625be3fb5da711080a0f8c4cbf168933`,
+and closed seven-file report bundle
+`75d50598fd03a07433caa6ef29c4f7f9f24b17408fbf433dbc34b373c07d89fa`.
+Thresholds, routes, dashboard authority, notifications, execution, and provider
+authorization remain unchanged.
 **Why:** The complete selection run produced useful descriptive evidence for
 market-led `dashboard_watch`, `risk_watch`, and `diagnostic` ideas, but no frozen
 policy scenario satisfied the multi-metric selection rule. Five routes and six
@@ -101,14 +107,17 @@ own final test. Historical protocol-v1 evidence must never be rewritten.
 **Status:** accepted
 **Decision:** Render empirical validation, walk-forward, shadow-policy, and live
 no-send evidence inside the existing Decision Radar dashboard, but read it from
-four fixed, bounded, descriptor-anchored report files as an authority-independent
-research projection. Research can remain inspectable when a production
-generation is stale, provided it is labeled descriptive/historical and never
-restores or implies current actionability. Missing, invalid, unsafe, or
-oversized reports produce explicit partial/unavailable state; they never become
-zero evidence. GET/HEAD cannot write, inspect provider authorization, change a
-threshold/route, or mutate dashboard authority, and shadow recommendations do
-not auto-apply.
+the exact seven fixed filenames in the closed report contract: validation,
+walk-forward, and policy-simulation Markdown/JSON pairs plus the limitations
+Markdown. One descriptor-anchored read must acquire the bounded bytes, and the
+whole bundle must validate before any semantic projection is rendered. It is an
+authority-independent research projection. Research can remain inspectable when
+a production generation is stale, provided it is labeled descriptive/historical
+and never restores or implies current actionability. Missing, invalid, unsafe,
+oversized, spliced, or digest-drifting reports suppress the complete semantic
+bundle; they never become zero evidence. GET/HEAD cannot write, inspect provider
+authorization, change a threshold/route, or mutate dashboard authority, and
+shadow recommendations do not auto-apply.
 **Why:** Operators need one coherent product surface for empirical evidence,
 including negative and insufficient results, without allowing research files or
 stale production data to bypass exact-generation publication safeguards.

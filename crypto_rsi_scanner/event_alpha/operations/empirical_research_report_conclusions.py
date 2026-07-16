@@ -42,8 +42,12 @@ def build_conclusions(
         }
         for name, finding in route_findings.items()
     }
-    no_evidence = [
+    no_evidence_routes = [
         name for name, finding in route_findings.items()
+        if finding["evidence_status"] == "no_empirical_evidence"
+    ]
+    no_evidence_origins = [
+        name for name, finding in origin_findings.items()
         if finding["evidence_status"] == "no_empirical_evidence"
     ]
     warnings = {
@@ -66,7 +70,8 @@ def build_conclusions(
         "route_findings": route_findings,
         "origin_findings": origin_findings,
         "route_matured_episode_samples": route_samples,
-        "routes_with_no_empirical_evidence": no_evidence,
+        "routes_with_no_empirical_evidence": no_evidence_routes,
+        "origins_with_no_empirical_evidence": no_evidence_origins,
         "no_evidence_is_not_validation": True,
         "score_monotonicity": _monotonicity_findings(analyses),
         "cost_and_survivability": {

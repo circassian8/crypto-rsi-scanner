@@ -1535,7 +1535,7 @@
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-16T07:32:57.484600+00:00",
+  "generated_at": "2026-07-16T07:49:15.881936+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3038,7 +3038,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1424,
+      "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3629,7 +3629,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1424,
+        "line_count": 1449,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
         "threshold": 1200
       },

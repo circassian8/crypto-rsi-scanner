@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Publish the audited empirical report bundle · Codex
+**Why:** The trace-only repair required one mechanical replacement replay pair
+before the first Decision Radar empirical conclusion could be published. The
+closed reports also needed to state unsupported thesis origins as explicitly as
+unsupported routes.
+**Changes:**
+- Completed replacement top-100 selection
+  `e906229597af15c6dc3caf3cb37a1846b5d273776c8477bc4637453a78ab7cec`
+  and sealed final test
+  `c4361588a7bc6165bf780e7dcd90ba81625be3fb5da711080a0f8c4cbf168933`
+  under the unchanged protocol and empty frozen candidate set. Their exact
+  projection-rejection histograms now reconcile across chunks; all side-effect
+  counters remain zero.
+- Published the exact seven-file bundle
+  `75d50598fd03a07433caa6ef29c4f7f9f24b17408fbf433dbc34b373c07d89fa`.
+  All nine material scenarios remain `not_supported`; final confirmation is
+  `no_candidate_recommendations`, with no threshold, route, policy, authority,
+  provider, notification, or execution mutation.
+- Added closed `origins_with_no_empirical_evidence` conclusions and human-facing
+  origin cohort tables. The bundle now states that catalyst, technical,
+  derivatives, on-chain, fundamental, and macro origins have no empirical
+  episodes, alongside five no-evidence routes and unavailable historical spread
+  and intraday execution.
+- Corrected the durable dashboard contract from four independent files to the
+  exact seven-file bundle that downstream rendering must acquire and validate
+  atomically. The first pair and bundle remain immutable superseded evidence.
+**Verify:** `tests/event_alpha/test_empirical_research_reports.py` passed (27
+tests), including a re-signed no-evidence-origin drift rejection; `make
+radar-research-reports` wrote the bundle and `make
+radar-research-reports-check` reproduced it byte-for-byte. Python compileall,
+`git diff --check`, and `make architecture-cleanliness-check` passed.
+**Notes/risks:** Historical replay is descriptive, not causal or probabilistically
+calibrated. Only market-led dashboard/risk/diagnostic cohorts have samples; live
+no-send evidence remains a separate insufficient observational lane. Production
+policy is deliberately unchanged.
+
 ## 2026-07-16 — Supersede the first full replay after trace-integrity audit · Codex
 **Why:** The first top-100 selection and sealed holdout were internally coherent
 for decisions and outcomes, but an independent audit found a contradiction in

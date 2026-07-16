@@ -455,6 +455,22 @@ def _validate_published_conclusions(
     expected_warning = empirical_validation_protocol.protocol_values()["statistics"][
         "multiple_comparison_policy"
     ]
+    route_findings = value.get("route_findings")
+    origin_findings = value.get("origin_findings")
+    expected_no_evidence_routes = [
+        name
+        for name in empirical_replay_analysis.ROUTES
+        if isinstance(route_findings, Mapping)
+        and isinstance(route_findings.get(name), Mapping)
+        and route_findings[name].get("evidence_status") == "no_empirical_evidence"
+    ]
+    expected_no_evidence_origins = [
+        name
+        for name in empirical_replay_analysis.PRIMARY_ORIGINS
+        if isinstance(origin_findings, Mapping)
+        and isinstance(origin_findings.get(name), Mapping)
+        and origin_findings[name].get("evidence_status") == "no_empirical_evidence"
+    ]
     if (
         value.get("causal_claim") is not False
         or value.get("probabilistic_calibration_claim") is not False
@@ -462,6 +478,14 @@ def _validate_published_conclusions(
         or value.get("production_policy_unchanged") is not True
         or value.get("automatic_policy_application") is not False
         or value.get("no_evidence_is_not_validation") is not True
+        or not isinstance(route_findings, Mapping)
+        or set(route_findings) != set(empirical_replay_analysis.ROUTES)
+        or not isinstance(origin_findings, Mapping)
+        or set(origin_findings) != set(empirical_replay_analysis.PRIMARY_ORIGINS)
+        or value.get("routes_with_no_empirical_evidence")
+        != expected_no_evidence_routes
+        or value.get("origins_with_no_empirical_evidence")
+        != expected_no_evidence_origins
         or unchanged != {
             "thresholds": True,
             "routes": True,
