@@ -333,6 +333,22 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   as an already-sealed display summary and is never read or used for selection
   here. Do not treat mixed-route monotonicity as calibration, auto-retune scores,
   or change production policy from this artifact.
+- **Bounded empirical artifact exports:** the checked-in
+  `research/DECISION_RADAR_EMPIRICAL_ARTIFACT_POLICY.json` is the only selection
+  authority for empirical evidence in `make export-src-with-artifacts`. It binds
+  four exact canonical run manifests, the frozen protocol and Protocol-v2
+  readiness contract, all seven v1 reports, the separate hardening supplement,
+  and bounded optional feedback. The exporter validates the supplement through
+  its full closed validator against the same exact seven report byte buffers and
+  carries the original verified fingerprints into the archive manifest; it must
+  not reselect or silently re-fingerprint changed evidence. Superseded lab files
+  remain immutable locally and are excluded from the standard review ZIP. Use
+  `make export-empirical-artifact-history` only for the fixed, ignored, optional
+  disjoint-complement archive with its own immutable manifest and checksums.
+  Neither command deletes, moves, compacts, or rewrites evidence. Missing policy,
+  manifest drift, unsafe paths, symlinks, races, invalid feedback, bounds
+  violations, report/supplement splices, or secret findings fail closed and
+  preserve any prior successful output.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,

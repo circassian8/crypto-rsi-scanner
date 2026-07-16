@@ -1,0 +1,165 @@
+{
+  "canonical_runs": [
+    {
+      "expected_manifest_sha256": "2bc91388a9ae3187a5e97bcca1f73e77ae688c7fdf648f29065240fdd52c9842",
+      "required_files": [
+        "replay_run_manifest.json"
+      ],
+      "role": "canonical_fixture_smoke",
+      "run_fingerprint": "8077755f2bd0f8041d992f6c3d362047119eb4e9ca350fb2a75f0d407da07435"
+    },
+    {
+      "expected_manifest_sha256": "24c9dedafdb888a11e44e66674cf91470578b749f5afd7828a1173f2139d0c59",
+      "expected_recommendation_seal_sha256": "b1e1c841ce764c3969e65231b6ddadd47eeac0686a401aceff674ed83dff5f42",
+      "required_files": [
+        "recommendation_seal.json",
+        "replay_run_manifest.json"
+      ],
+      "role": "canonical_medium",
+      "run_fingerprint": "4acc501d375e9bd2410dc7eccb4a2c35f0b373547a98565ae28d234c21004074"
+    },
+    {
+      "expected_manifest_sha256": "435afbf005168a2c35da21807ef78957f5f4572e58225f844bbc6eb5577cf610",
+      "expected_recommendation_seal_sha256": "3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639",
+      "required_files": [
+        "recommendation_seal.json",
+        "replay_run_manifest.json"
+      ],
+      "role": "current_selection",
+      "run_fingerprint": "8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489"
+    },
+    {
+      "expected_manifest_sha256": "12672ac1e8135696781b5d0714e0d193464dcada789ed126501e67ffd3412fe9",
+      "expected_recommendation_seal_sha256": "3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639",
+      "required_files": [
+        "final_test_confirmation.json",
+        "recommendation_seal.json",
+        "replay_run_manifest.json"
+      ],
+      "role": "current_final_test",
+      "run_fingerprint": "3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72"
+    }
+  ],
+  "canonical_semantics": {
+    "current_final_test_run_fingerprint": "3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72",
+    "current_selection_run_fingerprint": "8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489",
+    "protocol_sha256": "efee20ccaa3dda03c8e1172633d92d6a9bf8cb3ae12c926471f2151941d5f158",
+    "protocol_version": "decision_radar_empirical_validation_v1",
+    "recommendation_seal_sha256": "3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639",
+    "v1_bundle_id": "267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf"
+  },
+  "hardening_supplement": {
+    "path": "research/DECISION_RADAR_EMPIRICAL_HARDENING_SUPPLEMENT.json",
+    "role": "current_empirical_hardening_supplement",
+    "semantic_id": "decision_radar_empirical_hardening_supplement_v1",
+    "sha256": "46987963a7b62abb1acdd285743705f48143c9544d2079e49e15bea630ced718",
+    "size_bytes": 3139732,
+    "supplement_id": "670bfa10b5b74ce2f213a5f6c07ace0333ae72880d62dddaee59622349eb7343",
+    "v1_report_bundle_member": false
+  },
+  "history_archive": {
+    "checksums_archive_path": "EMPIRICAL_ARTIFACT_HISTORY_SHA256SUMS.txt",
+    "manifest_archive_path": "EMPIRICAL_ARTIFACT_HISTORY_MANIFEST.json",
+    "output_filename": "crypto_rsi_scanner_empirical_artifact_history.zip"
+  },
+  "lab_root": "event_fade_cache/decision_radar_research_lab",
+  "limits": {
+    "max_canonical_lab_file_count": 96,
+    "max_canonical_lab_total_bytes": 220200960,
+    "max_feedback_event_bytes": 8192,
+    "max_feedback_event_count": 4096,
+    "max_feedback_total_bytes": 4194304,
+    "max_history_file_count": 1024,
+    "max_history_total_bytes": 1610612736,
+    "max_lab_file_count": 1152,
+    "max_lab_total_bytes": 1879048192,
+    "max_single_empirical_file_bytes": 67108864,
+    "max_standard_empirical_file_count": 128,
+    "max_standard_empirical_total_bytes": 268435456
+  },
+  "optional_feedback_path": "event_fade_cache/decision_radar_research_lab/empirical_review_feedback.jsonl",
+  "policy": {
+    "canonical_evidence_is_immutable": true,
+    "history_export_is_optional": true,
+    "local_artifacts_are_never_deleted_or_moved": true,
+    "standard_export_excludes_superseded_runs": true
+  },
+  "protocol_artifacts": [
+    {
+      "path": "research/DECISION_RADAR_EMPIRICAL_VALIDATION_PROTOCOL.json",
+      "role": "frozen_protocol_json",
+      "semantic_id": "decision_radar_empirical_validation_v1",
+      "sha256": "69da1a732e175ba8fad228eeec9f2953dbc64dd12e6f2f23dd81a3ecdd8c784a"
+    },
+    {
+      "path": "research/DECISION_RADAR_EMPIRICAL_VALIDATION_PROTOCOL.md",
+      "role": "frozen_protocol_markdown",
+      "semantic_id": "decision_radar_empirical_validation_v1",
+      "sha256": "b7cc0efe4cf92855eba8a188dbeed963fe448860acd330034b3351aea9118b2f"
+    },
+    {
+      "path": "research/DECISION_RADAR_EMPIRICAL_PROTOCOL_V2_READINESS.md",
+      "role": "frozen_protocol_v2_readiness",
+      "semantic_id": "decision_radar_empirical_validation_v2_readiness_v1",
+      "sha256": "897b29a85ff38fb19f5c0eda7e8077bf4b3cbc18aa92270e03d3ffe413c8ae4e"
+    },
+    {
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2.py",
+      "role": "frozen_protocol_v2_contract_implementation",
+      "semantic_id": "decision_radar_empirical_validation_v2_readiness_v1",
+      "sha256": "78867805252783d887c4a8ee475e34edb289e9bc86aa8582723ba93bcc975e97"
+    }
+  ],
+  "protocol_v2_readiness": {
+    "contract_sha256": "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603",
+    "document_path": "research/DECISION_RADAR_EMPIRICAL_PROTOCOL_V2_READINESS.md",
+    "implementation_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2.py"
+  },
+  "reports": [
+    {
+      "path": "research/DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.md",
+      "role": "current_empirical_report_markdown",
+      "semantic_id": "empirical_validation",
+      "sha256": "13032a320a5d14fa98d022ebdb1f02b81b68509b36cb86a63d3803b842c606f7"
+    },
+    {
+      "path": "research/DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.json",
+      "role": "current_empirical_report_json",
+      "semantic_id": "empirical_validation",
+      "sha256": "87b2ea95b083f2ee03d8072498aa44e4571138bc63066ca61f1901b616f29a86"
+    },
+    {
+      "path": "research/DECISION_RADAR_WALK_FORWARD_REPORT.md",
+      "role": "current_walk_forward_report_markdown",
+      "semantic_id": "walk_forward",
+      "sha256": "b9f9a28351d1766deb5a7ee1cbfa86d06cc8ca52b40b95e218d4da0c4f105447"
+    },
+    {
+      "path": "research/DECISION_RADAR_WALK_FORWARD_REPORT.json",
+      "role": "current_walk_forward_report_json",
+      "semantic_id": "walk_forward",
+      "sha256": "d1a05cbc016976379884342572b705e11bc9beffe3aaa615487ffb9b45a1e3a6"
+    },
+    {
+      "path": "research/DECISION_RADAR_POLICY_SIMULATION_REPORT.md",
+      "role": "current_policy_simulation_report_markdown",
+      "semantic_id": "policy_simulation",
+      "sha256": "4119c87cc50177354071bd572b03f01fffe7681d58a1c12368c3c72daae4ed57"
+    },
+    {
+      "path": "research/DECISION_RADAR_POLICY_SIMULATION_REPORT.json",
+      "role": "current_policy_simulation_report_json",
+      "semantic_id": "policy_simulation",
+      "sha256": "23041581da22b2653b395ca6001ae1b69365d3d9e63d0685435ceff012af26fc"
+    },
+    {
+      "path": "research/DECISION_RADAR_RESEARCH_LIMITATIONS.md",
+      "role": "current_research_limitations",
+      "semantic_id": "research_limitations",
+      "sha256": "6cd88ea376c60894ffaa3974a3bcb7503eab4a0d09cb2ae42b51dd13d1751694"
+    }
+  ],
+  "schema_id": "decision_radar.empirical_artifact_export_policy",
+  "schema_version": 1,
+  "standard_manifest_archive_path": "event_fade_cache/decision_radar_research_lab/EMPIRICAL_ARTIFACT_EXPORT_MANIFEST.json"
+}

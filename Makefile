@@ -229,6 +229,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: event-alpha-burn-in-contract event-alpha-daily-live-no-send-burn-in event-alpha-daily-live-no-send-burn-in-plan event-alpha-daily-live-no-send-burn-in-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor event-alpha-daily-burn-in-readiness event-alpha-daily-review-inbox event-alpha-feedback-progress event-alpha-burn-in-weekly-measurement event-alpha-source-yield-report conviction-priors-shadow-report paper-risk-research event-alpha-archive-burn-in-evidence event-feedback-false-positive event-feedback-late event-feedback-source-noise event-feedback-needs-confirmation event-feedback-duplicate event-feedback-promising-source-type
 .PHONY: event-alpha-observed-outcome-preview event-alpha-observed-outcome-stage
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
+.PHONY: export-empirical-artifact-history
 
 help:
 	@echo "Targets:"
@@ -240,6 +241,7 @@ help:
 	@echo "  make dependency-verify  Run lock reproducibility plus vulnerability audit"
 	@echo "  make export-src  Write a clean source zip using git archive"
 	@echo "  make export-src-with-artifacts  Overwrite crypto_rsi_scanner_source_with_artifacts.zip"
+	@echo "  make export-empirical-artifact-history  Overwrite the optional superseded empirical-evidence history zip"
 	@echo "  make verify   Run the standard local verification suite"
 	@echo "  make verify-fast  Run the hard pytest gate plus smoke/backtest/score without duplicate standalone tests"
 	@echo "  make test     Run standalone tests"
@@ -605,6 +607,9 @@ export-src-with-artifacts:
 
 export-src-with-artifacts-smoke:
 	$(PYTHON) scripts/export_source_with_artifacts.py
+
+export-empirical-artifact-history:
+	$(PYTHON) scripts/export_empirical_artifact_history.py
 
 normalize-export-timestamps:
 	python3 scripts/normalize_export_timestamps.py .

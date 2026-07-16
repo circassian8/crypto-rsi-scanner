@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Bound empirical artifacts and close the hardening release · Codex
+**Why:** The empirical lab retained nearly one billion logical bytes across many
+immutable superseded runs. Shipping all of them in every review archive made the
+release surface unnecessarily large, while deleting or moving them would have
+destroyed audit history.
+**Changes:**
+- Added a closed checked-in export policy binding four exact canonical run
+  manifests, frozen v1/v2 protocol artifacts, all seven v1 reports, the separate
+  hardening supplement, and bounded optional feedback. The standard archive now
+  keeps only that selection; a fixed optional history archive carries the exact
+  disjoint complement with an immutable manifest and checksums.
+- Hardened both exporters around descriptor-anchored inventory/output
+  transactions, no-clobber failure, exact bounds, normalized modes, secret and
+  path checks, post-write source verification, and root/source replacement
+  races. Neither exporter deletes, moves, compacts, or rewrites evidence.
+- Closed a final semantic/TOCTOU gap by validating the full supplement against
+  the same seven report byte buffers and reusing those original fingerprints in
+  the archive manifest instead of re-reading changed bytes later.
+- Measured 439 lab files / 972,516,087 logical bytes: 76 canonical files /
+  194,084,656 bytes remain in the standard selection and 363 files /
+  778,431,431 bytes form the optional history complement.
+- Reconstructed the separate local live campaign without a provider call: nine
+  real cycles, 270 observations, 240 baseline-counted, 30 too-close, zero warm
+  assets, two historical `risk_watch` ideas, one matured outcome, and one
+  `due_missing_price`. The tracked v1-bound campaign projection was intentionally
+  left unchanged so the seven-file bundle stays byte-identical. Dashboard pointer
+  SHA-256 remains `95b35b13e7e...`; no research operation published it.
+**Verify:** On Darwin 25.5.0 arm64 with locked Python 3.13.5, 34 focused export
+security tests, 322 full empirical/dashboard/execution tests, protocol/report/
+supplement byte checks, dashboard and UX smokes, compileall, diff checks, and
+architecture cleanliness passed. `make verify-fast` passed 2,601 tests in
+167.57s. Full `make verify` passed 1,391/1,391 standalone checks plus 2,601
+pytest checks in 158.06s and its alert/backtest/score smokes.
+**Notes/risks:** Exact Linux source-with-artifacts verification is
+`pending_unavailable`: this host has no Docker, Podman, Colima, Lima, nerdctl,
+QEMU, or Multipass. GitHub source-only CI is not represented as artifact-bearing
+Linux evidence. Production policy, scoring, routes, thresholds, notifications,
+providers, execution, and dashboard authority remain unchanged.
+
 ## 2026-07-16 — Publish the operator-first empirical hardening supplement · Codex
 **Why:** The sealed Protocol-v1 result was correct but its negative conclusion,
 within-route score limitations, and market-wide operator burden were too easy to

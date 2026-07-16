@@ -328,6 +328,63 @@ CONFIRM=1 make radar-research-feedback-mark \
 Feedback is human-supplied preference metadata. It cannot change evidence
 bytes, scoring, selection, production policy, or dashboard authority.
 
+## Bounded source-with-artifacts and optional history exports
+
+The checked-in empirical artifact policy defines the exact canonical fixture,
+medium, selection, and final-test runs; frozen protocol and Protocol-v2
+readiness artifacts; seven v1 reports; separate hardening supplement; and
+optional bounded feedback ledger. Build the normal overwrite-in-place review
+archive with:
+
+```sh
+make export-src-with-artifacts PYTHON=.venv/bin/python
+```
+
+Superseded empirical runs and reports remain untouched locally and are excluded
+from the normal archive. Export their exact disjoint complement, with an
+immutable manifest and checksums, only when historical review is needed:
+
+```sh
+make export-empirical-artifact-history PYTHON=.venv/bin/python
+```
+
+The history command may write only the fixed ignored file
+`crypto_rsi_scanner_empirical_artifact_history.zip`. Neither exporter deletes,
+moves, compacts, or rewrites input evidence. Missing policy/lab data, manifest
+drift, unmanifested canonical files, invalid feedback, excluded noise,
+symlinks, path replacement, bounds violations, secrets, or archive collisions
+fail closed and preserve any prior successful archive.
+
+The hardening measurement inventory is explicit and additive: the local lab has
+439 regular files / 972,516,087 logical bytes; the standard selection retains 76
+lab files / 194,084,656 logical bytes; and the optional history complement has
+363 files / 778,431,431 logical bytes. Those sets are disjoint and reconcile to
+the complete local inventory. Archive compression is reported by each command;
+it is not used as a retention rule.
+
+### Platform-truthful release evidence
+
+Treat the locked local runtime and an extracted Linux source-with-artifacts
+checkout as separate release observations. Record the operating system,
+architecture, Python version, archive SHA-256, and exact commands for each.
+Passing on one platform must never be reported as passing on the other.
+
+On the current Mac, use the locked `.venv` and run the complete local ladder.
+For Linux, transfer the already-built review archive through an approved secure
+channel, extract it without changing its contents, then run:
+
+```sh
+make test-artifact-heavy-extracted-checkout PYTHON=python3
+make verify-fast PYTHON=python3
+make verify PYTHON=python3
+```
+
+If no Linux runtime has the exact archive, record Linux archive verification as
+`pending_unavailable`, not green. GitHub source-only CI is useful additional
+evidence, but it is not a substitute when the ignored empirical artifact store
+is absent from the runner. Unsupported descriptor/no-follow behavior must fail
+closed; do not skip its security regressions.
+
 ## Current canonical evidence
 
 - selection run: `8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489`;

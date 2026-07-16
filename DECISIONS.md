@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Bound the standard empirical export without deleting history
+**Status:** accepted
+**Decision:** Select empirical evidence for the normal source-with-artifacts ZIP
+only through one checked-in, closed policy that binds the exact canonical
+fixture, medium, selection, and final-test manifests; frozen protocol artifacts;
+seven v1 reports; the separate hardening supplement; and bounded optional human
+feedback. Preserve every superseded local artifact in place. Its exact disjoint
+complement may be copied only to one fixed optional research-history ZIP with an
+immutable manifest and checksums. Both exports are descriptor-anchored,
+bounded, secret-scanned, no-clobber until validation succeeds, and read-only
+with respect to evidence. The standard exporter must validate the supplement
+against the same exact seven report bytes and reuse the fingerprints from that
+semantic pass rather than silently accepting later bytes.
+**Why:** The lab held 439 files and 972,516,087 logical bytes, most of them
+superseded immutable runs. Shipping every run in every review ZIP made the
+release gate slow and obscured the canonical evidence, while deletion or moving
+would destroy audit history. The explicit selection plus optional complement
+keeps ordinary review bounded without weakening reproducibility or retention.
+**Revisit when:** A human approves a new canonical run set or a different
+retention limit through a reviewed policy revision; never infer it from file age
+or newest-directory order.
+
 ## 2026-07-16 - Publish empirical hardening only as a separate closed supplement
 **Status:** accepted
 **Decision:** Keep the seven Protocol-v1 reports and their bundle identifier
