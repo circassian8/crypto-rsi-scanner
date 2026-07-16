@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import sys
 from threading import Event, Thread
 
 import pytest
@@ -37,7 +38,10 @@ from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
     DashboardReadinessError,
     _publish_prepublication_namespace_pointer,
     _resolve_dashboard_startup,
+    inspect_current_dashboard_authority,
+    invalidate_current_namespace_pointer,
     publish_current_namespace_pointer,
+    publish_trusted_namespace_pointer,
     read_current_namespace_pointer,
     resolve_authoritative_dashboard,
 )
@@ -100,6 +104,122 @@ def test_dashboard_readiness_rejects_smoke_only_clock(tmp_path, capsys):
 
     assert status == 1
     assert "--smoke-now is allowed only with --smoke" in capsys.readouterr().err
+
+
+def test_dashboard_readiness_cli_is_read_only_with_exact_seeded_pointer(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    pointer_before = pointer_path.read_bytes()
+    namespace_hashes = _file_hashes(base / _FIXTURE_NAMESPACE)
+
+    real_resolver = resolve_authoritative_dashboard
+
+    def resolve_at_test_clock(artifact_base, namespace=None):
+        return real_resolver(artifact_base, namespace, now=_TEST_NOW)
+
+    monkeypatch.setattr(
+        dashboard_cli,
+        "resolve_authoritative_dashboard",
+        resolve_at_test_clock,
+    )
+    status = dashboard_main(
+        [
+            "--artifact-base",
+            str(base),
+            "--namespace",
+            _FIXTURE_NAMESPACE,
+            "--readiness",
+        ]
+    )
+
+    assert status == 0
+    assert "writes=0" in capsys.readouterr().out
+    assert pointer_path.read_bytes() == pointer_before
+    assert _file_hashes(base / _FIXTURE_NAMESPACE) == namespace_hashes
+
+
+def test_dashboard_fixture_render_and_authority_inspection_preserve_pointer_bytes(
+    tmp_path,
+    capsys,
+):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    pointer_before = pointer_path.read_bytes()
+
+    assert dashboard_main(
+        [
+            "--artifact-base",
+            str(base),
+            "--namespace",
+            _FIXTURE_NAMESPACE,
+            "--smoke",
+            "--smoke-now",
+            _TEST_NOW,
+        ]
+    ) == 0
+    inspection = inspect_current_dashboard_authority(base, now=_TEST_NOW)
+
+    assert inspection.status == "authoritative"
+    assert inspection.pointer_sha256 == hashlib.sha256(pointer_before).hexdigest()
+    assert pointer_path.read_bytes() == pointer_before
+    assert "radar_dashboard_smoke:" in capsys.readouterr().out
+
+
+def test_explicit_operator_publish_refuses_fixture_and_preserves_pointer(tmp_path, capsys):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    pointer_before = pointer_path.read_bytes()
+
+    with pytest.raises(DashboardReadinessError, match="fixture and legacy"):
+        publish_trusted_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    status = dashboard_main(
+        [
+            "--artifact-base",
+            str(base),
+            "--namespace",
+            _FIXTURE_NAMESPACE,
+            "--publish",
+            "--confirm-publish",
+        ]
+    )
+
+    assert status == 1
+    assert "fixture and legacy namespaces cannot be published" in capsys.readouterr().err
+    assert pointer_path.read_bytes() == pointer_before
+
+
+def test_explicit_invalidation_requires_confirmation_and_exact_namespace(tmp_path, capsys):
+    base = _copy_fixture(tmp_path)
+    publish_current_namespace_pointer(base, _FIXTURE_NAMESPACE, now=_TEST_NOW)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    pointer_before = pointer_path.read_bytes()
+
+    assert dashboard_main(
+        [
+            "--artifact-base",
+            str(base),
+            "--namespace",
+            _FIXTURE_NAMESPACE,
+            "--invalidate-authority",
+        ]
+    ) == 1
+    assert pointer_path.read_bytes() == pointer_before
+    with pytest.raises(DashboardReadinessError, match="does not match"):
+        invalidate_current_namespace_pointer(base, "different")
+    assert pointer_path.read_bytes() == pointer_before
+
+    removed = invalidate_current_namespace_pointer(base, _FIXTURE_NAMESPACE)
+
+    assert removed == hashlib.sha256(pointer_before).hexdigest()
+    assert pointer_path.exists() is False
+    assert "requires --confirm-invalidate" in capsys.readouterr().err
 
 
 def test_dashboard_readiness_publishes_exact_pointer_and_default_cli_uses_it(tmp_path, capsys):
@@ -876,8 +996,73 @@ def test_dashboard_make_targets_use_pointer_by_default_and_explicit_namespace_wh
         cwd=_ROOT,
         text=True,
     )
+    publish = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "radar-dashboard-publish",
+            "PYTHON=python3",
+            "ARTIFACT_NAMESPACE=current",
+            "CONFIRM=1",
+        ],
+        cwd=_ROOT,
+        text=True,
+    )
+    invalidate = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "radar-dashboard-invalidate",
+            "PYTHON=python3",
+            "ARTIFACT_NAMESPACE=current",
+            "CONFIRM=1",
+        ],
+        cwd=_ROOT,
+        text=True,
+    )
+    integrated_smoke = subprocess.check_output(
+        ["make", "-n", "event-alpha-integrated-radar-smoke", "PYTHON=python3"],
+        cwd=_ROOT,
+        text=True,
+    )
+    market_smoke = subprocess.check_output(
+        ["make", "-n", "radar-market-no-send-smoke", "PYTHON=python3"],
+        cwd=_ROOT,
+        text=True,
+    )
 
     assert "--namespace" not in default_serve
     assert "--namespace current" in explicit_serve
-    assert "--readiness" in readiness
+    assert "--validate" in readiness
     assert "--namespace current" in readiness
+    assert "--publish --confirm-publish" in publish
+    assert "--invalidate-authority --confirm-invalidate" in invalidate
+    assert "radar-dashboard-render-fixture" in integrated_smoke
+    assert "--publish" not in integrated_smoke
+    assert "radar-dashboard-readiness" not in integrated_smoke
+    assert "market_no_send publish" not in market_smoke
+
+
+def test_integrated_fixture_smoke_preserves_seeded_pointer_bytes(tmp_path):
+    artifact_base = tmp_path / "artifact-base"
+    artifact_base.mkdir()
+    pointer_path = artifact_base / CURRENT_NAMESPACE_POINTER
+    seeded_pointer = b"production-authority-sentinel\n"
+    pointer_path.write_bytes(seeded_pointer)
+
+    result = subprocess.run(
+        [
+            "make",
+            "event-alpha-integrated-radar-smoke",
+            f"PYTHON={sys.executable}",
+            f"EVENT_ALPHA_ARTIFACT_BASE_DIR={artifact_base}",
+        ],
+        cwd=_ROOT,
+        text=True,
+        capture_output=True,
+        timeout=120,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert pointer_path.read_bytes() == seeded_pointer

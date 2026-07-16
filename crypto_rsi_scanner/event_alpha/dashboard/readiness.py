@@ -73,6 +73,16 @@ class _DashboardReadinessResult:
     pointer_path: Path
 
 
+@dataclass(frozen=True)
+class DashboardAuthorityInspection:
+    """Credential-free current-authority status from persisted artifacts only."""
+
+    status: str
+    artifact_namespace: str
+    pointer_sha256: str
+    reason: str
+
+
 def resolve_authoritative_dashboard(
     artifact_base_dir: str | Path,
     artifact_namespace: str | None = None,
@@ -218,6 +228,145 @@ def publish_current_namespace_pointer(
         max_doctor_age_hours=max_doctor_age_hours,
         allow_managed_prepublication=False,
     )
+
+
+def publish_trusted_namespace_pointer(
+    artifact_base_dir: str | Path,
+    artifact_namespace: str,
+    *,
+    now: datetime | str | None = None,
+    max_generation_age_hours: float | None = None,
+    max_doctor_age_hours: float | None = None,
+) -> _DashboardReadinessResult:
+    """Explicitly publish one receipt-backed operational generation.
+
+    The ordinary readiness path is deliberately read-only.  This guarded
+    boundary refuses fixture and legacy namespaces by requiring the already
+    existing closed Daily Operations publication and restart receipts before
+    it delegates to the descriptor-anchored pointer writer.
+    """
+
+    namespace = str(artifact_namespace or "").strip()
+    if not namespace:
+        raise DashboardReadinessError(
+            "explicit artifact namespace is required for dashboard publication"
+        )
+    base = _artifact_base(artifact_base_dir)
+    from ..operations import daily_operations_publication
+
+    try:
+        managed = daily_operations_publication.is_daily_operations_managed_namespace(
+            base,
+            namespace,
+        )
+    except Exception as exc:  # noqa: BLE001 - trust classification fails closed
+        raise DashboardReadinessError(
+            "dashboard publication contract is unreadable"
+        ) from exc
+    if not managed:
+        raise DashboardReadinessError(
+            "dashboard publication requires a Daily Operations managed namespace; "
+            "fixture and legacy namespaces cannot be published"
+        )
+    validation = daily_operations_publication.validate_final_publication_contract(
+        base,
+        namespace,
+        require_current=False,
+        require_operations=True,
+    )
+    if not validation.valid:
+        detail = validation.errors[0] if validation.errors else "unknown"
+        raise DashboardReadinessError(
+            f"dashboard final publication contract is invalid ({detail})"
+        )
+    return publish_current_namespace_pointer(
+        base,
+        namespace,
+        now=now,
+        max_generation_age_hours=max_generation_age_hours,
+        max_doctor_age_hours=max_doctor_age_hours,
+    )
+
+
+def inspect_current_dashboard_authority(
+    artifact_base_dir: str | Path,
+    *,
+    now: datetime | str | None = None,
+) -> DashboardAuthorityInspection:
+    """Inspect current authority without provider, environment, or file writes."""
+
+    base = _artifact_base(artifact_base_dir)
+    pointer_path = base / CURRENT_NAMESPACE_POINTER
+    data, read_error = _read_regular_file_once(pointer_path)
+    if read_error == "artifact_missing":
+        return DashboardAuthorityInspection("none", "", "", "pointer_missing")
+    if read_error or data is None:
+        return DashboardAuthorityInspection(
+            "invalid", "", "", "pointer_unreadable_or_unsafe"
+        )
+    digest = hashlib.sha256(data).hexdigest()
+    try:
+        pointer = validate_current_namespace_pointer_bytes(data)
+    except DashboardReadinessError as exc:
+        return DashboardAuthorityInspection("invalid", "", digest, str(exc))
+    namespace = str(pointer["artifact_namespace"])
+    try:
+        resolve_authoritative_dashboard(base, now=now)
+    except DashboardReadinessError as exc:
+        return DashboardAuthorityInspection(
+            "stale_or_untrusted", namespace, digest, str(exc)
+        )
+    return DashboardAuthorityInspection(
+        "authoritative", namespace, digest, "exact_authority_revalidated"
+    )
+
+
+def invalidate_current_namespace_pointer(
+    artifact_base_dir: str | Path,
+    expected_namespace: str,
+) -> str:
+    """Remove only the exact named current authority under the shared lock.
+
+    Returns the SHA-256 digest of the pointer bytes that were removed.  A
+    missing pointer or a namespace mismatch fails closed instead of being
+    reported as a successful invalidation.
+    """
+
+    namespace = str(expected_namespace or "").strip()
+    if not namespace:
+        raise DashboardReadinessError(
+            "explicit artifact namespace is required for dashboard invalidation"
+        )
+    base = _artifact_base(artifact_base_dir)
+    try:
+        with current_pointer_mutation_lock(base) as mutation:
+            raw = mutation.read_regular_bytes(
+                CURRENT_NAMESPACE_POINTER,
+                missing_ok=True,
+            )
+            if raw is None:
+                raise DashboardReadinessError(
+                    "current namespace pointer is already absent"
+                )
+            pointer = validate_current_namespace_pointer_bytes(raw)
+            if pointer.get("artifact_namespace") != namespace:
+                raise DashboardReadinessError(
+                    "current namespace pointer does not match the expected namespace"
+                )
+            digest = hashlib.sha256(raw).hexdigest()
+            mutation.remove_regular(CURRENT_NAMESPACE_POINTER)
+            if mutation.read_regular_bytes(
+                CURRENT_NAMESPACE_POINTER,
+                missing_ok=True,
+            ) is not None:
+                raise DashboardReadinessError(
+                    "current namespace pointer invalidation could not be verified"
+                )
+            return digest
+    except CurrentPointerMutationError as exc:
+        raise DashboardReadinessError(
+            "current namespace pointer mutation lock is unavailable"
+        ) from exc
 
 
 def _publish_prepublication_namespace_pointer(
@@ -377,7 +526,8 @@ def read_current_namespace_pointer(artifact_base_dir: str | Path) -> dict[str, A
     data, read_error = _read_regular_file_once(path)
     if read_error == "artifact_missing":
         raise DashboardReadinessError(
-            "current namespace pointer is missing; run radar-dashboard-readiness with an explicit namespace"
+            "current namespace pointer is missing; inspect authority or explicitly publish "
+            "a trusted namespace"
         )
     if read_error or data is None:
         raise DashboardReadinessError("current namespace pointer is unreadable or unsafe")
@@ -592,8 +742,12 @@ def _aware_timestamp(value: str) -> datetime | None:
 
 __all__ = (
     "CURRENT_NAMESPACE_POINTER",
+    "DashboardAuthorityInspection",
     "DashboardReadinessError",
+    "inspect_current_dashboard_authority",
+    "invalidate_current_namespace_pointer",
     "publish_current_namespace_pointer",
+    "publish_trusted_namespace_pointer",
     "read_current_namespace_pointer",
     "resolve_authoritative_dashboard",
     "validate_current_namespace_pointer_bytes",

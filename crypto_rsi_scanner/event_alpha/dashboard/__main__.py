@@ -13,7 +13,9 @@ from .models import DashboardGenerationBinding, DashboardLoadError
 from .readiness import (
     DashboardReadinessError,
     _resolve_dashboard_startup,
-    publish_current_namespace_pointer,
+    inspect_current_dashboard_authority,
+    invalidate_current_namespace_pointer,
+    publish_trusted_namespace_pointer,
     read_current_namespace_pointer,
     resolve_authoritative_dashboard,
 )
@@ -26,12 +28,36 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--namespace", default=None)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--smoke", action="store_true", help="Render every page without starting a server or writing files.")
-    parser.add_argument(
-        "--readiness",
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument(
+        "--smoke",
         action="store_true",
-        help="Validate one exact authoritative generation and atomically update the current pointer.",
+        help="Render every page without starting a server or writing files.",
     )
+    actions.add_argument(
+        "--readiness",
+        "--validate",
+        dest="validate",
+        action="store_true",
+        help="Read-only validation of one exact authoritative generation.",
+    )
+    actions.add_argument(
+        "--publish",
+        action="store_true",
+        help="Publish one explicitly named, receipt-backed operational generation.",
+    )
+    actions.add_argument(
+        "--authority-status",
+        action="store_true",
+        help="Inspect persisted current authority without provider calls or writes.",
+    )
+    actions.add_argument(
+        "--invalidate-authority",
+        action="store_true",
+        help="Remove only the explicitly named current pointer.",
+    )
+    parser.add_argument("--confirm-publish", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--confirm-invalidate", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--smoke-now",
         default=None,
@@ -39,10 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        if args.readiness:
-            if args.smoke_now is not None:
-                raise DashboardReadinessError("--smoke-now is allowed only with --smoke")
-            result = publish_current_namespace_pointer(
+        if args.smoke_now is not None and not args.smoke:
+            raise DashboardReadinessError("--smoke-now is allowed only with --smoke")
+        if args.validate:
+            result = resolve_authoritative_dashboard(
                 args.artifact_base,
                 args.namespace,
             )
@@ -50,7 +76,49 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "radar_dashboard_readiness: READY "
                 f"namespace={snapshot.artifact_namespace} run_id={snapshot.run_id} "
+                f"revision={snapshot.revision} writes=0"
+            )
+            return 0
+        if args.publish:
+            if not args.confirm_publish:
+                raise DashboardReadinessError(
+                    "dashboard publication requires --confirm-publish"
+                )
+            result = publish_trusted_namespace_pointer(
+                args.artifact_base,
+                str(args.namespace or ""),
+            )
+            snapshot = result.snapshot
+            print(
+                "radar_dashboard_publish: PUBLISHED "
+                f"namespace={snapshot.artifact_namespace} run_id={snapshot.run_id} "
                 f"revision={snapshot.revision} pointer={result.pointer_path.name}"
+            )
+            return 0
+        if args.authority_status:
+            inspection = inspect_current_dashboard_authority(args.artifact_base)
+            print(
+                "radar_dashboard_authority: "
+                f"status={inspection.status} "
+                f"namespace={inspection.artifact_namespace or '-'} "
+                f"pointer_sha256={inspection.pointer_sha256 or '-'} "
+                f"reason={'_'.join(inspection.reason.split())} writes=0 provider_calls=0"
+            )
+            return 0
+        if args.invalidate_authority:
+            if not args.confirm_invalidate:
+                raise DashboardReadinessError(
+                    "dashboard invalidation requires --confirm-invalidate"
+                )
+            namespace = str(args.namespace or "").strip()
+            removed_digest = invalidate_current_namespace_pointer(
+                args.artifact_base,
+                namespace,
+            )
+            print(
+                "radar_dashboard_invalidate: INVALIDATED "
+                f"namespace={namespace} removed_pointer_sha256={removed_digest} "
+                "provider_calls=0"
             )
             return 0
         effective_smoke_now = args.smoke_now

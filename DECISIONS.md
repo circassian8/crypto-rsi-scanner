@@ -306,6 +306,31 @@ truth without weakening rollback, provider, or installation boundaries.
 store, the authorization receipt source changes, or dashboard ownership moves
 outside the exact local service contract.
 
+## 2026-07-16 - Keep validation and fixtures outside dashboard authority
+**Status:** accepted
+**Decision:** Dashboard readiness and namespace validation are observational:
+they may read and revalidate an explicit namespace or current pointer, but they
+never write, refresh, select, or remove authority. Fixture rendering, integrated
+radar smoke, outcome smoke, market no-send smoke, `verify-fast`, and `verify`
+must preserve current-pointer bytes exactly and must not invoke a publication
+command even to prove that fixture publication would fail. Pointer publication
+is an explicitly named, `CONFIRM=1` operator command that requires a namespace
+with the existing closed Daily Operations publication and owned-restart
+receipts; fixture and legacy namespaces are refused. Manual invalidation is a
+separate `CONFIRM=1` command that removes only the exact expected current
+namespace under the shared descriptor-anchored mutation lock and fails closed
+on absence or mismatch. A stale trusted real generation remains historical;
+it is not republished merely to keep the dashboard nonempty. If no fresh trusted
+generation exists, no current authority is the correct state.
+**Why:** A fixture smoke silently replaced the real pointer and later made the
+dashboard unavailable when that fixture aged out. A command named readiness
+must not carry publication authority, and a negative fixture-publication test
+must not aim a writer at the shared production store.
+**Revisit when:** Dashboard authority moves to an external transactional store
+with an equivalent explicit validation/publication split, receipt binding,
+fixture exclusion, exact compare-and-remove invalidation, and byte-preservation
+tests for every non-publication gate.
+
 ## 2026-07-15 - Accept attested partial official macro coverage
 **Status:** accepted
 **Decision:** Fed, BLS, and BEA acquisition are independent. Each source reports

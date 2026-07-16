@@ -21,10 +21,19 @@ instead of continuing to present an old generation as current.
 Useful read-only checks:
 
 ```sh
+make radar-dashboard-authority-status PYTHON=.venv/bin/python
 make radar-dashboard-readiness PYTHON=.venv/bin/python
 make radar-dashboard-smoke PYTHON=.venv/bin/python
 make radar-dashboard-ux-smoke PYTHON=.venv/bin/python
 make radar-market-no-send-readiness PYTHON=.venv/bin/python
+```
+
+Dashboard readiness validates and never updates the pointer. Publishing is a
+separate confirmation-gated action for an explicitly named, receipt-backed
+operational namespace; fixture and legacy namespaces are refused:
+
+```sh
+CONFIRM=1 make radar-dashboard-publish PYTHON=.venv/bin/python ARTIFACT_NAMESPACE=<namespace>
 ```
 
 Readiness does not call providers. The live market command may make one bounded

@@ -186,19 +186,30 @@ historical compatibility. Return evidence must declare coherent units; an
 implausible fraction/percent combination fails closed instead of being silently
 scaled.
 
-Run the complete fixture vertical and publish its exact dashboard pointer with:
+Run the complete fixture vertical and render it without touching dashboard
+authority with:
 
 ```sh
 make event-alpha-integrated-radar-smoke PYTHON=python3
-make radar-dashboard-readiness PYTHON=python3
 make radar-dashboard-smoke PYTHON=python3
 ```
 
-`radar-dashboard-readiness` publishes `event_fade_cache/radar_current_namespace.json`
-only after the selected generation has a complete fingerprinted product
+Fixture and smoke targets never publish
+`event_fade_cache/radar_current_namespace.json`. `radar-dashboard-readiness` is
+read-only and validates a selected generation's complete fingerprinted product
 manifest, exact current counts, fresh full strict doctor authority, and zero
-blockers. `make radar-dashboard` uses that pointer by default; an explicit
-command-line `ARTIFACT_NAMESPACE=...` selects and validates that namespace.
+blockers. Publishing a receipt-backed operational generation is intentionally
+separate and confirmation-gated:
+
+```sh
+make radar-dashboard-authority-status PYTHON=python3
+make radar-dashboard-readiness PYTHON=python3 ARTIFACT_NAMESPACE=<namespace>
+CONFIRM=1 make radar-dashboard-publish PYTHON=python3 ARTIFACT_NAMESPACE=<namespace>
+```
+
+The publish command rejects fixture and legacy namespaces. `make
+radar-dashboard` uses the pointer by default; an explicit command-line
+`ARTIFACT_NAMESPACE=...` selects and validates that namespace.
 Pointer-started serving remains bound to the exact namespace, run id, revision,
 and operator-state hash and returns 503 if the generation drifts after startup.
 It never guesses the newest directory.

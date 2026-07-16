@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Separate dashboard validation from authority mutation · Codex
+**Why:** The integrated fixture smoke called a mutating command named
+`radar-dashboard-readiness`, replacing real dashboard authority with a fixture
+pointer that later became stale and made the dashboard unavailable.
+**Changes:**
+- Made dashboard readiness/validation strictly read-only and added distinct
+  authority inspection, confirmation-gated receipt-backed publication, exact
+  confirmation-gated invalidation, and explicit fixture-render commands.
+  Operator publication refuses fixture and legacy namespaces; invalidation is
+  serialized through the existing descriptor-anchored lock and fails closed on
+  pointer absence or namespace mismatch.
+- Isolated the integrated radar smoke under its configured artifact base,
+  replaced its publication call with read-only fixture rendering, and removed
+  the negative publication invocation from market no-send smoke. Integrated
+  outcome smoke inherits the safe path.
+- Added byte-preservation regressions for CLI validation/rendering/inspection
+  and the complete Make-driven integrated smoke, plus confirmation, namespace,
+  fixture-publication, and Make-wiring coverage. Updated the runbook, operator
+  guide, working agreement, roadmap, and durable authority decision.
+- Removed the stale `integrated_radar_smoke` production pointer using the new
+  exact command. Current authority is now honestly absent; the prior real
+  generation remains retained historical evidence and was not republished.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_dashboard_readiness.py` (33 passed, including full
+isolated integrated smoke); `python3 -m compileall -q
+crypto_rsi_scanner/event_alpha/dashboard`; all new Make targets dry-ran;
+`git diff --check`. Pointer SHA-256 before invalidation was
+`f7868d8ef1c5659b518e05e89fdd945dee010add89be1170be8df772ca1d0cfe`;
+the exact invalidation removed that digest and authority status now reports
+`none` with `provider_calls=0`.
+**Notes/risks:** No provider call, send, trade, paper trade, normal RSI write,
+Event Alpha `TRIGGERED_FADE`, authorization change, threshold change, or stale
+real-generation publication occurred.
+
 ## 2026-07-15 — Prevent syndicated catalyst copies from inflating evidence · Codex
 **Why:** Reposted or lightly edited news could previously raise duplicate,
 domain-diversity, graph, alert, incident, and hypothesis confidence as though it

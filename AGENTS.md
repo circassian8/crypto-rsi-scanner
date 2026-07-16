@@ -166,11 +166,15 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   operator artifacts read-only on `127.0.0.1:8765`. Current content requires
   complete v1 file/tree/canonical-run fingerprints plus a fresh immutable run
   and fresh full strict doctor for the exact revision; untrusted current data is
-  suppressed, and the smoke fails rather than rendering a false green. Publish
-  or revalidate the fixed authoritative pointer with `make
-  radar-dashboard-readiness ARTIFACT_NAMESPACE=...`; without an explicit
-  command-line namespace, the dashboard and readiness command use that pointer
-  and never guess the newest directory. Pointer-mode serving is bound to the
+  suppressed, and the smoke fails rather than rendering a false green. `make
+  radar-dashboard-readiness ARTIFACT_NAMESPACE=...` is strictly read-only;
+  publication is a separate `CONFIRM=1 make radar-dashboard-publish
+  ARTIFACT_NAMESPACE=...` boundary that accepts only a receipt-backed Daily
+  Operations generation and rejects fixture/legacy namespaces. Inspect with
+  `make radar-dashboard-authority-status` and remove only an exact named pointer
+  with confirmed `radar-dashboard-invalidate`. Without an explicit command-line
+  namespace, the dashboard and readiness command use the pointer and never
+  guess the newest directory. Pointer-mode serving is bound to the
   exact run/revision/operator-state hash and fails closed if it drifts. `make
   radar-dashboard-smoke` renders all fixture pages without starting a server,
   calling providers, sending, or writing artifacts. The loopback WSGI serving
