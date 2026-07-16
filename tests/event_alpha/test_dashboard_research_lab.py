@@ -84,7 +84,7 @@ def test_research_lab_loads_only_fixed_bounded_reports(tmp_path: Path) -> None:
     assert tuple(lab["reports"]) == REPORT_FILENAMES
     assert lab["bundle"]["report_artifacts"] == REPORT_FILENAMES
     assert lab["bundle"]["bundle_id"] == (
-        "75d50598fd03a07433caa6ef29c4f7f9f24b17408fbf433dbc34b373c07d89fa"
+        "267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf"
     )
     validation = lab["projections"]["validation"]
     assert tuple(row["partition"] for row in validation["analyses"]) == (
@@ -255,8 +255,8 @@ def test_research_lab_render_is_explicit_descriptive_and_escaped(tmp_path: Path)
     assert "7/7" in page.body
     assert "No candidate recommendations" in page.body
     assert "Final empirical verdict" in page.body
-    assert "e906229597af15c6dc3caf3cb37a1846b5d273776c8477bc4637453a78ab7cec" in page.body
-    assert "c4361588a7bc6165bf780e7dcd90ba81625be3fb5da711080a0f8c4cbf168933" in page.body
+    assert "8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489" in page.body
+    assert "3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72" in page.body
     assert "No evidence" in page.body
     assert "Not evaluable" in page.body
     assert "Fewer than two populated score buckets" in page.body

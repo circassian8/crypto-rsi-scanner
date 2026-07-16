@@ -185,7 +185,285 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-15T10:23:27+00:00",
+  "generated_at": "2026-07-16T08:31:35+00:00",
+  "empirical_validation_lab": {
+    "additional_data_needed": [
+      "observed bid-ask spread and order-book execution-quality snapshots",
+      "intraday bars and exact decision-to-review latency",
+      "direct catalyst, calendar, derivatives, and on-chain evidence with point-in-time lineage",
+      "more independent matured episodes across routes, regimes, and data-quality cohorts"
+    ],
+    "analysis_window": {
+      "idea_end_exclusive": "2026-06-01T00:00:00Z",
+      "outcome_data_end_exclusive": "2026-06-18T00:00:00Z",
+      "start_inclusive": "2021-06-12T00:00:00Z"
+    },
+    "commands": {
+      "current_final_test": "make radar-replay-final-test RADAR_RESEARCH_RECOMMENDATION_SEAL=event_fade_cache/decision_radar_research_lab/runs/8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489/recommendation_seal.json PYTHON=.venv/bin/python",
+      "current_report_check": "make radar-research-reports-check RADAR_RESEARCH_SELECTION_RUN=event_fade_cache/decision_radar_research_lab/runs/8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489 RADAR_RESEARCH_FINAL_TEST_RUN=event_fade_cache/decision_radar_research_lab/runs/3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72 PYTHON=.venv/bin/python",
+      "current_report_publication": "make radar-research-reports RADAR_RESEARCH_SELECTION_RUN=event_fade_cache/decision_radar_research_lab/runs/8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489 RADAR_RESEARCH_FINAL_TEST_RUN=event_fade_cache/decision_radar_research_lab/runs/3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72 PYTHON=.venv/bin/python",
+      "full": "make radar-replay-full PYTHON=.venv/bin/python",
+      "medium": "make radar-replay-medium PYTHON=.venv/bin/python",
+      "protocol_check": "make radar-research-protocol-check PYTHON=.venv/bin/python",
+      "runbook": "research/DECISION_RADAR_RESEARCH_RUNBOOK.md",
+      "smoke": "make radar-replay-smoke PYTHON=.venv/bin/python"
+    },
+    "cost_scenarios": {
+      "break_even_cost_reported": true,
+      "historical_spread_observed": false,
+      "intraday_path_order_available": false,
+      "round_trip_cost_bps": [
+        0,
+        20,
+        50,
+        100,
+        200
+      ],
+      "unobserved_cost_label": "assumed_sensitivity_not_observed"
+    },
+    "current_canonical_evidence": {
+      "final_test_run": "3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72",
+      "recommendation_seal": "3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639",
+      "report_bundle": "267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf",
+      "selection_run": "8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489"
+    },
+    "current_result": {
+      "all_material_shadow_scenarios": "not_supported",
+      "candidate_recommendation_count": 0,
+      "final_confirmation": "no_candidate_recommendations",
+      "final_test_episode_count": 1423,
+      "final_test_idea_count": 1512,
+      "production_policy_unchanged": true,
+      "selection_episode_count": 3127,
+      "selection_idea_count": 3426,
+      "shadow_scenario_count": 9
+    },
+    "dashboard_surface": {
+      "authority_independent": true,
+      "dashboard_get_head_writes": false,
+      "invalid_bundle_semantic_projection": "suppressed",
+      "invalid_bundle_visible_state": "bounded_inventory_and_failure_only",
+      "page": "Research Lab",
+      "production_stale_research_visibility": "historical_descriptive_only",
+      "production_state_mutations": false,
+      "research_restores_current_actionability": false,
+      "whole_bundle_validation_required": true
+    },
+    "episodes": {
+      "dependent_repeats_counted_as_independent": false,
+      "method": "fixed_start_window",
+      "primary_window_hours": 24,
+      "progression_preserved": true,
+      "representative": "first_eligible_observation",
+      "representative_reselection": "forbidden",
+      "sensitivity_window_hours": [
+        12,
+        48
+      ],
+      "window_end_inclusive": true
+    },
+    "evidence_lanes": {
+      "artifact_replay": "separate",
+      "fixture": "mechanics_only",
+      "historical_replay": "selection_and_final_test_kept_distinct",
+      "live_and_replay_pooled": false,
+      "live_no_send": "separate_fingerprinted_observational_lane"
+    },
+    "feature_warmup": {
+      "current_or_future_metadata_fallback": false,
+      "partial_feature_substitution": "forbidden",
+      "volume_zscore_lookback_days": 90,
+      "volume_zscore_min_prior_observations": 20
+    },
+    "final_test_firewall": {
+      "candidate_set": "sealed_development_validation_candidates_only",
+      "empty_candidate_set_status": "no_candidate_recommendations",
+      "final_test_may_confirm_or_reject": true,
+      "final_test_may_nominate_or_tune": false,
+      "minimum_matured_visible_episodes": 30,
+      "recommendation_seal_required": true,
+      "rule_id": "noninferior_return_failure_selected_day_burden_v1"
+    },
+    "matched_controls": {
+      "causal_claim": false,
+      "match_fields": [
+        "partition",
+        "observation_date",
+        "market_regime",
+        "liquidity_tier"
+      ],
+      "selection": "deterministic_outcome_blind_hash_rank"
+    },
+    "missing_data_policy": {
+      "calendar_without_time_valid_snapshot": "missing",
+      "catalyst_without_public_attribution": "unknown",
+      "derivatives_without_historical_snapshot": "unavailable",
+      "direct_and_proxy_results_reported_separately": true,
+      "historical_order_book": "unavailable",
+      "historical_spread": "unavailable",
+      "intraday_timing_from_daily_ohlcv": "unavailable",
+      "onchain_without_historical_snapshot": "unavailable",
+      "proxy_must_be_labeled": true
+    },
+    "no_evidence_origins": [
+      "catalyst_led",
+      "technical_led",
+      "derivatives_led",
+      "onchain_led",
+      "fundamental_led",
+      "macro_led"
+    ],
+    "no_evidence_routes": [
+      "high_confidence_watch",
+      "actionable_watch",
+      "rapid_market_anomaly",
+      "fade_exhaustion_review",
+      "calendar_risk"
+    ],
+    "observation_clock": {
+      "cadence": "1d",
+      "future_data_forbidden": true,
+      "outcome_data_visible_to_scoring": false,
+      "timestamp": "completed_binance_daily_candle_close"
+    },
+    "outcomes": {
+      "campaign_outcome_ledger_mutated": false,
+      "mae_signed": true,
+      "primary_horizon_days": 3,
+      "relative_benchmarks": [
+        "BTC",
+        "ETH"
+      ],
+      "replay_storage": "immutable_research_run_namespace",
+      "same_bar_high_low_for_outcome": "forbidden",
+      "sensitivity_horizons_days": [
+        1,
+        7,
+        14
+      ],
+      "timing_metrics": [
+        "time_to_mfe_hours",
+        "time_to_mae_hours",
+        "time_to_invalidation_hours",
+        "pre_signal_move_7d"
+      ]
+    },
+    "partition_embargoes": [
+      {
+        "end_exclusive": "2023-01-15T00:00:00Z",
+        "idea_evaluation_allowed": false,
+        "start_inclusive": "2023-01-01T00:00:00Z"
+      },
+      {
+        "end_exclusive": "2025-01-15T00:00:00Z",
+        "idea_evaluation_allowed": false,
+        "start_inclusive": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "partitions": [
+      {
+        "end_exclusive": "2023-01-01T00:00:00Z",
+        "name": "development",
+        "outcome_end_exclusive": "2023-01-15T00:00:00Z",
+        "policy_selection_allowed": true,
+        "start_inclusive": "2021-06-12T00:00:00Z"
+      },
+      {
+        "end_exclusive": "2025-01-01T00:00:00Z",
+        "name": "validation",
+        "outcome_end_exclusive": "2025-01-15T00:00:00Z",
+        "policy_selection_allowed": true,
+        "start_inclusive": "2023-01-15T00:00:00Z"
+      },
+      {
+        "end_exclusive": "2026-06-01T00:00:00Z",
+        "name": "final_test",
+        "outcome_end_exclusive": "2026-06-18T00:00:00Z",
+        "policy_selection_allowed": false,
+        "start_inclusive": "2025-01-15T00:00:00Z"
+      }
+    ],
+    "point_in_time_universe": {
+      "full_top_n": 100,
+      "future_rank_forbidden": true,
+      "lookback_days": 30,
+      "medium_top_n": 30,
+      "rank_at": "daily_candle_close",
+      "ranking_field": "trailing_mean_quote_volume_usd",
+      "residual_limitation": "retained candidate pool has delisting survivorship",
+      "smoke_top_n": 3
+    },
+    "policy_boundary": {
+      "auto_apply": false,
+      "human_approval_required": true,
+      "production_mutation_allowed": false,
+      "requires_versioned_decision_and_rollback": true,
+      "threshold_lowering_to_create_ideas": false
+    },
+    "protocol_sha256": "efee20ccaa3dda03c8e1172633d92d6a9bf8cb3ae12c926471f2151941d5f158",
+    "protocol_version": "decision_radar_empirical_validation_v1",
+    "report_bundle": {
+      "descriptor_anchored_read_once": true,
+      "filenames": [
+        "DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.md",
+        "DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.json",
+        "DECISION_RADAR_WALK_FORWARD_REPORT.md",
+        "DECISION_RADAR_WALK_FORWARD_REPORT.json",
+        "DECISION_RADAR_POLICY_SIMULATION_REPORT.md",
+        "DECISION_RADAR_POLICY_SIMULATION_REPORT.json",
+        "DECISION_RADAR_RESEARCH_LIMITATIONS.md"
+      ],
+      "partial_semantic_rendering_allowed": false,
+      "report_count": 7,
+      "source_run_and_seal_bindings_required": true,
+      "whole_bundle_validation_required": true
+    },
+    "research_only": true,
+    "safety": {
+      "authorization_mutations": 0,
+      "auto_apply": false,
+      "dashboard_authority_mutations": 0,
+      "event_alpha_paper_trades": 0,
+      "event_alpha_triggered_fade": 0,
+      "normal_rsi_writes": 0,
+      "orders": 0,
+      "production_policy_mutations": 0,
+      "provider_calls": 0,
+      "telegram_sends": 0,
+      "trades": 0
+    },
+    "sample_semantics": {
+      "candidate": "development_validation_scenario_eligible_for_sealed_final_confirmation_not_production_policy",
+      "descriptive_sample": "descriptive_evidence_not_policy_eligible",
+      "insufficient_sample": "below_applicable_frozen_minimum_neither_positive_nor_negative_evidence",
+      "no_candidate_recommendations": "empty_sealed_candidate_set_final_test_did_not_search",
+      "no_sample": "zero_eligible_observations_no_evidence",
+      "not_evaluable": "comparison_population_missing_not_no_violations",
+      "not_supported": "frozen_rule_failed_or_no_material_policy_change_not_proof_of_harm",
+      "walk_forward_complete": "required_folds_and_purges_executed_not_causal_alpha"
+    },
+    "schema_id": "decision_radar.empirical_validation_lab",
+    "schema_version": 1,
+    "shadow_policy": {
+      "auto_apply": false,
+      "material_alternative_count": 9,
+      "operator_burden_denominator": "exact_selected_observation_utc_days_including_zero_idea_days",
+      "recommendation_rule": "noninferior_return_failure_selected_day_burden_v1",
+      "selection_partitions": [
+        "development",
+        "validation"
+      ]
+    },
+    "status": "frozen_before_final_test_evaluation",
+    "walk_forward": {
+      "final_test_used_for_tuning": false,
+      "minimum_outcome_evaluable_folds": 3,
+      "outcome_purge_rule": "primary_horizon_due_at_lt_fold_boundary",
+      "partial_test_fold_policy": "omit_fold_shorter_than_rolling_test_days",
+      "rolling_test_days": 180,
+      "rolling_train_days": 730
+    }
+  },
   "market_provenance_contract": {
     "decision_radar_campaign_authority": {
       "caller_asserted_counting_trusted": false,
@@ -976,6 +1254,9 @@
     ],
     "campaign_outcome_ledger": "radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl",
     "campaign_outcome_refresh_provider_calls": 0,
+    "empirical_replay_outcomes_enter_campaign_ledger": false,
+    "empirical_replay_outcomes_storage": "immutable fingerprinted research-run namespaces",
+    "empirical_review_feedback": "optional append-only preference metadata with no automatic scoring or policy effect",
     "human_feedback_is_optional_preference_data": true,
     "immutable_origin_namespaces_rewritten": false,
     "maturation_policy": "declared canonical primary horizon only; pending until due and sufficient observed price lineage exists, due_missing_price when due without sufficient lineage, then mature deterministically",
@@ -1010,6 +1291,18 @@
         "live observation campaign v2"
       ]
     },
+    "empirical_research_lab": {
+      "authority": "none",
+      "name": "Decision Radar Empirical Validation and Calibration Lab v1",
+      "owns": [
+        "immutable point-in-time historical replay",
+        "episode-aware outcome analysis",
+        "walk-forward evaluation",
+        "shadow-policy simulation",
+        "authority-independent Research Lab projection"
+      ],
+      "production_mutations": false
+    },
     "measurement_programs_are_aggregated": false,
     "relationship": "additive",
     "unknown_catalyst_policy": "soft explanatory-confidence penalty and risk input, not a universal visibility blocker"
@@ -1038,6 +1331,9 @@
   ],
   "row_type": "crypto_decision_radar_north_star",
   "safety_invariants": {
+    "empirical_research_auto_apply": false,
+    "empirical_research_dashboard_authority_mutations": 0,
+    "empirical_research_production_policy_mutations": 0,
     "human_decision_required": true,
     "no_credentials_in_artifacts_or_output": true,
     "no_event_alpha_paper_trading": true,
@@ -1176,7 +1472,8 @@
         "Calendar",
         "System Health",
         "Outcomes & Learning",
-        "Run History"
+        "Run History",
+        "Research Lab"
       ],
       "presentation_is_render_only": true,
       "presentation_policy": {

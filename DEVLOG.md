@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Republish empirical evidence under the locked runtime · Codex
+**Why:** Fixing pandas-3 timestamp normalization necessarily changed the replay
+code fingerprint. The prior report bundle remained valid historical evidence,
+but it could no longer be reproduced by current hash-pinned code or authorize a
+new sealed holdout run.
+**Changes:**
+- Re-ran the unchanged frozen protocol with the locked `.venv`: fixture smoke
+  `8077755f2bd0...`, top-30 medium `4acc501d375e...`, top-100 selection
+  `8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489`,
+  and the one seal-authorized final test
+  `3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72`.
+- Published and byte-checked current seven-report bundle
+  `267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`
+  with recommendation seal
+  `3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639`.
+  All nine frozen scenarios remain `not_supported`; the sealed candidate set is
+  empty and final status remains `no_candidate_recommendations`.
+- Preserved the earlier `e906229...` / `c436158...` / `75d505...` evidence as
+  immutable superseded history rather than rewriting it. Production thresholds,
+  routes, policy, dashboard authority, notifications, providers, and execution
+  remain unchanged.
+- Updated the North Star Markdown/JSON, operator guide, Research Lab dashboard
+  fixture binding, and a new operator research runbook to document the exact
+  replay clock, partitions, embargoes, outcome semantics, control matching,
+  assumed-cost boundary, final-test firewall, closed seven-file bundle, status
+  glossary, current negative result, and reproducible commands.
+**Verify:** Protocol check passed. Smoke produced 1,095 observations / 5
+episodes; medium produced 273,177 observations / 1,013 ideas / 924 episodes /
+922 matured / 905 controls / 7,298 qualified misses in 142 seconds; full
+produced 273,177 observations / 3,426 ideas / 3,127 episodes / 3,125 matured /
+3,122 controls / 24,757 qualified misses in 321 seconds; final test produced
+183,929 observations / 1,512 ideas / 1,423 matured episodes / 1,421 controls /
+10,022 qualified misses in 151 seconds. Every run reported zero provider calls
+and zero dashboard-authority mutations. Report publication and byte-check both
+returned the same bundle ID. The Research Lab tests passed (12 tests), JSON and
+Markdown contract checks passed, and an independent read-only audit verified
+the protocol/seal/run/manifest/report binding chain plus byte preservation for
+all seven report files with no blockers.
+**Notes/risks:** Historical spread, intraday execution, and six non-market-led
+origins remain unavailable. Five routes still have no historical episode. This
+is a reproducibility repair and negative empirical result, not evidence to lower
+thresholds or change production policy.
+
 ## 2026-07-16 — Restore locked-runtime replay and schema import parity · Codex
 **Why:** The combined release audit used the hash-pinned `.venv` and exposed two
 bugs hidden by system Python: pandas 3 uses microsecond datetime indexes, and a

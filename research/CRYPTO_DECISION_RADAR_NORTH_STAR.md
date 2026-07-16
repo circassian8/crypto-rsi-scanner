@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-15T10:23:27+00:00`
+- generated_at: `2026-07-16T08:31:35+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -321,16 +321,19 @@ risk, urgency, origins, catalyst status, timing/phase, tradability/spread,
 expiry/horizon, why-now, and confirmation/invalidation. Catalyst Radar
 classification appears second as explicitly labeled compatibility context.
 
-Operator Experience V1 organizes the dashboard around seven primary pages:
+Operator Experience V1 organizes the dashboard around eight primary pages:
 Today, Market Radar, Ideas, Calendar, System Health, Outcomes & Learning, and
-Run History. Today prioritizes current attention and constraints; Market
+Run History, plus the authority-independent Research Lab. Today prioritizes
+current attention and constraints; Market
 Radar explains the bounded provider-to-decision funnel; Ideas and Idea Detail
 render the canonical Decision v2 projection; Calendar preserves certainty and
 coverage; System Health separates failures from disabled, unselected,
 unconfigured, and warming states; Outcomes separates exact-current placeholders
 from historical learning; and Run History shows bounded immutable attempts
-without granting them current authority. Historical compatibility routes remain
-available but are not primary navigation.
+without granting them current authority. Research Lab presents closed historical
+replay, walk-forward, shadow-policy, and separately fingerprinted live no-send
+evidence without granting any result production authority. Historical
+compatibility routes remain available but are not primary navigation.
 
 The hierarchy is current-first and route-aware. A sole risk watch is named as a
 risk watch rather than a generic actionable idea; active scheduled windows lead
@@ -369,8 +372,9 @@ states use text and structure as well as color. Tables become contained mobile
 comparison cards where appropriate; long identifiers and technical values stay
 inside their components. Deep paths, hashes, reason codes, request-ledger data,
 and provenance are collapsed by default. The offline
-`make radar-dashboard-ux-smoke` target exercises all primary pages and the real
-browser review covers desktop, laptop, tablet, and mobile layouts.
+`make radar-dashboard-ux-smoke` target exercises all primary pages, including
+Research Lab, and the real browser review covers desktop, laptop, tablet, and
+mobile layouts.
 
 Optional phone access preserves that loopback boundary. It may expose the
 backend through private Tailscale Serve HTTPS to identities allowed by the
@@ -468,6 +472,132 @@ receipt reconciles the exact run, namespace device/inode, paths, content hashes,
 row semantics/lineage, and snapshot/anomaly/search-queue counts. All four scan
 outputs are preflighted and atomically replaced through one held no-follow
 namespace bundle. Empty anomaly artifacts without that receipt remain unavailable.
+
+## Empirical Validation and Research Lab
+
+Decision Radar empirical validation is an authority-independent research layer,
+not another decision model or production route system. It reuses the canonical
+Decision Model v2 projection at historical point-in-time observation clocks,
+measures episode-aware forward outcomes, compares predeclared shadow policies,
+and publishes recommendations only. Research replay cannot change thresholds,
+routes, provider authorization, notifications, execution, or dashboard
+authority, and every result carries `research_only=true`, `auto_apply=false`,
+and an explicit human-approval boundary.
+
+The frozen protocol is `decision_radar_empirical_validation_v1`, frozen at
+`2026-07-16T05:30:00Z` before final-test evaluation with SHA-256
+`efee20ccaa3dda03c8e1172633d92d6a9bf8cb3ae12c926471f2151941d5f158`.
+Daily observations occur at completed Binance candle close. Point-in-time
+universe membership uses the trailing 30-day quote-volume rank calculated at
+that close inside the locally retained historical candidate pool. The pool has
+an explicit residual delisting-survivorship limitation. Rolling features use
+only current and earlier completed bars; the frozen volume z-score uses a
+90-day lookback and requires 20 prior observations. Future ranks, future bars,
+current metadata fallbacks, retrospective catalyst knowledge, and outcome data
+are forbidden inputs. Available daily RSI is observational context only.
+
+Chronological idea and outcome boundaries are fixed:
+
+| Partition | Idea start | Idea end | Outcome end | Policy selection |
+|---|---|---|---|---|
+| development | `2021-06-12T00:00:00Z` | `2023-01-01T00:00:00Z` | `2023-01-15T00:00:00Z` | allowed |
+| validation | `2023-01-15T00:00:00Z` | `2025-01-01T00:00:00Z` | `2025-01-15T00:00:00Z` | allowed |
+| final test | `2025-01-15T00:00:00Z` | `2026-06-01T00:00:00Z` | `2026-06-18T00:00:00Z` | forbidden |
+
+Fourteen-day outcome-only embargoes separate the partitions. An outcome is
+readable only when its due time is strictly before the applicable outcome
+boundary. Walk-forward folds purge primary outcomes whose due time reaches the
+fold boundary and omit a final test window shorter than the frozen 180-day
+length. Development and validation may nominate a recommendation; final test
+may only confirm or reject the exact pre-sealed candidate set and cannot search
+for a replacement. An empty sealed set is reported as
+`no_candidate_recommendations`, not as final-test validation.
+
+The primary outcome horizon is three days; one-, seven-, and fourteen-day
+results are sensitivity evidence. Outcome bars begin after the idea bar.
+Return, BTC- and ETH-relative return, MFE, signed MAE, time to MFE/MAE,
+invalidation, continuation, reversal, expiry, and post-expiry behavior remain
+explicit. Fixed-start 24-hour episodes freeze the first eligible representative
+and use an inclusive end, so an observation exactly 24 hours later remains a
+dependent repeat. Repeats preserve route, score, phase, catalyst, spread, and
+derivatives progression but never inflate the independent sample count or
+replace the representative based on outcome maturity.
+
+Matched non-signal controls are chosen by an outcome-blind deterministic hash
+within date, regime, and liquidity buckets. Raw-mover, volume, RSI,
+relative-strength, BTC/ETH, and late-fade benchmarks are descriptive and do not
+support causal claims. Historical bid-ask spread, order-book execution quality,
+and intraday high/low ordering are unavailable. Fees, assumed spread, slippage,
+adverse selection, review delay, capacity, stop, holding-period, and idea-budget
+results are sensitivity scenarios unless an artifact explicitly marks them as
+observed. Break-even cost does not convert an assumed scenario into execution
+evidence.
+
+The rolling walk-forward contract uses 730-day training and 180-day test
+windows across development and validation, requires three outcome-evaluable
+folds, and never accesses final test for selection. The shadow simulator
+compares the frozen production policy with nine material alternatives under the
+predeclared `noninferior_return_failure_selected_day_burden_v1` rule. Candidate
+eligibility requires the frozen sample minimum, a material policy change,
+non-inferior mean directional return and quick-failure rate, and bounded ideas
+per exact selected observation day, including zero-idea days. A `candidate` is
+only eligible for sealing; it is not an applied policy.
+
+Historical replay, fixture, live no-send, and artifact replay are distinct
+evidence lanes. Fixture results prove mechanics only. Live no-send evidence is
+a separately fingerprinted observational lane, never pooled into historical
+sample sizes or used to turn an insufficient historical cohort into a policy
+candidate. Replay outcomes stay in immutable research-run artifacts and never
+enter or rewrite the mutable live campaign outcome ledger.
+
+Publication is one closed seven-file bundle, in this exact order:
+
+1. `DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.md`
+2. `DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.json`
+3. `DECISION_RADAR_WALK_FORWARD_REPORT.md`
+4. `DECISION_RADAR_WALK_FORWARD_REPORT.json`
+5. `DECISION_RADAR_POLICY_SIMULATION_REPORT.md`
+6. `DECISION_RADAR_POLICY_SIMULATION_REPORT.json`
+7. `DECISION_RADAR_RESEARCH_LIMITATIONS.md`
+
+Research Lab acquires all seven bounded files through one descriptor-anchored
+read, verifies their whole-bundle identity, source-run bindings, protocol,
+recommendation seal, final confirmation, live projection, report digests, and
+Markdown/JSON agreement, and only then renders semantic projections. A missing,
+unsafe, oversized, tampered, spliced, or digest-drifting member suppresses every
+semantic conclusion. The page may show only the bounded file inventory and
+failure state; invalid evidence is never rendered as zero evidence.
+
+Research remains inspectable when production authority is stale because it is
+explicitly historical and non-authoritative. That visibility never restores a
+current idea, relaxes dashboard pointer checks, or implies actionability. The
+page leads with bundle status, frozen protocol and run identities, final
+verdict, partition/sample counts, route and origin coverage, monotonicity,
+signed MFE/MAE, controls, assumed costs, walk-forward purges, operator burden,
+shadow-policy status, live/replay separation, limitations, and the unchanged
+production boundary.
+
+The current canonical evidence is bound to selection run
+`8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489`, final-test run `3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72`, report
+bundle `267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`, and recommendation seal
+`3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639`. All nine material shadow alternatives are
+`not_supported`; the sealed candidate set is empty and final confirmation is
+`no_candidate_recommendations`. Production thresholds, routes, notifications,
+execution, provider authorization, and dashboard authority remain unchanged.
+
+Historical samples exist only for market-led `dashboard_watch`, `risk_watch`,
+and `diagnostic` cohorts. `high_confidence_watch`, `actionable_watch`,
+`rapid_market_anomaly`, `fade_exhaustion_review`, and `calendar_risk`, plus
+`catalyst_led`, `technical_led`, `derivatives_led`, `onchain_led`,
+`fundamental_led`, and `macro_led` primary origins, have no empirical episodes.
+Zero samples mean no evidence, not strength, weakness, safety, or validation.
+The most important missing evidence is observed spread/order-book quality,
+intraday decision-to-review timing, and direct point-in-time catalyst, calendar,
+derivatives, and on-chain data across more independent episodes.
+
+The reproducible protocol-check, smoke, medium, full, sealed final-test, report,
+byte-check, and optional review-feedback workflow is documented in
+[Decision Radar Research Runbook](DECISION_RADAR_RESEARCH_RUNBOOK.md).
 
 ## Guarded Real/No-Send Market Generation
 
@@ -810,7 +940,10 @@ fail-closed drift.
 Outcomes and optional human feedback are measurement evidence only. They do not
 automatically alter thresholds, routes, priors, or notification policy. Any
 change to decision policy remains an explicit, human-approved, versioned
-decision.
+decision. Immutable empirical replay outcomes remain in their fingerprinted
+research-run namespaces and are never appended to, merged into, or used to
+rewrite the live campaign outcome ledger. Optional empirical-review labels are
+append-only preference metadata and have no automatic scoring or policy effect.
 
 ## Safety Invariants
 
@@ -826,3 +959,6 @@ decision.
 - no_live_provider_calls_without_existing_explicit_authorization: `True`
 - no_credentials_in_artifacts_or_output: `True`
 - preserve_historical_artifacts_without_silent_reinterpretation: `True`
+- empirical_research_auto_apply: `False`
+- empirical_research_production_policy_mutations: `0`
+- empirical_research_dashboard_authority_mutations: `0`

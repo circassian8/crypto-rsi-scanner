@@ -26,11 +26,15 @@ only report `no_candidate_recommendations`, not perform a post-hoc policy
 search. An initial selection/holdout pair with a trace-histogram aggregation
 defect is retained but superseded; its results cannot tune the unchanged
 replacement run. The replacement evidence is selection
-`e906229597af15c6dc3caf3cb37a1846b5d273776c8477bc4637453a78ab7cec`,
+`8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489`,
 final test
-`c4361588a7bc6165bf780e7dcd90ba81625be3fb5da711080a0f8c4cbf168933`,
+`3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72`,
 and closed seven-file report bundle
-`75d50598fd03a07433caa6ef29c4f7f9f24b17408fbf433dbc34b373c07d89fa`.
+`267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`.
+The preceding valid `e906229...` / `c436158...` / `75d505...` evidence remains
+immutable but is superseded for current-code reproducibility because correcting
+locked-pandas microsecond timestamp normalization changed the behavior-bearing
+code fingerprint. Its conclusions were not used to tune the unchanged rerun.
 Thresholds, routes, dashboard authority, notifications, execution, and provider
 authorization remain unchanged.
 **Why:** The complete selection run produced useful descriptive evidence for

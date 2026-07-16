@@ -63,7 +63,7 @@ Recover without weakening freshness or making an unapproved provider call:
    `launchctl kickstart -k "gui/$(id -u)/com.nasrenkaraf.crypto-radar-dashboard"`;
    otherwise stop and rerun `make radar-dashboard PYTHON=.venv/bin/python`.
 
-Daily Operations v1 is the guarded maintainer, but it remains prepared and
+Daily Operations v1.1 is the guarded maintainer, but it remains prepared and
 disabled until the operator explicitly installs it. Inspect it without writes
 or provider calls, or run one manual cycle, with:
 
@@ -308,8 +308,13 @@ An empty live calendar must name its coverage state. `Not configured` means the
 generation did not inspect a real calendar source; it does not mean there are no
 events. The official producer supports Fed FOMC, BLS CPI/employment, and BEA
 PCE/GDP. Readiness is no-call; live acquisition requires the pre-existing
-calendar authorization and honest BLS contact. Local import requires three
-operator-downloaded official files plus their real acquisition timestamp:
+calendar authorization and honest BLS contact. Local import accepts any explicit
+non-empty subset of genuine operator-downloaded Fed, BLS, and BEA files plus
+their real acquisition timestamp. Omit unavailable source variables rather than
+using an empty or fixture path. The resulting snapshot is `partial` and names
+the exact observed and missing sources; zero rows from an unavailable source do
+not mean that source had no events. For example, a complete three-source import
+is:
 
 ```sh
 make radar-calendar-official-readiness PYTHON=.venv/bin/python
@@ -324,9 +329,11 @@ make radar-calendar-official-import-local \
 
 Every successful pack preserves exact/window semantics and source timezones,
 writes immutable source evidence, and is hash-attested before Daily Operations
-can use its latest-success snapshot. Direct fixture, test, mock, or replay paths
-are rejected before writes. Missing, stale, unavailable, unsafe, or rejected
-calendar evidence remains explicit and cannot create directional bias alone.
+can use its latest-success snapshot. Complete and partial successes are both
+eligible only after the same receipt, pointer, coverage, and raw-source digest
+checks. Direct fixture, test, mock, or replay paths are rejected before writes.
+Missing, stale, unavailable, unsafe, or rejected calendar evidence remains
+explicit and cannot create directional bias alone.
 
 ### System Health
 
@@ -352,6 +359,40 @@ explicit cohorts with sample-size warnings. Feedback is optional preference
 data and never a prerequisite for idea visibility or an automatic threshold
 change.
 
+### Research Lab
+
+Research Lab presents historical replay, walk-forward, matched-control,
+cost-sensitivity, shadow-policy, and separately fingerprinted live no-send
+evidence. It is descriptive and authority-independent: a valid research bundle
+may remain inspectable when the production generation is stale, but it cannot
+restore current actionability, update the dashboard pointer, or change a route,
+threshold, provider setting, notification, or execution policy.
+
+The page requires one validated 7/7 report bundle. It reads the exact validation,
+walk-forward, and policy Markdown/JSON pairs plus the limitations Markdown
+through one descriptor-anchored snapshot. If any member is missing, unsafe,
+oversized, tampered, spliced, or inconsistent with the other six, semantic
+tables are suppressed. A bounded file inventory and failure state may remain;
+the page never translates invalid evidence into a healthy zero-sample result.
+
+Review the page in this order:
+
+1. final empirical verdict and frozen protocol/run identity;
+2. development, validation, and final-test idea/episode samples;
+3. route and thesis-origin coverage, including explicit no-evidence rows;
+4. score monotonicity and any not-evaluable comparisons;
+5. MFE, signed MAE, matched controls, missed/false/late classifications, and
+   assumed cost sensitivity;
+6. walk-forward folds, outcome purges, selected scenarios, and zero-idea days;
+7. operator burden and shadow-policy recommendations;
+8. live no-send comparison and research limitations.
+
+MAE is signed: a negative value is adverse excursion, not an unsigned magnitude
+or a positive quality score. `Historical spread not observed` means fee, spread,
+slippage, and adverse-selection results are assumptions, even when a break-even
+cost is shown. Live no-send evidence has its own fingerprint and sample warning;
+it is never pooled into replay counts.
+
 ### Run History
 
 Run History shows bounded immutable attempts, the latest attempt, provider
@@ -362,6 +403,41 @@ they are never merged into current authority.
 The separate Daily Operations ledger shows readiness, provider-attempt,
 publication, rollback/invalidation, and owned-dashboard restart state; it is
 maintenance telemetry, never authority by itself.
+
+## Historical research workflow
+
+The complete reproducible workflow is in
+[Decision Radar Research Runbook](DECISION_RADAR_RESEARCH_RUNBOOK.md). Its safe
+order is protocol check, fixture smoke, medium replay, full development/
+validation selection, sealed final-test replay, seven-file report publication,
+and a byte-for-byte report check. These commands are offline and research-only;
+they do not call a provider, inspect or create authorization, publish dashboard
+authority, or apply a recommendation.
+
+Interpret research states literally:
+
+- `no_sample`: zero eligible observations; no evidence.
+- `insufficient_sample`: below the applicable frozen minimum shown in the
+  artifact; neither positive nor negative evidence.
+- `descriptive_sample`: enough for a descriptive table, not enough for a policy
+  decision.
+- `not_supported`: a shadow scenario failed the frozen selection rule or
+  produced no material policy change; it is not proof that the scenario is
+  harmful.
+- `candidate`: development/validation evidence made a scenario eligible to be
+  sealed for final-test confirmation; it is not production policy.
+- `no_candidate_recommendations`: the sealed candidate set is empty, so final
+  test did not search for or confirm an alternative.
+- walk-forward `complete`: the required chronological folds and outcome purges
+  ran successfully; it is not proof of causal alpha or independent stability.
+- `not_evaluable`: the required comparison population is absent, such as fewer
+  than two populated score buckets. Never read it as “no violations.”
+- `violations_observed`: descriptive monotonicity counterexamples exist; no
+  automatic model or threshold change follows.
+
+Optional human review labels are append-only preference metadata. They are not
+required for automatic outcome analysis and never tune or apply a policy. Use
+the runbook's read-only feedback report before any separately confirmed append.
 
 ## Scores and routes
 

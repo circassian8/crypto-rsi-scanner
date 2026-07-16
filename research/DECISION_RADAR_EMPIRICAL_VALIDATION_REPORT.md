@@ -1,10 +1,10 @@
 # Decision Radar Empirical Validation Report
 
-- Report bundle: `75d50598fd03a07433caa6ef29c4f7f9f24b17408fbf433dbc34b373c07d89fa`
+- Report bundle: `267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`
 - Protocol: `decision_radar_empirical_validation_v1` (`efee20ccaa3dda03c8e1172633d92d6a9bf8cb3ae12c926471f2151941d5f158`)
-- Selection run: `e906229597af15c6dc3caf3cb37a1846b5d273776c8477bc4637453a78ab7cec`
-- Final-test run: `c4361588a7bc6165bf780e7dcd90ba81625be3fb5da711080a0f8c4cbf168933`
-- Recommendation seal: `68594ec396be4aeb82f771ff864b24d0058c91ccbed9fc3a91fa9e42224ab87b`
+- Selection run: `8212b2ddb626805f4312d8986cc1d9f6b3229a169aa49ca75b9b5bbfc1660489`
+- Final-test run: `3009e23dd9a9f11418cf97ee07f6e532c451c21196e69bd1ae0cd6ae96c47e72`
+- Recommendation seal: `3f0ea69c2cb3c455bf9d8e13f44f6db6cee6308192c61a090b9f39e0a5442639`
 - Live no-send report: `provided_separate_observational_lane`
 - Safety: research only; no automatic policy application; no sends, trades, orders, paper trades, RSI writes, provider calls, or authority mutations.
 
