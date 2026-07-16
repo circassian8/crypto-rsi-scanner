@@ -361,10 +361,21 @@ def _candidate(
         "source_content_cluster_count": 0,
         "replay_partition": partition,
         "replay_data_quality_mode": str(row.get("data_quality_mode") or "historical_ohlcv"),
+        "data_quality_mode": str(row.get("data_quality_mode") or "historical_ohlcv"),
+        "baseline_status": str(row.get("baseline_status") or "missing"),
+        "baseline_maturity": str(row.get("baseline_maturity") or row.get("baseline_status") or "missing"),
         "market_regime": str(row.get("market_regime") or "unknown"),
         "liquidity_tier": str(row.get("liquidity_tier") or "unknown"),
+        "liquidity_usd": _finite(row.get("liquidity_usd")),
+        "trailing_quote_volume": _finite(row.get("trailing_quote_volume")),
+        "trailing_quote_volume_usd": _finite(row.get("trailing_quote_volume")),
         "point_in_time_volume_rank": _finite(row.get("point_in_time_volume_rank")),
         "point_in_time_universe_member": True,
+        "feature_basis": _mapping(row.get("feature_basis")),
+        "missing_features": _strings(row.get("missing_features")),
+        "full_daily_bar": row.get("full_daily_bar") is True,
+        "return_unit": "percent_points",
+        "anomaly_generated": True,
     }
     for field in ("rsi_context", "rsi_context_references"):
         if row.get(field) not in (None, "", [], {}):

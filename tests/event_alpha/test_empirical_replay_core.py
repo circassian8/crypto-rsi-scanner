@@ -73,6 +73,11 @@ def test_replay_uses_canonical_production_projection_and_explicit_missing_spread
     assert projection["radar_route"] in {"dashboard_watch", "fade_exhaustion_review", "diagnostic"}
     assert idea["replay_feature_quality"]["spread_basis"] == "unavailable"
     assert idea["replay_feature_quality"]["catalyst_evidence_timing"] == "missing"
+    assert idea["baseline_status"] == "warm"
+    assert idea["liquidity_usd"] == 20_000_000.0
+    assert idea["data_quality_mode"] == "historical_ohlcv"
+    assert idea["return_unit"] == "percent_points"
+    assert idea["anomaly_generated"] is True
     assert result.trace_summary["provider_calls"] == 0
     assert result.trace_summary["dashboard_authority_mutations"] == 0
 

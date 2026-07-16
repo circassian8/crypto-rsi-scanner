@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Close offline PIT data, episode outcomes, and empirical cohorts · Codex
+**Why:** Historical Decision-v2 evaluation needed a direct, auditable path from
+bounded local daily bars through point-in-time features, fixed episodes, future-
+only outcomes, and honest sample-qualified analysis.
+**Changes:**
+- Added descriptor-anchored fixture/Binance-cache readers, content catalogs,
+  longest-horizon per-symbol selection, trailing-30-day volume ranks across the
+  complete bounded candidate pool (top 3/30/100 by mode), shifted 90-day volume
+  baselines, completed-bar returns/RSI/regime, explicit proxy/missing feature
+  bases, future-append invariance, and the residual-delisting-survivorship
+  disclosure. The real cache contains 419 selected symbols / 468,622 bars;
+  eight historical partial daily bars are inventoried but reset rolling
+  segments and never become warm or point-in-time universe members.
+- Added frozen half-open 24-hour episodes with first-representative retention,
+  route/score/phase/catalyst/spread/derivatives progression, direct dataset-row
+  frame support, 1/3/7/14-day raw and direction-adjusted returns, BTC/ETH
+  relatives, MFE/MAE, daily-resolution time-to-extremes/invalidation, expiry and
+  post-expiry behavior, and explicit pending/missing/matured states. Outcome
+  paths begin after the idea bar.
+- Added closed all-eight-route/all-seven-origin cohort tables, deterministic
+  episode bootstrap intervals, score monotonicity, market-regime/liquidity/data-
+  quality and market-vs-catalyst groups, false/late and predeclared missed
+  classifications, cost sensitivity, operator burden, and zero-sample rows that
+  say `no_evidence`. Canonical market-led `catalyst_status=unknown` is treated
+  as observation-time unknown evidence, never retrospective attribution.
+- Added a full fixture mechanics test from data to production Decision-v2,
+  fixed episodes, matured outcomes, and analysis while proving zero network,
+  writes, or dashboard-authority mutation.
+**Verify:** Focused empirical suite (protocol, data, core, outcomes, analysis,
+store, policy, live separation, and end-to-end fixture) passed: 62 tests in
+2.28s. Full-cache catalog proof loaded 419 symbols / 468,622 rows with 8 partial
+bars in under two seconds; focused compile checks passed.
+**Notes/risks:** Fixture results prove mechanics only. Daily data cannot validate
+intraday/rapid timing or observed spread; cached pairs retain residual delisting
+survivorship. Controls, reports, and real medium results follow next.
+
 ## 2026-07-16 — Keep live campaign evidence separate in the empirical lab · Codex
 **Why:** The historical replay and the short real/no-send campaign answer
 different questions and must never be pooled into one apparent sample.

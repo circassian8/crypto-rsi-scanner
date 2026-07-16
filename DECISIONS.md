@@ -33,7 +33,9 @@ The locally cached Binance universe is point-in-time by trailing volume only
 inside the retained candidate pool and must carry its residual delisting-
 survivorship limitation. Daily OHLCV cannot be presented as intraday timing or
 observed spread. Missing catalyst, calendar, derivatives, on-chain, market-cap,
-and order-book evidence stays missing or unavailable. Fixture route coverage is
+and order-book evidence stays missing or unavailable. A partial/early-close
+daily bar is inventory evidence only: it resets contiguous feature warm-up and
+cannot enter point-in-time membership, a warm baseline, or an idea. Fixture route coverage is
 mechanical evidence only. The lab is research-only, `auto_apply=false`, and
 cannot mutate production thresholds, routes, policy, authorization, dashboard
 authority, sends, trades, paper trades, RSI rows, or `TRIGGERED_FADE`.
