@@ -240,6 +240,7 @@ help:
 	@echo "  make smoke-alerts  Render representative alerts without sending"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
+	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
 	@echo "  make score    Print paper-trade scoreboard"
 	@echo "  make score-json  Print paper-trade scoreboard as JSON"
 	@echo "  make score-cohorts  Print paper-trade scoreboard with state cohorts"
@@ -817,6 +818,11 @@ event-llm-extract-eval:
 
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
+
+.PHONY: radar-research-protocol-check
+
+radar-research-protocol-check:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
 
 .PHONY: event-alpha-source-independence-oos-export event-alpha-source-independence-oos-validate event-alpha-source-independence-oos-report event-alpha-source-independence-storage-report
 

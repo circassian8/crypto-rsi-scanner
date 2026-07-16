@@ -1,0 +1,422 @@
+{
+  "analysis_window": {
+    "idea_end_exclusive": "2026-06-01T00:00:00Z",
+    "outcome_data_end_exclusive": "2026-06-18T00:00:00Z",
+    "reason": "frozen from locally available daily-cache coverage while retaining future bars only for matured outcomes",
+    "start_inclusive": "2021-06-12T00:00:00Z"
+  },
+  "auto_apply": false,
+  "benchmark_policies": [
+    "matched_non_signal",
+    "same_day_top_raw_mover",
+    "volume_anomaly_only",
+    "rsi_only",
+    "btc_buy_and_hold_context",
+    "eth_buy_and_hold_context",
+    "top_relative_strength",
+    "late_momentum_fade"
+  ],
+  "cost_scenarios": {
+    "break_even_cost_reported": true,
+    "historical_spread_observation_status": "unavailable",
+    "maximum_daily_ideas": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "maximum_simultaneous_ideas": [
+      1,
+      3,
+      5
+    ],
+    "position_liquidity_fraction_scenarios": [
+      0.0001,
+      0.001,
+      0.005
+    ],
+    "review_delay_days": [
+      0,
+      1
+    ],
+    "round_trip_cost_bps": [
+      0,
+      20,
+      50,
+      100,
+      200
+    ],
+    "unobserved_cost_label": "assumed_sensitivity_not_observed"
+  },
+  "episodes": {
+    "dependent_repeats_counted_as_independent": false,
+    "identity": [
+      "canonical_asset_id",
+      "directional_bias",
+      "anomaly_family"
+    ],
+    "method": "fixed_start_window",
+    "primary_window_hours": 24,
+    "progression_fields": [
+      "radar_route",
+      "actionability_score",
+      "evidence_confidence_score",
+      "risk_score",
+      "urgency_score",
+      "chase_risk_score",
+      "market_phase",
+      "catalyst_status",
+      "spread_status",
+      "derivatives_status"
+    ],
+    "representative": "first_eligible_observation",
+    "representative_reselection": "forbidden",
+    "sensitivity_window_hours": [
+      12,
+      48
+    ]
+  },
+  "false_positive_and_late_rules": {
+    "classification_is_descriptive": true,
+    "high_chase_risk_min": 70.0,
+    "late_pre_signal_move_7d_fraction": 0.2,
+    "poor_asymmetry_mfe_to_abs_mae_max": 0.75,
+    "quick_failure_horizon_days": 1,
+    "quick_failure_return_fraction": -0.05
+  },
+  "feature_warmup": {
+    "baseline_status_before_complete": "insufficient_history",
+    "liquidity_lookback_days": 30,
+    "market_regime_long_ma_days": 200,
+    "partial_feature_substitution": "forbidden",
+    "return_days": [
+      1,
+      3,
+      7,
+      14
+    ],
+    "rsi_lookback_days": 14,
+    "volatility_lookback_days": 30,
+    "volume_zscore_lookback_days": 90
+  },
+  "frozen_at": "2026-07-16T06:00:00Z",
+  "historical_sources": [
+    {
+      "fields": [
+        "open_time",
+        "high",
+        "low",
+        "close",
+        "base_volume",
+        "quote_volume"
+      ],
+      "known_limitation": "cached candidate pool reflects pairs retained locally and has residual delisting survivorship",
+      "mode": "historical_ohlcv",
+      "name": "binance_daily_ohlcv_cache",
+      "provider_calls_per_replay": 0
+    },
+    {
+      "fields": [
+        "trailing_30d_mean_quote_volume",
+        "daily_rank"
+      ],
+      "known_limitation": "membership is point-in-time inside the cached candidate pool, not a complete historical listing master",
+      "mode": "point_in_time_volume_universe",
+      "name": "binance_trailing_volume_membership",
+      "provider_calls_per_replay": 0
+    },
+    {
+      "known_limitation": "short observational stream remains separate from replay evidence",
+      "mode": "live_no_send",
+      "name": "decision_radar_live_campaign",
+      "provider_calls_per_research_report": 0
+    },
+    {
+      "known_limitation": "mechanics coverage only; never evidence of forward value",
+      "mode": "fixture",
+      "name": "integrated_radar_fixture",
+      "provider_calls_per_replay": 0
+    }
+  ],
+  "human_approval_required_for_policy_change": true,
+  "matched_controls": {
+    "controls_per_episode": 1,
+    "exclude_signal_assets_same_timestamp": true,
+    "match_fields": [
+      "partition",
+      "observation_date",
+      "market_regime",
+      "liquidity_tier"
+    ],
+    "seed": 20260716,
+    "selection": "deterministic_hash_rank",
+    "selection_uses_outcomes": false
+  },
+  "minimum_samples": {
+    "below_minimum_state": "insufficient_sample",
+    "cohort_directional": 30,
+    "descriptive": 5,
+    "final_test_confirmation": 30,
+    "live_policy_change": 100,
+    "shadow_recommendation_development_validation": 100
+  },
+  "missed_opportunity_rule": {
+    "classification_occurs_only_after_maturity": true,
+    "long_endpoint_return_min_fraction": 0.12,
+    "maximum_future_excursion_alone_is_sufficient": false,
+    "minimum_trailing_quote_volume_usd": 2000000.0,
+    "primary_horizon_days": 3,
+    "requires_operator_visible_idea": false,
+    "requires_point_in_time_membership": true,
+    "requires_warm_baseline": true,
+    "risk_endpoint_return_max_fraction": -0.1
+  },
+  "missing_data_policy": {
+    "calendar_without_time_valid_snapshot": "missing",
+    "catalyst_without_attribution_public_by_observation": "unknown",
+    "derivatives_without_historical_snapshot": "unavailable",
+    "direct_and_proxy_results_reported_separately": true,
+    "market_cap_without_historical_series": "missing",
+    "onchain_without_historical_snapshot": "unavailable",
+    "proxy_must_be_labeled": true,
+    "spread_without_order_book": "unavailable"
+  },
+  "observation": {
+    "cadence": "1d",
+    "entry_price": "same_daily_close_after_feature_observation",
+    "intraday_fields_without_intraday_data": "unavailable",
+    "minimum_spacing_hours": 24,
+    "same_bar_high_low_for_outcome_forbidden": true,
+    "timestamp": "daily_candle_close"
+  },
+  "operator_burden": {
+    "budgets": {
+      "cooldown_hours": [
+        6,
+        12,
+        24,
+        48
+      ],
+      "material_change_only": true,
+      "one_item_per_visible_family": true,
+      "urgent_per_cycle": [
+        1,
+        3,
+        5
+      ],
+      "urgent_per_day": [
+        3,
+        5,
+        10
+      ]
+    },
+    "metrics": [
+      "ideas_per_day",
+      "urgent_items_per_day",
+      "digest_items_per_day",
+      "repeated_family_items",
+      "material_change_interval_hours",
+      "idea_lifetime_hours",
+      "review_queue_size",
+      "system_warning_volume",
+      "calendar_reminder_volume"
+    ]
+  },
+  "outcomes": {
+    "classifications": [
+      "continuation",
+      "reversal",
+      "breakout_failure",
+      "fade_success",
+      "risk_event_validation",
+      "expired_without_resolution",
+      "post_expiry_continuation",
+      "post_expiry_reversal"
+    ],
+    "mae_basis": "future_low_after_idea_bar",
+    "mfe_basis": "future_high_after_idea_bar",
+    "outcome_before_maturity": "pending",
+    "outcome_data_visible_to_scoring": false,
+    "primary_horizon_days": 3,
+    "relative_benchmarks": [
+      "BTC",
+      "ETH"
+    ],
+    "return_entry": "idea_close",
+    "return_exit": "future_close",
+    "sensitivity_horizons_days": [
+      1,
+      7,
+      14
+    ],
+    "timing_metrics": [
+      "time_to_mfe_hours",
+      "time_to_mae_hours",
+      "time_to_invalidation_hours",
+      "pre_signal_move_7d"
+    ]
+  },
+  "partitions": [
+    {
+      "end_exclusive": "2023-01-01T00:00:00Z",
+      "name": "development",
+      "policy_selection_allowed": true,
+      "start_inclusive": "2021-06-12T00:00:00Z"
+    },
+    {
+      "end_exclusive": "2025-01-01T00:00:00Z",
+      "name": "validation",
+      "policy_selection_allowed": true,
+      "start_inclusive": "2023-01-01T00:00:00Z"
+    },
+    {
+      "end_exclusive": "2026-06-01T00:00:00Z",
+      "name": "final_test",
+      "policy_selection_allowed": false,
+      "start_inclusive": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "point_in_time_universe": {
+    "current_metadata_fallback_forbidden": true,
+    "full_top_n": 100,
+    "future_rank_forbidden": true,
+    "lookback_days": 30,
+    "medium_top_n": 30,
+    "minimum_history_days": 30,
+    "rank_at": "daily_candle_close",
+    "ranking_field": "trailing_mean_quote_volume_usd",
+    "smoke_top_n": 3,
+    "tie_method": "minimum_rank"
+  },
+  "policy_change_rules": {
+    "final_test_may_reject_but_not_select_a_scenario": true,
+    "production_mutation_allowed": false,
+    "recommendations_only": true,
+    "requires_independent_human_approval": true,
+    "requires_versioned_decision_and_rollback": true,
+    "threshold_lowering_to_create_ideas": false
+  },
+  "protocol_version": "decision_radar_empirical_validation_v1",
+  "replay_data_quality_modes": [
+    "temporal_direct",
+    "provider_observed",
+    "historical_ohlcv",
+    "point_in_time_volume_universe",
+    "cross_sectional_proxy",
+    "calendar_fixture",
+    "catalyst_replay",
+    "missing",
+    "unavailable"
+  ],
+  "research_only": true,
+  "safety": {
+    "authorization_mutations": 0,
+    "dashboard_authority_mutations": 0,
+    "event_alpha_paper_trades": 0,
+    "event_alpha_triggered_fade": 0,
+    "normal_rsi_writes": 0,
+    "orders": 0,
+    "provider_calls": 0,
+    "telegram_sends": 0,
+    "trades": 0
+  },
+  "schema_id": "decision_radar.empirical_validation_protocol",
+  "schema_version": 1,
+  "shadow_scenarios": [
+    {
+      "changes": {},
+      "name": "production_policy"
+    },
+    {
+      "changes": {
+        "dashboard_watch_threshold": 40.0
+      },
+      "name": "dashboard_watch_40"
+    },
+    {
+      "changes": {
+        "dashboard_watch_threshold": 50.0
+      },
+      "name": "dashboard_watch_50"
+    },
+    {
+      "changes": {
+        "actionability_threshold": 70.0
+      },
+      "name": "actionable_70"
+    },
+    {
+      "changes": {
+        "actionable_min_evidence": 60.0
+      },
+      "name": "actionable_evidence_60"
+    },
+    {
+      "changes": {
+        "actionable_max_risk": 55.0
+      },
+      "name": "actionable_max_risk_55"
+    },
+    {
+      "changes": {
+        "unknown_spread_actionable": false
+      },
+      "name": "unknown_spread_dashboard_only"
+    },
+    {
+      "changes": {
+        "rapid_urgency_threshold": 78.0
+      },
+      "name": "rapid_urgency_78"
+    },
+    {
+      "changes": {
+        "maximum_expiry_hours": 24
+      },
+      "name": "expiry_24h"
+    },
+    {
+      "changes": {
+        "family_cooldown_hours": 48
+      },
+      "name": "family_cooldown_48h"
+    }
+  ],
+  "statistics": {
+    "bootstrap_resamples_full": 2000,
+    "bootstrap_resamples_medium": 500,
+    "bootstrap_resamples_smoke": 100,
+    "bootstrap_unit": "episode",
+    "causal_claims_from_matched_controls": false,
+    "confidence_level": 0.95,
+    "deterministic_seed": 20260716,
+    "multiple_comparison_policy": "exploratory_cohorts_are_unadjusted_and_must_carry_a_multiple_comparison_warning",
+    "reported_location": [
+      "mean",
+      "median",
+      "trimmed_mean_10pct"
+    ],
+    "reported_risk": [
+      "hit_rate",
+      "mfe",
+      "mae",
+      "downside_5pct",
+      "drawdown_proxy"
+    ]
+  },
+  "status": "frozen_before_final_test_evaluation",
+  "walk_forward": {
+    "confirmation_partition": "final_test",
+    "final_test_used_for_tuning": false,
+    "minimum_folds": 3,
+    "recommendation_set_must_be_hashed_before_final_test": true,
+    "rolling_test_days": 180,
+    "rolling_train_days": 730,
+    "scenario_set_frozen_with_protocol": true,
+    "selection_partitions": [
+      "development",
+      "validation"
+    ]
+  }
+}
+

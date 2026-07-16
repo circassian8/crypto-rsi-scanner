@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Freeze empirical-validation protocol before final-test replay · Codex
+**Why:** Existing backtest primitives are useful but do not provide a closed
+Decision-v2 replay or a final-test firewall. The research dates, primary
+outcome, controls, missed-move definitions, cost assumptions, and shadow
+scenarios therefore had to be fixed before calculating final-partition results.
+**Changes:**
+- Added `decision_radar_empirical_validation_v1`, a closed immutable protocol
+  with explicit local data sources and limitations, daily point-in-time volume
+  membership, feature warm-up and missing-data rules, contiguous
+  development/validation/final-test partitions, frozen 3-day primary and
+  1/7/14-day sensitivity outcomes, fixed-start episode progression, outcome-
+  blind controls, predeclared missed/false/late rules, costs, bootstrap/sample
+  thresholds, shadow scenarios, operator budgets, and zero-side-effect policy.
+- Added tracked JSON/Markdown protocol projections, an offline validation Make
+  target, fail-closed mutation tests, the durable decision, and the active
+  roadmap entry. The protocol explicitly labels residual cached-pool
+  survivorship and daily-data limits; it does not manufacture intraday, spread,
+  catalyst, calendar, derivatives, on-chain, or market-cap evidence.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_empirical_validation_protocol.py` (6 passed); `make
+radar-research-protocol-check PYTHON=python3`; focused `compileall`; and
+`git diff --check` passed.
+**Notes/risks:** No final-test Decision-v2 outcome was evaluated in this slice.
+No provider call, authorization mutation, send, trade, paper trade, RSI write,
+execution, dashboard-authority mutation, threshold/route change, or Event Alpha
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-16 — Deliver operator authority and evidence reality v1 · Codex
 **Why:** Fixture and release workflows could mutate the canonical dashboard
 pointer, while notification-quality profiles blurred source capability with

@@ -16,6 +16,37 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-16 - Freeze Decision Radar empirical-validation protocol v1 before final-test evaluation
+**Status:** accepted
+**Decision:** Use `decision_radar_empirical_validation_v1` as the immutable
+research protocol for the first Decision-v2 historical replay. It fixes the
+daily completed-candle observation clock, trailing 30-day point-in-time quote-
+volume universe, 2021-06-12 through 2026-06-01 idea window, contiguous
+development/validation/final-test partitions, 3-day primary outcome, 1/7/14-day
+sensitivity outcomes, fixed-start 24-hour episodes, outcome-blind matched
+controls, predeclared missed/false/late rules, deterministic episode bootstrap,
+cost scenarios, minimum samples, operator-burden budgets, and the complete
+shadow scenario set. Development and validation may nominate a recommendation;
+the final test may only confirm or reject its already-hashed bytes.
+
+The locally cached Binance universe is point-in-time by trailing volume only
+inside the retained candidate pool and must carry its residual delisting-
+survivorship limitation. Daily OHLCV cannot be presented as intraday timing or
+observed spread. Missing catalyst, calendar, derivatives, on-chain, market-cap,
+and order-book evidence stays missing or unavailable. Fixture route coverage is
+mechanical evidence only. The lab is research-only, `auto_apply=false`, and
+cannot mutate production thresholds, routes, policy, authorization, dashboard
+authority, sends, trades, paper trades, RSI rows, or `TRIGGERED_FADE`.
+**Why:** Choosing partitions, outcomes, missed-move thresholds, or scenarios
+after viewing final-test Decision results would make the apparent validation
+non-reproducible and outcome-leaking. Freezing the limitations as well as the
+parameters prevents unavailable data from being silently converted into a
+stronger claim.
+**Revisit when:** A new protocol version is proposed before its own untouched
+holdout is evaluated. Historical v1 results and bytes remain immutable; any
+production policy change still needs independent human approval, a versioned
+decision, and rollback criteria.
+
 ## 2026-07-16 - Treat Event Alpha profiles as capability, never authorization
 **Status:** accepted
 **Decision:** A profile may describe which live source or OpenAI stage it can
