@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-16 — Complete Empirical Validation Lab v1 release · Codex
+**Why:** The empirical lab was not complete until the locked runtime, security
+boundary, dashboard surface, artifact-heavy checkout, broad package gate, and
+standalone compatibility runner all agreed on the exact current evidence.
+**Changes:**
+- Closed the local release ladder without changing the frozen protocol,
+  production Decision policy, provider authorization, notifications, execution,
+  or dashboard authority.
+- Rechecked the exact selection/final pair and seven-report bundle after the
+  architecture reconciliation; the empirical behavior fingerprint remains
+  `ffbf55bc11257cb579d9e192874aaa6fd546d9421c40a2caed41ebae6eaa9e61`.
+- Confirmed the authoritative dashboard pointer SHA-256 remained exactly
+  `95b35b13e7e7e5d4d4566d7ccbc2dcc440191266796f21efd9d074ce56967d88`
+  before and after every release gate.
+**Verify:** Export parent-symlink regression passed first (1 test); the complete
+export security stack passed (14 tests); the empirical/dashboard stack passed
+332 tests; compileall, frozen protocol, resumed fixture replay, exact report
+byte-check, dashboard smoke, dashboard UX smoke, and architecture cleanliness
+passed. The artifact-heavy extracted-checkout guard passed 14 tests in 0.22s.
+After fixing the architecture accounting found by its first run, `verify-fast`
+passed 2,498 tests in 152.42s plus alert/backtest/scoreboard smokes. Full
+`make verify` passed the standalone runner 1,391/1,391, the package suite 2,498
+tests in 151.40s, and the same smokes. The report bundle remained
+`267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`.
+**Notes/risks:** This is a measured negative result: all nine shadow alternatives
+remain unsupported and no candidate was sealed. Five routes, six non-market-led
+origins, observed spread/order-book quality, and intraday timing still lack
+historical evidence. A new research protocol and untouched holdout are required
+before any future policy recommendation.
+
 ## 2026-07-16 — Reconcile empirical research with architecture gates · Codex
 **Why:** The first broad locked-runtime `verify-fast` run exposed two release
 accounting gaps that focused feature tests could not see: seven new files over
