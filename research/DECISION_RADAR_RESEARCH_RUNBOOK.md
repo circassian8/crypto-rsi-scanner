@@ -89,7 +89,11 @@ Complete the rendered template with an intended venue, `spot`/`perpetual`/`dex`
 mode, quote currency, exact bounded eligible-instrument set, dated
 jurisdiction/account eligibility confirmation, and the expected public/private
 market-data boundary. This grants no provider, private-data, order, or trading
-permission and does not select a spread provider.
+permission and does not select a spread provider. The concise option comparison
+is [Decision Radar execution-venue decision package](DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md).
+Its multiple-venue research alternative keeps every venue's book and quote
+separate; it cannot close the primary cost model until one execution surface is
+sealed.
 
 ## Inputs and default paths
 
@@ -330,37 +334,58 @@ bytes, scoring, selection, production policy, or dashboard authority.
 
 ## Bounded source-with-artifacts and optional history exports
 
-The checked-in empirical artifact policy defines the exact canonical fixture,
-medium, selection, and final-test runs; frozen protocol and Protocol-v2
-readiness artifacts; seven v1 reports; separate hardening supplement; and
-optional bounded feedback ledger. Build the normal overwrite-in-place review
-archive with:
+The checked-in project artifact policy is the top-level selection authority for
+the normal review ZIP. It keeps only exact operator controls, the current
+pointer-selected generation, the latest genuine live/no-send attempt
+generation, bounded shared campaign/calendar/source-contract state, and the
+canonical selection delegated to the empirical policy. Fixture, rehearsal,
+failed, intermediate, superseded, and historical artifacts are excluded from
+the normal archive without being deleted, moved, compacted, or rewritten.
+
+Build the normal overwrite-in-place review archive with:
 
 ```sh
 make export-src-with-artifacts PYTHON=.venv/bin/python
 ```
 
-Superseded empirical runs and reports remain untouched locally and are excluded
-from the normal archive. Export their exact disjoint complement, with an
-immutable manifest and checksums, only when historical review is needed:
+Export the exact disjoint complement of the standard project selection only
+when complete historical review is needed:
+
+```sh
+make export-project-artifact-history PYTHON=.venv/bin/python
+```
+
+That command may write only the fixed ignored file
+`crypto_rsi_scanner_artifact_history.zip`. It carries immutable per-file
+fingerprints, a manifest, and checksums. Missing optional current sources stay
+explicit in the standard manifest as partial coverage; they are never treated
+as healthy-empty.
+
+Within that top-level policy, the checked-in empirical artifact policy defines
+the exact canonical fixture, medium, selection, and final-test runs; frozen
+protocol and Protocol-v2 readiness artifacts; seven v1 reports; separate
+hardening supplement; and optional bounded feedback ledger. The narrower
+empirical-only history complement remains available for lab-specific review:
 
 ```sh
 make export-empirical-artifact-history PYTHON=.venv/bin/python
 ```
 
-The history command may write only the fixed ignored file
-`crypto_rsi_scanner_empirical_artifact_history.zip`. Neither exporter deletes,
-moves, compacts, or rewrites input evidence. Missing policy/lab data, manifest
+The empirical history command may write only the fixed ignored file
+`crypto_rsi_scanner_empirical_artifact_history.zip`. None of the exporters
+deletes, moves, compacts, or rewrites input evidence. Missing policy/lab data, manifest
 drift, unmanifested canonical files, invalid feedback, excluded noise,
 symlinks, path replacement, bounds violations, secrets, or archive collisions
 fail closed and preserve any prior successful archive.
 
-The hardening measurement inventory is explicit and additive: the local lab has
-439 regular files / 972,516,087 logical bytes; the standard selection retains 76
-lab files / 194,084,656 logical bytes; and the optional history complement has
-363 files / 778,431,431 logical bytes. Those sets are disjoint and reconcile to
-the complete local inventory. Archive compression is reported by each command;
-it is not used as a retention rule.
+The project-wide hardening inventory is explicit and additive: 2,439 eligible
+artifacts split into 161 canonical files and 2,278 history files. The nested
+lab inventory remains 439 regular files / 972,516,087 logical bytes; its
+standard selection retains 76 lab files / 194,084,656 logical bytes and its
+lab-specific history complement has 363 files / 778,431,431 logical bytes. Each
+standard/history pair is disjoint and reconciles to its complete inventory.
+Archive compression is reported by each command; it is not used as a retention
+rule.
 
 ### Platform-truthful release evidence
 

@@ -1384,7 +1384,7 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
         outside_future_ts = time.time() + 172800
         os.utime(outside, (outside_future_ts, outside_future_ts))
         outside_mtime_ns = outside.stat().st_mtime_ns
-        artifact_dir = tree / "event_fade_cache" / "unit"
+        artifact_dir = tree / "backtest_cache" / "unit"
         artifact_dir.mkdir(parents=True)
         (artifact_dir / "linked-evidence.txt").symlink_to(outside)
         future_ts = time.time() + 86400
@@ -1399,7 +1399,7 @@ def test_export_source_with_artifacts_fallback_and_archive_validation():
         assert ".env" not in names
         assert "local.db" not in names
         assert "backtest_cache/cached.json" not in names
-        assert "event_fade_cache/unit/linked-evidence.txt" not in names
+        assert "backtest_cache/unit/linked-evidence.txt" not in names
         assert outside.stat().st_mtime_ns == outside_mtime_ns
         assert outside.read_text(encoding="utf-8") == "unconfigured private material\n"
         assert makefile_ts <= time.time()

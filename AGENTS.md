@@ -122,6 +122,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   360 seconds; it is observational rather than a flaky CI wall-clock gate.
   Investigate a run above 360 seconds or more than 25% slower than the latest
   comparable same-machine baseline before release.
+  The standalone compatibility runner behind `make test` always starts one
+  disposable artifact/discovery root, strips ambient per-store path overrides,
+  disables sends, and removes that root on exit. This preserves namespace-
+  relative test behavior while preventing the compatibility pass from appending
+  to cumulative operator stores. A release sequence must compare the real
+  artifact tree and dashboard pointer before/after when authority neutrality is
+  part of the acceptance evidence.
   Run full `make verify` for release-style handoff, risky shared
   code changes, CI/parity checks, before live/provider activation work, after a
   cluster of roughly 5-10 low-risk prompts, or whenever targeted evidence is
@@ -132,13 +139,24 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   such as `.env`, DBs, logs, caches, and `.venv` are not shared.
 - **Source + research artifacts export:** `make export-src-with-artifacts`
   overwrites `crypto_rsi_scanner_source_with_artifacts.zip` with current
-  committed source plus local research artifacts such as `event_fade_cache/`,
-  while excluding secrets, DBs, logs, virtualenvs, git data, caches, and other
-  zip files. The supported exporter is read-only with respect to source and
-  research inputs and writes one reproducible, UTC-safe ZIP timestamp for every
-  entry (the ZIP epoch by default, or a wall-clock-safe `SOURCE_DATE_EPOCH`). It
-  must retain the descriptor-anchored symlink/TOCTOU and secret-scanning gates;
-  never normalize review archives by mutating input mtimes. Tests that do not
+  committed source plus only the canonical project evidence selected by
+  `research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json`. The project policy
+  retains exact operator controls, current pointer and latest genuine
+  live/no-send namespaces, shared campaign/source-contract/calendar state, and
+  the separately governed canonical empirical evidence. Superseded, fixture,
+  failed, rehearsal, and other noncanonical artifacts remain immutable locally
+  and are excluded from the standard ZIP; `make
+  export-project-artifact-history` copies their exact disjoint complement into
+  one fixed optional ignored archive with an immutable manifest and checksums.
+  Neither export deletes, moves, compacts, or rewrites artifacts. Both exclude
+  secrets, DBs, logs, virtualenvs, git data, caches, and other zip files. The
+  supported exporter is read-only with respect to source and research inputs
+  and writes one reproducible, UTC-safe ZIP timestamp for every entry (the ZIP
+  epoch by default, or a wall-clock-safe `SOURCE_DATE_EPOCH`). It must retain
+  the descriptor-anchored symlink/TOCTOU, bounded-inventory, exact-selection,
+  post-write source-drift, and secret-scanning gates; never normalize review
+  archives by mutating input mtimes. Missing optional canonical sources are
+  reported as partial coverage, never healthy-empty. Tests that do not
   explicitly verify shipped artifacts use isolated temporary artifact bases;
   cumulative root stores are excluded from unrelated fixture tests. In an
   extracted source-with-artifacts review checkout, run `make
@@ -300,13 +318,19 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   events remain context/risk only and cannot manufacture directional bias.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
-  feasible spot, perpetual, and DEX venue contracts. Its v2 decision boundary
-  requires the owner to name the intended venue, instrument mode, quote
-  currency, exact bounded eligible-instrument set, current jurisdiction/account
-  eligibility, and expected public/private market-data boundary. It requests no
-  public/private data permission, order permission, or trading permission. Do
-  not select a venue, spread provider, activate a live adapter, or add
-  execution/order behavior on the owner's behalf.
+  feasible spot, perpetual, DEX, and comparative multiple-venue research
+  contracts. The concise checked decision package is
+  `research/DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md`; the structured
+  form is available from `radar-execution-quality-readiness-json`. Multiple-
+  venue mode keeps native venue identity and may study robustness, but it does
+  not close Protocol-v2's primary cost model until one execution surface is
+  sealed. The v3 decision boundary requires the owner to name the intended
+  venue, instrument mode, quote currency, exact bounded eligible-instrument
+  set, current jurisdiction/account eligibility, and expected public/private
+  market-data boundary. It requests no public/private data permission, order
+  permission, or trading permission. Do not select a venue, spread provider,
+  activate a live adapter, or add execution/order behavior on the owner's
+  behalf.
 - **Empirical Protocol-v2 readiness:**
   `make radar-research-protocol-v2-readiness` renders the frozen/static required
   evidence and annex contract without reading environment, files, credentials,

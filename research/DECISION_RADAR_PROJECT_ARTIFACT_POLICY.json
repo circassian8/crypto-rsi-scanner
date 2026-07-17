@@ -1,0 +1,55 @@
+{
+  "artifact_root": "event_fade_cache",
+  "canonical_root_files": [
+    "event_alpha_namespace_registry.json",
+    "event_market_no_send_attempts.jsonl",
+    "event_market_no_send_latest_attempt.json",
+    "event_market_no_send_pilot_audit.json",
+    "event_market_no_send_pilot_audit.md",
+    "event_provider_health.json",
+    "event_radar_daily_operations_current_status.json",
+    "event_radar_daily_operations_cycles.jsonl",
+    "event_radar_daily_operations_state.json",
+    "radar_current_namespace.json"
+  ],
+  "canonical_shared_directories": [
+    "event_source_independence_contracts",
+    "official_macro_calendar",
+    "radar_market_history_cache"
+  ],
+  "delegated_empirical_subtree": "decision_radar_research_lab",
+  "dynamic_namespace_selectors": [
+    {
+      "kind": "dashboard_pointer_namespace",
+      "path": "radar_current_namespace.json"
+    },
+    {
+      "kind": "latest_live_no_send_attempt_namespace",
+      "path": "event_market_no_send_latest_attempt.json"
+    }
+  ],
+  "history_archive": {
+    "checksums_archive_path": "PROJECT_ARTIFACT_HISTORY_SHA256SUMS.txt",
+    "manifest_archive_path": "PROJECT_ARTIFACT_HISTORY_MANIFEST.json",
+    "output_filename": "crypto_rsi_scanner_artifact_history.zip"
+  },
+  "limits": {
+    "max_artifact_file_count": 4096,
+    "max_artifact_total_bytes": 1610612736,
+    "max_history_file_count": 4096,
+    "max_history_total_bytes": 1610612736,
+    "max_single_artifact_file_bytes": 134217728,
+    "max_standard_artifact_file_count": 512,
+    "max_standard_artifact_total_bytes": 402653184
+  },
+  "policy": {
+    "canonical_selection_is_manifested": true,
+    "delegated_empirical_policy_remains_authoritative": true,
+    "history_export_is_optional": true,
+    "local_artifacts_are_never_deleted_or_moved": true,
+    "standard_export_excludes_noncanonical_artifacts": true
+  },
+  "schema_id": "decision_radar.project_artifact_export_policy",
+  "schema_version": 1,
+  "standard_manifest_archive_path": "event_fade_cache/PROJECT_ARTIFACT_EXPORT_MANIFEST.json"
+}

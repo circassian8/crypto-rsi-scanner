@@ -42,6 +42,16 @@ EMPIRICAL_HISTORY_MANIFEST_ARCHIVE_PATH = (
 EMPIRICAL_HISTORY_CHECKSUMS_ARCHIVE_PATH = (
     "EMPIRICAL_ARTIFACT_HISTORY_SHA256SUMS.txt"
 )
+PROJECT_ARTIFACT_POLICY_RELATIVE_PATH = Path(
+    "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json"
+)
+PROJECT_ARTIFACT_ROOT_RELATIVE_PATH = Path("event_fade_cache")
+PROJECT_STANDARD_MANIFEST_ARCHIVE_PATH = (
+    "event_fade_cache/PROJECT_ARTIFACT_EXPORT_MANIFEST.json"
+)
+PROJECT_HISTORY_OUTPUT_FILENAME = "crypto_rsi_scanner_artifact_history.zip"
+PROJECT_HISTORY_MANIFEST_ARCHIVE_PATH = "PROJECT_ARTIFACT_HISTORY_MANIFEST.json"
+PROJECT_HISTORY_CHECKSUMS_ARCHIVE_PATH = "PROJECT_ARTIFACT_HISTORY_SHA256SUMS.txt"
 EMPIRICAL_PROTOCOL_V2_DOCUMENT_PATH = Path(
     "research/DECISION_RADAR_EMPIRICAL_PROTOCOL_V2_READINESS.md"
 )
@@ -87,6 +97,42 @@ EMPIRICAL_LIMITS = {
     "max_standard_empirical_file_count": 128,
     "max_standard_empirical_total_bytes": 268_435_456,
 }
+PROJECT_ARTIFACT_LIMITS = {
+    "max_artifact_file_count": 4_096,
+    "max_artifact_total_bytes": 1_610_612_736,
+    "max_history_file_count": 4_096,
+    "max_history_total_bytes": 1_610_612_736,
+    "max_single_artifact_file_bytes": 134_217_728,
+    "max_standard_artifact_file_count": 512,
+    "max_standard_artifact_total_bytes": 402_653_184,
+}
+PROJECT_CANONICAL_ROOT_FILES = (
+    "event_alpha_namespace_registry.json",
+    "event_market_no_send_attempts.jsonl",
+    "event_market_no_send_latest_attempt.json",
+    "event_market_no_send_pilot_audit.json",
+    "event_market_no_send_pilot_audit.md",
+    "event_provider_health.json",
+    "event_radar_daily_operations_current_status.json",
+    "event_radar_daily_operations_cycles.jsonl",
+    "event_radar_daily_operations_state.json",
+    "radar_current_namespace.json",
+)
+PROJECT_CANONICAL_SHARED_DIRECTORIES = (
+    "event_source_independence_contracts",
+    "official_macro_calendar",
+    "radar_market_history_cache",
+)
+PROJECT_DYNAMIC_NAMESPACE_SELECTORS = (
+    {
+        "kind": "dashboard_pointer_namespace",
+        "path": "radar_current_namespace.json",
+    },
+    {
+        "kind": "latest_live_no_send_attempt_namespace",
+        "path": "event_market_no_send_latest_attempt.json",
+    },
+)
 _OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
 _STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
 _STAT_SUPPORTS_FOLLOW_SYMLINKS = os.stat in os.supports_follow_symlinks
@@ -270,6 +316,9 @@ def _tracked_paths(root: Path = ROOT) -> set[Path]:
 def _walk_source_paths(root: Path = ROOT) -> set[Path]:
     paths: set[Path] = set()
     for path in root.rglob("*"):
+        relative = path.relative_to(root)
+        if relative.parts and relative.parts[0] in ARTIFACT_ROOTS:
+            continue
         if _safe_regular_file(path, root=root) and not _skip(path, root=root):
             paths.add(path)
     return paths
@@ -1333,6 +1382,377 @@ def _standard_empirical_manifest(plan: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _validate_project_artifact_policy(policy: object) -> dict[str, object]:
+    """Validate the one checked-in authority for non-empirical artifact export."""
+
+    if not isinstance(policy, dict):
+        raise ValueError("project artifact policy must be an object")
+    if (
+        policy.get("schema_id") != "decision_radar.project_artifact_export_policy"
+        or policy.get("schema_version") != 1
+    ):
+        raise ValueError("unsupported project artifact policy")
+    expected_keys = {
+        "artifact_root",
+        "canonical_root_files",
+        "canonical_shared_directories",
+        "delegated_empirical_subtree",
+        "dynamic_namespace_selectors",
+        "history_archive",
+        "limits",
+        "policy",
+        "schema_id",
+        "schema_version",
+        "standard_manifest_archive_path",
+    }
+    if set(policy) != expected_keys:
+        raise ValueError("project artifact policy schema is not closed")
+    if (
+        _policy_relative_path(policy.get("artifact_root"), field="artifact_root")
+        != PROJECT_ARTIFACT_ROOT_RELATIVE_PATH
+        or _policy_relative_path(
+            policy.get("delegated_empirical_subtree"),
+            field="delegated_empirical_subtree",
+        )
+        != Path("decision_radar_research_lab")
+        or _policy_relative_path(
+            policy.get("standard_manifest_archive_path"),
+            field="standard_manifest_archive_path",
+        ).as_posix()
+        != PROJECT_STANDARD_MANIFEST_ARCHIVE_PATH
+    ):
+        raise ValueError("project artifact policy paths are not fixed")
+    if tuple(policy.get("canonical_root_files") or ()) != PROJECT_CANONICAL_ROOT_FILES:
+        raise ValueError("project canonical root-file policy drifted")
+    if (
+        tuple(policy.get("canonical_shared_directories") or ())
+        != PROJECT_CANONICAL_SHARED_DIRECTORIES
+    ):
+        raise ValueError("project canonical shared-directory policy drifted")
+    if tuple(policy.get("dynamic_namespace_selectors") or ()) != (
+        PROJECT_DYNAMIC_NAMESPACE_SELECTORS
+    ):
+        raise ValueError("project dynamic selector policy drifted")
+    limits = policy.get("limits")
+    if (
+        not isinstance(limits, dict)
+        or limits != PROJECT_ARTIFACT_LIMITS
+        or any(type(value) is not int or value < 1 for value in limits.values())
+    ):
+        raise ValueError("project artifact limits are not fixed and bounded")
+    policy_flags = policy.get("policy")
+    required_flags = {
+        "canonical_selection_is_manifested",
+        "delegated_empirical_policy_remains_authoritative",
+        "history_export_is_optional",
+        "local_artifacts_are_never_deleted_or_moved",
+        "standard_export_excludes_noncanonical_artifacts",
+    }
+    if (
+        not isinstance(policy_flags, dict)
+        or set(policy_flags) != required_flags
+        or any(policy_flags.get(key) is not True for key in required_flags)
+    ):
+        raise ValueError("project artifact policy safety flags are incomplete")
+    history = policy.get("history_archive")
+    expected_history = {
+        "checksums_archive_path": PROJECT_HISTORY_CHECKSUMS_ARCHIVE_PATH,
+        "manifest_archive_path": PROJECT_HISTORY_MANIFEST_ARCHIVE_PATH,
+        "output_filename": PROJECT_HISTORY_OUTPUT_FILENAME,
+    }
+    if not isinstance(history, dict) or history != expected_history:
+        raise ValueError("project artifact history policy drifted")
+    for field, value in expected_history.items():
+        path = _policy_relative_path(value, field=f"history_archive.{field}")
+        if len(path.parts) != 1:
+            raise ValueError("project artifact history paths must be basenames")
+    return policy
+
+
+def _load_project_artifact_policy(
+    root: Path,
+) -> tuple[dict[str, object], bytes] | None:
+    artifact_root = root / PROJECT_ARTIFACT_ROOT_RELATIVE_PATH
+    try:
+        artifact_identity = artifact_root.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(artifact_identity.st_mode) or stat.S_ISLNK(
+        artifact_identity.st_mode
+    ):
+        raise ValueError("project artifact root is not a safe directory")
+    policy_path = root / PROJECT_ARTIFACT_POLICY_RELATIVE_PATH
+    policy_raw = _verified_file_bytes_bounded(
+        policy_path,
+        root=root,
+        maximum=64 * 1024,
+    )
+    try:
+        parsed = json.loads(policy_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("project artifact policy is invalid JSON") from exc
+    return _validate_project_artifact_policy(parsed), policy_raw
+
+
+def _project_namespace_component(value: object, *, field: str) -> str:
+    path = _policy_relative_path(value, field=field)
+    if len(path.parts) != 1 or not re.fullmatch(
+        r"radar_market_no_send_[A-Za-z0-9_]+", path.name
+    ):
+        raise ValueError(f"invalid project artifact namespace: {field}")
+    return path.name
+
+
+def _dashboard_pointer_namespace(payload: bytes) -> tuple[str, dict[str, object]]:
+    from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
+        validate_current_namespace_pointer_bytes,
+    )
+
+    pointer = validate_current_namespace_pointer_bytes(payload)
+    namespace = _project_namespace_component(
+        pointer.get("artifact_namespace"), field="dashboard pointer namespace"
+    )
+    return namespace, {
+        "artifact_namespace": namespace,
+        "revision": pointer["revision"],
+        "run_id": pointer["run_id"],
+        "status": "selected",
+    }
+
+
+def _latest_attempt_namespace(payload: bytes) -> tuple[str, dict[str, object]]:
+    try:
+        row = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("latest market attempt is invalid JSON") from exc
+    if not isinstance(row, dict):
+        raise ValueError("latest market attempt must be an object")
+    required_truth = {
+        "candidate_source_mode": "live_no_send",
+        "data_acquisition_mode": "live_provider",
+        "data_mode": "live",
+        "no_send": True,
+        "research_only": True,
+        "row_type": "event_market_no_send_latest_attempt",
+    }
+    if any(row.get(key) != value for key, value in required_truth.items()):
+        raise ValueError("latest market attempt is not canonical live/no-send evidence")
+    if row.get("status") not in {"blocked", "complete", "failed", "skipped"}:
+        raise ValueError("latest market attempt status is invalid")
+    namespace = _project_namespace_component(
+        row.get("artifact_namespace"), field="latest attempt namespace"
+    )
+    return namespace, {
+        "artifact_namespace": namespace,
+        "attempt_id": row.get("attempt_id"),
+        "provider_call_attempted": row.get("provider_call_attempted"),
+        "status": "selected",
+        "terminal_status": row.get("status"),
+    }
+
+
+def _project_artifact_export_plan(
+    root: Path,
+    *,
+    empirical_plan: dict[str, object] | None,
+) -> dict[str, object] | None:
+    """Select current operator evidence while preserving history in place."""
+
+    loaded = _load_project_artifact_policy(root)
+    if loaded is None:
+        return None
+    policy, policy_raw = loaded
+    limits = policy["limits"]
+    artifact_root = root / PROJECT_ARTIFACT_ROOT_RELATIVE_PATH
+    inventoried = _strict_regular_files_under(
+        artifact_root,
+        root=root,
+        max_file_count=limits["max_artifact_file_count"],
+        max_total_bytes=limits["max_artifact_total_bytes"],
+        max_single_file_bytes=limits["max_single_artifact_file_bytes"],
+    )
+    eligible = {path for path in inventoried if not _skip(path, root=root)}
+    excluded_noise = sorted(
+        path.relative_to(root).as_posix() for path in inventoried - eligible
+    )
+    synthetic_manifest = root / Path(
+        *PurePosixPath(PROJECT_STANDARD_MANIFEST_ARCHIVE_PATH).parts
+    )
+    if synthetic_manifest in inventoried:
+        raise ValueError("project artifact tree collides with synthetic manifest")
+
+    selected: set[Path] = set()
+    roles: dict[Path, str] = {}
+    present_root_files: list[str] = []
+    missing_root_files: list[str] = []
+    for name in policy["canonical_root_files"]:
+        path = artifact_root / str(name)
+        if path in eligible:
+            selected.add(path)
+            roles[path] = "canonical_operator_control"
+            present_root_files.append(str(name))
+        else:
+            missing_root_files.append(str(name))
+
+    present_shared_directories: list[str] = []
+    missing_shared_directories: list[str] = []
+    for name in policy["canonical_shared_directories"]:
+        directory = artifact_root / str(name)
+        try:
+            identity = directory.lstat()
+        except FileNotFoundError:
+            missing_shared_directories.append(str(name))
+            continue
+        if not stat.S_ISDIR(identity.st_mode) or stat.S_ISLNK(identity.st_mode):
+            raise ValueError("canonical shared artifact path is not a safe directory")
+        directory_inventory = _strict_regular_files_under(
+            directory,
+            root=root,
+            max_file_count=limits["max_standard_artifact_file_count"],
+            max_total_bytes=limits["max_standard_artifact_total_bytes"],
+            max_single_file_bytes=limits["max_single_artifact_file_bytes"],
+        )
+        directory_paths = {
+            path for path in directory_inventory if not _skip(path, root=root)
+        }
+        if not directory_paths <= eligible:
+            raise ValueError("canonical shared artifact directory escaped inventory")
+        selected.update(directory_paths)
+        for path in directory_paths:
+            roles[path] = "canonical_shared_state"
+        present_shared_directories.append(str(name))
+
+    selector_results: list[dict[str, object]] = []
+    selector_roles = {
+        "dashboard_pointer_namespace": "current_dashboard_authority_generation",
+        "latest_live_no_send_attempt_namespace": "latest_live_no_send_attempt_generation",
+    }
+    selector_loaders = {
+        "dashboard_pointer_namespace": _dashboard_pointer_namespace,
+        "latest_live_no_send_attempt_namespace": _latest_attempt_namespace,
+    }
+    for selector in policy["dynamic_namespace_selectors"]:
+        kind = str(selector["kind"])
+        control_name = str(selector["path"])
+        control_path = artifact_root / control_name
+        if control_path not in eligible:
+            selector_results.append(
+                {"kind": kind, "path": control_name, "status": "control_missing"}
+            )
+            continue
+        payload = _verified_file_bytes_bounded(
+            control_path,
+            root=root,
+            maximum=4 * 1024 * 1024,
+        )
+        namespace, result = selector_loaders[kind](payload)
+        directory = artifact_root / namespace
+        directory_inventory = _strict_regular_files_under(
+            directory,
+            root=root,
+            max_file_count=limits["max_standard_artifact_file_count"],
+            max_total_bytes=limits["max_standard_artifact_total_bytes"],
+            max_single_file_bytes=limits["max_single_artifact_file_bytes"],
+        )
+        directory_paths = {
+            path for path in directory_inventory if not _skip(path, root=root)
+        }
+        if not directory_paths or not directory_paths <= eligible:
+            raise ValueError("dynamic canonical artifact namespace is incomplete or unsafe")
+        selected.update(directory_paths)
+        for path in directory_paths:
+            roles[path] = selector_roles[kind]
+        selector_results.append({"kind": kind, "path": control_name, **result})
+
+    delegated_paths: set[Path] = set()
+    delegated_root = artifact_root / str(policy["delegated_empirical_subtree"])
+    try:
+        delegated_root.lstat()
+    except FileNotFoundError:
+        if empirical_plan is not None:
+            raise ValueError("empirical export plan exists without delegated subtree")
+    else:
+        if empirical_plan is None:
+            raise ValueError("delegated empirical subtree lacks its canonical policy")
+        delegated_paths = set(empirical_plan["selected_lab_paths"])
+        if not delegated_paths <= eligible:
+            raise ValueError("delegated empirical selection is outside project inventory")
+        selected.update(delegated_paths)
+        for path in delegated_paths:
+            roles[path] = "delegated_empirical_current"
+
+    if not selected <= eligible:
+        raise ValueError("project artifact selection is outside the eligible inventory")
+    entries = []
+    for path in sorted(selected, key=lambda item: item.relative_to(root).as_posix()):
+        entries.append(
+            {
+                "path": path.relative_to(root).as_posix(),
+                "role": roles[path],
+                **_verified_file_fingerprint(path, root=root),
+            }
+        )
+    if (
+        len(entries) > limits["max_standard_artifact_file_count"]
+        or sum(int(row["size_bytes"]) for row in entries)
+        > limits["max_standard_artifact_total_bytes"]
+    ):
+        raise ValueError("canonical project artifact selection exceeds policy bounds")
+    return {
+        "all_artifact_paths": eligible,
+        "delegated_empirical_path_count": len(delegated_paths),
+        "entries": entries,
+        "excluded_noise": excluded_noise,
+        "missing_root_files": missing_root_files,
+        "missing_shared_directories": missing_shared_directories,
+        "policy": policy,
+        "policy_sha256": hashlib.sha256(policy_raw).hexdigest(),
+        "present_root_files": present_root_files,
+        "present_shared_directories": present_shared_directories,
+        "selected_artifact_paths": selected,
+        "selector_results": selector_results,
+    }
+
+
+def _standard_project_artifact_manifest(plan: dict[str, object]) -> dict[str, object]:
+    policy = plan["policy"]
+    entries = plan["entries"]
+    missing_root_files = plan["missing_root_files"]
+    missing_shared_directories = plan["missing_shared_directories"]
+    return {
+        "all_eligible_artifact_count": len(plan["all_artifact_paths"]),
+        "canonical_selection_is_closed": True,
+        "canonical_source_coverage_status": (
+            "complete"
+            if not missing_root_files and not missing_shared_directories
+            else "partial"
+        ),
+        "delegated_empirical_path_count": plan["delegated_empirical_path_count"],
+        "entries": entries,
+        "entry_count": len(entries),
+        "excluded_history_count": len(plan["all_artifact_paths"])
+        - len(plan["selected_artifact_paths"]),
+        "excluded_noise": plan["excluded_noise"],
+        "history_archive": {
+            "available_via_separate_optional_export": True,
+            "included_in_standard_export": False,
+            "output_filename": policy["history_archive"]["output_filename"],
+        },
+        "local_artifacts_deleted_or_moved": False,
+        "missing_canonical_root_files": missing_root_files,
+        "missing_canonical_shared_directories": missing_shared_directories,
+        "policy_sha256": plan["policy_sha256"],
+        "present_canonical_root_files": plan["present_root_files"],
+        "present_canonical_shared_directories": plan[
+            "present_shared_directories"
+        ],
+        "research_only": True,
+        "schema_id": "decision_radar.project_artifact_export_manifest",
+        "schema_version": 1,
+        "selector_results": plan["selector_results"],
+    }
+
+
 def _write_bytes_to_zip(
     zf: zipfile.ZipFile,
     data: bytes,
@@ -2118,28 +2538,252 @@ def empirical_history_main(
             os.close(parent_fd)
 
 
+def project_history_main(
+    root: Path = ROOT,
+    out: Path | None = None,
+) -> int:
+    """Write the fixed optional archive of all non-canonical project artifacts."""
+
+    output = Path(root).expanduser().absolute() / PROJECT_HISTORY_OUTPUT_FILENAME
+    resolved_parent = output.parent
+    parent_fd = -1
+    parent_stat: os.stat_result | None = None
+    candidate_name = f"{output.name}.tmp"
+    candidate_identity: tuple[int, int] | None = None
+    validation_fd = -1
+    try:
+        empirical_plan = _empirical_export_plan(root)
+        plan = _project_artifact_export_plan(
+            root,
+            empirical_plan=empirical_plan,
+        )
+        if plan is None or not plan["all_artifact_paths"]:
+            raise ValueError("project artifact history is unavailable")
+        policy = plan["policy"]
+        history_policy = policy["history_archive"]
+        fixed_output = (
+            Path(root).expanduser().absolute()
+            / str(history_policy["output_filename"])
+        )
+        output = Path(out).expanduser().absolute() if out is not None else fixed_output
+        if output != fixed_output:
+            raise ValueError("project artifact history output path is not fixed")
+        selected_paths = set(plan["selected_artifact_paths"])
+        history_paths = set(plan["all_artifact_paths"]) - selected_paths
+        entries: list[dict[str, object]] = []
+        for path in sorted(
+            history_paths, key=lambda item: item.relative_to(root).as_posix()
+        ):
+            relative = path.relative_to(root)
+            artifact_relative = relative.relative_to(
+                PROJECT_ARTIFACT_ROOT_RELATIVE_PATH
+            )
+            if str(artifact_relative).startswith("decision_radar_research_lab/"):
+                role = "delegated_empirical_history"
+            elif len(artifact_relative.parts) == 1:
+                role = "historical_or_noncanonical_root_artifact"
+            else:
+                role = "noncanonical_namespace_artifact"
+            entries.append(
+                {
+                    "path": relative.as_posix(),
+                    "role": role,
+                    "semantic_ids": {"historical_or_noncanonical": True},
+                    **_verified_file_fingerprint(path, root=root),
+                }
+            )
+        limits = policy["limits"]
+        if (
+            len(entries) > limits["max_history_file_count"]
+            or sum(int(row["size_bytes"]) for row in entries)
+            > limits["max_history_total_bytes"]
+            or selected_paths & history_paths
+            or selected_paths | history_paths != set(plan["all_artifact_paths"])
+        ):
+            raise ValueError("project artifact history complement violates policy")
+        standard_manifest = _standard_project_artifact_manifest(plan)
+        history_manifest = {
+            "canonical_artifacts_included": False,
+            "canonical_entry_count": len(plan["entries"]),
+            "canonical_manifest_sha256": hashlib.sha256(
+                _canonical_json_bytes(standard_manifest)
+            ).hexdigest(),
+            "complement_of_standard_project_selection": True,
+            "entries": entries,
+            "entry_count": len(entries),
+            "excluded_noise": plan["excluded_noise"],
+            "immutable_history": True,
+            "local_artifacts_deleted_or_moved": False,
+            "policy_sha256": plan["policy_sha256"],
+            "research_only": True,
+            "schema_id": "decision_radar.project_artifact_history_manifest",
+            "schema_version": 1,
+            "standard_manifest_archive_path": policy[
+                "standard_manifest_archive_path"
+            ],
+        }
+        checksums = "".join(
+            f"{row['sha256']}  {row['path']}\n" for row in entries
+        ).encode("utf-8")
+        manifest_archive_path = str(history_policy["manifest_archive_path"])
+        checksums_archive_path = str(history_policy["checksums_archive_path"])
+        source_names = {str(row["path"]) for row in entries}
+        if (
+            manifest_archive_path in source_names
+            or checksums_archive_path in source_names
+            or manifest_archive_path == checksums_archive_path
+        ):
+            raise ValueError("project history synthetic archive paths collide")
+        now_ts = _safe_export_timestamp()
+        (
+            output,
+            resolved_parent,
+            parent_fd,
+            parent_stat,
+            candidate_name,
+            descriptor,
+            validation_fd,
+            candidate_identity,
+        ) = _start_output_transaction(output)
+        with os.fdopen(descriptor, "w+b") as candidate_file:
+            with zipfile.ZipFile(
+                candidate_file,
+                "w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=6,
+            ) as archive:
+                for path in sorted(
+                    history_paths,
+                    key=lambda item: item.relative_to(root).as_posix(),
+                ):
+                    _write_file_to_zip(
+                        archive,
+                        path,
+                        path.relative_to(root).as_posix(),
+                        now_ts=now_ts,
+                        root=root,
+                    )
+                _write_bytes_to_zip(
+                    archive,
+                    _canonical_json_bytes(history_manifest),
+                    manifest_archive_path,
+                    now_ts=now_ts,
+                )
+                _write_bytes_to_zip(
+                    archive,
+                    checksums,
+                    checksums_archive_path,
+                    now_ts=now_ts,
+                )
+            candidate_file.flush()
+            os.fsync(candidate_file.fileno())
+
+        with os.fdopen(os.dup(validation_fd), "rb") as candidate_reader:
+            bad = _validate_archive_entries(
+                candidate_reader,
+                safe_export_timestamp=now_ts,
+                sensitive_values=_configured_sensitive_values(root),
+            )
+        with os.fdopen(os.dup(validation_fd), "rb") as candidate_reader:
+            bad.extend(
+                _validate_fingerprinted_manifest(
+                    candidate_reader,
+                    history_manifest,
+                    manifest_archive_path=manifest_archive_path,
+                )
+            )
+        with os.fdopen(os.dup(validation_fd), "rb") as candidate_reader:
+            with zipfile.ZipFile(candidate_reader) as archive:
+                names = archive.namelist()
+                expected_names = {
+                    *(path.relative_to(root).as_posix() for path in history_paths),
+                    manifest_archive_path,
+                    checksums_archive_path,
+                }
+                if set(names) != expected_names:
+                    bad.append("project_history_not_exact_complement")
+                if archive.read(checksums_archive_path) != checksums:
+                    bad.append("project_history_checksums_drift")
+        if parent_stat is None:
+            raise OSError(errno.EIO, "project history parent state is missing")
+        _recheck_output_parent(
+            output=output,
+            resolved_parent=resolved_parent,
+            parent_fd=parent_fd,
+            parent_stat=parent_stat,
+        )
+        current_inventory = {
+            path
+            for path in _strict_regular_files_under(
+                root / PROJECT_ARTIFACT_ROOT_RELATIVE_PATH,
+                root=root,
+                max_file_count=limits["max_artifact_file_count"],
+                max_total_bytes=limits["max_artifact_total_bytes"],
+                max_single_file_bytes=limits["max_single_artifact_file_bytes"],
+            )
+            if not _skip(path, root=root)
+        }
+        if current_inventory != set(plan["all_artifact_paths"]):
+            bad.append("project_history_source_tree_drift")
+        bad.extend(
+            _fingerprinted_sources_drift(root, entries, label="project_history")
+        )
+        canonical_names = {
+            path.relative_to(root).as_posix() for path in selected_paths
+        }
+        if canonical_names & set(names):
+            bad.append("project_history_contains_canonical_artifact")
+        print(output)
+        print(f"size_bytes={os.fstat(validation_fd).st_size}")
+        print(f"history_entries={len(entries)}")
+        print(
+            "history_source_bytes="
+            f"{sum(int(row['size_bytes']) for row in entries)}"
+        )
+        print(
+            "history_manifest_sha256="
+            f"{hashlib.sha256(_canonical_json_bytes(history_manifest)).hexdigest()}"
+        )
+        print(f"bad_entries={len(bad)}")
+        if bad:
+            print("\n".join(bad[:50]))
+            _unlink_owned_candidate_at(parent_fd, candidate_name, candidate_identity)
+            return 1
+        _publish_output_transaction(
+            output=output,
+            resolved_parent=resolved_parent,
+            parent_fd=parent_fd,
+            parent_stat=parent_stat,
+            candidate_name=candidate_name,
+            candidate_identity=candidate_identity,
+        )
+        return 0
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as exc:
+        print(f"project_history_export_failed_closed={type(exc).__name__}")
+        if parent_fd >= 0:
+            _unlink_owned_candidate_at(parent_fd, candidate_name, candidate_identity)
+        return 1
+    finally:
+        if validation_fd >= 0:
+            os.close(validation_fd)
+        if parent_fd >= 0:
+            os.close(parent_fd)
+
+
 def main(root: Path = ROOT, out: Path = OUT) -> int:
     try:
-        paths = _tracked_paths(root) | _artifact_paths(root)
+        paths = _tracked_paths(root)
         empirical_plan = _empirical_export_plan(root)
+        project_plan = _project_artifact_export_plan(
+            root,
+            empirical_plan=empirical_plan,
+        )
+        if project_plan is not None:
+            paths |= set(project_plan["selected_artifact_paths"])
+        else:
+            paths |= _artifact_paths(root)
         if empirical_plan is not None:
-            lab_relative = _policy_relative_path(
-                empirical_plan["policy"]["lab_root"], field="lab_root"
-            )
-            retained: set[Path] = set()
-            for path in paths:
-                try:
-                    relative = path.relative_to(root)
-                except ValueError:
-                    continue
-                if relative == lab_relative or lab_relative in relative.parents:
-                    continue
-                retained.add(path)
-            paths = (
-                retained
-                | set(empirical_plan["selected_lab_paths"])
-                | set(empirical_plan.get("tracked_paths", set()))
-            )
+            paths |= set(empirical_plan.get("tracked_paths", set()))
     except (OSError, ValueError) as exc:
         print(f"export_failed_closed={type(exc).__name__}")
         return 1
@@ -2198,6 +2842,20 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
                         ),
                         now_ts=now_ts,
                     )
+                if project_plan is not None:
+                    project_manifest = _standard_project_artifact_manifest(
+                        project_plan
+                    )
+                    _write_bytes_to_zip(
+                        zf,
+                        _canonical_json_bytes(project_manifest),
+                        str(
+                            project_plan["policy"][
+                                "standard_manifest_archive_path"
+                            ]
+                        ),
+                        now_ts=now_ts,
+                    )
             candidate_file.flush()
             os.fsync(candidate_file.fileno())
     except (OSError, ValueError) as exc:
@@ -2236,6 +2894,55 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
                     root, empirical_manifest["entries"], label="empirical_standard"
                 )
             )
+        if project_plan is not None:
+            project_manifest = _standard_project_artifact_manifest(project_plan)
+            project_manifest_path = str(
+                project_plan["policy"]["standard_manifest_archive_path"]
+            )
+            with os.fdopen(os.dup(validation_fd), "rb") as candidate_reader:
+                bad.extend(
+                    _validate_fingerprinted_manifest(
+                        candidate_reader,
+                        project_manifest,
+                        manifest_archive_path=project_manifest_path,
+                    )
+                )
+            bad.extend(
+                _fingerprinted_sources_drift(
+                    root, project_manifest["entries"], label="project_standard"
+                )
+            )
+            limits = project_plan["policy"]["limits"]
+            current_inventory = {
+                path
+                for path in _strict_regular_files_under(
+                    root / PROJECT_ARTIFACT_ROOT_RELATIVE_PATH,
+                    root=root,
+                    max_file_count=limits["max_artifact_file_count"],
+                    max_total_bytes=limits["max_artifact_total_bytes"],
+                    max_single_file_bytes=limits[
+                        "max_single_artifact_file_bytes"
+                    ],
+                )
+                if not _skip(path, root=root)
+            }
+            if current_inventory != set(project_plan["all_artifact_paths"]):
+                bad.append("project_standard_source_tree_drift")
+            expected_project_names = {
+                str(row["path"]) for row in project_manifest["entries"]
+            }
+            actual_project_names = {
+                name
+                for name in names
+                if name.startswith("event_fade_cache/")
+                and name
+                not in {
+                    project_manifest_path,
+                    EMPIRICAL_STANDARD_MANIFEST_ARCHIVE_PATH.as_posix(),
+                }
+            }
+            if actual_project_names != expected_project_names:
+                bad.append("project_standard_selection_drift")
         if parent_stat is None:
             raise OSError(errno.EIO, "export output parent state is missing")
         _recheck_output_parent(
@@ -2272,6 +2979,17 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
         print(
             "empirical_manifest_sha256="
             f"{hashlib.sha256(_canonical_json_bytes(_standard_empirical_manifest(empirical_plan))).hexdigest()}"
+        )
+    if project_plan is not None:
+        project_manifest = _standard_project_artifact_manifest(project_plan)
+        print(f"project_canonical_entries={len(project_plan['entries'])}")
+        print(
+            "project_history_entries_excluded="
+            f"{project_manifest['excluded_history_count']}"
+        )
+        print(
+            "project_manifest_sha256="
+            f"{hashlib.sha256(_canonical_json_bytes(project_manifest)).hexdigest()}"
         )
     print(f"bad_entries={len(bad)}")
     if bad:

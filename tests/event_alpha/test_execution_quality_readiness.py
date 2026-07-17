@@ -15,6 +15,7 @@ from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness impor
     COMMON_METRICS,
     CONTRACT_VERSION,
     EXECUTION_MODES,
+    MULTI_VENUE_RESEARCH_OPTION,
     REQUIRED_SNAPSHOT_FIELDS,
     ExecutionQualityReader,
     ExecutionQualitySnapshot,
@@ -32,13 +33,16 @@ EXPECTED_VENUES = {
     "dex_operator_selected",
 }
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DECISION_PACKAGE = (
+    REPO_ROOT / "research/DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md"
+)
 
 
 def test_static_readiness_selects_and_activates_nothing() -> None:
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v2"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v3"
     assert result.status == "operator_venue_required"
     assert result.selected_venue is None
     assert result.selected_execution_mode is None
@@ -68,6 +72,7 @@ def test_static_readiness_selects_and_activates_nothing() -> None:
     assert result.private_market_data_permission_requested is False
     assert result.order_permission_requested is False
     assert result.trading_permission_requested is False
+    assert result.multiple_venue_research_option == MULTI_VENUE_RESEARCH_OPTION
     assert set(result.selection_blockers) == {
         "intended_execution_venue_not_selected",
         "intended_execution_mode_not_selected",
@@ -283,6 +288,10 @@ def test_human_report_is_explicitly_nonselecting_and_no_call() -> None:
         "sell_price_impact_bps_by_notional"
     ) in rendered
     assert "dex_additions=chain_id,block_number,pool_or_router_id" in rendered
+    assert "Multiple-venue research alternative (not an execution venue)" in rendered
+    assert "mode_id=multiple_venue_research" in rendered
+    assert "cannot_close_the_primary_cost_model" in rendered
+    assert "no_credentials_orders_wallets_or_trading_permission" in rendered
     for venue_id in EXPECTED_VENUES:
         assert f"- {venue_id}:" in rendered
 
@@ -343,6 +352,7 @@ def test_cli_json_is_structured_static_and_secret_free(
     assert payload["private_market_data_permission_requested"] is False
     assert payload["order_permission_requested"] is False
     assert payload["trading_permission_requested"] is False
+    assert payload["multiple_venue_research_option"] == MULTI_VENUE_RESEARCH_OPTION
     assert payload["human_decision_template"] == {
         "eligible_instrument_set": "<exact bounded instrument ids>",
         "expected_public_private_data_boundary": (
@@ -391,3 +401,30 @@ def test_make_targets_are_static_readiness_only() -> None:
     rendered = f"{human}\n{structured}".casefold()
     assert "place-order" not in rendered
     assert "execute-order" not in rendered
+
+
+def test_checked_operator_decision_package_is_complete_and_nonselecting() -> None:
+    rendered = DECISION_PACKAGE.read_text(encoding="utf-8")
+
+    assert "human decision required" in rendered
+    assert "no venue, provider, adapter, credential, or" in rendered
+    assert "trading permission selected" in rendered
+    for option in (
+        "Binance",
+        "Bybit",
+        "Coinbase Exchange",
+        "Kraken",
+        "Operator-selected DEX",
+        "Multiple-venue research",
+    ):
+        assert f"| {option} |" in rendered
+    for field, _placeholder in (
+        build_execution_quality_readiness().human_decision_template
+    ):
+        assert field in rendered
+    assert "cannot close the primary cost model" in rendered
+    assert "No Protocol-v2 holdout is defined, opened, or evaluated" in rendered
+    assert (
+        "No production threshold, route, score, notification, or authority changes"
+        in rendered
+    )

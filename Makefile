@@ -229,7 +229,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: event-alpha-burn-in-contract event-alpha-daily-live-no-send-burn-in event-alpha-daily-live-no-send-burn-in-plan event-alpha-daily-live-no-send-burn-in-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke event-alpha-daily-live-no-send-burn-in-candidate-mode-smoke-doctor event-alpha-daily-burn-in-readiness event-alpha-daily-review-inbox event-alpha-feedback-progress event-alpha-burn-in-weekly-measurement event-alpha-source-yield-report conviction-priors-shadow-report paper-risk-research event-alpha-archive-burn-in-evidence event-feedback-false-positive event-feedback-late event-feedback-source-noise event-feedback-needs-confirmation event-feedback-duplicate event-feedback-promising-source-type
 .PHONY: event-alpha-observed-outcome-preview event-alpha-observed-outcome-stage
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
-.PHONY: export-empirical-artifact-history
+.PHONY: export-empirical-artifact-history export-project-artifact-history
 
 help:
 	@echo "Targets:"
@@ -242,6 +242,7 @@ help:
 	@echo "  make export-src  Write a clean source zip using git archive"
 	@echo "  make export-src-with-artifacts  Overwrite crypto_rsi_scanner_source_with_artifacts.zip"
 	@echo "  make export-empirical-artifact-history  Overwrite the optional superseded empirical-evidence history zip"
+	@echo "  make export-project-artifact-history  Overwrite the optional disjoint history of all non-canonical research artifacts"
 	@echo "  make verify   Run the standard local verification suite"
 	@echo "  make verify-fast  Run the hard pytest gate plus smoke/backtest/score without duplicate standalone tests"
 	@echo "  make test     Run standalone tests"
@@ -611,6 +612,9 @@ export-src-with-artifacts-smoke:
 export-empirical-artifact-history:
 	$(PYTHON) scripts/export_empirical_artifact_history.py
 
+export-project-artifact-history:
+	$(PYTHON) scripts/export_project_artifact_history.py
+
 normalize-export-timestamps:
 	python3 scripts/normalize_export_timestamps.py .
 
@@ -622,6 +626,37 @@ verify: check-python test test-full smoke-alerts backtest-fixture score
 verify-fast: check-python test-full smoke-alerts backtest-fixture score
 
 test:
+	@tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/crypto-rsi-standalone.XXXXXX"); \
+	trap 'rm -rf "$$tmp"' EXIT INT TERM; \
+	env \
+	-u RSI_EVENT_ALPHA_RUN_LEDGER_PATH \
+	-u RSI_EVENT_ALPHA_ALERT_STORE_PATH \
+	-u RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH \
+	-u RSI_EVENT_WATCHLIST_STATE_PATH \
+	-u RSI_EVENT_ALPHA_FEEDBACK_PATH \
+	-u RSI_EVENT_ALPHA_MISSED_PATH \
+	-u RSI_EVENT_ALPHA_PRIORS_PATH \
+	-u RSI_EVENT_PROVIDER_HEALTH_PATH \
+	-u RSI_EVENT_ALPHA_DAILY_BRIEF_PATH \
+	-u RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH \
+	-u RSI_EVENT_CORE_OPPORTUNITY_STORE_PATH \
+	-u RSI_EVENT_INCIDENT_STORE_PATH \
+	-u RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH \
+	-u RSI_EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR \
+	-u RSI_EVENT_RESEARCH_CARDS_DIR \
+	-u RSI_EVENT_LLM_BUDGET_LEDGER_PATH \
+	-u RSI_EVENT_ALPHA_OUTCOMES_PATH \
+	-u RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUEST_LEDGER_PATH \
+	-u RSI_EVENT_SOURCE_ENRICHMENT_CACHE_DIR \
+	-u RSI_EVENT_LLM_CACHE_PATH \
+	-u RSI_EVENT_LLM_EXTRACTOR_CACHE_PATH \
+	-u RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR="$$tmp/event-alpha-artifacts" \
+	RSI_EVENT_DISCOVERY_CACHE_DIR="$$tmp/event-discovery-cache" \
+	TELEGRAM_BOT_TOKEN='' \
+	TELEGRAM_CHAT_ID='' \
+	OPENAI_API_KEY='' \
 	$(PYTHON) tests/test_indicators.py
 
 # Full pytest suite as a hard gate: unlike test-pytest-safe, a missing pytest

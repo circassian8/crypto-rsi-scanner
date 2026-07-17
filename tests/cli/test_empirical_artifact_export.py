@@ -313,6 +313,13 @@ def _empirical_tree(tmp_path: Path) -> tuple[Path, dict[str, object], list[str]]
         root / "research/DECISION_RADAR_EMPIRICAL_ARTIFACT_POLICY.json",
         _canonical_json(policy),
     )
+    _write(
+        root / "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json",
+        (
+            REPO_ROOT
+            / "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json"
+        ).read_bytes(),
+    )
     return root, policy, run_ids
 
 
@@ -354,7 +361,8 @@ def test_standard_export_keeps_only_bounded_canonical_empirical_evidence(tmp_pat
         manifest = json.loads(archive.read(policy["standard_manifest_archive_path"]))
         assert all(((row.external_attr >> 16) & 0o777) == 0o644 for row in archive.infolist())
 
-    assert "event_fade_cache/other/kept.json" in names
+    assert "event_fade_cache/other/kept.json" not in names
+    assert "event_fade_cache/PROJECT_ARTIFACT_EXPORT_MANIFEST.json" in names
     assert all(
         any(f"/runs/{run_id}/" in name for run_id in run_ids)
         for name in names

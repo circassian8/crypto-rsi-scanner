@@ -16,6 +16,48 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-17 - Bound the complete project artifact export without deleting evidence
+**Status:** accepted
+**Decision:** Select ordinary source-with-artifacts evidence through the closed
+`DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json`. Retain exact root operator
+controls, the pointer-selected generation, the latest genuine live/no-send
+attempt generation, bounded shared campaign/calendar/source-contract state, and
+the empirical policy's independent canonical selection. Exclude every other
+fixture, rehearsal, failed, intermediate, superseded, and historical artifact
+from the standard review ZIP. Preserve all excluded artifacts in place and
+offer only their exact disjoint complement through the fixed optional
+`make export-project-artifact-history` archive with immutable fingerprints,
+manifest, and checksums. Missing optional canonical sources must render as
+partial coverage rather than healthy-empty. Both exports remain descriptor-
+anchored, bounded, secret-scanned, source-drift checked, no-clobber until clean,
+and read-only with respect to every artifact.
+**Why:** The prior empirical-only policy left 2,278 noncanonical project files
+in the standard review ZIP. That obscured current operator truth, amplified
+artifact-heavy verification and review cost, and made retention accidental.
+An explicit project-wide canonical/history boundary keeps the routine release
+portable while preserving the complete audit record without deletion, moving,
+age-based guessing, or reinterpretation.
+**Revisit when:** A human approves a versioned policy change for a new canonical
+shared store, selector, retention bound, or history boundary. Never infer
+canonical status from newest-directory order, modification time, or fixture
+availability.
+
+## 2026-07-17 - Keep multiple-venue mode comparative and require one primary v2 cost surface
+**Status:** accepted
+**Decision:** Include multiple-venue research as an explicit operator option,
+but preserve each venue's native quote, identity, spread, depth, impact,
+eligibility, and request budget independently. Comparative evidence may test
+robustness; it cannot close Protocol-v2's primary execution-cost model until the
+operator seals one exact primary execution surface. The readiness package still
+selects nothing and requests no credential, private data, wallet, order, or
+trading permission.
+**Why:** Cross-venue evidence can reveal venue sensitivity, but blending books
+or leaving the executable venue undefined would manufacture cost precision and
+make a preregistration changeable after results are visible.
+**Revisit when:** The operator completes the exact venue/instrument/quote/set,
+jurisdiction/account, and public/private-data decision template before any
+Protocol-v2 holdout is defined or opened.
+
 ## 2026-07-16 - Bound the standard empirical export without deleting history
 **Status:** accepted
 **Decision:** Select empirical evidence for the normal source-with-artifacts ZIP

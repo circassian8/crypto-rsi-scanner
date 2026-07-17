@@ -517,5 +517,10 @@ fixtures into a live generation, or enable sends to populate the dashboard.
 
 To compare execution-quality integration choices without selecting a venue or
 calling one, run `make radar-execution-quality-readiness
-PYTHON=.venv/bin/python`. No spread/depth adapter or order behavior exists until
-the operator identifies the intended spot, perpetual, or DEX venue.
+PYTHON=.venv/bin/python`. The concise option matrix and copyable human decision
+template are in
+[Decision Radar execution-venue decision package](DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md).
+Multiple-venue research is comparative only and still requires one primary
+execution surface before Protocol v2 can seal its cost model. No spread/depth
+adapter or order behavior exists until the operator identifies the intended
+spot, perpetual, DEX, or comparative research boundary.

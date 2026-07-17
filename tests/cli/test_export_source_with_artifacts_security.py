@@ -389,7 +389,15 @@ def test_export_generic_artifact_secret_fails_and_preserves_previous_zip():
         trusted_root = Path(tmp) / "trusted"
         trusted_root.mkdir()
         (trusted_root / "Makefile").write_text("verify:\n\t@true\n", encoding="utf-8")
-        artifact_root = trusted_root / "event_fade_cache" / "pilot"
+        project_policy = trusted_root / "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json"
+        project_policy.parent.mkdir(parents=True)
+        project_policy.write_bytes(
+            (
+                REPO_ROOT
+                / "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json"
+            ).read_bytes()
+        )
+        artifact_root = trusted_root / "event_fade_cache" / "radar_market_history_cache"
         artifact_root.mkdir(parents=True)
         evidence = artifact_root / "provider.json"
         evidence.write_text('{"status":"safe"}\n', encoding="utf-8")
@@ -407,4 +415,6 @@ def test_export_generic_artifact_secret_fails_and_preserves_previous_zip():
         assert archive.read_bytes() == previous
         assert not archive.with_name(f"{archive.name}.tmp").exists()
         with zipfile.ZipFile(archive) as zf:
-            assert zf.read("event_fade_cache/pilot/provider.json") == b'{"status":"safe"}\n'
+            assert zf.read(
+                "event_fade_cache/radar_market_history_cache/provider.json"
+            ) == b'{"status":"safe"}\n'

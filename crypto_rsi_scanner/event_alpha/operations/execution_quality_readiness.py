@@ -14,7 +14,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v2"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v3"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 COMMON_METRICS = (
     "best_bid",
@@ -52,6 +52,43 @@ REQUIRED_SNAPSHOT_FIELDS = (
     "request_lineage_id",
     "research_only",
 )
+MULTI_VENUE_RESEARCH_OPTION = {
+    "mode_id": "multiple_venue_research",
+    "status": "feasible_research_only_not_implemented",
+    "execution_mode": "none_comparative_read_only_research",
+    "quote_currency_policy": (
+        "preserve_each_native_quote_and_normalize_only_after_the_operator_seals_"
+        "a_reference_quote"
+    ),
+    "market_data_access": (
+        "separate_public_order_book_reads_expected_without_credentials_for_each_"
+        "selected_cex;DEX_access_remains_provider_specific"
+    ),
+    "credentials_required": "none_for_expected_cex_public_books",
+    "quality_fields": (
+        "per_venue_best_bid_ask_spread_depth_and_price_impact;never_blend_away_"
+        "venue_identity_or_missing_depth"
+    ),
+    "instrument_mapping": (
+        "exact_cross_venue_base_quote_contract_and_instrument_identity_required"
+    ),
+    "jurisdiction_and_limits": (
+        "eligibility_and_request_budgets_must_be_confirmed_independently_for_every_"
+        "included_venue"
+    ),
+    "protocol_v2_suitability": (
+        "useful_for_venue_robustness_research_but_cannot_close_the_primary_cost_"
+        "model_until_one_execution_surface_is_sealed"
+    ),
+    "security_boundary": (
+        "no_credentials_orders_wallets_or_trading_permission;each_future_read_"
+        "provider_requires_its_own_review_and_authorization_boundary"
+    ),
+    "operator_decision": (
+        "choose_exact_venues_instruments_reference_quote_and_primary_execution_"
+        "surface_or_reject_multi_venue_mode"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -155,6 +192,7 @@ class _ExecutionQualityReadiness:
     supported_live_adapters: tuple[str, ...]
     supported_interface_modes: tuple[str, ...]
     feasible_venues: tuple[ExecutionVenueCapability, ...]
+    multiple_venue_research_option: Mapping[str, str]
     required_snapshot_fields: tuple[str, ...]
     selection_blockers: tuple[str, ...]
     operator_decision: str
@@ -217,6 +255,9 @@ def _execution_quality_readiness_dict(
         "supported_live_adapters": list(value.supported_live_adapters),
         "supported_interface_modes": list(value.supported_interface_modes),
         "feasible_venues": [row.to_dict() for row in value.feasible_venues],
+        "multiple_venue_research_option": dict(
+            value.multiple_venue_research_option
+        ),
         "required_snapshot_fields": list(value.required_snapshot_fields),
         "selection_blockers": list(value.selection_blockers),
         "operator_decision": value.operator_decision,
@@ -438,6 +479,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         supported_live_adapters=(),
         supported_interface_modes=EXECUTION_MODES,
         feasible_venues=VENUE_CAPABILITIES,
+        multiple_venue_research_option=MULTI_VENUE_RESEARCH_OPTION,
         required_snapshot_fields=REQUIRED_SNAPSHOT_FIELDS,
         selection_blockers=(
             "intended_execution_venue_not_selected",
@@ -547,6 +589,13 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
             "- freshness_and_lineage=provider_observed_at,acquired_at,freshness_status,source_url,request_lineage_id",
             "- dex_additions=chain_id,block_number,pool_or_router_id,gas_estimate_native,route_identity",
             "",
+            "Multiple-venue research alternative (not an execution venue):",
+            "- "
+            + "; ".join(
+                f"{key}={value}"
+                for key, value in result.multiple_venue_research_option.items()
+            ),
+            "",
             "Feasible candidates (not selected or activated):",
         )
     )
@@ -605,6 +654,7 @@ __all__ = (
     "COMMON_METRICS",
     "CONTRACT_VERSION",
     "EXECUTION_MODES",
+    "MULTI_VENUE_RESEARCH_OPTION",
     "ExecutionQualityReadiness",
     "ExecutionQualityReader",
     "ExecutionQualityRequest",

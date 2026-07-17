@@ -17,6 +17,69 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-17 — Bound project artifacts and isolate the complete release gate · Codex
+**Why:** The empirical-only retention policy still left thousands of fixture,
+rehearsal, failed, intermediate, and superseded project artifacts in every
+review ZIP. Release measurement also revealed that the standalone compatibility
+runner appended fixture rows to three cumulative root stores even though pytest
+and the dashboard pointer were isolated.
+**Changes:**
+- Added a closed project-wide artifact policy above the existing empirical
+  policy. The normal source-with-artifacts ZIP now retains exact operator
+  controls, the pointer-selected real generation, the latest genuine
+  live/no-send attempt, bounded shared state, and canonical empirical evidence.
+  It excludes 2,278 noncanonical files without deleting, moving, compacting, or
+  reinterpreting them. A fixed optional project-history ZIP is their exact
+  disjoint complement with immutable fingerprints, manifest, and checksums.
+- Hardened standard and history export around descriptor-walk inventories,
+  closed policy/schema/bounds, genuine live selector validation, exact set
+  reconciliation, post-write source-tree drift detection, no-clobber output
+  transactions, secret/path/symlink/TOCTOU checks, and explicit partial source
+  coverage. The real standard archive shrank from 42,606,657 to 19,201,978
+  compressed bytes (23,404,679 bytes / 54.932%) while retaining 161 canonical
+  files; the 2,278-file optional history is 74,849,844 compressed bytes.
+- Changed the standalone `make test` runner to strip ambient per-store path
+  overrides and derive every Event Alpha store under one disposable artifact/
+  discovery root with sends and credentials disabled. Existing historical rows
+  appended by earlier compatibility runs were preserved rather than silently
+  deleted. The final fast/full sequence left all 2,439 real non-lock artifacts
+  byte-identical.
+- Upgraded static execution readiness to v3 with a checked operator package for
+  Binance spot/perpetual, Bybit spot/perpetual, Coinbase spot, Kraken spot,
+  operator-selected DEX, and multiple-venue comparative research. The latter
+  never blends venue books and cannot close Protocol-v2's primary cost model
+  until the human seals one execution surface. No venue, provider, adapter,
+  credential, order, wallet, or trading permission was selected.
+- Revalidated the frozen v1 bundle `267a1c6d3048...` unchanged and Protocol-v2
+  static contract `683f03fe7430...` blocked/unfrozen with no holdout access.
+  Source-independence OOS still covers all seven required case classes with
+  labels pending; thresholds and normalization remain unchanged. Evidence-cycle
+  readiness found no eligible genuine source and made zero calls/writes.
+- Preserved truthful operator state: the real revision-12 pointer remains
+  explicitly stale/diagnostic-only at SHA-256 `95b35b13e7e...`; no fixture
+  fallback or publication occurred. The separate live campaign now holds nine
+  real cycles, 270 observations, 240 baseline-counted, 30 too-close, zero warm
+  assets, two historical `risk_watch` ideas, one matured outcome, and one
+  missing-data outcome. The v1-bound tracked campaign projection was not
+  rewritten.
+**Verify:** 65 focused export/security/venue tests, 88 focused research/
+authority/source-independence tests, dashboard/UX smokes, the 14-test synthetic
+artifact-heavy guard, protocol/report/supplement byte checks, compileall, diff
+checks, and architecture cleanliness passed. The final locked Darwin sequence
+passed `make verify-fast` with 2,610 tests in 166.59s and `make verify` with
+1,391/1,391 standalone plus 2,610 pytest tests in 283.00s. A complete 2,439-file
+SHA-256 inventory and the pointer were identical before/after. Real standard
+and optional-history exports completed in 20.00s and 80.17s with zero bad
+entries.
+**Notes/risks:** This continuation made no provider call; the goal's one earlier
+already-authorized bounded CoinGecko no-send observation remains the only live
+call. Linux source-with-artifacts verification is still
+`pending_unavailable` because no Linux/container runtime exists on this host,
+so universal release green is not claimed. No sends, trades, orders, paper
+trades, normal RSI writes, execution, Event Alpha `TRIGGERED_FADE`, provider-
+authorization mutation, threshold/route/policy change, or historical-evidence
+rewrite occurred.
+
 ## 2026-07-16 — Bound empirical artifacts and close the hardening release · Codex
 **Why:** The empirical lab retained nearly one billion logical bytes across many
 immutable superseded runs. Shipping all of them in every review archive made the
