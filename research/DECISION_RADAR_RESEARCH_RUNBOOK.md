@@ -389,14 +389,19 @@ rule.
 
 ### Platform-truthful release evidence
 
-Treat the locked local runtime and an extracted Linux source-with-artifacts
-checkout as separate release observations. Record the operating system,
-architecture, Python version, archive SHA-256, and exact commands for each.
-Passing on one platform must never be reported as passing on the other.
+The release support matrix is explicit:
 
-On the current Mac, use the locked `.venv` and run the complete local ladder.
-For Linux, transfer the already-built review archive through an approved secure
-channel, extract it without changing its contents, then run:
+| environment | support status | verification status |
+|---|---|---|
+| macOS normal checkout | supported | verified |
+| macOS source-with-artifacts archive | supported | verified |
+| Linux normal checkout | supported | verified in CI on Python 3.11 and 3.13 |
+| Linux source-with-artifacts archive | optional portability coverage | currently unverified; not release-blocking and not Linux-certified |
+
+Record the operating system, architecture, Python version, archive SHA-256, and
+exact commands for each observation. Passing on one platform must never be
+reported as passing on another. On macOS, use the locked `.venv` and run the
+complete local ladder. The exact extracted archive verification commands are:
 
 ```sh
 make test-artifact-heavy-extracted-checkout PYTHON=python3
@@ -404,11 +409,15 @@ make verify-fast PYTHON=python3
 make verify PYTHON=python3
 ```
 
-If no Linux runtime has the exact archive, record Linux archive verification as
-`pending_unavailable`, not green. GitHub source-only CI is useful additional
-evidence, but it is not a substitute when the ignored empirical artifact store
-is absent from the runner. Unsupported descriptor/no-follow behavior must fail
-closed; do not skip its security regressions.
+The same exact-archive commands may be run on Linux later as optional
+portability coverage when a suitable environment and approved archive path
+already exist. Their absence does not block release of the supported macOS
+operator product. Do not install a VM/container runtime, transfer the archive,
+or change the host solely to obtain that optional proof. Until it is actually
+run, report Linux source-with-artifacts as `unverified_optional` and never as
+Linux-certified. Linux source-only CI remains required and is not presented as
+artifact-bearing evidence. Unsupported descriptor/no-follow behavior on any
+supported runtime must still fail closed; do not skip its security regressions.
 
 ## Current canonical evidence
 

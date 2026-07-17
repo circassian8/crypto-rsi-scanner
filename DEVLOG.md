@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-17 — Close release hardening on the supported platform matrix · Codex
+**Why:** The owner confirmed macOS as the personal production/operator
+environment and explicitly made exact Linux source-with-artifacts verification
+optional portability coverage rather than a release blocker.
+**Changes:**
+- Documented one explicit matrix across the working agreement and research
+  runbook: both macOS checkout forms are supported/verified; Linux source-only
+  is supported/CI-verified on Python 3.11 and 3.13; Linux artifact-bearing is
+  optional, currently unverified, and not Linux-certified.
+- Closed the release-hardening roadmap item and moved the optional Linux archive
+  observation to low-priority future coverage, behind Decision Radar product
+  and empirical work.
+- Recorded the durable boundary that no VM/container runtime, archive transfer,
+  or macOS host change should be made solely for the optional observation. The
+  filesystem security and fail-closed contracts remain unchanged.
+- Reconciled the ignored release hardening Markdown/JSON status reports so they
+  distinguish supported-matrix release readiness from optional portability.
+**Verify:** `git diff --check` passed; the ignored release JSON parsed with
+`python3 -m json.tool`; semantic assertions confirmed the four exact matrix
+states, zero remaining release blockers, and explicit
+`linux_source_with_artifacts_certified=false`; exact-text checks found both
+checked-in matrices and the current-policy scan found no lingering required or
+blocking Linux artifact language. Full pytest/`make verify` was intentionally
+skipped because this prompt changes policy documentation and reports only.
+**Notes/risks:** Earlier DEVLOG entries retain their then-current blocker
+language as historical audit evidence; this entry and the accepted decision
+supersede that release requirement. No code, production policy, provider,
+authority, artifact history, send, trade, order, paper, RSI, or fade behavior
+changed.
+
 ## 2026-07-17 — Make artifact-history dry runs portable under nested GNU Make · Codex
 **Why:** The pushed Linux source-only release workflow passed the standalone
 runner but failed its pytest phase on both Python 3.11 and 3.13. The only

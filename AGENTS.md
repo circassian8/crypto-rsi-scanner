@@ -87,6 +87,21 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 
 ## Run / test / deploy
 
+### Supported release matrix
+
+| environment | support status | verification status |
+|---|---|---|
+| macOS normal checkout | supported | verified |
+| macOS source-with-artifacts archive | supported | verified |
+| Linux normal checkout | supported | verified in CI on Python 3.11 and 3.13 |
+| Linux source-with-artifacts archive | optional portability coverage | currently unverified; not release-blocking and not Linux-certified |
+
+The personal production/operator environment is macOS. Do not install a VM or
+container runtime, transfer the review archive, or change the host solely to
+obtain the optional Linux artifact-bearing observation. Linux source-only CI
+remains a required compatibility gate; exact Linux artifact-bearing verification
+may be added later when a suitable environment already exists.
+
 - **Python:** `.venv/bin/python` (3.13 default via `.python-version`); supported
   CI/runtime compatibility is Python 3.11 and 3.13. Direct dependency intent is
   in `requirements.in`; `requirements.txt` is the generated universal,
@@ -159,10 +174,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   reported as partial coverage, never healthy-empty. Tests that do not
   explicitly verify shipped artifacts use isolated temporary artifact bases;
   cumulative root stores are excluded from unrelated fixture tests. In an
-  extracted source-with-artifacts review checkout, run `make
+  supported macOS extracted source-with-artifacts review checkout, run `make
   test-artifact-heavy-extracted-checkout PYTHON=python3` before `make
   verify-fast PYTHON=python3`; retain both timing-report pairs as release
-  evidence.
+  evidence. Running the same commands against an exact Linux archive is useful
+  optional portability coverage, not a release gate or a Linux certification.
 - **Deterministic event research clock:** event fixture/review commands may set
   `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`. Fixture-oriented Make targets
   use `EVENT_FIXTURE_NOW` (default `2026-06-15T16:00:00Z`) so checked-in June

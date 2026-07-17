@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-17 - Support macOS operator releases and keep Linux artifact archives optional
+**Status:** accepted
+**Decision:** Use this release support matrix: macOS normal checkout is
+supported and verified; macOS source-with-artifacts archive is supported and
+verified; Linux normal checkout is supported and verified in CI on Python 3.11
+and 3.13; Linux source-with-artifacts archive is optional portability coverage,
+currently unverified, non-release-blocking, and not Linux-certified. Close the
+release-hardening goal against that supported matrix and return active priority
+to Decision Radar product and empirical work. Do not install a VM/container
+runtime, transfer the archive, or change the macOS host solely to obtain the
+optional Linux observation. This supersedes only the earlier expectation that
+Linux artifact-bearing proof was required; all filesystem security and
+fail-closed requirements remain accepted.
+**Why:** This personal project's production and operator environment is macOS,
+where both ordinary and exact artifact-bearing releases have been verified.
+Linux source-only CI already provides the required code-compatibility evidence
+on both supported Python versions. Manufacturing a second host solely for an
+optional archive observation adds operational risk without strengthening the
+supported production boundary.
+**Revisit when:** Linux becomes a supported production/operator environment, or
+an appropriate Linux environment and approved archive path already exist for a
+non-disruptive optional portability run.
+
 ## 2026-07-17 - Bound the complete project artifact export without deleting evidence
 **Status:** accepted
 **Decision:** Select ordinary source-with-artifacts evidence through the closed
@@ -137,8 +160,9 @@ components, and non-exclusive create leaves a check/create substitution window.
 Empirical evidence and human preference data cannot be trustworthy if either
 path may be redirected outside the operator-selected tree.
 **Revisit when:** The project adopts an equally strict shared secure-path API
-whose supported-platform behavior and component/leaf replacement regressions
-are proven in both locked local and Linux source-with-artifacts verification.
+whose behavior and component/leaf replacement regressions are proven across
+the supported release matrix. Linux artifact-bearing coverage remains optional
+unless Linux becomes a supported production/operator environment.
 
 ## 2026-07-16 - Treat the empirical lab as bounded research debt, not a generation namespace
 **Status:** accepted
