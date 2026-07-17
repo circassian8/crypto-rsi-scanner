@@ -855,13 +855,22 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality v1 is a static readiness and interface contract only. It
-reports feasible centralized spot, perpetual, and operator-selected DEX venues;
-public versus authenticated boundaries; jurisdiction/network constraints;
-request limits; and expected spread, depth, and price-impact fields. No venue is
-selected, no live adapter is active, and no execution/order behavior may be
-implemented until the operator identifies the intended venue and instrument
-mode.
+Execution-quality readiness v4 records the owner-confirmed primary research
+surface: Bybit USDT-linear perpetuals, public market data only, with current
+jurisdiction/account eligibility affirmed for this scope. The eligible-universe
+rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
+active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled, non-prelisting
+contracts. The exact resulting instrument IDs remain unfrozen until the
+Protocol-v2 annex is sealed.
+
+The first adapter slice is deliberately offline: it validates supplied V5
+instrument and order-book payloads, preserves provider/snapshot clocks and
+book sequence, and derives spread, USDT depth bands, and USDT-notional price
+impact without treating USDT as USD. It has no HTTP client, credential access,
+private-data operation, or order method. Live activation remains blocked by
+the unfrozen exact set, missing runtime provider authorization, and honest
+reachability after the recorded Bybit 403; no proxy, VPN, or region bypass is
+authorized.
 
 The remaining human decisions stay explicit:
 
@@ -876,8 +885,11 @@ The remaining human decisions stay explicit:
   call each configured Fed/BLS/BEA source at most once and never creates or
   mutates authorization.
 - Execution quality: inspect with `make radar-execution-quality-readiness
-  PYTHON=.venv/bin/python` (static/no-network). No spread provider or venue is
-  selected, and there is nothing to disable until the operator chooses one.
+  PYTHON=.venv/bin/python` (static/no-network), then run the checked offline
+  normalizer with `make radar-execution-quality-bybit-smoke
+  PYTHON=.venv/bin/python`. Bybit perpetual is selected, but live spread remains
+  unavailable and there is nothing to disable because no live adapter or
+  provider process is active.
 - Phone access: private and public readiness/status are non-enabling checks.
   Either route requires its exact `CONFIRM=1 ...-enable` command and is rolled
   back only with the matching confirmed disable command; neither is enabled by

@@ -1108,20 +1108,31 @@
     "unique_immutable_namespace_per_attempt": true
   },
   "execution_quality_readiness": {
-    "authorization_boundary": "static readiness only until operator selects venue and instrument mode",
+    "authorization_boundary": "confirmed public-market-data research scope does not create runtime provider authorization or allow credentials, private data, orders, or trading",
+    "bybit_public_reachability": "unverified after recorded region-restricted 403; fail closed without proxy VPN or region bypass",
+    "contract_version": "crypto_radar_execution_quality_readiness_v4",
+    "eligible_instrument_selection_rule": "top 30 liquidity-ranked Decision Radar assets intersected with exact active Bybit LinearPerpetual Trading USDT-quoted USDT-settled non-prelisting contracts, then frozen in the Protocol-v2 annex",
+    "eligible_instrument_set_frozen": false,
     "final_live_adapter_implemented": false,
-    "next_safe_command": "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
-    "operator_venue_required": true,
+    "jurisdiction_and_account_eligibility": "owner confirmed 2026-07-17 for the selected research scope",
+    "next_safe_command": "make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python",
+    "offline_fixture_normalizer_implemented": true,
+    "operator_venue_required": false,
     "provider_calls": 0,
+    "public_private_data_boundary": "public market data only; no credentials or private account data",
+    "quote_currency": "USDT",
     "reports": [
-      "spot perpetual or DEX fit",
+      "confirmed Bybit USDT-linear perpetual surface",
+      "exact active-contract identity and top-30 intersection",
       "public endpoint or credential boundary",
       "jurisdiction and network constraints",
       "request limits",
-      "spread depth and price-impact metrics"
+      "USDT spread depth and price-impact metrics"
     ],
-    "rollback_disable_command": "none; no venue or adapter is active",
-    "selected_venue": null
+    "rollback_disable_command": "none; no live adapter, provider process, private-data path, or order path is active",
+    "selected_execution_mode": "perpetual",
+    "selected_venue": "bybit",
+    "unit_boundary": "offline normalization remains USDT-denominated and never silently relabels USDT as USD"
   },
   "artifact_heavy_verification": {
     "artifact_retention_report": {

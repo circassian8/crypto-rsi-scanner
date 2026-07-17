@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-17 — Select Bybit perpetuals and add an offline execution-quality slice · Codex
+**Why:** The owner confirmed Bybit USDT-linear perpetuals as the intended
+Decision Radar execution surface, public market data only, with current
+jurisdiction/account eligibility for the research scope. The project needed to
+replace its stale “no venue selected” state without pretending the recorded
+Bybit 403, exact universe, or live spread evidence was already solved.
+**Changes:**
+- Recorded the durable selection as Bybit `LinearPerpetual` / USDT quote and
+  settlement, with a bounded top-30 liquidity-ranked Radar intersection that
+  remains an explicit point-in-time instrument set to freeze in the Protocol-v2
+  annex. The frozen static Protocol-v2 requirements contract and unopened
+  holdout remain unchanged.
+- Added a strict offline V5 normalizer that accepts only active, non-prelisting
+  USDT-linear perpetual contracts; rejects incomplete pagination, ambiguous
+  identity, multiplier-symbol guessing, invalid/crossed books, malformed clocks,
+  and implausible freshness; and preserves request lineage plus `ts`, `cts`,
+  update ID, and cross sequence.
+- Derived bid/ask, mid, spread, USDT depth bands, and USDT-notional price impact
+  from supplied book snapshots. Insufficient depth remains `null`, stale stays
+  stale, and USDT is never silently relabeled USD.
+- Added a bounded non-executable public-GET description and checked fixture
+  smoke. It contains no HTTP client, credential/private-data operation, or order
+  method, and explicitly records zero provider calls and no runtime
+  authorization.
+- Upgraded static execution-quality readiness to v4, added
+  `radar-execution-quality-bybit-smoke`, and reconciled the decision package,
+  North Star, runbook, README, roadmap, working agreement, focused tests, and
+  current architecture reports.
+**Verify:** Official Bybit V5 instrument and order-book documentation was
+reviewed on 2026-07-17. North Star JSON validation and compileall passed. The 67
+focused Bybit/readiness/Protocol-v2/Make tests passed; static readiness, offline
+Bybit smoke, Protocol-v2 check, and architecture cleanliness passed with zero
+new violations. The broad `verify-fast` pytest phase ran all 2,627 tests: 2,626
+passed, while the sandbox denied the one real localhost-bind dashboard test
+with `EPERM`; that exact test passed separately with local-bind permission.
+Alert rendering, fixture backtest, and paper-scoreboard smokes then passed.
+Full duplicate `make verify` was intentionally skipped because no live adapter,
+provider activation, shared runtime route, or production policy changed and the
+broad pytest plus runtime-smoke evidence covered this isolated additive slice.
+**Notes/risks:** Live Bybit evidence remains blocked until the exact instrument
+set and unit/cost rules are sealed, a separate runtime authorization already
+exists, and the official endpoint is honestly reachable. The recorded 403
+still fails closed; no proxy, VPN, region bypass, send, trade, order, paper
+trade, normal RSI write, Event Alpha fade trigger, dashboard authority change,
+or holdout access occurred.
+
 ## 2026-07-17 — Close release hardening on the supported platform matrix · Codex
 **Why:** The owner confirmed macOS as the personal production/operator
 environment and explicitly made exact Linux source-with-artifacts verification

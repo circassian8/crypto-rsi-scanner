@@ -79,21 +79,24 @@ Protocol-v2 holdout is undefined and unopened, its access count is zero, and no
 replay, selection, or final-test target exists. Protocol-v1 final-test evidence
 must never be reused to tune v2.
 
-The execution-quality decision remains human-owned. Start with:
+The owner confirmed Bybit USDT-linear perpetuals, public market data only, and
+current jurisdiction/account eligibility for this research scope on
+2026-07-17. Inspect the static current truth and offline normalizer with:
 
 ```sh
 make radar-execution-quality-readiness PYTHON=.venv/bin/python
+make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
 ```
 
-Complete the rendered template with an intended venue, `spot`/`perpetual`/`dex`
-mode, quote currency, exact bounded eligible-instrument set, dated
-jurisdiction/account eligibility confirmation, and the expected public/private
-market-data boundary. This grants no provider, private-data, order, or trading
-permission and does not select a spread provider. The concise option comparison
-is [Decision Radar execution-venue decision package](DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md).
-Its multiple-venue research alternative keeps every venue's book and quote
-separate; it cannot close the primary cost model until one execution surface is
-sealed.
+The confirmed universe rule is the top 30 liquidity-ranked Radar assets
+intersected with exact active Bybit `LinearPerpetual`, `Trading`, USDT-quoted,
+USDT-settled, non-prelisting contracts. The exact resulting IDs remain a
+Protocol-v2 annex field, not an inferred current set. The offline normalizer
+reports USDT depth and notionals and does not silently convert them to USD. This
+selection grants no runtime provider authorization, credential/private-data,
+order, or trading permission. The recorded 403 must fail closed without a
+proxy, VPN, or region bypass. The concise decision and remaining blockers are
+in [Decision Radar execution-venue decision package](DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md).
 
 ## Inputs and default paths
 

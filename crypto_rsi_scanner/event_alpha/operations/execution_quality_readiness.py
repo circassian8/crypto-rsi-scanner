@@ -1,9 +1,9 @@
-"""Static, no-network execution-quality feasibility and interface contract.
+"""Static, no-network execution-quality selection and readiness contract.
 
-This module deliberately stops before venue selection or adapter activation.  It
-describes candidate read-only market-data surfaces and the closed value contract
-that a future operator-selected adapter must satisfy.  It reads no environment,
-credentials, files, or provider state and performs no writes or network calls.
+The owner selected Bybit USDT-linear perpetuals with public market data only.
+This report records that choice while stopping before provider authorization or
+live-adapter activation.  It reads no environment, credentials, files, provider
+state, or holdout data and performs no writes or network calls.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v3"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v4"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 COMMON_METRICS = (
     "best_bid",
@@ -184,11 +184,15 @@ class _ExecutionQualityReadiness:
     intended_instrument_mode: str | None
     quote_currency: str | None
     eligible_instrument_set: tuple[str, ...]
+    eligible_instrument_selection_rule: str | None
+    eligible_instrument_set_frozen: bool
     jurisdiction_and_account_eligibility_confirmation: str | None
     jurisdiction_and_account_eligibility_confirmed: bool | None
     expected_public_private_data_boundary: str | None
+    human_decision_confirmed_at: str | None
     required_human_decision_fields: tuple[str, ...]
     human_decision_template: tuple[tuple[str, str], ...]
+    supported_offline_adapters: tuple[str, ...]
     supported_live_adapters: tuple[str, ...]
     supported_interface_modes: tuple[str, ...]
     feasible_venues: tuple[ExecutionVenueCapability, ...]
@@ -202,6 +206,7 @@ class _ExecutionQualityReadiness:
     expected_provider_activity: str
     rollback_disable_command: str
     spread_provider_status: str
+    public_market_data_scope_confirmed: bool
     public_market_data_permission_requested: bool
     private_market_data_permission_requested: bool
     order_permission_requested: bool
@@ -241,6 +246,8 @@ def _execution_quality_readiness_dict(
         "intended_instrument_mode": value.intended_instrument_mode,
         "quote_currency": value.quote_currency,
         "eligible_instrument_set": list(value.eligible_instrument_set),
+        "eligible_instrument_selection_rule": value.eligible_instrument_selection_rule,
+        "eligible_instrument_set_frozen": value.eligible_instrument_set_frozen,
         "jurisdiction_and_account_eligibility_confirmation": (
             value.jurisdiction_and_account_eligibility_confirmation
         ),
@@ -250,8 +257,10 @@ def _execution_quality_readiness_dict(
         "expected_public_private_data_boundary": (
             value.expected_public_private_data_boundary
         ),
+        "human_decision_confirmed_at": value.human_decision_confirmed_at,
         "required_human_decision_fields": list(value.required_human_decision_fields),
         "human_decision_template": dict(value.human_decision_template),
+        "supported_offline_adapters": list(value.supported_offline_adapters),
         "supported_live_adapters": list(value.supported_live_adapters),
         "supported_interface_modes": list(value.supported_interface_modes),
         "feasible_venues": [row.to_dict() for row in value.feasible_venues],
@@ -267,6 +276,9 @@ def _execution_quality_readiness_dict(
         "expected_provider_activity": value.expected_provider_activity,
         "rollback_disable_command": value.rollback_disable_command,
         "spread_provider_status": value.spread_provider_status,
+        "public_market_data_scope_confirmed": (
+            value.public_market_data_scope_confirmed
+        ),
         "public_market_data_permission_requested": (
             value.public_market_data_permission_requested
         ),
@@ -334,7 +346,9 @@ VENUE_CAPABILITIES = (
     ExecutionVenueCapability(
         venue_id="bybit",
         display_name="Bybit",
-        implementation_status="feasible_but_current_egress_restricted_not_implemented",
+        implementation_status=(
+            "selected_offline_normalizer_ready_live_egress_reachability_unverified"
+        ),
         execution_modes=("spot", "perpetual"),
         market_data_access="public_market_data_no_credentials_expected",
         public_endpoint_expected=True,
@@ -353,10 +367,11 @@ VENUE_CAPABILITIES = (
         ),
         expected_metrics=COMMON_METRICS + ("order_book_update_sequence",),
         official_source_urls=(
+            "https://bybit-exchange.github.io/docs/v5/market/instrument",
             "https://bybit-exchange.github.io/docs/v5/market/orderbook",
             "https://bybit-exchange.github.io/docs/v5/rate-limit",
         ),
-        official_sources_reviewed_at="2026-07-15",
+        official_sources_reviewed_at="2026-07-17",
     ),
     ExecutionVenueCapability(
         venue_id="coinbase_exchange",
@@ -444,37 +459,49 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
 
     return ExecutionQualityReadiness(
         contract_version=CONTRACT_VERSION,
-        status="operator_venue_required",
-        selected_venue=None,
-        selected_execution_mode=None,
-        intended_venue=None,
-        intended_instrument_mode=None,
-        quote_currency=None,
+        status="execution_surface_selected_live_adapter_blocked",
+        selected_venue="bybit",
+        selected_execution_mode="perpetual",
+        intended_venue="bybit",
+        intended_instrument_mode="perpetual",
+        quote_currency="USDT",
         eligible_instrument_set=(),
-        jurisdiction_and_account_eligibility_confirmation=None,
-        jurisdiction_and_account_eligibility_confirmed=None,
-        expected_public_private_data_boundary=None,
+        eligible_instrument_selection_rule=(
+            "top_30_liquid_decision_radar_assets_intersect_active_bybit_USDT_"
+            "linear_perpetuals_then_freeze_exact_set_in_protocol_v2_annex"
+        ),
+        eligible_instrument_set_frozen=False,
+        jurisdiction_and_account_eligibility_confirmation=(
+            "owner_confirmed_2026-07-17_for_bybit_USDT_linear_perpetual_"
+            "research_scope"
+        ),
+        jurisdiction_and_account_eligibility_confirmed=True,
+        expected_public_private_data_boundary=(
+            "public_market_data_only_no_credentials_no_private_data"
+        ),
+        human_decision_confirmed_at="2026-07-17",
         required_human_decision_fields=(
-            "intended_execution_venue",
-            "instrument_mode_spot_perpetual_or_dex",
-            "quote_currency",
-            "eligible_instrument_set",
-            "jurisdiction_and_account_eligibility_confirmation",
-            "expected_public_private_data_boundary",
+            "exact_frozen_eligible_instrument_set",
         ),
         human_decision_template=(
-            ("intended_venue", "<venue_id>"),
-            ("instrument_mode", "<spot|perpetual|dex>"),
-            ("quote_currency", "<quote_asset>"),
-            ("eligible_instrument_set", "<exact bounded instrument ids>"),
+            ("intended_venue", "bybit"),
+            ("instrument_mode", "perpetual"),
+            ("quote_currency", "USDT"),
+            (
+                "eligible_instrument_set",
+                "pending_exact_annex_freeze_from_confirmed_selection_rule",
+            ),
             (
                 "jurisdiction_and_account_eligibility_confirmation",
-                "<confirmed with date and scope>",
+                "confirmed_2026-07-17_by_owner_for_research_scope",
             ),
             (
                 "expected_public_private_data_boundary",
-                "<public-only reads|private reads required and separately authorized>",
+                "public_market_data_only_no_credentials_no_private_data",
             ),
+        ),
+        supported_offline_adapters=(
+            "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
         ),
         supported_live_adapters=(),
         supported_interface_modes=EXECUTION_MODES,
@@ -482,29 +509,37 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         multiple_venue_research_option=MULTI_VENUE_RESEARCH_OPTION,
         required_snapshot_fields=REQUIRED_SNAPSHOT_FIELDS,
         selection_blockers=(
-            "intended_execution_venue_not_selected",
-            "intended_execution_mode_not_selected",
-            "quote_currency_not_selected",
-            "eligible_instrument_set_not_declared",
-            "jurisdiction_and_account_eligibility_not_confirmed",
-            "public_private_data_boundary_not_declared",
+            "eligible_instrument_set_not_frozen",
+            "bybit_public_endpoint_reachability_unverified_after_recorded_403",
             "no_live_execution_quality_adapter_implemented",
+            "runtime_provider_authorization_not_created_by_operator_selection",
+            "USDT_to_USD_cost_unit_policy_not_sealed",
+            "protocol_v2_annex_not_sealed",
         ),
-        operator_decision="select_execution_venue_and_instrument_mode",
+        operator_decision=(
+            "confirmed_bybit_USDT_linear_perpetual_public_market_data_only"
+        ),
         implications=(
-            "venue_selection_defines_the_relevant_spread_depth_and_impact_surface",
-            "public_market_data_access_does_not_imply_trading_eligibility",
-            "selection_will_require_a_separate_read_only_adapter_review",
+            "Bybit_USDT_perpetual_books_define_the_primary_spread_depth_and_impact_surface",
+            "the_exact_top_30_intersection_must_be_frozen_before_holdout_access",
+            "public_data_scope_does_not_activate_a_provider_call_or_trading_path",
+            "the_recorded_403_must_fail_closed_without_proxy_VPN_or_region_bypass",
         ),
         next_safe_command=(
-            "make radar-execution-quality-readiness PYTHON=.venv/bin/python"
+            "make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python"
         ),
         authorization_boundary=(
-            "this_report_neither_selects_nor_authorizes_a_venue_provider_or_order_path"
+            "the_operator_choice_confirms_public_only_research_scope_but_does_not_"
+            "create_runtime_provider_authorization_or_permit_private_data_orders_or_trading"
         ),
-        expected_provider_activity="none_static_readiness_only",
-        rollback_disable_command="none_required_no_adapter_or_provider_is_active",
-        spread_provider_status="not_selected",
+        expected_provider_activity="none_offline_fixture_normalization_only",
+        rollback_disable_command=(
+            "none_required_no_live_adapter_provider_process_or_order_path_is_active"
+        ),
+        spread_provider_status=(
+            "bybit_selected_offline_contract_only_live_spread_unavailable"
+        ),
+        public_market_data_scope_confirmed=True,
         public_market_data_permission_requested=False,
         private_market_data_permission_requested=False,
         order_permission_requested=False,
@@ -520,7 +555,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
 
 
 def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str:
-    """Render concise operator-readable readiness without suggesting a venue."""
+    """Render the confirmed selection and remaining fail-closed boundaries."""
 
     mode_access = {
         "spot": (
@@ -539,11 +574,18 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
     lines = [
         "CRYPTO DECISION RADAR EXECUTION-QUALITY READINESS",
         f"status={result.status}",
-        "selected_venue=none selected_execution_mode=none",
-        "intended_venue=none intended_instrument_mode=none",
-        "quote_currency=none eligible_instrument_set=none",
-        "jurisdiction_and_account_eligibility_confirmed=none",
-        "expected_public_private_data_boundary=none",
+        f"selected_venue={result.selected_venue} "
+        f"selected_execution_mode={result.selected_execution_mode}",
+        f"intended_venue={result.intended_venue} "
+        f"intended_instrument_mode={result.intended_instrument_mode}",
+        f"quote_currency={result.quote_currency} eligible_instrument_set=not_yet_frozen",
+        f"eligible_instrument_selection_rule={result.eligible_instrument_selection_rule}",
+        f"eligible_instrument_set_frozen={str(result.eligible_instrument_set_frozen).casefold()}",
+        "jurisdiction_and_account_eligibility_confirmed=true "
+        f"confirmed_at={result.human_decision_confirmed_at}",
+        "expected_public_private_data_boundary="
+        f"{result.expected_public_private_data_boundary}",
+        "supported_offline_adapters=" + ",".join(result.supported_offline_adapters),
         "supported_live_adapters=none",
         "read_only=true provider_calls=0 provider_call_planned=false provider_call_attempted=false",
         "credentials_read=false network_called=false writes_performed=false",
@@ -554,16 +596,17 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         f"expected_provider_activity={result.expected_provider_activity}",
         f"rollback_disable_command={result.rollback_disable_command}",
         f"spread_provider_status={result.spread_provider_status}",
+        "public_market_data_scope_confirmed=true",
         "public_market_data_permission_requested=false "
         "private_market_data_permission_requested=false",
         "order_permission_requested=false trading_permission_requested=false",
-        "required_human_decision_fields="
+        "remaining_human_sealing_fields="
         + ",".join(result.required_human_decision_fields),
         "",
-        "HUMAN EXECUTION-QUALITY DECISION TEMPLATE (copy and complete; no order permission):",
+        "CONFIRMED EXECUTION-QUALITY DECISION (no order permission):",
         *(f"{key}={value}" for key, value in result.human_decision_template),
         "",
-        "Supported instrument modes and venue options (human selection required):",
+        "Feasibility catalog (Bybit perpetual is selected; alternatives are inactive):",
     ]
     for mode in result.supported_interface_modes:
         venue_ids = ",".join(
@@ -582,10 +625,10 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
     lines.extend(
         (
             "",
-            "Expected normalized execution-quality fields:",
-            "- spread=best_bid,best_ask,mid_price,spread_bps",
-            "- depth=bid_depth_usd_by_band,ask_depth_usd_by_band",
-            "- impact=buy_price_impact_bps_by_notional,sell_price_impact_bps_by_notional",
+            "Execution-quality unit boundary:",
+            "- selected_bybit_offline=best_bid,best_ask,mid_price,spread_bps,bid_depth_usdt_by_band,ask_depth_usdt_by_band,buy_price_impact_bps_by_notional_usdt,sell_price_impact_bps_by_notional_usdt",
+            "- future_generic_USD_projection=unavailable_until_a_trusted_USDT_to_USD_cost_unit_policy_is_sealed",
+            "- generic_target_after_conversion=bid_depth_usd_by_band,ask_depth_usd_by_band,buy_price_impact_bps_by_notional,sell_price_impact_bps_by_notional",
             "- freshness_and_lineage=provider_observed_at,acquired_at,freshness_status,source_url,request_lineage_id",
             "- dex_additions=chain_id,block_number,pool_or_router_id,gas_estimate_native,route_identity",
             "",
@@ -596,7 +639,7 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
                 for key, value in result.multiple_venue_research_option.items()
             ),
             "",
-            "Feasible candidates (not selected or activated):",
+            "Feasible candidates (only Bybit perpetual is selected; none is live-activated):",
         )
     )
     for venue in result.feasible_venues:
@@ -625,8 +668,9 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
     lines.extend(
         (
             "",
-            "No venue is selected. No provider call, credential read, adapter activation, "
-            "trade, order, or execution action is authorized by this report.",
+            "Bybit USDT-linear perpetuals are selected for public-data research. "
+            "No provider call, credential read, live-adapter activation, private-data "
+            "read, trade, order, or execution action is authorized by this report.",
         )
     )
     return "\n".join(lines)

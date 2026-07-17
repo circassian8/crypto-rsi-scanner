@@ -334,19 +334,21 @@ may be added later when a suitable environment already exists.
   events remain context/risk only and cannot manufacture directional bias.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
-  feasible spot, perpetual, DEX, and comparative multiple-venue research
-  contracts. The concise checked decision package is
+  the owner-confirmed Bybit USDT-linear perpetual public-data research surface
+  plus feasible inactive alternatives. The concise checked decision package is
   `research/DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md`; the structured
-  form is available from `radar-execution-quality-readiness-json`. Multiple-
-  venue mode keeps native venue identity and may study robustness, but it does
-  not close Protocol-v2's primary cost model until one execution surface is
-  sealed. The v3 decision boundary requires the owner to name the intended
-  venue, instrument mode, quote currency, exact bounded eligible-instrument
-  set, current jurisdiction/account eligibility, and expected public/private
-  market-data boundary. It requests no public/private data permission, order
-  permission, or trading permission. Do not select a venue, spread provider,
-  activate a live adapter, or add execution/order behavior on the owner's
-  behalf.
+  form is available from `radar-execution-quality-readiness-json`. The confirmed
+  universe rule intersects the top 30 liquidity-ranked Radar assets with exact
+  active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled, non-prelisting
+  contracts and freezes the resulting IDs only in the Protocol-v2 annex. Run
+  `make radar-execution-quality-bybit-smoke` for the offline fixture normalizer;
+  it preserves clocks/sequence and computes spread, USDT depth, and
+  USDT-notional impact without an HTTP client or silent USD conversion. The
+  recorded Bybit 403 remains an honest reachability blocker; never use a proxy,
+  VPN, or region bypass. The selection creates no runtime provider
+  authorization, credential/private-data permission, order permission, or
+  trading permission. Do not activate a live adapter or add execution/order
+  behavior without a separate explicit boundary.
 - **Empirical Protocol-v2 readiness:**
   `make radar-research-protocol-v2-readiness` renders the frozen/static required
   evidence and annex contract without reading environment, files, credentials,

@@ -159,13 +159,15 @@ Add `BLS_CALENDAR_ICS=...` and/or `BEA_RELEASE_DATES_JSON=...` when those genuin
 exports are available. Unlinked macro rows remain context/risk only and never
 manufacture directional bias.
 
-Execution-quality integration is intentionally venue-neutral. Run
-`make radar-execution-quality-readiness PYTHON=.venv/bin/python` to compare
-feasible spot, perpetual, and DEX inputs. This command is static/no-network;
-currently no venue or spread provider is selected, so no adapter is active and
-there is nothing to disable. The operator must select the intended execution
-venue and instrument mode before any spread/depth adapter is designed; that
-choice still would not authorize orders or execution.
+The owner selected Bybit USDT-linear perpetuals as the intended
+execution-quality surface, using public market data only. Run
+`make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the current
+static/no-network truth and `make radar-execution-quality-bybit-smoke
+PYTHON=.venv/bin/python` for the offline V5 fixture normalizer. The exact top-30
+Radar/active-contract intersection is not frozen, live Bybit reachability is
+unverified after the recorded 403, and no runtime authorization or live adapter
+is active. Nothing here authorizes credentials, private data, orders, or
+execution, and there is nothing to disable.
 
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.

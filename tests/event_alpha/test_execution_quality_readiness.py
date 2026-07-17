@@ -38,21 +38,36 @@ DECISION_PACKAGE = (
 )
 
 
-def test_static_readiness_selects_and_activates_nothing() -> None:
+def test_static_readiness_records_confirmed_surface_without_live_activation() -> None:
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v3"
-    assert result.status == "operator_venue_required"
-    assert result.selected_venue is None
-    assert result.selected_execution_mode is None
-    assert result.intended_venue is None
-    assert result.intended_instrument_mode is None
-    assert result.quote_currency is None
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v4"
+    assert result.status == "execution_surface_selected_live_adapter_blocked"
+    assert result.selected_venue == "bybit"
+    assert result.selected_execution_mode == "perpetual"
+    assert result.intended_venue == "bybit"
+    assert result.intended_instrument_mode == "perpetual"
+    assert result.quote_currency == "USDT"
     assert result.eligible_instrument_set == ()
-    assert result.jurisdiction_and_account_eligibility_confirmation is None
-    assert result.jurisdiction_and_account_eligibility_confirmed is None
-    assert result.expected_public_private_data_boundary is None
+    assert "top_30_liquid_decision_radar_assets" in (
+        result.eligible_instrument_selection_rule or ""
+    )
+    assert result.eligible_instrument_set_frozen is False
+    assert result.jurisdiction_and_account_eligibility_confirmation == (
+        "owner_confirmed_2026-07-17_for_bybit_USDT_linear_perpetual_research_scope"
+    )
+    assert result.jurisdiction_and_account_eligibility_confirmed is True
+    assert result.expected_public_private_data_boundary == (
+        "public_market_data_only_no_credentials_no_private_data"
+    )
+    assert result.human_decision_confirmed_at == "2026-07-17"
+    assert result.required_human_decision_fields == (
+        "exact_frozen_eligible_instrument_set",
+    )
+    assert result.supported_offline_adapters == (
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
+    )
     assert result.supported_live_adapters == ()
     assert result.provider_call_planned is False
     assert result.provider_call_attempted is False
@@ -61,26 +76,32 @@ def test_static_readiness_selects_and_activates_nothing() -> None:
     assert result.network_called is False
     assert result.writes_performed is False
     assert result.research_only is True
-    assert result.operator_decision == "select_execution_venue_and_instrument_mode"
-    assert result.next_safe_command == (
-        "make radar-execution-quality-readiness PYTHON=.venv/bin/python"
+    assert result.operator_decision == (
+        "confirmed_bybit_USDT_linear_perpetual_public_market_data_only"
     )
-    assert result.expected_provider_activity == "none_static_readiness_only"
-    assert result.rollback_disable_command == "none_required_no_adapter_or_provider_is_active"
-    assert result.spread_provider_status == "not_selected"
+    assert result.next_safe_command == (
+        "make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python"
+    )
+    assert result.expected_provider_activity == "none_offline_fixture_normalization_only"
+    assert result.rollback_disable_command == (
+        "none_required_no_live_adapter_provider_process_or_order_path_is_active"
+    )
+    assert result.spread_provider_status == (
+        "bybit_selected_offline_contract_only_live_spread_unavailable"
+    )
+    assert result.public_market_data_scope_confirmed is True
     assert result.public_market_data_permission_requested is False
     assert result.private_market_data_permission_requested is False
     assert result.order_permission_requested is False
     assert result.trading_permission_requested is False
     assert result.multiple_venue_research_option == MULTI_VENUE_RESEARCH_OPTION
     assert set(result.selection_blockers) == {
-        "intended_execution_venue_not_selected",
-        "intended_execution_mode_not_selected",
-        "quote_currency_not_selected",
-        "eligible_instrument_set_not_declared",
-        "jurisdiction_and_account_eligibility_not_confirmed",
-        "public_private_data_boundary_not_declared",
+        "eligible_instrument_set_not_frozen",
+        "bybit_public_endpoint_reachability_unverified_after_recorded_403",
         "no_live_execution_quality_adapter_implemented",
+        "runtime_provider_authorization_not_created_by_operator_selection",
+        "USDT_to_USD_cost_unit_policy_not_sealed",
+        "protocol_v2_annex_not_sealed",
     }
 
 
@@ -149,7 +170,8 @@ def test_every_capability_reports_access_limits_metrics_and_constraints() -> Non
         assert row.network_constraints
         assert row.request_limits
         assert set(COMMON_METRICS) <= set(row.expected_metrics)
-        assert row.official_sources_reviewed_at == "2026-07-15"
+        expected_review_date = "2026-07-17" if row.venue_id == "bybit" else "2026-07-15"
+        assert row.official_sources_reviewed_at == expected_review_date
 
 
 def test_cex_candidates_expect_public_books_without_credentials() -> None:
@@ -195,7 +217,8 @@ def test_catalog_preserves_known_bybit_restriction_without_bypass() -> None:
         if row.venue_id == "bybit"
     )
 
-    assert "current_egress_restricted" in bybit.implementation_status
+    assert "selected_offline_normalizer_ready" in bybit.implementation_status
+    assert "live_egress_reachability_unverified" in bybit.implementation_status
     assert "current_project_egress_has_recorded_a_region_restricted_403" in (
         bybit.network_constraints
     )
@@ -238,53 +261,59 @@ def test_reader_protocol_exposes_only_one_read_operation() -> None:
     )
 
 
-def test_human_report_is_explicitly_nonselecting_and_no_call() -> None:
+def test_human_report_is_explicitly_selected_but_no_call() -> None:
     rendered = format_execution_quality_readiness(build_execution_quality_readiness())
 
-    assert "status=operator_venue_required" in rendered
-    assert "selected_venue=none selected_execution_mode=none" in rendered
-    assert "intended_venue=none intended_instrument_mode=none" in rendered
-    assert "quote_currency=none eligible_instrument_set=none" in rendered
-    assert "jurisdiction_and_account_eligibility_confirmed=none" in rendered
-    assert "expected_public_private_data_boundary=none" in rendered
+    assert "status=execution_surface_selected_live_adapter_blocked" in rendered
+    assert "selected_venue=bybit selected_execution_mode=perpetual" in rendered
+    assert "intended_venue=bybit intended_instrument_mode=perpetual" in rendered
+    assert "quote_currency=USDT eligible_instrument_set=not_yet_frozen" in rendered
+    assert "top_30_liquid_decision_radar_assets" in rendered
+    assert "eligible_instrument_set_frozen=false" in rendered
+    assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
+    assert "expected_public_private_data_boundary=public_market_data_only" in rendered
+    assert "supported_offline_adapters=bybit_usdt_linear_perpetual" in rendered
     assert "supported_live_adapters=none" in rendered
     assert (
         "read_only=true provider_calls=0 provider_call_planned=false "
         "provider_call_attempted=false"
     ) in rendered
     assert "credentials_read=false network_called=false writes_performed=false" in rendered
-    assert "next_safe_command=make radar-execution-quality-readiness" in rendered
-    assert "expected_provider_activity=none_static_readiness_only" in rendered
-    assert "spread_provider_status=not_selected" in rendered
+    assert "next_safe_command=make radar-execution-quality-bybit-smoke" in rendered
+    assert "expected_provider_activity=none_offline_fixture_normalization_only" in rendered
+    assert "spread_provider_status=bybit_selected_offline_contract_only" in rendered
+    assert "public_market_data_scope_confirmed=true" in rendered
     assert "public_market_data_permission_requested=false" in rendered
     assert "private_market_data_permission_requested=false" in rendered
     assert "order_permission_requested=false trading_permission_requested=false" in rendered
-    assert "HUMAN EXECUTION-QUALITY DECISION TEMPLATE" in rendered
-    assert "intended_venue=<venue_id>" in rendered
-    assert "instrument_mode=<spot|perpetual|dex>" in rendered
-    assert "quote_currency=<quote_asset>" in rendered
-    assert "eligible_instrument_set=<exact bounded instrument ids>" in rendered
+    assert "CONFIRMED EXECUTION-QUALITY DECISION" in rendered
+    assert "intended_venue=bybit" in rendered
+    assert "instrument_mode=perpetual" in rendered
+    assert "quote_currency=USDT" in rendered
+    assert "eligible_instrument_set=pending_exact_annex_freeze" in rendered
     assert (
         "jurisdiction_and_account_eligibility_confirmation="
-        "<confirmed with date and scope>"
+        "confirmed_2026-07-17_by_owner_for_research_scope"
     ) in rendered
     assert (
         "expected_public_private_data_boundary="
-        "<public-only reads|private reads required and separately authorized>"
+        "public_market_data_only_no_credentials_no_private_data"
     ) in rendered
-    assert "No venue is selected" in rendered
-    assert "Supported instrument modes and venue options" in rendered
+    assert "Bybit USDT-linear perpetuals are selected" in rendered
+    assert "Feasibility catalog (Bybit perpetual is selected" in rendered
     assert "- spot: venues=binance,bybit,coinbase_exchange,kraken" in rendered
     assert "- perpetual: venues=binance,bybit" in rendered
     assert "- dex: venues=dex_operator_selected" in rendered
     assert "route_identity" in rendered
     assert "operator_must_confirm_derivatives_jurisdiction" in rendered
     assert "RPC_or_quote_access_and_credentials_unknown" in rendered
-    assert "Expected normalized execution-quality fields" in rendered
-    assert "spread=best_bid,best_ask,mid_price,spread_bps" in rendered
-    assert "depth=bid_depth_usd_by_band,ask_depth_usd_by_band" in rendered
+    assert "Execution-quality unit boundary" in rendered
+    assert "selected_bybit_offline=best_bid,best_ask,mid_price,spread_bps" in rendered
+    assert "bid_depth_usdt_by_band" in rendered
+    assert "future_generic_USD_projection=unavailable" in rendered
+    assert "generic_target_after_conversion=bid_depth_usd_by_band" in rendered
     assert (
-        "impact=buy_price_impact_bps_by_notional,"
+        "buy_price_impact_bps_by_notional,"
         "sell_price_impact_bps_by_notional"
     ) in rendered
     assert "dex_additions=chain_id,block_number,pool_or_router_id" in rendered
@@ -333,40 +362,55 @@ def test_cli_json_is_structured_static_and_secret_free(
     payload = json.loads(output.out)
 
     assert output.err == ""
-    assert payload["status"] == "operator_venue_required"
-    assert payload["selected_venue"] is None
-    assert payload["intended_venue"] is None
-    assert payload["intended_instrument_mode"] is None
-    assert payload["quote_currency"] is None
+    assert payload["status"] == "execution_surface_selected_live_adapter_blocked"
+    assert payload["selected_venue"] == "bybit"
+    assert payload["selected_execution_mode"] == "perpetual"
+    assert payload["intended_venue"] == "bybit"
+    assert payload["intended_instrument_mode"] == "perpetual"
+    assert payload["quote_currency"] == "USDT"
     assert payload["eligible_instrument_set"] == []
-    assert payload["jurisdiction_and_account_eligibility_confirmation"] is None
-    assert payload["jurisdiction_and_account_eligibility_confirmed"] is None
-    assert payload["expected_public_private_data_boundary"] is None
+    assert "top_30_liquid_decision_radar_assets" in payload[
+        "eligible_instrument_selection_rule"
+    ]
+    assert payload["eligible_instrument_set_frozen"] is False
+    assert payload["jurisdiction_and_account_eligibility_confirmed"] is True
+    assert payload["expected_public_private_data_boundary"] == (
+        "public_market_data_only_no_credentials_no_private_data"
+    )
+    assert payload["human_decision_confirmed_at"] == "2026-07-17"
+    assert payload["supported_offline_adapters"] == [
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v1"
+    ]
     assert payload["supported_live_adapters"] == []
     assert payload["provider_call_planned"] is False
     assert payload["provider_call_attempted"] is False
     assert payload["network_called"] is False
     assert payload["credentials_read"] is False
-    assert payload["spread_provider_status"] == "not_selected"
+    assert payload["spread_provider_status"] == (
+        "bybit_selected_offline_contract_only_live_spread_unavailable"
+    )
+    assert payload["public_market_data_scope_confirmed"] is True
     assert payload["public_market_data_permission_requested"] is False
     assert payload["private_market_data_permission_requested"] is False
     assert payload["order_permission_requested"] is False
     assert payload["trading_permission_requested"] is False
     assert payload["multiple_venue_research_option"] == MULTI_VENUE_RESEARCH_OPTION
     assert payload["human_decision_template"] == {
-        "eligible_instrument_set": "<exact bounded instrument ids>",
+        "eligible_instrument_set": (
+            "pending_exact_annex_freeze_from_confirmed_selection_rule"
+        ),
         "expected_public_private_data_boundary": (
-            "<public-only reads|private reads required and separately authorized>"
+            "public_market_data_only_no_credentials_no_private_data"
         ),
-        "instrument_mode": "<spot|perpetual|dex>",
-        "intended_venue": "<venue_id>",
+        "instrument_mode": "perpetual",
+        "intended_venue": "bybit",
         "jurisdiction_and_account_eligibility_confirmation": (
-            "<confirmed with date and scope>"
+            "confirmed_2026-07-17_by_owner_for_research_scope"
         ),
-        "quote_currency": "<quote_asset>",
+        "quote_currency": "USDT",
     }
     assert payload["rollback_disable_command"] == (
-        "none_required_no_adapter_or_provider_is_active"
+        "none_required_no_live_adapter_provider_process_or_order_path_is_active"
     )
     assert "must-not-print" not in output.out
 
@@ -403,12 +447,14 @@ def test_make_targets_are_static_readiness_only() -> None:
     assert "execute-order" not in rendered
 
 
-def test_checked_operator_decision_package_is_complete_and_nonselecting() -> None:
+def test_checked_operator_decision_package_records_selection_and_boundaries() -> None:
     rendered = DECISION_PACKAGE.read_text(encoding="utf-8")
 
-    assert "human decision required" in rendered
-    assert "no venue, provider, adapter, credential, or" in rendered
-    assert "trading permission selected" in rendered
+    assert "operator decision confirmed" in rendered
+    assert "Bybit" in rendered
+    assert "USDT-linear perpetual" in rendered
+    assert "public market data only" in rendered
+    assert "no live provider adapter, credential, private-data" in rendered
     for option in (
         "Binance",
         "Bybit",
@@ -418,9 +464,7 @@ def test_checked_operator_decision_package_is_complete_and_nonselecting() -> Non
         "Multiple-venue research",
     ):
         assert f"| {option} |" in rendered
-    for field, _placeholder in (
-        build_execution_quality_readiness().human_decision_template
-    ):
+    for field, _value in build_execution_quality_readiness().human_decision_template:
         assert field in rendered
     assert "cannot close the primary cost model" in rendered
     assert "No Protocol-v2 holdout is defined, opened, or evaluated" in rendered

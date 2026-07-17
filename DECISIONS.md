@@ -16,6 +16,32 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-17 - Select Bybit USDT-linear perpetuals for execution-quality research
+**Status:** accepted
+**Decision:** Use Bybit USDT-linear perpetuals as Decision Radar's intended
+primary execution-quality and Protocol-v2 cost surface. Use public market data
+only, with no credentials or private account data. Define the bounded universe
+as the top 30 liquidity-ranked Decision Radar assets intersected with exact
+active Bybit `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
+non-prelisting contracts, and freeze the resulting instrument IDs only when the
+Protocol-v2 annex is sealed. Record the owner's 2026-07-17 confirmation of
+current jurisdiction/account eligibility for this research scope. The initial
+implementation is an offline V5 payload normalizer and non-executable request
+description; selection does not create runtime provider authorization, permit a
+live call, or authorize credentials, private data, orders, execution, or
+trading. Preserve USDT-denominated depth/notionals explicitly rather than
+silently claiming USD equivalence. The recorded Bybit 403 fails closed; no
+proxy, VPN, or regional bypass is authorized.
+**Why:** The primary cost model needs one venue-native surface rather than
+generic or blended spread assumptions. Bybit USDT perpetuals match the owner's
+intended instrument, while the exact identity, unit, freshness, reachability,
+and preregistration boundaries prevent the choice from manufacturing usable
+execution evidence before it exists.
+**Revisit when:** Bybit eligibility changes, official public access remains
+unreachable through the permitted environment, the owner explicitly chooses a
+different primary venue/instrument, or the complete Protocol-v2 annex is ready
+to freeze the exact instrument set and data/cost rules before holdout access.
+
 ## 2026-07-17 - Support macOS operator releases and keep Linux artifact archives optional
 **Status:** accepted
 **Decision:** Use this release support matrix: macOS normal checkout is
@@ -71,9 +97,11 @@ availability.
 but preserve each venue's native quote, identity, spread, depth, impact,
 eligibility, and request budget independently. Comparative evidence may test
 robustness; it cannot close Protocol-v2's primary execution-cost model until the
-operator seals one exact primary execution surface. The readiness package still
-selects nothing and requests no credential, private data, wallet, order, or
-trading permission.
+operator seals one exact primary execution surface. The readiness package
+selected nothing when this decision was accepted; the later 2026-07-17 Bybit
+USDT-perpetual decision supersedes only that no-selection state. The
+comparative-mode boundary still requests no credential, private data, wallet,
+order, or trading permission.
 **Why:** Cross-venue evidence can reveal venue sensitivity, but blending books
 or leaving the executable venue undefined would manufacture cost precision and
 make a preregistration changeable after results are visible.

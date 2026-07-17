@@ -1,0 +1,90 @@
+{
+  "retCode": 0,
+  "retMsg": "OK",
+  "result": {
+    "category": "linear",
+    "nextPageCursor": "",
+    "list": [
+      {
+        "symbol": "BTCUSDT",
+        "contractType": "LinearPerpetual",
+        "status": "Trading",
+        "baseCoin": "BTC",
+        "quoteCoin": "USDT",
+        "settleCoin": "USDT",
+        "launchTime": "1585526400000",
+        "deliveryTime": "0",
+        "isPreListing": false,
+        "priceFilter": {"tickSize": "0.10"},
+        "lotSizeFilter": {"qtyStep": "0.001"}
+      },
+      {
+        "symbol": "ETHUSDT",
+        "contractType": "LinearPerpetual",
+        "status": "Trading",
+        "baseCoin": "ETH",
+        "quoteCoin": "USDT",
+        "settleCoin": "USDT",
+        "launchTime": "1585526400000",
+        "deliveryTime": "0",
+        "isPreListing": false,
+        "priceFilter": {"tickSize": "0.01"},
+        "lotSizeFilter": {"qtyStep": "0.01"}
+      },
+      {
+        "symbol": "USDCUSDT",
+        "contractType": "LinearFutures",
+        "status": "Trading",
+        "baseCoin": "USDC",
+        "quoteCoin": "USDT",
+        "settleCoin": "USDT",
+        "launchTime": "1700000000000",
+        "deliveryTime": "1800000000000",
+        "isPreListing": false,
+        "priceFilter": {"tickSize": "0.0001"},
+        "lotSizeFilter": {"qtyStep": "1"}
+      },
+      {
+        "symbol": "1000PEPEUSDT",
+        "contractType": "LinearPerpetual",
+        "status": "Trading",
+        "baseCoin": "1000PEPE",
+        "quoteCoin": "USDT",
+        "settleCoin": "USDT",
+        "launchTime": "1700000000000",
+        "deliveryTime": "0",
+        "isPreListing": false,
+        "priceFilter": {"tickSize": "0.0000001"},
+        "lotSizeFilter": {"qtyStep": "1"}
+      },
+      {
+        "symbol": "PEPEUSDT",
+        "contractType": "LinearPerpetual",
+        "status": "PreLaunch",
+        "baseCoin": "PEPE",
+        "quoteCoin": "USDT",
+        "settleCoin": "USDT",
+        "launchTime": "1800000000000",
+        "deliveryTime": "0",
+        "isPreListing": true,
+        "priceFilter": {"tickSize": "0.0000001"},
+        "lotSizeFilter": {"qtyStep": "1"}
+      },
+      {
+        "symbol": "BTCUSDC",
+        "contractType": "LinearPerpetual",
+        "status": "Trading",
+        "baseCoin": "BTC",
+        "quoteCoin": "USDC",
+        "settleCoin": "USDC",
+        "launchTime": "1700000000000",
+        "deliveryTime": "0",
+        "isPreListing": false,
+        "priceFilter": {"tickSize": "0.10"},
+        "lotSizeFilter": {"qtyStep": "0.001"}
+      }
+    ]
+  },
+  "retExtInfo": {},
+  "time": 1784289600000
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "canonical_asset_id": "bitcoin",
+    "symbol": "btc",
+    "liquidity_rank": 1
+  },
+  {
+    "canonical_asset_id": "ethereum",
+    "symbol": "eth",
+    "liquidity_rank": 2
+  },
+  {
+    "canonical_asset_id": "usd-coin",
+    "symbol": "usdc",
+    "liquidity_rank": 3
+  },
+  {
+    "canonical_asset_id": "pepe",
+    "symbol": "pepe",
+    "liquidity_rank": 4
+  }
+]
