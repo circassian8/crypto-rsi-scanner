@@ -258,12 +258,18 @@ def test_post_write_project_source_drift_preserves_prior_archive(
 
 def test_project_history_make_target_is_fixed_and_optional() -> None:
     rendered = subprocess.check_output(
-        ["make", "-n", "export-project-artifact-history", "PYTHON=python3"],
+        [
+            "make",
+            "--no-print-directory",
+            "-n",
+            "export-project-artifact-history",
+            "PYTHON=chosen-python",
+        ],
         cwd=REPO_ROOT,
         text=True,
     )
 
-    assert "scripts/export_project_artifact_history.py" in rendered
+    assert rendered.strip() == "chosen-python scripts/export_project_artifact_history.py"
     assert "rm " not in rendered
     assert "mv " not in rendered
 

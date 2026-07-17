@@ -775,7 +775,13 @@ def test_descriptor_walk_directory_swap_fails_closed(tmp_path, swap_component):
 
 def test_optional_history_make_target_uses_selected_python():
     output = subprocess.check_output(
-        ["make", "-n", "export-empirical-artifact-history", "PYTHON=chosen-python"],
+        [
+            "make",
+            "--no-print-directory",
+            "-n",
+            "export-empirical-artifact-history",
+            "PYTHON=chosen-python",
+        ],
         cwd=REPO_ROOT,
         text=True,
     )

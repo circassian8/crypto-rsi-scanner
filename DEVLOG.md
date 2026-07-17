@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-17 — Make artifact-history dry runs portable under nested GNU Make · Codex
+**Why:** The pushed Linux source-only release workflow passed the standalone
+runner but failed its pytest phase on both Python 3.11 and 3.13. The only
+failure was an exact string assertion that treated GNU Make's inherited
+`Entering/Leaving directory` chatter as part of the target command.
+**Changes:**
+- Made the empirical-history target test pass `--no-print-directory` before
+  asserting its exact dry-run command, so the test verifies the selected Python
+  and script rather than parent-Make presentation noise.
+- Applied the same exact portable contract to the new project-history target;
+  it now proves the selected Python command while retaining the no-delete and
+  no-move assertions.
+**Verify:** With forced nested-Make state (`MAKEFLAGS=w MAKELEVEL=1`), all 40
+empirical/project artifact-export tests passed and both dry-run targets rendered
+only their exact command. Local `make verify-fast PYTHON=.venv/bin/python`
+passed all 2,610 tests plus alert, backtest, and scoreboard smokes in 164.07s;
+the real dashboard pointer remained byte-identical at
+`95b35b13e7e7e5d4d4566d7ccbc2dcc440191266796f21efd9d074ce56967d88`.
+**Notes/risks:** GitHub run `29549655729` provided genuine Linux source-only
+evidence for the failure and its otherwise-green 1,391-test standalone pass,
+but it did not contain the ignored local artifact archive. A fresh Linux
+source-with-artifacts run remains required before universal release green can
+be claimed. No provider call, send, trade, order, paper trade, RSI write,
+authority mutation, policy change, or historical-evidence rewrite occurred.
+
 ## 2026-07-17 — Bound project artifacts and isolate the complete release gate · Codex
 **Why:** The empirical-only retention policy still left thousands of fixture,
 rehearsal, failed, intermediate, and superseded project artifacts in every
