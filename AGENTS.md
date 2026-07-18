@@ -381,6 +381,20 @@ may be added later when a suitable environment already exists.
   credential/private-data permission, order permission, or trading permission.
   Unset the authorization flag to disable the collection boundary; no provider
   process or order surface exists.
+- **Venue-native Bybit derivatives context:**
+  `make radar-derivatives-bybit-smoke` is an offline, no-write contract for the
+  selected Bybit USDT-linear perpetual surface. It normalizes supplied public
+  ticker, settled-funding, 1h open-interest, and 1h long/short-account-ratio
+  responses against the exact execution-quality instrument identity, preserving
+  provider clocks, lineage, native USDT/base-asset units, mark/index basis, and
+  explicit fraction-to-percent conversions. The bounded plan is four public GETs
+  per instrument and at most 120 for the future top-30 intersection, but the
+  module has no HTTP client and never creates authorization. Every snapshot is
+  context-only, has no directional authority or Decision-policy side effect, and
+  remains Protocol-v2-ineligible until a separately authorized immutable live
+  capture exists and its exact ID is sealed in the annex. Coinalyze remains an
+  optional secondary Catalyst-Radar cross-check, not a substitute for the
+  selected venue-native execution, funding, OI, or positioning surface.
 - **Direct Bybit 1h/4h readiness:**
   `make radar-intraday-bybit-smoke` proves the completed trade-price bar
   normalizer offline. `make radar-intraday-bybit-readiness` is no-network and

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Define venue-native Bybit derivatives context · Codex
+**Why:** The selected Protocol-v2 research surface is Bybit USDT-linear
+perpetuals, so derivatives crowding context must share its exact venue-native
+instrument identity, units, and clocks rather than depend on a third-party
+aggregate or repeat the known fraction/percent unit error.
+**Changes:**
+- Added an offline Bybit V5 contract for exact ticker/mark/index/basis/current
+  funding, settled funding, 1h open interest, and 1h long/short-account-ratio
+  inputs. The bounded request plan is four public GETs per exact instrument and
+  at most 120 for the future top-30 intersection, but no HTTP client, live
+  adapter, authorization mutation, credential, or persistence path exists.
+- Added closed BTCUSDT fixtures and fail-closed tests for venue/instrument
+  identity, categories, provider and history clocks, ordering, freshness,
+  lineage, native USDT/base-asset units, explicit fraction-to-percent
+  conversion, plausible funding/basis/return bounds, and the rejected `10.0`
+  fraction case.
+- Made every snapshot explicitly context-only, non-directional,
+  Decision-policy-neutral, annex-unbound, and Protocol-v2-ineligible. Added the
+  zero-call `radar-derivatives-bybit-smoke` target and documented Bybit-native
+  context as Decision Radar's primary derivatives surface, with Coinalyze only
+  an optional secondary Catalyst-Radar cross-check.
+- Kept the public normalizer below the architecture function-size gate by
+  separating payload/clock validation from metric projection, then refreshed
+  the current architecture reports and collaboration records.
+**Verify:** 97 focused Bybit execution-quality, derivatives, intraday,
+readiness, provider-activation, and project-health tests passed; compileall,
+the offline Make smoke, JSON validation, `git diff --check`, and architecture
+cleanliness passed with zero new size violations.
+**Notes/risks:** This is a fixture-proven data contract, not genuine evidence.
+No provider call, write, authorization change, send, order, trade, paper/RSI
+write, fade trigger, route, score, threshold, dashboard authority, or Protocol-
+v2 annex change occurred. A separately authorized immutable live capture is
+still required, and the recorded Bybit 403 must never be bypassed.
+
 ## 2026-07-18 — Record explicit receipt-bound Decision review latency · Codex
 **Why:** Protocol v2 needs genuine point-in-time operator latency, but dashboard
 requests, health probes, and inferred attention cannot prove a human review or

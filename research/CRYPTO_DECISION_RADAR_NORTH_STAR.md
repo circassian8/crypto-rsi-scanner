@@ -899,6 +899,20 @@ projection from raw bytes, rejects pointer rollback/drift, and excludes unknown
 provider fields from the closed capture summary. The standard review archive
 selects and fully revalidates only the latest completed capture.
 
+The venue-native derivatives context contract separately normalizes supplied
+Bybit ticker, settled-funding, 1h open-interest, and 1h long/short-account-ratio
+responses for the exact selected execution-quality instrument. Run
+`make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python` to prove the
+offline path. It preserves provider clocks and request lineage; keeps USDT,
+base-asset, fraction, percent-point, and basis-point units explicit; rejects the
+known 100x fraction/percent failure; and plans no more than four public GETs per
+instrument or 120 for the future top-30 intersection. The module has no HTTP
+client, writes, credentials, authorization mutation, sends, orders, or trades.
+Its output is context-only, non-directional, policy-neutral, annex-unbound, and
+Protocol-v2-ineligible. Coinalyze is optional secondary Catalyst-Radar
+corroboration, not a substitute for the chosen venue-native derivatives or
+execution surface.
+
 The direct intraday offline contract likewise validates exact latest-completed
 Bybit trade-price candles independently at 1h and 4h. It cuts requests off just
 before the current bucket, preserves native instrument identity, OHLC,

@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Prefer venue-native Bybit derivatives context for Decision Radar
+**Status:** accepted
+**Decision:** For the selected Bybit USDT-linear perpetual research surface,
+Decision Radar's primary derivatives context must come from exact native Bybit
+instruments: current ticker/mark/index/funding, settled funding history, 1h open
+interest, and 1h long/short account ratios. Normalize each field with explicit
+USDT, base-asset, fraction, percent-point, basis-point, provider-clock, and
+request-lineage semantics. The offline contract may plan at most four public
+GETs per instrument and 120 for the future top-30 intersection, but it has no
+HTTP client or authorization path. Normalized context has no directional
+authority, cannot create a route or idea, and remains Protocol-v2-ineligible
+until a separately authorized immutable live capture is annex-bound. Coinalyze
+may remain a secondary Catalyst-Radar corroboration source; it must not replace
+the chosen venue-native cost, funding, OI, or positioning evidence.
+**Why:** Execution quality, direct bars, and derivatives crowding should share
+one native instrument identity and clock domain. A third-party aggregate is
+useful for cross-checking but cannot prove what was observable on the selected
+venue, and silent fraction/percent conversion would reintroduce a known 100x
+unit failure mode.
+**Revisit when:** The human changes the execution venue/instrument decision, or
+a preregistered Protocol-v2 sensitivity annex adds a second independent venue
+or aggregator while preserving Bybit-native evidence separately.
+
 ## 2026-07-18 - Measure human review latency only from explicit receipt-bound actions
 **Status:** accepted
 **Decision:** Decision Radar must never infer a human view from dashboard GET,

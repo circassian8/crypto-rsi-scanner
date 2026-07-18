@@ -62,6 +62,41 @@ exact USDT spent; sell size means exact USDT proceeds. These definitions must
 remain explicit in any Protocol-v2 cost annex. See the official
 [Bybit order-book contract](https://bybit-exchange.github.io/docs/v5/market/orderbook).
 
+## Venue-native derivatives context contract
+
+The selected surface now has an offline, fail-closed derivatives-context
+normalizer. It consumes already-supplied public Bybit V5 bytes for the exact
+execution-quality instrument and produces one point-in-time context snapshot:
+
+- current mark/index price, mark-index basis, 24-hour return, current funding,
+  next funding time, turnover, volume, and open interest from the ticker;
+- the latest two settled funding observations;
+- the latest two 1h open-interest observations and their explicit percentage-
+  point change; and
+- the latest two 1h long/short account-ratio observations.
+
+The request plan is fixed at four public GETs per instrument and is bounded to
+120 requests for the future top-30 intersection. The implemented module has no
+HTTP client, persistence, authorization mutation, credentials, notifications,
+orders, or trading path. It rejects future/misordered rows, identity/category
+drift, incomplete lineage, implausible funding/basis/returns, and the known
+`10.0`-as-fraction 100x return-unit error; stale snapshots remain explicitly
+stale instead of being promoted. Every normalized row is
+explicitly context-only, non-directional, policy-neutral, annex-unbound, and
+Protocol-v2-ineligible. Run its zero-call proof with:
+
+```sh
+make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python
+```
+
+The exact official contracts are [ticker](https://bybit-exchange.github.io/docs/v5/market/tickers),
+[funding history](https://bybit-exchange.github.io/docs/v5/market/history-fund-rate),
+[open interest](https://bybit-exchange.github.io/docs/v5/market/open-interest),
+and [long/short account ratio](https://bybit-exchange.github.io/docs/v5/market/long-short-ratio).
+Coinalyze remains useful as an optional secondary Catalyst-Radar cross-check,
+but it is not the selected venue and cannot substitute for Bybit-native
+execution, funding, OI, positioning, identity, or clocks.
+
 ## Next point-in-time intraday contract
 
 The intended venue-native 1h/4h source is Bybit V5
@@ -152,6 +187,7 @@ The safe implementation smoke is:
 
 ```sh
 make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
+make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python
 make radar-intraday-bybit-smoke PYTHON=.venv/bin/python
 make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 make radar-intraday-bybit-status PYTHON=.venv/bin/python
@@ -159,7 +195,7 @@ make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 ```
 
-All six commands perform no network call, read no credential, and have no
+All seven commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
 already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
@@ -193,6 +229,8 @@ The exact operator sequence is intentionally split:
   claim that all 29 candidate joins are canonically confirmed contracts.
 - The execution-quality live adapter and immutable capture contract exist but
   are inactive; no genuine capture exists and live spread remains unavailable.
+- Venue-native ticker/funding/OI/positioning normalization is fixture-proven and
+  context-only; no derivatives live adapter or immutable genuine capture exists.
 - The direct 1h/4h completed-bar offline contract exists and is fixture-proven;
   its separately authorized live boundary and immutable exact-response capture
   exist but are inactive behind the missing execution-quality proof and
