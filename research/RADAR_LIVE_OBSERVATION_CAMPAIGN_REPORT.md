@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T19:42:25.213440+00:00` from local artifacts only.
+Generated at `2026-07-18T20:25:50.018899+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -19,6 +19,7 @@ Research and decision support only. This report contains no trade recommendation
 - Matured outcomes: `1`
 - Explicit first-view records: `0`
 - Completed human reviews: `0`
+- Ideas awaiting explicit review action: `3`
 - Provider failures: `4`
 - Preflight/blocked attempts: `1`
 - Event Alpha catalyst burn-in: `separate_not_aggregated`
@@ -145,6 +146,11 @@ These rows remain unresolved because the exact retained price history does not c
 
 Human review is counted only through explicit confirmed actions; dashboard GET/HEAD and health probes never create timing evidence.
 - Status: `no_events`
+- Receipt-backed ideas eligible for review timing: `3`
+- Awaiting explicit human action: `3`
+- Not yet viewed: `3`
+- In review: `0`
+- Review queue command: `make radar-review-timing-queue PYTHON=.venv/bin/python`
 - Ledger events: `0`
 - Idea records: `0`
 - First views: `0`
@@ -154,7 +160,7 @@ Human review is counted only through explicit confirmed actions; dashboard GET/H
 - Availability definition: exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD
 - Latency definition: `idea_available_at_to_review_completed_at`
 - Protocol-v2 evidence eligible: `false` until the sealed annex binds the exact clock and missing-data rules.
-- No explicit human review timing has been recorded.
+- No explicit human review timing has been recorded; eligible queue rows remain unmeasured until the operator confirms a real action.
 
 ## Anomaly episodes (shadow)
 

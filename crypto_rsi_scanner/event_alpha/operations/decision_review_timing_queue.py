@@ -23,6 +23,9 @@ QUEUE_SCHEMA_ID = "decision_radar.idea_review_timing_queue"
 QUEUE_SCHEMA_VERSION = 1
 MAX_QUEUE_GENERATIONS = 256
 MAX_QUEUE_IDEAS = 512
+CAMPAIGN_QUEUE_SUMMARY_SCHEMA_ID = (
+    "decision_radar.idea_review_timing_queue_summary"
+)
 
 
 def build_review_timing_queue(
@@ -274,7 +277,158 @@ def _queue_action(
     }
 
 
+def campaign_queue_projection(queue: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the path-free queue truth safe for the canonical campaign report."""
+
+    if queue.get("schema_id") != QUEUE_SCHEMA_ID:
+        raise timing.DecisionReviewTimingError(
+            "review_timing_queue_schema_invalid"
+        )
+    raw_records = queue.get("records")
+    if isinstance(raw_records, (str, bytes, bytearray)) or not isinstance(
+        raw_records, Sequence
+    ):
+        raise timing.DecisionReviewTimingError(
+            "review_timing_queue_records_invalid"
+        )
+    records = tuple(timing._mapping(row) for row in raw_records)
+    eligible_count = timing._nonnegative_int(queue.get("eligible_idea_count"))
+    if len(records) != eligible_count:
+        raise timing.DecisionReviewTimingError(
+            "review_timing_queue_record_count_mismatch"
+        )
+    record_projection = [
+        {
+            "artifact_namespace": timing._identity(
+                row.get("artifact_namespace"), "artifact_namespace"
+            ),
+            "run_id": timing._identity(row.get("run_id"), "run_id"),
+            "revision": timing._nonnegative_int(row.get("revision")),
+            "idea_id": timing._identity(row.get("idea_id"), "idea_id"),
+            "core_opportunity_id": timing._identity(
+                row.get("core_opportunity_id"), "core_opportunity_id"
+            ),
+            "radar_route": timing._identity(
+                row.get("radar_route"), "radar_route"
+            ),
+            "review_status": timing._identity(
+                row.get("review_status"), "review_status"
+            ),
+            "idea_available_at": timing._canonical_timestamp(
+                row.get("idea_available_at"), field="idea_available_at"
+            ),
+            "first_operator_viewed_at": (
+                timing._canonical_timestamp(
+                    row.get("first_operator_viewed_at"),
+                    field="first_operator_viewed_at",
+                )
+                if row.get("first_operator_viewed_at") is not None
+                else None
+            ),
+            "review_completed_at": (
+                timing._canonical_timestamp(
+                    row.get("review_completed_at"), field="review_completed_at"
+                )
+                if row.get("review_completed_at") is not None
+                else None
+            ),
+        }
+        for row in records
+    ]
+    summary = {
+        "schema_id": CAMPAIGN_QUEUE_SUMMARY_SCHEMA_ID,
+        "schema_version": 1,
+        "row_type": "decision_radar_idea_review_timing_queue_summary",
+        "generated_at": timing._canonical_timestamp(
+            queue.get("generated_at"), field="generated_at"
+        ),
+        "status": timing._identity(queue.get("status"), "status"),
+        "eligible_generation_count": timing._nonnegative_int(
+            queue.get("eligible_generation_count")
+        ),
+        "eligible_idea_count": eligible_count,
+        "action_required_count": timing._nonnegative_int(
+            queue.get("action_required_count")
+        ),
+        "not_viewed_count": timing._nonnegative_int(queue.get("not_viewed_count")),
+        "in_review_count": timing._nonnegative_int(queue.get("in_review_count")),
+        "complete_count": timing._nonnegative_int(queue.get("complete_count")),
+        "skipped_candidate_count": timing._nonnegative_int(
+            queue.get("skipped_candidate_count")
+        ),
+        "skipped_generation_reason_counts": dict(
+            sorted(
+                (
+                    timing._identity(reason, "skip_reason"),
+                    timing._nonnegative_int(count),
+                )
+                for reason, count in timing._mapping(
+                    queue.get("skipped_generation_reason_counts")
+                ).items()
+            )
+        ),
+        "events_in_window_count": timing._nonnegative_int(
+            queue.get("events_in_window_count")
+        ),
+        "events_after_evaluated_at_count": timing._nonnegative_int(
+            queue.get("events_after_evaluated_at_count")
+        ),
+        "records": record_projection,
+        "operator_queue_command": (
+            "make radar-review-timing-queue PYTHON=.venv/bin/python"
+        ),
+        "operator_action_commands_available_via_queue": True,
+        "absolute_paths_or_action_commands_embedded": False,
+        "dashboard_reads_recorded_as_human_actions": False,
+        "commands_require_explicit_confirmation": True,
+        "provider_calls": 0,
+        "writes": 0,
+        "protocol_v2_evidence_eligible": False,
+        "protocol_v2_annex_bound": False,
+        "automatic_policy_effect": "none",
+        "research_only": True,
+        "safety": dict(timing._SAFETY),
+    }
+    if (
+        summary["not_viewed_count"]
+        + summary["in_review_count"]
+        + summary["complete_count"]
+        != eligible_count
+    ):
+        raise timing.DecisionReviewTimingError(
+            "review_timing_queue_status_count_mismatch"
+        )
+    if (
+        summary["not_viewed_count"] + summary["in_review_count"]
+        != summary["action_required_count"]
+    ):
+        raise timing.DecisionReviewTimingError(
+            "review_timing_queue_action_count_mismatch"
+        )
+    return summary
+
+
+def campaign_metric_values(summary: Mapping[str, Any]) -> dict[str, int]:
+    """Project distinct queue counts into the campaign summary metrics."""
+
+    fields = {
+        "review_timing_eligible_ideas": "eligible_idea_count",
+        "review_timing_action_required": "action_required_count",
+        "review_timing_not_viewed": "not_viewed_count",
+        "review_timing_in_review": "in_review_count",
+        "review_timing_queue_complete": "complete_count",
+        "review_timing_skipped_candidates": "skipped_candidate_count",
+    }
+    return {
+        metric: timing._nonnegative_int(summary.get(source_field))
+        for metric, source_field in fields.items()
+    }
+
+
 __all__ = (
+    "CAMPAIGN_QUEUE_SUMMARY_SCHEMA_ID",
     "QUEUE_SCHEMA_ID",
     "build_review_timing_queue",
+    "campaign_metric_values",
+    "campaign_queue_projection",
 )

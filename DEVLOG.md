@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Reconcile human-review queue and campaign truth · Codex
+**Why:** The dedicated queue correctly found three receipt-backed ideas awaiting
+their first human view, while the canonical campaign report showed only zero
+timing-ledger records. Both facts were true, but the report could be read as if
+there were no human review work at all.
+**Changes:**
+- Campaign report generation now rebuilds and revalidates the review queue from
+  exact campaign generations, final publication receipts, operations receipts,
+  and dashboard snapshots before persisting a separate queue summary.
+- The summary carries eligible, action-required, not-viewed, in-review,
+  complete, skipped, and exact idea-identity truth. It intentionally strips
+  absolute artifact paths and per-idea action commands; the explicit queue
+  target remains the only command surface.
+- Campaign metrics and Markdown now distinguish measured first-view/completion
+  events from receipt-backed work awaiting action. The current real report is 3
+  eligible / 3 not viewed / 3 action required / 0 measured events, with 2
+  legacy or unpublished candidates explicitly excluded.
+- Regenerated the canonical Markdown/JSON campaign report locally without a
+  provider call. No view, completion, latency, route, score, outcome, policy,
+  authorization, or dashboard authority was invented or changed.
+**Verify:** All 31 focused review-timing and campaign tests pass. Python
+compileall, `git diff --check`, the real no-call campaign-report target, and
+focused JSON/Markdown assertions pass. The isolated architecture size gate
+passes with zero new violations and zero unresolved production files over
+1,200 lines. The persisted summary contains no
+absolute path or `next_safe_command`, reports zero provider calls/writes, and
+reconciles its status counts exactly.
+**Notes/risks:** These three rows are still genuine human actions, not tasks the
+system can complete automatically. Run the read-only queue first; only a real
+operator view should use its separate `CONFIRM=1` command.
+
 ## 2026-07-18 — Review the official OKX announcement surface · Codex
 **Why:** The source registry already named `okx_announcements`, but no adapter
 or explicit provider contract existed. Leaving the name unexplained risked

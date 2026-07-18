@@ -23,7 +23,7 @@ from ..dashboard import readiness as dashboard_readiness
 from ..dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from ..radar.integrated import api as integrated_radar
 from . import daily_operations_publication
-from . import decision_review_timing
+from . import decision_review_timing, decision_review_timing_queue
 from . import market_no_send_audit, market_no_send_history_cache
 from . import market_no_send_publication
 from . import market_observation_campaign_attempts
@@ -144,9 +144,8 @@ def build_campaign_report(
         outcomes,
         history_snapshot=history_snapshot,
     )
-    review_timing = decision_review_timing.build_review_timing_report(
-        base,
-        evaluated_at=evaluated,
+    review_timing, review_queue = _build_review_projections(
+        base, generations, evaluated=evaluated
     )
     episode_shadow, episode_input_audit = (
         market_observation_campaign_episodes.build_campaign_anomaly_episode_shadow(
@@ -173,7 +172,7 @@ def build_campaign_report(
         current_asset_ids=current_authority.get("_current_asset_ids"),
     )
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
-    metrics.update(decision_review_timing.campaign_metric_values(review_timing))
+    metrics.update(_review_metric_values(review_timing, review_queue))
     metrics["provider_failed_attempts"] = len(provider_failed)
     metrics["blocked_attempts"] = len(blocked)
     pointer_state = _pointer_state(
@@ -217,6 +216,7 @@ def build_campaign_report(
         pointer_history=pointer_history,
         outcome_metrics=outcome_metrics,
         review_timing=review_timing,
+        review_queue=review_queue,
         episode_shadow=episode_shadow,
         episode_input_audit=episode_input_audit,
         episode_scorecard=episode_scorecard,
@@ -224,6 +224,33 @@ def build_campaign_report(
         next_observation=next_observation,
         conclusion=conclusion,
     )
+
+
+def _build_review_projections(
+    artifact_base_dir: Path,
+    generations: Sequence[Mapping[str, Any]],
+    *,
+    evaluated: datetime,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    timing_report = decision_review_timing.build_review_timing_report(
+        artifact_base_dir,
+        evaluated_at=evaluated,
+    )
+    queue = decision_review_timing_queue.build_review_timing_queue(
+        artifact_base_dir,
+        generations,
+        evaluated_at=evaluated,
+    )
+    return timing_report, decision_review_timing_queue.campaign_queue_projection(queue)
+
+
+def _review_metric_values(
+    timing_report: Mapping[str, Any], queue_summary: Mapping[str, Any]
+) -> dict[str, int]:
+    return {
+        **decision_review_timing.campaign_metric_values(timing_report),
+        **decision_review_timing_queue.campaign_metric_values(queue_summary),
+    }
 
 
 def write_campaign_report(

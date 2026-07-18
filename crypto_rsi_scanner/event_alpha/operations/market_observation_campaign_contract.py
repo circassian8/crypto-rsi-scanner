@@ -32,6 +32,7 @@ def build_report_value(
     limitations: Sequence[Mapping[str, Any]],
     next_observation: Mapping[str, Any],
     conclusion: Mapping[str, Any],
+    review_queue: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the schema-closed campaign report without reading or writing."""
 
@@ -83,6 +84,7 @@ def build_report_value(
         "pointer_history": list(pointer_history),
         "outcomes": dict(outcome_metrics),
         "human_review_timing": dict(review_timing),
+        "human_review_queue": dict(review_queue or {}),
         "shadow_anomaly_episodes": dict(episode_shadow),
         "shadow_anomaly_episode_input_audit": dict(episode_input_audit),
         "decision_v2_episode_outcome_scorecard": dict(episode_scorecard),

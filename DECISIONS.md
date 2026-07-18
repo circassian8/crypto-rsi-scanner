@@ -484,9 +484,18 @@ publication and owned-dashboard operations receipts validate. It must reload
 the exact source generation and expose legacy/unpublished candidates only as
 excluded counts. Historical time expiry alone may not erase a previously
 receipt-backed review object, but any non-time authority defect blocks it.
+The canonical campaign report must copy a freshly revalidated, path-free queue
+summary separately from the event ledger: eligible, not-viewed, in-review,
+complete, action-required, and skipped counts plus exact idea identities. It
+must not embed machine paths or per-idea confirmed action commands. Therefore
+`ledger_event_count=0` cannot be presented as if no review work exists, and a
+queue row still does not become a measured view until the explicit confirmed
+event is written.
 **Why:** Automated requests cannot prove operator attention, while mutable or
 unbound timestamps would create look-ahead and attribution ambiguity. Explicit
-actions preserve the human/system boundary and exact idea lineage.
+actions preserve the human/system boundary and exact idea lineage. Separating
+queue truth from event truth prevents “not yet measured” from being rendered as
+“nothing to review.”
 **Revisit when:** The Protocol-v2 annex is ready to seal the human-review clock,
 right-censoring/missing-action treatment, and latency-cost rule before any
 untouched holdout is identified or read.

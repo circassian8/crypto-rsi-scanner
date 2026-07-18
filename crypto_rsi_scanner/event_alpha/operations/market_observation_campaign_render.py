@@ -17,6 +17,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
     metrics = _mapping(report.get("campaign_metrics"))
     outcomes = _mapping(report.get("outcomes"))
     review_timing = _mapping(report.get("human_review_timing"))
+    review_queue = _mapping(report.get("human_review_queue"))
     baseline = _mapping(report.get("baseline_maturity"))
     pointer = _mapping(report.get("pointer"))
     next_observation = _mapping(report.get("next_observation"))
@@ -45,6 +46,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         f"- Matured outcomes: `{_int(metrics.get('matured_outcomes'))}`",
         f"- Explicit first-view records: `{_int(metrics.get('review_timing_first_views'))}`",
         f"- Completed human reviews: `{_int(metrics.get('review_timing_completed_reviews'))}`",
+        f"- Ideas awaiting explicit review action: `{_int(metrics.get('review_timing_action_required'))}`",
         f"- Provider failures: `{_int(metrics.get('provider_failed_attempts'))}`",
         f"- Preflight/blocked attempts: `{_int(metrics.get('blocked_attempts'))}`",
         "- Event Alpha catalyst burn-in: `separate_not_aggregated`",
@@ -92,7 +94,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
         "## Human review timing",
         "",
-        *_review_timing_lines(review_timing),
+        *_review_timing_lines(review_timing, review_queue),
         "",
         "## Anomaly episodes (shadow)",
         "",
@@ -162,10 +164,17 @@ def _authority_proven(pointer: Mapping[str, Any]) -> bool:
     )
 
 
-def _review_timing_lines(value: Mapping[str, Any]) -> list[str]:
+def _review_timing_lines(
+    value: Mapping[str, Any], queue: Mapping[str, Any]
+) -> list[str]:
     lines = [
         "Human review is counted only through explicit confirmed actions; dashboard GET/HEAD and health probes never create timing evidence.",
         f"- Status: `{_text(value.get('status'))}`",
+        f"- Receipt-backed ideas eligible for review timing: `{_int(queue.get('eligible_idea_count'))}`",
+        f"- Awaiting explicit human action: `{_int(queue.get('action_required_count'))}`",
+        f"- Not yet viewed: `{_int(queue.get('not_viewed_count'))}`",
+        f"- In review: `{_int(queue.get('in_review_count'))}`",
+        f"- Review queue command: `{_md(queue.get('operator_queue_command')) or 'unavailable'}`",
         f"- Ledger events: `{_int(value.get('ledger_event_count'))}`",
         f"- Idea records: `{_int(value.get('idea_record_count'))}`",
         f"- First views: `{_int(value.get('first_view_record_count'))}`",
@@ -182,7 +191,10 @@ def _review_timing_lines(value: Mapping[str, Any]) -> list[str]:
         if isinstance(row, Mapping)
     ]
     if not records:
-        return [*lines, "- No explicit human review timing has been recorded."]
+        return [
+            *lines,
+            "- No explicit human review timing has been recorded; eligible queue rows remain unmeasured until the operator confirms a real action.",
+        ]
     lines.extend(
         [
             "",

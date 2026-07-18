@@ -392,8 +392,10 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert first["outcomes"]["pending"] == 3
     assert first["outcomes"]["matured"] == 0
     assert first["human_review_timing"]["status"] == "no_events"
+    assert first["human_review_queue"]["status"] == "no_eligible_ideas"
     assert first["campaign_metrics"]["review_timing_first_views"] == 0
     assert first["campaign_metrics"]["review_timing_completed_reviews"] == 0
+    assert first["campaign_metrics"]["review_timing_action_required"] == 0
     assert first["pointer"]["exact_operator_binding"] is True
     conclusion = first["campaign_v2_conclusion"]
     assert conclusion["baseline_status"] == "warming"
@@ -576,6 +578,29 @@ def test_final_receipts_reconcile_attempt_publication_operations_and_current(
         campaign.dashboard_readiness,
         "resolve_authoritative_dashboard",
         _dashboard_authority,
+    )
+    monkeypatch.setattr(
+        campaign.decision_review_timing_queue,
+        "build_review_timing_queue",
+        lambda *_args, **_kwargs: {
+            "schema_id": "decision_radar.idea_review_timing_queue",
+            "schema_version": 1,
+            "generated_at": _EVALUATED,
+            "status": "no_eligible_ideas",
+            "eligible_generation_count": 0,
+            "eligible_idea_count": 0,
+            "action_required_count": 0,
+            "not_viewed_count": 0,
+            "in_review_count": 0,
+            "complete_count": 0,
+            "skipped_candidate_count": 2,
+            "skipped_generation_reason_counts": {
+                "minimal_publication_fixture": 1
+            },
+            "events_in_window_count": 0,
+            "events_after_evaluated_at_count": 0,
+            "records": [],
+        },
     )
 
     report = campaign.build_campaign_report(base, evaluated_at=_EVALUATED)

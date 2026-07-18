@@ -440,6 +440,24 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
         and "RADAR_REVIEWER_ALIAS=YOUR_ALIAS" in row["next_safe_command"]
         for row in queue["records"]
     )
+    campaign_projection = timing_queue.campaign_queue_projection(queue)
+    assert campaign_projection["eligible_idea_count"] == 2
+    assert campaign_projection["action_required_count"] == 2
+    assert campaign_projection["absolute_paths_or_action_commands_embedded"] is False
+    assert campaign_projection["operator_queue_command"] == (
+        "make radar-review-timing-queue PYTHON=.venv/bin/python"
+    )
+    assert timing_queue.campaign_metric_values(campaign_projection) == {
+        "review_timing_eligible_ideas": 2,
+        "review_timing_action_required": 2,
+        "review_timing_not_viewed": 2,
+        "review_timing_in_review": 0,
+        "review_timing_queue_complete": 0,
+        "review_timing_skipped_candidates": 2,
+    }
+    serialized_projection = json.dumps(campaign_projection, sort_keys=True)
+    assert str(base) not in serialized_projection
+    assert "next_safe_command" not in serialized_projection
 
     timing.record_review_timing_event(
         base,
@@ -568,13 +586,27 @@ def test_campaign_markdown_labels_explicit_review_timing_as_annex_ineligible() -
     }
 
     markdown = market_observation_campaign_render.format_campaign_report(
-        {"human_review_timing": review}
+        {
+            "human_review_timing": review,
+            "human_review_queue": {
+                "eligible_idea_count": 3,
+                "action_required_count": 2,
+                "not_viewed_count": 1,
+                "in_review_count": 1,
+                "operator_queue_command": (
+                    "make radar-review-timing-queue PYTHON=.venv/bin/python"
+                ),
+            },
+        }
     )
 
     assert "## Human review timing" in markdown
     assert "dashboard GET/HEAD and health probes never create timing evidence" in markdown
     assert "| radar_market_no_send_exact | iar:exact-idea | dashboard_watch | complete | 5 | 5 | 10 | 15 |" in markdown
     assert "Protocol-v2 evidence eligible: `false`" in markdown
+    assert "Receipt-backed ideas eligible for review timing: `3`" in markdown
+    assert "Awaiting explicit human action: `2`" in markdown
+    assert "make radar-review-timing-queue PYTHON=.venv/bin/python" in markdown
 
 
 def test_review_export_selects_every_validated_timing_source_namespace(

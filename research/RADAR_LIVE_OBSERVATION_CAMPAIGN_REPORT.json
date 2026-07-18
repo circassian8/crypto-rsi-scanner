@@ -5237,10 +5237,16 @@
     "real_cycles": 20,
     "real_observations": 600,
     "retained_observation_count": 600,
+    "review_timing_action_required": 3,
     "review_timing_completed_reviews": 0,
+    "review_timing_eligible_ideas": 3,
     "review_timing_first_views": 0,
     "review_timing_idea_records": 0,
+    "review_timing_in_review": 0,
     "review_timing_incomplete_reviews": 0,
+    "review_timing_not_viewed": 3,
+    "review_timing_queue_complete": 0,
+    "review_timing_skipped_candidates": 2,
     "route_counts": {
       "dashboard_watch": 2,
       "diagnostic": 1,
@@ -5323,7 +5329,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "64116ac1e5d43fdd6273aa1a723f1172a9ee3b48d936cd600b2331944a46ed05",
     "candidate_rows_supplied": 5,
-    "contract_digest": "7d38b3761de5bc0477ad08fcfb7afc962a5a151ea36854b916df75d7ce9f572e",
+    "contract_digest": "5ac70b5af676bc3c39452ddf01fa47d840ac28db1f34172a80a735bed043b002",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "5a0b2e443d58e7f8e0f31a1eefb81a1ddbe26d7dbe95479bc21ed77ec9a2b0d6",
     "core_rows_supplied": 5,
@@ -5338,7 +5344,7 @@
       "not_evaluated": 1,
       "opposed": 0
     },
-    "evaluated_at": "2026-07-18T19:42:25.213440+00:00",
+    "evaluated_at": "2026-07-18T20:25:50.018899+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -5681,7 +5687,7 @@
         }
       ]
     },
-    "input_binding_digest": "cd0a5502336d33adae97e41d082cd1bd5714b49456b158fc549c2a90ed65ffa8",
+    "input_binding_digest": "2af17f3fb2b798069dc056efb834842327de1a8e28c85506abe5eda4715e87da",
     "matched_control_available": false,
     "matured_episode_count": 1,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -6052,7 +6058,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "641adad8011e6c56fc806f72fb47201281c1bd05ab9b751f6603025f66a6d804",
+    "source_episode_contract_digest": "6b7abdf8758dd3c58dd06dfab85bcd34222ef0b9bb970fa907db53aac39fa42a",
     "source_episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -6063,11 +6069,92 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-18T19:42:25.213440+00:00",
+  "generated_at": "2026-07-18T20:25:50.018899+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
     "valid_generation_count": 20
+  },
+  "human_review_queue": {
+    "absolute_paths_or_action_commands_embedded": false,
+    "action_required_count": 3,
+    "automatic_policy_effect": "none",
+    "commands_require_explicit_confirmation": true,
+    "complete_count": 0,
+    "dashboard_reads_recorded_as_human_actions": false,
+    "eligible_generation_count": 3,
+    "eligible_idea_count": 3,
+    "events_after_evaluated_at_count": 0,
+    "events_in_window_count": 0,
+    "generated_at": "2026-07-18T20:25:50.018899+00:00",
+    "in_review_count": 0,
+    "not_viewed_count": 3,
+    "operator_action_commands_available_via_queue": true,
+    "operator_queue_command": "make radar-review-timing-queue PYTHON=.venv/bin/python",
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false,
+    "provider_calls": 0,
+    "records": [
+      {
+        "artifact_namespace": "radar_market_no_send_20260718t024737179194z_ec091813d359",
+        "core_opportunity_id": "agg:634eae4a52fb",
+        "first_operator_viewed_at": null,
+        "idea_available_at": "2026-07-18T02:47:45.145682+00:00",
+        "idea_id": "iar:634eae4a52fb",
+        "radar_route": "dashboard_watch",
+        "review_completed_at": null,
+        "review_status": "not_viewed",
+        "revision": 12,
+        "run_id": "2026-07-18T02:47:37.287740+00:00|no_key_live"
+      },
+      {
+        "artifact_namespace": "radar_market_no_send_20260718t034857168543z_0140a5243ae4",
+        "core_opportunity_id": "agg:634eae4a52fb",
+        "first_operator_viewed_at": null,
+        "idea_available_at": "2026-07-18T03:49:04.436735+00:00",
+        "idea_id": "iar:634eae4a52fb",
+        "radar_route": "diagnostic",
+        "review_completed_at": null,
+        "review_status": "not_viewed",
+        "revision": 12,
+        "run_id": "2026-07-18T03:48:57.289214+00:00|no_key_live"
+      },
+      {
+        "artifact_namespace": "radar_market_no_send_20260718t054122756225z_8f5918a66699",
+        "core_opportunity_id": "agg:634eae4a52fb",
+        "first_operator_viewed_at": null,
+        "idea_available_at": "2026-07-18T05:41:30.476128+00:00",
+        "idea_id": "iar:634eae4a52fb",
+        "radar_route": "dashboard_watch",
+        "review_completed_at": null,
+        "review_status": "not_viewed",
+        "revision": 12,
+        "run_id": "2026-07-18T05:41:22.898181+00:00|no_key_live"
+      }
+    ],
+    "research_only": true,
+    "row_type": "decision_radar_idea_review_timing_queue_summary",
+    "safety": {
+      "authorization_mutations": 0,
+      "dashboard_authority_mutations": 0,
+      "event_alpha_paper_trades": 0,
+      "event_alpha_triggered_fade": 0,
+      "normal_rsi_writes": 0,
+      "orders": 0,
+      "production_policy_mutations": 0,
+      "provider_calls": 0,
+      "telegram_sends": 0,
+      "trades": 0
+    },
+    "schema_id": "decision_radar.idea_review_timing_queue_summary",
+    "schema_version": 1,
+    "skipped_candidate_count": 2,
+    "skipped_generation_reason_counts": {
+      "final_publication_receipt_missing": 1,
+      "never_authoritative": 1
+    },
+    "status": "action_required",
+    "writes": 0
   },
   "human_review_timing": {
     "automatic_policy_effect": "none",
@@ -6077,7 +6164,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-18T19:42:25.213440+00:00",
+    "generated_at": "2026-07-18T20:25:50.018899+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -6626,7 +6713,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260718t194216552291z_db06c53cff36",
-    "authority_checked_at": "2026-07-18T19:42:25.213440+00:00",
+    "authority_checked_at": "2026-07-18T20:25:50.018899+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -6841,7 +6928,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "6ce51c3d19a1c05f515ea3c785886ebc3e9c9f526d064a64f25aa06d5fcb51fd",
+    "audit_digest": "88584971b94df7911faccac7b9eb313387533df4dda88801eceafa55b90afab4",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -7045,7 +7132,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "641adad8011e6c56fc806f72fb47201281c1bd05ab9b751f6603025f66a6d804",
+    "episode_contract_digest": "6b7abdf8758dd3c58dd06dfab85bcd34222ef0b9bb970fa907db53aac39fa42a",
     "episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "episode_records_supplied": 5,
     "exact_outcome_join_count": 5,
@@ -7086,7 +7173,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "641adad8011e6c56fc806f72fb47201281c1bd05ab9b751f6603025f66a6d804",
+    "contract_digest": "6b7abdf8758dd3c58dd06dfab85bcd34222ef0b9bb970fa907db53aac39fa42a",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -7276,7 +7363,7 @@
         "window_end_exclusive_at": "2026-07-19T02:47:37.287740+00:00"
       }
     ],
-    "evaluated_at": "2026-07-18T19:42:25.213440+00:00",
+    "evaluated_at": "2026-07-18T20:25:50.018899+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

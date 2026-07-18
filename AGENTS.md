@@ -625,8 +625,12 @@ may be added later when a suitable environment already exists.
   idea availability is the immutable owned-dashboard operations-receipt clock;
   every event also binds the canonical Decision projection, candidate/Core
   artifact digests, run/revision/operator identity, and both final receipts.
-  Campaign reporting includes the exact point-in-time latency projection, but
-  it remains `protocol_v2_evidence_eligible=false` and
+  Campaign reporting includes the exact point-in-time latency projection plus
+  a revalidated path-free queue summary, so zero ledger events cannot hide
+  receipt-backed ideas awaiting a first view. The canonical report excludes
+  machine paths and per-idea action commands; those remain available only from
+  the explicit queue target. Both projections remain
+  `protocol_v2_evidence_eligible=false` and
   `protocol_v2_annex_bound=false` until the sealed annex fixes clock and
   missing-data rules. Review events never alter routes, scores, outcomes,
   provider authorization, or dashboard authority.
