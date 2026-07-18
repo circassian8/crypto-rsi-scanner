@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make architecture naming scans reproducible · Codex
+**Why:** Re-running the passing architecture gate reordered more than five
+thousand unchanged report rows because top-level documents came from a set and
+recursive file walks were not explicitly sorted. That created review noise and
+made artifact-heavy verification less reproducible.
+**Changes:**
+- Applied lexical ordering to source/test naming walks, the full terminology
+  scan walk, and the closed top-level document set before any occurrence is
+  classified.
+- Added a regression covering source, test, research, and top-level document
+  ordering. Classification policy, counts, and gates are unchanged.
+- Regenerated the canonical architecture reports once in the new stable order;
+  subsequent runs change only truthful run metadata or changed inputs.
+**Verify:** Ran the focused scan-order/static-report tests, compared complete
+occurrence digests in separate processes with `PYTHONHASHSEED=1` and `2` (both
+`4cace706d6cd88e542ba4a08bc6b2d9744999d0d745c6456e97f7a35813d76fa`),
+Python compileall, architecture cleanliness, and diff checks.
+**Notes/risks:** Project-health reproducibility only. No product evidence,
+provider call, authorization, route, score, threshold, policy, dashboard
+authority, send, trade, order, paper trade, RSI row, or `TRIGGERED_FADE`
+changed.
+
 ## 2026-07-18 — Reject boolean empirical schema versions · Codex
 **Why:** Python booleans compare equal to integers, so a digest-consistent live
 empirical projection with `schema_version=true` could pass the validator as

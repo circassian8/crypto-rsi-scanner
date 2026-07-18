@@ -638,7 +638,7 @@ def _legacy_named_files(repo_root: Path) -> list[dict[str, str]]:
         root = repo_root / root_name
         if not root.exists():
             continue
-        for path in root.rglob("*.py"):
+        for path in sorted(root.rglob("*.py")):
             if _skip_path(path):
                 continue
             rel = _rel(path, repo_root)
@@ -654,7 +654,7 @@ def _refactor_named_source_files(repo_root: Path) -> list[dict[str, str]]:
     root = repo_root / "crypto_rsi_scanner"
     if not root.exists():
         return rows
-    for path in root.rglob("*.py"):
+    for path in sorted(root.rglob("*.py")):
         if _skip_path(path):
             continue
         rel = _rel(path, repo_root)
@@ -706,7 +706,7 @@ def _iter_scan_files(repo_root: Path) -> Iterable[Path]:
     for root in roots:
         if not root.exists():
             continue
-        for path in root.rglob("*"):
+        for path in sorted(root.rglob("*")):
             if _skip_path(path) or not path.is_file():
                 continue
             if _is_refactor_history_archive_path(path, repo_root):
@@ -720,7 +720,7 @@ def _iter_scan_files(repo_root: Path) -> Iterable[Path]:
                     continue
                 yielded.add(path.resolve())
                 yield path
-    for name in DOC_NAMES:
+    for name in sorted(DOC_NAMES):
         path = repo_root / name
         if path.exists() and path.resolve() not in yielded:
             yielded.add(path.resolve())
