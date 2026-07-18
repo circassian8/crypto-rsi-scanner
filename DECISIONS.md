@@ -450,6 +450,11 @@ first-view, review-duration, and available-to-completion latency. These values
 are descriptive campaign evidence only and remain Protocol-v2-ineligible until
 the sealed annex binds clock, missing-action, censoring, and latency-cost rules.
 They never change scores, routes, outcomes, authorization, or authority.
+The read-only review queue may discover only campaign-counted ideas whose final
+publication and owned-dashboard operations receipts validate. It must reload
+the exact source generation and expose legacy/unpublished candidates only as
+excluded counts. Historical time expiry alone may not erase a previously
+receipt-backed review object, but any non-time authority defect blocks it.
 **Why:** Automated requests cannot prove operator attention, while mutable or
 unbound timestamps would create look-ahead and attribution ambiguity. Explicit
 actions preserve the human/system boundary and exact idea lineage.

@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Expose exact human review-timing queue · Codex
+**Why:** Three final-receipt-backed historical Decision ideas were eligible for
+real human timing evidence, but the existing status command showed only the
+empty event ledger and gave the operator no safe way to discover them. A later
+strict-doctor timestamp refresh could also make an otherwise exact historical
+idea fail the review loader solely because its normal dashboard freshness had
+expired.
+**Changes:**
+- Added read-only `make radar-review-timing-queue`. It derives a bounded
+  discovery index from the local campaign report, then independently validates
+  each final publication/operations contract and exact generation before
+  showing an idea or its next confirmed command.
+- The current queue identifies three receipt-backed ideas awaiting first view
+  and reports two legacy/unpublished candidates as excluded. It makes no
+  provider call or write and never infers a dashboard GET/HEAD as human action.
+- Historical review accepts only `generation:stale` / `doctor:stale` after the
+  final receipts validate. Any identity, fingerprint, schema, doctor, manifest,
+  or other structural authority defect still blocks.
+- Kept discovery in a focused 280-line module so the timing ledger remains
+  below the architecture size target. Updated operator help, accepted decision,
+  roadmap, and North Star Markdown/JSON without recording a human event or
+  changing Protocol-v2 eligibility, routes, scores, thresholds, outcomes,
+  authorization, or dashboard authority.
+**Verify:** 31 focused review-timing and campaign-report tests pass; Python
+compileall, North Star JSON validation, `git diff --check`, and architecture
+cleanliness pass with zero new violations. The real read-only queue completed
+with 3 eligible / 3 action-required / 2 excluded candidates, 0 events, 0 writes,
+and 0 provider calls.
+**Notes/risks:** The owner must perform a real review and run the queue's exact
+`CONFIRM=1` command with a chosen reviewer alias; Codex intentionally did not
+manufacture first-view or completion timestamps.
+
 ## 2026-07-18 — Use one complete Bybit catalog per capture · Codex
 **Why:** The first execution-quality live contract planned one instrument-
 metadata request plus one order-book request for every requestable Radar asset.

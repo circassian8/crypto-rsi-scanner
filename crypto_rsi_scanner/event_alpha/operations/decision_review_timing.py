@@ -166,12 +166,12 @@ def load_idea_binding(
         field="idea_available_at",
     )
     try:
-        snapshot = load_dashboard_snapshot(base, namespace, now=available_at)
+        snapshot = load_dashboard_snapshot(base, namespace)
     except Exception as exc:  # noqa: BLE001 - trust boundary stays fail closed
         raise DecisionReviewTimingError(
             "review_timing_exact_generation_invalid"
         ) from exc
-    if not snapshot.generation_authoritative:
+    if not _historical_snapshot_receipt_eligible(snapshot):
         raise DecisionReviewTimingError("review_timing_generation_not_authoritative")
 
     matches = [
@@ -1032,6 +1032,17 @@ def _digest_value(value: Mapping[str, Any]) -> str:
 
 def _mapping(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _historical_snapshot_receipt_eligible(snapshot: object) -> bool:
+    """Accept an exact old snapshot only when time expiry is its sole defect."""
+
+    if getattr(snapshot, "generation_authoritative", False) is True:
+        return True
+    reasons = tuple(getattr(snapshot, "generation_authority_reasons", ()) or ())
+    return bool(reasons) and all(
+        reason in {"generation:stale", "doctor:stale"} for reason in reasons
+    )
 
 
 def _entry_stat(parent_fd: int, name: str) -> os.stat_result | None:

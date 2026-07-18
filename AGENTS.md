@@ -596,9 +596,16 @@ may be added later when a suitable environment already exists.
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
   Human review timing uses the separate append-only shared campaign ledger
   `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
-  `make radar-review-timing-status` is read-only/no-network. Only the explicit
-  confirmed `radar-review-timing-view` and `...-complete` commands may record a
-  human action for one exact receipt-backed namespace/idea. Dashboard GET/HEAD,
+  `make radar-review-timing-status` is read-only/no-network. `make
+  radar-review-timing-queue` is likewise read-only/no-network and discovers
+  every campaign-counted idea with valid final publication plus owned-dashboard
+  operations receipts, revalidates its exact source generation, and prints the
+  next confirmed command. Legacy/unpublished ideas remain explicit excluded
+  counts. A historical snapshot may be reviewed after time expiry only when
+  `generation:stale` and/or `doctor:stale` are its sole authority reasons;
+  structural drift still fails closed. Only the explicit confirmed
+  `radar-review-timing-view` and `...-complete` commands may record a human
+  action for one exact receipt-backed namespace/idea. Dashboard GET/HEAD,
   phone access, probes, and health checks never count as human views. Provable
   idea availability is the immutable owned-dashboard operations-receipt clock;
   every event also binds the canonical Decision projection, candidate/Core

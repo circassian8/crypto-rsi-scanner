@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 from . import decision_review_timing
+from . import decision_review_timing_queue
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -23,6 +24,14 @@ def _parser() -> argparse.ArgumentParser:
         "status", help="Read the bounded point-in-time review-timing report"
     )
     status.add_argument("--evaluated-at")
+    queue = subparsers.add_parser(
+        "queue",
+        help=(
+            "Discover receipt-backed campaign ideas awaiting an explicit human "
+            "view or completion action"
+        ),
+    )
+    queue.add_argument("--evaluated-at")
 
     for command, help_text in (
         ("view", "Record the first explicit operator view"),
@@ -42,6 +51,23 @@ def main(argv: list[str] | None = None) -> int:
         result: dict[str, Any] = decision_review_timing.build_review_timing_report(
             args.artifact_base,
             evaluated_at=args.evaluated_at or _utc_now(),
+        )
+    elif args.command == "queue":
+        from . import market_observation_campaign
+
+        evaluated_at = args.evaluated_at or _utc_now()
+        campaign = market_observation_campaign.build_campaign_report(
+            args.artifact_base,
+            evaluated_at=evaluated_at,
+        )
+        generations = (
+            *campaign.get("authoritative_generations", ()),
+            *campaign.get("non_authoritative_complete_generations", ()),
+        )
+        result = decision_review_timing_queue.build_review_timing_queue(
+            args.artifact_base,
+            generations,
+            evaluated_at=evaluated_at,
         )
     else:
         result = decision_review_timing.record_review_timing_event(

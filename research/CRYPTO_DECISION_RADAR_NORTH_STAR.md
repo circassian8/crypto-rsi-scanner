@@ -796,7 +796,13 @@ analytics side effect. The shared append-only ledger is
 `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
 Only confirmed `radar-review-timing-view` and
 `radar-review-timing-complete` commands can append one first-view and one later
-completion event for an exact namespace/idea; status is read-only/no-network.
+completion event for an exact namespace/idea; status and queue discovery are
+read-only/no-network. The queue selects only campaign-counted ideas with valid
+final publication and operations receipts, revalidates the exact source
+generation, prints the next confirmed command, and reports legacy/unpublished
+ideas only as excluded counts. A receipt-backed historical generation remains
+reviewable when ordinary generation/doctor staleness is its sole authority
+defect; any structural authority defect still fails closed.
 Dashboard GET/HEAD, phone access, health probes, previews, and notifications
 never count as human attention. `idea_observed_at` comes from the canonical
 Decision projection. Conservative provable `idea_available_at` is the exact
@@ -1004,8 +1010,10 @@ The remaining human decisions stay explicit:
   exact 1h/4h responses. Disable the boundary by unsetting that flag. A complete
   capture remains campaign-detached and annex-ineligible until preregistration.
 - Human review timing: inspect `make radar-review-timing-status
-  PYTHON=.venv/bin/python` without a provider call or write. Record only a real
-  human action with `CONFIRM=1 make radar-review-timing-view
+  PYTHON=.venv/bin/python` without a provider call or write, then run `make
+  radar-review-timing-queue PYTHON=.venv/bin/python` to discover the exact
+  receipt-backed ideas and their next safe commands. Record only a real human
+  action with `CONFIRM=1 make radar-review-timing-view
   RADAR_REVIEW_NAMESPACE=<exact> RADAR_REVIEW_IDEA_ID=<exact>
   RADAR_REVIEWER_ALIAS=<alias>` and later the matching `...-complete` target.
   The application never records a dashboard request as a view, and no missing

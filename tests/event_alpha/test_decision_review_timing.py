@@ -13,6 +13,9 @@ from types import SimpleNamespace
 import pytest
 
 from crypto_rsi_scanner.event_alpha.operations import decision_review_timing as timing
+from crypto_rsi_scanner.event_alpha.operations import (
+    decision_review_timing_queue as timing_queue,
+)
 from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign_render
 
 
@@ -338,6 +341,208 @@ def test_status_without_ledger_is_clean_no_event_report(tmp_path: Path) -> None:
     assert report["ledger_event_count"] == 0
     assert report["records"] == []
     assert report["provider_calls"] == 0
+
+
+def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = _base(tmp_path)
+    first = _binding(
+        artifact_namespace="radar_market_no_send_first",
+        idea_id="iar:first-idea",
+        core_opportunity_id="agg:first-idea",
+    )
+    second = _binding(
+        artifact_namespace="radar_market_no_send_second",
+        idea_id="iar:second-idea",
+        core_opportunity_id="agg:second-idea",
+        radar_route="diagnostic",
+        directional_bias="neutral",
+    )
+    bindings = {
+        (first["artifact_namespace"], first["idea_id"]): first,
+        (second["artifact_namespace"], second["idea_id"]): second,
+    }
+
+    def idea_ids(
+        _base_dir: Path,
+        namespace: str,
+        *,
+        expected_candidate_count: int,
+    ) -> tuple[str, ...]:
+        assert expected_candidate_count == 1
+        return (
+            "iar:first-idea"
+            if namespace == "radar_market_no_send_first"
+            else "iar:second-idea",
+        )
+
+    monkeypatch.setattr(timing_queue, "_receipt_backed_generation_idea_ids", idea_ids)
+    monkeypatch.setattr(
+        timing,
+        "load_idea_binding",
+        lambda _base_dir, namespace, idea_id: dict(bindings[(namespace, idea_id)]),
+    )
+    receipt_backed = {
+        "campaign_counted": True,
+        "candidate_count": 1,
+        "publication": {
+            "ever_authoritative": True,
+            "final_publication_receipt_valid": True,
+            "operations_receipt_valid": True,
+        },
+    }
+    generations = [
+        {**receipt_backed, "artifact_namespace": "radar_market_no_send_first"},
+        {**receipt_backed, "artifact_namespace": "radar_market_no_send_second"},
+        {
+            **receipt_backed,
+            "artifact_namespace": "radar_market_no_send_legacy",
+            "publication": {
+                "ever_authoritative": True,
+                "final_publication_receipt_valid": False,
+                "operations_receipt_valid": False,
+            },
+        },
+        {
+            **receipt_backed,
+            "artifact_namespace": "radar_market_no_send_unpublished",
+            "publication": {
+                "ever_authoritative": False,
+                "final_publication_receipt_valid": False,
+                "operations_receipt_valid": False,
+            },
+        },
+    ]
+
+    queue = timing_queue.build_review_timing_queue(
+        base,
+        generations,
+        evaluated_at="2026-07-18T12:01:00+00:00",
+    )
+
+    assert queue["status"] == "action_required"
+    assert queue["eligible_generation_count"] == 2
+    assert queue["eligible_idea_count"] == 2
+    assert queue["not_viewed_count"] == 2
+    assert queue["skipped_candidate_count"] == 2
+    assert queue["skipped_generation_reason_counts"] == {
+        "final_publication_receipt_missing": 1,
+        "never_authoritative": 1,
+    }
+    assert queue["writes"] == 0
+    assert queue["provider_calls"] == 0
+    assert queue["dashboard_reads_recorded_as_human_actions"] is False
+    assert all(
+        row["next_make_target"] == "radar-review-timing-view"
+        and "CONFIRM=1 make radar-review-timing-view" in row["next_safe_command"]
+        and "RADAR_REVIEWER_ALIAS=YOUR_ALIAS" in row["next_safe_command"]
+        for row in queue["records"]
+    )
+
+    timing.record_review_timing_event(
+        base,
+        artifact_namespace="radar_market_no_send_first",
+        idea_id="iar:first-idea",
+        event_type="first_viewed",
+        reviewer_alias="owner",
+        confirm=True,
+        recorded_at="2026-07-18T12:00:10+00:00",
+    )
+    updated = timing_queue.build_review_timing_queue(
+        base,
+        generations,
+        evaluated_at="2026-07-18T12:01:00+00:00",
+    )
+    by_id = {row["idea_id"]: row for row in updated["records"]}
+    assert updated["in_review_count"] == 1
+    assert updated["not_viewed_count"] == 1
+    assert by_id["iar:first-idea"]["next_make_target"] == (
+        "radar-review-timing-complete"
+    )
+    assert "CONFIRM=1 make radar-review-timing-complete" in (
+        by_id["iar:first-idea"]["next_safe_command"]
+    )
+
+
+def test_queue_revalidates_generation_candidate_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = _base(tmp_path)
+    namespace = "radar_market_no_send_exact"
+    monkeypatch.setattr(
+        timing_queue.daily_operations_publication,
+        "validate_final_publication_contract",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            valid=True,
+            errors=(),
+            operations_receipt={"recorded_at": "2026-07-18T12:00:05+00:00"},
+        ),
+    )
+    monkeypatch.setattr(
+        timing_queue,
+        "load_dashboard_snapshot",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            generation_authoritative=True,
+            current_candidates=(),
+        ),
+    )
+
+    with pytest.raises(
+        timing.DecisionReviewTimingError,
+        match="candidate_count_mismatch",
+    ):
+        timing_queue._receipt_backed_generation_idea_ids(
+            base,
+            namespace,
+            expected_candidate_count=1,
+        )
+
+
+def test_receipt_backed_historical_queue_accepts_only_time_expiry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = _base(tmp_path)
+    namespace = "radar_market_no_send_historical"
+    monkeypatch.setattr(
+        timing_queue.daily_operations_publication,
+        "validate_final_publication_contract",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            valid=True,
+            errors=(),
+            operations_receipt={"recorded_at": "2026-07-18T12:00:05+00:00"},
+        ),
+    )
+    snapshot = SimpleNamespace(
+        generation_authoritative=False,
+        generation_authority_reasons=("generation:stale", "doctor:stale"),
+        current_candidates=({"integrated_candidate_id": "iar:historical"},),
+    )
+    monkeypatch.setattr(
+        timing_queue,
+        "load_dashboard_snapshot",
+        lambda *_args, **_kwargs: snapshot,
+    )
+
+    assert timing_queue._receipt_backed_generation_idea_ids(
+        base,
+        namespace,
+        expected_candidate_count=1,
+    ) == ("iar:historical",)
+
+    snapshot.generation_authority_reasons = ("manifest:fingerprint_mismatch",)
+    with pytest.raises(
+        timing.DecisionReviewTimingError,
+        match="generation_not_authoritative",
+    ):
+        timing_queue._receipt_backed_generation_idea_ids(
+            base,
+            namespace,
+            expected_candidate_count=1,
+        )
 
 
 def test_campaign_markdown_labels_explicit_review_timing_as_annex_ineligible() -> None:
