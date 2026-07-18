@@ -916,8 +916,12 @@ never retries, preserves request/provider clocks and exact response bytes in
 memory, and revalidates the capture/instrument/authority chain. A closed no-I/O
 capture-input contract now rederives every normalized context, unit, request
 clock, lineage row, and deterministic capture identity from those exact bytes;
-mapping-only diagnostic results cannot enter it. It has no immutable namespace,
-receipt, pointer, or persistence yet. Output is context-only, non-directional,
+mapping-only diagnostic results cannot enter it. The separately confirmed
+capture command publishes one descriptor-anchored immutable namespace with raw
+responses, closed projections, manifest, completion receipt, and rollback-
+protected latest pointer. Read-only status and the standard review export fully
+revalidate the capture from raw bytes. No genuine capture exists in the current
+store. Output is context-only, non-directional,
 policy-neutral, input-quality-ineligible, annex-unbound, and Protocol-v2-
 ineligible. Coinalyze is optional secondary Catalyst-Radar corroboration, not a
 substitute for the chosen venue-native derivatives or execution surface.

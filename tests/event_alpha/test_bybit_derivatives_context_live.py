@@ -22,13 +22,16 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context import 
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_live import (
     AUTHORIZATION_ACTION,
+    CAPTURE_COMMAND,
     COLLECT_COMMAND,
     CONTRACT_VERSION,
     LIVE_AUTH_ENV,
     READINESS_COMMAND,
+    STATUS_COMMAND,
     BybitDerivativesContextLiveError,
     _collect_authoritative_bybit_derivatives,
     build_bybit_derivatives_live_readiness,
+    capture_authoritative_bybit_derivatives,
     collect_authoritative_bybit_derivatives,
     main,
 )
@@ -201,7 +204,11 @@ def test_current_execution_capture_requires_separate_derivatives_auth() -> None:
     assert payload["operator_action_required"] == AUTHORIZATION_ACTION
     assert payload["eligible_instrument_count"] == 1
     assert payload["maximum_provider_requests_for_current_capture"] == 4
-    assert payload["immutable_capture_implemented"] is False
+    assert payload["immutable_capture_implemented"] is True
+    assert payload["capture_publication_available"] is True
+    assert payload["latest_derivatives_capture_status"] == "unavailable"
+    assert payload["immutable_capture_command"] == CAPTURE_COMMAND
+    assert payload["capture_status_command"] == STATUS_COMMAND
     assert payload["expected_provider_activity"] == "none_readiness_only"
 
 
@@ -224,6 +231,29 @@ def test_authorized_readiness_is_exact_but_still_no_call_or_write() -> None:
     assert payload["provider_call_planned"] is False
     assert payload["artifact_persisted"] is False
     assert payload["directional_authority"] is False
+
+
+def test_confirmed_capture_seals_only_exact_transport_responses(
+    tmp_path: Path,
+) -> None:
+    result = capture_authoritative_bybit_derivatives(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=_clock(),
+        capture_loader=lambda _base: _capture(),
+        resolver=_resolver(),
+        fetch_json=_captured_fetch,
+    )
+
+    assert result["status"] == "complete"
+    assert result["immutable_capture_persisted"] is True
+    assert result["request_count"] == 4
+    assert result["context_count"] == 1
+    assert result["protocol_v2_input_quality_eligible"] is True
+    assert result["protocol_v2_evidence_eligible"] is False
+    assert result["campaign_attached"] is False
+    assert result["pointer_validated"] is True
+    assert result["directional_authority"] is False
 
 
 def test_stale_or_drifted_execution_capture_cannot_unlock_derivatives() -> None:
@@ -452,6 +482,14 @@ def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     assert payload["reason"] == "explicit_collection_confirmation_required"
     assert payload["provider_request_count"] == 0
     assert payload["writes_performed"] is False
+    assert main(["capture", "--artifact-base", str(tmp_path)]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["reason"] == "explicit_collection_confirmation_required"
+    assert payload["provider_request_count"] == 0
+    assert main(["status", "--artifact-base", str(tmp_path)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "unavailable"
+    assert payload["provider_call_attempted"] is False
 
     def dry_run(target: str, *, confirm: bool = False) -> str:
         command = ["make", "-n", target, "PYTHON=python3"]
@@ -468,10 +506,18 @@ def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     readiness = dry_run("radar-derivatives-bybit-readiness")
     collection = dry_run("radar-derivatives-bybit-collect")
     confirmed = dry_run("radar-derivatives-bybit-collect", confirm=True)
+    capture = dry_run("radar-derivatives-bybit-capture")
+    confirmed_capture = dry_run("radar-derivatives-bybit-capture", confirm=True)
+    status = dry_run("radar-derivatives-bybit-status")
     assert "bybit_derivatives_context_live readiness" in readiness
     assert "bybit_derivatives_context_live collect" not in readiness
     assert "bybit_derivatives_context_live collect" in collection
     assert "--confirm" not in collection
     assert confirmed.count("--confirm") == 1
+    assert "bybit_derivatives_context_live capture" in capture
+    assert "--confirm" not in capture
+    assert confirmed_capture.count("--confirm") == 1
+    assert "bybit_derivatives_context_live status" in status
+    assert "--confirm" not in status
     assert LIVE_AUTH_ENV not in readiness
     assert f"{LIVE_AUTH_ENV}=1" not in collection

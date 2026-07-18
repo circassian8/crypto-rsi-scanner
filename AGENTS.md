@@ -398,9 +398,14 @@ may be added later when a suitable environment already exists.
   capture/instrument/authority identity afterward. The closed no-I/O capture-
   input contract rederives every normalized context, request timing, lineage,
   unit, and deterministic capture identity from those exact bytes and rejects
-  mapping-only diagnostic results. Immutable namespace/receipt/pointer
-  publication is not implemented, so no immutable derivatives capture exists
-  yet. Every snapshot is context-only, has no directional
+  mapping-only diagnostic results. `CONFIRM=1 make
+  radar-derivatives-bybit-capture` is the separate immutable write boundary;
+  `make radar-derivatives-bybit-status` revalidates the latest capture without a
+  call or write. Publication holds one descriptor-anchored namespace, writes
+  exact raw responses plus closed projections, manifest, completion receipt,
+  and rollback-protected latest pointer, and the standard review archive selects
+  only a fully revalidated latest capture. No genuine derivatives capture exists
+  in the current artifact store. Every snapshot is context-only, has no directional
   authority or Decision-policy side effect, and remains Protocol-v2-ineligible
   until a separately authorized immutable capture is sealed and annex-bound.
   Coinalyze remains an optional secondary Catalyst-Radar cross-check, not a

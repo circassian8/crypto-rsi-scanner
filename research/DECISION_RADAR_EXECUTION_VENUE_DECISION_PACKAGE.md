@@ -84,8 +84,11 @@ collection never retries, preserves exact response bytes and request clocks in
 memory, and revalidates the capture/instrument/authority chain after the final
 response. A closed no-I/O capture-input contract rederives every context, unit,
 clock, lineage row, and deterministic identity from those exact bytes and
-rejects mapping-only diagnostic responses. It has no immutable namespace,
-receipt, pointer, or persistence yet and never creates authorization,
+rejects mapping-only diagnostic responses. Confirmed capture writes one
+descriptor-anchored immutable namespace, manifest, completion receipt, and
+rollback-protected latest pointer. Read-only status and the standard review
+export fully revalidate it from raw bytes. No genuine capture exists in the
+current store, and this boundary never creates authorization,
 credentials, notifications, orders, or trading capability. It rejects
 future/misordered rows, identity/category drift, incomplete lineage,
 implausible funding/basis/returns, and the known
@@ -97,6 +100,7 @@ Protocol-v2-ineligible. Run its zero-call proof with:
 ```sh
 make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python
 make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python
+make radar-derivatives-bybit-status PYTHON=.venv/bin/python
 ```
 
 The exact official contracts are [ticker](https://bybit-exchange.github.io/docs/v5/market/tickers),
@@ -110,11 +114,11 @@ execution, funding, OI, positioning, identity, or clocks.
 After a genuine current execution-quality capture exists, the exact operator
 sequence is: set the separate flag only in the local ignored environment;
 rerun the no-call readiness command; run `CONFIRM=1 make
-radar-derivatives-bybit-collect PYTHON=.venv/bin/python` once; inspect stdout;
-then unset the flag. Stop on any 403, 429, region restriction, malformed
+radar-derivatives-bybit-capture PYTHON=.venv/bin/python` once; inspect the
+immutable status; then unset the flag. Stop on any 403, 429, region restriction, malformed
 response, or prerequisite drift. Do not retry or bypass it. This diagnostic
-collection does not publish evidence; immutable capture/publication is the
-next engineering boundary.
+the diagnostic collection does not publish evidence; only the separately
+confirmed capture command may publish the exact response bundle.
 
 ## Next point-in-time intraday contract
 

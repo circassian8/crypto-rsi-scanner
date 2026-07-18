@@ -11,6 +11,7 @@
     "event_radar_daily_operations_cycles.jsonl",
     "event_radar_daily_operations_state.json",
     "radar_bybit_execution_quality_latest.json",
+    "radar_bybit_derivatives_context_latest.json",
     "radar_bybit_intraday_latest.json",
     "radar_current_namespace.json"
   ],
@@ -36,6 +37,10 @@
     {
       "kind": "latest_bybit_intraday_namespace",
       "path": "radar_bybit_intraday_latest.json"
+    },
+    {
+      "kind": "latest_bybit_derivatives_namespace",
+      "path": "radar_bybit_derivatives_context_latest.json"
     },
     {
       "kind": "review_timing_source_namespaces",

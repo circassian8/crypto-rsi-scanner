@@ -8,11 +8,16 @@ separate boundary and cannot accept mapping-only diagnostic responses.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
+import fcntl
 import hashlib
 import json
+import os
+from pathlib import Path
 import re
-from typing import Mapping, Sequence
+import stat
+from typing import Any, Iterator, Mapping, Sequence
 from urllib.parse import urlencode
 
 from .bybit_derivatives_context import (
@@ -22,7 +27,6 @@ from .bybit_derivatives_context import (
     build_bybit_derivatives_requests,
     normalize_bybit_derivatives_context,
 )
-from .bybit_derivatives_context_live import CONTRACT_VERSION as LIVE_CONTRACT_VERSION
 from .bybit_execution_quality import (
     PUBLIC_API_BASE,
     BybitEligibleInstrument,
@@ -35,13 +39,41 @@ from .bybit_execution_quality_capture import (
 )
 from .bybit_execution_quality_capture_models import TRANSPORT_CONTRACT
 from .bybit_intraday_live import BybitIntradayLiveError, _instrument_from_values
+from .market_no_send_io import (
+    _open_verified_namespace_dir,
+    ensure_safe_namespace_dir,
+    parse_json_object_bytes,
+    read_regular_bytes,
+    write_bytes_immutable,
+    write_json_atomic,
+    write_json_immutable,
+)
+from .market_no_send_models import MarketNoSendError
 
 
 CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_capture_v1"
+LIVE_CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v1"
+POINTER_FILENAME = "radar_bybit_derivatives_context_latest.json"
+MANIFEST_FILENAME = "capture_manifest.json"
+RECEIPT_FILENAME = "capture_completion_receipt.json"
+SUMMARY_FILENAME = "capture_input_summary.json"
+PROJECTION_FILENAME = "capture_projection.json"
+SOURCE_FILENAME = "source_execution_quality_capture.json"
+INSTRUMENTS_FILENAME = "eligible_instruments.json"
+CONTEXTS_FILENAME = "derivatives_contexts.json"
+REQUEST_INDEX_FILENAME = "request_index.json"
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+_LOCK_FILENAME = ".radar_bybit_derivatives_context.lock"
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 _EXECUTION_NAMESPACE_RE = re.compile(
     r"^radar_bybit_execution_quality_[0-9]{8}t[0-9]{12}z_[a-f0-9]{12}$"
+)
+_NAMESPACE_RE = re.compile(
+    r"^radar_bybit_derivatives_[0-9]{8}t[0-9]{12}z_[a-f0-9]{12}$"
+)
+_SAFE_RAW_RE = re.compile(
+    r"^raw_[0-9]{3}_(?:ticker|funding_history|open_interest|account_ratio)_"
+    r"[A-Z0-9]{4,32}\.json$"
 )
 _LIVE_SUMMARY_KEYS = frozenset(
     {
@@ -500,8 +532,657 @@ def prepare_bybit_derivatives_context_capture(
     }
 
 
+def _request_from_values(value: object) -> BybitPublicRequest:
+    expected = {
+        "credentials_required", "method", "path", "private_data", "query",
+        "research_only",
+    }
+    if not isinstance(value, Mapping) or set(value) != expected:
+        raise BybitDerivativesContextCaptureError(
+            "captured_request_schema_invalid"
+        )
+    query = value.get("query")
+    if not isinstance(query, list) or not query:
+        raise BybitDerivativesContextCaptureError(
+            "captured_request_query_invalid"
+        )
+    pairs: list[tuple[str, str]] = []
+    for pair in query:
+        if (
+            not isinstance(pair, list)
+            or len(pair) != 2
+            or not all(isinstance(item, str) and item for item in pair)
+        ):
+            raise BybitDerivativesContextCaptureError(
+                "captured_request_query_invalid"
+            )
+        pairs.append((pair[0], pair[1]))
+    return BybitPublicRequest(
+        method=str(value.get("method") or ""),
+        path=str(value.get("path") or ""),
+        query=tuple(pairs),
+        credentials_required=value.get("credentials_required") is True,
+        private_data=value.get("private_data") is True,
+        research_only=value.get("research_only") is True,
+    )
+
+
+def _pretty_bytes(value: Mapping[str, object]) -> bytes:
+    return (json.dumps(dict(value), indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+
+
+def _fingerprint(raw: bytes) -> dict[str, object]:
+    return {"sha256": _sha256(raw), "size_bytes": len(raw)}
+
+
+def _raw_rows(
+    prepared: Mapping[str, object],
+    responses: Sequence[BybitCapturedJSONResponse],
+) -> list[tuple[str, bytes]]:
+    request_index = prepared.get("request_index")
+    if not isinstance(request_index, list) or len(request_index) != len(responses):
+        raise BybitDerivativesContextCaptureError("capture_request_index_invalid")
+    rows: list[tuple[str, bytes]] = []
+    for request_row, response in zip(request_index, responses, strict=True):
+        if not isinstance(request_row, Mapping):
+            raise BybitDerivativesContextCaptureError(
+                "capture_request_index_invalid"
+            )
+        name = str(request_row.get("raw_artifact") or "")
+        if not _SAFE_RAW_RE.fullmatch(name):
+            raise BybitDerivativesContextCaptureError(
+                "capture_artifact_name_invalid"
+            )
+        rows.append((name, response.raw_bytes))
+    return rows
+
+
+def _capture_payloads(
+    *,
+    summary: Mapping[str, object],
+    prepared: Mapping[str, object],
+    raw_rows: Sequence[tuple[str, bytes]],
+) -> list[tuple[str, str, bytes]]:
+    capture_id = str(prepared["capture_id"])
+    source = {
+        "schema_id": "decision_radar.bybit_derivatives_source_execution_capture",
+        "schema_version": 1,
+        "capture_id": capture_id,
+        "source_execution_quality_capture": prepared[
+            "source_execution_quality_capture"
+        ],
+        "research_only": True,
+    }
+    instruments = {
+        "schema_id": "decision_radar.bybit_derivatives_instruments",
+        "schema_version": 1,
+        "capture_id": capture_id,
+        "instrument_count": len(prepared["eligible_instruments"]),
+        "instruments": prepared["eligible_instruments"],
+        "research_only": True,
+    }
+    contexts = {
+        "schema_id": "decision_radar.bybit_derivatives_contexts",
+        "schema_version": 1,
+        "capture_id": capture_id,
+        "context_count": len(prepared["contexts"]),
+        "contexts": prepared["contexts"],
+        "all_context_fresh": prepared["all_context_fresh"],
+        "research_only": True,
+    }
+    request_index = {
+        "schema_id": "decision_radar.bybit_derivatives_request_index",
+        "schema_version": 1,
+        "capture_id": capture_id,
+        "request_count": len(prepared["request_index"]),
+        "requests": prepared["request_index"],
+        "retries": 0,
+        "redirects_followed": 0,
+        "credentials_read": False,
+        "private_data_read": False,
+        "research_only": True,
+    }
+    projection = dict(_canonical_value(prepared))
+    return [
+        (SOURCE_FILENAME, "source_execution_quality_capture", _pretty_bytes(source)),
+        (INSTRUMENTS_FILENAME, "eligible_instruments", _pretty_bytes(instruments)),
+        (CONTEXTS_FILENAME, "derivatives_contexts", _pretty_bytes(contexts)),
+        (REQUEST_INDEX_FILENAME, "request_index", _pretty_bytes(request_index)),
+        (SUMMARY_FILENAME, "capture_input_summary", _pretty_bytes(summary)),
+        (PROJECTION_FILENAME, "capture_projection", _pretty_bytes(projection)),
+        *[
+            (name, "accepted_raw_provider_response", raw)
+            for name, raw in raw_rows
+        ],
+    ]
+
+
+def _publication_objects(
+    prepared: Mapping[str, object],
+    descriptors: Sequence[Mapping[str, object]],
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    source = prepared["source_execution_quality_capture"]
+    common = {
+        "contract_version": CONTRACT_VERSION,
+        "capture_id": prepared["capture_id"],
+        "artifact_namespace": prepared["artifact_namespace"],
+        "completed_at": prepared["completed_at"],
+        "source_execution_quality_capture_id": source["capture_id"],
+        "source_execution_quality_pointer_sha256": source["pointer_sha256"],
+        "request_count": prepared["request_count"],
+        "context_count": prepared["context_count"],
+        "all_context_fresh": prepared["all_context_fresh"],
+        "protocol_v2_input_quality_eligible": prepared[
+            "protocol_v2_input_quality_eligible"
+        ],
+        "protocol_v2_evidence_eligible": False,
+        "protocol_v2_annex_bound": False,
+        "campaign_attached": False,
+        "context_only": True,
+        "directional_authority": False,
+        "decision_policy_applied": False,
+        "research_only": True,
+    }
+    manifest = {
+        "schema_id": "decision_radar.bybit_derivatives_capture_manifest",
+        "schema_version": 1,
+        **common,
+        "started_at": prepared["started_at"],
+        "venue_id": "bybit",
+        "execution_mode": "perpetual",
+        "category": "linear",
+        "quote_asset": "USDT",
+        "artifacts": list(descriptors),
+        "no_send": True,
+        "orders": 0,
+        "trades": 0,
+        "paper_trades": 0,
+        "normal_rsi_writes": 0,
+        "event_alpha_triggered_fade": 0,
+    }
+    manifest_raw = _pretty_bytes(manifest)
+    receipt = {
+        "schema_id": "decision_radar.bybit_derivatives_completion_receipt",
+        "schema_version": 1,
+        "status": "complete",
+        **common,
+        "manifest": {"name": MANIFEST_FILENAME, **_fingerprint(manifest_raw)},
+    }
+    receipt_raw = _pretty_bytes(receipt)
+    pointer = {
+        "schema_id": "decision_radar.bybit_derivatives_latest_pointer",
+        "schema_version": 1,
+        "status": "complete",
+        **common,
+        "receipt": {"name": RECEIPT_FILENAME, **_fingerprint(receipt_raw)},
+    }
+    return manifest, receipt, pointer
+
+
+@contextmanager
+def _publication_lock(base: Path) -> Iterator[None]:
+    descriptor: int | None = None
+    locked = False
+    try:
+        with _open_verified_namespace_dir(base) as anchored:
+            _base_fd, namespace_fd, _namespace, _identity = anchored
+            flags = (
+                os.O_RDWR
+                | os.O_CREAT
+                | os.O_NOFOLLOW
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            descriptor = os.open(_LOCK_FILENAME, flags, 0o600, dir_fd=namespace_fd)
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+                raise BybitDerivativesContextCaptureError("capture_lock_invalid")
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            locked = True
+            yield
+    except BybitDerivativesContextCaptureError:
+        raise
+    except (MarketNoSendError, OSError) as exc:
+        raise BybitDerivativesContextCaptureError("capture_lock_unavailable") from exc
+    finally:
+        if locked and descriptor is not None:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def persist_bybit_derivatives_context_capture(
+    artifact_base_dir: str | Path,
+    *,
+    summary: Mapping[str, object],
+    responses: Sequence[BybitCapturedJSONResponse],
+) -> dict[str, object]:
+    """Seal one exact derivatives response set and publish its latest pointer."""
+
+    base = Path(artifact_base_dir).expanduser().absolute()
+    if not base.is_dir():
+        raise BybitDerivativesContextCaptureError("artifact_base_unavailable")
+    prepared = prepare_bybit_derivatives_context_capture(summary, responses)
+    raw_rows = _raw_rows(prepared, responses)
+    payloads = _capture_payloads(
+        summary=summary,
+        prepared=prepared,
+        raw_rows=raw_rows,
+    )
+    descriptors = [
+        {"name": name, "role": role, **_fingerprint(raw)}
+        for name, role, raw in payloads
+    ]
+    manifest, receipt, pointer = _publication_objects(prepared, descriptors)
+    namespace = str(prepared["artifact_namespace"])
+    with _publication_lock(base):
+        existing_raw = read_regular_bytes(base / POINTER_FILENAME, missing_ok=True)
+        if existing_raw is not None:
+            existing = validate_bybit_derivatives_context_pointer_bytes(existing_raw)
+            prior = validate_bybit_derivatives_context_capture(
+                base,
+                namespace=str(existing["artifact_namespace"]),
+                pointer=existing,
+            )
+            if _utc(prior["completed_at"], "prior_completed_at") > _utc(
+                prepared["completed_at"], "capture_completed_at"
+            ):
+                raise BybitDerivativesContextCaptureError(
+                    "capture_pointer_rollback_rejected"
+                )
+        namespace_dir = base / namespace
+        try:
+            ensure_safe_namespace_dir(namespace_dir)
+            for name, _role, raw in payloads:
+                write_bytes_immutable(namespace_dir / name, raw)
+            write_json_immutable(namespace_dir / MANIFEST_FILENAME, manifest)
+            write_json_immutable(namespace_dir / RECEIPT_FILENAME, receipt)
+        except MarketNoSendError as exc:
+            raise BybitDerivativesContextCaptureError(
+                "capture_immutable_write_failed"
+            ) from exc
+        validate_bybit_derivatives_context_capture(base, namespace=namespace)
+        try:
+            write_json_atomic(base / POINTER_FILENAME, pointer)
+        except MarketNoSendError as exc:
+            raise BybitDerivativesContextCaptureError(
+                "capture_pointer_write_failed"
+            ) from exc
+        from .bybit_derivatives_context_capture_status import (
+            load_latest_bybit_derivatives_context_capture,
+        )
+
+        return load_latest_bybit_derivatives_context_capture(base)
+
+
+def _same_file(left: os.stat_result, right: os.stat_result) -> bool:
+    fields = (
+        "st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns",
+        "st_ctime_ns",
+    )
+    return all(getattr(left, field) == getattr(right, field) for field in fields)
+
+
+def _read_regular_bytes_at(directory_fd: int, name: str) -> bytes:
+    if not name or Path(name).name != name or name in {".", ".."}:
+        raise BybitDerivativesContextCaptureError("capture_artifact_name_invalid")
+    descriptor: int | None = None
+    try:
+        before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise BybitDerivativesContextCaptureError("capture_artifact_unreadable")
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=directory_fd,
+        )
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or not _same_file(before, opened):
+            raise BybitDerivativesContextCaptureError("capture_artifact_unreadable")
+        with os.fdopen(descriptor, "rb") as handle:
+            descriptor = None
+            raw = handle.read(MAX_RESPONSE_BYTES + 1)
+            completed = os.fstat(handle.fileno())
+        after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if (
+            len(raw) > MAX_RESPONSE_BYTES
+            or not _same_file(opened, completed)
+            or not _same_file(completed, after)
+            or len(raw) != completed.st_size
+        ):
+            raise BybitDerivativesContextCaptureError("capture_artifact_unreadable")
+        return raw
+    except BybitDerivativesContextCaptureError:
+        raise
+    except OSError as exc:
+        raise BybitDerivativesContextCaptureError(
+            "capture_artifact_unreadable"
+        ) from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _parse_json(raw: bytes) -> dict[str, Any]:
+    try:
+        return parse_json_object_bytes(raw)
+    except MarketNoSendError as exc:
+        raise BybitDerivativesContextCaptureError(
+            "capture_artifact_invalid_json"
+        ) from exc
+
+
+def validate_bybit_derivatives_context_pointer_bytes(
+    raw: bytes,
+) -> dict[str, Any]:
+    pointer = _parse_json(raw)
+    expected = {
+        "all_context_fresh", "artifact_namespace", "campaign_attached",
+        "capture_id", "completed_at", "context_count", "context_only",
+        "contract_version", "decision_policy_applied", "directional_authority",
+        "protocol_v2_annex_bound", "protocol_v2_evidence_eligible",
+        "protocol_v2_input_quality_eligible", "receipt", "request_count",
+        "research_only", "schema_id", "schema_version",
+        "source_execution_quality_capture_id",
+        "source_execution_quality_pointer_sha256", "status",
+    }
+    receipt = pointer.get("receipt")
+    if (
+        set(pointer) != expected
+        or pointer.get("schema_id")
+        != "decision_radar.bybit_derivatives_latest_pointer"
+        or pointer.get("schema_version") != 1
+        or pointer.get("contract_version") != CONTRACT_VERSION
+        or pointer.get("status") != "complete"
+        or not _NAMESPACE_RE.fullmatch(str(pointer.get("artifact_namespace") or ""))
+        or not _SHA256_RE.fullmatch(str(pointer.get("capture_id") or ""))
+        or not _SHA256_RE.fullmatch(
+            str(pointer.get("source_execution_quality_capture_id") or "")
+        )
+        or not _SHA256_RE.fullmatch(
+            str(pointer.get("source_execution_quality_pointer_sha256") or "")
+        )
+        or type(pointer.get("request_count")) is not int
+        or not 1 <= pointer["request_count"] <= MAX_PLANNED_REQUESTS
+        or type(pointer.get("context_count")) is not int
+        or not 1 <= pointer["context_count"] <= 30
+        or pointer["request_count"] != pointer["context_count"] * len(_PATH_LABELS)
+        or type(pointer.get("all_context_fresh")) is not bool
+        or pointer.get("protocol_v2_input_quality_eligible")
+        is not pointer.get("all_context_fresh")
+        or pointer.get("protocol_v2_evidence_eligible") is not False
+        or pointer.get("protocol_v2_annex_bound") is not False
+        or pointer.get("campaign_attached") is not False
+        or pointer.get("context_only") is not True
+        or pointer.get("directional_authority") is not False
+        or pointer.get("decision_policy_applied") is not False
+        or pointer.get("research_only") is not True
+        or not isinstance(receipt, Mapping)
+        or set(receipt) != {"name", "sha256", "size_bytes"}
+        or receipt.get("name") != RECEIPT_FILENAME
+        or not _SHA256_RE.fullmatch(str(receipt.get("sha256") or ""))
+        or type(receipt.get("size_bytes")) is not int
+        or not 0 < receipt["size_bytes"] <= MAX_RESPONSE_BYTES
+    ):
+        raise BybitDerivativesContextCaptureError(
+            "capture_pointer_contract_invalid"
+        )
+    _utc(pointer.get("completed_at"), "pointer_completed_at")
+    return pointer
+
+
+def _read_capture_bundle(
+    namespace_dir: Path,
+) -> tuple[dict[str, Any], bytes, dict[str, Any], bytes, dict[str, bytes]]:
+    required = {
+        SOURCE_FILENAME: "source_execution_quality_capture",
+        INSTRUMENTS_FILENAME: "eligible_instruments",
+        CONTEXTS_FILENAME: "derivatives_contexts",
+        REQUEST_INDEX_FILENAME: "request_index",
+        SUMMARY_FILENAME: "capture_input_summary",
+        PROJECTION_FILENAME: "capture_projection",
+    }
+    try:
+        with _open_verified_namespace_dir(namespace_dir) as anchored:
+            _base_fd, namespace_fd, _namespace, _identity = anchored
+            receipt_raw = _read_regular_bytes_at(namespace_fd, RECEIPT_FILENAME)
+            manifest_raw = _read_regular_bytes_at(namespace_fd, MANIFEST_FILENAME)
+            receipt = _parse_json(receipt_raw)
+            manifest = _parse_json(manifest_raw)
+            descriptors = manifest.get("artifacts")
+            if (
+                not isinstance(descriptors, list)
+                or not 6 < len(descriptors) <= MAX_PLANNED_REQUESTS + 6
+            ):
+                raise BybitDerivativesContextCaptureError(
+                    "capture_artifact_index_invalid"
+                )
+            artifacts: dict[str, bytes] = {}
+            for descriptor in descriptors:
+                if not isinstance(descriptor, Mapping) or set(descriptor) != {
+                    "name", "role", "sha256", "size_bytes"
+                }:
+                    raise BybitDerivativesContextCaptureError(
+                        "capture_artifact_index_invalid"
+                    )
+                name = str(descriptor.get("name") or "")
+                role = str(descriptor.get("role") or "")
+                expected_role = required.get(name)
+                if (
+                    name in artifacts
+                    or name in {MANIFEST_FILENAME, RECEIPT_FILENAME}
+                    or (expected_role is None and not _SAFE_RAW_RE.fullmatch(name))
+                    or (expected_role is not None and role != expected_role)
+                    or (
+                        expected_role is None
+                        and role != "accepted_raw_provider_response"
+                    )
+                ):
+                    raise BybitDerivativesContextCaptureError(
+                        "capture_artifact_name_invalid"
+                    )
+                artifact_raw = _read_regular_bytes_at(namespace_fd, name)
+                if (
+                    descriptor.get("sha256") != _sha256(artifact_raw)
+                    or descriptor.get("size_bytes") != len(artifact_raw)
+                ):
+                    raise BybitDerivativesContextCaptureError(
+                        "capture_fingerprint_mismatch"
+                    )
+                artifacts[name] = artifact_raw
+            if set(required) - set(artifacts):
+                raise BybitDerivativesContextCaptureError(
+                    "capture_required_artifact_missing"
+                )
+            expected_entries = set(artifacts) | {
+                MANIFEST_FILENAME,
+                RECEIPT_FILENAME,
+            }
+            if set(os.listdir(namespace_fd)) != expected_entries:
+                raise BybitDerivativesContextCaptureError(
+                    "capture_unmanifested_artifact"
+                )
+    except BybitDerivativesContextCaptureError:
+        raise
+    except (MarketNoSendError, OSError) as exc:
+        raise BybitDerivativesContextCaptureError(
+            "capture_artifact_unreadable"
+        ) from exc
+    return receipt, receipt_raw, manifest, manifest_raw, artifacts
+
+
+def _responses_from_index(
+    request_index: Mapping[str, object],
+    artifacts: Mapping[str, bytes],
+    *,
+    capture_id: object,
+) -> list[BybitCapturedJSONResponse]:
+    rows = request_index.get("requests")
+    expected = {
+        "capture_id", "credentials_read", "private_data_read",
+        "redirects_followed", "request_count", "requests", "research_only",
+        "retries", "schema_id", "schema_version",
+    }
+    if (
+        set(request_index) != expected
+        or request_index.get("schema_id")
+        != "decision_radar.bybit_derivatives_request_index"
+        or request_index.get("schema_version") != 1
+        or request_index.get("capture_id") != capture_id
+        or not isinstance(rows, list)
+        or request_index.get("request_count") != len(rows)
+        or request_index.get("retries") != 0
+        or request_index.get("redirects_followed") != 0
+        or request_index.get("credentials_read") is not False
+        or request_index.get("private_data_read") is not False
+        or request_index.get("research_only") is not True
+    ):
+        raise BybitDerivativesContextCaptureError("capture_request_index_invalid")
+    responses: list[BybitCapturedJSONResponse] = []
+    required_keys = {
+        "content_type", "duration_ms", "http_status", "raw_artifact", "request",
+        "request_started_at", "request_url", "response_received_at", "sequence",
+        "sha256", "size_bytes", "transport_contract",
+    }
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, Mapping) or set(row) != required_keys:
+            raise BybitDerivativesContextCaptureError(
+                "capture_request_index_invalid"
+            )
+        raw = artifacts.get(str(row.get("raw_artifact") or ""))
+        if (
+            row.get("sequence") != index
+            or raw is None
+            or row.get("sha256") != _sha256(raw)
+            or row.get("size_bytes") != len(raw)
+            or type(row.get("duration_ms")) is not int
+            or row.get("http_status") != 200
+        ):
+            raise BybitDerivativesContextCaptureError(
+                "capture_request_index_invalid"
+            )
+        responses.append(
+            BybitCapturedJSONResponse(
+                request=_request_from_values(row.get("request")),
+                request_started_at=str(row.get("request_started_at") or ""),
+                response_received_at=str(row.get("response_received_at") or ""),
+                duration_ms=int(row.get("duration_ms")),
+                response_url=str(row.get("request_url") or ""),
+                http_status=int(row.get("http_status")),
+                content_type=str(row.get("content_type") or ""),
+                raw_bytes=raw,
+                transport_contract=str(row.get("transport_contract") or ""),
+            )
+        )
+    return responses
+
+
+def _validate_publication(
+    *,
+    namespace: str,
+    prepared: Mapping[str, object],
+    receipt: Mapping[str, object],
+    receipt_raw: bytes,
+    manifest: Mapping[str, object],
+    manifest_raw: bytes,
+    pointer: Mapping[str, object] | None,
+) -> None:
+    expected_manifest, expected_receipt, expected_pointer = _publication_objects(
+        prepared,
+        manifest.get("artifacts") if isinstance(manifest.get("artifacts"), list) else [],
+    )
+    if (
+        _canonical_value(manifest) != _canonical_value(expected_manifest)
+        or _canonical_value(receipt) != _canonical_value(expected_receipt)
+        or receipt.get("artifact_namespace") != namespace
+        or receipt.get("manifest")
+        != {"name": MANIFEST_FILENAME, **_fingerprint(manifest_raw)}
+        or (
+            pointer is not None
+            and (
+                _canonical_value(pointer) != _canonical_value(expected_pointer)
+                or pointer.get("receipt")
+                != {"name": RECEIPT_FILENAME, **_fingerprint(receipt_raw)}
+            )
+        )
+    ):
+        raise BybitDerivativesContextCaptureError(
+            "capture_publication_contract_invalid"
+        )
+
+
+def validate_bybit_derivatives_context_capture(
+    artifact_base_dir: str | Path,
+    *,
+    namespace: str,
+    pointer: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Hold one namespace, rederive every context, and validate publication."""
+
+    if not _NAMESPACE_RE.fullmatch(namespace):
+        raise BybitDerivativesContextCaptureError("capture_namespace_invalid")
+    base = Path(artifact_base_dir).expanduser().absolute()
+    receipt, receipt_raw, manifest, manifest_raw, artifacts = _read_capture_bundle(
+        base / namespace
+    )
+    summary = _parse_json(artifacts[SUMMARY_FILENAME])
+    request_index = _parse_json(artifacts[REQUEST_INDEX_FILENAME])
+    capture_id = receipt.get("capture_id")
+    responses = _responses_from_index(
+        request_index,
+        artifacts,
+        capture_id=capture_id,
+    )
+    prepared = prepare_bybit_derivatives_context_capture(summary, responses)
+    if (
+        prepared.get("capture_id") != capture_id
+        or prepared.get("artifact_namespace") != namespace
+    ):
+        raise BybitDerivativesContextCaptureError("capture_identity_drift")
+    source = _parse_json(artifacts[SOURCE_FILENAME])
+    instruments = _parse_json(artifacts[INSTRUMENTS_FILENAME])
+    contexts = _parse_json(artifacts[CONTEXTS_FILENAME])
+    projection = _parse_json(artifacts[PROJECTION_FILENAME])
+    if (
+        source.get("source_execution_quality_capture")
+        != prepared.get("source_execution_quality_capture")
+        or instruments.get("instruments") != prepared.get("eligible_instruments")
+        or contexts.get("contexts") != prepared.get("contexts")
+        or contexts.get("all_context_fresh")
+        is not prepared.get("all_context_fresh")
+        or _canonical_value(projection) != _canonical_value(prepared)
+    ):
+        raise BybitDerivativesContextCaptureError("capture_projection_drift")
+    _validate_publication(
+        namespace=namespace,
+        prepared=prepared,
+        receipt=receipt,
+        receipt_raw=receipt_raw,
+        manifest=manifest,
+        manifest_raw=manifest_raw,
+        pointer=pointer,
+    )
+    result = dict(prepared)
+    result.update(
+        {
+            "status": "complete",
+            "immutable_capture_persisted": True,
+            "artifact_persisted": True,
+            "pointer_validated": pointer is not None,
+            "provider_call_attempted": False,
+            "writes_performed": False,
+        }
+    )
+    return result
+
+
 __all__ = (
     "CONTRACT_VERSION",
+    "POINTER_FILENAME",
     "BybitDerivativesContextCaptureError",
+    "persist_bybit_derivatives_context_capture",
     "prepare_bybit_derivatives_context_capture",
+    "validate_bybit_derivatives_context_capture",
+    "validate_bybit_derivatives_context_pointer_bytes",
 )

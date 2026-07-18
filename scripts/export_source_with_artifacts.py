@@ -118,6 +118,7 @@ PROJECT_CANONICAL_ROOT_FILES = (
     "event_radar_daily_operations_cycles.jsonl",
     "event_radar_daily_operations_state.json",
     "radar_bybit_execution_quality_latest.json",
+    "radar_bybit_derivatives_context_latest.json",
     "radar_bybit_intraday_latest.json",
     "radar_current_namespace.json",
 )
@@ -142,6 +143,10 @@ PROJECT_DYNAMIC_NAMESPACE_SELECTORS = (
     {
         "kind": "latest_bybit_intraday_namespace",
         "path": "radar_bybit_intraday_latest.json",
+    },
+    {
+        "kind": "latest_bybit_derivatives_namespace",
+        "path": "radar_bybit_derivatives_context_latest.json",
     },
     {
         "kind": "review_timing_source_namespaces",
@@ -1641,6 +1646,37 @@ def _latest_bybit_intraday_namespace(
     }
 
 
+def _latest_bybit_derivatives_namespace(
+    payload: bytes,
+) -> tuple[str, dict[str, object]]:
+    from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_capture import (
+        BybitDerivativesContextCaptureError,
+        validate_bybit_derivatives_context_pointer_bytes,
+    )
+
+    try:
+        pointer = validate_bybit_derivatives_context_pointer_bytes(payload)
+    except BybitDerivativesContextCaptureError as exc:
+        raise ValueError("latest Bybit derivatives pointer is invalid") from exc
+    namespace = str(pointer["artifact_namespace"])
+    return namespace, {
+        "artifact_namespace": namespace,
+        "capture_id": pointer["capture_id"],
+        "source_execution_quality_capture_id": pointer[
+            "source_execution_quality_capture_id"
+        ],
+        "all_context_fresh": pointer["all_context_fresh"],
+        "protocol_v2_input_quality_eligible": pointer[
+            "protocol_v2_input_quality_eligible"
+        ],
+        "protocol_v2_evidence_eligible": pointer[
+            "protocol_v2_evidence_eligible"
+        ],
+        "protocol_v2_annex_bound": pointer["protocol_v2_annex_bound"],
+        "status": "selected",
+    }
+
+
 def _project_artifact_export_plan(
     root: Path,
     *,
@@ -1718,6 +1754,7 @@ def _project_artifact_export_plan(
         "latest_live_no_send_attempt_namespace": "latest_live_no_send_attempt_generation",
         "latest_bybit_execution_quality_namespace": "latest_bybit_execution_quality_capture",
         "latest_bybit_intraday_namespace": "latest_bybit_intraday_capture",
+        "latest_bybit_derivatives_namespace": "latest_bybit_derivatives_capture",
         "review_timing_source_namespaces": "human_review_timing_source_generation",
     }
     selector_loaders = {
@@ -1725,6 +1762,7 @@ def _project_artifact_export_plan(
         "latest_live_no_send_attempt_namespace": _latest_attempt_namespace,
         "latest_bybit_execution_quality_namespace": _latest_bybit_execution_quality_namespace,
         "latest_bybit_intraday_namespace": _latest_bybit_intraday_namespace,
+        "latest_bybit_derivatives_namespace": _latest_bybit_derivatives_namespace,
     }
     for selector in policy["dynamic_namespace_selectors"]:
         kind = str(selector["kind"])
@@ -1829,6 +1867,22 @@ def _project_artifact_export_plan(
                 raise ValueError("latest Bybit intraday capture is invalid") from exc
             if validated_capture.get("artifact_namespace") != namespace:
                 raise ValueError("latest Bybit intraday pointer/capture mismatch")
+        elif kind == "latest_bybit_derivatives_namespace":
+            from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_capture import (
+                BybitDerivativesContextCaptureError,
+            )
+            from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_capture_status import (
+                load_latest_bybit_derivatives_context_capture,
+            )
+
+            try:
+                validated_capture = load_latest_bybit_derivatives_context_capture(
+                    artifact_root
+                )
+            except BybitDerivativesContextCaptureError as exc:
+                raise ValueError("latest Bybit derivatives capture is invalid") from exc
+            if validated_capture.get("artifact_namespace") != namespace:
+                raise ValueError("latest Bybit derivatives pointer/capture mismatch")
         directory = artifact_root / namespace
         directory_inventory = _strict_regular_files_under(
             directory,

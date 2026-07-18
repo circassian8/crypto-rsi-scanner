@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal immutable Bybit derivatives capture evidence · Codex
+**Why:** Exact-response rederivation was closed, but Protocol-v2 input-quality
+evidence also needs immutable publication, stable pointer semantics, and full
+review-export revalidation rather than stdout or mutable local files.
+**Changes:**
+- Added a descriptor-anchored immutable derivatives capture store. It writes
+  exact raw ticker/funding/OI/positioning responses, source authority, native
+  instruments, contexts, request index, input summary, deterministic projection,
+  manifest, completion receipt, and a rollback-protected latest pointer.
+- Validation holds one exact namespace for the complete read, rejects symlinks,
+  unmanifested leaves, fingerprint/projection/pointer drift and older-pointer
+  replacement, reconstructs typed requests, and rederives every context from the
+  raw bytes before returning a complete status.
+- Added separate confirmed capture and read-only status commands, wired current
+  readiness to report the honest latest-capture state, and taught the fixed
+  source-with-artifacts exporter to select only a fully revalidated latest
+  derivatives capture. Split the read-only status surface to keep all production
+  files below the architecture size limit.
+**Verify:** 72 focused capture/live/offline/export/Make/architecture tests passed;
+compileall, JSON validation, real no-call status/readiness, `git diff --check`,
+and architecture cleanliness passed with zero new size violations.
+**Notes/risks:** The real store still has no derivatives pointer because the
+genuine execution-quality prerequisite and separate derivatives authorization
+are absent. No provider call or flag mutation occurred. An immutable capture may
+be input-quality eligible only when complete/fresh and remains campaign-detached,
+non-directional, policy-neutral, annex-unbound, and Protocol-v2-ineligible. No
+sends, orders, trades, paper/RSI writes, fade triggers, routes, scores,
+thresholds, or dashboard authority changed.
+
 ## 2026-07-18 — Close exact Bybit derivatives evidence before persistence · Codex
 **Why:** The guarded collector retained exact response buffers, but an immutable
 publisher must not trust its normalized stdout projection or accept mapping-only

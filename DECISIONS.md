@@ -31,8 +31,12 @@ separately present derivatives authorization, and explicit confirmation; it
 never retries and must revalidate the source capture afterward. Exact responses
 remain in memory and must pass the closed derivatives-capture input contract,
 which rederives every context, unit, clock, lineage row, and deterministic
-capture identity from the exact bytes. That contract performs no I/O; a
-separate immutable publication boundary is still required.
+capture identity from the exact bytes. Confirmed capture then writes one
+descriptor-anchored immutable namespace, manifest, completion receipt, and
+rollback-protected latest pointer; read-only status rederives the normalized
+contexts from the raw bytes while holding the exact namespace. A complete fresh
+capture may be input-quality eligible but is never Protocol-v2 evidence until
+the sealed annex explicitly binds its capture ID.
 Normalized context has no directional authority, cannot create a route or idea,
 and remains Protocol-v2-ineligible until an immutable live capture is annex-
 bound. Coinalyze

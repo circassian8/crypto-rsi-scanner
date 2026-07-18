@@ -30,6 +30,13 @@ from .bybit_derivatives_context import (
     build_bybit_derivatives_requests,
     normalize_bybit_derivatives_context,
 )
+from .bybit_derivatives_context_capture import (
+    BybitDerivativesContextCaptureError,
+    persist_bybit_derivatives_context_capture,
+)
+from .bybit_derivatives_context_capture_status import (
+    bybit_derivatives_context_capture_status,
+)
 from .bybit_execution_quality import (
     QUOTE_ASSET,
     BybitEligibleInstrument,
@@ -59,6 +66,10 @@ READINESS_COMMAND = "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/pyt
 COLLECT_COMMAND = (
     "CONFIRM=1 make radar-derivatives-bybit-collect PYTHON=.venv/bin/python"
 )
+CAPTURE_COMMAND = (
+    "CONFIRM=1 make radar-derivatives-bybit-capture PYTHON=.venv/bin/python"
+)
+STATUS_COMMAND = "make radar-derivatives-bybit-status PYTHON=.venv/bin/python"
 AUTHORIZATION_ACTION = (
     f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_then_rerun_readiness"
 )
@@ -187,6 +198,7 @@ def build_bybit_derivatives_live_readiness(
     if not authorized:
         reasons.append("runtime_provider_authorization_absent")
     request_bound = len(instruments) * len(_PATH_LABELS)
+    latest_capture = bybit_derivatives_context_capture_status(artifact_base_dir)
     ready = not reasons
     only_auth_missing = reasons == ["runtime_provider_authorization_absent"]
     return {
@@ -220,8 +232,10 @@ def build_bybit_derivatives_live_readiness(
         "provider_call_attempted": False,
         "artifact_persisted": False,
         "exact_response_capture_contract_implemented": True,
-        "immutable_capture_implemented": False,
-        "capture_publication_available": False,
+        "immutable_capture_implemented": True,
+        "capture_publication_available": True,
+        "latest_derivatives_capture_status": latest_capture.get("status"),
+        "latest_derivatives_capture": latest_capture,
         "campaign_attached": False,
         "context_only": True,
         "directional_authority": False,
@@ -233,6 +247,8 @@ def build_bybit_derivatives_live_readiness(
         "next_safe_command": COLLECT_COMMAND if ready else READINESS_COMMAND,
         "readiness_recheck_command": READINESS_COMMAND,
         "diagnostic_collect_command": COLLECT_COMMAND,
+        "immutable_capture_command": CAPTURE_COMMAND,
+        "capture_status_command": STATUS_COMMAND,
         "operator_action_required": (
             AUTHORIZATION_ACTION
             if only_auth_missing
@@ -570,6 +586,46 @@ def collect_authoritative_bybit_derivatives(
     return summary
 
 
+def capture_authoritative_bybit_derivatives(
+    *,
+    artifact_base_dir: str | Path,
+    environ: Mapping[str, str] | None = None,
+    now: Clock | None = None,
+    capture_loader: CaptureLoader = load_latest_bybit_execution_quality_capture,
+    resolver: Resolver = resolve_authoritative_dashboard,
+    fetch_json: FetchJSON | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    """Collect once and seal exact derivatives bytes as immutable evidence."""
+
+    summary, responses = _collect_authoritative_bybit_derivatives(
+        artifact_base_dir=artifact_base_dir,
+        environ=environ,
+        now=now,
+        capture_loader=capture_loader,
+        resolver=resolver,
+        fetch_json=fetch_json,
+        timeout_seconds=timeout_seconds,
+    )
+    request_count = int(summary["provider_request_count"])
+    if len(responses) != request_count:
+        raise BybitDerivativesContextLiveError(
+            "exact_provider_response_capture_unavailable",
+            request_count=request_count,
+        )
+    try:
+        return persist_bybit_derivatives_context_capture(
+            artifact_base_dir,
+            summary=summary,
+            responses=responses,
+        )
+    except BybitDerivativesContextCaptureError as exc:
+        raise BybitDerivativesContextLiveError(
+            f"capture_{exc}",
+            request_count=request_count,
+        ) from exc
+
+
 def _failure_payload(exc: BybitDerivativesContextLiveError) -> dict[str, object]:
     return {
         "contract_version": CONTRACT_VERSION,
@@ -595,17 +651,18 @@ def _failure_payload(exc: BybitDerivativesContextLiveError) -> dict[str, object]
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("readiness", "collect"):
+    for name in ("readiness", "collect", "capture", "status"):
         command = commands.add_parser(name)
         command.add_argument(
             "--artifact-base",
             type=Path,
             default=Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR),
         )
-    commands.choices["collect"].add_argument(
-        "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
-    )
-    commands.choices["collect"].add_argument("--confirm", action="store_true")
+    for name in ("collect", "capture"):
+        commands.choices[name].add_argument(
+            "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
+        )
+        commands.choices[name].add_argument("--confirm", action="store_true")
     return parser
 
 
@@ -617,6 +674,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
+    if args.command == "status":
+        payload = bybit_derivatives_context_capture_status(args.artifact_base)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
     if not args.confirm:
         payload = _failure_payload(
             BybitDerivativesContextLiveError(
@@ -626,7 +687,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 1
     try:
-        payload = collect_authoritative_bybit_derivatives(
+        operation = (
+            capture_authoritative_bybit_derivatives
+            if args.command == "capture"
+            else collect_authoritative_bybit_derivatives
+        )
+        payload = operation(
             artifact_base_dir=args.artifact_base,
             timeout_seconds=args.timeout_seconds,
         )
@@ -639,14 +705,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = (
     "AUTHORIZATION_ACTION",
+    "CAPTURE_COMMAND",
     "COLLECT_COMMAND",
     "CONTRACT_VERSION",
     "LIVE_AUTH_ENV",
     "MAX_PLANNED_REQUESTS",
     "READINESS_COMMAND",
+    "STATUS_COMMAND",
     "BybitDerivativesContextLiveError",
     "_collect_authoritative_bybit_derivatives",
     "build_bybit_derivatives_live_readiness",
+    "capture_authoritative_bybit_derivatives",
     "collect_authoritative_bybit_derivatives",
     "main",
 )

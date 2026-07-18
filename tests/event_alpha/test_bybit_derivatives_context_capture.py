@@ -5,9 +5,11 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlencode
+import zipfile
 
 import pytest
 
@@ -19,8 +21,15 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context import 
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_capture import (
     CONTRACT_VERSION,
+    POINTER_FILENAME,
     BybitDerivativesContextCaptureError,
+    persist_bybit_derivatives_context_capture,
     prepare_bybit_derivatives_context_capture,
+    validate_bybit_derivatives_context_capture,
+)
+from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_capture_status import (
+    bybit_derivatives_context_capture_status,
+    load_latest_bybit_derivatives_context_capture,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_live import (
     LIVE_AUTH_ENV,
@@ -280,3 +289,183 @@ def test_fraction_unit_error_in_raw_ticker_fails_closed() -> None:
         match="derivatives_response_contract_invalid",
     ):
         prepare_bybit_derivatives_context_capture(summary, changed)
+
+
+def test_exact_capture_persists_validates_and_loads_latest(tmp_path: Path) -> None:
+    summary, responses = _evidence()
+
+    result = persist_bybit_derivatives_context_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+
+    assert result["status"] == "complete"
+    assert result["immutable_capture_persisted"] is True
+    assert result["artifact_persisted"] is True
+    assert result["pointer_validated"] is True
+    assert result["protocol_v2_input_quality_eligible"] is True
+    assert result["protocol_v2_evidence_eligible"] is False
+    assert result["provider_call_attempted"] is False
+    assert result["writes_performed"] is False
+    assert load_latest_bybit_derivatives_context_capture(tmp_path) == result
+    namespace = str(result["artifact_namespace"])
+    assert validate_bybit_derivatives_context_capture(
+        tmp_path,
+        namespace=namespace,
+    )["pointer_validated"] is False
+    assert len(list((tmp_path / namespace).iterdir())) == 12
+
+
+def test_status_is_closed_when_no_pointer_exists(tmp_path: Path) -> None:
+    status = bybit_derivatives_context_capture_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "capture_pointer_missing"
+    assert status["protocol_v2_input_quality_eligible"] is False
+    assert status["protocol_v2_evidence_eligible"] is False
+    assert status["provider_call_attempted"] is False
+    assert status["writes_performed"] is False
+
+
+def test_tampered_raw_response_invalidates_capture(tmp_path: Path) -> None:
+    summary, responses = _evidence()
+    result = persist_bybit_derivatives_context_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+    namespace = tmp_path / str(result["artifact_namespace"])
+    raw_path = namespace / "raw_001_ticker_BTCUSDT.json"
+    raw_path.write_bytes(raw_path.read_bytes() + b" ")
+
+    status = bybit_derivatives_context_capture_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "capture_fingerprint_mismatch"
+
+
+def test_unmanifested_leaf_invalidates_capture(tmp_path: Path) -> None:
+    summary, responses = _evidence()
+    result = persist_bybit_derivatives_context_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+    namespace = tmp_path / str(result["artifact_namespace"])
+    (namespace / "unexpected.json").write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(
+        BybitDerivativesContextCaptureError,
+        match="capture_unmanifested_artifact",
+    ):
+        load_latest_bybit_derivatives_context_capture(tmp_path)
+
+
+def test_pointer_tamper_fails_closed(tmp_path: Path) -> None:
+    summary, responses = _evidence()
+    persist_bybit_derivatives_context_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+    pointer_path = tmp_path / POINTER_FILENAME
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer["protocol_v2_evidence_eligible"] = True
+    pointer_path.write_text(json.dumps(pointer), encoding="utf-8")
+
+    status = bybit_derivatives_context_capture_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "capture_pointer_contract_invalid"
+
+
+def test_namespace_symlink_is_rejected(tmp_path: Path) -> None:
+    summary, responses = _evidence()
+    prepared = prepare_bybit_derivatives_context_capture(summary, responses)
+    target = tmp_path / "outside"
+    target.mkdir()
+    (tmp_path / str(prepared["artifact_namespace"])).symlink_to(
+        target,
+        target_is_directory=True,
+    )
+
+    with pytest.raises(BybitDerivativesContextCaptureError):
+        persist_bybit_derivatives_context_capture(
+            tmp_path,
+            summary=summary,
+            responses=responses,
+        )
+
+
+def test_older_capture_cannot_replace_newer_latest_pointer(tmp_path: Path) -> None:
+    summary, responses = _evidence()
+    persist_bybit_derivatives_context_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+    older = deepcopy(summary)
+    older["started_at"] = "2026-07-18T07:44:00Z"
+    older["completed_at"] = "2026-07-18T07:44:00.300000Z"
+    older["maximum_context_age_at_completion_seconds"] = 0.3
+
+    with pytest.raises(
+        BybitDerivativesContextCaptureError,
+        match="capture_pointer_rollback_rejected",
+    ):
+        persist_bybit_derivatives_context_capture(
+            tmp_path,
+            summary=older,
+            responses=responses,
+        )
+
+
+def test_project_review_export_selects_and_revalidates_latest_capture(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "tree"
+    base = root / "event_fade_cache"
+    base.mkdir(parents=True)
+    (root / "Makefile").write_text("verify:\n\t@true\n", encoding="utf-8")
+    policy_source = ROOT / "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json"
+    policy_target = root / "research/DECISION_RADAR_PROJECT_ARTIFACT_POLICY.json"
+    policy_target.parent.mkdir(parents=True)
+    policy_target.write_bytes(policy_source.read_bytes())
+    summary, responses = _evidence()
+    capture = persist_bybit_derivatives_context_capture(
+        base,
+        summary=summary,
+        responses=responses,
+    )
+    spec = importlib.util.spec_from_file_location(
+        "bybit_derivatives_project_export",
+        ROOT / "scripts/export_source_with_artifacts.py",
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    output = root / "review.zip"
+
+    assert module.main(root=root, out=output) == 0
+
+    with zipfile.ZipFile(output) as archive:
+        names = set(archive.namelist())
+        manifest = json.loads(
+            archive.read("event_fade_cache/PROJECT_ARTIFACT_EXPORT_MANIFEST.json")
+        )
+    prefix = f"event_fade_cache/{capture['artifact_namespace']}/"
+    assert "event_fade_cache/radar_bybit_derivatives_context_latest.json" in names
+    assert f"{prefix}capture_completion_receipt.json" in names
+    assert f"{prefix}capture_manifest.json" in names
+    assert f"{prefix}raw_001_ticker_BTCUSDT.json" in names
+    selected = {
+        row["kind"]: row for row in manifest["selector_results"]
+    }["latest_bybit_derivatives_namespace"]
+    assert selected["artifact_namespace"] == capture["artifact_namespace"]
+    assert selected["capture_id"] == capture["capture_id"]
+    assert selected["source_execution_quality_capture_id"] == "b" * 64
+    assert selected["all_context_fresh"] is True
+    assert selected["protocol_v2_input_quality_eligible"] is True
+    assert selected["protocol_v2_evidence_eligible"] is False
+    assert selected["protocol_v2_annex_bound"] is False
