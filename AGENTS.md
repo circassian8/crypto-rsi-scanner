@@ -357,7 +357,9 @@ may be added later when a suitable environment already exists.
   and reason-coded exclusions remain immutable in the capture. The initial
   Radar-symbol-to-Bybit-base join is an auditable candidate join, not confirmed
   canonical identity; exact IDs stay pending human confirmation in the sealed
-  Protocol-v2 annex. A complete capture immutably stores only the closed exact
+  Protocol-v2 annex. If no query candidate resolves to an eligible exact active
+  perpetual, collection fails before any order-book request or publication. A
+  complete capture immutably stores only the closed exact
   authority/universe, accepted raw responses, request timing, normalized USDT
   observations, fingerprints, manifest, completion receipt, and latest pointer. Validation
   holds one descriptor-anchored namespace for the complete read, rederives all

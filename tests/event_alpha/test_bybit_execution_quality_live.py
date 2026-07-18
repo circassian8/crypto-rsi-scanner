@@ -320,6 +320,31 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
     assert all("FIGR_HELOC" not in str(request.query) for request in requests)
 
 
+def test_provider_metadata_with_no_eligible_contract_fails_before_orderbook() -> None:
+    requests: list[BybitPublicRequest] = []
+
+    def fetch(request: BybitPublicRequest, _timeout: float) -> Mapping[str, object]:
+        requests.append(request)
+        payload = deepcopy(_fixture("instruments_info.json"))
+        payload["result"]["list"] = []
+        return payload
+
+    with pytest.raises(BybitExecutionQualityLiveError) as captured:
+        collect_authoritative_bybit_execution_quality(
+            artifact_base_dir="unused",
+            environ={LIVE_AUTH_ENV: "1"},
+            now=lambda: NOW,
+            resolver=_resolver((_observation("bitcoin", "BTC", 3_000.0),)),
+            fetch_json=fetch,
+        )
+
+    assert captured.value.reason_code == "eligible_instrument_set_empty"
+    assert captured.value.request_count == 1
+    assert [request.path for request in requests] == [
+        "/v5/market/instruments-info"
+    ]
+
+
 class _FakeResponse:
     def __init__(self, url: str, payload: Mapping[str, object]) -> None:
         self.status = 200

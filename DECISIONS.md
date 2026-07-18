@@ -26,7 +26,9 @@ full universe, exact query subset, and exclusions in universe schema v2. Treat
 exact Radar symbol equals Bybit base coin only as a candidate identity join;
 canonical asset identity remains pending human confirmation when the exact
 native instrument set is sealed in the Protocol-v2 annex. If the query subset
-is empty, fail before the network boundary.
+is empty, fail before the network boundary. If provider metadata resolves none
+of the query candidates to an eligible exact active contract, fail before any
+order-book request or publication rather than reporting an empty success.
 **Why:** The current authoritative top 30 contains `FIGR_HELOC`, whose underscore
 cannot form a valid request under the existing closed Bybit symbol contract.
 Discovering that only after entering the request loop would consume or fail a

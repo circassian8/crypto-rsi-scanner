@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Reject an empty Bybit contract intersection · Codex
+**Why:** The public collector could finish all instrument-metadata requests with
+zero exact active contracts and report a complete diagnostic result, while the
+immutable capture layer correctly rejected the same empty observation set.
+That disagreement could make a failed first live boundary look successful.
+**Changes:**
+- Made the live collector fail with `eligible_instrument_set_empty` immediately
+  after the bounded metadata phase when no query candidate resolves to an exact
+  active USDT-linear perpetual. It performs no order-book request and publishes
+  no capture in that state.
+- Added a focused regression proving the exact one-request count and absence of
+  any order-book call; aligned the working agreement and durable universe rule.
+**Verify:** 43 focused Bybit normalizer/live/capture tests and compileall passed;
+architecture cleanliness passed with zero new violations; `git diff --check`
+passed.
+**Notes/risks:** This changes only false-success semantics for a zero-contract
+intersection. It does not authorize or call Bybit, change the selected venue,
+guess mappings, publish evidence, or affect sends/trades/orders/paper/RSI/fade.
+
 ## 2026-07-18 — Close the Bybit provider-query universe before capture · Codex
 **Why:** The fresh top-30 Radar authority includes `FIGR_HELOC`, which cannot
 form a request under the closed Bybit base-symbol contract. The live adapter

@@ -454,6 +454,8 @@ def _collect_authoritative_bybit_execution_quality(
             selected = select_bybit_usdt_perpetual_instruments((asset,), payload)
             if selected:
                 eligible.append(selected[0])
+        if not eligible:
+            raise BybitExecutionQualityLiveError("eligible_instrument_set_empty")
 
         snapshots: list[dict[str, object]] = []
         lineage_seed = hashlib.sha256(
