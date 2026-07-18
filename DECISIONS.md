@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Preserve official announcement windows without inventing time
+**Status:** accepted
+**Decision:** Canonical announcement evidence must preserve separately the
+provider publication time, explicit activity/effective start, and explicit
+activity/effective end. The Bybit adapter accepts both the v5 response-table
+`startDataTimestamp`/`endDataTimestamp` names and the official response-example
+`startDateTimestamp`/`endDateTimestamp` names. Raw events, official-exchange
+events, and candidates copy the resulting window and an explicit status. A
+missing endpoint remains missing; an end before its start is
+`invalid_end_before_start` plus `invalid_effective_window`, never swapped,
+clamped, or silently treated as complete. Calendar or activity windows provide
+timing/risk context and cannot create directional bias alone.
+**Why:** Dropping the end destroys expiry and episode boundaries, while
+repairing malformed source time would manufacture evidence. The provider's own
+documentation currently uses two near-identical field spellings, so supporting
+both is necessary to remain compatible with its documented contract.
+**Revisit when:** Bybit deprecates one spelling in an official versioned
+contract. Continue reading historical evidence without rewriting it and retain
+publication, start, and end as distinct clocks.
+
 ## 2026-07-18 - Do not promote an unverified Binance announcement transport
 **Status:** accepted
 **Decision:** The legacy signed Binance CMS WebSocket adapter remains disabled,

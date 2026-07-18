@@ -951,6 +951,10 @@ work.
   and normalized projection; strict doctor rejects missing, changed, symlinked,
   or unprojected bytes. Failed and oversized responses remain bounded redacted
   diagnostics and must not create accepted source artifacts.
+  Preserve provider publication, activity start, and activity end separately.
+  Bybit's documented `startDataTimestamp`/`endDataTimestamp` and response-example
+  `startDateTimestamp`/`endDateTimestamp` spellings are both supported; an
+  inverted window stays invalid and may not be silently repaired.
   The signed Binance CMS WebSocket adapter is legacy/unverified: preserve its
   fixture parser and historical code, but do not activate it, extend it as an
   authoritative capture surface, or admit it to Protocol-v2 evidence until the

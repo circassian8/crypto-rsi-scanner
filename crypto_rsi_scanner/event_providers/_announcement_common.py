@@ -160,7 +160,7 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("publish_time")
         or item.get("dateTimestamp")
     )
-    event_time = _parse_time(
+    explicit_event_time = _parse_time(
         item.get("event_time")
         or item.get("listing_time")
         or item.get("listingTime")
@@ -169,7 +169,19 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("launchTime")
         or item.get("startDateTimestamp")
         or item.get("startDataTimestamp")
-    ) or published_at
+    )
+    event_time = explicit_event_time or published_at
+    event_end_time = _parse_time(
+        item.get("event_end_time")
+        or item.get("end_time")
+        or item.get("endTime")
+        or item.get("endDateTimestamp")
+        or item.get("endDataTimestamp")
+    )
+    event_window_status = _event_window_status(
+        explicit_event_time,
+        event_end_time,
+    )
     raw_id = str(
         item.get("raw_id")
         or item.get("id")
@@ -197,6 +209,10 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
     payload["announcement_pairs"] = pairs
     payload["announcement_contracts"] = contracts
     payload["announcement_time"] = event_time.isoformat() if event_time else None
+    payload["announcement_end_time"] = (
+        event_end_time.isoformat() if event_end_time else None
+    )
+    payload["announcement_window_status"] = event_window_status
     payload["announcement_published_at"] = published_at.isoformat() if published_at else None
     payload["exchange_product_type"] = product_type
     if source_url:
@@ -205,6 +221,13 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         "event_name": title,
         "event_type": event_type,
         "event_time": event_time.isoformat() if event_time else None,
+        "event_end_time": event_end_time.isoformat() if event_end_time else None,
+        "event_window_status": event_window_status,
+        "event_time_basis": (
+            "explicit_provider_window_start"
+            if explicit_event_time is not None
+            else "announcement_publication_fallback"
+        ),
         "event_time_confidence": 1.0 if _has_explicit_event_time(item) else 0.60,
         "confidence": float(item.get("source_confidence") or 0.85),
         "description": body or title,
@@ -367,6 +390,21 @@ def _has_explicit_event_time(item: Mapping[str, Any]) -> bool:
             "startDataTimestamp",
         )
     )
+
+
+def _event_window_status(
+    start: datetime | None,
+    end: datetime | None,
+) -> str:
+    if start is None and end is None:
+        return "not_provided"
+    if start is None:
+        return "end_only"
+    if end is None:
+        return "start_only"
+    if end < start:
+        return "invalid_end_before_start"
+    return "complete"
 
 
 def _cms_data_payload(raw: Mapping[str, Any]) -> Mapping[str, Any] | None:

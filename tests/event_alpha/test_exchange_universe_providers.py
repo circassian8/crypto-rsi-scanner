@@ -455,6 +455,7 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
                         "url": "https://announcements.bybit.com/en-US/article/test-live/",
                         "dateTimestamp": 1781514000000,
                         "startDateTimestamp": 1781524800000,
+                        "endDateTimestamp": 1781528400000,
                     },
                     {
                         "title": "Bybit savings campaign for TLIVE holders",
@@ -493,6 +494,11 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
     assert event.raw_json["fetched_at_source"] == "local_response_read_complete"
     assert event.raw_json["event"]["event_type"] == "exchange_listing"
     assert event.raw_json["event"]["event_time"] == "2026-06-15T12:00:00+00:00"
+    assert event.raw_json["event"]["event_end_time"] == "2026-06-15T13:00:00+00:00"
+    assert event.raw_json["event"]["event_window_status"] == "complete"
+    assert event.raw_json["event"]["event_time_basis"] == "explicit_provider_window_start"
+    assert event.raw_json["announcement_end_time"] == "2026-06-15T13:00:00+00:00"
+    assert event.raw_json["announcement_window_status"] == "complete"
     assert event.raw_json["event"]["event_time_confidence"] == 1.0
 
     def failing_opener(request, timeout):
@@ -503,6 +509,51 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
         live_enabled=True,
         opener=failing_opener,
     ).fetch_events(start, end) == []
+
+
+def test_bybit_documented_activity_window_survives_official_event_and_candidate_projection():
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange as event_official_exchange
+
+    item = {
+        "id": "bybit-window",
+        "title": "Bybit New Derivatives Listing: TESTPERPUSDT Perpetual Contract",
+        "description": "Bybit will launch TESTPERPUSDT perpetual trading.",
+        "publishTime": 1781514000000,
+        "startDataTimestamp": 1781524800000,
+        "endDataTimestamp": 1781532000000,
+        "coin_ids": {"TESTPERP": "test-perp"},
+    }
+    with TemporaryDirectory() as tmp:
+        result = event_official_exchange.run_official_exchange_scan_from_items(
+            namespace_dir=tmp,
+            provider_items={"bybit_announcements": (item,)},
+            profile="fixture",
+            artifact_namespace="bybit_window",
+            run_mode="fixture",
+            run_id="run-bybit-window",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+    event = result.events[0]
+    candidate = result.candidates[0]
+    assert event["effective_time"] == "2026-06-15T12:00:00+00:00"
+    assert event["effective_end_time"] == "2026-06-15T14:00:00+00:00"
+    assert event["effective_window_status"] == "complete"
+    assert event["raw_payload_redacted"]["endDataTimestamp"] == 1781532000000
+    assert candidate["effective_time"] == event["effective_time"]
+    assert candidate["effective_end_time"] == event["effective_end_time"]
+    assert candidate["effective_window_status"] == "complete"
+
+    invalid = event_official_exchange.normalize_official_exchange_event(
+        {
+            **item,
+            "startDataTimestamp": 1781532000000,
+            "endDataTimestamp": 1781524800000,
+        },
+        provider="bybit_announcements",
+        observed_at="2026-06-15T16:00:00Z",
+    )
+    assert invalid["effective_window_status"] == "invalid_end_before_start"
+    assert "invalid_effective_window" in invalid["resolver_warnings"]
 
 
 def test_event_discovery_bybit_live_response_byte_budget_fails_closed():

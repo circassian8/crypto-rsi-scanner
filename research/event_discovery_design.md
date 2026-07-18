@@ -155,6 +155,12 @@ and return announcement rows under `result.list` with title, description, type,
 tags, URL, and timestamps:
 https://bybit-exchange.github.io/docs/v5/announcement
 
+The source window remains closed across projections: publication time, explicit
+activity start, and explicit activity end stay separate. The adapter accepts
+the documentation table's `startDataTimestamp`/`endDataTimestamp` names and the
+response example's `startDateTimestamp`/`endDateTimestamp` names. Missing or
+inverted windows are surfaced explicitly and are never silently repaired.
+
 The exchange providers parse spot listing and perpetual/futures listing
 announcements into `RawDiscoveredEvent` rows with normalized event metadata.
 These events are valuable for the radar and negative/control sample, but they

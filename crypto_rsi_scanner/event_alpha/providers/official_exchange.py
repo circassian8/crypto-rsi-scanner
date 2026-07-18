@@ -371,6 +371,19 @@ def normalize_official_exchange_event(
         "resumeTime",
         "suspensionTime",
     )
+    effective_end_time = _event_time(
+        item,
+        "effective_end_time",
+        "event_end_time",
+        "end_time",
+        "endTime",
+        "endDateTimestamp",
+        "endDataTimestamp",
+    )
+    effective_window_status = _effective_window_status(
+        effective_time,
+        effective_end_time,
+    )
     symbols = _extract_symbols(item, title, body)
     pairs = tuple(dict.fromkeys(_announcement_pairs(title, body)))
     contracts = tuple(dict.fromkeys(_announcement_contracts(title, body)))
@@ -412,13 +425,19 @@ def normalize_official_exchange_event(
         "pairs": pairs,
         "contracts": contracts,
         "effective_time": effective_time,
+        "effective_end_time": effective_end_time,
+        "effective_window_status": effective_window_status,
         "listing_scope": listing_scope_for_event_type(event_type),
         "source_class": SOURCE_CLASS,
         "source_strength": SOURCE_STRENGTH,
         "confidence": confidence,
         "raw_payload_redacted": _redacted_payload(item),
         "reason_codes": reason_codes,
-        "resolver_warnings": _resolver_warnings(symbols, coin_ids),
+        "resolver_warnings": _resolver_warnings(
+            symbols,
+            coin_ids,
+            effective_window_status=effective_window_status,
+        ),
         "source_pack": source_pack_for_event_type(event_type),
         "impact_path_type": impact_path_for_event_type(event_type),
         "negative_catalyst": event_type in RISK_EVENT_TYPES,
@@ -619,6 +638,8 @@ def _candidate_rows_for_event(event: Mapping[str, Any], item: Mapping[str, Any])
             "listing_scope": event.get("listing_scope"),
             "published_at": event.get("published_at"),
             "effective_time": event.get("effective_time"),
+            "effective_end_time": event.get("effective_end_time"),
+            "effective_window_status": event.get("effective_window_status"),
             "source_url": event.get("source_url"),
             "source_class": SOURCE_CLASS,
             "source_strength": SOURCE_STRENGTH,
@@ -825,13 +846,39 @@ def _is_simple_major_pair_event(event_type: str, *, symbols: tuple[str, ...], pa
     return bool(bases and bases.issubset(MAJOR_PAIR_BASE_ASSETS))
 
 
-def _resolver_warnings(symbols: tuple[str, ...], coin_ids: tuple[str, ...]) -> tuple[str, ...]:
+def _resolver_warnings(
+    symbols: tuple[str, ...],
+    coin_ids: tuple[str, ...],
+    *,
+    effective_window_status: str = "not_provided",
+) -> tuple[str, ...]:
     warnings: list[str] = []
     if not symbols:
         warnings.append("no_symbol_extracted")
     if symbols and not coin_ids:
         warnings.append("coin_id_unresolved")
+    if effective_window_status == "invalid_end_before_start":
+        warnings.append("invalid_effective_window")
     return tuple(warnings)
+
+
+def _effective_window_status(
+    start: str | None,
+    end: str | None,
+) -> str:
+    if start is None and end is None:
+        return "not_provided"
+    if start is None:
+        return "end_only"
+    if end is None:
+        return "start_only"
+    parsed_start = _parse_time(start)
+    parsed_end = _parse_time(end)
+    if parsed_start is None or parsed_end is None:
+        return "invalid_time"
+    if parsed_end < parsed_start:
+        return "invalid_end_before_start"
+    return "complete"
 
 
 def _confidence(event_type: str, symbols: tuple[str, ...], coin_ids: tuple[str, ...]) -> float:

@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve complete Bybit announcement activity windows · Codex
+**Why:** Bybit's documented v5 announcement response can carry an activity
+start and end, but canonical raw events, official-exchange events, and
+candidates retained only the start. That discarded source timing needed for
+honest expiry and later episode measurement.
+**Changes:**
+- The shared announcement parser now preserves both documented field spellings:
+  `startDataTimestamp`/`endDataTimestamp` from the response table and
+  `startDateTimestamp`/`endDateTimestamp` from the official example. Raw events
+  carry explicit start, end, time source, and closed window status.
+- Official-exchange event and candidate projections copy `effective_time`,
+  `effective_end_time`, and `effective_window_status`. End-before-start source
+  windows remain visible and receive `invalid_effective_window`; they are not
+  silently repaired or treated as complete.
+- Updated the durable decision, roadmap, working agreement, and discovery
+  design. This is source-context preservation only; no provider call,
+  authorization, score, route, threshold, notification, trade, paper, RSI, or
+  fade behavior changed.
+**Verify:** All 18 exchange/universe provider tests and 2 focused official-
+exchange/integrated-rehearsal surface tests pass; Python compileall,
+architecture cleanliness, and `git diff --check` pass.
+**Notes/risks:** Full `make verify` was intentionally skipped for this narrow
+additive timing projection. The direct documented response, both provider field
+spellings, invalid-window warning, canonical event/candidate copies, integrated
+rehearsal, syntax, and architecture surfaces are covered offline.
+
 ## 2026-07-18 — Hold the legacy Binance announcement transport outside authority · Codex
 **Why:** The evidence-first plan should not invest in or promote a catalyst
 transport merely because its historical payload still parses; the exact current
