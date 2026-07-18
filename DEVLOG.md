@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Prove the closed Daily Operations publication path live · Codex
+**Why:** The single-coordinator fix needed one genuine cadence-eligible cycle to
+prove that observation, publication, owned restart, final receipts, terminal
+state, dashboard identity, and campaign reporting now close together.
+**Changes:**
+- Ran the first post-fix canonical Daily Operations cycle only after readiness
+  reported eligible. It made one authorized CoinGecko request with no retry,
+  received 80 rows, selected 30, and published strict-clean namespace
+  `radar_market_no_send_20260718t114604067494z_bcd38d70ccfe` at revision 12.
+- Confirmed immutable prepublication, final publication, and dashboard
+  operations evidence; exact pointer publication; an owned dashboard restart;
+  a succeeded terminal cycle row; and a current maintenance-state update. The
+  loopback dashboard serves HTTP 200 with the same namespace, run, revision,
+  and operator-state digest.
+- Refreshed campaign truth to 16 real cycles, 480 retained observations, 450
+  baseline-counted observations, 30 too-close observations, 34 historical
+  assets, 5 historical ideas, 0 current ideas, and 0/480 trusted spread
+  coverage. The next eligible observation is 2026-07-18 12:46:04 UTC.
+- Rechecked all three offline Bybit contracts. Execution quality, completed
+  1h/4h bars, and derivatives context remain fixture-clean but honestly blocked
+  from real collection by the absent independent authorization flags and the
+  recorded country-level CloudFront denial. Official macro, outcome recovery,
+  live catalyst/context, and frozen OOS labels remain explicit human/provider
+  boundaries; no authorization or evidence was fabricated.
+**Verify:** Daily Operations readiness reported current authorization and exact
+cadence eligibility without a provider call. The cycle returned
+`published_and_restarted`; strict doctor reported zero blockers and warnings;
+dashboard authority and readiness passed; the final loopback HEAD returned HTTP
+200 with exact identity headers. Execution-quality, intraday, and derivatives
+offline Bybit smokes passed with zero provider calls. Campaign report safety
+shows zero report calls, sends, trades, paper trades, RSI writes, fade triggers,
+or automatic threshold/route changes. Architecture cleanliness passed with no
+new size violation and no internal/test/documentation use of old import paths.
+**Notes/risks:** The recurring service remains uninstalled. The exact DEXE
+outcome recovery, Bybit execution capture, official macro acquisition, and OOS
+labeling still require their separate pre-existing human authorization or
+inputs; none was created in this cycle.
+
 ## 2026-07-18 — Make Daily Operations the sole market authority writer · Codex
 **Why:** One authorized cadence-eligible market observation completed correctly,
 but the legacy direct command then advanced the dashboard pointer without the
