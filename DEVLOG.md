@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Keep the frozen empirical algorithm contract intact · Codex
+**Why:** The source-with-artifacts gate correctly rejected the preceding unit
+fix because `market_units.py` is byte-bound into the immutable empirical
+hardening supplement. Updating that shared component would silently invalidate
+the sealed diagnostics evidence even though the defect occurs only while a
+broader rolling-history row is adapted into a canonical market snapshot.
+**Changes:**
+- Restored `market_units.py` byte-for-byte to the version fingerprinted by the
+  empirical supplement; no historical supplement, report, manifest, or policy
+  fingerprint was regenerated.
+- Moved the fix into `market_state.py`. Its source-validation projection removes
+  only the three exact internally generated temporal return metadata families,
+  while malformed or arbitrary fields remain warnings.
+- Kept field-aware extreme validation on the already-normalized canonical
+  projection and suppressed only the duplicate source-wide heuristic that is
+  invalid for a legitimate mixed fraction/percentage-point row.
+- Extended the regression to prove a near-miss field such as
+  `temporal_return_1x` is still rejected.
+**Verify:** The empirical export plan validates again with all 89 canonical
+manifest entries. Ran 169 focused market-history, market-enrichment,
+market-surface, no-send, fixture-route, Decision-v2, and doctor tests; all passed. Re-projected
+the exact current 30-row live cache to 30 warning-free snapshots and the same
+zero anomalies. Market-anomaly and integrated-radar offline smokes, Python
+compileall, and diff checks passed.
+**Notes/risks:** This supersedes only the implementation location from the
+preceding entry. The live correctness result is unchanged, while the frozen
+empirical evidence remains byte-honest. No provider call, threshold, score,
+route, authorization, spread, send, trade, order, paper trade, RSI row, or
+`TRIGGERED_FADE` changed.
+
 ## 2026-07-18 — Preserve valid temporal return units through anomaly scanning · Codex
 **Why:** The current genuine market generation exposed false unit warnings on
 all 30 snapshots. Rolling history correctly declared its derived temporal
@@ -42,7 +72,8 @@ and diff checks passed.
 **Notes/risks:** Existing immutable generations are not rewritten. The next
 cadence-eligible generation will carry the corrected snapshots. No threshold,
 score, route, provider, authorization, call, spread, send, trade, order, paper
-trade, RSI row, or `TRIGGERED_FADE` changed.
+trade, RSI row, or `TRIGGERED_FADE` changed. The next entry relocates the fix
+out of the empirical-supplement-bound shared validator before release export.
 
 ## 2026-07-18 — Remove the last unresolved production-size warning · Codex
 **Why:** The broad local gate exposed one real project-state drift:

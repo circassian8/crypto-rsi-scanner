@@ -8,11 +8,23 @@ event-fade triggers.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
 import crypto_rsi_scanner.event_alpha.radar.market_units as event_market_units
+
+
+_INTERNAL_TEMPORAL_RETURN_UNIT_FIELD = re.compile(
+    r"temporal_(?:return|return_volatility|relative_return_vs_(?:btc|eth))_[1-9][0-9]*h"
+)
+_COMMON_UNIT_EXTREME_WARNINGS = frozenset(
+    {
+        "return_1h_extreme_without_unit_context",
+        "return_4h_extreme_without_unit_context",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -129,7 +141,7 @@ def snapshot_from_market_row(
     if row.get("return_unit") not in (None, "") or any(
         key in row for key in event_market_units.RETURN_UNIT_METADATA_KEYS
     ):
-        unit_warnings.extend(event_market_units.validate_market_snapshot_units(row))
+        unit_warnings.extend(_source_unit_warnings(row))
     snapshot = MarketStateSnapshot(
         symbol=symbol,
         coin_id=coin_id,
@@ -172,6 +184,35 @@ def snapshot_from_market_row(
         warnings=tuple(dict.fromkeys(warnings)),
     )
     return snapshot
+
+
+def _source_unit_warnings(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """Validate the source fields consumed by the canonical snapshot.
+
+    Rolling-history rows also retain explicitly unitized ``temporal_*``
+    evidence fields.  Those are not canonical snapshot inputs, so remove only
+    the three exact internally generated families from the source projection.
+    Unknown metadata remains visible.  The normalized projection above already
+    performs field-aware 1h/4h extreme checks; suppress the source validator's
+    duplicate common-unit heuristic because a mixed row may legitimately use a
+    fractional provider default plus percentage-point field overrides.
+    """
+
+    projected = dict(row)
+    for metadata_key in event_market_units.RETURN_UNIT_METADATA_KEYS:
+        value = projected.get(metadata_key)
+        if not isinstance(value, Mapping):
+            continue
+        projected[metadata_key] = {
+            str(field): unit
+            for field, unit in value.items()
+            if _INTERNAL_TEMPORAL_RETURN_UNIT_FIELD.fullmatch(str(field)) is None
+        }
+    return tuple(
+        warning
+        for warning in event_market_units.validate_market_snapshot_units(projected)
+        if warning not in _COMMON_UNIT_EXTREME_WARNINGS
+    )
 
 
 def _normalized_return_values(
