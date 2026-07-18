@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Explain the real temporal-baseline maturity frontier · Codex
+**Why:** The dashboard correctly said the campaign baseline was warming, but it
+collapsed materially different feature states into one generic warning. That
+made 630 retained observations look closer to globally warm than the sparse
+point-in-time 1h/4h/24h history actually is.
+**Changes:**
+- Extended the bounded, exact-pointer-matched campaign projection to validate
+  the complete seven-family current-universe maturity contract. Every family
+  must reconcile warm, warming, cold, and other counts to the exact observed
+  universe; missing groups or contradictory counts suppress campaign context.
+- Today now states the genuine frontier in the actionability constraint: 0/30
+  assets are fully warm, turnover and volume are 30/30 warm, and the 1h, 4h,
+  24h, BTC/ETH-relative, and volatility families remain 0/30 warm. It explicitly
+  preserves the independent-sample and elapsed-coverage requirement and makes
+  no warmup forecast.
+- Updated focused dashboard fixtures and the active roadmap. No future sample,
+  proxy value, threshold change, or score change was introduced.
+**Verify:** Ran 45 focused market-history/campaign-context/dashboard tests,
+`make radar-dashboard-smoke PYTHON=.venv/bin/python`, `make
+radar-dashboard-ux-smoke PYTHON=.venv/bin/python`, `.venv/bin/python -m
+compileall -q crypto_rsi_scanner tests`, the live revision-12 current-authority
+readiness check, and a direct live-authority 12-page no-write render; all passed.
+**Notes/risks:** The campaign report remains historical context bound to the
+exact current pointer, not a second authority. Missing or invalid context uses
+the prior generic wording. No provider call, authorization mutation, send,
+trade, order, paper trade, normal RSI write, `TRIGGERED_FADE`, review event, or
+outcome mutation occurred.
+
 ## 2026-07-18 — Surface genuine open operator work on the dashboard · Codex
 **Why:** The current authority correctly contains zero Decision ideas, but the
 campaign still has three receipt-backed ideas awaiting human review, one DEXE

@@ -37,6 +37,15 @@ _OUTCOME_READINESS_COMMAND = (
 _BYBIT_READINESS_COMMAND = (
     "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
 )
+_BASELINE_FEATURE_GROUPS = (
+    "btc_eth_relative",
+    "returns_1h",
+    "returns_24h",
+    "returns_4h",
+    "turnover",
+    "volatility",
+    "volume",
+)
 _ZERO_REPORT_SAFETY = (
     "normal_rsi_signal_rows_written",
     "paper_trades_created",
@@ -154,6 +163,9 @@ def _project_campaign_actions(
         retained_observations=metrics["retained_observation_count"],
         spread_available=metrics["spread_available_count"],
     )
+    temporal_baseline = _project_temporal_baseline(
+        report.get("baseline_maturity")
+    )
     if metrics["review_timing_action_required"] != review["action_required_count"]:
         raise ValueError("campaign_report_review_count_mismatch")
     if metrics["matured_outcomes"] != outcomes["matured_count"]:
@@ -167,6 +179,7 @@ def _project_campaign_actions(
         "human_review": review,
         "outcome_recovery": outcomes,
         "execution_quality": execution,
+        "temporal_baseline": temporal_baseline,
         "pointer": {
             "artifact_namespace": artifact_namespace,
             "run_id": run_id,
@@ -197,6 +210,60 @@ def _project_metrics(value: Any) -> dict[str, int]:
     if projected["spread_available_count"] > projected["retained_observation_count"]:
         raise ValueError("campaign_report_spread_count_invalid")
     return projected
+
+
+def _project_temporal_baseline(value: Any) -> dict[str, Any]:
+    maturity = _mapping(value, "baseline_maturity")
+    current = _mapping(
+        maturity.get("current_universe_maturity"),
+        "current_universe_maturity",
+    )
+    status = _text(current.get("status"), 32)
+    if status not in {"cold", "warming", "warm", "incomplete"}:
+        raise ValueError("campaign_baseline_status_invalid")
+    expected = _count(current.get("expected_asset_count"), "expected_asset_count")
+    observed = _count(current.get("observed_asset_count"), "observed_asset_count")
+    missing = _count(current.get("missing_asset_count"), "missing_asset_count")
+    fully_warm = _count(
+        current.get("baseline_warm_asset_count"),
+        "baseline_warm_asset_count",
+    )
+    if observed + missing != expected or fully_warm > observed:
+        raise ValueError("campaign_baseline_universe_count_mismatch")
+    source_groups = _mapping(
+        current.get("baseline_feature_readiness"),
+        "baseline_feature_readiness",
+    )
+    if set(source_groups) != set(_BASELINE_FEATURE_GROUPS):
+        raise ValueError("campaign_baseline_feature_groups_invalid")
+    groups: dict[str, dict[str, int]] = {}
+    for name in _BASELINE_FEATURE_GROUPS:
+        details = _mapping(source_groups.get(name), f"baseline_feature_{name}")
+        counts = {
+            field: _count(details.get(field), f"{name}_{field}")
+            for field in (
+                "warm_asset_count",
+                "warming_asset_count",
+                "cold_asset_count",
+                "other_asset_count",
+                "asset_count",
+            )
+        }
+        if (
+            counts["asset_count"] != observed
+            or sum(counts[field] for field in counts if field != "asset_count")
+            != counts["asset_count"]
+        ):
+            raise ValueError("campaign_baseline_feature_count_mismatch")
+        groups[name] = counts
+    return {
+        "status": status,
+        "expected_asset_count": expected,
+        "observed_asset_count": observed,
+        "missing_asset_count": missing,
+        "fully_warm_asset_count": fully_warm,
+        "feature_groups": groups,
+    }
 
 
 def _project_review_queue(value: Any) -> dict[str, Any]:

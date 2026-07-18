@@ -395,7 +395,7 @@ def _operator_warnings(snapshot: DashboardSnapshot) -> str:
         decision_blockers.append((
             "decision:baseline",
             "Temporal baseline still warming",
-            "No asset has a globally warm feature baseline yet. Direct observations and cross-sectional proxies are labeled separately.",
+            _temporal_baseline_constraint_detail(snapshot),
             "/campaign-history",
         ))
     if snapshot.doctor_status.casefold() != "ok":
@@ -446,6 +446,48 @@ def _operator_warnings(snapshot: DashboardSnapshot) -> str:
             )
         sections.append(_coverage_gap_disclosure(optional_coverage_gaps))
     return "".join(sections)
+
+
+def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
+    fallback = (
+        "No asset has a globally warm feature baseline yet. Direct observations "
+        "and cross-sectional proxies are labeled separately."
+    )
+    state = snapshot.campaign_operator_actions
+    baseline = state.get("temporal_baseline")
+    if state.get("status") != "ready" or not isinstance(baseline, Mapping):
+        return fallback
+    groups = baseline.get("feature_groups")
+    if not isinstance(groups, Mapping):
+        return fallback
+    observed = _non_negative_int(baseline.get("observed_asset_count"))
+    fully_warm = _non_negative_int(baseline.get("fully_warm_asset_count"))
+    if observed is None or observed <= 0 or fully_warm is None:
+        return fallback
+    labels = (
+        ("turnover", "turnover"),
+        ("volume", "volume"),
+        ("returns_1h", "1h returns"),
+        ("returns_4h", "4h returns"),
+        ("returns_24h", "24h returns"),
+        ("btc_eth_relative", "BTC/ETH-relative"),
+        ("volatility", "volatility"),
+    )
+    summaries: list[str] = []
+    for key, label in labels:
+        details = groups.get(key)
+        if not isinstance(details, Mapping):
+            return fallback
+        warm = _non_negative_int(details.get("warm_asset_count"))
+        asset_count = _non_negative_int(details.get("asset_count"))
+        if warm is None or asset_count != observed:
+            return fallback
+        summaries.append(f"{label} {warm}/{asset_count}")
+    return (
+        f"{fully_warm}/{observed} assets are fully warm. Warm by feature family: "
+        + " · ".join(summaries)
+        + ". Each family still requires enough independent samples and elapsed coverage."
+    )
 
 
 def _dedupe_constraints(

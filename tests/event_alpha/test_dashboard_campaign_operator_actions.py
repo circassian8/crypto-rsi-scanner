@@ -51,6 +51,33 @@ def _campaign_report() -> dict[str, object]:
             "review_timing_action_required": 3,
             "spread_available_count": 0,
         },
+        "baseline_maturity": {
+            "current_universe_maturity": {
+                "status": "warming",
+                "expected_asset_count": 30,
+                "observed_asset_count": 30,
+                "missing_asset_count": 0,
+                "baseline_warm_asset_count": 0,
+                "baseline_feature_readiness": {
+                    name: {
+                        "warm_asset_count": warm,
+                        "warming_asset_count": 30 - warm,
+                        "cold_asset_count": 0,
+                        "other_asset_count": 0,
+                        "asset_count": 30,
+                    }
+                    for name, warm in (
+                        ("btc_eth_relative", 0),
+                        ("returns_1h", 0),
+                        ("returns_24h", 0),
+                        ("returns_4h", 0),
+                        ("turnover", 30),
+                        ("volatility", 0),
+                        ("volume", 30),
+                    )
+                },
+            }
+        },
         "human_review_queue": {
             "schema_id": "decision_radar.idea_review_timing_queue_summary",
             "schema_version": 1,
@@ -178,6 +205,12 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     )
     assert result["outcome_recovery"]["symbols"] == ("DEXE",)
     assert result["execution_quality"]["venue"] == "bybit"
+    assert result["temporal_baseline"]["feature_groups"]["turnover"][
+        "warm_asset_count"
+    ] == 30
+    assert result["temporal_baseline"]["feature_groups"]["returns_24h"][
+        "warm_asset_count"
+    ] == 0
     assert "/private/" not in repr(result)
 
 
@@ -203,6 +236,13 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
         "/private/outside/generation"
     )
     _write_report(tmp_path, path_like)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    contradictory_baseline = _campaign_report()
+    contradictory_baseline["baseline_maturity"]["current_universe_maturity"][
+        "baseline_feature_readiness"
+    ]["returns_24h"]["warm_asset_count"] = 31
+    _write_report(tmp_path, contradictory_baseline)
     assert _load(tmp_path)["status"] == "unavailable"
 
 
@@ -246,6 +286,31 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
                 "PYTHON=.venv/bin/python"
             ),
         },
+        "temporal_baseline": {
+            "status": "warming",
+            "expected_asset_count": 30,
+            "observed_asset_count": 30,
+            "missing_asset_count": 0,
+            "fully_warm_asset_count": 0,
+            "feature_groups": {
+                name: {
+                    "warm_asset_count": warm,
+                    "warming_asset_count": 30 - warm,
+                    "cold_asset_count": 0,
+                    "other_asset_count": 0,
+                    "asset_count": 30,
+                }
+                for name, warm in (
+                    ("btc_eth_relative", 0),
+                    ("returns_1h", 0),
+                    ("returns_24h", 0),
+                    ("returns_4h", 0),
+                    ("turnover", 30),
+                    ("volatility", 0),
+                    ("volume", 30),
+                )
+            },
+        },
     }
     snapshot = replace(_snapshot(), campaign_operator_actions=root_projection)
 
@@ -264,6 +329,9 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
         assert "CONFIRM=1" not in page
     assert today.index("Open operator work") < today.index("Decision constraints")
     assert today.count("Execution spread unavailable") == 0
+    assert "0/30 assets are fully warm" in today
+    assert "turnover 30/30" in today
+    assert "24h returns 0/30" in today
     assert health.count('id="human-work-queue"') == 1
     assert health.count("Spread evidence is unavailable") == 0
 
