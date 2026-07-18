@@ -1,0 +1,45 @@
+{
+  "decision": "do_not_activate_or_promote_until_current_official_contract_is_reviewable",
+  "existing_adapter_status": "legacy_unverified_research_only",
+  "interface": {
+    "legacy_topic": "com_announcement_en",
+    "legacy_transport": "wss://api.binance.com/sapi/wss"
+  },
+  "protocol_v2_eligible": false,
+  "provider_call_performed": false,
+  "research_only": true,
+  "reviewed_at": "2026-07-18",
+  "reviewed_sources": [
+    {
+      "finding": "documented portal interfaces are supported; undocumented interfaces should not be relied upon",
+      "url": "https://developers.binance.com/en/docs/introduction"
+    },
+    {
+      "finding": "current public API catalog exposes no announcement endpoint or stream contract",
+      "url": "https://developers.binance.com/en/docs/catalog"
+    },
+    {
+      "finding": "developer center advertises an Announcements product but does not publicly expose enough contract detail to validate the legacy adapter",
+      "url": "https://developers.binance.com/"
+    }
+  ],
+  "revisit_requires": [
+    "exact_current_official_endpoint_or_stream_documentation",
+    "topic_and_payload_schema",
+    "authentication_and_permission_model",
+    "rate_or_request_limits",
+    "retention_and_redistribution_terms",
+    "bounded_no_send_rehearsal_contract",
+    "immutable_accepted_frame_evidence",
+    "strict_doctor",
+    "explicit_provider_authorization"
+  ],
+  "safety": {
+    "event_alpha_triggered_fade_created": 0,
+    "normal_rsi_signal_rows_written": 0,
+    "paper_trades_created": 0,
+    "telegram_sends": 0,
+    "trades_or_orders_created": 0
+  },
+  "schema_version": "binance_announcement_interface_review_v1"
+}

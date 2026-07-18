@@ -134,8 +134,12 @@ fixture/no-call until it has its own provider-specific preflight, redacted
 request ledger, small-budget no-send rehearsal, provider-health update, and
 artifact-doctor checks. Binance public or fixture announcement normalization is
 separate from the signed Binance listener. Public/fixture announcement parsing
-can be `fixture_ready` without Binance credentials. The signed listener remains
-blocked until its API key/secret and bounded no-send rehearsal are configured.
+can be `fixture_ready` without Binance credentials. The signed listener is a
+legacy/unverified research adapter and remains blocked even if credentials are
+present until its exact current official endpoint/topic/schema/auth/limits/terms
+contract is accessible and reviewed; only then may a separate explicit
+authorization and bounded no-send rehearsal be considered. See
+`BINANCE_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
 
 ## No-Send Rehearsal
 

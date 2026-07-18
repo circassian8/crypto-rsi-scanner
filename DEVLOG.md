@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Hold the legacy Binance announcement transport outside authority · Codex
+**Why:** The evidence-first plan should not invest in or promote a catalyst
+transport merely because its historical payload still parses; the exact current
+provider contract must be verifiable from official material first.
+**Changes:**
+- Reviewed Binance's current official developer introduction, public API
+  catalog, and Developer Center. The center advertises an Announcements product,
+  but the public catalog does not expose enough endpoint, topic, schema,
+  authentication, limit, or terms detail to certify this repository's legacy
+  `sapi/wss` / `com_announcement_en` adapter.
+- Added a Markdown/JSON evidence review and made the durable policy explicit:
+  preserve historical code and fixture coverage, but keep the signed listener
+  disabled, non-authoritative, and Protocol-v2-ineligible until current official
+  documentation and terms are accessible and separately reviewed/authorized.
+- Updated the roadmap, working agreement, activation runbook, and discovery
+  design. The documented Bybit v5 path remains the venue-aligned priority under
+  its existing authorization and no-bypass reachability gates.
+**Verify:** JSON validation and `git diff --check` pass; the linked official
+source URLs were reviewed on 2026-07-18. No source code or runtime behavior was
+changed.
+**Notes/risks:** Full tests were intentionally skipped for this documentation
+and evidence-policy-only change. No credential was inspected, no provider was
+enabled or called, and no send/trade/order/paper/RSI/fade behavior changed.
+
 ## 2026-07-18 — Seal accepted Bybit announcement response evidence · Codex
 **Why:** A successful bounded official-announcement rehearsal retained its
 normalized rows and request ledger but not the exact accepted response bytes,

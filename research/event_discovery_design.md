@@ -140,6 +140,13 @@ raw Binance announcement evidence to the observational JSONL cache. It is still
 research-only; wrapping it in launchd/KeepAlive for continuous collection remains
 an ops task, not a trading promotion.
 
+Current evidence-policy note: this signed CMS transport is retained as a
+legacy/unverified adapter, not an authoritative current interface. Binance's
+2026-07 public API catalog does not expose enough endpoint/topic/schema/auth/
+limits/terms detail to certify the repository's transport. Keep it disabled and
+Protocol-v2-ineligible until the exact official current contract is accessible
+and reviewed; see `BINANCE_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
+
 Bybit can also fetch the official `GET /v5/announcements/index` endpoint when
 `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`. The live fetch is still a
 research-only source for local reports/exports; it is not live routing. The

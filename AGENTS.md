@@ -951,6 +951,11 @@ work.
   and normalized projection; strict doctor rejects missing, changed, symlinked,
   or unprojected bytes. Failed and oversized responses remain bounded redacted
   diagnostics and must not create accepted source artifacts.
+  The signed Binance CMS WebSocket adapter is legacy/unverified: preserve its
+  fixture parser and historical code, but do not activate it, extend it as an
+  authoritative capture surface, or admit it to Protocol-v2 evidence until the
+  exact current official interface contract and terms are accessible and
+  reviewed. See `research/BINANCE_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
   Ticker-only/ambiguous asset matches must stay below trigger confidence.
   The default manual alias file is `event_discovery_aliases.json`; fixture
   aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture

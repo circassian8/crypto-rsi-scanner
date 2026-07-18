@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Do not promote an unverified Binance announcement transport
+**Status:** accepted
+**Decision:** The legacy signed Binance CMS WebSocket adapter remains disabled,
+research-only, and ineligible for Protocol-v2 or authoritative catalyst use.
+Preserve its fixture parser and historical code, but do not activate it or add
+an authoritative raw-frame publication path until current official Binance
+documentation identifies the exact endpoint/stream, topic, authentication and
+permission model, payload schema, request/rate limits, supported environment,
+and retention/redistribution terms. Credentials and the legacy live flag alone
+do not establish that contract. See
+`research/BINANCE_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
+**Why:** Binance's current official developer introduction says undocumented
+interfaces should not be relied upon, and its public API catalog does not expose
+the repository's `sapi/wss` / `com_announcement_en` contract. Its Developer
+Center does advertise an Announcements product, so absence from the public
+catalog is not proof the product does not exist; it is proof that this checkout
+cannot currently certify the legacy transport as supported evidence.
+**Revisit when:** Current official product documentation and applicable terms
+are accessible, then after an explicit human review authorizes a bounded
+no-send rehearsal with a redacted ledger, immutable accepted frames, and strict
+doctor. Never infer authorization from credentials or bypass access controls.
+
 ## 2026-07-18 - Accepted official-announcement bytes precede source authority
 **Status:** accepted
 **Decision:** A successful bounded Bybit official-announcement rehearsal must
