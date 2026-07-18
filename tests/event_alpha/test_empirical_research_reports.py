@@ -9,11 +9,13 @@ from typing import Any, Callable
 import pytest
 
 from crypto_rsi_scanner.event_alpha.operations import (
+    empirical_live_campaign,
     empirical_policy_lab,
     empirical_replay_analysis,
     empirical_replay_controls,
     empirical_replay_persistence,
     empirical_replay_store,
+    empirical_research_report_validation,
     empirical_research_reports,
     empirical_review,
     empirical_validation_protocol,
@@ -905,6 +907,24 @@ def test_binds_valid_live_campaign_as_separate_canonical_projection(
         "decision_radar.empirical_live_campaign_projection"
     )
     assert binding["evidence_pooled_with_replay"] is False
+
+
+def test_rejects_boolean_live_projection_schema_version() -> None:
+    projection = empirical_live_campaign.project_live_campaign(_live_report())
+    projection["schema_version"] = True
+    binding = {
+        "status": "provided_separate_observational_lane",
+        "canonical_projection": projection,
+        "canonical_projection_sha256": hashlib.sha256(
+            empirical_replay_store.canonical_json_bytes(projection)
+        ).hexdigest(),
+        "evidence_pooled_with_replay": False,
+    }
+
+    with pytest.raises(
+        RuntimeError, match="empirical_research_report_live_binding_invalid"
+    ):
+        empirical_research_report_validation._validate_published_live(binding)
 
 
 def _resign_publication_bundle(

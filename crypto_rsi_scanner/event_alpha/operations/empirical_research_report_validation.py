@@ -431,6 +431,7 @@ def _validate_published_live(value: Any) -> None:
         value.get("status") != "provided_separate_observational_lane"
         or not isinstance(projection, Mapping)
         or projection.get("schema_id") != empirical_live_campaign.SCHEMA_ID
+        or type(projection.get("schema_version")) is not int
         or projection.get("schema_version")
         not in empirical_live_campaign.SUPPORTED_SCHEMA_VERSIONS
         or projection.get("research_only") is not True

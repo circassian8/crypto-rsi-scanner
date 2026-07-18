@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Reject boolean empirical schema versions · Codex
+**Why:** Python booleans compare equal to integers, so a digest-consistent live
+empirical projection with `schema_version=true` could pass the validator as
+legacy schema version 1. Schema identity must be exact before immutable research
+evidence is trusted.
+**Changes:**
+- Required the published live-campaign projection schema version to have the
+  exact integer type before membership in the closed `(1, 2)` version set.
+- Added a regression that recomputes the projection digest after substituting a
+  boolean and proves the closed validator still rejects it.
+- Kept the already-sealed schema-v1 empirical report bundle byte-identical and
+  valid; no report evidence was regenerated or promoted to schema v2.
+**Verify:** Ran 51 focused empirical projection/report/Research Lab tests,
+Python compileall, architecture cleanliness, and the direct seven-file shipped
+report-bundle validator. The bundle retained ID
+`267a1c6d30488fcd7088bf20ce6f653df6bf79f82c5e7d401e27fd4b24debbcf`
+and validated as immutable schema-v1 evidence.
+**Notes/risks:** Validation hardening only. No provider call, authorization,
+evidence row, episode, outcome, route, score, threshold, policy, dashboard
+authority, send, trade, order, paper trade, RSI row, or `TRIGGERED_FADE`
+changed.
+
 ## 2026-07-18 — Preserve no-independence claims in live projection v2 · Codex
 **Why:** Fixed-start episode grouping explicitly refuses to estimate statistical
 or cross-asset independence, but the live empirical projection stripped those
