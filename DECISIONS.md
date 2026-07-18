@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Keep overdue outcome price gaps explicit and non-interpolated
+**Status:** accepted
+**Decision:** A Decision Radar primary-horizon outcome may mature only from a
+genuine retained price observed inside its closed post-due lag window. If no
+such price exists, campaign JSON and Markdown must retain `due_missing_price`
+and bind the exact price-history snapshot, due time, latest permitted time,
+nearest retained observations, and resolution status. A later observation
+outside the window cannot be substituted, and interpolation, nearest-neighbor
+guessing, automatic threshold changes, or silent repair are prohibited. If a
+qualifying retained price exists while the ledger is stale, report that an
+outcome refresh can resolve it; otherwise require genuine historical
+point-in-time evidence through a separately closed provenance path.
+**Why:** Using the nearest later price would hide collection gaps and distort
+return timing, while a bare missing count does not distinguish unavailable
+evidence from a stale local ledger. Exact diagnostics preserve empirical truth
+without blocking a future provenance-safe recovery.
+**Revisit when:** A sealed Protocol-v2 annex preregisters a different outcome
+sampling rule before its holdout is identified or read.
+
 ## 2026-07-18 - Prefer venue-native Bybit derivatives context for Decision Radar
 **Status:** accepted
 **Decision:** For the selected Bybit USDT-linear perpetual research surface,

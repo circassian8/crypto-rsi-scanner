@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T09:09:51.698690+00:00` from local artifacts only.
+Generated at `2026-07-18T09:30:26.822936+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -120,6 +120,19 @@ Research and decision support only. This report contains no trade recommendation
 - Missing data: `1`
 - Source: `campaign_outcome_ledger`
 - Refresh/build errors: `0`
+
+### Due outcomes without a qualifying price
+
+These rows remain unresolved because the exact retained price history does not currently prove a price inside the closed outcome window. No interpolation or automatic threshold change is permitted.
+
+- Price-history snapshot status: `observed`
+- Price-history rows: `420`
+- Price-history SHA-256: `1acaf6a303b3fb212b61a236a93273401b45d3c2cff85b7767274f606e0926f3`
+
+| Asset | Candidate observed | Outcome due | Price allowed through | First retained after due | Outside window | Evidence status |
+|---|---|---|---|---|---:|---|
+| DEXE | 2026-07-14T00:29:40.814498+00:00 | 2026-07-15T00:29:40.814498+00:00 | 2026-07-16T00:29:40.814498+00:00 | 2026-07-16T02:08:32.428755+00:00 | 1.65 h | first_post_due_price_outside_allowed_window |
+
 - Human labels remain optional preference feedback; no thresholds or routes change automatically.
 
 ## Human review timing

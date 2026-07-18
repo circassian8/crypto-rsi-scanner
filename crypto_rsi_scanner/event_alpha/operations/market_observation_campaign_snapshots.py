@@ -175,24 +175,84 @@ def campaign_outcome_ledger_snapshot(
 ) -> dict[str, Any]:
     """Read the mutable campaign outcome ledger into one exact byte snapshot."""
 
+    return _campaign_jsonl_snapshot(
+        base,
+        history_namespace=history_namespace,
+        filename=filename,
+        binding_source="campaign_outcome_ledger_exact_bytes",
+        missing_binding_source="campaign_outcome_ledger_path",
+    )
+
+
+def campaign_market_history_snapshot(
+    base: Path,
+    *,
+    history_namespace: str,
+    filename: str,
+) -> dict[str, Any]:
+    """Read retained campaign prices into one exact byte snapshot."""
+
+    return _campaign_jsonl_snapshot(
+        base,
+        history_namespace=history_namespace,
+        filename=filename,
+        binding_source="campaign_market_history_exact_bytes",
+        missing_binding_source="campaign_market_history_path",
+    )
+
+
+def _campaign_jsonl_snapshot(
+    base: Path,
+    *,
+    history_namespace: str,
+    filename: str,
+    binding_source: str,
+    missing_binding_source: str,
+) -> dict[str, Any]:
+    """Read one mutable campaign JSONL artifact exactly once and fail closed."""
+
     if not _safe_path_segment(history_namespace) or not _safe_path_segment(filename):
-        return _ledger_snapshot_metadata(filename=None, status="unavailable")
+        return _campaign_snapshot_metadata(
+            filename=None,
+            status="unavailable",
+            binding_source=missing_binding_source,
+        )
     path = base / history_namespace / filename
     try:
         parent = path.parent.lstat()
     except FileNotFoundError:
-        return _ledger_snapshot_metadata(filename=filename, status="missing")
+        return _campaign_snapshot_metadata(
+            filename=filename,
+            status="missing",
+            binding_source=missing_binding_source,
+        )
     except OSError:
-        return _ledger_snapshot_metadata(filename=filename, status="unavailable")
+        return _campaign_snapshot_metadata(
+            filename=filename,
+            status="unavailable",
+            binding_source=missing_binding_source,
+        )
     if not stat.S_ISDIR(parent.st_mode) or stat.S_ISLNK(parent.st_mode):
-        return _ledger_snapshot_metadata(filename=filename, status="unavailable")
+        return _campaign_snapshot_metadata(
+            filename=filename,
+            status="unavailable",
+            binding_source=missing_binding_source,
+        )
     try:
         raw = read_regular_bytes(path, missing_ok=True)
         if raw is None:
-            return _ledger_snapshot_metadata(filename=filename, status="missing")
+            return _campaign_snapshot_metadata(
+                filename=filename,
+                status="missing",
+                binding_source=missing_binding_source,
+            )
         rows = parse_jsonl_bytes(raw)
     except (MarketNoSendError, OSError, TypeError, ValueError):
-        return _ledger_snapshot_metadata(filename=filename, status="unavailable")
+        return _campaign_snapshot_metadata(
+            filename=filename,
+            status="unavailable",
+            binding_source=missing_binding_source,
+        )
     return {
         "rows": tuple(dict(row) for row in rows),
         "status": "observed" if rows else "observed_empty",
@@ -200,7 +260,7 @@ def campaign_outcome_ledger_snapshot(
         "sha256": hashlib.sha256(raw).hexdigest(),
         "size_bytes": len(raw),
         "row_count": len(rows),
-        "binding_source": "campaign_outcome_ledger_exact_bytes",
+        "binding_source": binding_source,
     }
 
 
@@ -314,10 +374,11 @@ def _validate_legacy_operator_identity(
         )
 
 
-def _ledger_snapshot_metadata(
+def _campaign_snapshot_metadata(
     *,
     filename: str | None,
     status: str,
+    binding_source: str,
 ) -> dict[str, Any]:
     return {
         "rows": (),
@@ -326,7 +387,7 @@ def _ledger_snapshot_metadata(
         "sha256": None,
         "size_bytes": None,
         "row_count": 0,
-        "binding_source": "campaign_outcome_ledger_path",
+        "binding_source": binding_source,
     }
 
 
@@ -351,6 +412,7 @@ def _sha256_digest(value: object) -> bool:
 
 
 __all__ = (
+    "campaign_market_history_snapshot",
     "campaign_outcome_ledger_snapshot",
     "capture_bound_jsonl_snapshot",
     "capture_candidate_snapshot",

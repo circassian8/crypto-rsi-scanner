@@ -844,6 +844,52 @@ def test_campaign_outcome_ledger_snapshot_exposes_exact_binding_metadata(
     assert len(snapshot["sha256"]) == 64
 
 
+def test_campaign_market_history_snapshot_exposes_exact_binding_metadata(
+    tmp_path: Path,
+):
+    history_dir = tmp_path / LIVE_HISTORY_CACHE_NAMESPACE
+    history_dir.mkdir()
+    history_path = history_dir / market_observation_campaign.HISTORY_FILENAME
+    market_no_send_io.write_jsonl(
+        history_path,
+        [{"coin_id": "one", "price": 1.0}, {"coin_id": "two", "price": 2.0}],
+    )
+
+    snapshot = market_observation_campaign_snapshots.campaign_market_history_snapshot(
+        tmp_path,
+        history_namespace=LIVE_HISTORY_CACHE_NAMESPACE,
+        filename=market_observation_campaign.HISTORY_FILENAME,
+    )
+
+    assert snapshot["artifact"] == history_path.name
+    assert snapshot["status"] == "observed"
+    assert snapshot["size_bytes"] == len(history_path.read_bytes())
+    assert snapshot["row_count"] == 2
+    assert snapshot["binding_source"] == "campaign_market_history_exact_bytes"
+    assert len(snapshot["sha256"]) == 64
+
+
+def test_campaign_market_history_snapshot_rejects_parent_symlink(tmp_path: Path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    market_no_send_io.write_jsonl(
+        outside / market_observation_campaign.HISTORY_FILENAME,
+        [{"coin_id": "outside", "price": 999.0}],
+    )
+    (tmp_path / LIVE_HISTORY_CACHE_NAMESPACE).symlink_to(outside, target_is_directory=True)
+
+    snapshot = market_observation_campaign_snapshots.campaign_market_history_snapshot(
+        tmp_path,
+        history_namespace=LIVE_HISTORY_CACHE_NAMESPACE,
+        filename=market_observation_campaign.HISTORY_FILENAME,
+    )
+
+    assert snapshot["status"] == "unavailable"
+    assert snapshot["rows"] == ()
+    assert snapshot["sha256"] is None
+    assert snapshot["binding_source"] == "campaign_market_history_path"
+
+
 def test_post_validation_snapshot_failure_remains_explicit_in_episode_audit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

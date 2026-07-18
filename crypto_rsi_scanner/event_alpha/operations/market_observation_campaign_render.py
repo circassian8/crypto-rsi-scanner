@@ -87,6 +87,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         f"- Missing data: `{_int(outcomes.get('missing_data'))}`",
         f"- Source: `{_text(outcomes.get('source'))}`",
         f"- Refresh/build errors: `{_int(outcomes.get('refresh_build_error_count'))}`",
+        *_due_missing_price_lines(outcomes),
         "- Human labels remain optional preference feedback; no thresholds or routes change automatically.",
         "",
         "## Human review timing",
@@ -455,6 +456,53 @@ def _attempt_table(value: Any, *, empty: str) -> list[str]:
             f"{str(row.get('provider_call_attempted') is True).lower()} | "
             f"{_md(row.get('failure_class') or 'none')} |"
         )
+    return lines
+
+
+def _due_missing_price_lines(outcomes: Mapping[str, Any]) -> list[str]:
+    rows = [
+        dict(row)
+        for row in outcomes.get("due_missing_price_details") or ()
+        if isinstance(row, Mapping)
+    ]
+    if not rows:
+        return []
+    history = _mapping(outcomes.get("price_history_snapshot"))
+    lines = [
+        "",
+        "### Due outcomes without a qualifying price",
+        "",
+        (
+            "These rows remain unresolved because the exact retained price history does not "
+            "currently prove a price inside the closed outcome window. No interpolation or "
+            "automatic threshold change is permitted."
+        ),
+        "",
+        f"- Price-history snapshot status: `{_md(history.get('status'))}`",
+        f"- Price-history rows: `{_int(history.get('row_count'))}`",
+        f"- Price-history SHA-256: `{_md(history.get('sha256') or 'none')}`",
+        "",
+        "| Asset | Candidate observed | Outcome due | Price allowed through | First retained after due | Outside window | Evidence status |",
+        "|---|---|---|---|---|---:|---|",
+    ]
+    for row in rows:
+        first_after = _mapping(row.get("first_retained_price_after_due"))
+        beyond = row.get("seconds_beyond_allowed_window")
+        outside = (
+            f"{float(beyond) / 3600:.2f} h"
+            if type(beyond) in (int, float) and float(beyond) > 0
+            else "0.00 h"
+            if type(beyond) in (int, float)
+            else "unknown"
+        )
+        asset = _text(row.get("symbol")) or _text(row.get("coin_id")) or "unknown"
+        lines.append(
+            f"| {_md(asset)} | {_md(row.get('observed_at'))} | {_md(row.get('due_at'))} | "
+            f"{_md(row.get('allowed_latest_price_at'))} | "
+            f"{_md(first_after.get('observed_at') or 'none')} | {_md(outside)} | "
+            f"{_md(row.get('resolution_status'))} |"
+        )
+    lines.append("")
     return lines
 
 

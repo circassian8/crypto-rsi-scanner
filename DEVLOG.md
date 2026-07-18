@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Explain overdue outcome price gaps exactly · Codex
+**Why:** Campaign truth reported one `due_missing_price` outcome but did not say
+whether retained evidence could resolve it, whether the ledger was stale, or
+why the nearest later price was rejected.
+**Changes:**
+- Added an exact read-once snapshot for retained campaign market history and
+  deterministic per-outcome diagnostics covering the due time, closed allowed
+  window, nearest retained observations, qualifying count, and recovery state.
+- JSON and Markdown now prove that the DEXE 24h outcome remains unresolved: its
+  first retained post-due price arrived 5,931.614257 seconds after the permitted
+  window. The report binds all 420 retained rows by SHA-256 and explicitly
+  forbids interpolation or automatic threshold changes.
+- Kept the diagnostic logic in a focused module so the report builder and
+  production-file size gates remain clean. No outcome, score, route, policy,
+  provider authorization, or dashboard authority was changed.
+**Verify:** 78 focused campaign/outcome/episode tests passed; compileall and
+architecture cleanliness passed with zero new size violations. The canonical
+campaign report regenerated from local artifacts with `provider_calls=0` and
+shows exactly one DEXE gap with `qualifying_price_observation_count=0`.
+**Notes/risks:** Retained history cannot close this outcome. Genuine historical
+point-in-time price evidence inside the original window still needs a separate
+provenance-safe recovery path; the 25h38m later observation must not be used.
+
 ## 2026-07-18 — Record one eligible CoinGecko DNS failure without retry · Codex
 **Why:** The campaign became cadence-eligible after the eight-hour evidence
 build, so regular collection required one guarded attempt and coherent terminal

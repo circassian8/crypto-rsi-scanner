@@ -17,6 +17,7 @@ from crypto_rsi_scanner.event_alpha.operations import market_no_send_audit
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_publication
 from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign as campaign
+from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign_render
 from crypto_rsi_scanner.event_alpha.operations.market_no_send_models import (
     SAFETY_COUNTERS,
     MarketNoSendReadiness,
@@ -1113,6 +1114,128 @@ def test_campaign_outcome_state_uses_only_canonical_primary_horizon():
         "due_missing_price": 1,
         "not_due": 1,
     }
+
+
+def test_due_missing_price_diagnostic_proves_nearest_price_is_outside_window():
+    due = datetime(2026, 7, 15, 0, 30, tzinfo=timezone.utc)
+    outcome = {
+        "outcome_identity_key": "outcome:one",
+        "source_artifact_namespace": "radar_market_no_send_one",
+        "candidate_id": "candidate:one",
+        "core_opportunity_id": "core:one",
+        "symbol": "TEST",
+        "coin_id": "test-coin",
+        "observed_at": (due - timedelta(days=1)).isoformat(),
+        "primary_horizon": "24h",
+        "outcome_evaluated_at": (due + timedelta(days=2)).isoformat(),
+        "observation_price_id": "entry",
+        "horizon_metadata": {
+            "24h": {
+                "due_at": due.isoformat(),
+                "maturity_status": "missing_data",
+                "price_observation_id": None,
+            },
+        },
+    }
+    history = {
+        "status": "observed",
+        "artifact": campaign.HISTORY_FILENAME,
+        "sha256": "a" * 64,
+        "row_count": 2,
+        "binding_source": "campaign_market_history_exact_bytes",
+        "rows": (
+            {
+                "symbol": "TEST",
+                "coin_id": "test-coin",
+                "observed_at": (due - timedelta(minutes=30)).isoformat(),
+                "price": 10.0,
+                "provider": "coingecko",
+                "observation_id": "before",
+            },
+            {
+                "symbol": "TEST",
+                "coin_id": "test-coin",
+                "observed_at": (due + timedelta(hours=25)).isoformat(),
+                "price": 11.0,
+                "provider": "coingecko",
+                "observation_id": "after-too-late",
+            },
+        ),
+    }
+
+    metrics = campaign._outcome_metrics((outcome,), history_snapshot=history)
+
+    assert metrics["due_missing_price"] == 1
+    assert metrics["due_missing_price_detail_count"] == 1
+    assert metrics["price_history_snapshot"] == {
+        "status": "observed",
+        "artifact": campaign.HISTORY_FILENAME,
+        "sha256": "a" * 64,
+        "row_count": 2,
+        "binding_source": "campaign_market_history_exact_bytes",
+    }
+    detail = metrics["due_missing_price_details"][0]
+    assert detail["allowed_lag_seconds"] == 24 * 60 * 60
+    assert detail["allowed_latest_price_at"] == (
+        due + timedelta(hours=24)
+    ).isoformat()
+    assert detail["first_retained_price_after_due"]["observation_id"] == (
+        "after-too-late"
+    )
+    assert detail["first_post_due_lag_seconds"] == 25 * 60 * 60
+    assert detail["seconds_beyond_allowed_window"] == 60 * 60
+    assert detail["resolution_status"] == (
+        "first_post_due_price_outside_allowed_window"
+    )
+    assert detail["ledger_refresh_can_resolve_from_retained_history"] is False
+    assert detail["historical_point_in_time_evidence_required"] is True
+    assert detail["interpolation_permitted"] is False
+    markdown = market_observation_campaign_render.format_campaign_report(
+        {"outcomes": metrics}
+    )
+    assert "Due outcomes without a qualifying price" in markdown
+    assert "first_post_due_price_outside_allowed_window" in markdown
+    assert "1.00 h" in markdown
+
+
+def test_due_missing_price_diagnostic_flags_stale_ledger_when_price_is_available():
+    due = datetime(2026, 7, 15, 0, 30, tzinfo=timezone.utc)
+    outcome = {
+        "symbol": "TEST",
+        "coin_id": "test-coin",
+        "observed_at": (due - timedelta(days=1)).isoformat(),
+        "primary_horizon": "24h",
+        "horizon_metadata": {
+            "24h": {
+                "due_at": due.isoformat(),
+                "maturity_status": "missing_data",
+                "price_observation_id": None,
+            },
+        },
+    }
+    history = {
+        "status": "observed",
+        "rows": ({
+            "symbol": "TEST",
+            "coin_id": "test-coin",
+            "observed_at": (due + timedelta(hours=2)).isoformat(),
+            "price": 10.5,
+            "provider": "coingecko",
+            "observation_id": "qualifying",
+        },),
+    }
+
+    detail = campaign._outcome_metrics(
+        (outcome,),
+        history_snapshot=history,
+    )["due_missing_price_details"][0]
+
+    assert detail["qualifying_price_observation_count"] == 1
+    assert detail["resolution_status"] == (
+        "qualifying_price_available_ledger_refresh_required"
+    )
+    assert detail["ledger_refresh_can_resolve_from_retained_history"] is True
+    assert detail["historical_point_in_time_evidence_required"] is False
 
 
 def test_campaign_outcome_state_preserves_legacy_primary_fallback_only():

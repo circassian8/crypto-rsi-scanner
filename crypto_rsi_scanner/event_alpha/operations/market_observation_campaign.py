@@ -31,6 +31,7 @@ from . import market_observation_campaign_baseline
 from . import market_observation_campaign_cadence
 from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
+from . import market_observation_campaign_outcome_gaps
 from . import market_observation_campaign_scorecard
 from . import market_observation_campaign_snapshots
 from . import market_observation_outcomes
@@ -138,7 +139,11 @@ def build_campaign_report(
         counted_generations,
         ledger_snapshot=ledger_snapshot,
     )
-    outcome_metrics = _outcome_metrics(outcomes)
+    history_snapshot = _campaign_market_history_snapshot(base)
+    outcome_metrics = _outcome_metrics(
+        outcomes,
+        history_snapshot=history_snapshot,
+    )
     review_timing = decision_review_timing.build_review_timing_report(
         base,
         evaluated_at=evaluated,
@@ -845,6 +850,14 @@ def _campaign_outcomes(
     return _deduplicate_outcomes((*pending_rows, *campaign_rows))
 
 
+def _campaign_market_history_snapshot(base: Path) -> dict[str, Any]:
+    return market_observation_campaign_snapshots.campaign_market_history_snapshot(
+        base,
+        history_namespace=market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE,
+        filename=HISTORY_FILENAME,
+    )
+
+
 def _deduplicate_outcomes(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     selected: dict[str, dict[str, Any]] = {}
     for index, source in enumerate(rows):
@@ -865,45 +878,16 @@ def _deduplicate_outcomes(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, A
     return [selected[key] for key in sorted(selected)]
 
 
-def _outcome_metrics(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    materialized = list(rows)
-    counts: Counter[str] = Counter(_outcome_state(row) for row in materialized)
-    refresh_errors: Counter[str] = Counter()
-    for row in materialized:
-        errors = row.get("campaign_outcome_refresh_errors")
-        if isinstance(errors, (list, tuple)):
-            refresh_errors.update(
-                _text(value) for value in errors if _text(value)
-            )
-    has_ledger = any(row.get("campaign_outcome_ledger") is True for row in materialized)
-    has_candidate_base = any(
-        row.get("campaign_outcome_source") == "canonical_candidate_pending_base"
-        for row in materialized
+def _outcome_metrics(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    history_snapshot: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return market_observation_campaign_outcome_gaps.build_outcome_metrics(
+        rows,
+        history_snapshot=history_snapshot,
+        outcome_state=_outcome_state,
     )
-    source = (
-        "canonical_candidate_pending_base_plus_campaign_ledger"
-        if has_ledger and has_candidate_base
-        else "campaign_outcome_ledger"
-        if has_ledger
-        else "canonical_candidate_pending_base"
-    )
-    return {
-        "total": len(materialized),
-        # Keep the v2 report's existing headline keys while exposing the exact
-        # primary-horizon states in ``status_counts`` and dedicated fields.
-        "pending": counts["not_due"],
-        "matured": counts["matured"],
-        "missing_data": counts["due_missing_price"],
-        "not_due": counts["not_due"],
-        "due_missing_price": counts["due_missing_price"],
-        "other": counts["other"],
-        "status_counts": dict(sorted(counts.items())),
-        "source": source,
-        "refresh_build_error_count": sum(refresh_errors.values()),
-        "refresh_build_error_counts": dict(sorted(refresh_errors.items())),
-        "human_feedback_optional": True,
-        "automatic_threshold_changes": False,
-    }
 
 
 def _outcome_state(row: Mapping[str, Any]) -> str:
