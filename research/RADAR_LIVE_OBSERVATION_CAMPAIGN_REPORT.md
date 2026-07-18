@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T02:49:46.417202+00:00` from local artifacts only.
+Generated at `2026-07-18T02:58:48.819679+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -170,7 +170,7 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 10 counted real/no-send cycles and 3 canonical ideas; 1 outcome is pending and 1 are matured. There are 2 provider failures and 1 blocked/preflight attempts. Baseline status is warming with 0/34 warm assets. Pointer history contains 7 bound generations and current authority is radar_market_no_send_20260718t024737179194z_ec091813d359. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 10 counted real/no-send cycles and 3 canonical ideas; 1 outcome is pending and 1 outcome is matured. Provider history contains 2 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 0/34 warm assets. Pointer history contains 7 bound generations and current authority is radar_market_no_send_20260718t024737179194z_ec091813d359. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.

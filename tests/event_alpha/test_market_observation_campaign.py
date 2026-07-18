@@ -377,6 +377,15 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
         "radar_market_no_send_a"
     )
     assert conclusion["current_authority"]["exact_operator_binding"] is True
+    assert conclusion["spread_provider_selection"] == (
+        "selected_bybit_usdt_linear_perpetuals"
+    )
+    assert conclusion["spread_evidence_status"] == (
+        "awaiting_authorized_immutable_capture"
+    )
+    assert conclusion["spread_readiness_command"] == (
+        "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
+    )
     assert conclusion["data_quality_limitation_categories"] == [
         "execution_quality_spread",
         "proxy_market_features",
@@ -850,6 +859,8 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
         first_markdown.lower()
     )
     assert b"spread-provider selection remains deferred" not in first_markdown.lower()
+    assert b"3 outcomes are pending and 0 outcomes are matured" in first_markdown
+    assert b"1 provider failure and 1 blocked/preflight attempt" in first_markdown
     assert b"Duplicate observations: `0`" in first_markdown
     assert b"Conflicting duplicate observations: `0`" in first_markdown
 

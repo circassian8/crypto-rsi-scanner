@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close campaign conclusion grammar and selection state · Codex
+**Why:** The fresh campaign report's detailed limitation was correct, but its
+summary still rendered singular counts as “1 are matured” / “1 attempts,” and a
+hidden structured conclusion field still labeled spread-provider selection as
+deferred.
+**Changes:**
+- Added deterministic singular/plural outcome and attempt phrases so zero, one,
+  and multiple counts remain grammatical without changing any measurement.
+- Made the structured campaign conclusion agree with the detailed limitation:
+  Bybit USDT-linear perpetuals are selected, immutable execution evidence is
+  still awaiting a separately authorized capture, and the exact no-call
+  readiness command is explicit.
+- Regenerated the current local-artifact campaign Markdown/JSON; no historical
+  empirical bundle or immutable generation was rewritten.
+**Verify:** 23 focused campaign/attempt tests and compileall passed; the current
+report renders “1 outcome is pending and 1 outcome is matured” plus “1
+blocked/preflight attempt”; campaign generation made zero provider calls;
+architecture cleanliness and `git diff --check` passed.
+**Notes/risks:** This is operator-copy and structured-status coherence only. No
+provider call, authorization change, route, score, threshold, outcome, authority,
+send, trade, order, paper trade, RSI write, or fade trigger changed.
+
 ## 2026-07-18 — Restore fresh Radar authority and align execution truth · Codex
 **Why:** The campaign was cadence-eligible but its dashboard pointer had expired,
 and the campaign report still described execution-venue selection as pending

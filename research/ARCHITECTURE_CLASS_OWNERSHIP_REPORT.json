@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 9798,
+  "function_count": 9800,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-18T02:51:02.121896+00:00",
+  "generated_at": "2026-07-18T02:59:31.168447+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3038,6 +3038,13 @@
       "status": "accepted_near_threshold"
     },
     {
+      "line_count": 1422,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1411,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3047,13 +3054,6 @@
     {
       "line_count": 1410,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1407,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3617,6 +3617,14 @@
         },
         {
           "accepted": true,
+          "line_count": 1422,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1411,
           "path": "crypto_rsi_scanner/project_health/architecture_report.py",
           "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
@@ -3629,14 +3637,6 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
           "reason": "Pure descriptive episode analysis keeps fixed cohort, cost, monotonicity, operator-burden, and failure classification semantics together under one frozen protocol.",
           "revisit_condition": "Split when the analysis schema changes or another cohort family is added, using digest-stable replay fixtures before moving helpers.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1407,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
           "threshold": 1200
         },
         {
@@ -3837,6 +3837,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1422,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1411,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
@@ -3844,11 +3849,6 @@
       {
         "line_count": 1410,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1407,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
@@ -4001,6 +4001,14 @@
           },
           {
             "accepted": true,
+            "line_count": 1422,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1411,
             "path": "crypto_rsi_scanner/project_health/architecture_report.py",
             "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
@@ -4013,14 +4021,6 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
             "reason": "Pure descriptive episode analysis keeps fixed cohort, cost, monotonicity, operator-burden, and failure classification semantics together under one frozen protocol.",
             "revisit_condition": "Split when the analysis schema changes or another cohort family is added, using digest-stable replay fixtures before moving helpers.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1407,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
             "threshold": 1200
           },
           {

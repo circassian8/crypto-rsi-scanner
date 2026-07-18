@@ -1026,6 +1026,14 @@ def _campaign_status(metrics: Mapping[str, Any], baseline: Mapping[str, Any]) ->
     return "observing_warm_baseline" if status == "warm" else f"in_progress_baseline_{status}"
 
 
+def _count_phrase(count: int, singular: str, plural: str | None = None) -> str:
+    return f"{count} {singular if count == 1 else plural or singular + 's'}"
+
+
+def _outcome_phrase(count: int, state: str) -> str:
+    return f"{_count_phrase(count, 'outcome')} {'is' if count == 1 else 'are'} {state}"
+
+
 def _campaign_conclusion(
     *,
     status: str,
@@ -1064,13 +1072,16 @@ def _campaign_conclusion(
         if pointer_target is not None
         else "no pointer target or current authority is available"
     )
+    pending_count = _int(metrics.get("pending_outcomes"))
+    matured_count = _int(metrics.get("matured_outcomes"))
     summary = (
         f"Decision Radar campaign v2 has {_int(metrics.get('real_cycles'))} counted real/no-send "
         f"cycles and {_int(metrics.get('real_candidates'))} canonical {'idea' if _int(metrics.get('real_candidates')) == 1 else 'ideas'}; "
-        f"{_int(metrics.get('pending_outcomes'))} {'outcome is' if _int(metrics.get('pending_outcomes')) == 1 else 'outcomes are'} pending and "
-        f"{_int(metrics.get('matured_outcomes'))} are matured. "
-        f"There are {len(provider_failed)} provider failures and {len(blocked)} blocked/preflight "
-        f"attempts. Baseline status is {_text(baseline.get('baseline_status')) or 'unknown'} with "
+        f"{_outcome_phrase(pending_count, 'pending')} and "
+        f"{_outcome_phrase(matured_count, 'matured')}. "
+        f"Provider history contains {_count_phrase(len(provider_failed), 'provider failure')} and "
+        f"{_count_phrase(len(blocked), 'blocked/preflight attempt')}. Baseline status is "
+        f"{_text(baseline.get('baseline_status')) or 'unknown'} with "
         f"{_int(baseline.get('baseline_warm_asset_count'))}/{_int(baseline.get('baseline_asset_count'))} "
         f"warm assets. Pointer history contains {len(pointer_history)} bound {'generation' if len(pointer_history) == 1 else 'generations'} and {authority_summary}. Data-quality limitation "
         f"categories are {', '.join(categories) or 'none'}; highest-value missing input is {highest}."
@@ -1090,7 +1101,11 @@ def _campaign_conclusion(
         "pointer_target": pointer_target,
         "data_quality_limitation_categories": categories,
         "highest_value_missing_input_category": highest,
-        "spread_provider_selection": "deferred_pending_operator_execution_venue",
+        "spread_provider_selection": "selected_bybit_usdt_linear_perpetuals",
+        "spread_evidence_status": "awaiting_authorized_immutable_capture",
+        "spread_readiness_command": (
+            "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
+        ),
         "research_only": True,
         "no_trade_recommendation": True,
     }
