@@ -289,6 +289,11 @@ may be added later when a suitable environment already exists.
   prepared/disabled until `CONFIRM=1 make radar-daily-ops-install`; confirmed
   uninstall removes only the exact owned service. Never embed authorization or
   credentials in its plist.
+  Provider-readiness `live_authorization_status` is typed secret-safe metadata,
+  not a credential: only `absent`, `missing_configuration`, `not_defined`,
+  `not_required`, and `present` are valid. Do not blanket-exempt fields that
+  contain `authorization` from secret scanning; any other value in this status
+  field must remain both an enum error and an unredacted-secret blocker.
 - **Event Alpha evidence-cycle readiness:**
   `make event-alpha-evidence-cycle-readiness PROFILE=notify_llm_quality
   ARTIFACT_NAMESPACE=<namespace>` is read-only, no-network, and no-write. It

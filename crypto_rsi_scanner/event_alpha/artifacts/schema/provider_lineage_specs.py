@@ -40,6 +40,12 @@ def provider_control_schemas(
                 "provider": "str", "configured": "bool", "live_call_allowed": "bool",
                 "fixture_input_configured": "bool", "live_rehearsal_eligible": "bool",
             },
+            enums={
+                "live_authorization_status": (
+                    "absent", "missing_configuration", "not_defined",
+                    "not_required", "present",
+                ),
+            },
             safety=("live_call_allowed", "no_send_rehearsal", *common_safety),
             paths=("request_ledger_path",),
             lineage=common_lineage,

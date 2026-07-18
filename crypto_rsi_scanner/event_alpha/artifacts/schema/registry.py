@@ -17,6 +17,7 @@ from . import measurement as measurement_specs
 from . import outcome_eligibility as outcome_eligibility_specs
 from . import operator_state as operator_state_specs, provider_lineage_specs
 from .registry_mappings import FILENAME_TO_SCHEMA_ID, ROW_TYPE_TO_SCHEMA_ID
+from .secret_metadata import is_safe_secret_metadata_status
 from .. import json_lines as artifact_json_lines
 EVENT_ALPHA_ARTIFACT_SCHEMA_VERSION = "event_alpha_schema_v1"
 ALLOWED_OPPORTUNITY_TYPES = (
@@ -190,8 +191,6 @@ SECRET_FIELD_FRAGMENTS = (
     "private_key",
     "telegram_bot_token",
 )
-
-
 def _schema(
     schema_id: str,
     *,
@@ -918,6 +917,8 @@ def validate_safety_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> li
 def validate_secret_redaction_fields(row: Mapping[str, Any], schema: ArtifactSchema) -> list[str]:
     out: list[str] = []
     for field_name, value in _iter_secret_like_fields(row, schema):
+        if is_safe_secret_metadata_status(field_name, value):
+            continue
         if _secret_value_is_safe(value):
             continue
         out.append(f"secret_field_unredacted:{field_name}")

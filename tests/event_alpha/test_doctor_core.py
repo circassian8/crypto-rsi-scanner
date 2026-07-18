@@ -341,6 +341,7 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert clean.live_provider_readiness_configured_missing_env == 0
         assert clean.live_provider_readiness_fixture_live_state_conflict == 0
         assert clean.live_provider_readiness_secret_leak == 0
+        assert clean.schema_validation_errors == 0
 
         payload["live_calls_allowed"] = True
         payload["providers"][0]["live_call_allowed"] = True

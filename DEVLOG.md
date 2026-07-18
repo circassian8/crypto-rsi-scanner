@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Keep authorization status metadata secret-safe · Codex
+**Why:** The eligible 16:12 UTC no-send cycle completed one successful bounded
+CoinGecko request, then correctly stopped before publication because strict
+doctor reported 11 secret errors. Every error was a false positive on the new
+typed `live_authorization_status` metadata, not leaked credential material.
+**Changes:**
+- Added a closed safe-value contract for `live_authorization_status` and the
+  matching provider-readiness schema enum. Only `absent`,
+  `missing_configuration`, `not_defined`, `not_required`, and `present` pass;
+  an arbitrary token still fails both enum and secret-redaction validation.
+- Added schema and strict live-provider-readiness regressions so the safe rows
+  are clean and a credential-like value still blocks. The generic
+  `authorization` secret fragment remains active; there is no broad status or
+  field-name exemption.
+- Rebuilt campaign truth after the terminal attempt. The successful observations
+  count toward research warm-up, bringing the campaign to 18 real cycles / 540
+  retained / 510 baseline-counted / 30 too-close, while the failed namespace
+  remains unpublished and non-authoritative. The previous strict-clean pointer
+  remains authority, and no retry is permitted before 17:12:24 UTC.
+- Updated the durable decision, roadmap, and working agreement. No provider
+  authorization, second call, send, trade, order, paper trade, normal RSI write,
+  Event Alpha fade trigger, score, route, threshold, or historical row rewrite
+  was introduced.
+**Verify:** All 138 focused schema, strict-doctor, Daily Operations, market-no-
+send, market-surface, and source-coverage tests pass. The exact failed namespace
+now validates 51 schema rows with zero errors and strict-doctors with zero
+blockers/warnings. Python compileall, architecture cleanliness (zero new
+violations), and `git diff --check` pass. Campaign truth rebuild succeeds with
+zero provider calls. Dashboard authority revalidation/readiness remain green on
+the prior namespace at revision 12 and pointer SHA-256 `38a1fd14ede9...`.
+**Notes/risks:** A clean post-fix doctor does not repair the terminal failure or
+create receipts. That generation must never be retroactively published; the
+next cadence-eligible cycle will create a new namespace. Full `make verify` was
+also attempted: its standalone pass reached 1,393/1,397 before four unrelated
+failures—one sandbox-denied loopback bind, one pre-existing Polymarket fixture
+expectation, and two pre-existing architecture-report assertions tied to the
+already-unresolved large Bybit preflight module. The status fix adds no new
+architecture violation; these exposed follow-ups are being handled separately.
+
 ## 2026-07-18 — Restore frozen Protocol-v2 audit bytes and split progress · Codex
 **Why:** The first current-progress implementation preserved the inner readiness
 object hash but changed two files that the empirical export policy fingerprints

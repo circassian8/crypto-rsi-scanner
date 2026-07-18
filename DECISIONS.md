@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Type authorization status metadata without weakening secret scans
+**Status:** accepted
+**Decision:** Treat `live_authorization_status` as a closed metadata field only
+when its value is exactly `absent`, `missing_configuration`, `not_defined`,
+`not_required`, or `present`. Keep the generic `authorization` secret-name
+fragment active. Any other value in the status field must fail both its schema
+enum and secret-redaction validation; never exempt all `*_status` or
+authorization-named fields from secret scanning.
+**Why:** A genuine no-send cycle produced 11 correct readiness rows but strict
+doctor mistook their `absent`/`not_defined` status values for credentials. A
+blanket field-name exemption would hide a real token accidentally written into
+the same field. Closed value typing distinguishes operator state from secret
+material without weakening the fail-closed boundary.
+**Revisit when:** A new authorization metadata state is required. Add it only
+with a documented semantic, an enum update, safe-value validation, and tests
+that still reject an arbitrary token in that field.
+
 ## 2026-07-18 - Separate current Protocol-v2 progress from its frozen requirements
 **Status:** accepted
 **Decision:** Keep the canonical 2026-07-16 Protocol-v2 requirements object at
