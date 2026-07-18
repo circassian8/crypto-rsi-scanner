@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Advance the Radar baseline with a twelfth live cycle · Codex
+**Why:** The hourly campaign was already authorized and cadence-eligible, while
+its point-in-time temporal baseline still needs independent, properly spaced
+observations before Protocol v2 can be sealed or any algorithm can be tuned.
+**Changes:**
+- Ran exactly one bounded CoinGecko no-send Daily Operations cycle without a
+  retry. It published immutable revision-12 authority
+  `radar_market_no_send_20260718t054122756225z_8f5918a66699` and restarted the
+  exact owned loopback dashboard.
+- Regenerated terminal campaign truth at 12 real cycles, 360 retained
+  observations, 330 baseline-counted observations, 30 too-close observations,
+  five historical/current Decision ideas, one matured outcome, and three
+  pending outcomes.
+- Advanced the exact current top-30 universe to 30/30 present: all 30 assets now
+  have warming 1h evidence, all 30 remain cold for 4h evidence, and no asset is
+  globally warm. The next eligible observation is 2026-07-18 06:41:22 UTC.
+**Verify:** Provider readiness was authorized/eligible immediately before the
+single attempt; the request succeeded. Exact-generation strict doctor passed
+with zero blockers/warnings, dashboard readiness returned the same namespace,
+run, and revision with zero writes, and campaign artifacts reconcile the new
+authority and counts.
+**Notes/risks:** The cycle made one already-authorized public market request and
+zero sends, trades, orders, paper trades, normal RSI writes, or triggered-fade
+rows. Scheduler installation remains disabled. Spread coverage remains zero;
+no Bybit call, authorization mutation, score/route/threshold change, or
+Protocol-v2 evidence admission occurred.
+
 ## 2026-07-18 — Separate current and retained baseline maturity · Codex
 **Why:** The campaign's 34 retained assets include four assets outside the exact
 current top-30 authority. A single aggregate could therefore stay warming after
