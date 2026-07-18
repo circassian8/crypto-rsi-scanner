@@ -27,10 +27,14 @@ request per unresolved window, no retries, redirects, ambient proxy, range
 expansion, interpolation, or alternate source. The first finite positive USD
 price inside the original window may become a future outcome-completion input;
 `no_results` remains valid evidence. Acquisition time and historical market time
-must stay separate. Recovery never enters market-observation history, temporal
-warmup, candidate generation, calibration, or Protocol-v2 evidence. No outcome
-may be mutated until exact response bytes have an immutable capture and a
-separately confirmed ledger-only application proves the baseline is byte-
+must stay separate. An authorized collection intended for use must be sealed as
+one immutable exact-response namespace with its request, raw response, rederived
+result, campaign/source bindings, manifest, completion receipt, and rollback-
+protected pointer. Status and review export must fully rederive that pointer
+target before accepting it. Recovery never enters market-observation history,
+temporal warmup, candidate generation, calibration, or Protocol-v2 evidence.
+No outcome may be mutated until exact response bytes have an immutable capture
+and a separately confirmed ledger-only application proves the baseline is byte-
 identical.
 **Why:** A genuine historical series can close an operational outcome gap, but
 post-hoc acquisition is not point-in-time campaign evidence. A distinct

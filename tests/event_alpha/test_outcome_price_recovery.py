@@ -304,9 +304,9 @@ def test_readiness_becomes_ready_without_call_or_write(tmp_path):
     assert first["historical_recovery_request_count"] == 1
     assert first["provider_call_planned"] is True
     assert first["provider_call_attempted"] is False
-    assert first["next_safe_command"] == recovery.COLLECT_COMMAND
+    assert first["next_safe_command"] == recovery.CAPTURE_COMMAND
     assert first["plan_digest"] == second["plan_digest"]
-    assert first["immutable_capture_implemented"] is False
+    assert first["immutable_capture_implemented"] is True
     assert first["calibration_eligible"] is False
 
 
@@ -428,7 +428,7 @@ def test_request_projection_type_drift_fails_with_closed_error():
         recovery.OutcomePriceRecoveryError,
         match="recovery_request_projection_invalid",
     ):
-        recovery._request_from_dict(projected)
+        recovery.recovery_request_from_values(projected)
 
 
 def test_collect_fails_closed_when_plan_changes_after_response(tmp_path):
@@ -484,12 +484,25 @@ def test_make_targets_keep_readiness_separate_from_confirmed_collection():
     readiness = dry_run("radar-outcome-price-recovery-readiness")
     collection = dry_run("radar-outcome-price-recovery-collect")
     confirmed = dry_run("radar-outcome-price-recovery-collect", confirm=True)
+    capture_command = dry_run("radar-outcome-price-recovery-capture")
+    confirmed_capture = dry_run(
+        "radar-outcome-price-recovery-capture",
+        confirm=True,
+    )
+    status = dry_run("radar-outcome-price-recovery-status")
 
     assert "outcome_price_recovery readiness" in readiness
     assert "outcome_price_recovery collect" not in readiness
     assert "outcome_price_recovery collect" in collection
     assert "--confirm" not in collection
     assert confirmed.count("--confirm") == 1
+    assert "outcome_price_recovery_capture capture" in capture_command
+    assert "--confirm" not in capture_command
+    assert confirmed_capture.count("--confirm") == 1
+    assert "outcome_price_recovery_capture status" in status
+    assert "--confirm" not in status
     assert recovery.LIVE_AUTH_ENV not in readiness
     assert f"{recovery.LIVE_AUTH_ENV}=1" not in collection
-    assert "place-order" not in (readiness + collection + confirmed).casefold()
+    assert "place-order" not in (
+        readiness + collection + confirmed + capture_command + confirmed_capture + status
+    ).casefold()

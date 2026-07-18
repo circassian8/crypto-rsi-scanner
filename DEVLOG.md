@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal immutable outcome-price recovery evidence · Codex
+**Why:** The guarded historical query contract could validate a response only
+in process memory. A recovered price cannot be considered for an outcome until
+its exact bytes and campaign lineage survive independent revalidation.
+**Changes:**
+- Added a separately confirmed immutable capture command and read-only status.
+  Each capture binds the exact request, accepted CoinGecko response bytes,
+  response/acquisition clocks, rederived result, current campaign pointer,
+  market-history and outcome-ledger snapshots, exact target row, and immutable
+  candidate/Core generation fingerprints.
+- Added descriptor-anchored immutable files, a closed manifest, completion
+  receipt, rollback-protected latest pointer, exact namespace inventory, and
+  full result rederivation. Raw-response, descriptor, role, projection, pointer,
+  symlink, unmanifested-file, source-identity, plan, and rollback drift fail
+  closed; honest `no_results` remains a valid capture.
+- Kept capture fully detached from campaign application: no outcome or baseline
+  row is written, acquisition time remains distinct from historical market
+  time, and capture is explicitly excluded from calibration and Protocol-v2
+  evidence. The real store remains empty because the separate recovery
+  authorization is absent.
+- Added fixed review-export selection for only the latest fully revalidated
+  recovery capture and updated the operator commands, policy, North Star work
+  records, and recovery contract documentation.
+**Verify:** 46 focused recovery/capture/export-security tests passed; compileall,
+`git diff --check`, and architecture cleanliness passed with zero new size or
+function violations. Real no-call status reports no pointer; real readiness
+still planned one DEXE request and made zero calls/writes. A read-only source
+check reconciled revision-12 authority, history SHA `1acaf6a303b3...`, outcome
+ledger SHA `9e69f48441a8...`, the exact target row, and source namespace.
+**Notes/risks:** No live recovery or authorization mutation occurred. The next
+slice is a separately confirmed ledger-only application with rollback and a
+byte-identical market-history proof; capture alone cannot complete an outcome.
+
 ## 2026-07-18 — Close diagnostic historical outcome-price recovery · Codex
 **Why:** The campaign proves that retained observations cannot close DEXE's
 overdue 24h outcome. A genuine historical query needs its own provenance and

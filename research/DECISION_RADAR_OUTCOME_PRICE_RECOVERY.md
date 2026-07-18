@@ -1,7 +1,7 @@
 # Decision Radar outcome-price recovery v1
 
-Status: diagnostic exact-response contract implemented; immutable capture and
-outcome application are not implemented.
+Status: diagnostic exact-response contract and immutable capture implemented;
+outcome application is not implemented.
 
 This path exists only to close genuine primary-horizon outcome gaps. It is not
 a second market-observation campaign and must never warm temporal baselines,
@@ -44,9 +44,10 @@ No retry, redirect, proxy, alternate host, or range expansion is allowed.
 
 ## Evidence semantics
 
-A diagnostic response must:
+A diagnostic response and immutable capture must:
 
-- retain exact response bytes in memory and fingerprint them;
+- retain exact response bytes in memory, then persist those exact bytes only
+  through the separately confirmed immutable capture command;
 - preserve request and response clocks separately from the historical market
   timestamp;
 - select the first valid positive USD price at or after `due_at` and at or
@@ -57,6 +58,10 @@ A diagnostic response must:
   prices, host drift, request drift, or plan drift after the response;
 - remain `point_in_time_collection_at_market_time=false` because acquisition
   occurs after the historical market time;
+- bind the canonical campaign pointer, exact market-history and outcome-ledger
+  snapshots, target outcome row, and immutable candidate/Core generation;
+- publish only through a manifest, completion receipt, and rollback-protected
+  latest pointer that rederive every result from the exact response;
 - remain excluded from baseline history, campaign observation counts,
   calibration, and Protocol-v2 evidence until a sealed annex says otherwise.
 
@@ -68,25 +73,35 @@ Readiness makes no provider call and writes nothing:
 make radar-outcome-price-recovery-readiness PYTHON=.venv/bin/python
 ```
 
-Diagnostic collection requires both the existing general CoinGecko live flag
-and a separate, already-present recovery authorization:
+Diagnostic collection and immutable capture require both the existing general
+CoinGecko live flag and a separate, already-present recovery authorization:
 
 ```text
 RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1
 RSI_DECISION_RADAR_OUTCOME_PRICE_RECOVERY_LIVE=1
 CONFIRM=1 make radar-outcome-price-recovery-collect PYTHON=.venv/bin/python
+CONFIRM=1 make radar-outcome-price-recovery-capture PYTHON=.venv/bin/python
+```
+
+The preferred writing command is `radar-outcome-price-recovery-capture`; it
+makes the same bounded provider attempt and seals a successful exact response.
+Read-only status makes no provider call or write:
+
+```text
+make radar-outcome-price-recovery-status PYTHON=.venv/bin/python
 ```
 
 Codex must never create or mutate either authorization. The diagnostic
-collector performs no artifact write, outcome mutation, baseline insertion,
-send, trade, paper trade, RSI write, or `TRIGGERED_FADE` creation.
+collector performs no artifact write. The capture command writes only its
+immutable response namespace and latest pointer; neither command performs an
+outcome mutation, baseline insertion, send, trade, paper trade, RSI write, or
+`TRIGGERED_FADE` creation. The standard review export selects and fully
+revalidates only the latest pointed capture.
 
 ## Remaining work
 
-Before a recovered price can complete an outcome, add a descriptor-anchored
-immutable capture containing the exact response, request plan, source outcome
-and history bindings, manifest, completion receipt, and rollback-protected
-pointer. Then add a separate confirmed application step that updates only the
-campaign outcome ledger, preserves historical-recovery provenance, and leaves
-the market-history baseline byte-identical. Protocol-v2 eligibility remains a
-later annex decision.
+Before a recovered price can complete an outcome, add a separate confirmed
+application step that revalidates the exact capture and current target, updates
+only the campaign outcome ledger, preserves historical-recovery provenance,
+and proves the market-history baseline byte-identical before and after.
+Protocol-v2 eligibility remains a later annex decision.

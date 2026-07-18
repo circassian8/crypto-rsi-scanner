@@ -117,6 +117,7 @@ PROJECT_CANONICAL_ROOT_FILES = (
     "event_radar_daily_operations_current_status.json",
     "event_radar_daily_operations_cycles.jsonl",
     "event_radar_daily_operations_state.json",
+    "event_decision_radar_outcome_price_recovery_latest.json",
     "radar_bybit_execution_quality_latest.json",
     "radar_bybit_derivatives_context_latest.json",
     "radar_bybit_intraday_latest.json",
@@ -147,6 +148,10 @@ PROJECT_DYNAMIC_NAMESPACE_SELECTORS = (
     {
         "kind": "latest_bybit_derivatives_namespace",
         "path": "radar_bybit_derivatives_context_latest.json",
+    },
+    {
+        "kind": "latest_outcome_price_recovery_namespace",
+        "path": "event_decision_radar_outcome_price_recovery_latest.json",
     },
     {
         "kind": "review_timing_source_namespaces",
@@ -1677,6 +1682,29 @@ def _latest_bybit_derivatives_namespace(
     }
 
 
+def _latest_outcome_price_recovery_namespace(
+    payload: bytes,
+) -> tuple[str, dict[str, object]]:
+    from crypto_rsi_scanner.event_alpha.operations.outcome_price_recovery_capture import (
+        OutcomePriceRecoveryError,
+        validate_outcome_price_recovery_pointer_bytes,
+    )
+
+    try:
+        pointer = validate_outcome_price_recovery_pointer_bytes(payload)
+    except OutcomePriceRecoveryError as exc:
+        raise ValueError("latest outcome-price recovery pointer is invalid") from exc
+    namespace = str(pointer["artifact_namespace"])
+    return namespace, {
+        "artifact_namespace": namespace,
+        "capture_id": pointer["capture_id"],
+        "request_count": pointer["request_count"],
+        "qualifying_price_count": pointer["qualifying_price_count"],
+        "protocol_v2_evidence_eligible": False,
+        "status": "selected",
+    }
+
+
 def _project_artifact_export_plan(
     root: Path,
     *,
@@ -1755,6 +1783,7 @@ def _project_artifact_export_plan(
         "latest_bybit_execution_quality_namespace": "latest_bybit_execution_quality_capture",
         "latest_bybit_intraday_namespace": "latest_bybit_intraday_capture",
         "latest_bybit_derivatives_namespace": "latest_bybit_derivatives_capture",
+        "latest_outcome_price_recovery_namespace": "latest_outcome_price_recovery_capture",
         "review_timing_source_namespaces": "human_review_timing_source_generation",
     }
     selector_loaders = {
@@ -1763,6 +1792,7 @@ def _project_artifact_export_plan(
         "latest_bybit_execution_quality_namespace": _latest_bybit_execution_quality_namespace,
         "latest_bybit_intraday_namespace": _latest_bybit_intraday_namespace,
         "latest_bybit_derivatives_namespace": _latest_bybit_derivatives_namespace,
+        "latest_outcome_price_recovery_namespace": _latest_outcome_price_recovery_namespace,
     }
     for selector in policy["dynamic_namespace_selectors"]:
         kind = str(selector["kind"])
@@ -1883,6 +1913,24 @@ def _project_artifact_export_plan(
                 raise ValueError("latest Bybit derivatives capture is invalid") from exc
             if validated_capture.get("artifact_namespace") != namespace:
                 raise ValueError("latest Bybit derivatives pointer/capture mismatch")
+        elif kind == "latest_outcome_price_recovery_namespace":
+            from crypto_rsi_scanner.event_alpha.operations.outcome_price_recovery_capture import (
+                OutcomePriceRecoveryError,
+                load_latest_outcome_price_recovery_capture,
+            )
+
+            try:
+                validated_capture = load_latest_outcome_price_recovery_capture(
+                    artifact_root
+                )
+            except OutcomePriceRecoveryError as exc:
+                raise ValueError(
+                    "latest outcome-price recovery capture is invalid"
+                ) from exc
+            if validated_capture.get("artifact_namespace") != namespace:
+                raise ValueError(
+                    "latest outcome-price recovery pointer/capture mismatch"
+                )
         directory = artifact_root / namespace
         directory_inventory = _strict_regular_files_under(
             directory,

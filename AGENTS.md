@@ -550,10 +550,16 @@ may be added later when a suitable environment already exists.
   redirect, ambient proxy, or window expansion. A response is either an honest
   `no_results` or the first finite positive USD price inside the original
   window, bound to the exact raw-response hash and separate acquisition and
-  historical-market clocks. The diagnostic path does not persist or apply the
-  response and never writes campaign baselines, candidates, scores, calibration
-  evidence, or Protocol-v2 evidence. Do not add an application step until an
-  immutable capture artifact and separately confirmed ledger-only mutation are
+  historical-market clocks. Prefer the separately confirmed
+  `radar-outcome-price-recovery-capture` command when collection is authorized:
+  it seals exact request/response/result bytes, campaign pointer, history and
+  outcome-ledger digests, target outcome, candidate/Core fingerprints, manifest,
+  receipt, and rollback-protected latest pointer. Read-only
+  `radar-outcome-price-recovery-status` fully rederives the latest capture; the
+  fixed review export selects only that validated pointer target. Neither the
+  diagnostic nor capture path applies a response or writes campaign baselines,
+  candidates, scores, calibration evidence, or Protocol-v2 evidence. Do not add
+  an application step until a separately confirmed ledger-only mutation is
   implemented and shown to leave the temporal baseline byte-identical.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.

@@ -52,6 +52,9 @@ READINESS_COMMAND = (
 COLLECT_COMMAND = (
     "CONFIRM=1 make radar-outcome-price-recovery-collect PYTHON=.venv/bin/python"
 )
+CAPTURE_COMMAND = (
+    "CONFIRM=1 make radar-outcome-price-recovery-capture PYTHON=.venv/bin/python"
+)
 MAX_RECOVERY_REQUESTS = 20
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 MAX_PRICE_POINTS = 10_000
@@ -248,14 +251,14 @@ def build_outcome_price_recovery_readiness(
         "shared_provider_state": _public_provider_state(provider_state),
         "exact_response_input_contract_implemented": True,
         "diagnostic_collection_implemented": True,
-        "immutable_capture_implemented": False,
+        "immutable_capture_implemented": True,
         "baseline_history_mutated": False,
         "campaign_outcomes_mutated": False,
         "calibration_eligible": False,
         "protocol_v2_annex_bound": False,
         "protocol_v2_evidence_eligible": False,
         "reasons": reasons,
-        "next_safe_command": COLLECT_COMMAND if ready else READINESS_COMMAND,
+        "next_safe_command": CAPTURE_COMMAND if ready else READINESS_COMMAND,
         "operator_action_required": (
             f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_then_rerun_readiness"
             if only_recovery_auth_missing
@@ -382,6 +385,57 @@ def collect_outcome_price_recovery(
 ) -> dict[str, Any]:
     """Collect exact responses diagnostically without retries or persistence."""
 
+    collected = collect_outcome_price_recovery_capture_inputs(
+        artifact_base_dir=artifact_base_dir,
+        confirm=confirm,
+        environ=environ,
+        timeout_seconds=timeout_seconds,
+        fixture_dir=fixture_dir,
+        report_builder=report_builder,
+        provider_state_assessor=provider_state_assessor,
+        fetch_exact=fetch_exact,
+        clock=clock,
+    )
+    results = collected["results"]
+    request_count = collected["provider_request_count"]
+    readiness = collected["readiness"]
+    return {
+        "contract_version": CONTRACT_VERSION,
+        "row_type": "decision_radar_outcome_price_recovery_collection",
+        "status": "complete",
+        "plan_digest": readiness["plan_digest"],
+        "provider": "coingecko",
+        "provider_request_count": request_count,
+        "provider_retry_count": 0,
+        "results": [dict(row) for row in results],
+        "qualifying_price_count": sum(
+            row.get("qualifying_price_found") is True for row in results
+        ),
+        "artifact_persisted": False,
+        "immutable_capture_implemented": False,
+        "baseline_history_mutated": False,
+        "campaign_outcomes_mutated": False,
+        "authorization_mutated": False,
+        **_safety(writes_performed=False),
+    }
+
+
+def collect_outcome_price_recovery_capture_inputs(
+    *,
+    artifact_base_dir: str | Path,
+    confirm: bool,
+    environ: Mapping[str, str] | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    fixture_dir: str | Path | None | object = ...,
+    report_builder: ReportBuilder = market_observation_campaign.build_campaign_report,
+    provider_state_assessor: ProviderStateAssessor = (
+        market_no_send_campaign_provider.assess_shared_provider_state
+    ),
+    fetch_exact: FetchExact | None = None,
+    clock: Clock = lambda: datetime.now(timezone.utc),
+) -> dict[str, Any]:
+    """Return exact in-memory capture inputs after post-response revalidation."""
+
     if not confirm:
         raise OutcomePriceRecoveryError("explicit_confirmation_required")
     checked = _utc(clock())
@@ -396,16 +450,18 @@ def collect_outcome_price_recovery(
     if readiness.get("ready") is not True:
         raise OutcomePriceRecoveryError("recovery_readiness_blocked")
     requests = tuple(
-        _request_from_dict(row)
+        recovery_request_from_values(row)
         for row in readiness["historical_recovery_requests"]
     )
     fetch = fetch_exact or _fetch_exact_coingecko_response
     results: list[dict[str, Any]] = []
+    responses: list[CapturedCoinGeckoResponse] = []
     request_count = 0
     for request in requests:
         try:
             request_count += 1
             captured = fetch(request, _positive_timeout(timeout_seconds))
+            responses.append(captured)
             results.append(normalize_captured_recovery_response(request, captured))
         except OutcomePriceRecoveryError as exc:
             raise OutcomePriceRecoveryError(
@@ -432,23 +488,11 @@ def collect_outcome_price_recovery(
             request_count=request_count,
         )
     return {
-        "contract_version": CONTRACT_VERSION,
-        "row_type": "decision_radar_outcome_price_recovery_collection",
-        "status": "complete",
-        "plan_digest": readiness["plan_digest"],
-        "provider": "coingecko",
+        "readiness": readiness,
+        "requests": requests,
+        "responses": tuple(responses),
+        "results": tuple(results),
         "provider_request_count": request_count,
-        "provider_retry_count": 0,
-        "results": results,
-        "qualifying_price_count": sum(
-            row.get("qualifying_price_found") is True for row in results
-        ),
-        "artifact_persisted": False,
-        "immutable_capture_implemented": False,
-        "baseline_history_mutated": False,
-        "campaign_outcomes_mutated": False,
-        "authorization_mutated": False,
-        **_safety(writes_performed=False),
     }
 
 
@@ -531,7 +575,9 @@ def _request_from_gap(row: Mapping[str, Any]) -> OutcomePriceRecoveryRequest:
     )
 
 
-def _request_from_dict(row: Mapping[str, Any]) -> OutcomePriceRecoveryRequest:
+def recovery_request_from_values(
+    row: Mapping[str, Any],
+) -> OutcomePriceRecoveryRequest:
     query = row.get("query")
     if not isinstance(query, Mapping):
         raise OutcomePriceRecoveryError("recovery_request_projection_invalid")
@@ -817,11 +863,14 @@ if __name__ == "__main__":
 
 __all__ = (
     "CapturedCoinGeckoResponse",
+    "CAPTURE_COMMAND",
     "OutcomePriceRecoveryError",
     "OutcomePriceRecoveryRequest",
     "build_outcome_price_recovery_readiness",
     "build_recovery_requests",
     "collect_outcome_price_recovery",
+    "collect_outcome_price_recovery_capture_inputs",
     "normalize_captured_recovery_response",
+    "recovery_request_from_values",
     "recovery_request_values",
 )
