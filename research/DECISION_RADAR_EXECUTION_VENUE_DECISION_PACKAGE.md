@@ -76,10 +76,16 @@ execution-quality instrument and produces one point-in-time context snapshot:
 - the latest two 1h long/short account-ratio observations.
 
 The request plan is fixed at four public GETs per instrument and is bounded to
-120 requests for the future top-30 intersection. The implemented module has no
-HTTP client, persistence, authorization mutation, credentials, notifications,
-orders, or trading path. It rejects future/misordered rows, identity/category
-drift, incomplete lineage, implausible funding/basis/returns, and the known
+120 requests for the future top-30 intersection. The offline module has no HTTP
+client. A guarded no-write adapter is implemented but inactive. Its readiness
+requires a genuine fresh execution-quality capture for exact current authority
+plus separately present `RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1`; confirmed
+collection never retries, preserves exact response bytes and request clocks in
+memory, and revalidates the capture/instrument/authority chain after the final
+response. It has no immutable persistence yet and never creates authorization,
+credentials, notifications, orders, or trading capability. It rejects
+future/misordered rows, identity/category drift, incomplete lineage,
+implausible funding/basis/returns, and the known
 `10.0`-as-fraction 100x return-unit error; stale snapshots remain explicitly
 stale instead of being promoted. Every normalized row is
 explicitly context-only, non-directional, policy-neutral, annex-unbound, and
@@ -87,6 +93,7 @@ Protocol-v2-ineligible. Run its zero-call proof with:
 
 ```sh
 make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python
+make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python
 ```
 
 The exact official contracts are [ticker](https://bybit-exchange.github.io/docs/v5/market/tickers),
@@ -96,6 +103,15 @@ and [long/short account ratio](https://bybit-exchange.github.io/docs/v5/market/l
 Coinalyze remains useful as an optional secondary Catalyst-Radar cross-check,
 but it is not the selected venue and cannot substitute for Bybit-native
 execution, funding, OI, positioning, identity, or clocks.
+
+After a genuine current execution-quality capture exists, the exact operator
+sequence is: set the separate flag only in the local ignored environment;
+rerun the no-call readiness command; run `CONFIRM=1 make
+radar-derivatives-bybit-collect PYTHON=.venv/bin/python` once; inspect stdout;
+then unset the flag. Stop on any 403, 429, region restriction, malformed
+response, or prerequisite drift. Do not retry or bypass it. This diagnostic
+collection does not publish evidence; immutable capture/publication is the
+next engineering boundary.
 
 ## Next point-in-time intraday contract
 
@@ -188,6 +204,7 @@ The safe implementation smoke is:
 ```sh
 make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
 make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python
+make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python
 make radar-intraday-bybit-smoke PYTHON=.venv/bin/python
 make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 make radar-intraday-bybit-status PYTHON=.venv/bin/python
@@ -195,7 +212,7 @@ make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 ```
 
-All seven commands perform no network call, read no credential, and have no
+All eight commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
 already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
@@ -230,7 +247,9 @@ The exact operator sequence is intentionally split:
 - The execution-quality live adapter and immutable capture contract exist but
   are inactive; no genuine capture exists and live spread remains unavailable.
 - Venue-native ticker/funding/OI/positioning normalization is fixture-proven and
-  context-only; no derivatives live adapter or immutable genuine capture exists.
+  context-only; its guarded no-write adapter exists but no immutable genuine
+  derivatives capture exists. Current readiness is blocked before the provider
+  boundary by the absent execution-quality capture and separate authorization.
 - The direct 1h/4h completed-bar offline contract exists and is fixture-proven;
   its separately authorized live boundary and immutable exact-response capture
   exist but are inactive behind the missing execution-quality proof and

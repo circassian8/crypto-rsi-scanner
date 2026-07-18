@@ -222,6 +222,31 @@ def build_bybit_derivatives_request_plan(
 ) -> dict[str, object]:
     """Build a bounded public-GET-only plan without executing it."""
 
+    requests = build_bybit_derivatives_requests(instruments)
+    return {
+        "contract_version": CONTRACT_VERSION,
+        "venue_id": VENUE_ID,
+        "execution_mode": EXECUTION_MODE,
+        "category": BYBIT_CATEGORY,
+        "quote_asset": QUOTE_ASSET,
+        "requests": [request.to_dict() for request in requests],
+        "request_count": len(requests),
+        "maximum_request_count": MAX_PLANNED_REQUESTS,
+        "provider_call_authorized": False,
+        "provider_call_planned": False,
+        "provider_call_attempted": False,
+        "credentials_required": False,
+        "private_data": False,
+        "orders_available": False,
+        "research_only": True,
+    }
+
+
+def build_bybit_derivatives_requests(
+    instruments: Sequence[BybitEligibleInstrument],
+) -> tuple[BybitPublicRequest, ...]:
+    """Return the exact typed requests shared by plans and guarded collection."""
+
     if not instruments or len(instruments) > MAX_RADAR_ASSETS:
         raise BybitDerivativesContextError("derivatives_instrument_count_invalid")
     if len({row.instrument_id for row in instruments}) != len(instruments):
@@ -252,23 +277,7 @@ def build_bybit_derivatives_request_plan(
         )
     if len(requests) > MAX_PLANNED_REQUESTS:
         raise BybitDerivativesContextError("derivatives_request_bound_exceeded")
-    return {
-        "contract_version": CONTRACT_VERSION,
-        "venue_id": VENUE_ID,
-        "execution_mode": EXECUTION_MODE,
-        "category": BYBIT_CATEGORY,
-        "quote_asset": QUOTE_ASSET,
-        "requests": [request.to_dict() for request in requests],
-        "request_count": len(requests),
-        "maximum_request_count": MAX_PLANNED_REQUESTS,
-        "provider_call_authorized": False,
-        "provider_call_planned": False,
-        "provider_call_attempted": False,
-        "credentials_required": False,
-        "private_data": False,
-        "orders_available": False,
-        "research_only": True,
-    }
+    return tuple(requests)
 
 
 def _response(
@@ -595,6 +604,7 @@ __all__ = (
     "BybitDerivativesContextError",
     "BybitDerivativesContextSnapshot",
     "build_bybit_derivatives_request_plan",
+    "build_bybit_derivatives_requests",
     "main",
     "normalize_bybit_derivatives_context",
     "run_fixture_smoke",

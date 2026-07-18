@@ -185,6 +185,19 @@ unverified after the recorded 403;
 region bypass. Disable the provider boundary by unsetting the authorization
 flag.
 
+Venue-native derivatives context is a separate boundary. The offline contract
+is `make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python`; no-call
+readiness is `make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python`.
+It requires one genuine fresh execution-quality capture for the exact current
+authority and separately present
+`RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1`. Only then may `CONFIRM=1 make
+radar-derivatives-bybit-collect PYTHON=.venv/bin/python` perform exactly four
+public GETs per eligible instrument—ticker, settled funding, 1h open interest,
+and 1h account ratio—with no retry. It rechecks capture/instrument/authority
+identity after the responses and writes nothing. Exact response bytes stay in
+memory for a future immutable capture contract; no genuine derivatives capture
+or Protocol-v2 evidence exists yet. Unset the flag to close this boundary.
+
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
 Integrated runs normalize scheduled and fixture rows once and persist only

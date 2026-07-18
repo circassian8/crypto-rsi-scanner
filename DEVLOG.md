@@ -17,6 +17,48 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Guard Bybit derivatives collection behind exact prerequisites · Codex
+**Why:** The venue-native derivatives schema was fixture-proven, but genuine
+point-in-time evidence needs an explicit provider boundary that cannot outrun
+the selected execution instrument, current Radar authority, or operator
+authorization.
+**Changes:**
+- Added a separately authorized, confirmation-gated Bybit public collector for
+  exact ticker, settled-funding, 1h OI, and 1h account-ratio requests. It first
+  requires a genuine fresh execution-quality capture for exact current
+  authority, then performs four fixed-host GETs per eligible instrument with a
+  120-request absolute bound and no retries or redirects.
+- Reused the offline typed request contract as the single request source,
+  extended the existing fixed-host transport allowlist only for those four
+  exact endpoint/query shapes, preserved response/request/provider clocks and
+  lineage, and revalidated capture/instrument/authority identity after the last
+  response. A 403/429/region failure stops immediately with exact attempted-
+  request accounting.
+- Kept collection deliberately no-write. Exact response buffers remain only in
+  memory for the next immutable-capture slice; every result is context-only,
+  non-directional, Decision-policy-neutral, input-quality-ineligible,
+  annex-unbound, and Protocol-v2-ineligible. Completion-time freshness is
+  measured across the whole collection rather than inferred per request.
+- Added the no-call readiness and confirmed diagnostic collection Make targets,
+  default-off example authorization, operator/North-Star documentation, and
+  focused live-boundary/transport regressions. The architecture size gate was
+  kept strict by splitting pure observation-set projection from acquisition.
+**Verify:** 73 focused offline/live Bybit derivatives, execution-quality,
+intraday, exact-capture, fixed-host transport, confirmation, 403/no-retry, and
+post-response drift tests passed. Compileall, JSON validation, offline smoke,
+real no-call readiness, `git diff --check`, and architecture cleanliness passed
+with zero new size violations. The broader `verify-fast` pytest stage collected
+2,732 tests and had one sandbox-only local-loopback denial; its exact dashboard
+concurrency test passed outside the socket-restricted sandbox. Every recorded
+safety counter remained zero.
+**Notes/risks:** Real readiness is honestly blocked by
+`execution_quality_capture_unavailable` and
+`runtime_provider_authorization_absent`; it planned/attempted zero provider
+calls and performed zero writes. No flag was created or changed, no Bybit call
+was made, and no immutable derivatives capture exists yet. No sends, orders,
+trades, paper/RSI writes, fade triggers, campaign/pointer changes, routes,
+scores, thresholds, or GitHub-check waits occurred.
+
 ## 2026-07-18 — Advance the live baseline to fourteen clean cycles · Codex
 **Why:** The campaign was cadence-eligible again, and another genuine
 point-in-time observation was needed to warm direct temporal evidence before

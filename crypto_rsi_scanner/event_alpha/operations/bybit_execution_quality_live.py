@@ -41,6 +41,12 @@ from ..dashboard.readiness import (
     DashboardReadinessError,
     resolve_authoritative_dashboard,
 )
+from .bybit_derivatives_context import (
+    ACCOUNT_RATIO_PATH,
+    FUNDING_HISTORY_PATH,
+    OPEN_INTEREST_PATH,
+    TICKERS_PATH,
+)
 from .bybit_execution_quality import (
     BYBIT_CATEGORY,
     CONTRACT_TYPE,
@@ -653,6 +659,12 @@ def _fetch_public_json(
         INSTRUMENTS_PATH: {"category", "symbol"},
         ORDERBOOK_PATH: {"category", "symbol", "limit"},
         KLINE_PATH: {"category", "symbol", "interval", "end", "limit"},
+        TICKERS_PATH: {"category", "symbol"},
+        FUNDING_HISTORY_PATH: {"category", "symbol", "limit"},
+        OPEN_INTEREST_PATH: {
+            "category", "symbol", "intervalTime", "limit",
+        },
+        ACCOUNT_RATIO_PATH: {"category", "symbol", "period", "limit"},
     }
     if (
         request.method != "GET"
@@ -660,6 +672,21 @@ def _fetch_public_json(
         or set(query) != expected_keys[request.path]
         or query.get("category") != BYBIT_CATEGORY
         or (request.path == ORDERBOOK_PATH and query.get("limit") != "200")
+        or (
+            request.path == FUNDING_HISTORY_PATH
+            and query.get("limit") != "2"
+        )
+        or (
+            request.path == OPEN_INTEREST_PATH
+            and (
+                query.get("intervalTime") != "1h"
+                or query.get("limit") != "2"
+            )
+        )
+        or (
+            request.path == ACCOUNT_RATIO_PATH
+            and (query.get("period") != "1h" or query.get("limit") != "2")
+        )
         or (
             request.path == KLINE_PATH
             and (

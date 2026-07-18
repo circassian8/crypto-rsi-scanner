@@ -24,10 +24,15 @@ instruments: current ticker/mark/index/funding, settled funding history, 1h open
 interest, and 1h long/short account ratios. Normalize each field with explicit
 USDT, base-asset, fraction, percent-point, basis-point, provider-clock, and
 request-lineage semantics. The offline contract may plan at most four public
-GETs per instrument and 120 for the future top-30 intersection, but it has no
-HTTP client or authorization path. Normalized context has no directional
-authority, cannot create a route or idea, and remains Protocol-v2-ineligible
-until a separately authorized immutable live capture is annex-bound. Coinalyze
+GETs per instrument and 120 for the future top-30 intersection. The offline
+normalizer has no HTTP client. A distinct guarded no-write collector may cross
+that public boundary only after a genuine current execution-quality capture,
+separately present derivatives authorization, and explicit confirmation; it
+never retries and must revalidate the source capture afterward. Exact responses
+remain in memory until a separate immutable capture contract is implemented.
+Normalized context has no directional authority, cannot create a route or idea,
+and remains Protocol-v2-ineligible until an immutable live capture is annex-
+bound. Coinalyze
 may remain a secondary Catalyst-Radar corroboration source; it must not replace
 the chosen venue-native cost, funding, OI, or positioning evidence.
 **Why:** Execution quality, direct bars, and derivatives crowding should share

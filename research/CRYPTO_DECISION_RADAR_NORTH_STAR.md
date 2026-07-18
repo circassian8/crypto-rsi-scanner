@@ -906,12 +906,18 @@ responses for the exact selected execution-quality instrument. Run
 offline path. It preserves provider clocks and request lineage; keeps USDT,
 base-asset, fraction, percent-point, and basis-point units explicit; rejects the
 known 100x fraction/percent failure; and plans no more than four public GETs per
-instrument or 120 for the future top-30 intersection. The module has no HTTP
-client, writes, credentials, authorization mutation, sends, orders, or trades.
-Its output is context-only, non-directional, policy-neutral, annex-unbound, and
-Protocol-v2-ineligible. Coinalyze is optional secondary Catalyst-Radar
-corroboration, not a substitute for the chosen venue-native derivatives or
-execution surface.
+instrument or 120 for the future top-30 intersection. The offline module has no
+HTTP client. A guarded no-write adapter now exists but is inactive: no-call
+`make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python` requires a
+genuine fresh execution-quality capture for exact current authority and the
+separate already-present `RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1` flag.
+Confirmed collection performs exactly four public GETs per eligible instrument,
+never retries, preserves request/provider clocks and exact response bytes in
+memory, and revalidates the capture/instrument/authority chain. It has no
+immutable persistence yet. Output is context-only, non-directional,
+policy-neutral, input-quality-ineligible, annex-unbound, and Protocol-v2-
+ineligible. Coinalyze is optional secondary Catalyst-Radar corroboration, not a
+substitute for the chosen venue-native derivatives or execution surface.
 
 The direct intraday offline contract likewise validates exact latest-completed
 Bybit trade-price candles independently at 1h and 4h. It cuts requests off just

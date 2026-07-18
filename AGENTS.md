@@ -388,13 +388,20 @@ may be added later when a suitable environment already exists.
   responses against the exact execution-quality instrument identity, preserving
   provider clocks, lineage, native USDT/base-asset units, mark/index basis, and
   explicit fraction-to-percent conversions. The bounded plan is four public GETs
-  per instrument and at most 120 for the future top-30 intersection, but the
-  module has no HTTP client and never creates authorization. Every snapshot is
-  context-only, has no directional authority or Decision-policy side effect, and
-  remains Protocol-v2-ineligible until a separately authorized immutable live
-  capture exists and its exact ID is sealed in the annex. Coinalyze remains an
-  optional secondary Catalyst-Radar cross-check, not a substitute for the
-  selected venue-native execution, funding, OI, or positioning surface.
+  per instrument and at most 120 for the future top-30 intersection. The
+  offline normalizer has no HTTP client. The guarded no-write adapter is
+  implemented but inactive: `make radar-derivatives-bybit-readiness` requires a
+  genuine fresh execution-quality capture for exact current authority plus
+  separately present `RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1`; readiness
+  makes no call or write. Confirmed collection performs the exact request set,
+  never retries, retains exact transport responses in memory, and revalidates
+  capture/instrument/authority identity afterward. No immutable derivatives
+  capture exists yet. Every snapshot is context-only, has no directional
+  authority or Decision-policy side effect, and remains Protocol-v2-ineligible
+  until a separately authorized immutable capture is sealed and annex-bound.
+  Coinalyze remains an optional secondary Catalyst-Radar cross-check, not a
+  substitute for the selected venue-native execution, funding, OI, or
+  positioning surface.
 - **Direct Bybit 1h/4h readiness:**
   `make radar-intraday-bybit-smoke` proves the completed trade-price bar
   normalizer offline. `make radar-intraday-bybit-readiness` is no-network and
