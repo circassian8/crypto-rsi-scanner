@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record twentieth no-send market cycle · Codex
+**Why:** The persisted one-hour cadence became eligible and the existing local
+CoinGecko authorization was still present. One additional genuine point-in-time
+observation advances the temporal baseline without lowering thresholds or
+substituting missing execution-quality evidence.
+**Changes:**
+- Ran exactly one Daily Operations cycle after readiness reported eligible. The
+  single bounded CoinGecko request succeeded and created namespace
+  `radar_market_no_send_20260718t194216552291z_db06c53cff36` with 30 exact
+  market observations and zero forced Decision ideas.
+- Strict doctor passed with zero blockers/warnings; the final publication and
+  owned-dashboard operations receipts were sealed, the loopback dashboard was
+  restarted, and the exact revision-12 pointer became authoritative.
+- Refreshed campaign truth to 20 genuine cycles, 600 retained observations,
+  570 baseline-counted observations, 30 too-close observations, 5 historical
+  ideas, 0 current ideas, 1 matured outcome, 3 pending outcomes, and 1 honest
+  `due_missing_price`. Turnover/volume are warm for the current 30 assets;
+  return, relative-return, and volatility groups remain warming. Observed
+  spread coverage remains 0/600.
+- Updated the roadmap authority and next eligible boundary to
+  2026-07-18 20:42:16 UTC. No Bybit/calendar/outcome-recovery authorization was
+  created and no blocked provider was called.
+**Verify:** The cycle returned `succeeded` / `published_and_restarted` with one
+successful provider attempt and all send/trade/paper/RSI/trigger counters zero.
+The publication receipt records strict doctor `OK` with 0 blockers and 0
+warnings. Dashboard readiness is `READY`; authority status revalidates the new
+namespace and pointer digest; the regenerated campaign report reconciles 20 /
+600 / 570 / 30 and the next cadence boundary.
+**Notes/risks:** A prior permission-review request timed out before process
+creation. The latest-attempt ledger and campaign report remained on cycle 19,
+so no provider call had occurred; the one successful launch was therefore not a
+provider retry. The scheduler remains intentionally uninstalled.
+
 ## 2026-07-18 — Expose exact human review-timing queue · Codex
 **Why:** Three final-receipt-backed historical Decision ideas were eligible for
 real human timing evidence, but the existing status command showed only the
