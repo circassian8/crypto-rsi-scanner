@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Separate current and retained baseline maturity · Codex
+**Why:** The campaign's 34 retained assets include four assets outside the exact
+current top-30 authority. A single aggregate could therefore stay warming after
+every currently scanned asset matures, or tempt a future implementation to drop
+valid historical evidence to make the count look current.
+**Changes:**
+- Added a read-only current-universe maturity projection over the same retained
+  cache, keyed by exact canonical IDs from the fingerprint-bound dashboard
+  authority. It exposes expected, observed, missing, warm, and per-feature
+  counts and fails visibly as incomplete when a current ID is absent.
+- Kept the full retained-history projection intact and labeled both scopes in
+  the campaign JSON, Markdown, metrics, conclusion, and limitations.
+- Regenerated current campaign truth: 30/30 current assets are present with
+  zero missing; retained history remains 34 assets. The current 4h scope is 30
+  cold, while the retained 4h scope is 34 cold.
+**Verify:** 38 focused market-history/cache/campaign tests, compileall, and
+architecture cleanliness passed; `git diff --check` passed. The real report
+regenerated with 11 cycles, four candidates, exact current-universe
+reconciliation, and `provider_calls=0`.
+**Notes/risks:** No historical row, retention rule, warm-up threshold, signal,
+route, score, provider authorization/call, capture, trade/order, send,
+paper/RSI/fade action, or Radar authority changed.
+
 ## 2026-07-18 — Separate cold from warming market features · Codex
 **Why:** The campaign report's feature status counts correctly showed all 34
 4h-return assets as cold, while its aggregate `warming_asset_count` incorrectly

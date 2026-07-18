@@ -282,6 +282,27 @@ def _readiness(*_args, **_kwargs):
                 "other_asset_count": 0,
             }
         },
+        "current_universe_maturity": {
+            "status": "warming",
+            "scope": "current_authoritative_universe",
+            "expected_asset_count": 2,
+            "observed_asset_count": 2,
+            "missing_asset_count": 0,
+            "missing_asset_ids": [],
+            "baseline_observation_count": 8,
+            "baseline_counted_observation_count": 8,
+            "baseline_warm_asset_count": 0,
+            "baseline_feature_readiness": {
+                "volume": {
+                    "status_counts": {"warming": 2},
+                    "warm_asset_count": 0,
+                    "warming_asset_count": 2,
+                    "cold_asset_count": 0,
+                    "other_asset_count": 0,
+                }
+            },
+            "research_only": True,
+        },
     }
 
 
@@ -294,6 +315,10 @@ def _dashboard_authority(*_args, **_kwargs):
             revision=3,
             operator_state_sha256="0" * 64,
             generation_authority_checked_at="2026-07-13T17:31:00+00:00",
+            current_market_observations=(
+                {"canonical_asset_id": "test-a"},
+                {"canonical_asset_id": "test-b"},
+            ),
         )
     )
 
@@ -373,6 +398,13 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
         "counted_observations": 8,
         "asset_count": 2,
         "warm_asset_count": 0,
+    }
+    assert conclusion["current_universe_baseline"] == {
+        "status": "warming",
+        "expected_asset_count": 2,
+        "observed_asset_count": 2,
+        "warm_asset_count": 0,
+        "missing_asset_count": 0,
     }
     assert conclusion["pointer_history_count"] == 1
     assert conclusion["current_authority"]["artifact_namespace"] == (
@@ -866,6 +898,8 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     assert b"Duplicate observations: `0`" in first_markdown
     assert b"Conflicting duplicate observations: `0`" in first_markdown
     assert b"| Feature group | Warm | Warming | Cold | Other | Status counts |" in first_markdown
+    assert b"### Current authoritative universe" in first_markdown
+    assert b"### Retained campaign history" in first_markdown
 
     assert market_no_send_cli.main([
         "campaign-report",

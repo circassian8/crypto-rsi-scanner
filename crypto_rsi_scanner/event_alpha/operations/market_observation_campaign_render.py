@@ -73,24 +73,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
     ])
     lines.extend(_generation_table(report.get("non_authoritative_complete_generations")))
-    lines.extend([
-        "",
-        "## Baseline maturity",
-        "",
-        f"- Status: `{_text(baseline.get('baseline_status'))}`",
-        f"- Retained observations: `{_int(baseline.get('baseline_observation_count'))}`",
-        f"- Baseline-counted observations: `{_int(baseline.get('baseline_counted_observation_count'))}`",
-        f"- Too-close observations: `{_int(baseline.get('baseline_too_close_observation_count'))}`",
-        f"- Duplicate observations: `{_int(baseline.get('baseline_duplicate_observation_count'))}`",
-        f"- Conflicting duplicate observations: `{_int(baseline.get('baseline_duplicate_conflict_count'))}`",
-        f"- Assets: `{_int(baseline.get('baseline_asset_count'))}`",
-        f"- Warm assets: `{_int(baseline.get('baseline_warm_asset_count'))}`",
-        f"- Minimum spacing seconds: `{_int(baseline.get('minimum_observation_spacing_seconds'))}`",
-        "",
-        "### Feature maturity",
-        "",
-    ])
-    lines.extend(_feature_maturity_lines(baseline.get("baseline_feature_readiness")))
+    lines.extend(_baseline_maturity_section(baseline))
     lines.extend([
         "",
         "## Outcomes",
@@ -169,6 +152,46 @@ def _authority_proven(pointer: Mapping[str, Any]) -> bool:
         pointer.get("status") == "authoritative"
         and pointer.get("exact_operator_binding") is True
     )
+
+
+def _baseline_maturity_section(baseline: Mapping[str, Any]) -> list[str]:
+    current = _mapping(baseline.get("current_universe_maturity"))
+    lines = [
+        "",
+        "## Baseline maturity",
+        "",
+        "### Current authoritative universe",
+        "",
+        f"- Status: `{_text(current.get('status'))}`",
+        f"- Exact authority assets: `{_int(current.get('expected_asset_count'))}`",
+        f"- Assets found in retained history: `{_int(current.get('observed_asset_count'))}`",
+        f"- Missing current assets: `{_int(current.get('missing_asset_count'))}`",
+        f"- Warm current assets: `{_int(current.get('baseline_warm_asset_count'))}`",
+        f"- Current-universe retained observations: `{_int(current.get('baseline_observation_count'))}`",
+        f"- Current-universe baseline-counted observations: `{_int(current.get('baseline_counted_observation_count'))}`",
+        f"- Missing asset IDs: `{_joined(current.get('missing_asset_ids')) or 'none'}`",
+        "",
+        "#### Current-universe feature maturity",
+        "",
+        *_feature_maturity_lines(current.get("baseline_feature_readiness")),
+        "",
+        "### Retained campaign history",
+        "",
+        f"- Status: `{_text(baseline.get('baseline_status'))}`",
+        f"- Retained observations: `{_int(baseline.get('baseline_observation_count'))}`",
+        f"- Baseline-counted observations: `{_int(baseline.get('baseline_counted_observation_count'))}`",
+        f"- Too-close observations: `{_int(baseline.get('baseline_too_close_observation_count'))}`",
+        f"- Duplicate observations: `{_int(baseline.get('baseline_duplicate_observation_count'))}`",
+        f"- Conflicting duplicate observations: `{_int(baseline.get('baseline_duplicate_conflict_count'))}`",
+        f"- Assets: `{_int(baseline.get('baseline_asset_count'))}`",
+        f"- Warm assets: `{_int(baseline.get('baseline_warm_asset_count'))}`",
+        f"- Minimum spacing seconds: `{_int(baseline.get('minimum_observation_spacing_seconds'))}`",
+        "",
+        "#### Retained-history feature maturity",
+        "",
+        *_feature_maturity_lines(baseline.get("baseline_feature_readiness")),
+    ]
+    return lines
 
 
 def _route_lines(route_counts: Mapping[str, Any]) -> list[str]:
@@ -325,7 +348,7 @@ def _decision_episode_scorecard_section(report: Mapping[str, Any]) -> list[str]:
 def _feature_maturity_lines(value: Any) -> list[str]:
     feature_readiness = _mapping(value)
     if not feature_readiness:
-        return ["- Feature-level maturity is not yet available in retained evidence."]
+        return ["- Feature-level maturity is not yet available for this scope."]
     lines = [
         "| Feature group | Warm | Warming | Cold | Other | Status counts |",
         "|---|---:|---:|---:|---:|---|",
@@ -409,6 +432,12 @@ def _counts(value: Mapping[str, Any]) -> str:
     return ", ".join(
         f"{key}={_int(count)}" for key, count in sorted(value.items())
     ) or "none"
+
+
+def _joined(value: Any) -> str:
+    if not isinstance(value, (list, tuple)):
+        return ""
+    return ", ".join(_md(item) for item in value if _text(item))
 
 
 def _md(value: Any) -> str:

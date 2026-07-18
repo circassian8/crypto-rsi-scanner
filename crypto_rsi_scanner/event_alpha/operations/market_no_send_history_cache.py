@@ -34,6 +34,7 @@ def cache_readiness(
     history_filename: str,
     now: datetime | str | None = None,
     config: market_history.MarketHistoryConfig | None = None,
+    current_asset_ids: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Summarize the live cache without creating paths or mutating artifacts."""
 
@@ -59,7 +60,7 @@ def cache_readiness(
         now=evaluated_at,
         config=config,
     )
-    return {
+    result = {
         key: value
         for key, value in assessment.items()
         if key.startswith("baseline_")
@@ -73,6 +74,93 @@ def cache_readiness(
         "cache_status": cache_status,
         "cache_error": "shared market history is invalid" if cache_status == "invalid" else None,
     }
+    if current_asset_ids is not None:
+        result["current_universe_maturity"] = _current_universe_maturity(
+            rows,
+            current_asset_ids=current_asset_ids,
+            now=evaluated_at,
+            config=config,
+        )
+    return result
+
+
+def _current_universe_maturity(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    current_asset_ids: Sequence[str],
+    now: datetime | str,
+    config: market_history.MarketHistoryConfig | None,
+) -> dict[str, Any]:
+    """Project retained history onto the exact current authoritative universe."""
+
+    expected = tuple(
+        sorted(
+            {
+                str(value).strip()
+                for value in current_asset_ids
+                if isinstance(value, str) and value.strip()
+            }
+        )
+    )
+    if not expected:
+        return {
+            "status": "unavailable",
+            "scope": "current_authoritative_universe",
+            "expected_asset_count": 0,
+            "observed_asset_count": 0,
+            "missing_asset_count": 0,
+            "missing_asset_ids": [],
+            "baseline_observation_count": 0,
+            "baseline_counted_observation_count": 0,
+            "baseline_warm_asset_count": 0,
+            "baseline_feature_readiness": {},
+            "research_only": True,
+        }
+    expected_set = set(expected)
+    filtered = [
+        dict(row)
+        for row in rows
+        if str(row.get("canonical_asset_id") or "").strip() in expected_set
+    ]
+    assessment = market_history_readiness.assess_market_history_readiness(
+        filtered,
+        now=now,
+        config=config,
+    )
+    observed = set(_mapping_keys(assessment.get("baseline_asset_readiness")))
+    missing = sorted(expected_set - observed)
+    status = (
+        "incomplete"
+        if missing
+        else str(assessment.get("baseline_status") or "unknown")
+    )
+    return {
+        "status": status,
+        "scope": "current_authoritative_universe",
+        "expected_asset_count": len(expected),
+        "observed_asset_count": len(observed & expected_set),
+        "missing_asset_count": len(missing),
+        "missing_asset_ids": missing,
+        "baseline_observation_count": int(
+            assessment.get("baseline_observation_count") or 0
+        ),
+        "baseline_counted_observation_count": int(
+            assessment.get("baseline_counted_observation_count") or 0
+        ),
+        "baseline_warm_asset_count": int(
+            assessment.get("baseline_warm_asset_count") or 0
+        ),
+        "baseline_feature_readiness": dict(
+            assessment.get("baseline_feature_readiness") or {}
+        ),
+        "research_only": True,
+    }
+
+
+def _mapping_keys(value: object) -> tuple[str, ...]:
+    if not isinstance(value, Mapping):
+        return ()
+    return tuple(str(key) for key in value)
 
 
 def enrich_and_persist_history(

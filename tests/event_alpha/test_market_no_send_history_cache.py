@@ -213,6 +213,25 @@ def test_rapid_live_generation_is_retained_as_evidence_without_warming_cache(tmp
     assert eligible_readiness["baseline_counted_observation_count"] == 10
     assert eligible_readiness["baseline_too_close_observation_count"] == 5
 
+    current_ids = tuple(
+        row["canonical_asset_id"] for row in _normalized_rows(eligible_at)[:2]
+    ) + ("missing-current-asset",)
+    scoped = market_no_send_history_cache.cache_readiness(
+        base,
+        history_filename=market_no_send.HISTORY_FILENAME,
+        now=eligible_at,
+        current_asset_ids=current_ids,
+    )["current_universe_maturity"]
+    assert scoped["status"] == "incomplete"
+    assert scoped["expected_asset_count"] == 3
+    assert scoped["observed_asset_count"] == 2
+    assert scoped["missing_asset_count"] == 1
+    assert scoped["missing_asset_ids"] == ["missing-current-asset"]
+    assert all(
+        details["asset_count"] == 2
+        for details in scoped["baseline_feature_readiness"].values()
+    )
+
 
 def test_live_history_requires_active_provider_reserved_campaign(tmp_path):
     base = tmp_path / "artifacts"

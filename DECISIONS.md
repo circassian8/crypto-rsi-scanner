@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Separate current-universe maturity from retained-history maturity
+**Status:** accepted
+**Decision:** Report two explicit temporal-baseline scopes. The current-universe
+projection is defined by the exact canonical asset IDs in the fingerprint-bound
+authoritative dashboard snapshot and is evaluated against the retained campaign
+history. The retained-history projection continues to include every valid asset
+within policy retention. Missing current IDs are visible and make the current
+projection incomplete; departed historical assets never disappear silently.
+Do not rewrite or discard historical rows, and do not treat global retained
+warmth as a substitute for the per-asset evidence used by current ideas.
+**Why:** A rolling top-liquid universe naturally changes. Counting departed
+assets in the same unlabeled aggregate can keep the campaign globally warming
+after all current assets mature, while dropping them would destroy audit
+history. Separate closed projections preserve both operator relevance and
+historical truth without changing any signal or threshold.
+**Revisit when:** The Protocol-v2 annex freezes an exact universe and maturity
+policy. Keep both point-in-time current membership and retained-history lineage
+even if their presentation or status names change.
+
 ## 2026-07-18 - Revalidate Radar authority before Bybit capture publication
 **Status:** accepted
 **Decision:** Resolve current trusted Radar authority once before Bybit

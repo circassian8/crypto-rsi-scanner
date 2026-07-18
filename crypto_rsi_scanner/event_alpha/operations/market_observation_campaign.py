@@ -14,20 +14,19 @@ import os
 import stat
 import tempfile
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-from ... import config as project_config
 from ..outcomes import outcome_eligibility
 from ..dashboard import readiness as dashboard_readiness
 from ..dashboard.readiness import CURRENT_NAMESPACE_POINTER
-from ..radar import market_history
 from ..radar.integrated import api as integrated_radar
 from . import daily_operations_publication
 from . import market_no_send_audit, market_no_send_history_cache
 from . import market_no_send_publication
 from . import market_observation_campaign_attempts
+from . import market_observation_campaign_baseline
 from . import market_observation_campaign_cadence
 from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
@@ -157,7 +156,12 @@ def build_campaign_report(
             evaluated_at=evaluated,
         )
     )
-    baseline = _baseline_maturity(base, evaluated=evaluated)
+    baseline = market_observation_campaign_baseline.build_baseline_maturity(
+        base,
+        evaluated=evaluated,
+        history_filename=HISTORY_FILENAME,
+        current_asset_ids=current_authority.get("_current_asset_ids"),
+    )
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
     metrics["provider_failed_attempts"] = len(provider_failed)
     metrics["blocked_attempts"] = len(blocked)
@@ -725,6 +729,7 @@ def _campaign_metrics(
         candidates += _int(generation.get("candidate_count"))
         if _mapping(generation.get("publication")).get("currently_authoritative") is True:
             current_candidates += _int(generation.get("candidate_count"))
+    current_baseline = _mapping(baseline.get("current_universe_maturity"))
     return {
         "real_cycles": len(generations),
         "real_observations": selected,
@@ -748,6 +753,18 @@ def _campaign_metrics(
         "spread_coverage_ratio": round(spread / selected, 6) if selected else 0.0,
         "baseline_status": _text(baseline.get("baseline_status")) or "unknown",
         "baseline_warm_asset_count": _int(baseline.get("baseline_warm_asset_count")),
+        "current_universe_baseline_status": (
+            _text(current_baseline.get("status")) or "unavailable"
+        ),
+        "current_universe_expected_asset_count": _int(
+            current_baseline.get("expected_asset_count")
+        ),
+        "current_universe_observed_asset_count": _int(
+            current_baseline.get("observed_asset_count")
+        ),
+        "current_universe_warm_asset_count": _int(
+            current_baseline.get("baseline_warm_asset_count")
+        ),
         "provider_failed_attempts": 0,
         "blocked_attempts": 0,
     }
@@ -937,49 +954,6 @@ def _outcome_rank(row: Mapping[str, Any]) -> tuple[int, str]:
     return rank, _text(row.get("outcome_evaluated_at"))
 
 
-def _baseline_maturity(base: Path, *, evaluated: datetime) -> dict[str, Any]:
-    try:
-        history_config = market_history.MarketHistoryConfig(
-            minimum_observation_spacing=timedelta(
-                minutes=int(project_config.DECISION_RADAR_MIN_OBSERVATION_SPACING_MINUTES)
-            )
-        )
-    except (TypeError, ValueError):
-        history_config = market_history.MarketHistoryConfig()
-    try:
-        result = market_no_send_history_cache.cache_readiness(
-            base,
-            history_filename=HISTORY_FILENAME,
-            now=evaluated,
-            config=history_config,
-        )
-    except TypeError:  # historical adapter during rolling upgrades
-        result = market_no_send_history_cache.cache_readiness(
-            base,
-            history_filename=HISTORY_FILENAME,
-        )
-    output = dict(result)
-    output.setdefault("baseline_feature_readiness", {})
-    output.setdefault("baseline_counted_observation_count", output.get("baseline_observation_count", 0))
-    output.setdefault("baseline_too_close_observation_count", 0)
-    rejection_counts = _mapping(output.get("baseline_rejection_counts"))
-    output.setdefault(
-        "baseline_duplicate_observation_count",
-        _int(rejection_counts.get("duplicate")),
-    )
-    output.setdefault(
-        "baseline_duplicate_conflict_count",
-        _int(rejection_counts.get("duplicate_conflict")),
-    )
-    output.setdefault(
-        "minimum_observation_spacing_seconds",
-        int(market_history.MarketHistoryConfig().minimum_observation_spacing.total_seconds()),
-    )
-    next_eligible = market_observation_campaign_cadence.legacy_next_eligible(output)
-    output.setdefault("next_eligible_observation_at", next_eligible)
-    return output
-
-
 def _data_quality_limitations(metrics: Mapping[str, Any]) -> list[dict[str, Any]]:
     limitations: list[dict[str, Any]] = []
     selected = _int(metrics.get("selected_market_row_count"))
@@ -1011,10 +985,25 @@ def _data_quality_limitations(metrics: Mapping[str, Any]) -> list[dict[str, Any]
                 "observations; proxy evidence remains explicitly quality-capped."
             ),
         })
-    if _text(metrics.get("baseline_status")) != "warm":
+    current_baseline_status = _text(
+        metrics.get("current_universe_baseline_status")
+    )
+    retained_baseline_status = _text(metrics.get("baseline_status"))
+    evaluated_baseline_status = (
+        current_baseline_status
+        if current_baseline_status not in {"", "unavailable"}
+        else retained_baseline_status
+    )
+    if evaluated_baseline_status != "warm":
         limitations.append({
             "category": "temporal_baseline_maturity",
-            "detail": "The required feature/time-aware temporal baseline is not globally warm.",
+            "detail": (
+                "The exact current authoritative universe is not feature/time-aware warm."
+                if current_baseline_status not in {"", "unavailable"}
+                else "Current-universe maturity is unavailable; retained campaign history is not globally warm."
+            ),
+            "current_universe_status": current_baseline_status or "unavailable",
+            "retained_history_status": retained_baseline_status or "unknown",
         })
     return limitations
 
@@ -1074,6 +1063,8 @@ def _campaign_conclusion(
     )
     pending_count = _int(metrics.get("pending_outcomes"))
     matured_count = _int(metrics.get("matured_outcomes"))
+    current_baseline = _mapping(baseline.get("current_universe_maturity"))
+    current_baseline_status = _text(current_baseline.get("status")) or "unavailable"
     summary = (
         f"Decision Radar campaign v2 has {_int(metrics.get('real_cycles'))} counted real/no-send "
         f"cycles and {_int(metrics.get('real_candidates'))} canonical {'idea' if _int(metrics.get('real_candidates')) == 1 else 'ideas'}; "
@@ -1083,6 +1074,8 @@ def _campaign_conclusion(
         f"{_count_phrase(len(blocked), 'blocked/preflight attempt')}. Baseline status is "
         f"{_text(baseline.get('baseline_status')) or 'unknown'} with "
         f"{_int(baseline.get('baseline_warm_asset_count'))}/{_int(baseline.get('baseline_asset_count'))} "
+        f"warm retained assets; exact current-universe status is {current_baseline_status} with "
+        f"{_int(current_baseline.get('baseline_warm_asset_count'))}/{_int(current_baseline.get('expected_asset_count'))} "
         f"warm assets. Pointer history contains {len(pointer_history)} bound {'generation' if len(pointer_history) == 1 else 'generations'} and {authority_summary}. Data-quality limitation "
         f"categories are {', '.join(categories) or 'none'}; highest-value missing input is {highest}."
     )
@@ -1095,6 +1088,21 @@ def _campaign_conclusion(
             "counted_observations": _int(baseline.get("baseline_counted_observation_count")),
             "asset_count": _int(baseline.get("baseline_asset_count")),
             "warm_asset_count": _int(baseline.get("baseline_warm_asset_count")),
+        },
+        "current_universe_baseline": {
+            "status": current_baseline_status,
+            "expected_asset_count": _int(
+                current_baseline.get("expected_asset_count")
+            ),
+            "observed_asset_count": _int(
+                current_baseline.get("observed_asset_count")
+            ),
+            "warm_asset_count": _int(
+                current_baseline.get("baseline_warm_asset_count")
+            ),
+            "missing_asset_count": _int(
+                current_baseline.get("missing_asset_count")
+            ),
         },
         "pointer_history_count": len(pointer_history),
         "current_authority": current_authority,
@@ -1208,6 +1216,16 @@ def _resolve_current_authority(
     except dashboard_readiness.DashboardReadinessError as exc:
         return {}, _validation_error_code(exc)
     snapshot = result.snapshot
+    current_asset_ids = tuple(
+        sorted(
+            {
+                _text(row.get("canonical_asset_id"))
+                for row in getattr(snapshot, "current_market_observations", ())
+                if isinstance(row, Mapping)
+                and _text(row.get("canonical_asset_id"))
+            }
+        )
+    )
     return {
         "artifact_namespace": snapshot.artifact_namespace,
         "profile": snapshot.profile,
@@ -1215,6 +1233,7 @@ def _resolve_current_authority(
         "revision": snapshot.revision,
         "operator_state_sha256": snapshot.operator_state_sha256,
         "authority_checked_at": snapshot.generation_authority_checked_at,
+        "_current_asset_ids": current_asset_ids,
     }, None
 
 
