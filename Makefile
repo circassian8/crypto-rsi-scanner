@@ -922,7 +922,7 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-hardening-supplement radar-research-hardening-supplement-check radar-research-feedback-report radar-research-feedback-mark
+.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-research-protocol-v2-progress radar-research-protocol-v2-progress-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-hardening-supplement radar-research-hardening-supplement-check radar-research-feedback-report radar-research-feedback-mark
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
@@ -932,6 +932,12 @@ radar-research-protocol-v2-readiness:
 
 radar-research-protocol-v2-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 --check
+
+radar-research-protocol-v2-progress:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress
+
+radar-research-protocol-v2-progress-check:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --check
 
 radar-replay-smoke: radar-research-protocol-check
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \

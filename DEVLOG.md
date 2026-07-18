@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Restore frozen Protocol-v2 audit bytes and split progress · Codex
+**Why:** The first current-progress implementation preserved the inner readiness
+object hash but changed two files that the empirical export policy fingerprints
+as immutable evidence. The source-with-artifacts exporter correctly failed
+closed, so current operator truth needed a physically separate surface.
+**Changes:**
+- Restored the frozen Protocol-v2 readiness Markdown and implementation to their
+  exact policy fingerprints. Neither file now contains post-freeze decisions.
+- Added a separate static current-progress module, human report, Make targets,
+  and closed tests. It derives the accepted Bybit decision from the canonical
+  no-I/O execution-quality readiness contract, binds the frozen readiness hash,
+  lists only current blockers, and fails on audit, venue, blocker, or safety
+  drift.
+- Clarified the working agreement, durable decision, and roadmap so future
+  progress updates never edit the immutable preregistration. No environment,
+  credential, provider, file, or holdout read; provider call; authorization;
+  replay/selection/final target; route; score; threshold; send; trade; order;
+  paper trade; RSI write; or Event Alpha fade behavior was added.
+**Verify:** All 31 focused execution-readiness, frozen Protocol-v2, and current-
+progress tests pass; three focused canonical-export/frozen-drift/digest tests
+pass. Both frozen and current static readiness/check targets pass; Python
+compileall, architecture cleanliness (zero new violations), and `git diff
+--check` pass. The real source-with-artifacts exporter now succeeds with 1,478
+entries, 134 selected artifact entries, 89 canonical empirical entries, and
+zero unsafe entries. It will be rebuilt again from the corrective commit.
+**Notes/risks:** The current-progress surface is not the annex and grants no
+evidence authority. Exact instruments, permitted reachability, genuine capture,
+and every remaining empirical section are still unresolved.
+
 ## 2026-07-18 — Reconcile Protocol-v2 readiness with confirmed venue · Codex
 **Why:** The owner-confirmed Bybit USDT-linear-perpetual decision was durable in
 the roadmap and decision log, but the top-level Protocol-v2 readiness output

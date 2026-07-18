@@ -507,15 +507,18 @@ may be added later when a suitable environment already exists.
   `make radar-research-protocol-v2-readiness` renders the frozen/static required
   evidence and annex contract without reading environment, files, credentials,
   providers, or holdout data; `make radar-research-protocol-v2-check` validates
-  that exact blocked state. Its canonical 2026-07-16 requirements bytes and
-  SHA-256 stay unchanged; the human renderer separately shows current accepted
-  decision progress. Bybit USDT-linear perpetuals, USDT quote, public-only data
-  boundary, and owner research eligibility are confirmed, while the exact
-  eligible instrument IDs remain unsealed and reachability remains unproven
-  after the recorded 403. The executable protocol is intentionally not frozen
-  or active until the exact instrument set, source, partition/untouched-
-  holdout, outcome, cost, universe, route, episode, minimum-sample, and final
-  human annex approval are sealed. Missing 1h/4h, latency, spread/depth,
+  that exact blocked state. Its canonical 2026-07-16 Markdown and implementation
+  are export-policy fingerprinted and must stay byte-identical; do not add
+  current state to either file. Use
+  `make radar-research-protocol-v2-progress` and the matching `...-check` target
+  for the separate static current-decision projection. That surface records the
+  confirmed Bybit USDT-linear perpetual, USDT quote, public-only data boundary,
+  and owner research eligibility while keeping exact eligible instrument IDs
+  unsealed and permitted reachability unproven after the recorded 403. The
+  executable protocol is intentionally not frozen or active until the exact
+  instrument set, source, partition/untouched-holdout, outcome, cost, universe,
+  route, episode, minimum-sample, and final human annex approval are sealed.
+  Missing 1h/4h, latency, spread/depth,
   catalyst, official-calendar, derivatives, on-chain, or RSI evidence remains
   unavailable and cannot be proxied. No v2 replay, selection, or final-test
   target exists; protocol-v1 final-test evidence is forbidden for tuning.
