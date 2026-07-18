@@ -672,6 +672,7 @@ def _live_replay_panel(
     live: Mapping[str, Any],
 ) -> str:
     rows = []
+    live_snapshot_note = ""
     for analysis in analyses:
         rows.append((
             "Historical replay",
@@ -685,10 +686,21 @@ def _live_replay_panel(
     if live.get("available") is True:
         episodes = _mapping(live.get("episodes"))
         scorecard = _mapping(live.get("scorecard"))
+        episode_count = _count(episodes.get("primary_episode_count"))
+        repeat_count = _count(episodes.get("repeat_member_count"))
+        source_generated_at = str(live.get("source_generated_at") or "unknown")
+        live_snapshot_note = (
+            '<p class="muted">The live row is the immutable campaign snapshot '
+            "bound into this empirical bundle, not the current dashboard campaign. "
+            f"Snapshot time: {escape_html(source_generated_at)}. Its "
+            f"{episode_count} fixed-start {_plural(episode_count, 'episode')} and "
+            f"{repeat_count} dependent {_plural(repeat_count, 'repeat')} are "
+            "descriptive groups; statistical independence is not claimed.</p>"
+        )
         rows.append((
             "Live no-send",
             humanize_enum(live.get("campaign_status")),
-            display_count(episodes.get("primary_episode_count")),
+            display_count(episode_count),
             display_count(scorecard.get("matured_episode_count")),
             humanize_enum(live.get("evidence_strength")),
             "No",
@@ -723,10 +735,15 @@ def _live_replay_panel(
     return render_panel(
         "Live no-send vs replay",
         '<p>Live no-send evidence is a separate observational lane and is never pooled into historical replay sample sizes.</p>'
+        + live_snapshot_note
         + str(table)
         + str(disclosure("Controls & benchmarks", controls_body, summary="No causal claim")),
         eyebrow="Evidence separation",
     )
+
+
+def _plural(count: int, singular: str) -> str:
+    return singular if count == 1 else singular + "s"
 
 
 def _warnings_panel(

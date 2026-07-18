@@ -508,6 +508,10 @@ def test_research_lab_render_is_explicit_descriptive_and_escaped(tmp_path: Path)
     assert "Outcome leakage controls" in page.body
     assert "Zero-idea days" in page.body
     assert "Live no-send evidence is a separate observational lane" in page.body
+    assert "immutable campaign snapshot bound into this empirical bundle" in page.body
+    assert "not the current dashboard campaign" in page.body
+    assert "1 fixed-start episode and 1 dependent repeat" in page.body
+    assert "statistical independence is not claimed" in page.body
     assert "Historical spread" in page.body
     assert "not observed" in page.body.casefold()
     assert "Failed quickly symptom" in page.body

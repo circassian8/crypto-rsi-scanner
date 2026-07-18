@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Label frozen live episodes honestly in Research Lab · Codex
+**Why:** The Research Lab correctly kept live and replay evidence separate, but
+its bound historical live row showed an episode count without saying that the
+row was a frozen campaign snapshot or that repeated observations remained
+dependent. That could make one descriptive episode look like one independent
+sample or like current campaign truth.
+**Changes:**
+- Added a concise note to the existing Live no-send vs replay panel identifying
+  the immutable bundle-bound snapshot, its exact source time, fixed-start
+  episode count, dependent-repeat count, and explicit no-independence claim.
+- Kept the panel attached only to the validated empirical report bundle; it does
+  not read, pool, or silently substitute the mutable current campaign.
+- Added focused rendering assertions and updated the active roadmap.
+**Verify:** Ran the focused Research Lab loader/render suite, dashboard smoke,
+dashboard UX smoke, Python compileall, architecture cleanliness, and diff checks.
+**Notes/risks:** Presentation-only empirical truth. No empirical artifact,
+provider, authorization, route, score, threshold, outcome, dashboard authority,
+send, trade, order, paper trade, RSI row, or `TRIGGERED_FADE` changed.
+
 ## 2026-07-18 — Remove stale duplicate campaign truth · Codex
 **Why:** The roadmap carried one current 22-cycle campaign row and a second
 waiting row frozen at 20 cycles with an expired request boundary. Two competing
