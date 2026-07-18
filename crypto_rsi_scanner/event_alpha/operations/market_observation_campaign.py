@@ -23,6 +23,7 @@ from ..dashboard import readiness as dashboard_readiness
 from ..dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from ..radar.integrated import api as integrated_radar
 from . import daily_operations_publication
+from . import decision_review_timing
 from . import market_no_send_audit, market_no_send_history_cache
 from . import market_no_send_publication
 from . import market_observation_campaign_attempts
@@ -138,6 +139,10 @@ def build_campaign_report(
         ledger_snapshot=ledger_snapshot,
     )
     outcome_metrics = _outcome_metrics(outcomes)
+    review_timing = decision_review_timing.build_review_timing_report(
+        base,
+        evaluated_at=evaluated,
+    )
     episode_shadow, episode_input_audit = (
         market_observation_campaign_episodes.build_campaign_anomaly_episode_shadow(
             base,
@@ -163,6 +168,7 @@ def build_campaign_report(
         current_asset_ids=current_authority.get("_current_asset_ids"),
     )
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
+    metrics.update(decision_review_timing.campaign_metric_values(review_timing))
     metrics["provider_failed_attempts"] = len(provider_failed)
     metrics["blocked_attempts"] = len(blocked)
     pointer_state = _pointer_state(
@@ -205,6 +211,7 @@ def build_campaign_report(
         pointer=pointer_state,
         pointer_history=pointer_history,
         outcome_metrics=outcome_metrics,
+        review_timing=review_timing,
         episode_shadow=episode_shadow,
         episode_input_audit=episode_input_audit,
         episode_scorecard=episode_scorecard,

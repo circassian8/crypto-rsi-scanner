@@ -474,6 +474,20 @@ may be added later when a suitable environment already exists.
   the live target also refreshes it after every success or failure. Decision
   campaign generations, candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
+  Human review timing uses the separate append-only shared campaign ledger
+  `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
+  `make radar-review-timing-status` is read-only/no-network. Only the explicit
+  confirmed `radar-review-timing-view` and `...-complete` commands may record a
+  human action for one exact receipt-backed namespace/idea. Dashboard GET/HEAD,
+  phone access, probes, and health checks never count as human views. Provable
+  idea availability is the immutable owned-dashboard operations-receipt clock;
+  every event also binds the canonical Decision projection, candidate/Core
+  artifact digests, run/revision/operator identity, and both final receipts.
+  Campaign reporting includes the exact point-in-time latency projection, but
+  it remains `protocol_v2_evidence_eligible=false` and
+  `protocol_v2_annex_bound=false` until the sealed annex fixes clock and
+  missing-data rules. Review events never alter routes, scores, outcomes,
+  provider authorization, or dashboard authority.
   An optional current calendar snapshot is accepted through the explicit
   `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` environment setting or the Daily
   Operations coordinator's hash-attested official-macro latest-success path. Readiness

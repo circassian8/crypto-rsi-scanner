@@ -16,6 +16,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
     """Render the canonical report as deterministic operator-facing Markdown."""
     metrics = _mapping(report.get("campaign_metrics"))
     outcomes = _mapping(report.get("outcomes"))
+    review_timing = _mapping(report.get("human_review_timing"))
     baseline = _mapping(report.get("baseline_maturity"))
     pointer = _mapping(report.get("pointer"))
     next_observation = _mapping(report.get("next_observation"))
@@ -42,6 +43,8 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         f"- Proxy feature evidence: `{_int(metrics.get('proxy_feature_count'))}`",
         f"- Pending outcomes: `{_int(metrics.get('pending_outcomes'))}`",
         f"- Matured outcomes: `{_int(metrics.get('matured_outcomes'))}`",
+        f"- Explicit first-view records: `{_int(metrics.get('review_timing_first_views'))}`",
+        f"- Completed human reviews: `{_int(metrics.get('review_timing_completed_reviews'))}`",
         f"- Provider failures: `{_int(metrics.get('provider_failed_attempts'))}`",
         f"- Preflight/blocked attempts: `{_int(metrics.get('blocked_attempts'))}`",
         "- Event Alpha catalyst burn-in: `separate_not_aggregated`",
@@ -85,6 +88,10 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         f"- Source: `{_text(outcomes.get('source'))}`",
         f"- Refresh/build errors: `{_int(outcomes.get('refresh_build_error_count'))}`",
         "- Human labels remain optional preference feedback; no thresholds or routes change automatically.",
+        "",
+        "## Human review timing",
+        "",
+        *_review_timing_lines(review_timing),
         "",
         "## Anomaly episodes (shadow)",
         "",
@@ -152,6 +159,46 @@ def _authority_proven(pointer: Mapping[str, Any]) -> bool:
         pointer.get("status") == "authoritative"
         and pointer.get("exact_operator_binding") is True
     )
+
+
+def _review_timing_lines(value: Mapping[str, Any]) -> list[str]:
+    lines = [
+        "Human review is counted only through explicit confirmed actions; dashboard GET/HEAD and health probes never create timing evidence.",
+        f"- Status: `{_text(value.get('status'))}`",
+        f"- Ledger events: `{_int(value.get('ledger_event_count'))}`",
+        f"- Idea records: `{_int(value.get('idea_record_count'))}`",
+        f"- First views: `{_int(value.get('first_view_record_count'))}`",
+        f"- Completed reviews: `{_int(value.get('completed_review_record_count'))}`",
+        f"- Incomplete reviews: `{_int(value.get('incomplete_review_record_count'))}`",
+        f"- Events after report time: `{_int(value.get('events_after_evaluated_at_count'))}`",
+        f"- Availability definition: {_md(value.get('idea_available_at_definition'))}",
+        f"- Latency definition: `{_md(value.get('latency_seconds_definition'))}`",
+        "- Protocol-v2 evidence eligible: `false` until the sealed annex binds the exact clock and missing-data rules.",
+    ]
+    records = [
+        dict(row)
+        for row in value.get("records") or ()
+        if isinstance(row, Mapping)
+    ]
+    if not records:
+        return [*lines, "- No explicit human review timing has been recorded."]
+    lines.extend(
+        [
+            "",
+            "| Namespace | Idea | Route | Status | Pipeline s | First-view s | Review s | Available-to-complete s |",
+            "|---|---|---|---|---:|---:|---:|---:|",
+        ]
+    )
+    for row in records:
+        lines.append(
+            f"| {_md(row.get('artifact_namespace'))} | {_md(row.get('idea_id'))} | "
+            f"{_md(row.get('radar_route'))} | {_md(row.get('review_status'))} | "
+            f"{_number(row.get('pipeline_latency_seconds'))} | "
+            f"{_number(row.get('time_to_first_view_seconds'))} | "
+            f"{_number(row.get('review_duration_seconds'))} | "
+            f"{_number(row.get('latency_seconds'))} |"
+        )
+    return lines
 
 
 def _baseline_maturity_section(baseline: Mapping[str, Any]) -> list[str]:
@@ -426,6 +473,16 @@ def _int(value: Any) -> int:
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def _number(value: Any) -> str:
+    if type(value) not in (int, float):
+        return "—"
+    try:
+        rendered = float(value)
+    except (TypeError, ValueError):
+        return "—"
+    return f"{rendered:.6f}".rstrip("0").rstrip(".")
 
 
 def _counts(value: Mapping[str, Any]) -> str:

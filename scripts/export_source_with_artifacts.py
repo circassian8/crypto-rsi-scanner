@@ -105,6 +105,7 @@ PROJECT_ARTIFACT_LIMITS = {
     "max_single_artifact_file_bytes": 134_217_728,
     "max_standard_artifact_file_count": 512,
     "max_standard_artifact_total_bytes": 402_653_184,
+    "max_review_timing_source_namespaces": 64,
 }
 PROJECT_CANONICAL_ROOT_FILES = (
     "event_alpha_namespace_registry.json",
@@ -141,6 +142,13 @@ PROJECT_DYNAMIC_NAMESPACE_SELECTORS = (
     {
         "kind": "latest_bybit_intraday_namespace",
         "path": "radar_bybit_intraday_latest.json",
+    },
+    {
+        "kind": "review_timing_source_namespaces",
+        "path": (
+            "radar_market_history_cache/"
+            "event_decision_radar_review_timing_events.jsonl"
+        ),
     },
 )
 _OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
@@ -1710,6 +1718,7 @@ def _project_artifact_export_plan(
         "latest_live_no_send_attempt_namespace": "latest_live_no_send_attempt_generation",
         "latest_bybit_execution_quality_namespace": "latest_bybit_execution_quality_capture",
         "latest_bybit_intraday_namespace": "latest_bybit_intraday_capture",
+        "review_timing_source_namespaces": "human_review_timing_source_generation",
     }
     selector_loaders = {
         "dashboard_pointer_namespace": _dashboard_pointer_namespace,
@@ -1731,6 +1740,62 @@ def _project_artifact_export_plan(
             root=root,
             maximum=4 * 1024 * 1024,
         )
+        if kind == "review_timing_source_namespaces":
+            from crypto_rsi_scanner.event_alpha.operations.decision_review_timing import (
+                DecisionReviewTimingError,
+                validate_review_timing_sources,
+            )
+
+            try:
+                validation = validate_review_timing_sources(artifact_root)
+            except DecisionReviewTimingError as exc:
+                raise ValueError("Decision review-timing evidence is invalid") from exc
+            if validation.get("ledger_sha256") != hashlib.sha256(payload).hexdigest():
+                raise ValueError("Decision review-timing ledger changed during export")
+            namespaces = validation.get("source_namespaces")
+            if (
+                not isinstance(namespaces, list)
+                or len(namespaces)
+                > limits["max_review_timing_source_namespaces"]
+                or any(
+                    not isinstance(namespace, str) or not namespace
+                    for namespace in namespaces
+                )
+            ):
+                raise ValueError("Decision review-timing source namespace bound invalid")
+            for namespace in namespaces:
+                directory = artifact_root / namespace
+                directory_inventory = _strict_regular_files_under(
+                    directory,
+                    root=root,
+                    max_file_count=limits["max_standard_artifact_file_count"],
+                    max_total_bytes=limits["max_standard_artifact_total_bytes"],
+                    max_single_file_bytes=limits["max_single_artifact_file_bytes"],
+                )
+                directory_paths = {
+                    path for path in directory_inventory if not _skip(path, root=root)
+                }
+                if not directory_paths or not directory_paths <= eligible:
+                    raise ValueError(
+                        "Decision review-timing source namespace is incomplete or unsafe"
+                    )
+                selected.update(directory_paths)
+                for path in directory_paths:
+                    roles[path] = selector_roles[kind]
+            validation_result = dict(validation)
+            validation_status = validation_result.pop("status", None)
+            selector_results.append(
+                {
+                    "kind": kind,
+                    "path": control_name,
+                    **validation_result,
+                    "source_validation_status": validation_status,
+                    "status": (
+                        "selected" if namespaces else "selected_empty"
+                    ),
+                }
+            )
+            continue
         namespace, result = selector_loaders[kind](payload)
         if kind == "latest_bybit_execution_quality_namespace":
             from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_capture import (

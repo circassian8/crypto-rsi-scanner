@@ -390,6 +390,9 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert first["outcomes"]["source"] == "canonical_candidate_pending_base"
     assert first["outcomes"]["pending"] == 3
     assert first["outcomes"]["matured"] == 0
+    assert first["human_review_timing"]["status"] == "no_events"
+    assert first["campaign_metrics"]["review_timing_first_views"] == 0
+    assert first["campaign_metrics"]["review_timing_completed_reviews"] == 0
     assert first["pointer"]["exact_operator_binding"] is True
     conclusion = first["campaign_v2_conclusion"]
     assert conclusion["baseline_status"] == "warming"

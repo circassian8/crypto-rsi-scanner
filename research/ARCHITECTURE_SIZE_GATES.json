@@ -1532,7 +1532,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1441,
+      "line_count": 1448,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
       "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1064,
+  "file_count": 1067,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-18T06:44:54.593414+00:00",
+  "generated_at": "2026-07-18T07:39:17.161810+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1871,7 +1871,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1441,
+      "line_count": 1448,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "source_kind": "production"
     },
@@ -2173,7 +2173,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1254,
+      "line_count": 1257,
       "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
@@ -3811,7 +3811,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1441,
+      "line_count": 1448,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3982,7 +3982,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1441,
+      "line_count": 1448,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "source_kind": "production"
     },
@@ -4401,7 +4401,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1441,
+          "line_count": 1448,
           "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
           "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
           "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
@@ -4638,7 +4638,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1441,
+        "line_count": 1448,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
@@ -4853,7 +4853,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1441,
+            "line_count": 1448,
             "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
             "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
             "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",

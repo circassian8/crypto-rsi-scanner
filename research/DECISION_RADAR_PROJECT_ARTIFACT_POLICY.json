@@ -36,6 +36,10 @@
     {
       "kind": "latest_bybit_intraday_namespace",
       "path": "radar_bybit_intraday_latest.json"
+    },
+    {
+      "kind": "review_timing_source_namespaces",
+      "path": "radar_market_history_cache/event_decision_radar_review_timing_events.jsonl"
     }
   ],
   "history_archive": {
@@ -49,6 +53,7 @@
     "max_history_file_count": 4096,
     "max_history_total_bytes": 1610612736,
     "max_single_artifact_file_bytes": 134217728,
+    "max_review_timing_source_namespaces": 64,
     "max_standard_artifact_file_count": 512,
     "max_standard_artifact_total_bytes": 402653184
   },

@@ -93,6 +93,14 @@ sealed annex explicitly binds its capture ID.
 - Keep idea availability and human review latency separate from market HTTP
   latency. `idea_observed_at`, `idea_available_at`, first operator view, review
   completion, and their clock sources require their own exact audit evidence.
+- That audit surface is implemented through the shared append-only Decision
+  campaign review-timing ledger. Availability is conservatively proven by the
+  exact owned-dashboard operations receipt; first view and completion require
+  separate confirmed human commands. Dashboard requests never create events.
+  The campaign report revalidates every receipt/candidate/Core/projection
+  binding and applies a point-in-time cutoff, while all timing rows remain
+  Protocol-v2-ineligible until the annex seals clock, censoring, missing-action,
+  and latency-cost rules.
 - Do not attach bars to the campaign or call them Protocol-v2 evidence until a
   separately authorized immutable capture exists and the sealed annex binds
   its exact source, freshness, universe, partition, and missing-data rules.

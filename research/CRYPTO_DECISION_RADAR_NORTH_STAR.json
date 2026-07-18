@@ -185,7 +185,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-18T00:53:02+00:00",
+  "generated_at": "2026-07-18T07:09:15+00:00",
   "empirical_validation_lab": {
     "additional_data_needed": [
       "observed bid-ask spread and order-book execution-quality snapshots",
@@ -1007,8 +1007,34 @@
       "feature and time maturity",
       "next eligible observation time and command",
       "pending and mature outcomes",
+      "explicit human review timing",
       "data-quality limitations"
-    ]
+    ],
+    "human_review_timing": {
+      "automatic_policy_effect": "none",
+      "campaign_attachment": "descriptive_exact_identity",
+      "completion_command": "CONFIRM=1 make radar-review-timing-complete RADAR_REVIEW_NAMESPACE=<exact> RADAR_REVIEW_IDEA_ID=<exact> RADAR_REVIEWER_ALIAS=<alias> PYTHON=.venv/bin/python",
+      "dashboard_get_head_count_as_view": false,
+      "first_view_command": "CONFIRM=1 make radar-review-timing-view RADAR_REVIEW_NAMESPACE=<exact> RADAR_REVIEW_IDEA_ID=<exact> RADAR_REVIEWER_ALIAS=<alias> PYTHON=.venv/bin/python",
+      "idea_available_at": "exact owned-dashboard operations receipt recorded_at",
+      "idea_observed_at": "canonical Decision projection decision_evaluated_at",
+      "ledger": "radar_market_history_cache/event_decision_radar_review_timing_events.jsonl",
+      "maximum_events_per_idea": {
+        "first_viewed": 1,
+        "review_completed": 1
+      },
+      "missing_action_behavior": "unavailable; never synthesized",
+      "point_in_time_report_cutoff": true,
+      "protocol_v2_annex_bound": false,
+      "protocol_v2_evidence_eligible": false,
+      "source_bindings": [
+        "artifact namespace run revision and operator-state digest",
+        "canonical Decision projection digest",
+        "integrated-candidate and Core artifact digests",
+        "final publication and operations receipt digests"
+      ],
+      "status_command": "make radar-review-timing-status PYTHON=.venv/bin/python"
+    }
   },
   "daily_operations": {
     "authorization_truth": {

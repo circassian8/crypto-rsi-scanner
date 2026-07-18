@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T06:46:58.589641+00:00` from local artifacts only.
+Generated at `2026-07-18T07:27:39.303369+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -17,6 +17,8 @@ Research and decision support only. This report contains no trade recommendation
 - Proxy feature evidence: `952`
 - Pending outcomes: `3`
 - Matured outcomes: `1`
+- Explicit first-view records: `0`
+- Completed human reviews: `0`
 - Provider failures: `2`
 - Preflight/blocked attempts: `1`
 - Event Alpha catalyst burn-in: `separate_not_aggregated`
@@ -118,6 +120,21 @@ Research and decision support only. This report contains no trade recommendation
 - Source: `campaign_outcome_ledger`
 - Refresh/build errors: `0`
 - Human labels remain optional preference feedback; no thresholds or routes change automatically.
+
+## Human review timing
+
+Human review is counted only through explicit confirmed actions; dashboard GET/HEAD and health probes never create timing evidence.
+- Status: `no_events`
+- Ledger events: `0`
+- Idea records: `0`
+- First views: `0`
+- Completed reviews: `0`
+- Incomplete reviews: `0`
+- Events after report time: `0`
+- Availability definition: exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD
+- Latency definition: `idea_available_at_to_review_completed_at`
+- Protocol-v2 evidence eligible: `false` until the sealed annex binds the exact clock and missing-data rules.
+- No explicit human review timing has been recorded.
 
 ## Anomaly episodes (shadow)
 

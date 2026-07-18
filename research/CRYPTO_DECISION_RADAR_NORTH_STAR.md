@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-18T00:53:02+00:00`
+- generated_at: `2026-07-18T07:09:15+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -787,6 +787,26 @@ unpublished final state; legacy `audit_status` is only a compatibility alias for
 Its Decision campaign totals remain explicitly separate from Event Alpha
 catalyst burn-in.
 
+Human review latency is a separate explicit-action measurement, never a web
+analytics side effect. The shared append-only ledger is
+`radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
+Only confirmed `radar-review-timing-view` and
+`radar-review-timing-complete` commands can append one first-view and one later
+completion event for an exact namespace/idea; status is read-only/no-network.
+Dashboard GET/HEAD, phone access, health probes, previews, and notifications
+never count as human attention. `idea_observed_at` comes from the canonical
+Decision projection. Conservative provable `idea_available_at` is the exact
+owned-dashboard operations-receipt time. Every event binds the run, revision,
+operator-state digest, canonical Decision projection, candidate/Core artifact
+digests, and publication/operations receipt digests. The campaign report
+revalidates those sources and derives pipeline, available-to-first-view,
+review-duration, and available-to-completion latency through its point-in-time
+report cutoff. No event is invented when a review action is absent. The entire
+surface is descriptive, makes zero provider calls, has no automatic policy
+effect, and remains `protocol_v2_evidence_eligible=false` and
+`protocol_v2_annex_bound=false` until preregistration seals clocks, censoring,
+missing-action, and latency-cost rules.
+
 ## Daily Operations and Execution-Quality Readiness
 
 Daily Operations v1.1 is a local maintenance coordinator, not a trading system.
@@ -947,6 +967,13 @@ The remaining human decisions stay explicit:
   radar-intraday-bybit-capture PYTHON=.venv/bin/python` may collect and seal
   exact 1h/4h responses. Disable the boundary by unsetting that flag. A complete
   capture remains campaign-detached and annex-ineligible until preregistration.
+- Human review timing: inspect `make radar-review-timing-status
+  PYTHON=.venv/bin/python` without a provider call or write. Record only a real
+  human action with `CONFIRM=1 make radar-review-timing-view
+  RADAR_REVIEW_NAMESPACE=<exact> RADAR_REVIEW_IDEA_ID=<exact>
+  RADAR_REVIEWER_ALIAS=<alias>` and later the matching `...-complete` target.
+  The application never records a dashboard request as a view, and no missing
+  action is synthesized.
 - Phone access: private and public readiness/status are non-enabling checks.
   Either route requires its exact `CONFIRM=1 ...-enable` command and is rolled
   back only with the matching confirmed disable command; neither is enabled by

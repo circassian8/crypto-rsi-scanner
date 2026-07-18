@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Measure human review latency only from explicit receipt-bound actions
+**Status:** accepted
+**Decision:** Decision Radar must never infer a human view from dashboard GET,
+HEAD, phone access, health probes, or notification rendering. One exact
+receipt-backed campaign idea may receive at most one confirmed `first_viewed`
+event and one later confirmed `review_completed` event in the append-only shared
+review-timing ledger. `idea_observed_at` comes from the canonical Decision
+projection; conservative provable `idea_available_at` is the immutable owned-
+dashboard operations-receipt time. Events bind namespace, run, revision,
+operator digest, candidate/Core artifact fingerprints, canonical projection,
+and both final receipts. The campaign report derives point-in-time pipeline,
+first-view, review-duration, and available-to-completion latency. These values
+are descriptive campaign evidence only and remain Protocol-v2-ineligible until
+the sealed annex binds clock, missing-action, censoring, and latency-cost rules.
+They never change scores, routes, outcomes, authorization, or authority.
+**Why:** Automated requests cannot prove operator attention, while mutable or
+unbound timestamps would create look-ahead and attribution ambiguity. Explicit
+actions preserve the human/system boundary and exact idea lineage.
+**Revisit when:** The Protocol-v2 annex is ready to seal the human-review clock,
+right-censoring/missing-action treatment, and latency-cost rule before any
+untouched holdout is identified or read.
+
 ## 2026-07-18 - Preserve direct intraday evidence as immutable annex-detached captures
 **Status:** accepted
 **Decision:** A confirmed direct Bybit 1h/4h capture must retain the exact

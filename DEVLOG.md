@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record explicit receipt-bound Decision review latency · Codex
+**Why:** Protocol v2 needs genuine point-in-time operator latency, but dashboard
+requests, health probes, and inferred attention cannot prove a human review or
+be allowed to contaminate empirical evidence.
+**Changes:**
+- Added a confirmation-gated append-only campaign ledger with one exact
+  `first_viewed` and one later `review_completed` action per receipt-backed
+  live/no-send idea. Events bind the canonical Decision projection,
+  candidate/Core fingerprints, namespace/run/revision/operator identity, and
+  final publication/operations receipts.
+- Added read-only timing status plus explicit view/complete operator commands.
+  The campaign report now derives point-in-time pipeline, first-view,
+  review-duration, and available-to-completion latency while keeping every row
+  descriptive, annex-detached, and Protocol-v2-ineligible.
+- Hardened ledger reads/appends against partial rows, duplicate or drifting
+  bindings, noncanonical values, secret markers, bounds, symlink leaves and
+  parents, identity races, and unsafe filesystem features. The project review
+  exporter now revalidates the ledger and includes every exact source
+  generation, failing closed if ledger bytes drift during export.
+- Updated the working agreement, North Star, venue decision package, artifact
+  policy, roadmap, durable decision record, campaign reports, and static
+  architecture reports. The real ledger remains honestly empty because no
+  human action was fabricated.
+**Verify:** 126 focused timing/campaign/publication/export/security tests passed;
+the dedicated export parent-symlink regression passed; compileall, JSON
+validation, `git diff --check`, real no-call timing status, real no-call
+campaign-report regeneration, and architecture cleanliness passed. The local
+release gate passed 1,390/1,391 standalone tests inside the restricted sandbox;
+the sole loopback-socket denial then passed as an exact elevated test. The
+remaining pytest package gate passed 2,704 tests with that already-proven test
+deselected, and alert render, fixture backtest, and paper scoreboard smokes
+passed.
+**Notes/risks:** Review availability deliberately uses the conservative owned-
+dashboard operations-receipt clock. Missing human actions remain missing until
+the owner explicitly records them; the Protocol-v2 annex must preregister
+censoring, clock, and latency-cost treatment before admission. No provider
+call, authorization mutation, send, order, trade, paper/RSI write, fade trigger,
+score/route/threshold change, outcome rewrite, or dashboard publication
+occurred.
+
 ## 2026-07-18 — Advance the live baseline to thirteen clean cycles · Codex
 **Why:** The observation campaign was cadence-eligible again, and regular
 point-in-time collection is the first prerequisite for every later empirical
