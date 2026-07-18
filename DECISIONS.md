@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Reconcile campaign attempts by exact receipt identity
+**Status:** accepted
+**Decision:** Treat each immutable root `attempt_id` as one individual no-send
+campaign attempt. A namespace generation/audit projection that has no attempt
+ID may enrich that receipt with its exact run ID only when namespace and
+observation timestamp identify exactly one receipt and terminal status, provider
+result, source mode, and safety fields all agree. Preserve genuinely separate
+receipt IDs even when an operator reuses a namespace. Reject ambiguous
+projections and contradictory duplicate receipts instead of choosing a
+convenient row or altering failure counts.
+**Why:** A failed cycle is recorded both at the durable root boundary and inside
+its namespace. Counting representations made the two genuine July 18 provider
+failures appear as four, while deduplicating by namespace alone would erase
+legitimate repeated attempts. Receipt-first reconciliation keeps both audit
+surfaces and gives the campaign one coherent terminal count.
+**Revisit when:** The run coordinator introduces one stronger immutable cycle ID
+that is written atomically into every attempt, generation, and audit artifact;
+then migrate through an explicit compatibility contract rather than silently
+reinterpreting historical rows.
+
 ## 2026-07-18 - Separate immutable capture quality from Protocol-v2 evidence authority
 **Status:** accepted
 **Decision:** Preserve each successful Bybit public execution-quality run as one

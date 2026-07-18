@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T00:30:10.564975+00:00` from local artifacts only.
+Generated at `2026-07-18T02:26:03.798252+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -142,7 +142,7 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 | Namespace | Observed at | Status | Provider attempted | Failure class |
 |---|---|---|---|---|
 | radar_market_no_send_20260718t002953190093z_d31fe5583f6d | 2026-07-18T00:29:53.294224+00:00 | provider_unavailable | true | ClientConnectorDNSError |
-| radar_market_no_send_20260718t002953190093z_d31fe5583f6d | 2026-07-18T00:29:53.294224+00:00 | provider_unavailable | true | ClientConnectorDNSError |
+| radar_market_no_send_20260718t014700z | 2026-07-18T01:47:01.192491+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 
 | Namespace | Observed at | Status | Provider attempted | Failure class |
 |---|---|---|---|---|
@@ -160,7 +160,7 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 
 ## Next observation
 
-- Next eligible time: `2026-07-18T01:29:53.294224+00:00`
+- Next eligible time: `2026-07-18T02:47:01.192491+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-market-no-send-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.

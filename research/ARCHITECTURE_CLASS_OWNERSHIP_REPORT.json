@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 9788,
+  "function_count": 9798,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-18T02:05:49.093765+00:00",
+  "generated_at": "2026-07-18T02:26:14.853102+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -2996,13 +2996,6 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1496,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1492,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3061,6 +3054,13 @@
     {
       "line_count": 1397,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1397,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3569,14 +3569,6 @@
         },
         {
           "accepted": true,
-          "line_count": 1496,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
           "line_count": 1492,
           "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
           "reason": "Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol.",
@@ -3645,6 +3637,14 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
           "reason": "Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary.",
           "revisit_condition": "When the live calendar container schema changes or a second publication format is introduced.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
+          "line_count": 1397,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
           "threshold": 1200
         },
         {
@@ -3807,11 +3807,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1496,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1492,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
         "threshold": 1200
@@ -3854,6 +3849,11 @@
       {
         "line_count": 1397,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1397,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
@@ -3953,14 +3953,6 @@
           },
           {
             "accepted": true,
-            "line_count": 1496,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
             "line_count": 1492,
             "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
             "reason": "Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol.",
@@ -4029,6 +4021,14 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
             "reason": "Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary.",
             "revisit_condition": "When the live calendar container schema changes or a second publication format is introduced.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
+            "line_count": 1397,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
             "threshold": 1200
           },
           {

@@ -421,7 +421,12 @@ may be added later when a suitable environment already exists.
   live request in one eligible invocation. It never creates authorization. A
   stable base-root cadence receipt and bounded attempt ledger survive campaign
   state-directory replacement, and the exact latest-attempt receipt prevents a
-  blocked run from reusing an older complete manifest. Only canonical live/
+  blocked run from reusing an older complete manifest. Campaign reports use
+  root no-send `attempt_id` values as individual terminal-attempt identities;
+  an ID-less namespace projection may enrich a receipt only when namespace and
+  observation time identify exactly one attempt and every terminal field
+  agrees. Ambiguous or contradictory cross-artifact representations block the
+  report rather than changing counts. Only canonical live/
   no-send provenance plus a fresh strict doctor may publish. Published
   namespaces are immutable, so later live cycles use a new namespace and seed
   their exact history snapshot from `radar_market_history_cache`; fixture/mock

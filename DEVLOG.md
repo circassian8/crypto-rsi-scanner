@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Reconcile terminal campaign attempts across audit layers · Codex
+**Why:** Each genuine failed market cycle appeared once in the root attempt
+ledger and once through its namespace generation/audit. The campaign report
+therefore counted two July 18 failures as four and overstated provider trouble.
+**Changes:**
+- Extracted attempt projection/reconciliation into a focused module. Immutable
+  root `attempt_id` remains the individual-attempt authority; one compatible,
+  ID-less namespace projection can add its exact run ID without becoming a
+  second attempt.
+- Made duplicate receipt fields closed and deterministic. Conflicting rows or
+  an anonymous projection matching multiple receipts now fail the report closed;
+  separate receipt IDs remain separate even when they reuse a namespace.
+- Regenerated current campaign truth: 9 successful real cycles, 270 retained
+  observations, and exactly 2 unique provider failures. Both failures preserve
+  attempt ID, namespace, run ID, timestamp, failure class, and no-send safety.
+  Updated the working agreement, durable decision, roadmap, and architecture
+  reports.
+**Verify:** 102 focused campaign, attempt, dashboard-history, and Daily
+Operations tests passed; compileall passed; architecture cleanliness passed
+with zero new size violations; the no-provider campaign report regenerated
+successfully and reports 2 failures rather than 4. Full `verify-fast` was not
+repeated because the immediately preceding Bybit capture slice already passed
+all 2,655 tests and this bounded reporting change received its focused gates.
+**Notes/risks:** Both CoinGecko calls failed at the local sandbox DNS boundary.
+No retry, proxy/VPN, authorization change, provider-policy bypass, observation,
+publication, send, trade, order, paper trade, RSI write, or fade trigger occurred.
+
 ## 2026-07-18 — Seal immutable Bybit execution-quality capture bundles · Codex
 **Why:** The selected Bybit perpetual adapter could normalize public books, but
 its stdout-only result could not serve as durable point-in-time evidence. The

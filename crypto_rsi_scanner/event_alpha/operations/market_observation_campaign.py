@@ -27,6 +27,7 @@ from ..radar.integrated import api as integrated_radar
 from . import daily_operations_publication
 from . import market_no_send_audit, market_no_send_history_cache
 from . import market_no_send_publication
+from . import market_observation_campaign_attempts
 from . import market_observation_campaign_cadence
 from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
@@ -34,7 +35,6 @@ from . import market_observation_campaign_scorecard
 from . import market_observation_campaign_snapshots
 from . import market_observation_outcomes
 from .market_no_send_models import SAFETY_COUNTERS
-from .market_no_send_attempt import ATTEMPT_LEDGER_FILENAME, LATEST_ATTEMPT_FILENAME
 from .market_no_send_io import read_json_object, read_jsonl, safe_existing_namespace_dir
 from .market_no_send_models import MarketNoSendError
 from .market_observation_campaign_render import (
@@ -57,6 +57,12 @@ OPERATIONS_RECEIPT_FILENAME = daily_operations_publication.OPERATIONS_RECEIPT_FI
 REQUEST_LEDGER_FILENAME = "event_market_no_send_request_ledger.json"
 HISTORY_FILENAME = "event_market_history.jsonl"
 OPERATOR_STATE_FILENAME = "event_alpha_operator_state.json"
+
+_attempt_row = market_observation_campaign_attempts.attempt_row
+_attempt_sort_key = market_observation_campaign_attempts.attempt_sort_key
+_deduplicate_attempts = market_observation_campaign_attempts.deduplicate_attempts
+_is_live_market_attempt = market_observation_campaign_attempts.is_live_market_attempt
+_load_root_attempts = market_observation_campaign_attempts.load_root_attempts
 
 _SAFETY_COUNTER_FIELDS = (
     "telegram_sends",
@@ -1162,103 +1168,6 @@ def _pointer_history(
     return rows
 
 
-def _load_root_attempts(base: Path) -> list[dict[str, Any]]:
-    raw: list[Mapping[str, Any]] = []
-    audit = _read_json(base / PILOT_AUDIT_FILENAME)
-    if audit:
-        raw.append(audit)
-    receipt = _read_json(base / LATEST_ATTEMPT_FILENAME)
-    if receipt:
-        raw.append(receipt)
-    raw.extend(read_jsonl(base / ATTEMPT_LEDGER_FILENAME))
-    return [
-        _attempt_row({}, row, namespace=_text(row.get("artifact_namespace")) or "unknown")
-        for row in raw
-        if _is_live_market_attempt({}, row)
-    ]
-
-
-def _attempt_row(
-    manifest: Mapping[str, Any],
-    audit: Mapping[str, Any],
-    *,
-    namespace: str,
-) -> dict[str, Any]:
-    status = _text(manifest.get("status") or audit.get("attempt_status") or audit.get("status") or "unknown")
-    return {
-        "attempt_id": _text(audit.get("attempt_id")) or None,
-        "artifact_namespace": namespace,
-        "run_id": _text(manifest.get("run_id") or audit.get("exact_run_id") or audit.get("run_id")) or None,
-        "observed_at": _safe_timestamp(
-            manifest.get("observed_at") or audit.get("observed_at") or audit.get("generated_at")
-        ),
-        "attempt_status": status,
-        "provider": _text(manifest.get("provider") or audit.get("provider") or "coingecko"),
-        "provider_call_attempted": _strict_true(manifest, audit, "provider_call_attempted"),
-        "provider_request_succeeded": _strict_true(manifest, audit, "provider_request_succeeded"),
-        "failure_class": _safe_error_class(
-            manifest.get("failure_class") or audit.get("failure_class") or audit.get("error_class")
-        ),
-        "candidate_source_mode": _text(
-            manifest.get("candidate_source_mode") or audit.get("candidate_source_mode") or "preflight_only"
-        ),
-        "no_send": (
-            manifest.get("no_send") is True
-            or audit.get("no_send") is True
-            or _mapping(audit.get("safety")).get("no_send") is True
-        ),
-        "research_only": (
-            manifest.get("research_only") is True
-            or audit.get("research_only") is True
-            or _mapping(audit.get("safety")).get("research_only") is True
-        ),
-    }
-
-
-def _deduplicate_attempts(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    selected: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for row in rows:
-        attempt_id = _text(row.get("attempt_id"))
-        key = (
-            ("attempt_id", attempt_id)
-            if attempt_id
-            else (
-                "legacy_attempt",
-                row.get("artifact_namespace"),
-                row.get("run_id"),
-                row.get("observed_at"),
-                row.get("attempt_status"),
-                row.get("provider_call_attempted"),
-                row.get("provider_request_succeeded"),
-            )
-        )
-        selected[key] = dict(row)
-    return sorted(selected.values(), key=_attempt_sort_key)
-
-
-def _is_live_market_attempt(
-    manifest: Mapping[str, Any],
-    audit: Mapping[str, Any],
-) -> bool:
-    mode = _text(manifest.get("data_mode") or audit.get("data_mode")).casefold()
-    acquisition = _text(
-        manifest.get("data_acquisition_mode") or audit.get("data_acquisition_mode")
-    ).casefold()
-    candidate_mode = _text(
-        manifest.get("candidate_source_mode") or audit.get("candidate_source_mode")
-    ).casefold()
-    provider = _text(manifest.get("provider") or audit.get("provider")).casefold()
-    return bool(
-        mode == "live"
-        or acquisition in {"live_provider", "preflight_only"}
-        or candidate_mode in {"live_no_send", "preflight_only"}
-        or (provider == "coingecko" and audit.get("row_type") in {
-            "event_market_no_send_pilot_audit",
-            "event_market_no_send_latest_attempt",
-        })
-    ) and candidate_mode != "mocked_fixture" and mode != "mock"
-
-
 def _resolve_current_authority(
     base: Path,
     *,
@@ -1380,14 +1289,6 @@ def _write_atomic(path: Path, data: bytes) -> None:
 
 
 def _generation_sort_key(row: Mapping[str, Any]) -> tuple[str, str, str]:
-    return (
-        _text(row.get("observed_at")),
-        _text(row.get("artifact_namespace")),
-        _text(row.get("run_id")),
-    )
-
-
-def _attempt_sort_key(row: Mapping[str, Any]) -> tuple[str, str, str]:
     return (
         _text(row.get("observed_at")),
         _text(row.get("artifact_namespace")),
