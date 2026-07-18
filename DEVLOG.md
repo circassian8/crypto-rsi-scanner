@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Advance the live baseline to fourteen clean cycles · Codex
+**Why:** The campaign was cadence-eligible again, and another genuine
+point-in-time observation was needed to warm direct temporal evidence before
+any Protocol-v2 algorithm or score work is allowed.
+**Changes:**
+- Ran exactly one already-authorized Daily Operations no-send cycle. The single
+  CoinGecko request returned HTTP 200 in 1.511 seconds with 80 source rows, 30
+  selected observations, and zero retries; namespace
+  `radar_market_no_send_20260718t080415034561z_6d91b49d88b1` published at
+  revision 12 and the owned dashboard restarted successfully.
+- Refreshed campaign truth to 14 real cycles, 420 retained observations, 390
+  baseline-counted observations, 30 too-close observations, five historical
+  ideas, zero current ideas, one matured outcome, three pending outcomes, and
+  one explicit `due_missing_price` outcome.
+- The exact current 30-asset universe remains fully observed and warming. Its
+  direct 4h feature group advanced from cold to warming for all 30 assets; 1h
+  is warming for all 30, 24h is warming for 29 with one cold, and no asset is
+  globally warm yet. The next eligible observation is 2026-07-18 09:04:15 UTC.
+**Verify:** The final operator state is strict-doctor `OK` with zero blockers
+and warnings; publication and dashboard-operations receipts bind the exact
+namespace/run/revision/operator digest; campaign report, pointer, authority
+status, and dashboard readiness agree; post-cycle status is `waiting_cadence`.
+**Notes/risks:** The clean generation produced no anomaly or Decision idea;
+thresholds were not lowered. The scheduler remains uninstalled. No sends,
+orders, trades, paper/RSI writes, fade triggers, authorization mutations,
+Bybit calls, retries, or GitHub-check waits occurred. Spread coverage remains
+zero and the historical missing-price outcome remains unresolved.
+
 ## 2026-07-18 — Define venue-native Bybit derivatives context · Codex
 **Why:** The selected Protocol-v2 research surface is Bybit USDT-linear
 perpetuals, so derivatives crowding context must share its exact venue-native
