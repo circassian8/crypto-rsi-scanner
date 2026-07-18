@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Fixture configuration never implies live-provider readiness
+**Status:** accepted
+**Decision:** A checked-in or operator-selected fixture path may establish only
+`fixture_input_configured` and parser coverage. It must not set live
+`configured`, authorization, transport, mapping, request budget, rehearsal
+eligibility, provider health, or evidence authority. Fixture-only provider rows
+must expose `configuration_scope=fixture_input_only`, the explicit live
+transport/authorization/mapping states, zero current live request budget, and
+closed rehearsal blockers. Operator and dashboard surfaces label this state
+“Fixture only,” and strict doctor checks reject a fixture-scoped row that claims
+live configuration, call permission, eligibility, or implemented transport.
+This applies to the current offline Binance-public parser, structured-calendar
+parsers, DEX/on-chain parsers, and DefiLlama fundamentals parser; it does not
+change genuine live adapters with their own explicit authorization boundary.
+**Why:** File existence proves that deterministic parser mechanics can be
+tested. It says nothing about a current provider transport, authorization,
+real-world identity mapping, reachability, freshness, or admissible evidence.
+Conflating those states makes operator readiness and dashboard coverage look
+healthier than the system actually is.
+**Revisit when:** A provider gets a bounded live transport, a separate explicit
+authorization contract, genuine mapping where required, immutable raw capture,
+ledger/health/backoff/freshness controls, and focused doctor coverage. Promote
+only that provider's live fields; never infer promotion from its fixture path.
+
 ## 2026-07-18 - Keep DefiLlama fundamentals typed, mapped, and fixture-first
 **Status:** accepted
 **Decision:** The candidate DefiLlama protocol-fundamentals contract uses four

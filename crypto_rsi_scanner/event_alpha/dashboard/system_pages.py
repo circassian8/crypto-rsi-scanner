@@ -1088,6 +1088,21 @@ def _provider_assessment(item: Mapping[str, Any]) -> tuple[str, str, str]:
     combined = f"{status} {reason}".casefold()
     failures = _number(item.get("consecutive_failures"))
     http = _number(item.get("request_http_status") or item.get("http_status"))
+    transport_status = str(item.get("live_transport_status") or "").strip().casefold()
+    configuration_scope = str(item.get("configuration_scope") or "").strip().casefold()
+    if configuration_scope == "fixture_input_only" or transport_status in {
+        "fixture_only",
+        "not_implemented",
+    }:
+        fixture_status = str(item.get("fixture_parser_status") or "not observed")
+        mapping_status = str(item.get("live_mapping_status") or "not recorded")
+        return (
+            "Fixture only",
+            "muted",
+            "Offline parser evidence only; no live provider transport is implemented or "
+            f"eligible. Fixture parser: {humanize_enum(fixture_status)}; live mapping: "
+            f"{humanize_enum(mapping_status)}.",
+        )
     if (
         (failures is not None and failures > 0)
         or (http is not None and http >= 400)

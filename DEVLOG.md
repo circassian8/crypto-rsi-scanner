@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Separate fixture readiness from live-provider truth · Codex
+**Why:** Legacy provider surfaces treated an existing fixture path as
+`configured`, which could make offline parser coverage—especially DefiLlama
+fundamentals—look like a usable live source despite having no transport,
+authorization contract, or genuine mapping registry.
+**Changes:**
+- Added closed activation truth fields for fixture configuration, live
+  configuration scope, transport, authorization, mapping, rehearsal
+  eligibility, and exact blockers across provider activation and DEX/on-chain
+  readiness artifacts.
+- Reclassified the offline Binance-public, Tokenomist/Messari/CoinMarketCal,
+  GeckoTerminal/CoinGecko DEX, and DefiLlama paths as fixture-input-only. They
+  retain parser smokes but advertise zero live request budget and cannot be
+  made eligible by file existence or a credential alone.
+- Source coverage now says `live_configured` versus
+  `fixture_input_configured`; System Health labels these rows “Fixture only”;
+  DefiLlama visibly retains `missing_real_registry`; schema fields and strict
+  doctor checks reject fixture/live contradictions.
+- Updated the durable decision, roadmap, and DefiLlama interface review. No
+  provider transport, authorization, call, health claim, campaign/dashboard
+  authority, score, route, threshold, send, trade, order, paper trade, RSI
+  write, or Event Alpha fade behavior was added.
+**Verify:** All 215 focused provider/readiness/source-coverage/doctor/dashboard/
+schema/DefiLlama tests pass; the DEX/on-chain, live-provider, and typed
+DefiLlama no-call smokes pass; Python compileall, JSON validation, architecture
+cleanliness (zero new violations), and `git diff --check` pass.
+**Notes/risks:** This intentionally corrects the meaning of the legacy
+`configured` field for fixture-only rows. A future live adapter must add its
+own bounded transport and explicit authorization contract before changing that
+state; setting a fixture path remains insufficient. Full `make verify` is not
+needed for this provider-readiness projection because focused artifact,
+doctor, dashboard, schema, smoke, syntax, and architecture gates cover the
+changed boundary.
+
 ## 2026-07-18 — Preserve a cadence-reserved market failure honestly · Codex
 **Why:** The campaign became eligible for its next genuine CoinGecko
 observation, but local DNS resolution failed after the guarded provider boundary

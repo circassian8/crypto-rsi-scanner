@@ -71,6 +71,16 @@
   "implemented_contract": "decision_radar_defillama_fundamentals_v1",
   "safe_command": "make radar-fundamentals-defillama-smoke PYTHON=.venv/bin/python",
   "live_transport_implemented": false,
+  "readiness_projection": {
+    "configuration_scope": "fixture_input_only",
+    "fixture_input_configured": true,
+    "live_configured": false,
+    "live_transport_status": "not_implemented",
+    "live_authorization_status": "not_defined",
+    "live_mapping_status": "missing_real_registry",
+    "live_rehearsal_eligible": false,
+    "max_live_requests_per_run": 0
+  },
   "provider_authorization_created": false,
   "fixture_authority_eligible": false,
   "campaign_evidence_eligible": false,

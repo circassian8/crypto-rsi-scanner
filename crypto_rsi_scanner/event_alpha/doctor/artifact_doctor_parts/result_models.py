@@ -273,6 +273,7 @@ class _DoctorResultProviderReadinessFields:
     live_provider_readiness_secret_leak: int = 0
     live_provider_readiness_live_calls_allowed_in_smoke: int = 0
     live_provider_readiness_configured_missing_env: int = 0
+    live_provider_readiness_fixture_live_state_conflict: int = 0
     coinalyze_preflight_secret_leak: int = 0
     coinalyze_preflight_live_call_allowed_in_smoke: int = 0
     coinalyze_preflight_configured_missing_env: int = 0
@@ -311,6 +312,7 @@ class _DoctorResultProviderEvidenceFields:
     dex_onchain_live_without_ledger: int = 0
     dex_onchain_live_call_allowed_in_smoke: int = 0
     dex_onchain_missing_fixture_parser_status: int = 0
+    dex_onchain_fixture_live_state_conflict: int = 0
     dex_onchain_forbidden_side_effect_claim: int = 0
     dex_low_liquidity_promoted_confirmed: int = 0
     protocol_metric_missing_source_time: int = 0

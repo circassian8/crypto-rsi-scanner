@@ -247,15 +247,26 @@ def _dex_onchain_activation_lines(report: EventAlphaSourceCoverageReport) -> lis
 
 
 def _provider_row_lines(provider_rows: Iterable[Mapping[str, Any]]) -> list[str]:
-    return [
-        "  - "
-        f"{row.get('provider') or 'unknown'} "
-        f"configured={str(bool(row.get('configured'))).lower()} "
-        f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
-        f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
-        f"source_packs={_join(row.get('source_packs_enabled') or ())}"
-        for row in provider_rows
-    ]
+    lines: list[str] = []
+    for row in provider_rows:
+        if "configuration_scope" in row:
+            configuration = (
+                f"live_configured={str(bool(row.get('configured'))).lower()} "
+                f"fixture_input_configured="
+                f"{str(bool(row.get('fixture_input_configured'))).lower()} "
+                f"live_transport_status={row.get('live_transport_status') or 'unknown'} "
+            )
+        else:
+            configuration = f"configured={str(bool(row.get('configured'))).lower()} "
+        lines.append(
+            "  - "
+            f"{row.get('provider') or 'unknown'} "
+            f"{configuration}"
+            f"fixture_parser_status={row.get('fixture_parser_status') or 'unknown'} "
+            f"live_call_allowed={str(bool(row.get('live_call_allowed'))).lower()} "
+            f"source_packs={_join(row.get('source_packs_enabled') or ())}"
+        )
+    return lines
 
 
 def _official_exchange_activation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:

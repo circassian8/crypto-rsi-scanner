@@ -201,6 +201,7 @@ def _live_provider_readiness_conflicts(namespace_dir: str | Path | None) -> dict
         "live_provider_readiness_secret_leak": 0,
         "live_provider_readiness_live_calls_allowed_in_smoke": 0,
         "live_provider_readiness_configured_missing_env": 0,
+        "live_provider_readiness_fixture_live_state_conflict": 0,
     }
     if namespace_dir is None:
         return out
@@ -238,6 +239,13 @@ def _live_provider_readiness_conflicts(namespace_dir: str | Path | None) -> dict
                     out["live_provider_readiness_live_calls_allowed_in_smoke"] += 1
                 if bool(provider.get("configured")) and str(provider.get("preflight_status") or "") == "missing_config":
                     out["live_provider_readiness_configured_missing_env"] += 1
+                if str(provider.get("configuration_scope") or "") == "fixture_input_only" and (
+                    bool(provider.get("configured"))
+                    or bool(provider.get("live_call_allowed"))
+                    or bool(provider.get("live_rehearsal_eligible"))
+                    or str(provider.get("live_transport_status") or "") != "not_implemented"
+                ):
+                    out["live_provider_readiness_fixture_live_state_conflict"] += 1
     return out
 
 def _text_has_secret_like_value(text: str) -> bool:

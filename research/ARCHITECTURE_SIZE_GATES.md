@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-18T13:40:38.080237+00:00`
+- generated_at: `2026-07-18T14:03:50.822095+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -114,8 +114,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
+| `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1257 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 |
-| `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1242 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1235 |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 |
 | `crypto_rsi_scanner/event_alpha/dashboard/public_access.py` | 1200 |
@@ -158,8 +158,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 | The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface. | When the calendar page gains a new interaction family and has byte-stable page-section fixtures. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
+| `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1257 | The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection. | When health sections have independent golden render fixtures or the system-page contract reaches v2. |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
-| `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1242 | The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection. | When health sections have independent golden render fixtures or the system-page contract reaches v2. |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1235 | Canonical operator-state hashing and exact revision ownership remain centralized and fail closed. | When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures. |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 | Central escaped dashboard route renderer preserves shared candidate filtering, exact authority badges, and fail-closed response layout across the read-only surface. | Split the remaining candidate and authority helpers when a dashboard interaction family changes, using page-level golden render fixtures. |
 
@@ -177,10 +177,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_operator_state.py` | 1499 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1497 |
 | `tests/event_alpha/test_market_no_send.py` | 1485 |
+| `tests/event_alpha/test_radar_dashboard.py` | 1485 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
 | `tests/event_alpha/test_artifact_schema.py` | 1479 |
 | `tests/event_alpha/test_operator_workflows.py` | 1464 |
-| `tests/event_alpha/test_radar_dashboard.py` | 1461 |
 | `tests/event_alpha/test_decision_model_v2.py` | 1460 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1430 |

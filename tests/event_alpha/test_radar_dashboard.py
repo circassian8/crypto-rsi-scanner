@@ -1318,6 +1318,30 @@ def test_dashboard_exact_provider_readiness_requires_generation_lineage(tmp_path
     assert "provider_readiness_json:profile_mismatch" in snapshot.generation_authority_reasons
 
 
+def test_dashboard_labels_fixture_parser_coverage_as_fixture_only():
+    from crypto_rsi_scanner.event_alpha.dashboard.system_pages import _provider_assessment
+
+    label, tone, detail = _provider_assessment(
+        {
+            "provider_name": "defillama_tvl_fees_revenue",
+            "configured": False,
+            "configuration_scope": "fixture_input_only",
+            "fixture_input_configured": True,
+            "fixture_parser_status": "pass",
+            "live_transport_status": "not_implemented",
+            "live_authorization_status": "not_defined",
+            "live_mapping_status": "missing_real_registry",
+            "live_rehearsal_eligible": False,
+            "live_call_allowed": False,
+        }
+    )
+
+    assert label == "Fixture only"
+    assert tone == "muted"
+    assert "no live provider transport" in detail
+    assert "Missing real registry" in detail
+
+
 def test_dashboard_verifies_one_exact_canonical_run_ledger_row(tmp_path):
     target = _copy_namespace(tmp_path)
     state = _read_state(target)

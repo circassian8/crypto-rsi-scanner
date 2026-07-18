@@ -229,6 +229,7 @@ _CORE_OPPORTUNITY_COVERAGE_FIELDS: tuple[_CounterField, ...] = (
     ('live_provider_readiness_secret_leak', 'live_provider_readiness_secret_leak', None),
     ('live_provider_readiness_live_calls_allowed_in_smoke', 'live_provider_readiness_live_calls_allowed_in_smoke', None),
     ('live_provider_readiness_configured_missing_env', 'live_provider_readiness_configured_missing_env', None),
+    ('live_provider_readiness_fixture_live_state_conflict', 'live_provider_readiness_fixture_live_state_conflict', None),
     ('coinalyze_preflight_secret_leak', 'coinalyze_preflight_secret_leak', None),
     ('coinalyze_preflight_live_call_allowed_in_smoke', 'coinalyze_preflight_live_call_allowed_in_smoke', None),
     ('coinalyze_preflight_configured_missing_env', 'coinalyze_preflight_configured_missing_env', None),

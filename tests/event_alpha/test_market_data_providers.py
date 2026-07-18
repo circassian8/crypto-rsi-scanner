@@ -60,6 +60,11 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
         )
         payload = json.loads(result.readiness_json_path.read_text(encoding="utf-8"))
         assert payload["readiness_status"] == "fixture_ready"
+        assert payload["configured"] is False
+        assert payload["configuration_scope"] == "fixture_input_only"
+        assert payload["fixture_input_configured"] is True
+        assert payload["live_transport_status"] == "not_implemented"
+        assert payload["live_rehearsal_eligible"] is False
         assert payload["live_call_allowed"] is False
         assert payload["no_send_rehearsal"] is True
         assert payload["telegram_sends"] == 0
@@ -70,6 +75,10 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
         by_provider = {row["provider"]: row for row in payload["providers"]}
         assert set(by_provider) == {"geckoterminal", "coingecko_dex", "defillama_tvl_fees_revenue"}
         assert all(row["fixture_parser_status"] == "pass" for row in by_provider.values())
+        assert all(row["configured"] is False for row in by_provider.values())
+        assert all(row["fixture_input_configured"] is True for row in by_provider.values())
+        assert all(row["live_transport_status"] == "not_implemented" for row in by_provider.values())
+        assert by_provider["defillama_tvl_fees_revenue"]["live_mapping_status"] == "missing_real_registry"
         assert payload["dex_pool_state_rows"] == 3
         assert payload["dex_pool_anomaly_rows"] == 3
         assert payload["protocol_fundamental_rows"] == 2
@@ -99,8 +108,8 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
         assert source_report.protocol_fundamental_rows == 2
         source_text = event_alpha_source_coverage.format_source_coverage_report(source_report)
         assert "DEX/on-chain readiness: fixture_ready" in source_text
-        assert "geckoterminal configured=true fixture_parser_status=pass" in source_text
-        assert "defillama_tvl_fees_revenue configured=true fixture_parser_status=pass" in source_text
+        assert "geckoterminal live_configured=false fixture_input_configured=true live_transport_status=not_implemented" in source_text
+        assert "defillama_tvl_fees_revenue live_configured=false fixture_input_configured=true live_transport_status=not_implemented" in source_text
         (base / "event_alpha_source_coverage.md").write_text(source_text, encoding="utf-8")
 
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
@@ -113,9 +122,11 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
         assert clean.dex_onchain_live_without_ledger == 0
         assert clean.dex_low_liquidity_promoted_confirmed == 0
         assert clean.protocol_metric_missing_source_time == 0
+        assert clean.dex_onchain_fixture_live_state_conflict == 0
 
         payload["live_call_allowed"] = True
         payload["providers"][0]["live_call_allowed"] = True
+        payload["providers"][0]["configured"] = True
         payload["providers"][0]["fixture_parser_status"] = ""
         result.readiness_json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         protocol_rows[0].pop("source_url", None)
@@ -133,6 +144,7 @@ def test_event_alpha_dex_onchain_readiness_artifacts_are_fixture_only_and_covere
         assert unsafe.dex_onchain_live_without_ledger >= 1
         assert unsafe.dex_onchain_live_call_allowed_in_smoke >= 1
         assert unsafe.dex_onchain_missing_fixture_parser_status == 1
+        assert unsafe.dex_onchain_fixture_live_state_conflict >= 1
         assert unsafe.protocol_metric_missing_source_time == 1
         assert unsafe.status == "BLOCKED"
 

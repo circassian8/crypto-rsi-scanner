@@ -106,6 +106,7 @@ def apply_preflight_checks(ctx: object, blockers: Messages, warnings: Messages) 
         "live_provider_readiness_secret_leak",
         "live_provider_readiness_live_calls_allowed_in_smoke",
         "live_provider_readiness_configured_missing_env",
+        "live_provider_readiness_fixture_live_state_conflict",
     ):
         count = live_provider_readiness_conflicts.get(key, 0)
         if count:
@@ -160,6 +161,7 @@ def apply_preflight_checks(ctx: object, blockers: Messages, warnings: Messages) 
         "dex_onchain_live_without_ledger",
         "dex_onchain_live_call_allowed_in_smoke",
         "dex_onchain_missing_fixture_parser_status",
+        "dex_onchain_fixture_live_state_conflict",
         "dex_onchain_forbidden_side_effect_claim",
         "dex_low_liquidity_promoted_confirmed",
         "protocol_metric_missing_source_time",

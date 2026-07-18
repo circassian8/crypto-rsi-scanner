@@ -288,38 +288,46 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert by_provider["binance_announcements_public_or_fixture"]["preflight_status"] == "fixture_ready"
         assert by_provider["binance_announcements_signed_listener"]["env_vars_required"]
         assert by_provider["binance_announcements_signed_listener"]["activation_phase"] == "blocked"
-        assert by_provider["tokenomist"]["env_vars_required"] == [
+        assert by_provider["tokenomist"]["env_vars_required"] == []
+        assert by_provider["tokenomist"]["fixture_env_vars"] == [
             "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH",
-            "TOKENOMIST_API_KEY",
         ]
-        assert by_provider["messari_unlocks"]["env_vars_required"] == [
+        assert by_provider["messari_unlocks"]["env_vars_required"] == []
+        assert by_provider["messari_unlocks"]["fixture_env_vars"] == [
             "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH",
-            "MESSARI_API_KEY",
         ]
-        assert by_provider["coinmarketcal"]["env_vars_required"] == [
+        assert by_provider["coinmarketcal"]["env_vars_required"] == []
+        assert by_provider["coinmarketcal"]["fixture_env_vars"] == [
             "RSI_EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH",
-            "COINMARKETCAL_API_KEY",
         ]
         assert "event-alpha-tokenomist-preflight" in by_provider["tokenomist"]["smoke_targets"]
         assert "event-alpha-messari-unlocks-preflight" in by_provider["messari_unlocks"]["smoke_targets"]
         assert "event-alpha-coinmarketcal-preflight" in by_provider["coinmarketcal"]["smoke_targets"]
-        assert by_provider["geckoterminal"]["env_vars_required"] == [
+        assert by_provider["geckoterminal"]["fixture_env_vars"] == [
             "RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",
         ]
-        assert by_provider["geckoterminal"]["preflight_status"] == "quota_guarded"
+        assert by_provider["geckoterminal"]["env_vars_required"] == []
+        assert by_provider["geckoterminal"]["preflight_status"] == "fixture_ready"
         assert by_provider["geckoterminal"]["live_call_allowed"] is False
+        assert by_provider["geckoterminal"]["configured"] is False
+        assert by_provider["geckoterminal"]["fixture_input_configured"] is True
+        assert by_provider["geckoterminal"]["live_transport_status"] == "not_implemented"
         assert "event-alpha-dex-onchain-readiness-smoke" in by_provider["geckoterminal"]["smoke_targets"]
-        assert by_provider["coingecko_dex"]["env_vars_required"] == [
+        assert by_provider["coingecko_dex"]["env_vars_required"] == []
+        assert by_provider["coingecko_dex"]["fixture_env_vars"] == [
             "RSI_EVENT_ALPHA_DEX_COINGECKO_PATH",
-            "COINGECKO_API_KEY",
         ]
-        assert by_provider["coingecko_dex"]["preflight_status"] == "quota_guarded"
+        assert by_provider["coingecko_dex"]["preflight_status"] == "fixture_ready"
         assert by_provider["coingecko_dex"]["live_call_allowed"] is False
-        assert by_provider["defillama_tvl_fees_revenue"]["env_vars_required"] == [
+        assert by_provider["defillama_tvl_fees_revenue"]["env_vars_required"] == []
+        assert by_provider["defillama_tvl_fees_revenue"]["fixture_env_vars"] == [
             "RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",
         ]
-        assert by_provider["defillama_tvl_fees_revenue"]["preflight_status"] == "quota_guarded"
+        assert by_provider["defillama_tvl_fees_revenue"]["preflight_status"] == "fixture_ready"
         assert by_provider["defillama_tvl_fees_revenue"]["live_call_allowed"] is False
+        assert by_provider["defillama_tvl_fees_revenue"]["configuration_scope"] == "fixture_input_only"
+        assert by_provider["defillama_tvl_fees_revenue"]["live_mapping_status"] == "missing_real_registry"
+        assert by_provider["defillama_tvl_fees_revenue"]["live_rehearsal_eligible"] is False
         assert not event_alpha_artifact_doctor._text_has_secret_like_value(md_path.read_text(encoding="utf-8"))
         clean = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=source_path,
@@ -331,6 +339,7 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         assert clean.live_provider_readiness_missing == 0
         assert clean.live_provider_readiness_live_calls_allowed_in_smoke == 0
         assert clean.live_provider_readiness_configured_missing_env == 0
+        assert clean.live_provider_readiness_fixture_live_state_conflict == 0
         assert clean.live_provider_readiness_secret_leak == 0
 
         payload["live_calls_allowed"] = True
@@ -338,6 +347,7 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         payload["providers"][0]["configured"] = True
         payload["providers"][0]["preflight_status"] = "missing_config"
         payload["providers"][0]["last_error_safe"] = "api_key='THIS_IS_A_TEST_SECRET_VALUE_123456'"
+        by_provider["defillama_tvl_fees_revenue"]["configured"] = True
         json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         unsafe = event_alpha_artifact_doctor.diagnose_artifacts(
             source_coverage_report_path=source_path,
@@ -348,6 +358,7 @@ def test_event_alpha_live_provider_readiness_smoke_artifacts_are_safe_and_doctor
         )
         assert unsafe.live_provider_readiness_live_calls_allowed_in_smoke >= 1
         assert unsafe.live_provider_readiness_configured_missing_env == 1
+        assert unsafe.live_provider_readiness_fixture_live_state_conflict == 1
         assert unsafe.live_provider_readiness_secret_leak == 1
         assert unsafe.status == "BLOCKED"
 

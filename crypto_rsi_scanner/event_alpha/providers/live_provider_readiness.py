@@ -34,6 +34,14 @@ class LiveProviderReadinessProvider:
     env_vars_required: tuple[str, ...]
     secrets_redacted: bool
     live_call_allowed: bool
+    configuration_scope: str
+    fixture_input_configured: bool
+    fixture_env_vars: tuple[str, ...]
+    live_transport_status: str
+    live_authorization_status: str
+    live_mapping_status: str
+    live_rehearsal_eligible: bool
+    live_rehearsal_blockers: tuple[str, ...]
     fixture_available: bool
     provider_fixture_available: bool
     provider_fixture_path: str | None
@@ -87,6 +95,14 @@ def live_provider_readiness_provider_row(provider: LiveProviderReadinessProvider
         "env_vars_required": list(provider.env_vars_required),
         "secrets_redacted": provider.secrets_redacted,
         "live_call_allowed": provider.live_call_allowed,
+        "configuration_scope": provider.configuration_scope,
+        "fixture_input_configured": provider.fixture_input_configured,
+        "fixture_env_vars": list(provider.fixture_env_vars),
+        "live_transport_status": provider.live_transport_status,
+        "live_authorization_status": provider.live_authorization_status,
+        "live_mapping_status": provider.live_mapping_status,
+        "live_rehearsal_eligible": provider.live_rehearsal_eligible,
+        "live_rehearsal_blockers": list(provider.live_rehearsal_blockers),
         "fixture_available": provider.fixture_available,
         "provider_fixture_available": provider.provider_fixture_available,
         "provider_fixture_path": provider.provider_fixture_path,
@@ -256,6 +272,14 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
             f"  priority_rank: {provider.priority_rank}",
             f"  activation_phase: {provider.activation_phase}",
             f"  configured: {str(provider.configured).lower()}",
+            f"  configuration_scope: {provider.configuration_scope}",
+            f"  fixture_input_configured: {str(provider.fixture_input_configured).lower()}",
+            f"  fixture_env_vars: {_join(provider.fixture_env_vars)}",
+            f"  live_transport_status: {provider.live_transport_status}",
+            f"  live_authorization_status: {provider.live_authorization_status}",
+            f"  live_mapping_status: {provider.live_mapping_status}",
+            f"  live_rehearsal_eligible: {str(provider.live_rehearsal_eligible).lower()}",
+            f"  live_rehearsal_blockers: {_join(provider.live_rehearsal_blockers)}",
             f"  preflight_status: {provider.preflight_status}",
             f"  env_vars_required: {_join(provider.env_vars_required)}",
             f"  fixture_available: {str(provider.fixture_available).lower()}",
@@ -293,7 +317,14 @@ def format_readiness_report(report: LiveProviderReadinessReport) -> str:
             f"  latest_budget_used: {provider.latest_budget_used}",
             f"  safety_notes: {_join(provider.safety_notes)}",
         ])
-        if not provider.configured and (provider.sidecar_fixture_available or provider.smoke_target_available):
+        if provider.configuration_scope == "fixture_input_only":
+            lines.append(
+                "  note: Fixture/parser coverage exists, but it is not live-provider "
+                "configuration or call eligibility."
+            )
+        elif not provider.configured and (
+            provider.sidecar_fixture_available or provider.smoke_target_available
+        ):
             lines.append("  note: Live provider not configured, but fixture sidecar coverage exists.")
     lines.extend(["", "Activation Runbook:"])
     category_priorities = event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES
@@ -442,7 +473,7 @@ def _official_exchange_provider_rows(
             category="official_exchange",
             priority_rank=3,
             env_vars=(),
-            configured=bool(getattr(config, "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH", None)),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH", None),
             source_packs=("official_exchange_listing_pack", "official_exchange_risk_pack"),
@@ -469,6 +500,9 @@ def _official_exchange_provider_rows(
             cache_ttl_seconds=None,
             provider_health_key="binance_announcements",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
+            fixture_env_vars=("RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="fixture_only",
         ),
         _row(
             "binance_announcements_signed_listener",
@@ -523,8 +557,8 @@ def _unlock_calendar_provider_rows(
             "tokenomist",
             category="structured_unlock_calendar",
             priority_rank=5,
-            env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH", "TOKENOMIST_API_KEY"),
-            configured=Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH).exists(),
+            env_vars=(),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH", None),
             source_packs=("unlock_supply_pack",),
@@ -539,7 +573,7 @@ def _unlock_calendar_provider_rows(
             fixture_artifacts=("event_unlock_calendar_preflight.json", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
             next_safe_command="make event-alpha-tokenomist-preflight PROFILE=notify_llm_deep PYTHON=python3",
             no_send_rehearsal_command="make event-alpha-tokenomist-preflight PYTHON=python3",
-            max_requests_per_run=10,
+            max_requests_per_run=0,
             weekly_or_daily_budget="event-window bounded; no live call implemented by default",
             timeout_seconds=20,
             cache_ttl_seconds=3600,
@@ -553,13 +587,16 @@ def _unlock_calendar_provider_rows(
             latest_snapshots_written=unlock_history["latest_snapshots_written"],
             latest_budget_used=unlock_history["latest_budget_used"],
             activation_phase_override=unlock_history["activation_phase"],
+            fixture_env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_TOKENOMIST_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="fixture_only",
         ),
         _row(
             "messari_unlocks",
             category="structured_unlock_calendar",
             priority_rank=6,
-            env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH", "MESSARI_API_KEY"),
-            configured=Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH).exists(),
+            env_vars=(),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH", None),
             source_packs=("unlock_supply_pack",),
@@ -574,7 +611,7 @@ def _unlock_calendar_provider_rows(
             fixture_artifacts=("event_unlock_calendar_preflight.json", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
             next_safe_command="make event-alpha-messari-unlocks-preflight PROFILE=notify_llm_deep PYTHON=python3",
             no_send_rehearsal_command="make event-alpha-messari-unlocks-preflight PYTHON=python3",
-            max_requests_per_run=10,
+            max_requests_per_run=0,
             weekly_or_daily_budget="event-window bounded; no live call implemented by default",
             timeout_seconds=20,
             cache_ttl_seconds=3600,
@@ -588,13 +625,16 @@ def _unlock_calendar_provider_rows(
             latest_snapshots_written=unlock_history["latest_snapshots_written"],
             latest_budget_used=unlock_history["latest_budget_used"],
             activation_phase_override=unlock_history["activation_phase"],
+            fixture_env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_MESSARI_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="fixture_only",
         ),
         _row(
             "coinmarketcal",
             category="structured_unlock_calendar",
             priority_rank=7,
-            env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH", "COINMARKETCAL_API_KEY"),
-            configured=Path(config.EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH).exists(),
+            env_vars=(),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH", None),
             source_packs=("project_event_pack", "unlock_supply_pack"),
@@ -609,7 +649,7 @@ def _unlock_calendar_provider_rows(
             fixture_artifacts=("event_unlock_calendar_preflight.json", "event_scheduled_catalysts.jsonl", "event_unlock_candidates.jsonl"),
             next_safe_command="make event-alpha-coinmarketcal-preflight PROFILE=notify_llm_deep PYTHON=python3",
             no_send_rehearsal_command="make event-alpha-coinmarketcal-preflight PYTHON=python3",
-            max_requests_per_run=10,
+            max_requests_per_run=0,
             weekly_or_daily_budget="event-window bounded; no live call implemented by default",
             timeout_seconds=20,
             cache_ttl_seconds=3600,
@@ -623,6 +663,9 @@ def _unlock_calendar_provider_rows(
             latest_snapshots_written=unlock_history["latest_snapshots_written"],
             latest_budget_used=unlock_history["latest_budget_used"],
             activation_phase_override=unlock_history["activation_phase"],
+            fixture_env_vars=("RSI_EVENT_ALPHA_SCHEDULED_CATALYST_COINMARKETCAL_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="fixture_only",
         ),
     )
 
@@ -637,8 +680,8 @@ def _dex_onchain_provider_rows(
             "geckoterminal",
             category="dex_onchain",
             priority_rank=8,
-            env_vars=("RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",),
-            configured=Path(config.EVENT_ALPHA_DEX_GECKOTERMINAL_PATH).exists(),
+            env_vars=(),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_ALPHA_DEX_GECKOTERMINAL_PATH", None),
             source_packs=("dex_liquidity_pack", "market_anomaly_pack"),
@@ -662,7 +705,7 @@ def _dex_onchain_provider_rows(
             ),
             next_safe_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
             no_send_rehearsal_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
-            max_requests_per_run=20,
+            max_requests_per_run=0,
             weekly_or_daily_budget="not implemented for live DEX/on-chain providers yet; readiness remains no-call",
             timeout_seconds=20,
             cache_ttl_seconds=900,
@@ -676,13 +719,16 @@ def _dex_onchain_provider_rows(
             latest_snapshots_written=dex_onchain_history["latest_dex_pool_state_rows"],
             latest_budget_used=0,
             activation_phase_override=dex_onchain_history["activation_phase"],
+            fixture_env_vars=("RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="fixture_only",
         ),
         _row(
             "coingecko_dex",
             category="dex_onchain",
             priority_rank=9,
-            env_vars=("RSI_EVENT_ALPHA_DEX_COINGECKO_PATH", "COINGECKO_API_KEY"),
-            configured=Path(config.EVENT_ALPHA_DEX_COINGECKO_PATH).exists(),
+            env_vars=(),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_ALPHA_DEX_COINGECKO_PATH", None),
             source_packs=("dex_liquidity_pack", "market_anomaly_pack"),
@@ -706,7 +752,7 @@ def _dex_onchain_provider_rows(
             ),
             next_safe_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
             no_send_rehearsal_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
-            max_requests_per_run=20,
+            max_requests_per_run=0,
             weekly_or_daily_budget="not implemented for live DEX/on-chain providers yet; readiness remains no-call",
             timeout_seconds=20,
             cache_ttl_seconds=900,
@@ -720,13 +766,16 @@ def _dex_onchain_provider_rows(
             latest_snapshots_written=dex_onchain_history["latest_dex_pool_state_rows"],
             latest_budget_used=0,
             activation_phase_override=dex_onchain_history["activation_phase"],
+            fixture_env_vars=("RSI_EVENT_ALPHA_DEX_COINGECKO_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="fixture_only",
         ),
         _row(
             "defillama_tvl_fees_revenue",
             category="protocol_fundamentals",
             priority_rank=10,
-            env_vars=("RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",),
-            configured=Path(config.EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH).exists(),
+            env_vars=(),
+            configured=False,
             live_enabled=False,
             fixture_path=getattr(config, "EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH", None),
             source_packs=("protocol_fundamentals_pack", "strategic_investment_pack", "security_shock_pack"),
@@ -748,7 +797,7 @@ def _dex_onchain_provider_rows(
             ),
             next_safe_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
             no_send_rehearsal_command="make event-alpha-dex-onchain-readiness-smoke PYTHON=python3",
-            max_requests_per_run=20,
+            max_requests_per_run=0,
             weekly_or_daily_budget="not implemented for live protocol-fundamental providers yet; readiness remains no-call",
             timeout_seconds=20,
             cache_ttl_seconds=900,
@@ -762,6 +811,9 @@ def _dex_onchain_provider_rows(
             latest_snapshots_written=dex_onchain_history["latest_protocol_fundamental_rows"],
             latest_budget_used=0,
             activation_phase_override=dex_onchain_history["activation_phase"],
+            fixture_env_vars=("RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",),
+            live_transport_status="not_implemented",
+            live_mapping_status="missing_real_registry",
         ),
     )
 
@@ -795,6 +847,44 @@ def _context_provider_rows(*, smoke_mode: bool) -> tuple[LiveProviderReadinessPr
             provider_health_key="cryptopanic",
             lanes_blocked_without_market=("CONFIRMED_LONG_RESEARCH",),
         ),
+    )
+
+
+def _live_activation_truth(
+    *,
+    configured: bool,
+    live_enabled: bool,
+    smoke_mode: bool,
+    live_transport_status: str,
+    live_mapping_status: str,
+) -> tuple[str, str, bool, tuple[str, ...]]:
+    if live_transport_status != "implemented":
+        authorization_status = "not_defined"
+    elif live_enabled and configured:
+        authorization_status = "present"
+    elif live_enabled:
+        authorization_status = "missing_configuration"
+    else:
+        authorization_status = "absent"
+    blockers: list[str] = []
+    if live_transport_status != "implemented":
+        blockers.append("live_transport_not_implemented")
+    if authorization_status not in {"present", "not_required"}:
+        blockers.append(f"live_authorization_{authorization_status}")
+    if live_mapping_status not in {"ready", "not_required"}:
+        blockers.append(f"live_mapping_{live_mapping_status}")
+    if live_transport_status == "implemented" and not configured:
+        blockers.append("live_configuration_incomplete")
+    if smoke_mode:
+        blockers.append("smoke_mode_no_provider_calls")
+    configuration_scope = (
+        "fixture_input_only" if live_transport_status != "implemented" else "live_provider"
+    )
+    return (
+        configuration_scope,
+        authorization_status,
+        not blockers,
+        tuple(dict.fromkeys(blockers)),
     )
 
 
@@ -833,6 +923,9 @@ def _row(
     latest_snapshots_written: int = 0,
     latest_budget_used: int = 0,
     activation_phase_override: str | None = None,
+    fixture_env_vars: tuple[str, ...] = (),
+    live_transport_status: str = "implemented",
+    live_mapping_status: str = "not_required",
 ) -> LiveProviderReadinessProvider:
     provider_fixture_available = bool(fixture_path and Path(fixture_path).exists())
     fixture_available = bool(provider_fixture_available or sidecar_fixture_available or smoke_targets)
@@ -858,8 +951,24 @@ def _row(
         activation_phase = "not_implemented"
     else:
         activation_phase = "blocked"
-    if activation_phase_override:
+    if live_transport_status != "implemented":
+        activation_phase = (
+            "fixture_ready_live_unavailable" if fixture_available else "not_implemented"
+        )
+    elif activation_phase_override:
         activation_phase = activation_phase_override
+    (
+        configuration_scope,
+        authorization_status,
+        live_rehearsal_eligible,
+        live_rehearsal_blockers,
+    ) = _live_activation_truth(
+        configured=configured,
+        live_enabled=live_enabled,
+        smoke_mode=smoke_mode,
+        live_transport_status=live_transport_status,
+        live_mapping_status=live_mapping_status,
+    )
     return LiveProviderReadinessProvider(
         provider_name=provider_name,
         category=category,
@@ -869,6 +978,14 @@ def _row(
         env_vars_required=env_vars,
         secrets_redacted=True,
         live_call_allowed=False,
+        configuration_scope=configuration_scope,
+        fixture_input_configured=provider_fixture_available,
+        fixture_env_vars=fixture_env_vars,
+        live_transport_status=live_transport_status,
+        live_authorization_status=authorization_status,
+        live_mapping_status=live_mapping_status,
+        live_rehearsal_eligible=live_rehearsal_eligible,
+        live_rehearsal_blockers=live_rehearsal_blockers,
         fixture_available=fixture_available,
         provider_fixture_available=provider_fixture_available,
         provider_fixture_path=event_artifact_paths.artifact_display_path(fixture_path) if fixture_path else None,

@@ -541,7 +541,7 @@
         "DexOnchainReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 61,
+      "max_class_line_count": 71,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
       "public_class_count": 3,
@@ -556,7 +556,7 @@
         "LiveProviderReadinessReport"
       ],
       "exception_reason": "",
-      "max_class_line_count": 53,
+      "max_class_line_count": 58,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
       "public_class_count": 2,
@@ -1658,19 +1658,19 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+      "line_count": 1257,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
+      "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
       "source_kind": "production"
     },
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1242,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-      "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
-      "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
       "source_kind": "production"
     },
     {
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-18T13:40:38.080237+00:00",
+  "generated_at": "2026-07-18T14:03:50.822095+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1961,14 +1961,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "line_count": 1257,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1242,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -2095,6 +2095,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1485,
+      "path": "tests/event_alpha/test_radar_dashboard.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1483,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "source_kind": "test"
@@ -2109,12 +2115,6 @@
       "limit": 1500,
       "line_count": 1464,
       "path": "tests/event_alpha/test_operator_workflows.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1461,
-      "path": "tests/event_alpha/test_radar_dashboard.py",
       "source_kind": "test"
     },
     {
@@ -2812,7 +2812,7 @@
         "DexOnchainReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 61,
+      "max_class_line_count": 71,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
       "public_class_count": 3,
@@ -2827,7 +2827,7 @@
         "LiveProviderReadinessReport"
       ],
       "exception_reason": "",
-      "max_class_line_count": 53,
+      "max_class_line_count": 58,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
       "public_class_count": 2,
@@ -4079,14 +4079,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "line_count": 1257,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1242,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "line_count": 1247,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -4506,13 +4506,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1247,
-        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+        "line_count": 1257,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
         "threshold": 1200
       },
       {
-        "line_count": 1242,
-        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+        "line_count": 1247,
+        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       },
       {

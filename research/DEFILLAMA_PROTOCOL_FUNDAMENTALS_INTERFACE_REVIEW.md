@@ -76,6 +76,16 @@ The closed output also flows through the existing DEX/on-chain readiness
 surface without losing holders-revenue or metric-semantics fields. Historical
 flat DefiLlama-style fixtures retain their prior interpretation.
 
+The readiness projection is now explicit: the fixture path sets
+`fixture_input_configured=true`, while live `configured=false`,
+`live_transport_status=not_implemented`,
+`live_authorization_status=not_defined`,
+`live_mapping_status=missing_real_registry`, and
+`live_rehearsal_eligible=false`. Its current live request budget is zero. The
+dashboard labels this state **Fixture only**, and strict doctor blocks any
+fixture-scoped artifact that claims live configuration, transport, call
+permission, or rehearsal eligibility.
+
 Safe offline check:
 
 ```sh

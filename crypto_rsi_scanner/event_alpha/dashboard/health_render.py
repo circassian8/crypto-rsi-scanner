@@ -149,6 +149,12 @@ def _provider_detail(item: Mapping[str, Any]) -> str:
     values: list[str] = []
     fields = (
         ("configured", "configured"),
+        ("configuration_scope", "configuration_scope"),
+        ("fixture_input_configured", "fixture_input_configured"),
+        ("live_transport_status", "live_transport_status"),
+        ("live_authorization_status", "live_authorization_status"),
+        ("live_mapping_status", "live_mapping_status"),
+        ("live_rehearsal_eligible", "live_rehearsal_eligible"),
         ("live_call_allowed", "live_call_allowed"),
         ("activation_phase", "activation_phase"),
         ("preflight_status", "preflight"),

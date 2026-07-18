@@ -48,6 +48,14 @@ class DexOnchainProviderReadinessRow:
     env_vars_required: tuple[str, ...]
     fixture_parser_status: str
     live_call_allowed: bool
+    configuration_scope: str
+    fixture_input_configured: bool
+    fixture_env_vars: tuple[str, ...]
+    live_transport_status: str
+    live_authorization_status: str
+    live_mapping_status: str
+    live_rehearsal_eligible: bool
+    live_rehearsal_blockers: tuple[str, ...]
     no_send_rehearsal: bool
     request_ledger_path: str
     max_requests_per_run: int
@@ -75,6 +83,14 @@ class DexOnchainProviderReadinessRow:
             "env_vars_required": list(self.env_vars_required),
             "fixture_parser_status": self.fixture_parser_status,
             "live_call_allowed": self.live_call_allowed,
+            "configuration_scope": self.configuration_scope,
+            "fixture_input_configured": self.fixture_input_configured,
+            "fixture_env_vars": list(self.fixture_env_vars),
+            "live_transport_status": self.live_transport_status,
+            "live_authorization_status": self.live_authorization_status,
+            "live_mapping_status": self.live_mapping_status,
+            "live_rehearsal_eligible": self.live_rehearsal_eligible,
+            "live_rehearsal_blockers": list(self.live_rehearsal_blockers),
             "no_send_rehearsal": self.no_send_rehearsal,
             "request_ledger_path": self.request_ledger_path,
             "max_requests_per_run": self.max_requests_per_run,
@@ -103,6 +119,11 @@ class DexOnchainReadinessReport:
     generated_at: str
     readiness_status: str
     configured: bool
+    configuration_scope: str
+    fixture_input_configured: bool
+    live_transport_status: str
+    live_rehearsal_eligible: bool
+    live_rehearsal_blockers: tuple[str, ...]
     allow_live_preflight: bool
     live_call_allowed: bool
     no_send_rehearsal: bool
@@ -135,6 +156,11 @@ class DexOnchainReadinessReport:
             "readiness_status": self.readiness_status,
             "preflight_status": self.readiness_status,
             "configured": self.configured,
+            "configuration_scope": self.configuration_scope,
+            "fixture_input_configured": self.fixture_input_configured,
+            "live_transport_status": self.live_transport_status,
+            "live_rehearsal_eligible": self.live_rehearsal_eligible,
+            "live_rehearsal_blockers": list(self.live_rehearsal_blockers),
             "allow_live_preflight": self.allow_live_preflight,
             "live_call_allowed": self.live_call_allowed,
             "no_send_rehearsal": self.no_send_rehearsal,
@@ -242,7 +268,15 @@ def run_dex_onchain_readiness(
         artifact_namespace=artifact_namespace,
         generated_at=observed.isoformat(),
         readiness_status=status,
-        configured=any(row.configured for row in provider_rows),
+        configured=False,
+        configuration_scope="fixture_input_only",
+        fixture_input_configured=any(row.fixture_input_configured for row in provider_rows),
+        live_transport_status="not_implemented",
+        live_rehearsal_eligible=False,
+        live_rehearsal_blockers=(
+            "live_transport_not_implemented",
+            "live_authorization_contract_not_defined",
+        ),
         allow_live_preflight=allow_live,
         live_call_allowed=False,
         no_send_rehearsal=True,
@@ -320,7 +354,12 @@ def format_readiness_report(report: DexOnchainReadinessReport) -> str:
         f"artifact_namespace: {report.artifact_namespace or 'unknown'}",
         f"generated_at: {report.generated_at}",
         f"readiness_status: {report.readiness_status}",
-        f"configured: {str(report.configured).lower()}",
+        f"configured: {str(report.configured).lower()} (live-provider configuration)",
+        f"configuration_scope: {report.configuration_scope}",
+        f"fixture_input_configured: {str(report.fixture_input_configured).lower()}",
+        f"live_transport_status: {report.live_transport_status}",
+        f"live_rehearsal_eligible: {str(report.live_rehearsal_eligible).lower()}",
+        f"live_rehearsal_blockers: {_join(report.live_rehearsal_blockers)}",
         f"smoke_mode: {str(report.smoke_mode).lower()}",
         f"allow_live_preflight: {str(report.allow_live_preflight).lower()}",
         f"live_call_allowed: {str(report.live_call_allowed).lower()}",
@@ -343,7 +382,15 @@ def format_readiness_report(report: DexOnchainReadinessReport) -> str:
         lines.extend([
             f"- {row.provider}",
             f"  family: {row.family}",
-            f"  configured: {str(row.configured).lower()}",
+            f"  configured: {str(row.configured).lower()} (live-provider configuration)",
+            f"  configuration_scope: {row.configuration_scope}",
+            f"  fixture_input_configured: {str(row.fixture_input_configured).lower()}",
+            f"  fixture_env_vars: {_join(row.fixture_env_vars)}",
+            f"  live_transport_status: {row.live_transport_status}",
+            f"  live_authorization_status: {row.live_authorization_status}",
+            f"  live_mapping_status: {row.live_mapping_status}",
+            f"  live_rehearsal_eligible: {str(row.live_rehearsal_eligible).lower()}",
+            f"  live_rehearsal_blockers: {_join(row.live_rehearsal_blockers)}",
             f"  env_vars_required: {_join(row.env_vars_required)}",
             f"  fixture_parser_status: {row.fixture_parser_status}",
             f"  live_call_allowed: {str(row.live_call_allowed).lower()}",
@@ -401,6 +448,7 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
         "dex_onchain_live_without_ledger": 0,
         "dex_onchain_live_call_allowed_in_smoke": 0,
         "dex_onchain_missing_fixture_parser_status": 0,
+        "dex_onchain_fixture_live_state_conflict": 0,
         "dex_onchain_forbidden_side_effect_claim": 0,
         "dex_low_liquidity_promoted_confirmed": 0,
         "protocol_metric_missing_source_time": 0,
@@ -429,6 +477,13 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
         out["dex_onchain_live_call_allowed_in_smoke"] = 1
     if bool(data.get("live_call_allowed")) and not ledger_rows:
         out["dex_onchain_live_without_ledger"] = 1
+    if str(data.get("configuration_scope") or "") == "fixture_input_only" and (
+        bool(data.get("configured"))
+        or bool(data.get("live_call_allowed"))
+        or bool(data.get("live_rehearsal_eligible"))
+        or str(data.get("live_transport_status") or "") != "not_implemented"
+    ):
+        out["dex_onchain_fixture_live_state_conflict"] += 1
     if isinstance(provider_rows, Iterable) and not isinstance(provider_rows, (str, bytes, Mapping)):
         for row in provider_rows:
             if not isinstance(row, Mapping):
@@ -439,6 +494,13 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
                 out["dex_onchain_live_without_ledger"] += 1
             if bool(data.get("smoke_mode")) and bool(row.get("live_call_allowed")):
                 out["dex_onchain_live_call_allowed_in_smoke"] += 1
+            if str(row.get("configuration_scope") or "") == "fixture_input_only" and (
+                bool(row.get("configured"))
+                or bool(row.get("live_call_allowed"))
+                or bool(row.get("live_rehearsal_eligible"))
+                or str(row.get("live_transport_status") or "") != "not_implemented"
+            ):
+                out["dex_onchain_fixture_live_state_conflict"] += 1
             for key in _SIDE_EFFECT_COUNTERS:
                 if int(row.get(key) or 0) != 0:
                     out["dex_onchain_forbidden_side_effect_claim"] = 1
@@ -474,10 +536,12 @@ def _provider_specs(
             "provider": "geckoterminal",
             "family": "dex_onchain",
             "path": Path(geckoterminal_path).expanduser() if geckoterminal_path else Path(config.EVENT_ALPHA_DEX_GECKOTERMINAL_PATH),
-            "env_vars_required": ("RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",),
+            "env_vars_required": (),
+            "fixture_env_vars": ("RSI_EVENT_ALPHA_DEX_GECKOTERMINAL_PATH",),
+            "live_mapping_status": "fixture_only",
             "supported_event_types": ("dex_pool_liquidity", "dex_pool_volume", "dex_ohlcv", "new_pool"),
             "source_packs_enabled": ("dex_liquidity_pack", "market_anomaly_pack"),
-            "max_requests_per_run": 20,
+            "max_requests_per_run": 0,
             "provider_health_key": "geckoterminal",
             "request_ledger_path": ledger_path,
         },
@@ -485,10 +549,12 @@ def _provider_specs(
             "provider": "coingecko_dex",
             "family": "dex_onchain",
             "path": Path(coingecko_dex_path).expanduser() if coingecko_dex_path else Path(config.EVENT_ALPHA_DEX_COINGECKO_PATH),
-            "env_vars_required": ("RSI_EVENT_ALPHA_DEX_COINGECKO_PATH", "COINGECKO_API_KEY"),
+            "env_vars_required": (),
+            "fixture_env_vars": ("RSI_EVENT_ALPHA_DEX_COINGECKO_PATH",),
+            "live_mapping_status": "fixture_only",
             "supported_event_types": ("token_liquidity_pools", "dex_pool_liquidity", "dex_pool_volume"),
             "source_packs_enabled": ("dex_liquidity_pack", "market_anomaly_pack"),
-            "max_requests_per_run": 20,
+            "max_requests_per_run": 0,
             "provider_health_key": "coingecko_dex",
             "request_ledger_path": ledger_path,
         },
@@ -496,10 +562,12 @@ def _provider_specs(
             "provider": "defillama_tvl_fees_revenue",
             "family": "protocol_fundamentals",
             "path": Path(defillama_path).expanduser() if defillama_path else Path(config.EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH),
-            "env_vars_required": ("RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",),
+            "env_vars_required": (),
+            "fixture_env_vars": ("RSI_EVENT_ALPHA_PROTOCOL_DEFILLAMA_PATH",),
+            "live_mapping_status": "missing_real_registry",
             "supported_event_types": ("protocol_tvl", "protocol_fees", "protocol_revenue", "protocol_volume"),
             "source_packs_enabled": ("protocol_fundamentals_pack", "strategic_investment_pack", "security_shock_pack"),
-            "max_requests_per_run": 20,
+            "max_requests_per_run": 0,
             "provider_health_key": "defillama_tvl_fees_revenue",
             "request_ledger_path": ledger_path,
         },
@@ -526,7 +594,7 @@ def _provider_readiness_row(
     provider = str(spec.get("provider") or "")
     path = spec.get("path")
     path_obj = Path(path).expanduser() if path else None
-    configured = bool(path_obj and path_obj.exists())
+    fixture_input_configured = bool(path_obj and path_obj.exists())
     fixture_status = "not_configured"
     fixture_rows = 0
     dex_rows: list[dict[str, Any]] = []
@@ -569,10 +637,30 @@ def _provider_readiness_row(
     row = DexOnchainProviderReadinessRow(
         provider=provider,
         family=str(spec.get("family") or ""),
-        configured=configured,
+        configured=False,
         env_vars_required=tuple(str(item) for item in spec.get("env_vars_required") or ()),
         fixture_parser_status=fixture_status,
         live_call_allowed=False,
+        configuration_scope="fixture_input_only",
+        fixture_input_configured=fixture_input_configured,
+        fixture_env_vars=tuple(str(item) for item in spec.get("fixture_env_vars") or ()),
+        live_transport_status="not_implemented",
+        live_authorization_status="not_defined",
+        live_mapping_status=str(spec.get("live_mapping_status") or "fixture_only"),
+        live_rehearsal_eligible=False,
+        live_rehearsal_blockers=tuple(
+            dict.fromkeys(
+                (
+                    "live_transport_not_implemented",
+                    "live_authorization_contract_not_defined",
+                    (
+                        "real_mapping_registry_missing"
+                        if str(spec.get("live_mapping_status") or "") == "missing_real_registry"
+                        else "live_mapping_fixture_only"
+                    ),
+                )
+            )
+        ),
         no_send_rehearsal=True,
         request_ledger_path=str(spec.get("request_ledger_path") or ""),
         max_requests_per_run=int(spec.get("max_requests_per_run") or 0),
