@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Publish the nineteenth no-send market observation cycle · Codex
+**Why:** The enforced hourly cadence became eligible after the prior failed
+publication had still contributed its successful market observations to the
+research baseline. The next cycle needed to prove that the corrected strict
+doctor and complete Daily Operations publication chain worked on fresh genuine
+data without retrying or weakening any gate.
+**Changes:**
+- Ran exactly one already-authorized CoinGecko Daily Operations cycle after the
+  persisted eligibility timestamp. It retained 30 fresh observations in
+  `radar_market_no_send_20260718t171241517696z_05b1dff20e0b`, passed the exact
+  strict doctor with zero blockers and warnings, published revision 12, wrote
+  immutable publication and dashboard-operations receipts, restarted the owned
+  loopback dashboard, and completed its trusted HTTP probe.
+- Regenerated the checked-in campaign report from artifacts. Current truth is
+  19 genuine cycles, 570 retained observations, 540 baseline-counted, 30
+  explicitly too close, five historical ideas, zero current ideas, one matured
+  outcome, three pending outcomes, and one `due_missing_price`; trusted spread
+  coverage remains honestly 0/570.
+- Preserved every safety boundary: the cycle made one bounded market-data
+  request and produced zero sends, trades, orders, paper trades, normal RSI
+  writes, or Event Alpha `TRIGGERED_FADE` rows. The scheduler remains
+  uninstalled and the next provider boundary is cadence-reserved until
+  2026-07-18 18:12:41 UTC.
+**Verify:** The terminal Daily Operations row is `succeeded` with reason
+`published_and_restarted`; its publication receipt records strict doctor
+`OK`, zero blockers, and zero warnings. `radar-dashboard-readiness` is READY for
+the exact namespace/run/revision, `radar-dashboard-authority-status` reports the
+same pointer authoritative with zero writes/provider calls, campaign-report
+regeneration made zero provider calls, and `git diff --check` passes.
+
 ## 2026-07-18 — Close the Bybit preflight architecture blocker · Codex
 **Why:** Release verification still treated the 1,430-line Bybit announcements
 preflight as the sole unresolved production file above the 1,200-line advisory
