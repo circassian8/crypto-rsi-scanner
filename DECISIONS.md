@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Preserve no-independence truth in live empirical projections
+**Status:** accepted
+**Decision:** New `decision_radar.empirical_live_campaign_projection` values use
+schema v2 and copy the source episode contract's explicit
+`statistical_independence_claim=false` and
+`cross_asset_independence_claim=false`. A source that claims either form of
+independence is rejected. The already-sealed schema-v1 empirical report bundle
+remains readable as immutable legacy evidence; it is never rewritten or
+silently promoted to v2.
+**Why:** Fixed-start declustering prevents repeated observations from being
+counted as separate episode representatives, but it does not estimate an
+independent sample size. Stripping the explicit false claims allowed a consumer
+to infer more evidence than the source contract supports.
+**Revisit when:** A predeclared Protocol-v2 annex defines and validates an
+independent-sample estimator, correlated-market grouping, and minimum-sample
+rules from sufficient point-in-time evidence. Do not infer independence from
+episode count alone.
+
 ## 2026-07-18 - Show campaign work only from exact-pointer safe context
 **Status:** accepted
 **Decision:** The dashboard may surface campaign-wide human review, missing

@@ -10,7 +10,9 @@ from ..artifacts.json_lines import loads_no_duplicate_keys
 
 
 SCHEMA_ID = "decision_radar.empirical_live_campaign_projection"
-SCHEMA_VERSION = 1
+LEGACY_SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION)
 MAX_REPORT_BYTES = 2 * 1024 * 1024
 MAX_REPRESENTATIVES = 128
 _METRIC_FIELDS = (
@@ -71,6 +73,11 @@ def project_live_campaign(report: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("live campaign authorization mutation invalid")
     metrics = _mapping(report.get("campaign_metrics"))
     episodes = _mapping(report.get("shadow_anomaly_episodes"))
+    if (
+        episodes.get("statistical_independence_claim") is not False
+        or episodes.get("cross_asset_independence_claim") is not False
+    ):
+        raise ValueError("live campaign episode independence claim invalid")
     scorecard = _mapping(report.get("decision_v2_episode_outcome_scorecard"))
     outcomes = _mapping(report.get("outcomes"))
     representatives = [
@@ -98,6 +105,8 @@ def project_live_campaign(report: Mapping[str, Any]) -> dict[str, Any]:
             "representative_count": len(representatives),
             "representatives": representatives,
             "representatives_truncated": _integer(scorecard.get("representative_count")) > len(representatives),
+            "statistical_independence_claim": False,
+            "cross_asset_independence_claim": False,
         },
         "outcomes": {
             "total": _integer(outcomes.get("total")),
@@ -213,4 +222,11 @@ def _number(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
-__all__ = ["load_live_campaign_projection", "project_live_campaign"]
+__all__ = [
+    "LEGACY_SCHEMA_VERSION",
+    "SCHEMA_ID",
+    "SCHEMA_VERSION",
+    "SUPPORTED_SCHEMA_VERSIONS",
+    "load_live_campaign_projection",
+    "project_live_campaign",
+]

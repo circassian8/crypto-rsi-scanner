@@ -28,6 +28,8 @@ def _report():
             "primary_episode_count": 1,
             "primary_repeat_member_count": 1,
             "sensitivity_counts": {"24h": {"episode_count": 1, "repeat_member_count": 1}},
+            "statistical_independence_claim": False,
+            "cross_asset_independence_claim": False,
         },
         "outcomes": {"total": 2, "matured": 1, "pending": 0, "due_missing_price": 1},
         "decision_v2_episode_outcome_scorecard": {
@@ -71,6 +73,9 @@ def test_live_campaign_projection_stays_separate_and_insufficient() -> None:
     assert projection["evidence_mode"] == "live_no_send"
     assert projection["campaign_metrics"]["real_observations"] == 240
     assert projection["episodes"]["primary_episode_count"] == 1
+    assert projection["schema_version"] == 2
+    assert projection["episodes"]["statistical_independence_claim"] is False
+    assert projection["episodes"]["cross_asset_independence_claim"] is False
     assert projection["episodes"]["representatives"][0]["radar_route"] == "risk_watch"
     assert projection["evidence_strength"] == "insufficient_sample"
     assert projection["replay_evidence_aggregated"] is False
@@ -100,4 +105,15 @@ def test_live_campaign_projection_rejects_side_effect_claim() -> None:
     report = _report()
     report["safety"]["telegram_sends"] = 1
     with pytest.raises(ValueError, match="safety invalid"):
+        project_live_campaign(report)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("statistical_independence_claim", "cross_asset_independence_claim"),
+)
+def test_live_campaign_projection_rejects_independence_claim(field: str) -> None:
+    report = _report()
+    report["shadow_anomaly_episodes"][field] = True
+    with pytest.raises(ValueError, match="episode independence claim invalid"):
         project_live_campaign(report)

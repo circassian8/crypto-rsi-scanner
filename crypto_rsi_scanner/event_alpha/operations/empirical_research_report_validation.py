@@ -431,7 +431,8 @@ def _validate_published_live(value: Any) -> None:
         value.get("status") != "provided_separate_observational_lane"
         or not isinstance(projection, Mapping)
         or projection.get("schema_id") != empirical_live_campaign.SCHEMA_ID
-        or projection.get("schema_version") != empirical_live_campaign.SCHEMA_VERSION
+        or projection.get("schema_version")
+        not in empirical_live_campaign.SUPPORTED_SCHEMA_VERSIONS
         or projection.get("research_only") is not True
         or projection.get("auto_apply") is not False
         or any(projection.get(field) != 0 for field in (
@@ -442,6 +443,14 @@ def _validate_published_live(value: Any) -> None:
         != _sha256_bytes(_canonical_bytes(projection))
     ):
         raise RuntimeError("empirical_research_report_live_binding_invalid")
+    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+        episodes = projection.get("episodes")
+        if (
+            not isinstance(episodes, Mapping)
+            or episodes.get("statistical_independence_claim") is not False
+            or episodes.get("cross_asset_independence_claim") is not False
+        ):
+            raise RuntimeError("empirical_research_report_live_binding_invalid")
 
 
 def _validate_published_conclusions(

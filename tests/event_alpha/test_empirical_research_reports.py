@@ -251,7 +251,10 @@ def _live_report() -> dict[str, object]:
         "generated_at": "2026-07-16T00:00:00Z",
         "campaign_status": "observational",
         "campaign_metrics": {},
-        "shadow_anomaly_episodes": {},
+        "shadow_anomaly_episodes": {
+            "statistical_independence_claim": False,
+            "cross_asset_independence_claim": False,
+        },
         "decision_v2_episode_outcome_scorecard": {},
         "outcomes": {},
         "data_quality_limitations": [],

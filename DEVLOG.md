@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve no-independence claims in live projection v2 · Codex
+**Why:** Fixed-start episode grouping explicitly refuses to estimate statistical
+or cross-asset independence, but the live empirical projection stripped those
+two false claims. The dashboard wording was honest; the projected contract also
+needed to carry and enforce the same truth.
+**Changes:**
+- Advanced new live empirical projections to schema v2, copied both explicit
+  false independence claims, and rejected a source that asserts either claim.
+- Kept schema-v1 projections valid only as legacy immutable report evidence;
+  v2 report validation requires both explicit false fields.
+- Added source-tampering regressions plus the durable decision and roadmap
+  state. The sealed Protocol-v1 report bundle was not regenerated or rewritten.
+**Verify:** Ran focused live-projection/report/dashboard tests, the current
+seven-file empirical report-bundle validator, Python compileall, architecture
+cleanliness, and diff checks.
+**Notes/risks:** Contract hardening only. Episode membership, outcomes,
+independence estimation, policy, provider access, authorization, routes, scores,
+thresholds, dashboard authority, sends, trades, orders, paper trades, RSI rows,
+and `TRIGGERED_FADE` are unchanged.
+
 ## 2026-07-18 — Label frozen live episodes honestly in Research Lab · Codex
 **Why:** The Research Lab correctly kept live and replay evidence separate, but
 its bound historical live row showed an episode count without saying that the
