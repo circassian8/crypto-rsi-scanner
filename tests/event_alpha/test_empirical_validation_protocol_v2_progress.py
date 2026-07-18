@@ -147,3 +147,24 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "--check" not in rendered[0]
     assert rendered[1].count("--check") == 1
     assert "provider" not in "\n".join(rendered).casefold()
+
+
+def test_primary_readiness_target_leads_with_current_progress() -> None:
+    completed = subprocess.run(
+        ["make", "radar-research-protocol-v2-readiness", "PYTHON=python3"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    current_at = completed.stdout.index(
+        "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS"
+    )
+    frozen_at = completed.stdout.index("DECISION RADAR EMPIRICAL PROTOCOL V2 READINESS")
+
+    assert current_at < frozen_at
+    assert "selected_execution_surface=bybit:usdt_linear_perpetual:USDT" in (
+        completed.stdout
+    )
+    assert "execution_venue_not_selected" in completed.stdout[frozen_at:]
+    assert "provider_calls=0" in completed.stdout

@@ -213,7 +213,7 @@ def test_human_output_leads_with_blocked_unopened_truth(
     assert "No Protocol-v2 replay or final test is available" in output.out
 
 
-def test_make_targets_expose_only_static_readiness_and_check() -> None:
+def test_make_targets_validate_current_progress_then_frozen_contract() -> None:
     outputs = []
     for target in (
         "radar-research-protocol-v2-readiness",
@@ -228,9 +228,14 @@ def test_make_targets_expose_only_static_readiness_and_check() -> None:
         )
         outputs.append(completed.stdout)
 
-    assert all("operations.empirical_validation_protocol_v2" in row for row in outputs)
+    for row in outputs:
+        progress_token = "operations.empirical_validation_protocol_v2_progress"
+        frozen_token = "operations.empirical_validation_protocol_v2"
+        progress_at = row.index(progress_token)
+        frozen_at = row.index(frozen_token, progress_at + len(progress_token))
+        assert progress_at < frozen_at
     assert "--check" not in outputs[0]
-    assert outputs[1].count("--check") == 1
+    assert outputs[1].count("--check") == 2
     rendered = "\n".join(outputs).casefold()
     assert "replay_run" not in rendered
     assert "final-test" not in rendered

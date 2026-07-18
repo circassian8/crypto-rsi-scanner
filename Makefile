@@ -266,8 +266,10 @@ help:
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
 	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
-	@echo "  make radar-research-protocol-v2-readiness  Inspect blocked Protocol-v2 pre-registration requirements; no reads/calls/writes"
-	@echo "  make radar-research-protocol-v2-check  Validate the static blocked Protocol-v2 readiness contract"
+	@echo "  make radar-research-protocol-v2-readiness  Show current decisions, then immutable Protocol-v2 prerequisites; no reads/calls/writes"
+	@echo "  make radar-research-protocol-v2-check  Validate current decisions plus the static blocked Protocol-v2 contract"
+	@echo "  make radar-research-protocol-v2-progress  Show only the static current-decision projection"
+	@echo "  make radar-research-protocol-v2-progress-check  Validate only the static current-decision projection"
 	@echo "  make radar-replay-smoke             Run the immutable offline replay fixture chain"
 	@echo "  make radar-replay-medium            Run the top-30 development/validation replay from the local cache"
 	@echo "  make radar-replay-full              Run the top-100 development/validation replay from the local cache"
@@ -933,9 +935,11 @@ radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
 
 radar-research-protocol-v2-readiness:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2
 
 radar-research-protocol-v2-check:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --check
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 --check
 
 radar-research-protocol-v2-progress:

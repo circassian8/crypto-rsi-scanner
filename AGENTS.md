@@ -528,12 +528,14 @@ may be added later when a suitable environment already exists.
   snapshots, include an open candle, broaden the execution-quality authorization
   flag, or bypass a 403/region restriction.
 - **Empirical Protocol-v2 readiness:**
-  `make radar-research-protocol-v2-readiness` renders the frozen/static required
-  evidence and annex contract without reading environment, files, credentials,
-  providers, or holdout data; `make radar-research-protocol-v2-check` validates
-  that exact blocked state. Its canonical 2026-07-16 Markdown and implementation
-  are export-policy fingerprinted and must stay byte-identical; do not add
-  current state to either file. Use
+  `make radar-research-protocol-v2-readiness` first renders the separate current
+  decision projection, then the frozen/static required-evidence and annex
+  contract without reading environment, files, credentials, providers, or
+  holdout data; `make radar-research-protocol-v2-check` validates both in that
+  order. The frozen section retains its freeze-time placeholders, so it must not
+  be read alone as current operator state. Its canonical 2026-07-16 Markdown and
+  implementation are export-policy fingerprinted and must stay byte-identical;
+  do not add current state to either file. Use
   `make radar-research-protocol-v2-progress` and the matching `...-check` target
   for the separate static current-decision projection. That surface records the
   confirmed Bybit USDT-linear perpetual, USDT quote, public-only data boundary,

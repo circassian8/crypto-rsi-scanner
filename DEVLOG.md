@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make Protocol-v2 readiness lead with current truth · Codex
+**Why:** The primary readiness command printed the immutable 2026-07-16
+freeze-time blocker `execution_venue_not_selected` without first showing that
+the owner has since confirmed Bybit USDT-linear perpetuals. Both statements were
+auditable, but their hierarchy made current operator status look contradictory.
+**Changes:**
+- Changed the existing readiness target to render the static current-decision
+  projection first and the immutable prerequisite contract second. The matching
+  check now validates both in that same order.
+- Updated help and operating guidance to distinguish current truth from the
+  historical frozen section. The separate progress-only commands remain
+  available; no new framework or state artifact was added.
+- Added regressions for ordering, current Bybit/USDT-perpetual visibility, both
+  check paths, and continued presentation of the frozen placeholder as
+  freeze-time evidence only.
+**Verify:** Ran the focused Protocol-v2 readiness/progress tests, the primary
+readiness command, both check commands, `python3 -m compileall -q
+crypto_rsi_scanner tests`, and `git diff --check`. The current section reports
+Bybit / USDT-linear perpetual / USDT / public-market-data-only before the frozen
+section; both checks pass.
+**Notes/risks:** The export-policy-fingerprinted frozen Markdown and Python
+implementation remain byte-identical. No environment, credential, provider,
+artifact, or holdout read; provider call; replay/final test; authorization;
+send; trade; order; paper trade; RSI write; or `TRIGGERED_FADE` was added.
+
 ## 2026-07-18 — Record the twenty-first no-send market cycle · Codex
 **Why:** The CoinGecko cadence boundary became eligible while the evidence-first
 campaign was active. One genuine observation was needed to keep temporal
