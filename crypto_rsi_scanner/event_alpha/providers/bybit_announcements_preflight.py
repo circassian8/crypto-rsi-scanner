@@ -38,11 +38,13 @@ from ...event_providers.bybit_announcements import (
 )
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
-from ..operations.market_no_send_io import read_regular_bytes, write_bytes_immutable
+from ..operations.market_no_send_io import write_bytes_immutable
 from . import official_exchange as event_official_exchange
 from . import official_exchange_activation as event_official_exchange_activation
 from . import provider_health as event_provider_health
 from . import request_lineage as event_request_lineage
+from . import bybit_announcements_preflight_conflicts as preflight_conflict_checks
+from . import bybit_announcements_preflight_render as preflight_render
 
 
 PREFLIGHT_JSON = "event_bybit_announcements_preflight.json"
@@ -591,97 +593,16 @@ def _official_result_counts(
 
 
 def format_preflight_report(report: BybitAnnouncementsPreflightReport) -> str:
-    lines = [
-        "=" * 76,
-        "BYBIT OFFICIAL ANNOUNCEMENTS PREFLIGHT (research-only, no-call by default)",
-        "=" * 76,
-        f"provider: {report.provider}",
-        f"category: {report.category}",
-        f"generated_at: {report.generated_at}",
-        f"configured: {str(report.configured).lower()}",
-        f"preflight_status: {report.preflight_status}",
-        f"smoke_mode: {str(report.smoke_mode).lower()}",
-        f"live_call_allowed: {str(report.live_call_allowed).lower()}",
-        f"env_vars_required: {', '.join(report.env_vars_required) or 'none'}",
-        f"provider_health_key: {report.provider_health_key}",
-        f"request_ledger_path: {report.request_ledger_path}",
-        f"request_budget: {report.request_budget}",
-        f"max_pages: {report.max_pages}",
-        f"limit: {report.limit}",
-        f"timeout_seconds: {report.timeout_seconds:g}",
-        f"cache_ttl_seconds: {report.cache_ttl_seconds}",
-        f"fixture_parser_status: {report.fixture_parser_status}",
-        f"fixture_rows_observed: {report.fixture_rows_observed}",
-        f"supported_params: {', '.join(report.supported_params)}",
-        f"lanes_enabled_if_healthy: {', '.join(report.lanes_enabled_if_healthy)}",
-        f"source_packs_enabled: {', '.join(report.source_packs_enabled)}",
-        "",
-        "Safety notes:",
-    ]
-    lines.extend(f"- {item}" for item in report.safety_notes)
-    if report.warnings:
-        lines.extend(["", "Warnings:"])
-        lines.extend(f"- {warning}" for warning in report.warnings)
-    lines.append("")
-    lines.append("No provider network calls were performed by this preflight.")
-    return "\n".join(lines)
+    return preflight_render.format_preflight_report(report)
 
 
 def format_rehearsal_report(report: BybitAnnouncementsRehearsalReport) -> str:
-    lines = [
-        "# Bybit Official Announcements Bounded No-Send Rehearsal",
-        "",
-        "Research-only. Not a trade signal. No Telegram sends, trades, paper trades, normal RSI rows, or Event Alpha TRIGGERED_FADE.",
-        f"status: {report.status}",
-        f"provider: {report.provider}",
-        f"configured: {str(report.configured).lower()}",
-        f"allow_live_preflight: {str(report.allow_live_preflight).lower()}",
-        f"live_call_allowed: {str(report.live_call_allowed).lower()}",
-        f"no_send: {str(report.no_send).lower()}",
-        f"research_only: {str(report.research_only).lower()}",
-        f"provider_generation_id: {report.provider_generation_id}",
-        f"run_id: {report.run_id}",
-        f"requests_used: {report.requests_used}",
-        f"http_successes: {report.http_successes}",
-        f"accepted_source_response_count: {report.accepted_source_response_count}",
-        f"accepted_source_artifacts: {', '.join(report.accepted_source_artifacts) or 'none'}",
-        f"max_pages: {report.max_pages}",
-        f"limit: {report.limit}",
-        f"supported_params: {', '.join(report.supported_params)}",
-        f"announcements_inspected: {report.announcements_inspected}",
-        f"exchange_announcements_written: {report.exchange_announcements_written}",
-        f"official_events_written: {report.official_events_written}",
-        f"official_listing_candidates_written: {report.official_listing_candidates_written}",
-        f"provider_health_status: {report.provider_health_status}",
-        f"request_ledger_path: {report.request_ledger_path}",
-        f"exchange_announcements_path: {report.exchange_announcements_path}",
-        f"official_exchange_events_path: {report.official_exchange_events_path}",
-        f"official_listing_candidates_path: {report.official_listing_candidates_path}",
-        f"official_exchange_report_path: {report.official_exchange_report_path}",
-        f"strict_alerts_created: {report.strict_alerts_created}",
-        f"telegram_sends: {report.telegram_sends}",
-        f"trades_created: {report.trades_created}",
-        f"paper_trades_created: {report.paper_trades_created}",
-        f"normal_rsi_signal_rows_written: {report.normal_rsi_signal_rows_written}",
-        f"triggered_fade_created: {report.triggered_fade_created}",
-    ]
-    if report.error_class:
-        lines.append(f"error_class: {report.error_class}")
-    if report.error_message_safe:
-        lines.append(f"error_message_safe: {report.error_message_safe}")
-    if report.warnings:
-        lines.extend(["", "Warnings:"])
-        lines.extend(f"- {warning}" for warning in report.warnings)
-    if report.status == "skipped_live_calls_disabled":
-        lines.append(
-            f"next_step: set {ENV_ALLOW_LIVE_PREFLIGHT}=1 manually after review, then rerun; "
-            "the CLI allow flag may only accompany that provider-specific environment gate"
-        )
-    elif report.status == "blocked_request_budget":
-        lines.append(f"next_step: keep {ENV_PREFLIGHT_MAX_PAGES} <= 3 and {ENV_PREFLIGHT_LIMIT} <= 50")
-    else:
-        lines.append("next_step: regenerate source coverage/daily brief and run artifact doctor before any further activation.")
-    return "\n".join(lines)
+    return preflight_render.format_rehearsal_report(
+        report,
+        env_allow_live_preflight=ENV_ALLOW_LIVE_PREFLIGHT,
+        env_preflight_max_pages=ENV_PREFLIGHT_MAX_PAGES,
+        env_preflight_limit=ENV_PREFLIGHT_LIMIT,
+    )
 
 
 def effective_allow_live_preflight(value: bool = False) -> bool:
@@ -1252,179 +1173,16 @@ def _read_jsonl(path: Path) -> tuple[dict[str, Any], ...]:
 
 
 def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
-    out = {
-        "bybit_announcements_preflight_secret_leak": 0,
-        "bybit_announcements_preflight_live_call_allowed_in_smoke": 0,
-        "bybit_announcements_preflight_missing_fixture_parser_status": 0,
-        "bybit_announcements_rehearsal_secret_leak": 0,
-        "bybit_announcements_rehearsal_live_without_ledger": 0,
-        "bybit_announcements_rehearsal_live_without_explicit_allow": 0,
-        "bybit_announcements_rehearsal_unsupported_params": 0,
-        "bybit_announcements_rehearsal_accepted_source_invalid": 0,
-        "bybit_announcements_rehearsal_forbidden_side_effect_claim": 0,
-    }
-    if namespace_dir is None:
-        return out
-    base = Path(namespace_dir)
-    paths = [base / PREFLIGHT_JSON, base / PREFLIGHT_MD, base / REHEARSAL_JSON, base / REHEARSAL_MD, base / REQUEST_LEDGER]
-    existing = [path for path in paths if path.exists()]
-    if not existing:
-        return out
-    text = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in existing)
-    if _secret_like(text):
-        out["bybit_announcements_preflight_secret_leak"] = 1
-        out["bybit_announcements_rehearsal_secret_leak"] = 1
-    preflight = _read_json(base / PREFLIGHT_JSON)
-    if preflight:
-        if bool(preflight.get("smoke_mode")) and bool(preflight.get("live_call_allowed")):
-            out["bybit_announcements_preflight_live_call_allowed_in_smoke"] = 1
-        if not str(preflight.get("fixture_parser_status") or "").strip():
-            out["bybit_announcements_preflight_missing_fixture_parser_status"] = 1
-    rehearsal = _read_json(base / REHEARSAL_JSON)
-    ledger_rows = _read_jsonl(base / REQUEST_LEDGER)
-    if rehearsal:
-        generation_id = str(rehearsal.get("provider_generation_id") or "")
-        if generation_id:
-            ledger_rows = event_request_lineage.generation_rows(ledger_rows, generation_id)
-        live_allowed = bool(rehearsal.get("live_call_allowed"))
-        if live_allowed and not ledger_rows:
-            out["bybit_announcements_rehearsal_live_without_ledger"] = 1
-        if live_allowed and not bool(rehearsal.get("allow_live_preflight")):
-            out["bybit_announcements_rehearsal_live_without_explicit_allow"] = 1
-        for key in (
-            "strict_alerts_created",
-            "telegram_sends",
-            "trades_created",
-            "paper_trades_created",
-            "normal_rsi_signal_rows_written",
-            "triggered_fade_created",
-        ):
-            if int(rehearsal.get(key) or 0) != 0:
-                out["bybit_announcements_rehearsal_forbidden_side_effect_claim"] = 1
-    for row in ledger_rows:
-        unsupported = row.get("unsupported_query_params")
-        if unsupported:
-            out["bybit_announcements_rehearsal_unsupported_params"] += len(unsupported) if isinstance(unsupported, list) else 1
-    out["bybit_announcements_rehearsal_accepted_source_invalid"] = (
-        _accepted_source_conflict_count(
-            base,
-            ledger_rows=ledger_rows,
-            rehearsal=rehearsal,
-        )
+    return preflight_conflict_checks.artifact_conflicts(
+        namespace_dir,
+        preflight_json=PREFLIGHT_JSON,
+        preflight_md=PREFLIGHT_MD,
+        rehearsal_json=REHEARSAL_JSON,
+        rehearsal_md=REHEARSAL_MD,
+        request_ledger=REQUEST_LEDGER,
+        accepted_source_prefix=ACCEPTED_SOURCE_PREFIX,
+        accepted_source_suffix=ACCEPTED_SOURCE_SUFFIX,
+        accepted_source_name_re=_ACCEPTED_SOURCE_NAME_RE,
+        sha256_re=_SHA256_RE,
+        read_jsonl=_read_jsonl,
     )
-    if re.search(r"(?i)\b(send telegram|paper trade|live trade|execute order|triggered_fade created)\b", text):
-        out["bybit_announcements_rehearsal_forbidden_side_effect_claim"] = 1
-    return out
-
-
-def _accepted_source_conflict_count(
-    base: Path,
-    *,
-    ledger_rows: Iterable[Mapping[str, Any]],
-    rehearsal: Mapping[str, Any],
-) -> int:
-    conflicts = 0
-    expected: dict[str, tuple[str, int]] = {}
-    successful_result_count = 0
-    for row in ledger_rows:
-        artifact = str(row.get("accepted_source_artifact") or "")
-        digest = str(row.get("accepted_source_sha256") or "")
-        try:
-            size = int(row.get("accepted_source_size_bytes"))
-        except (TypeError, ValueError):
-            size = -1
-        success = bool(row.get("success"))
-        immutable = bool(row.get("accepted_source_immutable"))
-        if not success:
-            if artifact or digest or size >= 0 or immutable:
-                conflicts += 1
-            continue
-        if (
-            not _ACCEPTED_SOURCE_NAME_RE.fullmatch(artifact)
-            or not _SHA256_RE.fullmatch(digest)
-            or size <= 0
-            or not immutable
-            or artifact in expected
-        ):
-            conflicts += 1
-            continue
-        expected[artifact] = (digest, size)
-        try:
-            successful_result_count += int(row.get("result_count") or 0)
-        except (TypeError, ValueError):
-            conflicts += 1
-
-    try:
-        observed_names = {
-            entry.name
-            for entry in base.iterdir()
-            if entry.name.startswith(ACCEPTED_SOURCE_PREFIX)
-            and entry.name.endswith(ACCEPTED_SOURCE_SUFFIX)
-        }
-    except OSError:
-        return conflicts + max(1, len(expected))
-    conflicts += len(observed_names.symmetric_difference(expected))
-
-    valid_sources: dict[str, str] = {}
-    for artifact, (digest, size) in expected.items():
-        try:
-            raw = read_regular_bytes(base / artifact)
-        except Exception:  # noqa: BLE001 - any unsafe/missing leaf is a conflict
-            conflicts += 1
-            continue
-        if raw is None or len(raw) != size or hashlib.sha256(raw).hexdigest() != digest:
-            conflicts += 1
-            continue
-        if _secret_like(raw.decode("utf-8", errors="replace")):
-            conflicts += 1
-        valid_sources[artifact] = digest
-
-    report_artifacts = rehearsal.get("accepted_source_artifacts")
-    report_count = rehearsal.get("accepted_source_response_count")
-    if expected and not rehearsal:
-        conflicts += 1
-    elif rehearsal:
-        if (
-            not isinstance(report_artifacts, list)
-            or report_artifacts != list(expected)
-            or report_count != len(expected)
-            or rehearsal.get("announcements_inspected") != successful_result_count
-        ):
-            conflicts += 1
-
-    announcement_rows = _read_jsonl(
-        base / event_official_exchange.EXCHANGE_ANNOUNCEMENTS_FILENAME
-    )
-    sourced_rows = [
-        row for row in announcement_rows if bool(row.get("provider_request_succeeded"))
-    ]
-    if len(sourced_rows) != successful_result_count:
-        conflicts += 1
-    for row in sourced_rows:
-        payload = row.get("raw_payload_redacted")
-        if not isinstance(payload, Mapping):
-            conflicts += 1
-            continue
-        artifact = str(payload.get("provider_source_artifact") or "")
-        digest = str(payload.get("provider_source_sha256") or "")
-        if (
-            valid_sources.get(artifact) != digest
-            or not bool(payload.get("provider_source_immutable"))
-            or row.get("provider_source_artifact") != artifact
-        ):
-            conflicts += 1
-    return conflicts
-
-
-def _read_json(path: Path) -> Mapping[str, Any]:
-    if not path.exists():
-        return {}
-    try:
-        parsed = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return parsed if isinstance(parsed, Mapping) else {}
-
-
-def _secret_like(text: str) -> bool:
-    return bool(re.search(r"(?i)(api[_-]?key|secret|token|authorization|bearer)\s*[=:]\s*['\"][A-Za-z0-9._-]{20,}['\"]", text))

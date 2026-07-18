@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close the Bybit preflight architecture blocker · Codex
+**Why:** Release verification still treated the 1,430-line Bybit announcements
+preflight as the sole unresolved production file above the 1,200-line advisory
+boundary. That made the architecture acceptance report contradict the otherwise
+clean current source tree.
+**Changes:**
+- Split pure preflight/rehearsal text rendering and immutable-artifact conflict
+  validation into cohesive provider-local modules. The coordinating preflight
+  keeps its public API and is now 1,188 lines; the new helpers are 114 and 253
+  lines.
+- Preserved request budgets, explicit environment authorization, accepted-source
+  fingerprints, ledger lineage, secret detection, no-send side-effect checks,
+  provider-health behavior, and every report string. No HTTP client behavior,
+  Bybit reachability claim, authorization, retry, proxy, region bypass, source
+  promotion, score, route, or threshold changed.
+- The architecture report now has zero unresolved production files above the
+  advisory boundary and remains accepted with only its documented exceptions.
+**Verify:** All 48 provider-activation, doctor-conflict, and notification-rehearsal
+tests pass; all 26 Make/architecture contract tests pass, including both
+previous failures. Python compileall, architecture cleanliness with zero new
+violations, and `git diff --check` pass. No provider call occurred.
+
 ## 2026-07-18 — Preserve provider-native external catalyst timestamps · Codex
 **Why:** Full verification exposed a clock-dependent Polymarket fixture failure.
 The file-backed Gamma row carried genuine `createdAt` and `endDate` values, but
