@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Normalize current Tokenomist v5 unlocks without inventing authority
+**Status:** accepted
+**Decision:** The structured-unlock adapter targets Tokenomist's current v5
+cliff-unlock response contract, not deprecated v4. Its first implementation
+accepts only one closed synthetic-fixture capture: exact GET host/path/token
+identity, filters, pagination, provider query time, acquisition time, response
+coverage, token identity, cliff totals, allocation breakdown, reference-price
+timing, committed claims, and precision must validate before a row exists.
+`valueToMarketCap` is percent points of market capitalization and remains
+distinct from circulating- or total-supply percentage. Provider query/update
+time is not first-public time; month/week/quarter/year precision is estimated.
+Existing flat historical fixtures retain their prior semantics. The fixture
+path makes no call, reads no credential or authorization, writes no provider
+artifact, and is never campaign, dashboard, or Protocol-v2 authority.
+**Why:** The generic loader could see the official top-level `data` array but
+could not parse v5's `unlockDate` or nested `cliffUnlocks`, so a genuine-shaped
+response would lose timing and size while still appearing structured. A closed
+adapter removes that semantic false-positive without activating a provider or
+tuning any score. Tokenomist's documentation requires an API key, identifies v5
+as current, and limits ordinary plans to personal/non-commercial,
+non-redistribution use, so genuine response bytes need their own authorization,
+capture, retention, and export policy.
+**Revisit when:** The owner has an applicable Tokenomist subscription,
+explicitly authorizes a bounded no-send acquisition, and approves its request
+ledger, immutable capture, retention, and non-redistribution policy. Do not put
+genuine provider bytes into checked-in fixtures or the standard review archive
+before that review.
+
 ## 2026-07-18 - Keep EVM pool imports exact-named and detached from current authority
 **Status:** accepted
 **Decision:** A genuine operator-made EVM pool bundle may be validated locally

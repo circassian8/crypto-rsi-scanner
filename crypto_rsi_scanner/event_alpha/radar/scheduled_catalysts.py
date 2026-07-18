@@ -19,6 +19,7 @@ from typing import Any, Iterable, Mapping
 import crypto_rsi_scanner.event_alpha.radar.market_reaction as event_market_reaction
 from ..artifacts import schema_v1
 from ...event_providers.manual_json import parse_datetime
+from ...event_providers import tokenomist_v5
 from . import market_anomaly_receipt
 
 
@@ -330,6 +331,12 @@ def normalize_scheduled_catalyst_event(
         "event_timestamp_confidence": _event_timestamp_confidence(item, event_start=event_start, source_class=source_class),
         "tokens_unlocked": _optional_float(_first(item, "tokens_unlocked", "unlock_amount", "amount")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_usd": _optional_float(_first(item, "unlock_usd", "unlock_value_usd", "value_usd")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
+        "unlock_value_to_market_cap_pct": (
+            _optional_float(item.get("unlock_value_to_market_cap_pct"))
+            if event_type in {"token_unlock", "vesting_cliff", "linear_emission"}
+            else None
+        ),
+        "unlock_value_to_market_cap_unit": str(item.get("unlock_value_to_market_cap_unit") or "").strip() or None,
         "unlock_pct_circulating_supply": _optional_float(_first(item, "unlock_pct_circulating_supply", "unlock_pct_circulating", "percent_of_circulating_supply")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_pct_circulating": _optional_float(_first(item, "unlock_pct_circulating_supply", "unlock_pct_circulating", "percent_of_circulating_supply")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
         "unlock_pct_total_supply": _optional_float(_first(item, "unlock_pct_total_supply", "percent_of_total_supply")) if event_type in {"token_unlock", "vesting_cliff", "linear_emission"} else None,
@@ -339,6 +346,7 @@ def normalize_scheduled_catalyst_event(
         "market_snapshot": _market_snapshot(item),
         "derivatives_snapshot": _derivatives_snapshot(item),
         "supply_snapshot": _supply_snapshot(item),
+        **_scheduled_provider_context(item),
         "research_only": True,
         "created_alert": False,
         "notification_send_enabled": False,
@@ -379,6 +387,32 @@ def normalize_scheduled_catalyst_event(
         "why_not_alertable": tuple(dict.fromkeys(why_not)),
     })
     return row
+
+
+def _scheduled_provider_context(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "provider_api_version": item.get("provider_api_version"),
+        "provider_query_at": item.get("provider_query_at"),
+        "acquired_at": item.get("acquired_at"),
+        "provider_page": item.get("provider_page"),
+        "provider_page_size": item.get("provider_page_size"),
+        "provider_total_pages": item.get("provider_total_pages"),
+        "provider_total_rows": item.get("provider_total_rows"),
+        "provider_snapshot_status": item.get("provider_snapshot_status"),
+        "source_coverage_complete": item.get("source_coverage_complete"),
+        "capture_mode": item.get("capture_mode"),
+        "fixture_provenance": item.get("fixture_provenance"),
+        "provider_call_performed": item.get("provider_call_performed"),
+        "provider_authorization_created": item.get("provider_authorization_created"),
+        "authority_eligible": item.get("authority_eligible"),
+        "protocol_v2_evidence_eligible": item.get("protocol_v2_evidence_eligible"),
+        "first_public_at": item.get("first_public_at"),
+        "first_public_at_status": item.get("first_public_at_status"),
+        "query_date_is_publication_time": item.get("query_date_is_publication_time"),
+        "field_units": dict(item.get("field_units") or {})
+        if isinstance(item.get("field_units"), Mapping)
+        else {},
+    }
 
 
 def load_scheduled_catalysts(path: str | Path | None) -> tuple[dict[str, Any], ...]:
@@ -467,6 +501,7 @@ def format_unlock_risk_report(
             f"vesting={row.get('vesting_category') or 'unknown'} "
             f"timestamp_confidence={row.get('event_timestamp_confidence') or 'unknown'} "
             f"unlock_pct_circ={_format_pct(row.get('unlock_pct_circulating_supply'))} "
+            f"unlock_value_to_mcap={_format_percent_points(row.get('unlock_value_to_market_cap_pct'))} "
             f"unlock_vs_adv={_format_float(row.get('unlock_vs_30d_adv'))} "
             f"lane={row.get('opportunity_type') or 'unknown'} "
             f"market_state={row.get('market_state') or 'unknown'}"
@@ -490,7 +525,8 @@ def _unlock_candidate_for_event(event: Mapping[str, Any], item: Mapping[str, Any
     pct_circ = _optional_float(_first(item, "unlock_pct_circulating_supply", "unlock_pct_circulating", "percent_of_circulating_supply"))
     pct_total = _optional_float(_first(item, "unlock_pct_total_supply", "percent_of_total_supply"))
     unlock_vs_adv = _optional_float(_first(item, "unlock_vs_30d_adv", "unlock_to_adv", "unlock_vs_adv"))
-    size_missing = pct_circ is None and pct_total is None and unlock_vs_adv is None
+    value_to_market_cap = _optional_float(item.get("unlock_value_to_market_cap_pct"))
+    size_missing = pct_circ is None and pct_total is None and unlock_vs_adv is None and value_to_market_cap is None
     structured = _structured_unlock_proof(source_class, item, event)
     reason_codes = list(event.get("reason_codes") or ())
     if structured:
@@ -563,6 +599,8 @@ def _unlock_candidate_for_event(event: Mapping[str, Any], item: Mapping[str, Any
         "cliff_or_linear": _cliff_or_linear(item),
         "tokens_unlocked": _optional_float(_first(item, "tokens_unlocked", "unlock_amount", "amount")),
         "unlock_usd": _optional_float(_first(item, "unlock_usd", "unlock_value_usd", "value_usd")),
+        "unlock_value_to_market_cap_pct": value_to_market_cap,
+        "unlock_value_to_market_cap_unit": str(item.get("unlock_value_to_market_cap_unit") or "").strip() or None,
         "unlock_pct_circulating_supply": pct_circ,
         "unlock_pct_circulating": pct_circ,
         "unlock_pct_total_supply": pct_total,
@@ -577,6 +615,18 @@ def _unlock_candidate_for_event(event: Mapping[str, Any], item: Mapping[str, Any
         "market_snapshot": _market_snapshot(item),
         "derivatives_snapshot": _derivatives_snapshot(item),
         "supply_snapshot": _supply_snapshot(item),
+        "provider_api_version": event.get("provider_api_version"),
+        "provider_query_at": event.get("provider_query_at"),
+        "acquired_at": event.get("acquired_at"),
+        "provider_snapshot_status": event.get("provider_snapshot_status"),
+        "source_coverage_complete": event.get("source_coverage_complete"),
+        "capture_mode": event.get("capture_mode"),
+        "fixture_provenance": event.get("fixture_provenance"),
+        "authority_eligible": event.get("authority_eligible"),
+        "protocol_v2_evidence_eligible": event.get("protocol_v2_evidence_eligible"),
+        "first_public_at": event.get("first_public_at"),
+        "first_public_at_status": event.get("first_public_at_status"),
+        "field_units": dict(event.get("field_units") or {}) if isinstance(event.get("field_units"), Mapping) else {},
         "market_state_snapshot": reaction.market_state_snapshot.to_dict(),
         "market_state": reaction.market_state,
         "opportunity_type": lane,
@@ -595,7 +645,16 @@ def _unlock_candidate_for_event(event: Mapping[str, Any], item: Mapping[str, Any
 
 
 def _load_tokenomist_items(path: str | Path) -> tuple[Mapping[str, Any], ...]:
-    return _load_items(path, "unlocks")
+    source = Path(path).expanduser()
+    if not source.exists():
+        return ()
+    try:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ()
+    if tokenomist_v5.is_tokenomist_v5_fixture_capture(raw):
+        return tokenomist_v5.normalize_tokenomist_v5_fixture_capture(raw)
+    return _items_from_raw(raw, "unlocks")
 
 
 def _load_messari_unlock_items(path: str | Path) -> tuple[Mapping[str, Any], ...]:
@@ -629,6 +688,10 @@ def _load_items(path: str | Path, key: str) -> tuple[Mapping[str, Any], ...]:
         raw = json.loads(source.read_text(encoding="utf-8"))
     except Exception:
         return ()
+    return _items_from_raw(raw, key)
+
+
+def _items_from_raw(raw: object, key: str) -> tuple[Mapping[str, Any], ...]:
     if isinstance(raw, Mapping):
         raw_items = raw.get(key) or raw.get("items") or raw.get("data") or []
     else:
@@ -988,7 +1051,16 @@ def _supply_snapshot(item: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(supply, Mapping):
         return dict(supply)
     out: dict[str, Any] = {}
-    for key in ("unlock_pct_circulating", "unlock_pct_circulating_supply", "unlock_amount", "unlock_usd", "unlock_vs_30d_adv"):
+    for key in (
+        "unlock_pct_circulating",
+        "unlock_pct_circulating_supply",
+        "unlock_amount",
+        "unlock_usd",
+        "unlock_value_to_market_cap_pct",
+        "unlock_value_to_market_cap_unit",
+        "unlock_vs_30d_adv",
+        "field_units",
+    ):
         if item.get(key) not in (None, ""):
             out[key] = item.get(key)
     return out
@@ -1029,6 +1101,11 @@ def _format_pct(value: object) -> str:
 def _format_float(value: object) -> str:
     parsed = _optional_float(value)
     return "n/a" if parsed is None else f"{parsed:.2f}"
+
+
+def _format_percent_points(value: object) -> str:
+    parsed = _optional_float(value)
+    return "n/a" if parsed is None else f"{parsed:.2f}% mcap"
 
 
 def _redacted_payload(item: Mapping[str, Any]) -> dict[str, Any]:

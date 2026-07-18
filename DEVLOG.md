@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close the current Tokenomist v5 unlock response contract · Codex
+**Why:** The generic structured-unlock loader could find Tokenomist's top-level
+`data` rows but did not understand the current v5 field names or nested cliff
+payload, so genuine-shaped input could lose timing and size while still looking
+structured.
+**Changes:**
+- Added a strict offline adapter for one closed synthetic v5 fixture capture.
+  It binds exact request token/path/date/filter/pagination identity, response
+  query/acquisition clocks and coverage, token identity, cliff totals,
+  allocations, reference-price timing, committed claims, precision, and source
+  fingerprints. Unknown fields, pagination drift, clock inversion, non-finite
+  values, inconsistent allocation totals, and sensitive keys fail closed.
+- Preserved field meaning through scheduled and unlock artifacts:
+  `valueToMarketCap` is explicit percent points of market capitalization and is
+  not reinterpreted as circulating-supply percentage; provider query/update
+  time is not first-public time; month-level dates remain estimated; partial
+  pages stay partial. Historical flat fixtures remain unchanged.
+- Added a no-call/no-write Make smoke and focused integration/regression tests.
+  Every fixture row is explicitly synthetic, non-authoritative,
+  campaign-detached, and Protocol-v2-ineligible with zero sends/trades/orders/
+  paper/RSI writes/Event Alpha fades. No live client, key, or authorization was
+  added. Documented that genuine Tokenomist bytes require a separately approved
+  subscription, capture/retention boundary, and non-redistribution review.
+**Verify:** 27 focused Tokenomist/scheduled-catalyst/export-TOCTOU tests pass;
+Python compileall passes; `make radar-unlock-tokenomist-v5-smoke` reports one
+valid synthetic row and zero side effects; the existing scheduled-catalyst
+smoke and strict doctor complete with no blockers; architecture cleanliness
+passes with `new_violation_count=0` and no old-import references.
+**Notes/risks:** Full `make verify` was intentionally skipped for this narrow,
+pure provider-response adapter; the targeted parser, downstream surface,
+security, smoke, compile, and architecture gates cover the changed behavior.
+Official v5 acquisition still needs an API key and explicit human authorization;
+no provider request was made and no genuine provider response was stored.
+
 ## 2026-07-18 — Seal operator EVM pool imports without auto-publishing · Codex
 **Why:** The finalized-block pool normalizer could prove an input shape but did
 not preserve genuine operator-supplied bytes immutably or provide a closed way

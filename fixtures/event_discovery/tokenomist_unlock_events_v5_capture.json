@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "capture_contract": "tokenomist_unlock_events_v5_fixture_capture",
+  "capture_mode": "fixture",
+  "fixture_synthetic": true,
+  "provider": "tokenomist",
+  "api_version": "v5",
+  "acquired_at": "2026-06-15T15:01:00Z",
+  "request": {
+    "method": "GET",
+    "host": "api.tokenomist.ai",
+    "path": "/v5/unlock/events/test-unlock-v5",
+    "token_id": "test-unlock-v5",
+    "canonical_asset_id": "test-unlock-v5",
+    "start": "2026-06-01",
+    "end": "2026-07-01",
+    "standard_allocation": null,
+    "page": 1,
+    "page_size": 50
+  },
+  "response": {
+    "metadata": {
+      "queryDate": "2026-06-15T15:00:00Z",
+      "page": 1,
+      "pageSize": 50,
+      "totalPages": 1,
+      "total": 1
+    },
+    "status": true,
+    "data": [
+      {
+        "unlockDate": "2026-06-16T13:00:00Z",
+        "tokenName": "Test Unlock v5",
+        "tokenSymbol": "TESTV5",
+        "listedMethod": "INTERNAL",
+        "dataSource": "Synthetic public-schema fixture",
+        "cliffUnlocks": {
+          "cliffAmount": 10000000.0,
+          "cliffValue": 2500000.0,
+          "valueToMarketCap": 2.5,
+          "allocationBreakdown": [
+            {
+              "unlockDate": "2026-06-16T13:00:00Z",
+              "allocationName": "Investors",
+              "standardAllocationName": "Private Investors",
+              "cliffAmount": 6000000.0,
+              "cliffValue": 1500000.0,
+              "referencePrice": 0.25,
+              "referencePriceUpdatedTime": "2026-06-15T14:55:00Z",
+              "unlockPrecision": "month",
+              "committedClaim": {
+                "amount": 1000000.0,
+                "value": 250000.0,
+                "timestamp": 1781614800
+              }
+            },
+            {
+              "unlockDate": "2026-06-16T13:00:00Z",
+              "allocationName": "Team",
+              "standardAllocationName": "Founders & Team",
+              "cliffAmount": 4000000.0,
+              "cliffValue": 1000000.0,
+              "referencePrice": 0.25,
+              "referencePriceUpdatedTime": "2026-06-15T14:55:00Z",
+              "unlockPrecision": "month"
+            }
+          ]
+        },
+        "latestUpdateDate": "2026-06-14T08:49:27Z"
+      }
+    ]
+  },
+  "research_only": true
+}

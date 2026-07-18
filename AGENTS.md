@@ -332,6 +332,24 @@ may be added later when a suitable environment already exists.
   pointer, receipt, snapshot, source-coverage, and accepted raw-source hash
   attestation; an unavailable attempt never replaces it. Unlinked calendar
   events remain context/risk only and cannot manufacture directional bias.
+- **Tokenomist structured-unlock response contract:**
+  `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
+  cliff-unlock response shape entirely offline. The closed synthetic fixture
+  binds exact token-path, date/filter/pagination request identity,
+  query/acquisition clocks, page coverage, token identity, cliff
+  amounts/values, allocation breakdown, reference-price clocks, committed
+  claims, precision, and field units. `valueToMarketCap` remains percent points
+  of market capitalization; it is never copied into circulating-supply
+  percentage. Month/week/quarter/year precision remains estimated even when a
+  timestamp is present, and query time is not first-public time. The fixture
+  adapter performs no provider call, reads no key or authorization, writes
+  nothing, and cannot become campaign/dashboard/Protocol-v2 authority.
+  Historical flat Tokenomist-style fixtures keep their existing interpretation.
+  Tokenomist currently documents v5 as supported and v4 as deprecated; genuine
+  acquisition needs a separately approved subscription/authorization, bounded
+  request ledger, immutable capture, and retention/export review. Do not check
+  in or place genuine response bytes in the standard review archive without
+  confirming the applicable non-redistribution terms.
 - **Chain-native DEX/on-chain input:** `make
   radar-dex-onchain-evm-v2-smoke` validates one exact offline
   Uniswap-v2-compatible JSON-RPC bundle. The contract binds `eth_chainId`, one
