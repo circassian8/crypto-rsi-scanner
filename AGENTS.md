@@ -350,6 +350,24 @@ may be added later when a suitable environment already exists.
   request ledger, immutable capture, and retention/export review. Do not check
   in or place genuine response bytes in the standard review archive without
   confirming the applicable non-redistribution terms.
+- **DefiLlama protocol-fundamentals response contract:**
+  `make radar-fundamentals-defillama-smoke` validates a closed synthetic bundle
+  entirely offline. It binds `/protocols` plus three separately typed free
+  `/overview/fees` reads: `dailyFees`, `dailyRevenue`, and
+  `dailyHoldersRevenue`, with chart payloads excluded. Each request/read clock,
+  exact query identity, response digest, unit, methodology, and an explicit
+  operator-confirmed Radar/CoinGecko/protocol-ID/slug/name/symbol mapping
+  survives normalization. TVL change is not net flow; fees, protocol revenue,
+  and holder revenue are not interchangeable; 7d/30d values are period totals;
+  and missing metrics remain unavailable rather than zero. The reviewed free
+  overview response has no metric-value timestamp, so the output says so and
+  never substitutes acquisition time as provider value time. The module has no
+  client or environment lookup and the fixture makes no call or write. It is
+  context-only, non-authoritative, campaign-detached, and Protocol-v2-
+  ineligible. A genuine capture requires separately present authorization, a
+  real mapping registry, bounded immutable bytes, ledger/health/backoff,
+  freshness and retention review, strict doctor, and exact annex selection.
+  See `research/DEFILLAMA_PROTOCOL_FUNDAMENTALS_INTERFACE_REVIEW.md` / `.json`.
 - **Chain-native DEX/on-chain input:** `make
   radar-dex-onchain-evm-v2-smoke` validates one exact offline
   Uniswap-v2-compatible JSON-RPC bundle. The contract binds `eth_chainId`, one

@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close typed DefiLlama fundamentals semantics offline · Codex
+**Why:** The old flat fixture scaffold could demonstrate UI mechanics but did
+not prove the current official free response contract, separate fee meanings,
+asset/protocol mapping, or honest point-in-time limitations needed before any
+fundamental-led empirical evidence is collected.
+**Changes:**
+- Added a strict no-I/O synthetic normalizer for one `/protocols` response plus
+  separate `dailyFees`, `dailyRevenue`, and `dailyHoldersRevenue` overview
+  responses. It binds exact request/query identity, clocks, full response
+  digests, explicit protocol/asset mappings, units, methodology, and missing-
+  metric status.
+- TVL change is explicitly not net flow; fees, protocol revenue, and holders
+  revenue cannot substitute for one another; period totals are not averages;
+  no provider-value timestamp is invented; and no metric defaults to zero.
+- Wired the closed output through existing DEX/on-chain readiness without
+  stripping its semantics, added a safe offline Make smoke and focused fixture
+  tests, and documented the official source review plus durable activation
+  boundary. Historical flat fixtures remain unchanged.
+- No HTTP client, environment lookup, provider authorization, campaign or
+  dashboard authority, score/route/threshold mutation, send, trade, order,
+  paper trade, RSI write, or Event Alpha fade behavior was added.
+**Verify:** 66 focused DefiLlama/readiness/market-surface/source-coverage/source-
+registry tests pass; the dedicated no-call Make smoke, Python compileall, JSON
+validation, architecture cleanliness (zero new size/class violations), and
+`git diff --check` pass.
+**Notes/risks:** The fixture is parser evidence only and remains Protocol-v2-
+ineligible. A genuine source still requires a separate explicit authorization,
+operator-confirmed real mapping registry, bounded immutable capture, retention
+review, strict doctor, and exact annex selection. Full `make verify` was
+intentionally skipped for this isolated no-I/O fixture contract; its parser,
+legacy-integration, surface, source, syntax, smoke, and architecture gates are
+covered offline.
+
 ## 2026-07-18 — Preserve complete Bybit announcement activity windows · Codex
 **Why:** Bybit's documented v5 announcement response can carry an activity
 start and end, but canonical raw events, official-exchange events, and

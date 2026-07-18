@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 707,
+  "class_count": 708,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10198,
+  "function_count": 10226,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-18T13:22:43.164070+00:00",
+  "generated_at": "2026-07-18T13:40:41.400857+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3286,7 +3286,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 496,
+  "public_class_count": 497,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3488,6 +3488,7 @@
     "crypto_rsi_scanner.event_providers.cryptopanic.http_status_error": 1,
     "crypto_rsi_scanner.event_providers.cryptopanic.provider": 1,
     "crypto_rsi_scanner.event_providers.cryptopanic.usage_summary": 1,
+    "crypto_rsi_scanner.event_providers.defillama_fundamentals": 1,
     "crypto_rsi_scanner.event_providers.external_ipo": 1,
     "crypto_rsi_scanner.event_providers.gdelt": 1,
     "crypto_rsi_scanner.event_providers.manual_json": 1,

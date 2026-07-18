@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Keep DefiLlama fundamentals typed, mapped, and fixture-first
+**Status:** accepted
+**Decision:** The candidate DefiLlama protocol-fundamentals contract uses four
+separate official free-interface responses: `/protocols`, then
+`/overview/fees` with `dailyFees`, `dailyRevenue`, and
+`dailyHoldersRevenue`. Every response keeps its own request/read clock and
+digest. A row requires an explicit operator-confirmed mapping among canonical
+Radar asset ID, CoinGecko ID, DefiLlama protocol-list ID and slug, protocol
+name, and token symbol; name or symbol similarity never creates that mapping.
+TVL change stays percent points and is not net flow. User-paid fees, protocol-
+retained revenue, and token-holder revenue remain distinct; missing values are
+unavailable, not zero, and 7d/30d totals are not daily averages. Because the
+reviewed free overview schema exposes no metric-value timestamp, local
+acquisition clocks remain explicit while provider value time is unavailable.
+The implemented contract is synthetic-fixture-only, context-only, no-call,
+non-authoritative, campaign-detached, and Protocol-v2-ineligible. See
+`research/DEFILLAMA_PROTOCOL_FUNDAMENTALS_INTERFACE_REVIEW.md` / `.json`.
+**Why:** Protocol fundamentals can improve fundamental-led context only if
+economic meanings and token/protocol identities remain honest. Collapsing
+fees/revenue, treating USD TVL changes as deposits, auto-matching a token to a
+protocol, or inventing a provider timestamp would manufacture evidence.
+**Revisit when:** The operator approves a genuine mapping registry and a
+separate DefiLlama authorization already exists, then after request budgets,
+exact immutable bytes, ledger/health/backoff, freshness, retention/export,
+strict-doctor, rollback, and Protocol-v2 annex selection are reviewed. Do not
+add a client or infer authorization merely because the free endpoints are
+public.
+
 ## 2026-07-18 - Preserve official announcement windows without inventing time
 **Status:** accepted
 **Decision:** Canonical announcement evidence must preserve separately the

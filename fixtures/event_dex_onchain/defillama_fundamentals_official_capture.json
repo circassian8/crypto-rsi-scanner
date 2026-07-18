@@ -1,0 +1,164 @@
+{
+  "schema_id": "decision_radar.defillama_fundamentals_fixture_capture",
+  "schema_version": 1,
+  "capture_contract": "defillama_free_protocol_fundamentals_fixture_capture",
+  "capture_mode": "fixture",
+  "fixture_synthetic": true,
+  "provider": "defillama",
+  "api_contract": "defillama_free_api_v1",
+  "capture_started_at": "2026-07-18T12:00:00Z",
+  "capture_completed_at": "2026-07-18T12:00:01Z",
+  "mappings": [
+    {
+      "canonical_asset_id": "aave",
+      "coingecko_asset_id": "aave",
+      "protocol_list_id": "2269",
+      "protocol_slug": "aave",
+      "protocol_name": "Aave",
+      "token_symbol": "AAVE",
+      "mapping_authority": "operator_confirmed_fixture"
+    }
+  ],
+  "exchanges": [
+    {
+      "request_id": "protocols",
+      "request_started_at": "2026-07-18T12:00:00.050Z",
+      "response_received_at": "2026-07-18T12:00:00.250Z",
+      "duration_ms": 180,
+      "request": {
+        "method": "GET",
+        "host": "api.llama.fi",
+        "path": "/protocols",
+        "query": {}
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json; charset=utf-8",
+        "body": [
+          {
+            "id": "2269",
+            "name": "Aave",
+            "symbol": "AAVE",
+            "category": "Lending",
+            "chains": ["Ethereum", "Polygon"],
+            "tvl": 12500000000,
+            "change_1d": 2.1,
+            "change_7d": -5.3
+          }
+        ]
+      }
+    },
+    {
+      "request_id": "daily_fees",
+      "request_started_at": "2026-07-18T12:00:00.260Z",
+      "response_received_at": "2026-07-18T12:00:00.440Z",
+      "duration_ms": 160,
+      "request": {
+        "method": "GET",
+        "host": "api.llama.fi",
+        "path": "/overview/fees",
+        "query": {
+          "dataType": "dailyFees",
+          "excludeTotalDataChart": true,
+          "excludeTotalDataChartBreakdown": true
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "protocols": [
+            {
+              "id": "2269",
+              "name": "Aave",
+              "slug": "aave",
+              "total24h": 2800000,
+              "total7d": 18500000,
+              "total30d": 77000000,
+              "change_1d": 22.0,
+              "methodologyURL": "https://github.com/DefiLlama/dimension-adapters",
+              "methodology": {
+                "Fees": "Interest, liquidation, and flash-loan fees paid by users."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request_id": "daily_revenue",
+      "request_started_at": "2026-07-18T12:00:00.450Z",
+      "response_received_at": "2026-07-18T12:00:00.630Z",
+      "duration_ms": 160,
+      "request": {
+        "method": "GET",
+        "host": "api.llama.fi",
+        "path": "/overview/fees",
+        "query": {
+          "dataType": "dailyRevenue",
+          "excludeTotalDataChart": true,
+          "excludeTotalDataChartBreakdown": true
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "protocols": [
+            {
+              "id": "2269",
+              "name": "Aave",
+              "slug": "aave",
+              "total24h": 900000,
+              "total7d": 6100000,
+              "total30d": 25800000,
+              "change_1d": 18.0,
+              "methodologyURL": "https://github.com/DefiLlama/dimension-adapters",
+              "methodology": {
+                "Revenue": "Share of fees retained by the protocol."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request_id": "daily_holders_revenue",
+      "request_started_at": "2026-07-18T12:00:00.640Z",
+      "response_received_at": "2026-07-18T12:00:00.820Z",
+      "duration_ms": 160,
+      "request": {
+        "method": "GET",
+        "host": "api.llama.fi",
+        "path": "/overview/fees",
+        "query": {
+          "dataType": "dailyHoldersRevenue",
+          "excludeTotalDataChart": true,
+          "excludeTotalDataChartBreakdown": true
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "content_type": "application/json",
+        "body": {
+          "protocols": [
+            {
+              "id": "2269",
+              "name": "Aave",
+              "slug": "aave",
+              "total24h": 125000,
+              "total7d": 840000,
+              "total30d": 3600000,
+              "change_1d": 8.0,
+              "methodologyURL": "https://github.com/DefiLlama/dimension-adapters",
+              "methodology": {
+                "Holders revenue": "Revenue distributed to token holders."
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "research_only": true
+}

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from ... import config
+from ...event_providers import defillama_fundamentals
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
 
@@ -608,7 +609,15 @@ def _replace_provider_counts(
 
 
 def _load_provider_items(provider: str, path: Path) -> tuple[Mapping[str, Any], ...]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    raw_bytes = path.read_bytes()
+    data = json.loads(raw_bytes)
+    if (
+        provider == "defillama_tvl_fees_revenue"
+        and defillama_fundamentals.is_defillama_fundamentals_fixture_capture(data)
+    ):
+        return defillama_fundamentals.normalize_defillama_fundamentals_fixture_capture(
+            raw_bytes
+        )
     if isinstance(data, Mapping):
         if provider == "geckoterminal":
             raw = data.get("data") or data.get("pools") or data.get("items") or data.get("rows") or []
@@ -804,6 +813,11 @@ def _normalize_protocol_row(
     profile: str | None,
     artifact_namespace: str | None,
 ) -> dict[str, Any]:
+    if item.get("schema_id") == defillama_fundamentals.OUTPUT_SCHEMA_ID:
+        row = dict(item)
+        row["profile"] = profile
+        row["artifact_namespace"] = artifact_namespace
+        return row
     metrics = _mapping(item.get("metrics") or item.get("data"))
     protocol = _mapping(item.get("protocol"))
     symbol = _symbol(_first(item, metrics, protocol, "symbol", "token_symbol", "ticker"))
