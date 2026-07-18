@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Publish the seventeenth real no-send market cycle · Codex
+**Why:** The one-hour cadence window opened and the evidence-first program
+needs regular genuine observations to warm temporal baselines without lowering
+thresholds or inventing spread data.
+**Changes:**
+- Ran exactly one already-authorized Daily Operations cycle. Its single bounded
+  CoinGecko `/coins/markets` request returned HTTP 200 with 80 raw rows; the
+  closed top-liquid selection retained 30 exact observations in namespace
+  `radar_market_no_send_20260718t124637586106z_736f495b1007`.
+- The full terminal chain succeeded: generation complete, strict doctor OK,
+  final publication receipt, revision-12 pointer publication, owned dashboard
+  restart, operations receipt, exact identity probe, campaign refresh, and
+  cadence reservation through `2026-07-18T13:46:37.815370Z`.
+- Campaign truth is now 17 real cycles, 510 retained observations, 480
+  baseline-counted observations, 30 too-close observations, 5 historical ideas,
+  0 current ideas, 1 matured outcome, 3 pending outcomes, and 1 honest
+  `due_missing_price`. The current 30-asset universe has warm turnover/volume
+  but its return, relative, and volatility features remain warming. Trusted
+  spread remains 0/510; no substitute was invented.
+- Refreshed the checked-in Markdown/JSON campaign reports and current ROADMAP
+  snapshot. No code, threshold, score, route, authorization, or service-install
+  change was made.
+**Verify:** Daily Operations readiness was eligible before the request; the
+cycle returned `succeeded/published_and_restarted`; status reports the same
+successful cycle and next cadence; dashboard readiness is READY; publication,
+operations, pointer, operator state, and campaign rows agree on namespace/run/
+revision/operator digest; strict doctor reports 0 blockers and 0 warnings;
+three host-visible HEAD probes returned HTTP 200 with exact authority headers.
+All safety counters are zero.
+**Notes/risks:** Full `make verify` was intentionally skipped because this was
+an operational evidence cycle with no source-code change. Temporal baselines
+are still warming, spread remains unavailable, and DEXE outcome recovery still
+requires genuine historical point-in-time price evidence.
+
 ## 2026-07-18 — Separate official announcement publication and acquisition clocks · Codex
 **Why:** The live Bybit and Binance announcement paths could treat a provider
 publication/update timestamp as `fetched_at`, erasing the actual observation
