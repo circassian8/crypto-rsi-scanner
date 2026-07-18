@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close exact-universe DefiLlama mapping review · Codex
+**Why:** The typed fundamentals parser correctly required a genuine mapping
+registry, but there was no executable contract for proving which current Radar
+assets were explicitly mapped to a protocol, explicitly not applicable, or
+still unreviewed. That left the most error-prone fundamental identity boundary
+as prose.
+**Changes:**
+- Added a deterministic no-network/no-write mapping review and canonical
+  registry validator. Every exact-universe asset must be human-confirmed as
+  `mapped` or `not_applicable`; canonical/CoinGecko identity, symbol, protocol
+  ID/slug/name, reviewer, time, note, cardinality, and universe digest remain
+  closed and fingerprinted.
+- Coverage now fails closed on fixture mode, missing or extra decisions,
+  universe drift, symbol/ID conflicts, altered canonical projections,
+  ambiguous protocol identity, duplicate mappings, or secret-like keys. Names
+  and symbols are never used to infer a protocol. Exact blockers explain why a
+  registry cannot satisfy the live mapping prerequisite.
+- Added an offline fixture with one explicit non-protocol decision and one
+  mapped protocol, a dedicated Make smoke, focused regressions, and operator
+  documentation. The current revision-12 authority was measured honestly: its
+  exact 30-asset digest is
+  `8002383891e49f7eeea332dc40fc5c181c2a4455907c0c25a3def14f31bb3e52`,
+  with 30 unreviewed assets and zero inferred mappings.
+- Updated the durable decision, roadmap, working agreement, and DefiLlama
+  interface review. No provider authorization, transport, call, write,
+  campaign/dashboard authority, Protocol-v2 admission, route, score, threshold,
+  send, trade, order, paper trade, RSI write, or Event Alpha fade behavior was
+  added.
+**Verify:** All 21 focused mapping/fundamentals tests pass; the dedicated
+mapping smoke proves complete fixture coverage remains live-ineligible; Python
+compileall, JSON validation, architecture cleanliness (zero new violations),
+and `git diff --check` pass.
+**Notes/risks:** A complete operator registry closes only the identity-mapping
+prerequisite. Separate DefiLlama authorization, bounded immutable transport,
+retention/freshness/doctor controls, genuine capture, and exact Protocol-v2
+annex selection remain required. Full `make verify` was intentionally skipped
+for this isolated no-I/O contract because its parser, semantic, CLI, smoke,
+syntax, JSON, and architecture boundaries are covered directly.
+
 ## 2026-07-18 — Separate fixture readiness from live-provider truth · Codex
 **Why:** Legacy provider surfaces treated an existing fixture path as
 `configured`, which could make offline parser coverage—especially DefiLlama

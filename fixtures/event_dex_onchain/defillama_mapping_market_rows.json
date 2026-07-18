@@ -1,0 +1,18 @@
+{
+  "rows": [
+    {
+      "canonical_asset_id": "bitcoin",
+      "coin_id": "bitcoin",
+      "liquidity_rank": 1,
+      "name": "Bitcoin",
+      "symbol": "BTC"
+    },
+    {
+      "canonical_asset_id": "aave",
+      "coin_id": "aave",
+      "liquidity_rank": 2,
+      "name": "Aave",
+      "symbol": "AAVE"
+    }
+  ]
+}

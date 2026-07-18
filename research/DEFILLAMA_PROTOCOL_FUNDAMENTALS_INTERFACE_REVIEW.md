@@ -2,8 +2,8 @@
 
 Reviewed: 2026-07-18
 
-Status: **official free-interface shape closed offline; no live transport or
-authorization created**.
+Status: **official free-interface shape and exact-universe mapping review
+contract closed offline; no live transport or authorization created**.
 
 ## Decision
 
@@ -76,6 +76,23 @@ The closed output also flows through the existing DEX/on-chain readiness
 surface without losing holders-revenue or metric-semantics fields. Historical
 flat DefiLlama-style fixtures retain their prior interpretation.
 
+`crypto_rsi_scanner.event_providers.defillama_mapping_registry` closes the
+separate identity-review boundary. It builds a deterministic pending roster
+from exact liquidity-ranked market rows and accepts only an exact canonical
+registry in which every asset is explicitly either `mapped` or
+`not_applicable`. The registry binds its reviewer, review time, exact universe
+digest, canonical/CoinGecko identity, symbol, protocol-list ID, slug, name, and
+review note. Name or symbol similarity never creates a decision. A changed
+universe digest, missing asset, extra asset, symbol/ID conflict, fixture-mode
+registry, altered canonical projection, or incomplete decision set keeps live
+mapping eligibility false with explicit blockers.
+
+The mapping utility performs no provider call and writes nothing. A fixture
+registry can prove the validator but can never satisfy the live boundary; only
+a complete `registry_mode=operator` projection for the exact reviewed universe
+can close the mapping prerequisite. That still does not authorize DefiLlama,
+implement transport, publish evidence, or admit a capture to Protocol v2.
+
 The readiness projection is now explicit: the fixture path sets
 `fixture_input_configured=true`, while live `configured=false`,
 `live_transport_status=not_implemented`,
@@ -86,11 +103,26 @@ dashboard labels this state **Fixture only**, and strict doctor blocks any
 fixture-scoped artifact that claims live configuration, transport, call
 permission, or rehearsal eligibility.
 
-Safe offline check:
+Safe offline checks:
 
 ```sh
 make radar-fundamentals-defillama-smoke PYTHON=.venv/bin/python
+make radar-fundamentals-defillama-mapping-smoke PYTHON=.venv/bin/python
 ```
+
+Assess any exact market-row artifact without a call or write:
+
+```sh
+.venv/bin/python -m crypto_rsi_scanner.event_providers.defillama_mapping_registry \
+  <exact-market-rows.json> [--registry <operator-registry.json>]
+```
+
+The current revision-12 authority was assessed on 2026-07-18. Its exact
+30-asset roster has universe digest
+`8002383891e49f7eeea332dc40fc5c181c2a4455907c0c25a3def14f31bb3e52`:
+0 mapped, 0 explicitly not applicable, 30 unreviewed, 0 identity conflicts.
+The result is correctly live-ineligible and made zero provider calls. This is a
+measured review gap, not permission to infer mappings or lower the boundary.
 
 ## Still required before genuine evidence
 

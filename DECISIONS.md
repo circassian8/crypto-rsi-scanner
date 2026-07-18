@@ -68,6 +68,29 @@ strict-doctor, rollback, and Protocol-v2 annex selection are reviewed. Do not
 add a client or infer authorization merely because the free endpoints are
 public.
 
+## 2026-07-18 - Require an exact reviewed universe for DefiLlama mappings
+**Status:** accepted
+**Decision:** DefiLlama protocol identity is closed only by a canonical,
+operator-reviewed registry bound to one exact liquidity-ranked Radar universe
+digest. Every asset must be explicitly `mapped` or `not_applicable`; a mapped
+row retains canonical and CoinGecko IDs, symbol, DefiLlama protocol-list ID,
+slug, name, reviewer, review time, and note. Name/symbol similarity never
+creates or carries a mapping. Missing/extra rows, universe drift, identity
+conflicts, altered canonical projections, and incomplete decisions fail closed.
+A fixture registry may prove validation mechanics but cannot become live-
+mapping eligible. The review and coverage command performs no provider call or
+write, and even a complete operator registry grants neither provider
+authorization nor evidence/Protocol-v2 authority.
+**Why:** Token and protocol identities are not interchangeable. An apparently
+reasonable automatic join can attach TVL, fee, or revenue evidence to the wrong
+asset and manufacture a fundamental thesis. Binding the human decision to the
+exact reviewed universe makes that ambiguity and later membership drift
+observable.
+**Revisit when:** A more durable canonical entity registry is independently
+designed, human-reviewed, versioned, and proven to preserve the same explicit
+mapped/not-applicable decisions across universe changes without inference. Do
+not weaken the current exact-universe boundary merely to reduce review work.
+
 ## 2026-07-18 - Preserve official announcement windows without inventing time
 **Status:** accepted
 **Decision:** Canonical announcement evidence must preserve separately the

@@ -367,6 +367,17 @@ may be added later when a suitable environment already exists.
   ineligible. A genuine capture requires separately present authorization, a
   real mapping registry, bounded immutable bytes, ledger/health/backoff,
   freshness and retention review, strict doctor, and exact annex selection.
+  `make radar-fundamentals-defillama-mapping-smoke` separately proves the
+  explicit mapping-review validator. The no-write CLI
+  `python -m crypto_rsi_scanner.event_providers.defillama_mapping_registry
+  <exact-market-rows.json> [--registry <operator-registry.json>]` reports the
+  exact universe digest, mapped/not-applicable/unreviewed/conflict counts, and
+  closed blockers without a provider call. Only a complete canonical
+  `registry_mode=operator` registry for that exact universe can satisfy the
+  mapping prerequisite; fixtures, names/symbols, missing decisions, identity
+  drift, and altered canonical projections never do. Mapping eligibility alone
+  grants no authorization, transport, evidence authority, or Protocol-v2
+  admission.
   See `research/DEFILLAMA_PROTOCOL_FUNDAMENTALS_INTERFACE_REVIEW.md` / `.json`.
 - **Chain-native DEX/on-chain input:** `make
   radar-dex-onchain-evm-v2-smoke` validates one exact offline

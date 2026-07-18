@@ -70,6 +70,42 @@
   ],
   "implemented_contract": "decision_radar_defillama_fundamentals_v1",
   "safe_command": "make radar-fundamentals-defillama-smoke PYTHON=.venv/bin/python",
+  "mapping_review_contract": {
+    "schema_id": "decision_radar.defillama_mapping_registry",
+    "schema_version": 1,
+    "safe_smoke_command": "make radar-fundamentals-defillama-mapping-smoke PYTHON=.venv/bin/python",
+    "assessment_command": ".venv/bin/python -m crypto_rsi_scanner.event_providers.defillama_mapping_registry <exact-market-rows.json> [--registry <operator-registry.json>]",
+    "allowed_decisions": [
+      "mapped",
+      "not_applicable"
+    ],
+    "exact_universe_digest_required": true,
+    "automatic_identity_inference": false,
+    "complete_operator_registry_required_for_live_mapping_eligibility": true,
+    "fixture_registry_live_mapping_eligible": false,
+    "provider_calls": 0,
+    "artifact_writes": 0
+  },
+  "current_authority_mapping_gap": {
+    "assessed_on": "2026-07-18",
+    "namespace": "radar_market_no_send_20260718t124637586106z_736f495b1007",
+    "revision": 12,
+    "market_universe_sha256": "8002383891e49f7eeea332dc40fc5c181c2a4455907c0c25a3def14f31bb3e52",
+    "asset_count": 30,
+    "mapped_count": 0,
+    "not_applicable_count": 0,
+    "unreviewed_count": 30,
+    "identity_conflict_count": 0,
+    "coverage_complete": false,
+    "live_capture_mapping_eligible": false,
+    "live_capture_mapping_blockers": [
+      "operator_registry_missing",
+      "registry_universe_digest_mismatch",
+      "mapping_cardinality_mismatch",
+      "unreviewed_assets_present"
+    ],
+    "provider_calls": 0
+  },
   "live_transport_implemented": false,
   "readiness_projection": {
     "configuration_scope": "fixture_input_only",

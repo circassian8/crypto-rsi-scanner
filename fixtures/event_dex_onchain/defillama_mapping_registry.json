@@ -1,0 +1,35 @@
+{
+  "mappings": [
+    {
+      "canonical_asset_id": "bitcoin",
+      "coingecko_asset_id": "bitcoin",
+      "mapping_status": "not_applicable",
+      "protocol_list_id": null,
+      "protocol_name": null,
+      "protocol_slug": null,
+      "review_note": "Synthetic fixture proves an explicitly reviewed non-protocol asset.",
+      "reviewer_confirmed": true,
+      "symbol": "BTC"
+    },
+    {
+      "canonical_asset_id": "aave",
+      "coingecko_asset_id": "aave",
+      "mapping_status": "mapped",
+      "protocol_list_id": "2269",
+      "protocol_name": "Aave",
+      "protocol_slug": "aave",
+      "review_note": "Synthetic fixture mapping matches the closed DefiLlama response fixture.",
+      "reviewer_confirmed": true,
+      "symbol": "AAVE"
+    }
+  ],
+  "market_universe_sha256": "ecc946511e90e3a258cab7f69b8df40180464b3ed45cccb1525ce09e4c86e3b4",
+  "provider": "defillama",
+  "registry_id": "defillama-map-v1:fixture",
+  "registry_mode": "fixture",
+  "research_only": true,
+  "reviewed_at": "2026-07-18T12:00:00Z",
+  "reviewed_by": "fixture",
+  "schema_id": "decision_radar.defillama_mapping_registry",
+  "schema_version": 1
+}
