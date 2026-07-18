@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Reconcile Protocol-v2 readiness with confirmed venue · Codex
+**Why:** The owner-confirmed Bybit USDT-linear-perpetual decision was durable in
+the roadmap and decision log, but the top-level Protocol-v2 readiness output
+still presented its frozen 2026-07-16 “venue/instrument/quote not selected”
+placeholders as current blockers. The empirical gate therefore contradicted
+operator truth.
+**Changes:**
+- Preserved the canonical frozen requirements object byte-for-byte at SHA-256
+  `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
+  No preregistration or holdout evidence was rewritten.
+- Added a separate defensive current-decision progress projection and rendered
+  it before the audit placeholders. It records Bybit, USDT-linear perpetuals,
+  USDT quote, public-data-only scope, and owner-confirmed research eligibility.
+- Replaced the false current blockers with the real remaining sequence: exact
+  instrument set, permitted reachability after the recorded 403, genuine
+  execution-quality capture, sources, untouched holdout, outcomes/costs,
+  universe/routes/episodes/minimum samples, and final human annex approval.
+  The frozen blockers remain visibly labeled historical audit/hash state.
+- Updated the Protocol-v2 readiness note, working agreement, durable decision,
+  and roadmap. No environment/file/credential/provider/holdout read,
+  authorization, call, replay/selection/final target, route, score, threshold,
+  send, trade, order, paper trade, RSI write, or Event Alpha fade behavior was
+  added.
+**Verify:** All 10 focused Protocol-v2 tests pass; both static readiness and
+check targets preserve the exact frozen hash while rendering the confirmed
+surface; Python compileall, architecture cleanliness (zero new violations), and
+`git diff --check` pass.
+**Notes/risks:** Current progress is intentionally not the sealed annex. The
+exact eligible IDs and all genuine evidence/statistical sections remain open,
+and the holdout remains undefined and unread. Full `make verify` was skipped
+because this is a static no-I/O truth-rendering correction covered by exact-
+digest, no-ambient-state, CLI, syntax, and architecture gates.
+
 ## 2026-07-18 — Close exact-universe DefiLlama mapping review · Codex
 **Why:** The typed fundamentals parser correctly required a genuine mapping
 registry, but there was no executable contract for proving which current Radar

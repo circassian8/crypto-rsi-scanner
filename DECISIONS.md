@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Separate current Protocol-v2 progress from its frozen requirements
+**Status:** accepted
+**Decision:** Keep the canonical 2026-07-16 Protocol-v2 requirements object
+byte-identical at SHA-256
+`683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
+Render later accepted human decisions through a separate static current-progress
+projection: Bybit, USDT-linear perpetuals, USDT quote, public market data only,
+and owner-confirmed research eligibility are selected. Do not present the
+frozen object's freeze-time “venue/instrument/quote not selected” placeholders
+as current blockers. Current blockers begin with the exact unsealed instrument
+set, unproven permitted reachability after the recorded 403, and absent genuine
+execution-quality capture, followed by the remaining sources, holdout,
+outcome/cost, universe/route/episode/sample, and final annex decisions. The
+progress projection reads no environment, files, credentials, providers, or
+holdout data and creates no authorization or evaluation target.
+**Why:** Rewriting the preregistered requirements would destroy its audit hash,
+while continuing to show superseded placeholders as current truth contradicts
+the accepted venue decision. Separating immutable historical requirements from
+current decision progress preserves both auditability and operator coherence.
+**Revisit when:** The exact Protocol-v2 annex is ready to be sealed as a new,
+human-approved immutable artifact. Until then, update only genuinely accepted
+progress and never imply that selection, evidence, holdout, or activation is
+complete.
+
 ## 2026-07-18 - Fixture configuration never implies live-provider readiness
 **Status:** accepted
 **Decision:** A checked-in or operator-selected fixture path may establish only

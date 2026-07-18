@@ -1,7 +1,7 @@
 # Decision Radar empirical Protocol-v2 readiness
 
 Status: **required-evidence contract frozen/static; executable protocol blocked
-and not frozen; holdout unopened**.
+and not frozen; confirmed venue decision recorded separately; holdout unopened**.
 
 - Contract: `decision_radar_empirical_validation_v2_readiness_v1`
 - Proposed executable protocol: `decision_radar_empirical_validation_v2`
@@ -13,6 +13,39 @@ and not frozen; holdout unopened**.
 - Research only; zero provider calls, credential/environment/file reads, writes,
   sends, trades, orders, paper trades, RSI writes, fade triggers, or pointer
   changes.
+
+## Current decision progress after the frozen contract
+
+The frozen 2026-07-16 requirements object and its SHA-256 remain byte-for-byte
+unchanged. It intentionally records the unresolved placeholders that existed at
+freeze time. The current readiness view now renders later accepted human
+decisions separately so historical contract evidence and present operator truth
+are not conflated.
+
+Confirmed:
+
+- venue: Bybit;
+- instrument mode: USDT-linear perpetuals;
+- quote currency: USDT;
+- universe rule: top 30 liquidity-ranked Radar assets intersected with exact
+  active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
+  non-prelisting contracts;
+- data boundary: public market data only, with no credentials, private account
+  data, orders, execution, or trading;
+- jurisdiction/account eligibility for this research scope: owner-confirmed on
+  2026-07-17.
+
+Still unresolved:
+
+- the exact eligible instrument IDs have not been captured and sealed;
+- permitted Bybit public reachability remains unproven after the recorded 403;
+- no genuine execution-quality capture exists;
+- exact sources, partitions/untouched holdout, outcomes, costs, universe,
+  routes, episodes, minimum samples, and final human annex approval remain
+  unsealed.
+
+This progress overlay makes zero provider calls, creates no authorization, and
+does not freeze or activate Protocol v2.
 
 ## Required evidence
 
@@ -36,8 +69,8 @@ Invented, current-metadata, retrospective, and proxy substitution is forbidden.
 The executable protocol remains blocked until a human-approved, digest-bound
 annex fixes all of the following before an untouched holdout is read:
 
-- intended venue, instrument mode, quote, exact eligible instruments, and
-  jurisdiction/account plus public/private-data boundaries;
+- the confirmed venue, instrument mode, quote, jurisdiction/account, and
+  public-data boundary plus the still-unsealed exact eligible instruments;
 - exact providers/datasets/endpoints and authorization boundaries;
 - development, validation, embargo/purge, outcome-maturity, and untouched
   holdout windows plus a holdout content commitment and access ledger;
@@ -49,8 +82,10 @@ annex fixes all of the following before an untouched holdout is read:
 - aggregate and route/bias/regime/liquidity/quality minimum samples plus the
   multiple-comparison policy.
 
-No venue or provider is selected by this document. No order or trading
-permission is requested.
+The frozen requirements object itself selected no venue. The later accepted
+decision selects Bybit only as the intended public research surface; it does
+not select exact instrument IDs, create provider authorization, or request
+order/trading permission.
 
 ## Safe commands
 

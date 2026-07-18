@@ -26,6 +26,9 @@ REQUIRED_EVIDENCE_ROLES = {
     "onchain_context",
     "rsi_technical_context",
 }
+FROZEN_READINESS_SHA256 = (
+    "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
+)
 
 
 def test_readiness_contract_is_valid_but_protocol_activation_is_blocked() -> None:
@@ -46,6 +49,32 @@ def test_readiness_contract_is_valid_but_protocol_activation_is_blocked() -> Non
         "all_required_sections_complete": False,
     }
     assert values["research_only"] is True
+    assert protocol_v2.readiness_sha256(values) == FROZEN_READINESS_SHA256
+
+
+def test_current_progress_records_confirmed_venue_without_mutating_frozen_contract() -> None:
+    progress = protocol_v2.current_decision_progress_values()
+    decision = progress["confirmed_execution_decision"]
+
+    assert progress["status"] == "venue_selected_evidence_collection_blocked"
+    assert progress["frozen_readiness_contract_mutated"] is False
+    assert decision["venue_id"] == "bybit"
+    assert decision["instrument_mode"] == "usdt_linear_perpetual"
+    assert decision["quote_currency"] == "USDT"
+    assert decision["data_boundary"] == "public_market_data_only"
+    assert decision["exact_eligible_instrument_set_sealed"] is False
+    assert decision["credentials_or_private_account_data"] is False
+    assert decision["orders_or_execution_or_trading"] is False
+    assert "exact_eligible_instrument_set_not_sealed" in progress[
+        "current_activation_blockers"
+    ]
+    assert "execution_venue_not_selected" not in progress[
+        "current_activation_blockers"
+    ]
+    assert progress["provider_authorization_created"] is False
+    assert progress["provider_calls"] == 0
+    assert progress["holdout_accessed"] is False
+    assert protocol_v2.readiness_sha256() == FROZEN_READINESS_SHA256
 
 
 def test_required_evidence_is_explicit_point_in_time_and_never_proxied() -> None:
@@ -174,6 +203,10 @@ def test_values_are_defensive_and_digest_is_deterministic() -> None:
     assert protocol_v2.readiness_sha256() == expected
     assert protocol_v2.canonical_readiness_bytes().endswith(b"\n")
 
+    progress = protocol_v2.current_decision_progress_values()
+    progress["current_activation_blockers"].append("invented")
+    assert progress != protocol_v2.current_decision_progress_values()
+
 
 def test_build_and_cli_read_no_ambient_state_and_write_nothing(
     tmp_path: Path,
@@ -212,6 +245,11 @@ def test_human_output_leads_with_blocked_unopened_truth(
     assert "protocol_frozen=false activation=blocked holdout_accessed=false" in output.out
     assert "targets_exposed=replay:0,selection:0,final_test:0" in output.out
     assert "Required point-in-time evidence (no invention or proxy)" in output.out
+    assert "current_decision_progress=venue_selected_evidence_collection_blocked" in output.out
+    assert "selected_execution_surface=bybit:usdt_linear_perpetual:USDT" in output.out
+    assert "Current unresolved activation blockers:" in output.out
+    assert "- exact_eligible_instrument_set_not_sealed" in output.out
+    assert "Frozen-contract placeholders retained for audit/hash stability:" in output.out
     assert "No Protocol-v2 replay or final test is available" in output.out
 
 

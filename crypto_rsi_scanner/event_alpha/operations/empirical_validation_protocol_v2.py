@@ -23,6 +23,44 @@ CONTRACT_VERSION = "decision_radar_empirical_validation_v2_readiness_v1"
 PROPOSED_PROTOCOL_VERSION = "decision_radar_empirical_validation_v2"
 
 
+_CURRENT_DECISION_PROGRESS: dict[str, Any] = {
+    "schema_id": "decision_radar.empirical_validation_protocol_v2_decision_progress",
+    "schema_version": 1,
+    "as_of": "2026-07-18",
+    "status": "venue_selected_evidence_collection_blocked",
+    "source": "accepted_human_decisions_after_frozen_readiness_contract",
+    "frozen_readiness_contract_mutated": False,
+    "confirmed_execution_decision": {
+        "venue_id": "bybit",
+        "instrument_mode": "usdt_linear_perpetual",
+        "quote_currency": "USDT",
+        "universe_rule": (
+            "top_30_liquidity_ranked_radar_assets_intersect_exact_active_"
+            "linearperpetual_trading_usdt_quoted_usdt_settled_nonprelisting_contracts"
+        ),
+        "exact_eligible_instrument_set_sealed": False,
+        "data_boundary": "public_market_data_only",
+        "credentials_or_private_account_data": False,
+        "orders_or_execution_or_trading": False,
+        "jurisdiction_and_account_eligibility": "owner_confirmed_2026-07-17",
+    },
+    "current_activation_blockers": [
+        "exact_eligible_instrument_set_not_sealed",
+        "bybit_public_reachability_unproven_after_recorded_403",
+        "genuine_execution_quality_capture_absent",
+        "data_sources_not_sealed",
+        "partitions_and_untouched_holdout_not_sealed",
+        "outcomes_and_costs_not_sealed",
+        "universe_routes_episodes_and_minimum_samples_not_sealed",
+        "human_protocol_v2_annex_approval_absent",
+    ],
+    "provider_authorization_created": False,
+    "provider_calls": 0,
+    "holdout_accessed": False,
+    "research_only": True,
+}
+
+
 _REQUIRED_EVIDENCE: tuple[dict[str, Any], ...] = (
     {
         "role": "intraday_market_observations",
@@ -304,6 +342,12 @@ def readiness_values() -> dict[str, Any]:
     return deepcopy(_READINESS)
 
 
+def current_decision_progress_values() -> dict[str, Any]:
+    """Return current accepted decisions without mutating the frozen contract."""
+
+    return deepcopy(_CURRENT_DECISION_PROGRESS)
+
+
 def canonical_readiness_bytes(value: Mapping[str, Any] | None = None) -> bytes:
     payload = dict(value) if value is not None else readiness_values()
     return (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode(
@@ -362,6 +406,8 @@ def validate_readiness(value: Mapping[str, Any]) -> list[str]:
 
 def format_readiness(value: Mapping[str, Any] | None = None) -> str:
     payload = dict(value) if value is not None else readiness_values()
+    progress = current_decision_progress_values()
+    decision = progress["confirmed_execution_decision"]
     lines = [
         "DECISION RADAR EMPIRICAL PROTOCOL V2 READINESS",
         f"status={payload['status']}",
@@ -373,6 +419,15 @@ def format_readiness(value: Mapping[str, Any] | None = None) -> str:
         "targets_exposed=replay:0,selection:0,final_test:0",
         "provider_calls=0 credential_reads=0 file_reads=0 file_writes=0 environment_reads=0",
         "research_only=true no_orders=true no_trading_permission_requested=true",
+        (
+            "current_decision_progress="
+            f"{progress['status']} frozen_contract_mutated=false"
+        ),
+        (
+            "selected_execution_surface="
+            f"{decision['venue_id']}:{decision['instrument_mode']}:"
+            f"{decision['quote_currency']} data_boundary={decision['data_boundary']}"
+        ),
         "",
         "Required point-in-time evidence (no invention or proxy):",
     ]
@@ -385,14 +440,19 @@ def format_readiness(value: Mapping[str, Any] | None = None) -> str:
     lines.extend(("", "Required exact sealed annex sections:"))
     for section, fields in payload["required_freeze_annex"].items():
         lines.append(f"- {section}: {','.join(fields)}")
-    lines.extend(("", "Activation blockers:"))
+    lines.extend(("", "Current unresolved activation blockers:"))
+    lines.extend(
+        f"- {blocker}" for blocker in progress["current_activation_blockers"]
+    )
+    lines.extend(("", "Frozen-contract placeholders retained for audit/hash stability:"))
     lines.extend(f"- {blocker}" for blocker in payload["activation_blockers"])
     lines.extend(
         (
             "",
-            "No Protocol-v2 replay or final test is available. A human-approved exact "
-            "venue, instrument, source, partition/holdout, outcome, cost, universe, route, "
-            "episode, and minimum-sample annex must be sealed before activation.",
+            "No Protocol-v2 replay or final test is available. The confirmed Bybit "
+            "surface still requires a human-approved exact instrument set, source, "
+            "partition/holdout, outcome, cost, universe, route, episode, and minimum-"
+            "sample annex before activation.",
         )
     )
     return "\n".join(lines)
@@ -427,6 +487,7 @@ __all__ = (
     "SCHEMA_ID",
     "SCHEMA_VERSION",
     "canonical_readiness_bytes",
+    "current_decision_progress_values",
     "format_readiness",
     "main",
     "readiness_sha256",
