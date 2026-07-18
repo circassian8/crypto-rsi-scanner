@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record one eligible CoinGecko DNS failure without retry · Codex
+**Why:** The campaign became cadence-eligible after the eight-hour evidence
+build, so regular collection required one guarded attempt and coherent terminal
+truth even if the provider boundary failed.
+**Changes:**
+- Readiness confirmed already-present authorization and cadence eligibility,
+  then Daily Operations attempted exactly one bounded CoinGecko request. DNS
+  resolution failed inside the restricted network environment; the cycle wrote
+  one terminal `provider_request_failed` row and was not retried or bypassed.
+- Refreshed campaign truth to three provider-failed attempts while preserving 14
+  successful real cycles, 420 observations, 390 baseline-counted observations,
+  zero current ideas, and zero spread coverage. The prior revision-12 authority
+  remains exact; no pointer publication, invalidation, rollback, or dashboard
+  restart occurred. Next eligibility is 2026-07-18 10:09:51 UTC.
+**Verify:** Daily Operations status reconciles the exact attempted/failed pair,
+current authorization, waiting cadence, unchanged last-success namespace, and
+all zero safety counters. The tracked JSON/Markdown campaign reports agree and
+`git diff --check` passed.
+**Notes/risks:** Do not retry this observation before the new cadence boundary.
+No sends, orders, trades, paper/RSI writes, fade triggers, routes, scores,
+thresholds, or authority changes occurred.
+
 ## 2026-07-18 — Seal immutable Bybit derivatives capture evidence · Codex
 **Why:** Exact-response rederivation was closed, but Protocol-v2 input-quality
 evidence also needs immutable publication, stable pointer semantics, and full
