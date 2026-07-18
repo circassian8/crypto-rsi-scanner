@@ -66,10 +66,11 @@ remain explicit in any Protocol-v2 cost annex. See the official
 
 The intended venue-native 1h/4h source is Bybit V5
 `GET /v5/market/kline` on the same exact USDT-linear perpetual instrument IDs.
-The offline completed-bar normalizer and fixtures are implemented; the live
-adapter and immutable provider capture remain intentionally unimplemented and
-unauthorized until a genuine execution-quality capture first proves the same
-Bybit boundary.
+The offline completed-bar normalizer and a guarded no-write live collector are
+implemented. The collector remains inactive until a genuine execution-quality
+capture first proves the same current Bybit boundary and separate intraday
+authorization plus confirmation exist. Immutable intraday capture/publication
+is not yet implemented.
 
 - Request `category=linear` with exact uppercase `symbol` and explicit
   `interval=60` or `interval=240`. Preserve the exact start/end query, response
@@ -128,11 +129,12 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
 - Seal point-in-time sources, partitions/untouched holdout, outcomes, fees,
   spread/depth/impact rules, latency, universe, routes, episodes, and minimum
   samples in the Protocol-v2 annex.
-- Implement the live/capture half of the reviewed closed-candle 1h/4h contract
-  only after the first genuine execution-quality capture proves the permitted
-  Bybit boundary. Give it a separate explicit authorization and request budget;
-  do not broaden the execution-quality flag silently. The offline normalizer is
-  already available and crosses no provider boundary.
+- Implement immutable capture/publication for the reviewed closed-candle 1h/4h
+  contract only after the first genuine execution-quality capture proves the
+  permitted Bybit boundary. The no-write collector already has a separate
+  authorization, confirmation, exact two-GETs-per-instrument budget, and
+  post-response authority recheck; do not broaden the execution-quality flag
+  silently.
 - Resolve the explicit USDT cost-unit policy before any field is represented as
   USD. The offline normalizer reports USDT depth and USDT notionals and does not
   silently assume a 1:1 conversion.
@@ -142,6 +144,7 @@ The safe implementation smoke is:
 ```sh
 make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
 make radar-intraday-bybit-smoke PYTHON=.venv/bin/python
+make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 ```
@@ -181,7 +184,8 @@ The exact operator sequence is intentionally split:
 - The execution-quality live adapter and immutable capture contract exist but
   are inactive; no genuine capture exists and live spread remains unavailable.
 - The direct 1h/4h completed-bar offline contract exists and is fixture-proven;
-  its separately authorized live/capture boundary does not yet exist.
+  its separately authorized no-write live collector exists but is inactive, and
+  its immutable capture/publication boundary does not yet exist.
 - No capture is Protocol-v2 evidence and no capture ID is annex-bound.
 - Current Bybit reachability remains unverified after the recorded 403.
 - No provider call is planned or attempted by readiness.

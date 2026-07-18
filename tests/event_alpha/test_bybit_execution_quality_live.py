@@ -426,6 +426,47 @@ def test_transport_uses_fixed_public_get_without_credentials_or_redirects() -> N
     assert "cdn-request-id" in headers
 
 
+def test_transport_accepts_only_the_closed_direct_kline_query_shape() -> None:
+    payload = json.loads(
+        (
+            REPO_ROOT
+            / "fixtures"
+            / "bybit_intraday"
+            / "klines_btcusdt_60.json"
+        ).read_text(encoding="utf-8")
+    )
+    request = BybitPublicRequest(
+        method="GET",
+        path="/v5/market/kline",
+        query=(
+            ("category", "linear"),
+            ("symbol", "BTCUSDT"),
+            ("interval", "60"),
+            ("end", "1784289599999"),
+            ("limit", "2"),
+        ),
+    )
+
+    captured = _fetch_public_json(request, 10.0, opener=_FakeOpener(payload))
+
+    assert captured.payload() == payload
+    assert captured.request == request
+    assert captured.response_url.startswith(
+        "https://api.bybit.com/v5/market/kline?"
+    )
+
+    invalid = BybitPublicRequest(
+        method="GET",
+        path=request.path,
+        query=tuple(
+            (key, "3" if key == "limit" else value)
+            for key, value in request.query
+        ),
+    )
+    with pytest.raises(BybitExecutionQualityLiveError, match="request_contract"):
+        _fetch_public_json(invalid, 10.0, opener=_FakeOpener(payload))
+
+
 def test_default_transport_ignores_ambient_proxy_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

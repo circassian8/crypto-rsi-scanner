@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Gate live intraday collection behind execution-quality proof
+**Status:** accepted
+**Decision:** A Bybit direct-bar readiness/collection attempt must first load and
+fully validate one immutable execution-quality capture whose fresh input-quality
+flag is true and whose source namespace, run, revision, and operator digest
+still equal current Radar authority. It then requires a separate already-present
+`RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE=1` authorization and `CONFIRM=1`.
+Collection performs exactly two public GETs per eligible native instrument—one
+1h and one 4h—without retries, then revalidates the same capture, instrument set,
+and Radar authority after the final response. The execution-quality flag never
+silently authorizes intraday collection.
+**Why:** Direct bars are downstream of the chosen venue/instrument mapping. A
+standalone ticker query could race authority, collect a different universe, or
+bypass the still-unproven Bybit execution-quality boundary. Separate capability,
+authorization, and confirmation keep request budgets and operator intent exact.
+**Revisit when:** One descriptor-anchored transaction atomically binds execution
+quality and intraday responses for the same provider instant. Retain distinct
+authorization, request accounting, raw evidence, and failure status even then.
+
 ## 2026-07-18 - Use exact completed Bybit trade-price bars for direct 1h/4h evidence
 **Status:** accepted
 **Decision:** Direct intraday evidence for the selected execution surface uses

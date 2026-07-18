@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Add the guarded Bybit direct-bar live boundary · Codex
+**Why:** The completed-bar normalizer alone could not guarantee that future
+live collection inherits the same exact native instruments and Radar authority
+as genuine execution-quality evidence. Intraday access also needs its own
+explicit operator boundary rather than silently reusing a broader flag.
+**Changes:**
+- Added no-call/no-write intraday readiness that requires one validated fresh
+  execution-quality capture for current Radar authority plus separately present
+  `RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE=1` authorization.
+- Added a confirmation-gated stdout collector that requests exactly one 1h and
+  one 4h completed trade-price bar per eligible native instrument, never
+  retries, stops on the first failure, and revalidates the capture, instrument
+  set, and Radar authority after the final response.
+- Extended the existing fixed-host/direct/no-redirect Bybit transport only for
+  the exact closed kline query shape, exposed validated eligible instruments
+  from immutable execution captures, added readiness/collect Make targets and
+  focused regressions, and reconciled operator/North Star/roadmap decisions.
+**Verify:** 84 focused execution-quality/intraday tests passed; compileall,
+actual no-call readiness, JSON checks, `git diff --check`, and architecture
+cleanliness passed with zero new violations.
+**Notes/risks:** Current real readiness remains blocked by both the absent
+execution-quality capture and absent intraday flag; zero provider calls or
+writes occurred. The collector intentionally does not persist or enter Protocol
+v2. Immutable intraday capture remains next. No authorization mutation, proxy/
+VPN/bypass, retry, send, order, trade, paper/RSI write, fade trigger, outcome
+rewrite, algorithm/threshold/score change, or Radar authority mutation occurred.
+
 ## 2026-07-18 — Seal the offline Bybit direct 1h/4h bar contract · Codex
 **Why:** CoinGecko campaign snapshots cannot provide genuine venue-native 1h/4h
 bars or repair missed outcome horizons. Before any separately authorized live

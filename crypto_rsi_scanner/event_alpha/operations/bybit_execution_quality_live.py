@@ -60,6 +60,7 @@ from .bybit_execution_quality_universe import (
     BybitExecutionQualityUniverseError,
     partition_bybit_provider_query_assets as _partition_provider_query_assets,
 )
+from .bybit_intraday import KLINE_PATH
 from .bybit_execution_quality_capture import (
     BybitCapturedJSONResponse,
     BybitExecutionQualityCaptureError,
@@ -651,6 +652,7 @@ def _fetch_public_json(
     expected_keys = {
         INSTRUMENTS_PATH: {"category", "symbol"},
         ORDERBOOK_PATH: {"category", "symbol", "limit"},
+        KLINE_PATH: {"category", "symbol", "interval", "end", "limit"},
     }
     if (
         request.method != "GET"
@@ -658,6 +660,14 @@ def _fetch_public_json(
         or set(query) != expected_keys[request.path]
         or query.get("category") != BYBIT_CATEGORY
         or (request.path == ORDERBOOK_PATH and query.get("limit") != "200")
+        or (
+            request.path == KLINE_PATH
+            and (
+                query.get("interval") not in {"60", "240"}
+                or query.get("limit") != "2"
+                or not str(query.get("end") or "").isdigit()
+            )
+        )
     ):
         raise BybitExecutionQualityLiveError("public_request_contract_invalid")
     url = f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}"

@@ -885,9 +885,13 @@ before the current bucket, preserves native instrument identity, OHLC,
 base-asset volume, USDT turnover, provider/request/response clocks, and
 close-to-acquisition latency, and rejects open/missing/misidentified bars. Run
 `make radar-intraday-bybit-smoke PYTHON=.venv/bin/python` with zero provider
-calls or writes. Its live/capture half remains absent and must require a genuine
-execution-quality capture plus separate authorization; CoinGecko sparklines,
-interpolation, derived 4h values, and mark/index bars are not direct substitutes.
+calls or writes. Its guarded live collector is implemented but inactive: zero-
+call readiness requires a genuine fresh execution-quality capture for exact
+current Radar authority plus separate intraday authorization, and confirmed
+collection performs exactly two public GETs per eligible instrument with no
+retry or write before revalidating the full prerequisite chain. Immutable
+intraday capture/publication remains absent. CoinGecko sparklines, interpolation,
+derived 4h values, and mark/index bars are not direct substitutes.
 
 A fresh complete capture may be `protocol_v2_input_quality_eligible`, but it
 remains `protocol_v2_evidence_eligible=false` and

@@ -381,6 +381,19 @@ may be added later when a suitable environment already exists.
   credential/private-data permission, order permission, or trading permission.
   Unset the authorization flag to disable the collection boundary; no provider
   process or order surface exists.
+- **Direct Bybit 1h/4h readiness:**
+  `make radar-intraday-bybit-smoke` proves the completed trade-price bar
+  normalizer offline. `make radar-intraday-bybit-readiness` is no-network and
+  no-write; it requires a complete fresh execution-quality capture for the exact
+  current Radar authority plus separately present
+  `RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE=1`. A confirmed
+  `radar-intraday-bybit-collect` performs exactly one `interval=60` and one
+  `interval=240` public GET per eligible native instrument, never retries, and
+  revalidates the capture/instrument/authority chain after the final response.
+  It writes nothing and is not Protocol-v2 evidence. The immutable intraday
+  capture/publication boundary remains unimplemented. Never infer direct bars
+  from CoinGecko snapshots, include an open candle, broaden the execution-
+  quality authorization flag, or bypass a 403/region restriction.
 - **Empirical Protocol-v2 readiness:**
   `make radar-research-protocol-v2-readiness` renders the frozen/static required
   evidence and annex contract without reading environment, files, credentials,
