@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-18T22:59:33.517215+00:00`
+- generated_at: `2026-07-18T23:14:57.248182+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`

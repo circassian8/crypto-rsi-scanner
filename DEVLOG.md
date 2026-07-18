@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Explain healthy-empty anomaly scans with exact inputs · Codex
+**Why:** A genuine 30-asset cycle with zero anomalies rendered only `None`,
+making a successful quiet scan look indistinguishable from missing market data.
+The exact snapshots already contained enough evidence to explain the result
+without changing detection policy.
+**Changes:**
+- Kept the completion-receipt-bound snapshot projection on the existing scan
+  result so the written report and CLI renderer use the same exact inputs.
+- Added classifier coverage, exclusion/no-reaction counts, freshness, temporal
+  baseline state, and per-field availability for return, relative strength,
+  volume, liquidity, spread, and derivatives-crowding inputs.
+- Rendered the current configured classification thresholds and a five-row
+  descriptive movement view. The view explicitly is not an anomaly score,
+  threshold-distance ranking, route, or tuning queue.
+- Kept the public scanner API stable while placing the pure Markdown renderer
+  in `market_anomaly_report.py`; the scanner is 1,128 lines and the focused
+  renderer is 269, so no new size exception or test-file warning was accepted.
+- A zero-anomaly result now says that no configured rule matched while
+  distinguishing it from an empty collection. Missing values remain
+  unavailable and spread absence stays unverified.
+**Verify:** Ran 65 focused anomaly-report, anomaly-surface, adversarial receipt, no-send, and
+publication-coordination tests; all passed. Market-anomaly and integrated-radar
+offline smokes passed, along with Python compileall and diff checks. A no-write
+projection of the exact current cache reports 30 evaluated / 30 no-reaction,
+fresh=30, warming=30, complete 4h/24h/relative/volume/liquidity inputs, 0/30
+spread, 0/30 derivatives crowding, and the unchanged zero-anomaly result.
+Architecture cleanliness passes with zero new size violations and no oversized
+functions.
+**Notes/risks:** This enriches the existing Markdown report only; it adds no
+provider call, artifact framework, threshold, score, route, candidate,
+authorization, spread estimate, send, trade, order, paper trade, RSI row, or
+`TRIGGERED_FADE`. Existing immutable generations are not rewritten.
+
 ## 2026-07-18 — Keep the frozen empirical algorithm contract intact · Codex
 **Why:** The source-with-artifacts gate correctly rejected the preceding unit
 fix because `market_units.py` is byte-bound into the immutable empirical

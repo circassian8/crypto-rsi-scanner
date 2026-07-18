@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-18T22:59:36.887680+00:00`
+- generated_at: `2026-07-18T23:15:00.622895+00:00`
 - public_class_count: `499`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -178,7 +178,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.llm.extraction_models` | 8 | 13 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.llm.extractor` | 4 | 17 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.llm.models` | 8 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 | 20 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | 4 | 31 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.market_reaction` | 5 | 35 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.missed` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
@@ -272,7 +272,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.llm.extraction_models` | 8 | 13 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.llm.extractor` | 4 | 17 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.llm.models` | 8 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 | 20 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.market_confirmation` | 4 | 31 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.market_reaction` | 5 | 35 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.radar.missed` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |

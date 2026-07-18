@@ -18,6 +18,7 @@ from typing import Any, Iterable, Mapping
 from ..artifacts import schema_v1
 from . import asset_registry as event_asset_registry
 from . import market_anomaly_receipt
+from . import market_anomaly_report
 from . import market_state as event_market_state
 
 
@@ -85,6 +86,7 @@ class MarketAnomalyScanResult:
     snapshot_count: int
     anomaly_count: int
     catalyst_search_queue_count: int
+    snapshots: tuple[dict[str, Any], ...]
     anomalies: tuple[dict[str, Any], ...]
     catalyst_search_queue: tuple[dict[str, Any], ...]
     snapshots_sha256: str
@@ -189,6 +191,8 @@ def scan_market_rows(
             "diagnostics_reason",
             "derivatives_available",
             "market_cap",
+            "market_data_quality",
+            "temporal_baseline_status",
         ):
             if key in row:
                 snapshot_payload[key] = row.get(key)
@@ -307,10 +311,12 @@ def run_market_anomaly_scan(
     report_path = directory / MARKET_ANOMALY_REPORT_FILENAME
     report = format_market_anomaly_report(
         anomalies,
+        snapshots=snapshots,
         catalyst_search_queue=catalyst_search_queue,
         snapshot_count=len(snapshots),
         profile=profile,
         artifact_namespace=artifact_namespace,
+        cfg=cfg,
     )
     namespace_device, namespace_inode = market_anomaly_receipt.write_artifacts_atomic(
         directory,
@@ -336,6 +342,10 @@ def run_market_anomaly_scan(
         ),
         expected_names=_RECEIPT_ARTIFACT_FILENAMES,
     )
+    bound_snapshots = market_anomaly_receipt.strict_jsonl(
+        payloads[MARKET_STATE_SNAPSHOT_FILENAME],
+        row_type="event_market_state_snapshot",
+    )
     bound_anomalies = market_anomaly_receipt.strict_jsonl(
         payloads[MARKET_ANOMALY_FILENAME],
         row_type="event_market_anomaly",
@@ -357,6 +367,7 @@ def run_market_anomaly_scan(
         snapshot_count=len(snapshots),
         anomaly_count=len(anomalies),
         catalyst_search_queue_count=len(catalyst_search_queue),
+        snapshots=bound_snapshots,
         anomalies=bound_anomalies,
         catalyst_search_queue=bound_queue,
         snapshots_sha256=market_anomaly_receipt.sha256(payloads[MARKET_STATE_SNAPSHOT_FILENAME]),
@@ -405,6 +416,7 @@ def refresh_market_anomaly_scan_result(
         raise RuntimeError("market_anomaly_completion_receipt_invalid:count")
     return replace(
         result,
+        snapshots=snapshots,
         anomalies=anomalies,
         catalyst_search_queue=queue,
         snapshots_sha256=market_anomaly_receipt.sha256(payloads[MARKET_STATE_SNAPSHOT_FILENAME]),
@@ -695,73 +707,24 @@ def _merge_asset_metadata(row: dict[str, Any], asset: event_asset_registry.Canon
 def format_market_anomaly_report(
     anomalies: Iterable[Mapping[str, Any]],
     *,
+    snapshots: Iterable[Mapping[str, Any]] | None = None,
     catalyst_search_queue: Iterable[Mapping[str, Any]] | None = None,
     snapshot_count: int = 0,
     profile: str | None = None,
     artifact_namespace: str | None = None,
+    cfg: MarketAnomalyScannerConfig | None = None,
     limit: int = 20,
 ) -> str:
-    rows = [dict(row) for row in anomalies if isinstance(row, Mapping)]
-    queue_rows = [dict(row) for row in catalyst_search_queue or () if isinstance(row, Mapping)]
-    counts: dict[str, int] = {}
-    bucket_counts: dict[str, int] = {}
-    for row in rows:
-        key = str(row.get("market_state_class") or row.get("anomaly_type") or "unknown")
-        counts[key] = counts.get(key, 0) + 1
-        bucket = str(row.get("anomaly_bucket") or row.get("market_anomaly_bucket") or "unknown")
-        bucket_counts[bucket] = bucket_counts.get(bucket, 0) + 1
-    lines = [
-        "# Event Alpha Market Anomaly Report",
-        "",
-        "Research-only. Not a trade signal, paper trade, live RSI signal, or execution.",
-        f"Profile: {profile or 'unknown'}",
-        f"Artifact namespace: {artifact_namespace or 'unknown'}",
-        f"Market state snapshots: {snapshot_count}",
-        f"Anomalies: {len(rows)}",
-        f"Catalyst enrichment queue: {len(queue_rows)}",
-        "Counts: " + (", ".join(f"{key}={value}" for key, value in sorted(counts.items())) if counts else "none"),
-        "Buckets: " + (", ".join(f"{key}={value}" for key, value in sorted(bucket_counts.items())) if bucket_counts else "none"),
-        "",
-        "## Top Market Anomalies for Catalyst Enrichment",
-    ]
-    if not rows:
-        lines.append("- None.")
-    for row in rows[: max(0, limit)]:
-        snapshot = row.get("market_state_snapshot") if isinstance(row.get("market_state_snapshot"), Mapping) else {}
-        market_state_class = row.get("market_state_class") or row.get("anomaly_type") or "unknown"
-        lines.append(
-            f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'}: "
-            f"{market_state_class} "
-            f"bucket={row.get('anomaly_bucket') or row.get('market_anomaly_bucket') or 'unknown'} "
-            f"return_4h={_format_pct(snapshot.get('return_4h'))} "
-            f"return_24h={_format_pct(snapshot.get('return_24h'))} "
-            f"volume_z={_format_number(snapshot.get('volume_zscore_24h'))} "
-            f"priority={_format_number(row.get('priority'))} "
-            f"catalyst_search_role={row.get('catalyst_search_role') or 'confidence_enrichment'} "
-            f"catalyst_required={str(bool(row.get('decision_model_v2_catalyst_required'))).lower()}"
-        )
-        confirms = row.get("what_confirms") if isinstance(row.get("what_confirms"), list) else []
-        invalidates = row.get("what_invalidates") if isinstance(row.get("what_invalidates"), list) else []
-        if confirms:
-            lines.append("  - What confirms: " + "; ".join(str(item) for item in confirms[:3]))
-        if invalidates:
-            lines.append("  - What invalidates: " + "; ".join(str(item) for item in invalidates[:3]))
-    if len(rows) > limit:
-        lines.append(f"- +{len(rows) - limit} more in local artifacts.")
-    if queue_rows:
-        lines.extend(["", "## Catalyst Enrichment Queue"])
-        for row in queue_rows[: max(0, limit)]:
-            queries = _string_list(row.get("search_queries"))
-            packs = _string_list(row.get("suggested_source_packs"))
-            lines.append(
-                f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'}: "
-                f"priority={_format_number(row.get('priority'))} "
-                f"deadline={row.get('search_deadline') or 'unknown'} "
-                f"packs={', '.join(packs[:3]) if packs else 'missing'}"
-            )
-            if queries:
-                lines.append("  - Queries: " + "; ".join(queries[:3]))
-    return "\n".join(lines) + "\n"
+    return market_anomaly_report.format_market_anomaly_report(
+        anomalies,
+        snapshots=snapshots,
+        catalyst_search_queue=catalyst_search_queue,
+        snapshot_count=snapshot_count,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        cfg=cfg or MarketAnomalyScannerConfig(),
+        limit=limit,
+    )
 
 
 def _anomaly_row(
@@ -1153,16 +1116,6 @@ def _string_list(value: object) -> list[str]:
     if isinstance(value, IterableABC) and not isinstance(value, (str, bytes, Mapping)):
         return [str(item) for item in value if str(item or "")]
     return [str(value)]
-
-
-def _format_pct(value: object) -> str:
-    parsed = _float(value)
-    return "n/a" if parsed is None else f"{parsed:+.1f}%"
-
-
-def _format_number(value: object) -> str:
-    parsed = _float(value)
-    return "n/a" if parsed is None else f"{parsed:.1f}"
 
 
 def _float(value: object) -> float | None:

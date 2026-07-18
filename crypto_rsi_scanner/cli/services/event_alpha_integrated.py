@@ -170,10 +170,12 @@ def _event_alpha_market_anomaly_scan_report_locked(
     )
     print(event_market_anomaly_scanner.format_market_anomaly_report(
         result.anomalies,
+        snapshots=result.snapshots,
         catalyst_search_queue=result.catalyst_search_queue,
         snapshot_count=result.snapshot_count,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
+        cfg=cfg,
     ))
 
 

@@ -1074,7 +1074,7 @@
         "MarketAnomalyScannerConfig"
       ],
       "exception_reason": "",
-      "max_class_line_count": 20,
+      "max_class_line_count": 21,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
       "public_class_count": 2,
@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1113,
+  "file_count": 1115,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-18T22:59:33.517215+00:00",
+  "generated_at": "2026-07-18T23:14:57.248182+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -3345,7 +3345,7 @@
         "MarketAnomalyScannerConfig"
       ],
       "exception_reason": "",
-      "max_class_line_count": 20,
+      "max_class_line_count": 21,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
       "public_class_count": 2,
