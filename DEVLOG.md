@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Advance the live baseline to thirteen clean cycles · Codex
+**Why:** The observation campaign was cadence-eligible again, and regular
+point-in-time collection is the first prerequisite for every later empirical
+route and outcome improvement.
+**Changes:**
+- Ran exactly one already-authorized Daily Operations no-send cycle. Its single
+  CoinGecko request returned HTTP 200 in 2.168 seconds with zero retries, then
+  strict publication and the owned dashboard restart succeeded for namespace
+  `radar_market_no_send_20260718t064649934868z_174f5ac6bb1f` at revision 12.
+- Refreshed canonical campaign truth to 13 real cycles, 390 retained market
+  observations, 360 baseline-counted observations, 30 too-close observations,
+  five historical ideas, zero current ideas, one matured outcome, three pending
+  outcomes, and one honestly unresolved `due_missing_price` outcome.
+- Reconciled the current 30/30 universe as baseline-warming with zero globally
+  warm assets; direct 1h return samples advanced while direct 4h remains cold.
+  The next eligible observation is 2026-07-18 07:46:50 UTC.
+**Verify:** Daily Operations readiness reported authorized/eligible before the
+call. The final publication and operations receipts are valid, strict doctor is
+`OK` with zero blockers/warnings, campaign/pointer/run/revision counts agree,
+dashboard readiness is exact and read-only, and post-cycle status reports
+`waiting_cadence` without another provider call.
+**Notes/risks:** The fresh generation legitimately has zero current Decision
+ideas and zero spread coverage; thresholds were not lowered. The scheduler
+remains uninstalled. No retry, send, order, trade, paper/RSI write, fade trigger,
+authorization mutation, Bybit call, outcome reinterpretation, or Protocol-v2
+admission occurred.
+
 ## 2026-07-18 — Seal immutable Bybit direct-bar evidence bundles · Codex
 **Why:** The guarded 1h/4h collector could prove request mechanics but could not
 preserve provider bytes or support later reproduction. Direct bars need the
