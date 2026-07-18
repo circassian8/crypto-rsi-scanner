@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close exact Bybit derivatives evidence before persistence · Codex
+**Why:** The guarded collector retained exact response buffers, but an immutable
+publisher must not trust its normalized stdout projection or accept mapping-only
+diagnostic responses. The exact bytes need one closed rederivation contract
+before any artifact write is allowed.
+**Changes:**
+- Added a no-I/O derivatives capture-input contract that accepts only exact
+  successful fixed-host transport response objects, validates the closed live
+  summary and execution-quality source capture, and rederives every ticker,
+  settled-funding, 1h OI, and 1h positioning context from raw bytes.
+- Bound exact native request order, response/request/provider clocks, request
+  lineage, units, completion freshness, source-before-collection time, and the
+  execution-quality instrument set. The contract derives one deterministic
+  capture ID/namespace plus raw-response fingerprints without writing it.
+- Added regressions for deterministic identity, mapping-only input, byte/order/
+  projection/timing/schema drift, source-time inversion, and the known
+  `10.0`-fraction 100x unit failure. Documentation now distinguishes this
+  implemented input validator from the still-missing immutable publisher.
+**Verify:** 37 focused derivatives offline/live/capture tests passed; compileall,
+JSON validation, `git diff --check`, and architecture cleanliness passed with
+zero new size violations.
+**Notes/risks:** This slice makes no provider call and writes no evidence. It
+does not create a latest pointer, completion receipt, Protocol-v2 authority,
+route, score, threshold, send, order, trade, paper/RSI row, or fade trigger.
+Immutable descriptor-anchored namespace publication and revalidation remain the
+next engineering boundary; real prerequisites and authorization remain absent.
+
 ## 2026-07-18 — Guard Bybit derivatives collection behind exact prerequisites · Codex
 **Why:** The venue-native derivatives schema was fixture-proven, but genuine
 point-in-time evidence needs an explicit provider boundary that cannot outrun

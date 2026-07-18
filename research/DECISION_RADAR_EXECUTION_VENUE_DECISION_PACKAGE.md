@@ -82,7 +82,10 @@ requires a genuine fresh execution-quality capture for exact current authority
 plus separately present `RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1`; confirmed
 collection never retries, preserves exact response bytes and request clocks in
 memory, and revalidates the capture/instrument/authority chain after the final
-response. It has no immutable persistence yet and never creates authorization,
+response. A closed no-I/O capture-input contract rederives every context, unit,
+clock, lineage row, and deterministic identity from those exact bytes and
+rejects mapping-only diagnostic responses. It has no immutable namespace,
+receipt, pointer, or persistence yet and never creates authorization,
 credentials, notifications, orders, or trading capability. It rejects
 future/misordered rows, identity/category drift, incomplete lineage,
 implausible funding/basis/returns, and the known

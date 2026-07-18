@@ -219,6 +219,7 @@ def build_bybit_derivatives_live_readiness(
         "provider_call_planned": False,
         "provider_call_attempted": False,
         "artifact_persisted": False,
+        "exact_response_capture_contract_implemented": True,
         "immutable_capture_implemented": False,
         "capture_publication_available": False,
         "campaign_attached": False,

@@ -29,7 +29,10 @@ normalizer has no HTTP client. A distinct guarded no-write collector may cross
 that public boundary only after a genuine current execution-quality capture,
 separately present derivatives authorization, and explicit confirmation; it
 never retries and must revalidate the source capture afterward. Exact responses
-remain in memory until a separate immutable capture contract is implemented.
+remain in memory and must pass the closed derivatives-capture input contract,
+which rederives every context, unit, clock, lineage row, and deterministic
+capture identity from the exact bytes. That contract performs no I/O; a
+separate immutable publication boundary is still required.
 Normalized context has no directional authority, cannot create a route or idea,
 and remains Protocol-v2-ineligible until an immutable live capture is annex-
 bound. Coinalyze

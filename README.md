@@ -195,8 +195,11 @@ radar-derivatives-bybit-collect PYTHON=.venv/bin/python` perform exactly four
 public GETs per eligible instrument—ticker, settled funding, 1h open interest,
 and 1h account ratio—with no retry. It rechecks capture/instrument/authority
 identity after the responses and writes nothing. Exact response bytes stay in
-memory for a future immutable capture contract; no genuine derivatives capture
-or Protocol-v2 evidence exists yet. Unset the flag to close this boundary.
+memory and must pass a closed no-I/O capture-input contract that rederives every
+context, unit, clock, lineage row, and deterministic capture identity. Immutable
+namespace publication is still unimplemented, so no genuine derivatives
+capture or Protocol-v2 evidence exists yet. Unset the flag to close this
+boundary.
 
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.
