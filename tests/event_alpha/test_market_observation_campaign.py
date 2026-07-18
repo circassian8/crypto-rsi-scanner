@@ -382,6 +382,17 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
         "proxy_market_features",
         "temporal_baseline_maturity",
     ]
+    spread_limit = first["data_quality_limitations"][0]
+    assert spread_limit["provider_selection"] == (
+        "selected_bybit_usdt_linear_perpetuals"
+    )
+    assert spread_limit["evidence_status"] == (
+        "awaiting_authorized_immutable_capture"
+    )
+    assert spread_limit["next_safe_command"] == (
+        "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
+    )
+    assert "explicit_flag_plus_CONFIRM=1" in spread_limit["authorization_boundary"]
     assert first["next_observation"]["eligible_now"] is False
     assert first["safety"]["provider_calls_made_by_report"] == 0
     assert all(
@@ -835,7 +846,10 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     assert b"secret-token" not in first_json
     assert b"must-not-leak" not in first_json
     assert b"no trade recommendation" in first_markdown.lower()
-    assert b"spread-provider selection remains deferred" in first_markdown.lower()
+    assert b"bybit usdt-linear perpetuals are the selected execution surface" in (
+        first_markdown.lower()
+    )
+    assert b"spread-provider selection remains deferred" not in first_markdown.lower()
     assert b"Duplicate observations: `0`" in first_markdown
     assert b"Conflicting duplicate observations: `0`" in first_markdown
 

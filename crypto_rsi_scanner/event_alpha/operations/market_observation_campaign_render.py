@@ -5,6 +5,13 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 
+EXECUTION_SURFACE_NOTICE = (
+    "Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth "
+    "evidence is treated as available until a separately authorized immutable capture "
+    "succeeds."
+)
+
+
 def format_campaign_report(report: Mapping[str, Any]) -> str:
     """Render the canonical report as deterministic operator-facing Markdown."""
     metrics = _mapping(report.get("campaign_metrics"))
@@ -150,7 +157,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
         _text(conclusion.get("summary")),
         "",
-        "Spread-provider selection remains deferred until the operator identifies the intended execution venue.",
+        EXECUTION_SURFACE_NOTICE,
         "No trade is recommended. No automatic threshold or route change is authorized.",
         "",
     ])

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Restore fresh Radar authority and align execution truth · Codex
+**Why:** The campaign was cadence-eligible but its dashboard pointer had expired,
+and the campaign report still described execution-venue selection as pending
+after the owner had confirmed Bybit USDT-linear perpetuals.
+**Changes:**
+- Ran exactly one already-authorized CoinGecko no-send Daily Operations cycle
+  after its persisted reservation elapsed. It succeeded without retry, produced
+  30 observations and one non-actionable DEXE `dashboard_watch`, passed strict
+  doctor with zero blockers/warnings, published exact revision-12 namespace
+  `radar_market_no_send_20260718t024737179194z_ec091813d359`, and restarted the
+  exact owned loopback dashboard.
+- Regenerated coherent campaign truth: 10 real cycles, 300 retained observations,
+  270 baseline-counted observations, 30 too-close observations, 3 canonical
+  ideas, 1 matured outcome, 1 missing-data outcome, 1 pending outcome, and the
+  two earlier provider failures counted exactly once each.
+- Replaced the stale “venue selection deferred” limitation with closed structured
+  truth: Bybit USDT-linear perps are selected, trusted spread coverage remains
+  `0/300`, immutable capture is absent, and the no-call readiness command plus
+  explicit authorization/confirmation boundary are rendered. Updated tests,
+  roadmap, durable decision, and generated architecture/campaign reports.
+**Verify:** The live cycle reported `published_and_restarted`, one provider call
+attempt and success, and zero sends/trades/orders/paper/RSI/fade side effects.
+Dashboard authority and readiness passed; loopback HEAD returned HTTP 200 with
+the exact namespace/run/revision/operator-digest headers. Bybit readiness found
+the fresh 30-asset authority and made no call, correctly blocking only on absent
+runtime authorization. Campaign report regeneration made zero provider calls;
+23 focused campaign tests and compileall passed; architecture cleanliness passed
+with zero new violations; `git diff --check` passed. Full verification was not
+repeated because the immediately preceding capture slice passed all 2,655 tests
+and this bounded report/operations slice received its focused product gates.
+**Notes/risks:** The recurring service remains uninstalled. Bybit authorization
+was not created or changed, no Bybit/calendar/Telegram call occurred, and no
+threshold, score, route, Protocol-v2 annex, or authority rule changed.
+
 ## 2026-07-18 — Define the closed Bybit intraday evidence boundary · Codex
 **Why:** Protocol v2 requires genuine 1h/4h point-in-time evidence, but the
 current campaign has only sparse observation returns and CoinGecko sparkline

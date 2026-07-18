@@ -988,10 +988,20 @@ def _data_quality_limitations(metrics: Mapping[str, Any]) -> list[dict[str, Any]
         limitations.append({
             "category": "execution_quality_spread",
             "detail": (
-                f"Trusted spread coverage is {spread}/{selected}. Provider selection is deferred "
-                "until the operator identifies the intended execution venue."
+                f"Trusted spread coverage is {spread}/{selected}. Bybit USDT-linear perpetuals "
+                "are the selected execution surface; coverage remains unavailable until a "
+                "separately authorized immutable public-market capture succeeds and is bound "
+                "into the campaign."
             ),
-            "provider_selection": "deferred_pending_execution_venue",
+            "provider_selection": "selected_bybit_usdt_linear_perpetuals",
+            "evidence_status": "awaiting_authorized_immutable_capture",
+            "next_safe_command": (
+                "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
+            ),
+            "authorization_boundary": (
+                "readiness_is_no_network; capture_requires_an_already_present_explicit_flag_"
+                "plus_CONFIRM=1"
+            ),
         })
     if _int(metrics.get("proxy_feature_count")) > 0:
         limitations.append({

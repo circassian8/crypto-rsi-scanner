@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Separate selected execution surface from observed execution evidence
+**Status:** accepted
+**Decision:** Campaign and dashboard-facing reports must state that Bybit
+USDT-linear perpetuals are the selected execution surface while independently
+reporting trusted spread/depth coverage, current runtime authorization, and
+immutable-capture availability. Zero coverage means evidence is unavailable; it
+does not mean venue selection is still pending. Artifact-only campaign reports
+must not inspect the environment and instead provide the no-network Bybit
+readiness command plus the explicit-flag and `CONFIRM=1` boundary.
+**Why:** The owner already selected the venue and instrument, but the regenerated
+campaign report retained the older “selection deferred” sentence. Conflating a
+human decision with provider authorization and observed data makes operator
+truth contradictory and obscures the exact remaining action.
+**Revisit when:** The selected execution venue changes through an explicit human
+decision, or a sealed multi-venue Protocol-v2 annex requires the report to show
+more than one independently observed surface.
+
 ## 2026-07-18 - Use closed venue-native Bybit bars for future intraday evidence
 **Status:** accepted
 **Decision:** When the intraday evidence step is implemented, use Bybit V5
