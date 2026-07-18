@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Use exact completed Bybit trade-price bars for direct 1h/4h evidence
+**Status:** accepted
+**Decision:** Direct intraday evidence for the selected execution surface uses
+Bybit V5 trade-price klines for the exact native USDT-linear perpetual
+instrument, with independent `interval=60` and `interval=240` requests. Request
+only through the final millisecond before the current bucket and accept only the
+exact latest completed bar. Preserve native identity, OHLC, base-asset volume,
+USDT turnover, request/response/provider clocks, and signed close-to-acquisition
+latency. Never substitute an open candle, CoinGecko sparkline, interpolated
+price, derived four-hour value, mark/index bar, or pre-horizon observation.
+**Why:** Direct point-in-time bars are needed for temporal anomaly features and
+outcomes, but Bybit documents an open REST candle's close as merely the latest
+traded price. A deterministic completed-bucket cutoff prevents future or partial
+data from entering the baseline, while explicit units avoid silently treating
+USDT as USD.
+**Revisit when:** Protocol v2 adds a separately preregistered mark/index-price
+sensitivity analysis. Keep trade-price evidence and every alternative source
+separate; never rewrite historical bar lineage.
+
 ## 2026-07-18 - Separate current-universe maturity from retained-history maturity
 **Status:** accepted
 **Decision:** Report two explicit temporal-baseline scopes. The current-universe

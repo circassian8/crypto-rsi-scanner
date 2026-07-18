@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal the offline Bybit direct 1h/4h bar contract · Codex
+**Why:** CoinGecko campaign snapshots cannot provide genuine venue-native 1h/4h
+bars or repair missed outcome horizons. Before any separately authorized live
+work, the system needs a closed definition that cannot admit an open candle,
+derived proxy, wrong instrument, or ambiguous unit.
+**Changes:**
+- Added a pure Bybit V5 trade-price kline normalizer for exact active
+  USDT-linear perpetual identities at independent 60- and 240-minute intervals.
+  Requests end one millisecond before the current bucket; only the exact latest
+  completed bar is accepted.
+- Preserved OHLC, base-asset volume, USDT turnover, provider/request/response
+  clocks, close-to-acquisition latency, freshness, native identity, and request
+  lineage. Open/missing/misordered/misidentified/malformed evidence fails
+  closed without reinterpretation.
+- Added deterministic BTCUSDT fixtures, 14 focused regressions, the no-call/no-
+  write `radar-intraday-bybit-smoke` target, and reconciled the venue decision,
+  North Star, roadmap, and durable source decision.
+**Verify:** 14 focused tests passed; compileall and the offline fixture smoke
+passed with two completed bars, zero provider calls/writes, and all safety
+counters at zero. JSON validation and `git diff --check` passed.
+**Notes/risks:** This implements only the offline contract. A live/capture path
+must remain unavailable until a genuine execution-quality capture proves the
+same Bybit boundary, and must then use separate existing authorization and
+confirmation. No provider call, authorization change, historical outcome
+rewrite, algorithm/score/threshold change, send, order, trade, paper/RSI write,
+fade trigger, or Radar authority mutation occurred.
+
 ## 2026-07-18 — Advance the Radar baseline with a twelfth live cycle · Codex
 **Why:** The hourly campaign was already authorized and cadence-eligible, while
 its point-in-time temporal baseline still needs independent, properly spaced

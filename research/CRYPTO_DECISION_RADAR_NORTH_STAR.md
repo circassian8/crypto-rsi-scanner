@@ -879,6 +879,16 @@ projection from raw bytes, rejects pointer rollback/drift, and excludes unknown
 provider fields from the closed capture summary. The standard review archive
 selects and fully revalidates only the latest completed capture.
 
+The direct intraday offline contract likewise validates exact latest-completed
+Bybit trade-price candles independently at 1h and 4h. It cuts requests off just
+before the current bucket, preserves native instrument identity, OHLC,
+base-asset volume, USDT turnover, provider/request/response clocks, and
+close-to-acquisition latency, and rejects open/missing/misidentified bars. Run
+`make radar-intraday-bybit-smoke PYTHON=.venv/bin/python` with zero provider
+calls or writes. Its live/capture half remains absent and must require a genuine
+execution-quality capture plus separate authorization; CoinGecko sparklines,
+interpolation, derived 4h values, and mark/index bars are not direct substitutes.
+
 A fresh complete capture may be `protocol_v2_input_quality_eligible`, but it
 remains `protocol_v2_evidence_eligible=false` and
 `protocol_v2_annex_bound=false`. Promotion occurs only when the sealed
@@ -904,7 +914,9 @@ The remaining human decisions stay explicit:
 - Execution quality: inspect with `make radar-execution-quality-readiness
   PYTHON=.venv/bin/python` (static/no-network), then run the checked offline
   normalizer with `make radar-execution-quality-bybit-smoke
-  PYTHON=.venv/bin/python`. The live-boundary readiness command is `make
+  PYTHON=.venv/bin/python`. The direct completed-bar fixture gate is `make
+  radar-intraday-bybit-smoke PYTHON=.venv/bin/python`. The live-boundary
+  readiness command is `make
   radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`; it remains
   no-call/no-write. Validate the latest capture without a provider call using
   `make radar-execution-quality-bybit-status PYTHON=.venv/bin/python`. Only an

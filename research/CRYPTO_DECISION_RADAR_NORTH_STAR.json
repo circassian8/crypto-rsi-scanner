@@ -1117,6 +1117,14 @@
     "eligible_instrument_set_frozen": false,
     "final_live_adapter_implemented": false,
     "immutable_capture_contract_implemented": true,
+    "intraday_direct_bar_intervals": [
+      "1h",
+      "4h"
+    ],
+    "intraday_live_adapter_implemented": false,
+    "intraday_live_prerequisite": "one genuine immutable execution-quality capture for the same current authority plus a separate explicit authorization boundary",
+    "intraday_offline_contract_implemented": true,
+    "intraday_smoke_command": "make radar-intraday-bybit-smoke PYTHON=.venv/bin/python",
     "live_adapter_active": false,
     "live_adapter_contract": "exact authoritative Radar generation; separate runtime authorization plus CONFIRM=1; at most two public GETs per asset; no retries, redirects, ambient proxies, credentials, private data, orders, trading, or sends; capture mode preserves exact accepted response bytes, request timing, normalized observations, manifest, completion receipt, and latest pointer",
     "public_rest_adapter_implemented": true,
