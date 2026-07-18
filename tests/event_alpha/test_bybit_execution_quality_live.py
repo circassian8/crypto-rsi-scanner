@@ -20,9 +20,12 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
     BybitPublicRequest,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live import (
+    AUTHORIZATION_ACTION,
+    CAPTURE_COMMAND,
     CONTRACT_VERSION,
     LIVE_AUTH_ENV,
     MAX_PROVIDER_REQUESTS,
+    READINESS_COMMAND,
     BybitExecutionQualityLiveError,
     _build_public_opener,
     _fetch_public_json,
@@ -149,6 +152,17 @@ def test_readiness_is_no_call_and_requires_exact_authority_plus_explicit_auth() 
     assert payload["evidence_publication_status"] == "no_immutable_capture_available"
     assert payload["maximum_provider_requests_for_current_universe"] == 2
     assert payload["reasons"] == ["runtime_provider_authorization_absent"]
+    assert payload["operator_action_required"] == AUTHORIZATION_ACTION
+    assert payload["authorization_action_required"] == AUTHORIZATION_ACTION
+    assert payload["next_safe_command"] == READINESS_COMMAND
+    assert payload["readiness_recheck_command"] == READINESS_COMMAND
+    assert payload["authorized_capture_command"] == CAPTURE_COMMAND
+    assert payload["authorization_mutated"] is False
+    assert payload["capture_confirmation_required"] is True
+    assert payload["expected_provider_activity"] == "none_readiness_only"
+    assert payload["expected_provider_activity_if_authorized_and_confirmed"] == (
+        "collect_at_most_2_public_GETs_no_retries"
+    )
     assert payload["credentials_read"] is False
     assert payload["orders_available"] is False
     assert payload["writes_performed"] is False
@@ -170,6 +184,10 @@ def test_readiness_fails_closed_when_current_generation_is_not_authoritative() -
     assert payload["current_authority"] is None
     assert payload["radar_assets"] == []
     assert payload["reasons"] == ["authoritative_market_generation_unavailable"]
+    assert payload["operator_action_required"] == (
+        "resolve_readiness_reasons_then_rerun_readiness"
+    )
+    assert payload["authorization_action_required"] == "none"
     assert payload["expected_provider_activity"] == "none_readiness_only"
 
 
@@ -201,6 +219,12 @@ def test_non_contract_symbol_is_excluded_before_provider_without_hiding_authorit
     assert readiness["provider_query_asset_count"] == 1
     assert readiness["preflight_excluded_asset_count"] == 1
     assert readiness["maximum_provider_requests_for_current_universe"] == 2
+    assert readiness["operator_action_required"] == "none"
+    assert readiness["authorization_action_required"] == "none"
+    assert readiness["next_safe_command"] == CAPTURE_COMMAND
+    assert readiness["expected_provider_activity"] == (
+        "collect_at_most_2_public_GETs_no_retries"
+    )
 
 
 def test_collection_without_authorization_stops_before_fetch() -> None:

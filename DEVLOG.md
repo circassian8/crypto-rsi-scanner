@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make the Bybit authorization handoff explicit · Codex
+**Why:** The execution-quality readiness report correctly blocked without its
+dedicated runtime flag, but its only next command was to rerun the same report.
+That left the human authorization action, the separately confirmed provider
+boundary, and the bounded activity spread across documentation instead of one
+closed operator result.
+**Changes:**
+- Added explicit no-write readiness fields for the local gitignored
+  authorization action, no-call recheck, separately confirmed immutable capture
+  command, confirmation requirement, maximum current request count, authorized
+  activity, and rollback boundary.
+- Kept non-authorization blockers distinct: readiness asks the operator to
+  resolve its reason codes before authorization when exact authority or the
+  requestable universe is invalid.
+- Added the exact four-step operator sequence to the execution-venue decision
+  package and reconciled the active Protocol-v2 roadmap row.
+**Verify:** 27 focused Bybit live/capture tests passed; compileall and
+`git diff --check` passed. The real current readiness remains blocked only on
+the absent dedicated flag, reports a 58-request maximum, exposes the confirmed
+capture command, and records zero calls, writes, or authorization mutation.
+**Notes/risks:** No provider call or authorization change occurred. No capture,
+trade/order, send, paper/RSI/fade action, route, score, threshold, Protocol-v2
+annex, or Radar authority changed.
+
 ## 2026-07-18 — Advance the hourly Radar baseline with one clean cycle · Codex
 **Why:** The campaign was authorized and cadence-eligible, while its 1h/4h
 features remained cold because earlier observations were irregular or too

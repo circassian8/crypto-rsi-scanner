@@ -142,7 +142,7 @@ make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 ```
 
-Both commands perform no network call, read no credential, and have no
+All three commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
 already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
@@ -150,6 +150,21 @@ separate `radar-execution-quality-bybit-capture` target to cross the public
 provider boundary, and that target additionally requires `CONFIRM=1`; unsetting
 the flag disables capture. The `...-collect` target remains a stdout diagnostic
 probe and does not publish evidence.
+
+The exact operator sequence is intentionally split:
+
+1. If the owner authorizes this bounded public-data attempt, add
+   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` to the local gitignored
+   `.env`. The application never writes or changes this flag.
+2. Rerun `make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`.
+   It must report `ready=true`, the exact Radar authority, and the current
+   request bound before any call.
+3. Run `CONFIRM=1 make radar-execution-quality-bybit-capture
+   PYTHON=.venv/bin/python` once. Stop on any failure; do not retry or bypass a
+   403/region restriction.
+4. Validate the immutable result with
+   `make radar-execution-quality-bybit-status PYTHON=.venv/bin/python`, then
+   unset the flag to close the provider boundary.
 
 ## Current boundary
 

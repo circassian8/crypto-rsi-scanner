@@ -82,6 +82,9 @@ COLLECT_COMMAND = (
 CAPTURE_COMMAND = (
     "CONFIRM=1 make radar-execution-quality-bybit-capture PYTHON=.venv/bin/python"
 )
+AUTHORIZATION_ACTION = (
+    f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_then_rerun_readiness"
+)
 SAFETY = {
     "research_only": True,
     "no_send": True,
@@ -308,6 +311,7 @@ def build_bybit_execution_quality_live_readiness(
         reasons.append("runtime_provider_authorization_absent")
     request_bound = len(query_assets) * 2
     ready = not reasons
+    only_authorization_missing = reasons == ["runtime_provider_authorization_absent"]
     latest_capture = bybit_execution_quality_capture_status(artifact_base_dir)
     return {
         "contract_version": CONTRACT_VERSION,
@@ -343,10 +347,27 @@ def build_bybit_execution_quality_live_readiness(
         ),
         "reasons": reasons,
         "next_safe_command": CAPTURE_COMMAND if ready else READINESS_COMMAND,
+        "readiness_recheck_command": READINESS_COMMAND,
+        "authorized_capture_command": CAPTURE_COMMAND,
+        "operator_action_required": (
+            AUTHORIZATION_ACTION
+            if only_authorization_missing
+            else "resolve_readiness_reasons_then_rerun_readiness"
+            if reasons
+            else "none"
+        ),
+        "authorization_action_required": (
+            AUTHORIZATION_ACTION if not authorized else "none"
+        ),
+        "authorization_mutated": False,
+        "capture_confirmation_required": True,
         "expected_provider_activity": (
             f"collect_at_most_{request_bound}_public_GETs_no_retries"
             if ready
             else "none_readiness_only"
+        ),
+        "expected_provider_activity_if_authorized_and_confirmed": (
+            f"collect_at_most_{request_bound}_public_GETs_no_retries"
         ),
         "authorization_boundary": (
             f"collection_requires_already_present_{LIVE_AUTH_ENV}=1;"
@@ -799,6 +820,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 __all__ = (
+    "AUTHORIZATION_ACTION",
     "CAPTURE_COMMAND",
     "COLLECT_COMMAND",
     "CONTRACT_VERSION",
