@@ -2,16 +2,16 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-18T22:25:56.875365+00:00`
+- generated_at: `2026-07-18T22:50:26.037539+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
-- v3_gate_status: `pending`
+- v3_gate_status: `accepted_with_documented_exceptions`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `26`
+- production_files_over_1200_lines: `25`
 - accepted_production_files_over_1200_lines: `25`
-- unresolved_production_files_over_1200_lines: `1`
+- unresolved_production_files_over_1200_lines: `0`
 - production_size_gate_status: `warning`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
@@ -70,7 +70,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 26 | target_gap |
+| `production_files_over_1200_lines` | 25 | accepted_exception |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -116,7 +116,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1247 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1235 |
-| `crypto_rsi_scanner/event_alpha/dashboard/style_operator.py` | 1207 |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 |
 | `crypto_rsi_scanner/event_alpha/dashboard/public_access.py` | 1200 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1200 |
@@ -132,6 +131,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1186 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1181 |
 | `crypto_rsi_scanner/event_alpha/doctor/checks/operations.py` | 1181 |
+| `crypto_rsi_scanner/event_fade.py` | 1181 |
 
 ## Accepted Production Files Over 1200 Lines
 
@@ -167,7 +167,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/dashboard/style_operator.py` | 1207 |
+| none | 0 |
 
 ## Largest Test Files
 

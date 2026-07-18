@@ -46,6 +46,9 @@ from crypto_rsi_scanner.event_alpha.dashboard.style_decision_detail import (
 )
 from crypto_rsi_scanner.event_alpha.dashboard.style_foundation import FOUNDATION_CSS
 from crypto_rsi_scanner.event_alpha.dashboard.style_operator import OPERATOR_CSS
+from crypto_rsi_scanner.event_alpha.dashboard.style_operator_work import (
+    OPERATOR_WORK_CSS,
+)
 from crypto_rsi_scanner.event_alpha.dashboard.style_records import RECORDS_CSS
 from crypto_rsi_scanner.event_alpha.dashboard.style_responsive import RESPONSIVE_CSS
 from crypto_rsi_scanner.event_alpha.dashboard.styles import (
@@ -399,6 +402,7 @@ def test_stylesheet_composition_preserves_fragment_order() -> None:
         (
             FOUNDATION_CSS,
             OPERATOR_CSS,
+            OPERATOR_WORK_CSS,
             DECISION_DETAIL_CSS,
             RECORDS_CSS,
             RESPONSIVE_CSS,

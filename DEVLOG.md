@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Remove the last unresolved production-size warning · Codex
+**Why:** The broad local gate exposed one real project-state drift:
+`style_operator.py` had grown to 1,207 lines without an accepted exception,
+leaving architecture summaries pending even though no blocker threshold was
+crossed. The style ownership already had a natural operator-work boundary.
+**Changes:**
+- Moved the contiguous operator work queue, health action, responsive-table
+  annotation, and status-tone CSS tail into the focused
+  `style_operator_work.py` fragment and composed it immediately after the
+  remaining operator shell fragment.
+- Reduced `style_operator.py` to 1,035 lines; the new fragment is 181 lines.
+  No selector, declaration, order, rendered page, or accessibility behavior
+  changed.
+- Updated the stylesheet composition regression. The sole unresolved
+  production file over 1,200 lines is now gone rather than accepted as a new
+  exception.
+**Verify:** The complete stylesheet remains exactly 64,056 bytes with SHA-256
+`c1aae18e0a84b78fc752b8ce8e0ab19a2e0d0a361a1a5c49c2d0339a1796615b`.
+Ran 50 dashboard presentation/professional regressions, both previously failing
+architecture assertions, and the dashboard stalled-client concurrency test
+with explicit ephemeral loopback permission; all passed. Also ran Python
+compileall, dashboard smoke/UX smoke, architecture cleanliness, and diff checks.
+**Notes/risks:** Mechanical ownership split only. No dashboard data, route,
+score, threshold, provider, authorization, evidence, policy, send, trade, order,
+paper trade, RSI row, or `TRIGGERED_FADE` changed.
+
 ## 2026-07-18 — Record the twenty-third genuine no-send market cycle · Codex
 **Why:** The evidence-first program requires cadence-eligible point-in-time
 observations before Protocol-v2 freezing or any algorithm calibration. The
