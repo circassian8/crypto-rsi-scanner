@@ -1,0 +1,72 @@
+{
+  "decision": "separate_official_announcement_from_observed_product_state",
+  "provider_registry_ids": [
+    "coinbase",
+    "coinbase_announcements"
+  ],
+  "provider_status": "planned_unimplemented_unconfigured_unauthorized",
+  "protocol_v2_eligible": false,
+  "provider_call_performed": false,
+  "research_only": true,
+  "reviewed_at": "2026-07-18",
+  "reviewed_sources": [
+    {
+      "finding": "current CEX listing guide directs new-asset and process updates to the official CoinbaseMarkets X account",
+      "url": "https://www.coinbase.com/blog/a-guide-to-the-digital-asset-listing-process-at-coinbase"
+    },
+    {
+      "finding": "Exchange market-data APIs are documented as public and subject to market-data terms",
+      "url": "https://docs.cdp.coinbase.com/exchange/introduction/welcome"
+    },
+    {
+      "finding": "public products catalog exposes current identity, trading restriction, status, and auction fields whose values may change",
+      "url": "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-all-known-trading-pairs"
+    },
+    {
+      "finding": "public WebSocket status and auction channels expose current product and indicative auction state, not announcement publication",
+      "url": "https://docs.cdp.coinbase.com/exchange/websocket-feed/channels"
+    }
+  ],
+  "source_roles": {
+    "announcement": {
+      "current_official_channel": "CoinbaseMarkets_on_X",
+      "approved_project_transport": false,
+      "authoritative_machine_evidence_available": false
+    },
+    "product_state": {
+      "documented_public_machine_contract": true,
+      "candidate_endpoint": "GET_https://api.exchange.coinbase.com/products",
+      "proves": "locally_observed_current_product_and_trading_state",
+      "does_not_prove": [
+        "announcement_publication_time",
+        "listing_approval_time",
+        "integration_start_time",
+        "first_trading_time",
+        "directional_bias",
+        "selected_bybit_execution_quality"
+      ]
+    }
+  },
+  "revisit_requires": [
+    "explicit_announcement_or_product_state_lane_selection",
+    "applicable_access_and_retention_review",
+    "explicit_provider_authorization",
+    "offline_closed_normalizer",
+    "bounded_no_redirect_no_retry_capture",
+    "immutable_accepted_source_bytes",
+    "local_request_and_read_completion_clocks",
+    "complete_catalog_and_prior_snapshot_transition_contract",
+    "request_ledger_health_backoff_and_freshness",
+    "strict_doctor",
+    "explicit_protocol_v2_annex_selection"
+  ],
+  "safety": {
+    "authorization_created": false,
+    "event_alpha_triggered_fade_created": 0,
+    "normal_rsi_signal_rows_written": 0,
+    "paper_trades_created": 0,
+    "telegram_sends": 0,
+    "trades_or_orders_created": 0
+  },
+  "schema_version": "coinbase_listing_interface_review_v1"
+}

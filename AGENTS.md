@@ -1039,6 +1039,13 @@ work.
   the applicable official region and approve either a documented interface or a
   bounded public-page acquisition contract; see
   `research/OKX_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
+  Coinbase likewise has two separate planned roles. Its current listing guide
+  directs updates to `@CoinbaseMarkets` on X, for which this project has no
+  approved transport. Its documented public Exchange product/status/auction
+  APIs prove only locally observed trading state, never prior announcement
+  publication. Do not scrape X, backdate product discovery into a catalyst, or
+  substitute Coinbase state for selected-venue Bybit evidence; see
+  `research/COINBASE_LISTING_INTERFACE_REVIEW.md` / `.json`.
   Ticker-only/ambiguous asset matches must stay below trigger confidence.
   The default manual alias file is `event_discovery_aliases.json`; fixture
   aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture

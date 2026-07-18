@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Separate Coinbase announcements from product state · Codex
+**Why:** The source registry named Coinbase capabilities without an implemented
+contract. Coinbase now exposes both an official listing-update channel and a
+documented public product-state API, but treating them as the same evidence
+would manufacture announcement timing.
+**Changes:**
+- Reviewed official Coinbase sources only. The current listing guide directs
+  new-asset/process updates to `@CoinbaseMarkets` on X; the project has no
+  approved X transport. The public Exchange catalog/status/auction interfaces
+  document current trading state, not prior publication or approval.
+- Added a Markdown/JSON interface review that closes the two source roles,
+  clocks, claims, access/retention boundary, complete-catalog/prior-snapshot
+  requirement, and future immutable-capture gates.
+- Updated the operating agreement, durable decision, and roadmap. Coinbase
+  remains planned/unimplemented/unconfigured/unauthorized. No X scrape,
+  provider call, parser, transport, route, score, threshold, or authority was
+  added, and Bybit remains the selected execution surface.
+**Verify:** Parsed the new JSON, ran `git diff --check`, and statically asserted
+the reviewed-source count, role separation, provider-call flag, Protocol-v2
+ineligibility, and safety counters. No provider call, send, trade, order, paper
+trade, RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+**Notes/risks:** Product-state snapshots could later provide honest cross-venue
+confirmation, but only after explicit lane selection and authorization. First
+local discovery must never be rewritten as Coinbase's announcement time.
+
 ## 2026-07-18 — Reconcile human-review queue and campaign truth · Codex
 **Why:** The dedicated queue correctly found three receipt-backed ideas awaiting
 their first human view, while the canonical campaign report showed only zero

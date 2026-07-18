@@ -190,6 +190,29 @@ no-redirect/no-retry acquisition, raw-byte fingerprints, request ledger,
 coverage/freshness/health state, strict doctor, and an explicit Protocol-v2
 annex decision. Never use alternate hosts, proxies, VPNs, or region bypasses.
 
+## 2026-07-18 - Separate Coinbase announcement time from observed product state
+**Status:** accepted
+**Decision:** Keep `coinbase` and `coinbase_announcements` planned and inactive.
+Coinbase's current listing guide directs new-asset updates to the official
+`@CoinbaseMarkets` X account, but this project has no approved X transport. The
+documented public Exchange `GET /products` and WebSocket status/auction
+contracts may later prove exact locally observed product identity, restriction,
+and auction state. They do not prove a prior listing announcement, approval,
+integration start, or first-trading clock. Never scrape X, infer/backdate an
+announcement from first product discovery, or use Coinbase as a substitute for
+the selected Bybit USDT-linear perpetual execution surface. See
+`research/COINBASE_LISTING_INTERFACE_REVIEW.md` / `.json`.
+**Why:** Official communication and observed venue state answer different
+questions. Collapsing them would create false catalyst timing and look-ahead;
+collapsing Coinbase into Bybit would also corrupt venue-native cost and
+instrument evidence.
+**Revisit when:** The operator explicitly selects the announcement and/or
+product-state lane and approves its access/retention contract. Require separate
+authorization, a closed offline normalizer, bounded immutable capture, local
+read-completion time, complete-catalog/prior-snapshot transition proof,
+ledger/health/freshness, strict doctor, and explicit annex selection. Public/no-
+key access never creates authorization.
+
 ## 2026-07-18 - Preserve official announcement windows without inventing time
 **Status:** accepted
 **Decision:** Canonical announcement evidence must preserve separately the
