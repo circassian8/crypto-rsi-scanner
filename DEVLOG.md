@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal immutable Bybit execution-quality capture bundles · Codex
+**Why:** The selected Bybit perpetual adapter could normalize public books, but
+its stdout-only result could not serve as durable point-in-time evidence. The
+next Protocol-v2 prerequisite was a reproducible exact-response contract without
+mistaking technical capture quality for preregistered protocol authority.
+**Changes:**
+- Added a confirmation-gated capture path that preserves the exact accepted
+  Bybit response bytes, request/response clocks, exact current Radar
+  authority/universe, venue-native instrument identity, and normalized USDT
+  spread/depth/impact observations. Complete bundles have immutable artifacts,
+  a closed manifest, completion receipt, and rollback-resistant latest pointer;
+  partial or mapping-only transports never publish.
+- Made validation hold one descriptor-anchored namespace for the complete read,
+  reject symlink/hardlink/identity drift, close every persisted projection and
+  request-index schema, rederive normalized observations and capture identity
+  from raw bytes, and recheck the pointer after the read. Unknown summary fields
+  cannot enter artifacts. The no-call status command reports missing or invalid
+  captures explicitly.
+- Kept evidence states separate: a fresh complete bundle may be
+  `protocol_v2_input_quality_eligible`, but every capture remains
+  `protocol_v2_evidence_eligible=false`, `protocol_v2_annex_bound=false`, and
+  campaign-detached until the sealed annex binds its immutable capture ID.
+- Added the latest fully revalidated capture as an optional canonical selector
+  in the fixed source-with-artifacts review export; older/failed captures remain
+  local history. Updated Make targets, static readiness v6, README, AGENTS, the
+  execution decision package, ROADMAP, DECISIONS, and both North Star forms.
+**Verify:** JSON validation, compileall, diff hygiene, and 120 focused Bybit,
+readiness, Protocol-v2, project/empirical export, and source-export security
+tests passed. Offline Bybit normalization and no-call capture status passed;
+Protocol-v2 remained correctly blocked; architecture cleanliness passed with no
+new size/class/function violation; the real fixed-name review export passed;
+and `make verify-fast` passed all 2,655 tests plus alert, backtest-fixture, and
+paper-scoreboard smokes. Its one loopback concurrency test used the approved
+local test context after the sandbox correctly refused a socket bind.
+**Notes/risks:** No genuine Bybit capture was made. Runtime authorization is
+absent, current dashboard authority is stale, and the recorded Bybit 403 remains
+unresolved. No provider authorization, credential/private-data path, retry,
+proxy/VPN/alternate host, send, trade, order, paper trade, RSI write, or fade
+trigger was added.
+
 ## 2026-07-18 — Preserve failed live attempts in the canonical review export · Codex
 **Why:** The required post-push source-with-artifacts export failed closed after
 the genuine CoinGecko request ended as `provider_unavailable`. That terminal

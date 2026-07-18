@@ -344,19 +344,30 @@ may be added later when a suitable environment already exists.
   `make radar-execution-quality-bybit-smoke` for the offline fixture normalizer;
   it preserves clocks/sequence and computes spread, USDT depth, and
   USDT-notional impact without silent USD conversion. The separately gated
-  public REST adapter is implemented but inactive. `make
-  radar-execution-quality-bybit-readiness` binds to the exact authoritative
-  Radar generation with no provider call or write. Collection requires the
-  already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the
-  exact `CONFIRM=1` target, performs at most two fixed-host public GETs per
-  current asset, follows no redirects, ignores ambient proxies, makes no
-  retries, and writes no artifact. Its stdout-only probe is not campaign
-  authority or Protocol-v2 evidence. The recorded Bybit 403 remains an honest
-  reachability blocker; stop on 403/429/region restriction and never use a
-  proxy, VPN, alternate host, or region bypass. The selection/readiness never
-  creates runtime authorization, credential/private-data permission, order
-  permission, or trading permission. Unset the authorization flag to disable
-  the collection boundary; no provider process or order surface exists.
+  public REST adapter and immutable capture contract are implemented but
+  inactive. `make radar-execution-quality-bybit-readiness` binds to the exact
+  authoritative Radar generation, and `make
+  radar-execution-quality-bybit-status` validates the latest capture; neither
+  makes a provider call or write. Capture requires the already-present
+  `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the exact
+  `CONFIRM=1` target, performs at most two fixed-host public GETs per current
+  asset, follows no redirects, ignores ambient proxies, and makes no retries.
+  A complete capture immutably stores only the closed exact authority/universe,
+  accepted raw responses, request timing, normalized USDT observations,
+  fingerprints, manifest, completion receipt, and latest pointer. Validation
+  holds one descriptor-anchored namespace for the complete read, rederives all
+  projections from the raw bytes, and rejects drift or pointer rollback. The
+  standard review archive selects and fully revalidates only the latest complete
+  capture. A fresh capture may be Protocol-v2 input-quality eligible, but stays
+  `protocol_v2_evidence_eligible=false` and `protocol_v2_annex_bound=false`
+  until the sealed annex explicitly binds its immutable capture ID. The
+  stdout-only `...-collect` target remains diagnostic. The recorded Bybit 403
+  remains an honest reachability blocker; stop on 403/429/region restriction
+  and never use a proxy, VPN, alternate host, or region bypass. The
+  selection/readiness never creates runtime authorization,
+  credential/private-data permission, order permission, or trading permission.
+  Unset the authorization flag to disable the collection boundary; no provider
+  process or order surface exists.
 - **Empirical Protocol-v2 readiness:**
   `make radar-research-protocol-v2-readiness` renders the frozen/static required
   evidence and annex contract without reading environment, files, credentials,

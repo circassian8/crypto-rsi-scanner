@@ -43,8 +43,8 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v5"
-    assert result.status == "execution_surface_selected_live_adapter_inactive"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v6"
+    assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
     assert result.intended_venue == "bybit"
@@ -70,8 +70,14 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
     )
     assert result.supported_live_adapters == (
-        "bybit_usdt_linear_perpetual_public_REST_v1",
+        "bybit_usdt_linear_perpetual_public_REST_capture_v1",
     )
+    assert result.supported_evidence_stores == (
+        "immutable_raw_response_manifest_receipt_pointer_v1",
+    )
+    assert result.immutable_capture_contract_implemented is True
+    assert result.protocol_v2_annex_bound is False
+    assert result.protocol_v2_evidence_eligible is False
     assert result.provider_call_planned is False
     assert result.provider_call_attempted is False
     assert result.live_adapter_activated is False
@@ -90,7 +96,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "unset_RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE_if_later_enabled"
     )
     assert result.spread_provider_status == (
-        "bybit_public_adapter_ready_inactive_live_spread_unavailable"
+        "bybit_immutable_capture_ready_inactive_live_spread_unavailable"
     )
     assert result.public_market_data_scope_confirmed is True
     assert result.public_market_data_permission_requested is False
@@ -266,7 +272,10 @@ def test_reader_protocol_exposes_only_one_read_operation() -> None:
 def test_human_report_is_explicitly_selected_but_no_call() -> None:
     rendered = format_execution_quality_readiness(build_execution_quality_readiness())
 
-    assert "status=execution_surface_selected_live_adapter_inactive" in rendered
+    assert (
+        "status=execution_surface_selected_capture_contract_ready_inactive"
+        in rendered
+    )
     assert "selected_venue=bybit selected_execution_mode=perpetual" in rendered
     assert "intended_venue=bybit intended_instrument_mode=perpetual" in rendered
     assert "quote_currency=USDT eligible_instrument_set=not_yet_frozen" in rendered
@@ -275,7 +284,17 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
     assert "expected_public_private_data_boundary=public_market_data_only" in rendered
     assert "supported_offline_adapters=bybit_usdt_linear_perpetual" in rendered
-    assert "supported_live_adapters=bybit_usdt_linear_perpetual_public_REST_v1" in rendered
+    assert (
+        "supported_live_adapters="
+        "bybit_usdt_linear_perpetual_public_REST_capture_v1"
+    ) in rendered
+    assert (
+        "supported_evidence_stores="
+        "immutable_raw_response_manifest_receipt_pointer_v1"
+    ) in rendered
+    assert "immutable_capture_contract_implemented=true" in rendered
+    assert "protocol_v2_annex_bound=false" in rendered
+    assert "protocol_v2_evidence_eligible=false" in rendered
     assert (
         "read_only=true provider_calls=0 provider_call_planned=false "
         "provider_call_attempted=false"
@@ -283,7 +302,7 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "credentials_read=false network_called=false writes_performed=false" in rendered
     assert "next_safe_command=make radar-execution-quality-bybit-readiness" in rendered
     assert "expected_provider_activity=none_static_readiness_only" in rendered
-    assert "spread_provider_status=bybit_public_adapter_ready_inactive" in rendered
+    assert "spread_provider_status=bybit_immutable_capture_ready_inactive" in rendered
     assert "public_market_data_scope_confirmed=true" in rendered
     assert "public_market_data_permission_requested=false" in rendered
     assert "private_market_data_permission_requested=false" in rendered
@@ -364,7 +383,9 @@ def test_cli_json_is_structured_static_and_secret_free(
     payload = json.loads(output.out)
 
     assert output.err == ""
-    assert payload["status"] == "execution_surface_selected_live_adapter_inactive"
+    assert payload["status"] == (
+        "execution_surface_selected_capture_contract_ready_inactive"
+    )
     assert payload["selected_venue"] == "bybit"
     assert payload["selected_execution_mode"] == "perpetual"
     assert payload["intended_venue"] == "bybit"
@@ -384,14 +405,14 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_usdt_linear_perpetual_fixture_normalizer_v1"
     ]
     assert payload["supported_live_adapters"] == [
-        "bybit_usdt_linear_perpetual_public_REST_v1"
+        "bybit_usdt_linear_perpetual_public_REST_capture_v1"
     ]
     assert payload["provider_call_planned"] is False
     assert payload["provider_call_attempted"] is False
     assert payload["network_called"] is False
     assert payload["credentials_read"] is False
     assert payload["spread_provider_status"] == (
-        "bybit_public_adapter_ready_inactive_live_spread_unavailable"
+        "bybit_immutable_capture_ready_inactive_live_spread_unavailable"
     )
     assert payload["public_market_data_scope_confirmed"] is True
     assert payload["public_market_data_permission_requested"] is False
@@ -458,7 +479,10 @@ def test_checked_operator_decision_package_records_selection_and_boundaries() ->
     assert "Bybit" in rendered
     assert "USDT-linear perpetual" in rendered
     assert "public market data only" in rendered
-    assert "bounded public adapter is implemented but inactive" in rendered
+    assert "immutable exact-response\ncapture contract are implemented but inactive" in rendered
+    assert "protocol_v2_input_quality_eligible" in rendered
+    assert "protocol_v2_evidence_eligible=false" in rendered
+    assert "Never\n  rewrite a historical capture to promote it" in rendered
     assert "no credential, private-data access" in rendered
     for option in (
         "Binance",
@@ -487,12 +511,18 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     assert readiness["contract_version"] == CONTRACT_VERSION
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
+    assert readiness["immutable_capture_contract_implemented"] is True
     assert readiness["live_adapter_active"] is False
+    assert readiness["protocol_v2_annex_bound"] is False
+    assert readiness["protocol_v2_evidence_eligible"] is False
+    assert readiness["capture_status_command"].startswith(
+        "make radar-execution-quality-bybit-status"
+    )
     assert readiness["next_safe_command"].startswith(
         "make radar-execution-quality-bybit-readiness"
     )
     assert decision["current_status"] == (
-        "bybit_USDT_linear_perpetual_selected_public_adapter_implemented_inactive"
+        "bybit_USDT_linear_perpetual_selected_immutable_capture_ready_inactive"
     )
     assert "not_selected" not in json.dumps(decision, sort_keys=True)
     assert "RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE" in decision[

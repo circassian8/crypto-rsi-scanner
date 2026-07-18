@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Callable, Mapping, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -55,6 +56,12 @@ from .bybit_execution_quality import (
     normalize_bybit_orderbook,
     select_bybit_usdt_perpetual_instruments,
 )
+from .bybit_execution_quality_capture import (
+    BybitCapturedJSONResponse,
+    BybitExecutionQualityCaptureError,
+    bybit_execution_quality_capture_status,
+    persist_bybit_execution_quality_capture,
+)
 
 
 CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v1"
@@ -67,6 +74,9 @@ READINESS_COMMAND = (
 )
 COLLECT_COMMAND = (
     "CONFIRM=1 make radar-execution-quality-bybit-collect PYTHON=.venv/bin/python"
+)
+CAPTURE_COMMAND = (
+    "CONFIRM=1 make radar-execution-quality-bybit-capture PYTHON=.venv/bin/python"
 )
 SAFETY = {
     "research_only": True,
@@ -119,7 +129,8 @@ class _NoRedirectHandler(HTTPRedirectHandler):
 
 
 Resolver = Callable[..., Any]
-FetchJSON = Callable[[BybitPublicRequest, float], Mapping[str, object]]
+FetchResult = Mapping[str, object] | BybitCapturedJSONResponse
+FetchJSON = Callable[[BybitPublicRequest, float], FetchResult]
 Clock = Callable[[], datetime]
 
 
@@ -264,6 +275,7 @@ def build_bybit_execution_quality_live_readiness(
         reasons.append("runtime_provider_authorization_absent")
     request_bound = len(assets) * 2
     ready = not reasons
+    latest_capture = bybit_execution_quality_capture_status(artifact_base_dir)
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_execution_quality_live_readiness",
@@ -284,9 +296,16 @@ def build_bybit_execution_quality_live_readiness(
         "provider_call_planned": False,
         "provider_call_attempted": False,
         "evidence_authority_eligible": False,
-        "evidence_publication_status": "not_integrated_stdout_only",
+        "capture_publication_available": True,
+        "latest_capture_status": latest_capture.get("status"),
+        "latest_capture": latest_capture,
+        "evidence_publication_status": (
+            "no_immutable_capture_available"
+            if latest_capture.get("status") != "complete"
+            else "latest_immutable_capture_available"
+        ),
         "reasons": reasons,
-        "next_safe_command": COLLECT_COMMAND if ready else READINESS_COMMAND,
+        "next_safe_command": CAPTURE_COMMAND if ready else READINESS_COMMAND,
         "expected_provider_activity": (
             f"collect_at_most_{request_bound}_public_GETs_no_retries"
             if ready
@@ -336,6 +355,36 @@ def collect_authoritative_bybit_execution_quality(
 ) -> dict[str, object]:
     """Collect one bounded public snapshot set from exact current authority."""
 
+    summary, _responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=artifact_base_dir,
+        environ=environ,
+        now=now,
+        resolver=resolver,
+        fetch_json=fetch_json,
+        timeout_seconds=timeout_seconds,
+    )
+    return summary
+
+
+def _payload_and_capture(result: FetchResult) -> tuple[Mapping[str, object], BybitCapturedJSONResponse | None]:
+    if isinstance(result, BybitCapturedJSONResponse):
+        return result.payload(), result
+    if isinstance(result, Mapping):
+        return result, None
+    raise BybitExecutionQualityLiveError("provider_json_root_invalid")
+
+
+def _collect_authoritative_bybit_execution_quality(
+    *,
+    artifact_base_dir: str | Path,
+    environ: Mapping[str, str] | None = None,
+    now: Clock | None = None,
+    resolver: Resolver = resolve_authoritative_dashboard,
+    fetch_json: FetchJSON | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> tuple[dict[str, object], tuple[BybitCapturedJSONResponse, ...]]:
+    """Collect normalized values plus any exact transport response buffers."""
+
     clock = now or (lambda: datetime.now(timezone.utc))
     started = _utc(clock())
     env = os.environ if environ is None else environ
@@ -356,11 +405,14 @@ def collect_authoritative_bybit_execution_quality(
     fetch = fetch_json or _fetch_public_json
     requests_attempted = 0
     eligible: list[BybitEligibleInstrument] = []
+    captured_responses: list[BybitCapturedJSONResponse] = []
     try:
         for asset in assets:
             request = _instrument_request(asset)
             requests_attempted += 1
-            payload = fetch(request, timeout_seconds)
+            payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
+            if captured is not None:
+                captured_responses.append(captured)
             selected = select_bybit_usdt_perpetual_instruments((asset,), payload)
             if selected:
                 eligible.append(selected[0])
@@ -375,7 +427,9 @@ def collect_authoritative_bybit_execution_quality(
         for index, instrument in enumerate(eligible, start=1):
             request = _orderbook_request(instrument)
             requests_attempted += 1
-            payload = fetch(request, timeout_seconds)
+            payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
+            if captured is not None:
+                captured_responses.append(captured)
             acquired = _utc(clock())
             snapshot = normalize_bybit_orderbook(
                 payload,
@@ -403,7 +457,7 @@ def collect_authoritative_bybit_execution_quality(
         ) from exc
 
     completed = _utc(clock())
-    return {
+    summary = {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_execution_quality_observation_set",
         "status": "complete",
@@ -414,6 +468,7 @@ def collect_authoritative_bybit_execution_quality(
         "category": BYBIT_CATEGORY,
         "quote_asset": QUOTE_ASSET,
         "source_authority": identity,
+        "radar_assets": [dict(row) for row in assets],
         "requested_radar_asset_count": len(assets),
         "eligible_instrument_count": len(eligible),
         "eligible_instruments": [row.to_dict() for row in eligible],
@@ -438,6 +493,44 @@ def collect_authoritative_bybit_execution_quality(
         ),
         **SAFETY,
     }
+    return summary, tuple(captured_responses)
+
+
+def capture_authoritative_bybit_execution_quality(
+    *,
+    artifact_base_dir: str | Path,
+    environ: Mapping[str, str] | None = None,
+    now: Clock | None = None,
+    resolver: Resolver = resolve_authoritative_dashboard,
+    fetch_json: FetchJSON | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    """Collect and seal exact public responses without changing Radar authority."""
+
+    summary, responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=artifact_base_dir,
+        environ=environ,
+        now=now,
+        resolver=resolver,
+        fetch_json=fetch_json,
+        timeout_seconds=timeout_seconds,
+    )
+    if len(responses) != summary["provider_request_count"]:
+        raise BybitExecutionQualityLiveError(
+            "exact_provider_response_capture_unavailable",
+            request_count=int(summary["provider_request_count"]),
+        )
+    try:
+        return persist_bybit_execution_quality_capture(
+            artifact_base_dir,
+            summary=summary,
+            responses=responses,
+        )
+    except BybitExecutionQualityCaptureError as exc:
+        raise BybitExecutionQualityLiveError(
+            f"capture_{exc}",
+            request_count=int(summary["provider_request_count"]),
+        ) from exc
 
 
 def _fetch_public_json(
@@ -445,7 +538,7 @@ def _fetch_public_json(
     timeout_seconds: float,
     *,
     opener: OpenerDirector | None = None,
-) -> Mapping[str, object]:
+) -> BybitCapturedJSONResponse:
     """Perform one fixed-host public JSON GET without redirects or retries."""
 
     query = dict(request.query)
@@ -466,6 +559,8 @@ def _fetch_public_json(
     selected_opener = opener or _build_public_opener()
     response: Any | None = None
     raw: bytes | None = None
+    request_started = datetime.now(timezone.utc)
+    monotonic_started = time.monotonic_ns()
     try:
         with selected_opener.open(http_request, timeout=timeout_seconds) as response:
             raw_status = getattr(response, "status", None)
@@ -484,11 +579,20 @@ def _fetch_public_json(
             raw = response.read(MAX_RESPONSE_BYTES + 1)
             if not raw or len(raw) > MAX_RESPONSE_BYTES:
                 raise BybitExecutionQualityLiveError("provider_response_size_invalid")
-        payload = json.loads(raw.decode("utf-8"))
-        if not isinstance(payload, Mapping):
-            raise BybitExecutionQualityLiveError("provider_json_root_invalid")
+        response_received = datetime.now(timezone.utc)
+        captured = BybitCapturedJSONResponse(
+            request=request,
+            request_started_at=_iso(request_started),
+            response_received_at=_iso(response_received),
+            duration_ms=max(0, (time.monotonic_ns() - monotonic_started) // 1_000_000),
+            response_url=url,
+            http_status=status,
+            content_type=content_type,
+            raw_bytes=raw,
+        )
+        payload = captured.payload()
         raise_for_bybit_api_error(payload)
-        return payload
+        return captured
     except BybitExecutionQualityLiveError:
         raise
     except HTTPError as exc:
@@ -550,19 +654,20 @@ def _parser() -> argparse.ArgumentParser:
         description="Read or collect guarded public Bybit execution-quality evidence."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("readiness", "collect"):
+    for command in ("readiness", "collect", "capture", "status"):
         selected = subparsers.add_parser(command)
         selected.add_argument(
             "--artifact-base",
             type=Path,
             default=Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR),
         )
-    subparsers.choices["collect"].add_argument(
-        "--timeout-seconds",
-        type=float,
-        default=DEFAULT_TIMEOUT_SECONDS,
-    )
-    subparsers.choices["collect"].add_argument("--confirm", action="store_true")
+    for command in ("collect", "capture"):
+        subparsers.choices[command].add_argument(
+            "--timeout-seconds",
+            type=float,
+            default=DEFAULT_TIMEOUT_SECONDS,
+        )
+        subparsers.choices[command].add_argument("--confirm", action="store_true")
     return parser
 
 
@@ -572,6 +677,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = build_bybit_execution_quality_live_readiness(
             artifact_base_dir=args.artifact_base
         )
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+    if args.command == "status":
+        payload = bybit_execution_quality_capture_status(args.artifact_base)
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
     if not args.confirm:
@@ -588,7 +697,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
     try:
-        payload = collect_authoritative_bybit_execution_quality(
+        operation = (
+            capture_authoritative_bybit_execution_quality
+            if args.command == "capture"
+            else collect_authoritative_bybit_execution_quality
+        )
+        payload = operation(
             artifact_base_dir=args.artifact_base,
             timeout_seconds=args.timeout_seconds,
         )
@@ -600,6 +714,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 __all__ = (
+    "CAPTURE_COMMAND",
     "COLLECT_COMMAND",
     "CONTRACT_VERSION",
     "DEFAULT_TIMEOUT_SECONDS",
@@ -608,6 +723,7 @@ __all__ = (
     "READINESS_COMMAND",
     "BybitExecutionQualityLiveError",
     "build_bybit_execution_quality_live_readiness",
+    "capture_authoritative_bybit_execution_quality",
     "collect_authoritative_bybit_execution_quality",
     "main",
     "project_authoritative_radar_assets",

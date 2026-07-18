@@ -15,7 +15,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v5"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v6"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 COMMON_METRICS = (
     "best_bid",
@@ -195,6 +195,10 @@ class _ExecutionQualityReadiness:
     human_decision_template: tuple[tuple[str, str], ...]
     supported_offline_adapters: tuple[str, ...]
     supported_live_adapters: tuple[str, ...]
+    supported_evidence_stores: tuple[str, ...]
+    immutable_capture_contract_implemented: bool
+    protocol_v2_annex_bound: bool
+    protocol_v2_evidence_eligible: bool
     supported_interface_modes: tuple[str, ...]
     feasible_venues: tuple[ExecutionVenueCapability, ...]
     multiple_venue_research_option: Mapping[str, str]
@@ -263,6 +267,12 @@ def _execution_quality_readiness_dict(
         "human_decision_template": dict(value.human_decision_template),
         "supported_offline_adapters": list(value.supported_offline_adapters),
         "supported_live_adapters": list(value.supported_live_adapters),
+        "supported_evidence_stores": list(value.supported_evidence_stores),
+        "immutable_capture_contract_implemented": (
+            value.immutable_capture_contract_implemented
+        ),
+        "protocol_v2_annex_bound": value.protocol_v2_annex_bound,
+        "protocol_v2_evidence_eligible": value.protocol_v2_evidence_eligible,
         "supported_interface_modes": list(value.supported_interface_modes),
         "feasible_venues": [row.to_dict() for row in value.feasible_venues],
         "multiple_venue_research_option": dict(
@@ -460,7 +470,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
 
     return ExecutionQualityReadiness(
         contract_version=CONTRACT_VERSION,
-        status="execution_surface_selected_live_adapter_inactive",
+        status="execution_surface_selected_capture_contract_ready_inactive",
         selected_venue="bybit",
         selected_execution_mode="perpetual",
         intended_venue="bybit",
@@ -505,8 +515,14 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
         ),
         supported_live_adapters=(
-            "bybit_usdt_linear_perpetual_public_REST_v1",
+            "bybit_usdt_linear_perpetual_public_REST_capture_v1",
         ),
+        supported_evidence_stores=(
+            "immutable_raw_response_manifest_receipt_pointer_v1",
+        ),
+        immutable_capture_contract_implemented=True,
+        protocol_v2_annex_bound=False,
+        protocol_v2_evidence_eligible=False,
         supported_interface_modes=EXECUTION_MODES,
         feasible_venues=VENUE_CAPABILITIES,
         multiple_venue_research_option=MULTI_VENUE_RESEARCH_OPTION,
@@ -526,6 +542,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "the_exact_top_30_intersection_must_be_frozen_before_holdout_access",
             "public_data_scope_does_not_activate_a_provider_call_or_trading_path",
             "the_recorded_403_must_fail_closed_without_proxy_VPN_or_region_bypass",
+            "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
         ),
         next_safe_command=(
             "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
@@ -539,7 +556,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "unset_RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE_if_later_enabled"
         ),
         spread_provider_status=(
-            "bybit_public_adapter_ready_inactive_live_spread_unavailable"
+            "bybit_immutable_capture_ready_inactive_live_spread_unavailable"
         ),
         public_market_data_scope_confirmed=True,
         public_market_data_permission_requested=False,
@@ -589,6 +606,13 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         f"{result.expected_public_private_data_boundary}",
         "supported_offline_adapters=" + ",".join(result.supported_offline_adapters),
         "supported_live_adapters=" + ",".join(result.supported_live_adapters),
+        "supported_evidence_stores=" + ",".join(result.supported_evidence_stores),
+        "immutable_capture_contract_implemented="
+        f"{str(result.immutable_capture_contract_implemented).casefold()} "
+        "protocol_v2_annex_bound="
+        f"{str(result.protocol_v2_annex_bound).casefold()} "
+        "protocol_v2_evidence_eligible="
+        f"{str(result.protocol_v2_evidence_eligible).casefold()}",
         "read_only=true provider_calls=0 provider_call_planned=false provider_call_attempted=false",
         "credentials_read=false network_called=false writes_performed=false",
         "research_only=true",

@@ -116,6 +116,7 @@ PROJECT_CANONICAL_ROOT_FILES = (
     "event_radar_daily_operations_current_status.json",
     "event_radar_daily_operations_cycles.jsonl",
     "event_radar_daily_operations_state.json",
+    "radar_bybit_execution_quality_latest.json",
     "radar_current_namespace.json",
 )
 PROJECT_CANONICAL_SHARED_DIRECTORIES = (
@@ -131,6 +132,10 @@ PROJECT_DYNAMIC_NAMESPACE_SELECTORS = (
     {
         "kind": "latest_live_no_send_attempt_namespace",
         "path": "event_market_no_send_latest_attempt.json",
+    },
+    {
+        "kind": "latest_bybit_execution_quality_namespace",
+        "path": "radar_bybit_execution_quality_latest.json",
     },
 )
 _OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
@@ -1389,7 +1394,7 @@ def _validate_project_artifact_policy(policy: object) -> dict[str, object]:
         raise ValueError("project artifact policy must be an object")
     if (
         policy.get("schema_id") != "decision_radar.project_artifact_export_policy"
-        or policy.get("schema_version") != 1
+        or policy.get("schema_version") != 2
     ):
         raise ValueError("unsupported project artifact policy")
     expected_keys = {
@@ -1564,6 +1569,34 @@ def _latest_attempt_namespace(payload: bytes) -> tuple[str, dict[str, object]]:
     }
 
 
+def _latest_bybit_execution_quality_namespace(
+    payload: bytes,
+) -> tuple[str, dict[str, object]]:
+    from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_capture import (
+        BybitExecutionQualityCaptureError,
+        validate_bybit_execution_quality_pointer_bytes,
+    )
+
+    try:
+        pointer = validate_bybit_execution_quality_pointer_bytes(payload)
+    except BybitExecutionQualityCaptureError as exc:
+        raise ValueError("latest Bybit execution-quality pointer is invalid") from exc
+    namespace = str(pointer["artifact_namespace"])
+    return namespace, {
+        "artifact_namespace": namespace,
+        "capture_id": pointer["capture_id"],
+        "evidence_authority_eligible": pointer["evidence_authority_eligible"],
+        "protocol_v2_evidence_eligible": pointer[
+            "protocol_v2_evidence_eligible"
+        ],
+        "protocol_v2_input_quality_eligible": pointer[
+            "protocol_v2_input_quality_eligible"
+        ],
+        "protocol_v2_annex_bound": pointer["protocol_v2_annex_bound"],
+        "status": "selected",
+    }
+
+
 def _project_artifact_export_plan(
     root: Path,
     *,
@@ -1639,10 +1672,12 @@ def _project_artifact_export_plan(
     selector_roles = {
         "dashboard_pointer_namespace": "current_dashboard_authority_generation",
         "latest_live_no_send_attempt_namespace": "latest_live_no_send_attempt_generation",
+        "latest_bybit_execution_quality_namespace": "latest_bybit_execution_quality_capture",
     }
     selector_loaders = {
         "dashboard_pointer_namespace": _dashboard_pointer_namespace,
         "latest_live_no_send_attempt_namespace": _latest_attempt_namespace,
+        "latest_bybit_execution_quality_namespace": _latest_bybit_execution_quality_namespace,
     }
     for selector in policy["dynamic_namespace_selectors"]:
         kind = str(selector["kind"])
@@ -1659,6 +1694,24 @@ def _project_artifact_export_plan(
             maximum=4 * 1024 * 1024,
         )
         namespace, result = selector_loaders[kind](payload)
+        if kind == "latest_bybit_execution_quality_namespace":
+            from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_capture import (
+                BybitExecutionQualityCaptureError,
+                load_latest_bybit_execution_quality_capture,
+            )
+
+            try:
+                validated_capture = load_latest_bybit_execution_quality_capture(
+                    artifact_root
+                )
+            except BybitExecutionQualityCaptureError as exc:
+                raise ValueError(
+                    "latest Bybit execution-quality capture is invalid"
+                ) from exc
+            if validated_capture.get("artifact_namespace") != namespace:
+                raise ValueError(
+                    "latest Bybit execution-quality pointer/capture mismatch"
+                )
         directory = artifact_root / namespace
         directory_inventory = _strict_regular_files_under(
             directory,

@@ -1,12 +1,13 @@
 # Decision Radar execution-venue decision package
 
 Status: **operator decision confirmed: Bybit USDT-linear perpetuals, public
-market data only; the bounded public adapter is implemented but inactive, and
+market data only; the bounded public adapter and immutable exact-response
+capture contract are implemented but inactive, no genuine capture exists, and
 no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v5`. Run
+`crypto_radar_execution_quality_readiness_v6`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -55,13 +56,21 @@ private account data, wallet access, an order endpoint, or permission to trade.
   remains a blocker and must not be bypassed with a proxy, VPN, or alternate
   region route chosen by the code.
 - Keep the implemented public-read adapter inactive until its dedicated runtime
-  authorization already exists. Its readiness binds to one exact authoritative
-  Radar generation without a provider call or write. A collection attempt may
-  run only through the additional explicit `CONFIRM=1` boundary, use at most
-  two public GETs per current Radar asset, make no retries, and stop on the
-  first 403, 429, regional restriction, malformed response, or authority
-  failure. Its stdout-only result is not yet an immutable campaign artifact or
-  Protocol-v2 evidence.
+  authorization already exists. Readiness binds to one exact authoritative
+  Radar generation, and status validates the latest capture; neither makes a
+  provider call or write. A capture attempt may run only through the additional
+  explicit `CONFIRM=1` boundary, use at most two public GETs per current Radar
+  asset, make no retries, and stop on the first 403, 429, regional restriction,
+  malformed response, or authority failure. Only a complete run publishes an
+  immutable bundle containing the closed authority/universe, exact accepted
+  response bytes, request timing, normalized USDT observations, fingerprints,
+  manifest, completion receipt, and latest pointer. The bundle is fully
+  rederived and validated before pointer publication and review export.
+- Keep capture quality distinct from Protocol-v2 evidence authority. A fresh
+  complete capture may be `protocol_v2_input_quality_eligible`, but it remains
+  `protocol_v2_evidence_eligible=false` and `protocol_v2_annex_bound=false`
+  until the sealed annex explicitly binds the immutable capture ID. Never
+  rewrite a historical capture to promote it.
 - Seal point-in-time sources, partitions/untouched holdout, outcomes, fees,
   spread/depth/impact rules, latency, universe, routes, episodes, and minimum
   samples in the Protocol-v2 annex.
@@ -74,23 +83,26 @@ The safe implementation smoke is:
 ```sh
 make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
+make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 ```
 
 Both commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
 already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
-separate `radar-execution-quality-bybit-collect` target to cross the public
+separate `radar-execution-quality-bybit-capture` target to cross the public
 provider boundary, and that target additionally requires `CONFIRM=1`; unsetting
-the flag disables collection.
+the flag disables capture. The `...-collect` target remains a stdout diagnostic
+probe and does not publish evidence.
 
 ## Current boundary
 
 - Protocol-v2 executable protocol remains unfrozen and blocked.
 - Bybit USDT-linear perpetuals are selected as the intended primary surface.
 - The exact bounded instrument set is not yet frozen.
-- The execution-quality live adapter exists but is inactive; live spread
-  remains unavailable.
+- The execution-quality live adapter and immutable capture contract exist but
+  are inactive; no genuine capture exists and live spread remains unavailable.
+- No capture is Protocol-v2 evidence and no capture ID is annex-bound.
 - Current Bybit reachability remains unverified after the recorded 403.
 - No provider call is planned or attempted by readiness.
 - No Protocol-v2 holdout is defined, opened, or evaluated.

@@ -164,17 +164,23 @@ execution-quality surface, using public market data only. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the current
 static/no-network truth and `make radar-execution-quality-bybit-smoke
 PYTHON=.venv/bin/python` for the offline V5 fixture normalizer. The separately
-gated public REST adapter is implemented but inactive. Its read-only preflight
-is `make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`; it
-binds only to the exact authoritative Radar generation and makes no provider
-call or write. Collection remains blocked unless
-`RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` is already present, and then
-`CONFIRM=1 make radar-execution-quality-bybit-collect
+gated public REST adapter and immutable capture contract are implemented but
+inactive. Its read-only preflight is `make
+radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`; `make
+radar-execution-quality-bybit-status PYTHON=.venv/bin/python` validates the
+latest capture. Both make no provider call or write. Capture remains blocked
+unless `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` is already present,
+and then `CONFIRM=1 make radar-execution-quality-bybit-capture
 PYTHON=.venv/bin/python` performs at most two public GETs per current Radar
-asset, with no retries, credentials, private data, orders, or writes. This
-stdout-only probe is not yet a campaign artifact or Protocol-v2 evidence. The
-exact top-30 Radar/active-contract set is not frozen and live reachability
-remains unverified after the recorded 403;
+asset, with no retries, credentials, private data, orders, or sends. A complete
+capture immutably stores exact response bytes, request timing, authoritative
+universe identity, normalized USDT observations, fingerprints, receipt, and
+latest pointer; partial runs are not published. A fresh capture can satisfy the
+input-quality contract, but remains ineligible as Protocol-v2 evidence until
+the sealed annex explicitly binds its capture ID. The stdout-only `...-collect`
+target remains a diagnostic probe. The exact top-30 Radar/active-contract set
+is not frozen, no genuine capture exists, and live reachability remains
+unverified after the recorded 403;
 403/429/region failures stop immediately without proxy, VPN, alternate-host, or
 region bypass. Disable the provider boundary by unsetting the authorization
 flag.

@@ -10,6 +10,7 @@
     "event_radar_daily_operations_current_status.json",
     "event_radar_daily_operations_cycles.jsonl",
     "event_radar_daily_operations_state.json",
+    "radar_bybit_execution_quality_latest.json",
     "radar_current_namespace.json"
   ],
   "canonical_shared_directories": [
@@ -26,6 +27,10 @@
     {
       "kind": "latest_live_no_send_attempt_namespace",
       "path": "event_market_no_send_latest_attempt.json"
+    },
+    {
+      "kind": "latest_bybit_execution_quality_namespace",
+      "path": "radar_bybit_execution_quality_latest.json"
     }
   ],
   "history_archive": {
@@ -50,6 +55,6 @@
     "standard_export_excludes_noncanonical_artifacts": true
   },
   "schema_id": "decision_radar.project_artifact_export_policy",
-  "schema_version": 1,
+  "schema_version": 2,
   "standard_manifest_archive_path": "event_fade_cache/PROJECT_ARTIFACT_EXPORT_MANIFEST.json"
 }

@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Separate immutable capture quality from Protocol-v2 evidence authority
+**Status:** accepted
+**Decision:** Preserve each successful Bybit public execution-quality run as one
+immutable exact-response bundle: closed current Radar authority and universe,
+accepted provider bytes, request/response timing, venue-native instrument
+identity, normalized USDT spread/depth/impact observations, fingerprints,
+manifest, completion receipt, and latest pointer. Publish only complete bundles
+and fully rederive their projections from the raw bytes. A fresh complete bundle
+may set `protocol_v2_input_quality_eligible=true`, but every capture remains
+`protocol_v2_evidence_eligible=false`, `protocol_v2_annex_bound=false`, and
+detached from the campaign until the sealed Protocol-v2 annex explicitly binds
+its immutable capture ID. Never rewrite a historical capture to promote it.
+Readiness and status remain no-call/no-write; capture still requires the
+already-present dedicated provider authorization plus `CONFIRM=1`. The existing
+403/429/region fail-closed and no-proxy/VPN/alternate-host boundary is unchanged.
+**Why:** Exact bytes and clocks solve the evidence-preservation problem, but do
+not by themselves preregister the universe, cost model, partitions, outcomes,
+minimum samples, or untouched holdout. Keeping input quality separate from
+protocol authority prevents a technically valid capture from silently becoming
+selection or evaluation evidence after its results are known.
+**Revisit when:** The complete Protocol-v2 annex is ready to seal one or more
+specific capture IDs before holdout access. Promotion should occur in the annex
+and derived protocol index, not by mutating capture artifacts.
+
 ## 2026-07-18 - Complete evidence acquisition before any Decision Radar retuning
 **Status:** accepted
 **Decision:** Advance Protocol v2 in this order: maintain cadence-eligible

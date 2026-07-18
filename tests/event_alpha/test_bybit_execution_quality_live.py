@@ -143,7 +143,9 @@ def test_readiness_is_no_call_and_requires_exact_authority_plus_explicit_auth() 
     assert payload["provider_call_planned"] is False
     assert payload["provider_call_attempted"] is False
     assert payload["evidence_authority_eligible"] is False
-    assert payload["evidence_publication_status"] == "not_integrated_stdout_only"
+    assert payload["capture_publication_available"] is True
+    assert payload["latest_capture_status"] == "unavailable"
+    assert payload["evidence_publication_status"] == "no_immutable_capture_available"
     assert payload["maximum_provider_requests_for_current_universe"] == 2
     assert payload["reasons"] == ["runtime_provider_authorization_absent"]
     assert payload["credentials_read"] is False
@@ -287,7 +289,9 @@ def test_transport_uses_fixed_public_get_without_credentials_or_redirects() -> N
         query=(("category", "linear"), ("symbol", "BTCUSDT")),
     )
 
-    assert _fetch_public_json(request, 10.0, opener=opener) == payload
+    captured = _fetch_public_json(request, 10.0, opener=opener)
+    assert captured.payload() == payload
+    assert captured.raw_bytes == json.dumps(payload).encode("utf-8")
     sent = opener.requests[0]
     headers = {key.casefold(): value for key, value in sent.header_items()}
     assert sent.get_method() == "GET"
@@ -409,6 +413,8 @@ def test_make_targets_keep_readiness_separate_from_authorized_collection() -> No
 
     readiness = dry_run("radar-execution-quality-bybit-readiness")
     collection = dry_run("radar-execution-quality-bybit-collect")
+    capture = dry_run("radar-execution-quality-bybit-capture")
+    status = dry_run("radar-execution-quality-bybit-status")
     confirmed = subprocess.run(
         [
             "make",
@@ -422,14 +428,34 @@ def test_make_targets_keep_readiness_separate_from_authorized_collection() -> No
         capture_output=True,
         text=True,
     ).stdout
+    confirmed_capture = subprocess.run(
+        [
+            "make",
+            "-n",
+            "radar-execution-quality-bybit-capture",
+            "PYTHON=python3",
+            "CONFIRM=1",
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
 
     assert "bybit_execution_quality_live readiness" in readiness
     assert "bybit_execution_quality_live collect" not in readiness
     assert "bybit_execution_quality_live collect" in collection
+    assert "bybit_execution_quality_live capture" in capture
+    assert "bybit_execution_quality_live status" in status
     assert "--confirm" not in collection
+    assert "--confirm" not in capture
     assert confirmed.count("--confirm") == 1
+    assert confirmed_capture.count("--confirm") == 1
     assert LIVE_AUTH_ENV not in readiness
     assert f"{LIVE_AUTH_ENV}=1" not in collection
-    lowered = f"{readiness}\n{collection}\n{confirmed}".casefold()
+    lowered = (
+        f"{readiness}\n{collection}\n{capture}\n{status}\n"
+        f"{confirmed}\n{confirmed_capture}"
+    ).casefold()
     assert "place-order" not in lowered
     assert "execute-order" not in lowered
