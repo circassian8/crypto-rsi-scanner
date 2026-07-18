@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record the twenty-fourth market observation cycle · Codex
+**Why:** The exact one-hour cadence boundary was eligible, and the evidence-first
+program needs regular point-in-time observations to mature temporal baselines
+without counting rapid repeats.
+**Changes:**
+- Ran one already-authorized Daily Operations cycle. CoinGecko returned HTTP
+  200 with 80 bounded rows; the adapter selected 30, made no retry, and published
+  `radar_market_no_send_20260718t234445835741z_228150d5111e` after strict doctor.
+- Advanced canonical campaign truth to 24 real cycles, 720 retained observations,
+  690 baseline-counted observations, and the same 30 explicit too-close rows.
+  Historical/current ideas remain 5/0; outcomes remain 1 matured, 3 pending,
+  and 1 `due_missing_price`; trusted spread remains 0/720.
+- Proved the temporal-unit fix on genuine current evidence: all 30 snapshots are
+  fresh with zero unit-warning rows. The richer report reconciles 30 evaluated,
+  zero anomalies, and 30 configured no-reactions while showing 0/30 spread and
+  0/30 derivatives-crowding inputs.
+- Current-universe 4h maturity advanced from 0/30 to 29/30 warm, matching 1h at
+  29/30. SHIB is the only current holdout, with 5 eligible 1h and 3 eligible 4h
+  temporal samples; turnover and volume remain 30/30 warm.
+- Rebound the no-call DefiLlama mapping review to current-universe digest
+  `93a295aa2996682ac78f2e49239eb50a0164e681b8e4a3b29358786a941f5329`;
+  all 30 mappings remain honestly unreviewed.
+- Updated `ROADMAP.md` with the exact authority, campaign, maturity, next-cadence,
+  and human-input state.
+**Verify:** Request ledger is one `/coins/markets` request, HTTP 200, 80 rows,
+zero retries, and no error. Final publication and operations receipts bind the
+exact namespace/run/revision, pointer, operator-state hash, and owned dashboard
+PID. Strict doctor is authoritative with 0 blockers / 0 warnings. Dashboard
+readiness is READY with zero writes, and loopback HEAD returns HTTP 200 with the
+exact namespace, run, revision 12, and operator-state digest headers. Campaign
+report regenerated at 23:44:54 UTC and reconciles the 24 / 720 / 690 / 30 state.
+**Notes/risks:** Zero anomalies is a valid healthy-empty classification, not a
+reason to lower thresholds. No Telegram send, trade, order, paper trade, normal
+RSI write, or `TRIGGERED_FADE` occurred. Bybit, recovery, calendar, mapping,
+review, and Protocol-v2 authorization boundaries remain unchanged.
+
 ## 2026-07-18 — Make anomaly unit health operator-visible · Codex
 **Why:** Snapshot unit validation already protected Decision logic, but the
 operator-facing anomaly report showed feature availability without saying
