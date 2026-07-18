@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-16T08:31:35+00:00`
+- generated_at: `2026-07-18T00:53:02+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -855,7 +855,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v4 records the owner-confirmed primary research
+Execution-quality readiness v5 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -863,14 +863,19 @@ active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled, non-prelisting
 contracts. The exact resulting instrument IDs remain unfrozen until the
 Protocol-v2 annex is sealed.
 
-The first adapter slice is deliberately offline: it validates supplied V5
-instrument and order-book payloads, preserves provider/snapshot clocks and
-book sequence, and derives spread, USDT depth bands, and USDT-notional price
-impact without treating USDT as USD. It has no HTTP client, credential access,
-private-data operation, or order method. Live activation remains blocked by
-the unfrozen exact set, missing runtime provider authorization, and honest
-reachability after the recorded Bybit 403; no proxy, VPN, or region bypass is
-authorized.
+The offline slice validates supplied V5 instrument and order-book payloads,
+preserves provider/snapshot clocks and book sequence, and derives spread, USDT
+depth bands, and USDT-notional price impact without treating USDT as USD. A
+separately gated public REST adapter is now implemented but inactive. Its
+readiness command binds to the exact authoritative Radar generation and makes
+no provider call or write. Collection requires the already-present dedicated
+authorization flag, performs at most two public GETs per current Radar asset,
+requires an additional explicit `CONFIRM=1`, never retries, and has no
+credential, private-data, order, trading, send, or artifact-write surface. Its
+stdout-only probe is not campaign authority or Protocol-v2 evidence. The
+unfrozen exact set, absent runtime authorization, and honest reachability after
+the recorded Bybit 403 remain blockers; 403/429 or regional restrictions stop
+immediately, and no proxy, VPN, alternate host, or region bypass is authorized.
 
 The remaining human decisions stay explicit:
 
@@ -887,9 +892,12 @@ The remaining human decisions stay explicit:
 - Execution quality: inspect with `make radar-execution-quality-readiness
   PYTHON=.venv/bin/python` (static/no-network), then run the checked offline
   normalizer with `make radar-execution-quality-bybit-smoke
-  PYTHON=.venv/bin/python`. Bybit perpetual is selected, but live spread remains
-  unavailable and there is nothing to disable because no live adapter or
-  provider process is active.
+  PYTHON=.venv/bin/python`. The live-boundary readiness command is `make
+  radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`; it remains
+  no-call/no-write. Bybit perpetual is selected and the adapter exists, but live
+  spread remains unavailable while it is inactive. Collection is disabled by
+  unsetting `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE`; no provider
+  process or order path exists.
 - Phone access: private and public readiness/status are non-enabling checks.
   Either route requires its exact `CONFIRM=1 ...-enable` command and is rolled
   back only with the matching confirmed disable command; neither is enabled by

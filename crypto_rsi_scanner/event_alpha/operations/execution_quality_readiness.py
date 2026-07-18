@@ -1,9 +1,10 @@
 """Static, no-network execution-quality selection and readiness contract.
 
 The owner selected Bybit USDT-linear perpetuals with public market data only.
-This report records that choice while stopping before provider authorization or
-live-adapter activation.  It reads no environment, credentials, files, provider
-state, or holdout data and performs no writes or network calls.
+This report records that choice and the separately gated public REST adapter
+while stopping before provider authorization or live activation.  It reads no
+environment, credentials, files, provider state, or holdout data and performs
+no writes or network calls.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v4"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v5"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 COMMON_METRICS = (
     "best_bid",
@@ -347,7 +348,7 @@ VENUE_CAPABILITIES = (
         venue_id="bybit",
         display_name="Bybit",
         implementation_status=(
-            "selected_offline_normalizer_ready_live_egress_reachability_unverified"
+            "selected_public_REST_adapter_ready_inactive_live_egress_reachability_unverified"
         ),
         execution_modes=("spot", "perpetual"),
         market_data_access="public_market_data_no_credentials_expected",
@@ -459,7 +460,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
 
     return ExecutionQualityReadiness(
         contract_version=CONTRACT_VERSION,
-        status="execution_surface_selected_live_adapter_blocked",
+        status="execution_surface_selected_live_adapter_inactive",
         selected_venue="bybit",
         selected_execution_mode="perpetual",
         intended_venue="bybit",
@@ -503,7 +504,9 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         supported_offline_adapters=(
             "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
         ),
-        supported_live_adapters=(),
+        supported_live_adapters=(
+            "bybit_usdt_linear_perpetual_public_REST_v1",
+        ),
         supported_interface_modes=EXECUTION_MODES,
         feasible_venues=VENUE_CAPABILITIES,
         multiple_venue_research_option=MULTI_VENUE_RESEARCH_OPTION,
@@ -511,7 +514,6 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         selection_blockers=(
             "eligible_instrument_set_not_frozen",
             "bybit_public_endpoint_reachability_unverified_after_recorded_403",
-            "no_live_execution_quality_adapter_implemented",
             "runtime_provider_authorization_not_created_by_operator_selection",
             "USDT_to_USD_cost_unit_policy_not_sealed",
             "protocol_v2_annex_not_sealed",
@@ -526,18 +528,18 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "the_recorded_403_must_fail_closed_without_proxy_VPN_or_region_bypass",
         ),
         next_safe_command=(
-            "make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python"
+            "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
         ),
         authorization_boundary=(
             "the_operator_choice_confirms_public_only_research_scope_but_does_not_"
             "create_runtime_provider_authorization_or_permit_private_data_orders_or_trading"
         ),
-        expected_provider_activity="none_offline_fixture_normalization_only",
+        expected_provider_activity="none_static_readiness_only",
         rollback_disable_command=(
-            "none_required_no_live_adapter_provider_process_or_order_path_is_active"
+            "unset_RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE_if_later_enabled"
         ),
         spread_provider_status=(
-            "bybit_selected_offline_contract_only_live_spread_unavailable"
+            "bybit_public_adapter_ready_inactive_live_spread_unavailable"
         ),
         public_market_data_scope_confirmed=True,
         public_market_data_permission_requested=False,
@@ -586,7 +588,7 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         "expected_public_private_data_boundary="
         f"{result.expected_public_private_data_boundary}",
         "supported_offline_adapters=" + ",".join(result.supported_offline_adapters),
-        "supported_live_adapters=none",
+        "supported_live_adapters=" + ",".join(result.supported_live_adapters),
         "read_only=true provider_calls=0 provider_call_planned=false provider_call_attempted=false",
         "credentials_read=false network_called=false writes_performed=false",
         "research_only=true",
@@ -668,9 +670,10 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
     lines.extend(
         (
             "",
-            "Bybit USDT-linear perpetuals are selected for public-data research. "
-            "No provider call, credential read, live-adapter activation, private-data "
-            "read, trade, order, or execution action is authorized by this report.",
+            "Bybit USDT-linear perpetuals are selected for public-data research and "
+            "the bounded adapter is implemented but inactive. No provider call, "
+            "credential read, live-adapter activation, private-data read, trade, "
+            "order, or execution action is authorized by this static report.",
         )
     )
     return "\n".join(lines)

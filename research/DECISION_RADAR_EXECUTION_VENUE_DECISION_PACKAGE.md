@@ -1,11 +1,12 @@
 # Decision Radar execution-venue decision package
 
 Status: **operator decision confirmed: Bybit USDT-linear perpetuals, public
-market data only; no live provider adapter, credential, private-data access,
-order path, or trading permission is active**.
+market data only; the bounded public adapter is implemented but inactive, and
+no credential, private-data access, order path, or trading permission is
+active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v4`. Run
+`crypto_radar_execution_quality_readiness_v5`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -53,9 +54,14 @@ private account data, wallet access, an order endpoint, or permission to trade.
 - Prove the official public endpoint is honestly reachable. The recorded 403
   remains a blocker and must not be bypassed with a proxy, VPN, or alternate
   region route chosen by the code.
-- Add a separately reviewed, authorization-gated public-read adapter only after
-  reachability is established. The current implementation is an offline
-  fixture parser and request description only.
+- Keep the implemented public-read adapter inactive until its dedicated runtime
+  authorization already exists. Its readiness binds to one exact authoritative
+  Radar generation without a provider call or write. A collection attempt may
+  run only through the additional explicit `CONFIRM=1` boundary, use at most
+  two public GETs per current Radar asset, make no retries, and stop on the
+  first 403, 429, regional restriction, malformed response, or authority
+  failure. Its stdout-only result is not yet an immutable campaign artifact or
+  Protocol-v2 evidence.
 - Seal point-in-time sources, partitions/untouched holdout, outcomes, fees,
   spread/depth/impact rules, latency, universe, routes, episodes, and minimum
   samples in the Protocol-v2 annex.
@@ -67,18 +73,24 @@ The safe implementation smoke is:
 
 ```sh
 make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
+make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
 ```
 
-It reads checked fixtures, performs no network call, reads no credential, and
-has no private-data or order operation. Static current truth remains available
-through `make radar-execution-quality-readiness PYTHON=.venv/bin/python`.
+Both commands perform no network call, read no credential, and have no
+private-data or order operation. Static current truth remains available through
+`make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
+already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
+separate `radar-execution-quality-bybit-collect` target to cross the public
+provider boundary, and that target additionally requires `CONFIRM=1`; unsetting
+the flag disables collection.
 
 ## Current boundary
 
 - Protocol-v2 executable protocol remains unfrozen and blocked.
 - Bybit USDT-linear perpetuals are selected as the intended primary surface.
 - The exact bounded instrument set is not yet frozen.
-- No execution-quality live adapter exists; live spread remains unavailable.
+- The execution-quality live adapter exists but is inactive; live spread
+  remains unavailable.
 - Current Bybit reachability remains unverified after the recorded 403.
 - No provider call is planned or attempted by readiness.
 - No Protocol-v2 holdout is defined, opened, or evaluated.

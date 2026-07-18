@@ -16,6 +16,32 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Complete evidence acquisition before any Decision Radar retuning
+**Status:** accepted
+**Decision:** Advance Protocol v2 in this order: maintain cadence-eligible
+authorized no-send market observations and reconcile every terminal campaign
+state; collect venue-native Bybit USDT-linear perpetual spread, depth, impact,
+clock, and instrument identity; collect direct point-in-time 1h/4h and review
+latency; activate authoritative catalyst, unlock, derivatives, DEX/on-chain,
+fundamental, and official-macro context; resolve missing outcomes and complete
+the frozen source-independence human labels; accumulate independent route
+episodes; then seal venue, universe, costs, sources, outcomes, partitions,
+minimum samples, and untouched holdout in the Protocol-v2 annex before any v2
+evaluation. Do not adjust anomaly thresholds, Decision scores, route policy, or
+RSI conviction from the sparse live campaign or Protocol-v1 final-test evidence.
+Recurring Daily Operations installation remains a separate explicit human
+confirmation. Every provider uses its own already-present authorization; no
+authorization, retry bypass, proxy, VPN, or alternate-region route is created.
+**Why:** The current campaign has useful turnover/volume history but no warm
+1h/4h evidence and no observed spread coverage. Tuning on those gaps would
+convert missing evidence into false precision and contaminate the future
+holdout. Ordered acquisition makes each later model change measurable and
+pre-registered.
+**Revisit when:** The exact Protocol-v2 annex is sealed against sufficient
+independent, point-in-time evidence and its untouched holdout remains unopened;
+then algorithm candidates may be proposed through that protocol rather than
+applied directly.
+
 ## 2026-07-17 - Select Bybit USDT-linear perpetuals for execution-quality research
 **Status:** accepted
 **Decision:** Use Bybit USDT-linear perpetuals as Decision Radar's intended

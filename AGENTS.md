@@ -343,12 +343,20 @@ may be added later when a suitable environment already exists.
   contracts and freezes the resulting IDs only in the Protocol-v2 annex. Run
   `make radar-execution-quality-bybit-smoke` for the offline fixture normalizer;
   it preserves clocks/sequence and computes spread, USDT depth, and
-  USDT-notional impact without an HTTP client or silent USD conversion. The
-  recorded Bybit 403 remains an honest reachability blocker; never use a proxy,
-  VPN, or region bypass. The selection creates no runtime provider
-  authorization, credential/private-data permission, order permission, or
-  trading permission. Do not activate a live adapter or add execution/order
-  behavior without a separate explicit boundary.
+  USDT-notional impact without silent USD conversion. The separately gated
+  public REST adapter is implemented but inactive. `make
+  radar-execution-quality-bybit-readiness` binds to the exact authoritative
+  Radar generation with no provider call or write. Collection requires the
+  already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the
+  exact `CONFIRM=1` target, performs at most two fixed-host public GETs per
+  current asset, follows no redirects, ignores ambient proxies, makes no
+  retries, and writes no artifact. Its stdout-only probe is not campaign
+  authority or Protocol-v2 evidence. The recorded Bybit 403 remains an honest
+  reachability blocker; stop on 403/429/region restriction and never use a
+  proxy, VPN, alternate host, or region bypass. The selection/readiness never
+  creates runtime authorization, credential/private-data permission, order
+  permission, or trading permission. Unset the authorization flag to disable
+  the collection boundary; no provider process or order surface exists.
 - **Empirical Protocol-v2 readiness:**
   `make radar-research-protocol-v2-readiness` renders the frozen/static required
   evidence and annex contract without reading environment, files, credentials,

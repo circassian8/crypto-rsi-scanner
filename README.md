@@ -163,11 +163,21 @@ The owner selected Bybit USDT-linear perpetuals as the intended
 execution-quality surface, using public market data only. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the current
 static/no-network truth and `make radar-execution-quality-bybit-smoke
-PYTHON=.venv/bin/python` for the offline V5 fixture normalizer. The exact top-30
-Radar/active-contract intersection is not frozen, live Bybit reachability is
-unverified after the recorded 403, and no runtime authorization or live adapter
-is active. Nothing here authorizes credentials, private data, orders, or
-execution, and there is nothing to disable.
+PYTHON=.venv/bin/python` for the offline V5 fixture normalizer. The separately
+gated public REST adapter is implemented but inactive. Its read-only preflight
+is `make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`; it
+binds only to the exact authoritative Radar generation and makes no provider
+call or write. Collection remains blocked unless
+`RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` is already present, and then
+`CONFIRM=1 make radar-execution-quality-bybit-collect
+PYTHON=.venv/bin/python` performs at most two public GETs per current Radar
+asset, with no retries, credentials, private data, orders, or writes. This
+stdout-only probe is not yet a campaign artifact or Protocol-v2 evidence. The
+exact top-30 Radar/active-contract set is not frozen and live reachability
+remains unverified after the recorded 403;
+403/429/region failures stop immediately without proxy, VPN, alternate-host, or
+region bypass. Disable the provider boundary by unsetting the authorization
+flag.
 
 `make radar-calendar-preview` prints the unified macro/crypto calendar fixture
 without provider calls, artifact writes, or sends.

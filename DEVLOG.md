@@ -17,6 +17,71 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Start the evidence-first v2 program and gate public Bybit books · Codex
+**Why:** The live campaign cannot support score changes while cadence is idle,
+1h/4h baselines are cold, spread coverage is zero, and the selected Bybit
+surface has no observed execution-quality evidence. The next safe step was to
+make the evidence order explicit and prepare a real public-data boundary without
+creating authorization or pretending the recorded 403 was solved.
+**Changes:**
+- Created the active evidence-first goal and recorded its fixed order in
+  `ROADMAP.md` and `DECISIONS.md`: regular coherent no-send observations,
+  observed execution quality, direct intraday/latency evidence, authoritative
+  context, outcomes/labels, independent episodes, sealed Protocol v2, and only
+  then empirical algorithm calibration.
+- Audited current Daily Operations and campaign truth. Current CoinGecko
+  authorization was present and cadence eligible, but the scheduler remains
+  deliberately uninstalled, the newest counted observation was 2026-07-16,
+  1h/4h feature groups had zero samples, and spread coverage remained zero. A
+  manual cycle crossed no product safety boundary: its sandboxed network request
+  failed, terminal campaign truth refreshed, and the exact one-hour reservation
+  prevented another provider call. No reservation, retry, or network-policy
+  bypass was attempted.
+- Added an inactive Bybit USDT-linear perpetual public REST adapter. Its
+  no-call/no-write readiness binds to one exact authoritative Radar generation;
+  collection requires an already-present
+  `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1`, ranks at most 30 exact
+  current assets, and makes at most one instrument and one 200-level order-book
+  GET per asset behind an additional `CONFIRM=1`. It uses the fixed official
+  host, ignores ambient proxies, follows no redirects, makes no retries, stops
+  and classifies HTTP/API 403, 429, and regional restrictions, and normalizes
+  only through the existing strict USDT-denominated contract. Its stdout-only
+  probe is explicitly ineligible for campaign authority or Protocol-v2 evidence
+  until immutable request/observation integration is added.
+- Added focused mocked transport/authority/provenance tests and Make targets for
+  separate readiness and collection. Neither target creates authorization; the
+  Makefile never injects the flag. There is no credential, private-data, order,
+  execution, send, trading, paper, RSI-write, fade-trigger, artifact-write, or
+  provider-process surface.
+- Upgraded static execution readiness to v5, reconciled README, AGENTS, the
+  decision package, and the Markdown/JSON North Star, and removed the stale
+  structured North Star claim that no venue had been selected. The exact
+  instrument set, honest reachability, runtime authorization, USDT/USD rule,
+  complete v2 annex, and untouched holdout remain unresolved.
+- Refreshed the checked campaign report so its terminal attempt counts and stale
+  pointer state agree with the operational ledgers; no failed attempt was
+  misreported as a new observation.
+**Verify:** Reviewed the official Bybit V5 instrument-info and order-book
+contracts on 2026-07-18. Compileall, JSON validation, static readiness, the
+offline Bybit smoke, Protocol-v2 blocked-state check, and architecture
+cleanliness passed. The final focused Bybit/readiness/Protocol-v2 suite passed
+54 tests. `make verify-fast` ran 2,637 tests: 2,636 passed and the one real
+loopback-bind dashboard test was denied by the sandbox; that exact test passed
+separately with loopback permission. The broad run took 369.87 seconds, 9.87
+seconds above the 360-second observational review budget; its timing report
+identified the unchanged discovery-cache (143.22s) and fade-workflow (62.11s)
+files as the dominant cost, not this adapter. Full duplicate `make verify` was
+skipped because no provider was authorized or activated, no production
+generation consumed execution quality, and the broad pytest plus focused
+provider and runtime gates covered this isolated inactive boundary.
+**Notes/risks:** Current Bybit live readiness is honestly blocked by stale
+dashboard authority and absent adapter-specific authorization. The CoinGecko
+reservation is eligible again after 2026-07-18T01:29:53Z. Installing recurring
+Daily Operations still requires the human's separate exact `CONFIRM=1` command.
+No Bybit request, credential read, proxy/VPN/alternate-host bypass, dashboard
+publication, threshold change, holdout access, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-17 — Select Bybit perpetuals and add an offline execution-quality slice · Codex
 **Why:** The owner confirmed Bybit USDT-linear perpetuals as the intended
 Decision Radar execution surface, public market data only, with current

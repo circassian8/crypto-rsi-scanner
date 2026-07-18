@@ -185,7 +185,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-16T08:31:35+00:00",
+  "generated_at": "2026-07-18T00:53:02+00:00",
   "empirical_validation_lab": {
     "additional_data_needed": [
       "observed bid-ask spread and order-book execution-quality snapshots",
@@ -1110,12 +1110,15 @@
   "execution_quality_readiness": {
     "authorization_boundary": "confirmed public-market-data research scope does not create runtime provider authorization or allow credentials, private data, orders, or trading",
     "bybit_public_reachability": "unverified after recorded region-restricted 403; fail closed without proxy VPN or region bypass",
-    "contract_version": "crypto_radar_execution_quality_readiness_v4",
+    "contract_version": "crypto_radar_execution_quality_readiness_v5",
     "eligible_instrument_selection_rule": "top 30 liquidity-ranked Decision Radar assets intersected with exact active Bybit LinearPerpetual Trading USDT-quoted USDT-settled non-prelisting contracts, then frozen in the Protocol-v2 annex",
     "eligible_instrument_set_frozen": false,
     "final_live_adapter_implemented": false,
+    "live_adapter_active": false,
+    "live_adapter_contract": "exact authoritative Radar generation; separate runtime authorization plus CONFIRM=1; at most two public GETs per asset; no retries, redirects, ambient proxies, credentials, private data, orders, trading, sends, or writes; stdout-only probe is not campaign authority or Protocol-v2 evidence",
+    "public_rest_adapter_implemented": true,
     "jurisdiction_and_account_eligibility": "owner confirmed 2026-07-17 for the selected research scope",
-    "next_safe_command": "make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python",
+    "next_safe_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
     "offline_fixture_normalizer_implemented": true,
     "operator_venue_required": false,
     "provider_calls": 0,
@@ -1129,7 +1132,7 @@
       "request limits",
       "USDT spread depth and price-impact metrics"
     ],
-    "rollback_disable_command": "none; no live adapter, provider process, private-data path, or order path is active",
+    "rollback_disable_command": "unset RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE; no provider process, private-data path, or order path exists",
     "selected_execution_mode": "perpetual",
     "selected_venue": "bybit",
     "unit_boundary": "offline normalization remains USDT-denominated and never silently relabels USDT as USD"
@@ -1197,12 +1200,12 @@
       "rollback_disable_command": "CONFIRM=1 make radar-daily-ops-uninstall PYTHON=.venv/bin/python"
     },
     "execution_venue_and_spread_provider": {
-      "authorization_boundary": "operator must select venue and instrument mode before adapter design",
-      "current_status": "not_selected",
-      "expected_provider_activity": "none",
-      "implication": "spread remains unavailable and cannot qualify actionable or rapid routes",
-      "next_safe_command": "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
-      "rollback_disable_command": "none; no venue or adapter is active"
+      "authorization_boundary": "Bybit public collection requires already-present RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1 and never creates authorization, credentials, private-data, order, or trading permission",
+      "current_status": "bybit_USDT_linear_perpetual_selected_public_adapter_implemented_inactive",
+      "expected_provider_activity": "readiness none; an authorized and CONFIRM=1 collection probe uses at most two public GETs per exact current Radar asset with no retries",
+      "implication": "spread remains unavailable until a fresh authoritative generation, separate runtime authorization, and honest Bybit reachability all pass",
+      "next_safe_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
+      "rollback_disable_command": "unset RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE"
     },
     "official_calendar_acquisition": {
       "authorization_boundary": "acquire requires already-present RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE=1; BLS also needs an honest contact",
