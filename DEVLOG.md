@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Review the official OKX announcement surface · Codex
+**Why:** The source registry already named `okx_announcements`, but no adapter
+or explicit provider contract existed. Leaving the name unexplained risked
+making planned coverage look active or encouraging implementation against an
+undocumented content endpoint.
+**Changes:**
+- Reviewed only official OKX sources. Regional Help Center pages expose dated
+  listings, delistings, trading updates, suspensions, and API notices, while
+  the current v5 API guide review found no documented announcement REST or
+  WebSocket contract.
+- Added a Markdown/JSON interface review that keeps absence of a documented
+  contract distinct from absence of a product. It records the regional-source,
+  access/retention, pagination, clock, immutable-byte, request-ledger,
+  source-independence, authorization, and strict-doctor gates required before
+  activation.
+- Updated the operating agreement, durable decision, and roadmap. OKX remains
+  planned/unimplemented/unconfigured/unauthorized; no hidden endpoint, guessed
+  scraper, regional blending, provider call, parser, score, route, or authority
+  was added.
+**Verify:** Parsed the new JSON with Python, ran `git diff --check`, and checked
+all reviewed URLs and safety fields through a focused static assertion. No
+provider call, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred.
+**Notes/risks:** The operator still needs to choose the applicable OKX region
+and approve a documented machine contract or bounded public-page acquisition
+after access/retention review. The existing registry name does not satisfy
+either requirement.
+
 ## 2026-07-18 — Expose blind OOS labeling readiness · Codex
 **Why:** The frozen source-independence OOS workflow existed, but its first
 three commands required five opaque path/salt variables and there was no

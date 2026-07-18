@@ -166,6 +166,30 @@ designed, human-reviewed, versioned, and proven to preserve the same explicit
 mapped/not-applicable decisions across universe changes without inference. Do
 not weaken the current exact-universe boundary merely to reduce review work.
 
+## 2026-07-18 - Do not guess an OKX announcement transport or region
+**Status:** accepted
+**Decision:** Keep `okx_announcements` as a planned, unavailable capability
+until the operator selects the applicable official OKX region/domain and
+approves a supported acquisition contract. OKX's official Help Center exposes
+dated listing, delisting, trading, suspension, and API notices, but the current
+official v5 API guide review did not find a documented announcement REST or
+WebSocket contract. Do not invent a hidden content endpoint, scrape a guessed
+regional page, combine regional catalogs, or promote parsed Help Center HTML
+directly into authoritative catalyst or Protocol-v2 evidence. See
+`research/OKX_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
+**Why:** First-party pages can be valuable evidence, but their article sets and
+categories differ by region. A registry name or parseable page does not prove
+the correct jurisdiction, stable interface, complete pagination, access terms,
+retention rights, local observation time, or immutable source chain. Guessing
+those fields would turn an authoritative-looking source into unreviewable
+evidence.
+**Revisit when:** The applicable region and access/retention contract are
+explicitly approved. Begin with an offline parser against operator-reviewed
+immutable bytes; any live path still requires separate authorization, bounded
+no-redirect/no-retry acquisition, raw-byte fingerprints, request ledger,
+coverage/freshness/health state, strict doctor, and an explicit Protocol-v2
+annex decision. Never use alternate hosts, proxies, VPNs, or region bypasses.
+
 ## 2026-07-18 - Preserve official announcement windows without inventing time
 **Status:** accepted
 **Decision:** Canonical announcement evidence must preserve separately the

@@ -1,0 +1,55 @@
+{
+  "decision": "do_not_implement_or_promote_until_region_and_access_contract_are_approved",
+  "provider_registry_id": "okx_announcements",
+  "provider_status": "planned_unimplemented_unconfigured_unauthorized",
+  "protocol_v2_eligible": false,
+  "provider_call_performed": false,
+  "research_only": true,
+  "reviewed_at": "2026-07-18",
+  "reviewed_sources": [
+    {
+      "finding": "global official Help Center exposes dated announcement categories and current notices",
+      "url": "https://www.okx.com/help/category/announcements"
+    },
+    {
+      "finding": "US official Help Center exposes a region-specific latest-announcement set",
+      "url": "https://www.okx.com/en-us/help/section/announcements-latest-announcements"
+    },
+    {
+      "finding": "API announcements is a human-readable Help Center category, not a documented announcement API contract",
+      "url": "https://www.okx.com/en-us/help/section/announcements-api"
+    },
+    {
+      "finding": "current v5 API guide documents regional REST and WebSocket contracts; this review found no announcement endpoint or stream contract",
+      "url": "https://www.okx.com/docs-v5/en/"
+    }
+  ],
+  "known_source_characteristics": {
+    "first_party_help_center": true,
+    "dated_articles": true,
+    "explicit_categories": true,
+    "regional_coverage_differs": true,
+    "documented_machine_announcement_contract_found": false
+  },
+  "revisit_requires": [
+    "applicable_official_region_and_domain_selection",
+    "documented_machine_contract_or_explicit_bounded_public_page_approval",
+    "applicable_terms_and_retention_review",
+    "category_article_pagination_and_clock_contract",
+    "explicit_provider_authorization",
+    "bounded_no_send_capture",
+    "immutable_accepted_source_bytes",
+    "request_ledger_and_source_coverage",
+    "strict_doctor",
+    "explicit_protocol_v2_annex_selection"
+  ],
+  "safety": {
+    "authorization_created": false,
+    "event_alpha_triggered_fade_created": 0,
+    "normal_rsi_signal_rows_written": 0,
+    "paper_trades_created": 0,
+    "telegram_sends": 0,
+    "trades_or_orders_created": 0
+  },
+  "schema_version": "okx_announcement_interface_review_v1"
+}

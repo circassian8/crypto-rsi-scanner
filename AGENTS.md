@@ -1028,6 +1028,13 @@ work.
   authoritative capture surface, or admit it to Protocol-v2 evidence until the
   exact current official interface contract and terms are accessible and
   reviewed. See `research/BINANCE_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
+  `okx_announcements` is likewise a planned capability, not an active provider.
+  OKX's official regional Help Center pages expose useful dated notices, but the
+  current v5 API guide review found no documented announcement API/stream. Do
+  not guess a hidden content endpoint or scrape a guessed region. First select
+  the applicable official region and approve either a documented interface or a
+  bounded public-page acquisition contract; see
+  `research/OKX_ANNOUNCEMENT_INTERFACE_REVIEW.md` / `.json`.
   Ticker-only/ambiguous asset matches must stay below trigger confidence.
   The default manual alias file is `event_discovery_aliases.json`; fixture
   aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture
