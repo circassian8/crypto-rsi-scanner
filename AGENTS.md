@@ -382,7 +382,17 @@ may be added later when a suitable environment already exists.
   mapping prerequisite; fixtures, names/symbols, missing decisions, identity
   drift, and altered canonical projections never do. Mapping eligibility alone
   grants no authorization, transport, evidence authority, or Protocol-v2
-  admission.
+  admission. For the live campaign, start with
+  `make radar-fundamentals-defillama-mapping-review`: it resolves and strictly
+  revalidates only the current dashboard pointer, binds the exact live/no-send
+  CoinGecko universe, and prints a directly fillable but intentionally invalid
+  operator-registry template. It makes no call or write. Every placeholder,
+  `pending` status, empty note, and false confirmation must be replaced by a
+  real human decision. Re-run the same target with
+  `DEFILLAMA_MAPPING_REGISTRY=/absolute/path/operator-registry.json` to validate
+  the completed file against whatever universe is current then; membership or
+  order drift remains an explicit blocker rather than carrying a prior mapping
+  forward.
   See `research/DEFILLAMA_PROTOCOL_FUNDAMENTALS_INTERFACE_REVIEW.md` / `.json`.
 - **Chain-native DEX/on-chain input:** `make
   radar-dex-onchain-evm-v2-smoke` validates one exact offline

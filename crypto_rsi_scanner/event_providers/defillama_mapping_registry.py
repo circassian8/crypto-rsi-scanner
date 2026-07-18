@@ -72,6 +72,45 @@ def build_mapping_review(market_rows: Sequence[Mapping[str, object]]) -> dict[st
     }
 
 
+def build_operator_registry_template(
+    review: Mapping[str, object],
+) -> dict[str, Any]:
+    """Return a deliberately incomplete, directly fillable operator registry.
+
+    The template carries the exact reviewed identities and universe digest but
+    cannot pass ``normalize_mapping_registry`` until a human replaces every
+    placeholder, chooses ``mapped`` or ``not_applicable`` for every row, adds
+    an explicit note, and confirms each decision.
+    """
+
+    assets = _review_assets(review)
+    return {
+        "schema_id": REGISTRY_SCHEMA_ID,
+        "schema_version": SCHEMA_VERSION,
+        "provider": "defillama",
+        "registry_id": "REPLACE_WITH_DEFILLAMA_MAP_V1_REGISTRY_ID",
+        "registry_mode": "operator",
+        "reviewed_at": "REPLACE_WITH_UTC_TIMESTAMP",
+        "reviewed_by": "REPLACE_WITH_REVIEWER_ALIAS",
+        "market_universe_sha256": review["market_universe_sha256"],
+        "mappings": [
+            {
+                "canonical_asset_id": asset["canonical_asset_id"],
+                "coingecko_asset_id": asset["coingecko_asset_id"],
+                "symbol": asset["symbol"],
+                "mapping_status": PENDING,
+                "protocol_list_id": None,
+                "protocol_slug": None,
+                "protocol_name": None,
+                "review_note": "",
+                "reviewer_confirmed": False,
+            }
+            for asset in assets
+        ],
+        "research_only": True,
+    }
+
+
 def normalize_mapping_registry(
     raw: bytes,
     *,

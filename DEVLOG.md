@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Bind DefiLlama mapping review to current authority · Codex
+**Why:** The twentieth campaign cycle changed the exact 30-asset universe, so
+the previously recorded universe digest was already stale. A human mapping
+workflow tied to a copied market-row path could therefore validate the wrong
+membership/order or require brittle manual path discovery.
+**Changes:**
+- Added `make radar-fundamentals-defillama-mapping-review`. It resolves only
+  the strict current dashboard pointer, reuses its fingerprinted live/no-send
+  CoinGecko observations and universe audit, and binds namespace, run,
+  revision, operator-state digest, authority check, identities, names, order,
+  and exact universe digest into one read-only operator packet.
+- Added a directly fillable operator-registry template. It is deliberately
+  invalid while any placeholder, `pending` status, empty note, or false human
+  confirmation remains; no name/symbol inference or automatic carry-forward
+  is possible. Supplying `DEFILLAMA_MAPPING_REGISTRY=...` validates a completed
+  registry against whatever authority is current at that moment.
+- The live packet reports universe digest
+  `15f57c88d7a1e11ab987a83abe0121650d38bbd0a6a59189fc6c2382ecab0178`,
+  30 unreviewed assets, and the four exact missing-registry/cardinality/digest/
+  review blockers. Updated the accepted decision, operator contract, and
+  roadmap, including the twentieth-cycle campaign row that still described
+  the nineteenth authority.
+**Verify:** 54 focused DefiLlama mapping and dashboard-readiness tests pass;
+Python compileall passes; the fixture mapping smoke remains complete but
+live-ineligible; the exact current-authority target returns
+`operator_action_required` with 30/30 unreviewed, zero calls, zero writes, no
+inference, no evidence authority, and no Protocol-v2 eligibility. Architecture
+cleanliness passes with zero new size violations, and `git diff --check`
+passes.
+**Notes/risks:** This does not perform the 30 human mapping decisions, call
+DefiLlama, create authorization, capture fundamentals, alter routes/scores, or
+admit anything to Protocol v2. Re-run the packet after every authority change;
+universe drift is intentionally a blocker.
+
 ## 2026-07-18 — Record twentieth no-send market cycle · Codex
 **Why:** The persisted one-hour cadence became eligible and the existing local
 CoinGecko authorization was still present. One additional genuine point-in-time

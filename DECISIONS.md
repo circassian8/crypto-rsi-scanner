@@ -151,6 +151,11 @@ A fixture registry may prove validation mechanics but cannot become live-
 mapping eligible. The review and coverage command performs no provider call or
 write, and even a complete operator registry grants neither provider
 authorization nor evidence/Protocol-v2 authority.
+The normal operator review surface must resolve the strict current dashboard
+pointer rather than accept a guessed/latest namespace. Its generated template
+is deliberately invalid until every placeholder, pending status, note, and
+confirmation is replaced by an explicit human decision; a later universe
+digest or identity change must return the registry to the review queue.
 **Why:** Token and protocol identities are not interchangeable. An apparently
 reasonable automatic join can attach TVL, fee, or revenue evidence to the wrong
 asset and manufacture a fundamental thesis. Binding the human decision to the
