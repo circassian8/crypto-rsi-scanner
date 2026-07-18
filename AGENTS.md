@@ -539,6 +539,22 @@ may be added later when a suitable environment already exists.
   content hashes, row semantics/lineage, and snapshot/anomaly/queue counts. Its
   four outputs are likewise one anchored atomic bundle. Generic empty sidecar
   files remain unavailable.
+- **Decision Radar outcome-price recovery:**
+  `make radar-outcome-price-recovery-readiness` is read-only and makes no
+  provider call. It derives only exact overdue outcome windows from the
+  canonical campaign report and its read-once market-history snapshot. The
+  diagnostic collector requires the existing general CoinGecko authorization,
+  the separate `RSI_DECISION_RADAR_OUTCOME_PRICE_RECOVERY_LIVE=1` authorization,
+  and `CONFIRM=1`; it may make at most one fixed-host CoinGecko historical-range
+  request per exact missing window, with a 20-request total bound and no retry,
+  redirect, ambient proxy, or window expansion. A response is either an honest
+  `no_results` or the first finite positive USD price inside the original
+  window, bound to the exact raw-response hash and separate acquisition and
+  historical-market clocks. The diagnostic path does not persist or apply the
+  response and never writes campaign baselines, candidates, scores, calibration
+  evidence, or Protocol-v2 evidence. Do not add an application step until an
+  immutable capture artifact and separately confirmed ledger-only mutation are
+  implemented and shown to leave the temporal baseline byte-identical.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.
   Integrated cycles normalize raw scheduled/fixture rows exactly once and bind

@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close diagnostic historical outcome-price recovery · Codex
+**Why:** The campaign proves that retained observations cannot close DEXE's
+overdue 24h outcome. A genuine historical query needs its own provenance and
+authorization boundary so it cannot be mistaken for point-in-time baseline or
+calibration evidence.
+**Changes:**
+- Added a deterministic recovery planner over the canonical campaign gap and
+  exact history fingerprint. It produces one closed CoinGecko
+  `/coins/dexe/market_chart/range` request, preserves the original due/latest
+  window, omits `interval`, and prohibits interpolation, range expansion,
+  retries, redirects, ambient proxies, and alternate identities.
+- Added no-call/no-write readiness plus a separately authorized and confirmed
+  diagnostic collector. Exact response bytes are parsed with duplicate-key,
+  schema, ordering, unit, clock, host, and plan-drift checks; the result is the
+  first finite positive USD price in-window or an honest `no_results`. Failed
+  HTTP attempts are counted once even when no response is accepted.
+- Kept historical market time distinct from acquisition time and explicitly
+  excluded recovery from campaign history/warmup, candidate generation,
+  calibration, and Protocol-v2 evidence. Persistence and outcome application
+  remain unavailable until immutable capture and a separately confirmed
+  ledger-only mutation leave baseline bytes unchanged.
+- Documented the official source contract, commands, durable decision, roadmap
+  state, and operator working agreement. Split each public value/error type into
+  its own small module to satisfy architecture ownership without an exception.
+**Verify:** 53 focused recovery/campaign/outcome tests passed; compileall,
+`git diff --check`, and architecture cleanliness passed with zero new size
+violations. Real readiness bound revision-12 authority and the exact 420-row
+history digest, planned one DEXE request, made zero provider calls/writes, and
+blocked on the absent separate recovery authorization.
+**Notes/risks:** No live recovery was attempted and no authorization was
+created. The present diagnostic path deliberately cannot persist or apply a
+price; immutable capture and ledger-only application are the next outcome slice.
+
 ## 2026-07-18 — Explain overdue outcome price gaps exactly · Codex
 **Why:** Campaign truth reported one `due_missing_price` outcome but did not say
 whether retained evidence could resolve it, whether the ledger was stale, or

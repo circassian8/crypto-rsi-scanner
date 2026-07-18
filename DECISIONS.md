@@ -16,6 +16,31 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Keep historical outcome recovery separate from campaign evidence
+**Status:** accepted
+**Decision:** Historical outcome-price recovery may query only the exact
+CoinGecko coin identity and closed missing primary-horizon window already bound
+by the canonical campaign report. Readiness is no-call/no-write. Diagnostic
+collection requires the existing general CoinGecko authorization, a separate
+recovery authorization, and explicit confirmation; it permits one fixed-host
+request per unresolved window, no retries, redirects, ambient proxy, range
+expansion, interpolation, or alternate source. The first finite positive USD
+price inside the original window may become a future outcome-completion input;
+`no_results` remains valid evidence. Acquisition time and historical market time
+must stay separate. Recovery never enters market-observation history, temporal
+warmup, candidate generation, calibration, or Protocol-v2 evidence. No outcome
+may be mutated until exact response bytes have an immutable capture and a
+separately confirmed ledger-only application proves the baseline is byte-
+identical.
+**Why:** A genuine historical series can close an operational outcome gap, but
+post-hoc acquisition is not point-in-time campaign evidence. A distinct
+authorization, exact window, immutable provenance, and ledger-only boundary
+prevent recovery from manufacturing warmup, routes, or apparent predictive
+evidence.
+**Revisit when:** Immutable capture and confirmed ledger-only application are
+implemented, or a sealed Protocol-v2 annex preregisters a different recovery
+treatment before its holdout is identified or read.
+
 ## 2026-07-18 - Keep overdue outcome price gaps explicit and non-interpolated
 **Status:** accepted
 **Decision:** A Decision Radar primary-horizon outcome may mature only from a

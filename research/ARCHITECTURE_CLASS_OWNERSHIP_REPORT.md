@@ -2,8 +2,8 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-18T09:30:25.459675+00:00`
-- public_class_count: `490`
+- generated_at: `2026-07-18T09:49:55.724595+00:00`
+- public_class_count: `493`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
 - production_classes_over_limit: `3`
