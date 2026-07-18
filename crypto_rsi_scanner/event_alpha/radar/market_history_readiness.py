@@ -10,6 +10,7 @@ from . import market_history
 
 
 MARKET_HISTORY_READINESS_SCHEMA = "event_alpha.market_history_readiness"
+MARKET_HISTORY_READINESS_SCHEMA_VERSION = 2
 
 
 def assess_market_history_readiness(
@@ -102,14 +103,21 @@ def assess_market_history_readiness(
         group: {
             "status_counts": dict(sorted(counts.items())),
             "warm_asset_count": int(counts.get("warm", 0)),
-            "warming_asset_count": int(sum(counts.values()) - counts.get("warm", 0)),
+            "warming_asset_count": int(counts.get("warming", 0)),
+            "cold_asset_count": int(counts.get("cold", 0)),
+            "other_asset_count": int(
+                sum(counts.values())
+                - counts.get("warm", 0)
+                - counts.get("warming", 0)
+                - counts.get("cold", 0)
+            ),
             "asset_count": int(sum(counts.values())),
         }
         for group, counts in group_counts.items()
     }
     return {
         "schema_id": MARKET_HISTORY_READINESS_SCHEMA,
-        "schema_version": market_history.MARKET_HISTORY_SCHEMA_VERSION,
+        "schema_version": MARKET_HISTORY_READINESS_SCHEMA_VERSION,
         "evaluated_at": market_history._iso(evaluated_at),
         "baseline_status": status,
         "baseline_observation_count": len(canonical),
@@ -236,4 +244,8 @@ def _feature_details(
     }
 
 
-__all__ = ("MARKET_HISTORY_READINESS_SCHEMA", "assess_market_history_readiness")
+__all__ = (
+    "MARKET_HISTORY_READINESS_SCHEMA",
+    "MARKET_HISTORY_READINESS_SCHEMA_VERSION",
+    "assess_market_history_readiness",
+)

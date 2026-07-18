@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T03:49:04.749573+00:00` from local artifacts only.
+Generated at `2026-07-18T04:13:33.501815+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -72,15 +72,15 @@ Research and decision support only. This report contains no trade recommendation
 
 ### Feature maturity
 
-| Feature group | Warm assets | Warming assets | Status counts |
-|---|---:|---:|---|
-| btc_eth_relative | 0 | 34 | cold=3, warming=31 |
-| returns_1h | 0 | 34 | cold=4, warming=30 |
-| returns_24h | 0 | 34 | cold=4, warming=30 |
-| returns_4h | 0 | 34 | cold=34 |
-| turnover | 27 | 7 | warm=27, warming=7 |
-| volatility | 0 | 34 | cold=3, warming=31 |
-| volume | 27 | 7 | warm=27, warming=7 |
+| Feature group | Warm | Warming | Cold | Other | Status counts |
+|---|---:|---:|---:|---:|---|
+| btc_eth_relative | 0 | 31 | 3 | 0 | cold=3, warming=31 |
+| returns_1h | 0 | 30 | 4 | 0 | cold=4, warming=30 |
+| returns_24h | 0 | 30 | 4 | 0 | cold=4, warming=30 |
+| returns_4h | 0 | 0 | 34 | 0 | cold=34 |
+| turnover | 27 | 7 | 0 | 0 | warm=27, warming=7 |
+| volatility | 0 | 31 | 3 | 0 | cold=3, warming=31 |
+| volume | 27 | 7 | 0 | 0 | warm=27, warming=7 |
 
 ## Outcomes
 

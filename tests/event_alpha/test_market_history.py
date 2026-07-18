@@ -519,6 +519,12 @@ def test_readiness_rejects_rapid_count_warmth_and_reports_every_feature_group():
     assert set(readiness["baseline_feature_readiness"]) == set(
         event_market_history.FEATURE_READINESS_GROUPS
     )
+    returns_4h = readiness["baseline_feature_readiness"]["returns_4h"]
+    assert returns_4h["status_counts"] == {"cold": 1}
+    assert returns_4h["warm_asset_count"] == 0
+    assert returns_4h["warming_asset_count"] == 0
+    assert returns_4h["cold_asset_count"] == 1
+    assert returns_4h["other_asset_count"] == 0
     assert readiness["baseline_asset_readiness"]["move-token"]["status"] == "warming"
 
 
@@ -547,6 +553,9 @@ def test_long_horizon_history_is_globally_warm_only_when_all_groups_are_warm():
     assert readiness["baseline_warm_asset_count"] == 3
     for group in event_market_history.FEATURE_READINESS_GROUPS:
         assert readiness["baseline_feature_readiness"][group]["warm_asset_count"] == 3
+        assert readiness["baseline_feature_readiness"][group]["warming_asset_count"] == 0
+        assert readiness["baseline_feature_readiness"][group]["cold_asset_count"] == 0
+        assert readiness["baseline_feature_readiness"][group]["other_asset_count"] == 0
 
     without_eth = [row for row in history if row["canonical_asset_id"] != "ethereum"]
     missing_benchmark = market_history_readiness.assess_market_history_readiness(

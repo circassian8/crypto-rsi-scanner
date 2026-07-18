@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Separate cold from warming market features · Codex
+**Why:** The campaign report's feature status counts correctly showed all 34
+4h-return assets as cold, while its aggregate `warming_asset_count` incorrectly
+counted every non-warm asset as warming. That made operator truth internally
+contradictory during the most important baseline-acquisition stage.
+**Changes:**
+- Advanced market-history readiness to schema v2 and made warm, warming, cold,
+  and other asset counts mutually exclusive and exactly reconcilable to each
+  feature group's status counts.
+- Expanded the campaign Markdown maturity table to show all four categories
+  explicitly, with focused regressions for cold and fully warm histories.
+- Regenerated the canonical campaign report from local artifacts only. Current
+  4h truth is 34 cold / 0 warming / 0 warm; current 1h truth is 4 cold / 30
+  warming / 0 warm.
+**Verify:** 38 focused market-history/cache/campaign tests passed;
+`git diff --check` passed. Campaign regeneration reported 11 cycles and four
+candidates with `provider_calls=0`; the corrected JSON counts reconcile exactly.
+**Notes/risks:** No observation, baseline threshold, route, score, provider
+authorization/call, capture, trade/order, send, paper/RSI/fade action, or Radar
+authority changed. Historical rows remain immutable; only current evaluated
+readiness and its report projection use the corrected schema.
+
 ## 2026-07-18 — Make the Bybit authorization handoff explicit · Codex
 **Why:** The execution-quality readiness report correctly blocked without its
 dedicated runtime flag, but its only next command was to rerun the same report.

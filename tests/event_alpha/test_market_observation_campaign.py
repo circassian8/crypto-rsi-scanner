@@ -278,6 +278,8 @@ def _readiness(*_args, **_kwargs):
                 "status_counts": {"warming": 2},
                 "warm_asset_count": 0,
                 "warming_asset_count": 2,
+                "cold_asset_count": 0,
+                "other_asset_count": 0,
             }
         },
     }
@@ -863,6 +865,7 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     assert b"1 provider failure and 1 blocked/preflight attempt" in first_markdown
     assert b"Duplicate observations: `0`" in first_markdown
     assert b"Conflicting duplicate observations: `0`" in first_markdown
+    assert b"| Feature group | Warm | Warming | Cold | Other | Status counts |" in first_markdown
 
     assert market_no_send_cli.main([
         "campaign-report",

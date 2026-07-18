@@ -327,8 +327,8 @@ def _feature_maturity_lines(value: Any) -> list[str]:
     if not feature_readiness:
         return ["- Feature-level maturity is not yet available in retained evidence."]
     lines = [
-        "| Feature group | Warm assets | Warming assets | Status counts |",
-        "|---|---:|---:|---|",
+        "| Feature group | Warm | Warming | Cold | Other | Status counts |",
+        "|---|---:|---:|---:|---:|---|",
     ]
     for name, raw in sorted(feature_readiness.items()):
         feature = _mapping(raw)
@@ -338,7 +338,9 @@ def _feature_maturity_lines(value: Any) -> list[str]:
         ) or "none"
         lines.append(
             f"| {_md(name)} | {_int(feature.get('warm_asset_count'))} | "
-            f"{_int(feature.get('warming_asset_count'))} | {_md(counts)} |"
+            f"{_int(feature.get('warming_asset_count'))} | "
+            f"{_int(feature.get('cold_asset_count'))} | "
+            f"{_int(feature.get('other_asset_count'))} | {_md(counts)} |"
         )
     return lines
 
