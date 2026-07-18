@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Remove stale duplicate campaign truth · Codex
+**Why:** The roadmap carried one current 22-cycle campaign row and a second
+waiting row frozen at 20 cycles with an expired request boundary. Two competing
+operator states made an otherwise coherent campaign report look ambiguous.
+**Changes:**
+- Removed the stale duplicate campaign row so the single active Protocol-v2
+  program row remains the roadmap authority for current cadence state.
+- Recorded the verified empirical interpretation of the five historical
+  candidate rows: two fixed-start DEXE episodes, three dependent repeats, one
+  matured representative, and no statistical-independence or policy claim.
+**Verify:** Rebuilt the campaign report from local artifacts with no provider
+call, inspected the closed episode/input-audit/scorecard fields, and ran Markdown
+diff/whitespace checks. The report reconciles 5 candidate rows to 2 episodes +
+3 repeats and retains `insufficient_for_policy_change`.
+**Notes/risks:** Documentation and artifact-derived reporting only. No provider
+call, authorization, route, score, threshold, outcome, review event, dashboard
+authority, send, trade, order, paper trade, RSI row, or `TRIGGERED_FADE` changed.
+
 ## 2026-07-18 — Preserve sample and elapsed-coverage maturity truth · Codex
 **Why:** `warming` was directionally correct but operationally incomplete. The
 current 30-asset universe includes assets with very different histories, so a
