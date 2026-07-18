@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Separate official announcement publication and acquisition clocks · Codex
+**Why:** The live Bybit and Binance announcement paths could treat a provider
+publication/update timestamp as `fetched_at`, erasing the actual observation
+latency and making historical source documents look point-in-time acquired.
+**Changes:**
+- Added one shared live-response stamping boundary. After the complete response
+  body or WebSocket message is read, each row receives the local UTC
+  read-completion time as canonical `fetched_at`/`provider_acquired_at`, with
+  explicit provenance; provider publication, update, and event clocks remain
+  unchanged. A provider-supplied fetch claim is retained separately rather than
+  silently trusted as the local clock.
+- Applied the boundary to direct Bybit HTTP, bounded Bybit no-send rehearsal,
+  and Binance WebSocket ingestion. Injectable acquisition clocks keep offline
+  tests deterministic. No provider was enabled or called, and authorization,
+  request budgets, routing, scores, sends, trades, orders, paper, RSI, and fade
+  behavior are unchanged.
+- Added direct-provider and integrated rehearsal assertions proving publication
+  and acquisition time remain distinct and survive into redacted official-
+  exchange artifacts.
+**Verify:** 17 focused official-exchange/provider/rehearsal tests pass; Python
+compileall passes.
+**Notes/risks:** Full `make verify` was intentionally skipped for this narrow
+timestamp-provenance correction; the focused direct and integrated paths plus
+compile gate cover the changed behavior. Bybit remains unauthorized and under
+the recorded no-retry/no-bypass reachability block; Binance remains explicit
+opt-in. No live request was made.
+
 ## 2026-07-18 — Close the current Tokenomist v5 unlock response contract · Codex
 **Why:** The generic structured-unlock loader could find Tokenomist's top-level
 `data` rows but did not understand the current v5 field names or nested cliff

@@ -22,7 +22,12 @@ import aiohttp
 
 from ... import config
 from ...event_core.models import RawDiscoveredEvent
-from .._announcement_common import fetch_announcement_events, _announcement_items, _raw_event_from_item
+from .._announcement_common import (
+    _announcement_items,
+    _announcement_items_with_acquisition_time,
+    _raw_event_from_item,
+    fetch_announcement_events,
+)
 
 log = logging.getLogger(__name__)
 
@@ -130,7 +135,13 @@ async def fetch_binance_live_items(self: Any) -> list[dict[str, Any]]:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     payload = json.loads(msg.data)
                     try:
-                        out.extend(dict(item) for item in _announcement_items(payload))
+                        acquired_at = datetime.fromtimestamp(float(self.clock()), tz=timezone.utc)
+                        out.extend(
+                            _announcement_items_with_acquisition_time(
+                                _announcement_items(payload),
+                                acquired_at=acquired_at,
+                            )
+                        )
                     except ValueError:
                         continue
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSING):

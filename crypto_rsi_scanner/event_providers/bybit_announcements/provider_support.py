@@ -18,7 +18,12 @@ from urllib.parse import urlencode, urljoin
 from urllib.request import Request, urlopen
 
 from ...event_core.models import RawDiscoveredEvent
-from .._announcement_common import fetch_announcement_events, _announcement_items, _raw_event_from_item
+from .._announcement_common import (
+    _announcement_items,
+    _announcement_items_with_acquisition_time,
+    _raw_event_from_item,
+    fetch_announcement_events,
+)
 
 log = logging.getLogger(__name__)
 
@@ -204,6 +209,7 @@ def initialize_bybit_announcement_provider(
     limit: int = 20,
     timeout: float = 10.0,
     opener: UrlOpen | None = None,
+    acquisition_clock: Callable[[], datetime] | None = None,
 ) -> None:
     self.path = path
     self.required = required
@@ -216,6 +222,7 @@ def initialize_bybit_announcement_provider(
     self.limit = limit
     self.timeout = timeout
     self.opener = opener or _urlopen_with_timeout
+    self.acquisition_clock = acquisition_clock or (lambda: datetime.now(timezone.utc))
 
 
 def fetch_bybit_announcement_events(self: Any, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
@@ -237,9 +244,14 @@ def fetch_bybit_live_events(self: Any, start: datetime, end: datetime) -> list[R
     try:
         request = build_bybit_public_request(url)
         with self.opener(request, self.timeout) as response:
-            raw = json.loads(response.read().decode("utf-8"))
+            response_bytes = response.read()
+            acquired_at = self.acquisition_clock()
+            raw = json.loads(response_bytes.decode("utf-8"))
         raise_for_bybit_api_error(raw)
-        items = _announcement_items(raw)
+        items = _announcement_items_with_acquisition_time(
+            _announcement_items(raw),
+            acquired_at=acquired_at,
+        )
     except Exception as exc:  # noqa: BLE001
         if self.required:
             raise

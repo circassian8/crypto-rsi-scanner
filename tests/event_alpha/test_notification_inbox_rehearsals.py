@@ -460,8 +460,14 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
                 artifact_namespace=namespace,
                 allow_live_preflight=True,
                 opener=opener,
+                acquisition_clock=lambda: datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
                 now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
             )
+            announcement_rows = [
+                json.loads(line)
+                for line in (namespace_dir / event_official_exchange.EXCHANGE_ANNOUNCEMENTS_FILENAME).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
             candidates = event_official_exchange.load_official_listing_candidates(namespace_dir)
             by_symbol = {str(row.get("symbol") or ""): row for row in candidates}
             ledger_rows = [
@@ -514,6 +520,14 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert report.paper_trades_created == 0
             assert report.normal_rsi_signal_rows_written == 0
             assert report.triggered_fade_created == 0
+            assert all(
+                row["raw_payload_redacted"]["provider_acquired_at"] == "2026-06-15T16:00:00+00:00"
+                for row in announcement_rows
+            )
+            assert all(
+                row["raw_payload_redacted"]["fetched_at_source"] == "local_response_read_complete"
+                for row in announcement_rows
+            )
             activation_rows = event_official_exchange_activation.load_activation_rows(namespace_dir)
             activation_by_provider = {str(row.get("provider") or ""): row for row in activation_rows}
             bybit_activation = activation_by_provider["bybit_announcements_public"]

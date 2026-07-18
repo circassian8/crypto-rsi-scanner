@@ -61,6 +61,32 @@ def _announcement_items(raw: object) -> list[Mapping[str, Any]]:
     return items
 
 
+def _announcement_items_with_acquisition_time(
+    items: Iterable[Mapping[str, Any]],
+    *,
+    acquired_at: datetime,
+) -> tuple[dict[str, Any], ...]:
+    """Bind live provider rows to the local response-read clock.
+
+    Provider publication/update fields describe the source document. They are
+    not evidence of when this process acquired the response. Preserve any
+    provider-supplied ``fetched_at`` claim separately and make the canonical
+    fetch clock the local read-completion timestamp.
+    """
+    stamp = _as_utc(acquired_at).isoformat()
+    out: list[dict[str, Any]] = []
+    for item in items:
+        row = dict(item)
+        source_fetched_at = row.get("fetched_at") or row.get("fetchedAt")
+        if source_fetched_at not in (None, ""):
+            row["source_reported_fetched_at"] = source_fetched_at
+        row["fetched_at"] = stamp
+        row["provider_acquired_at"] = stamp
+        row["fetched_at_source"] = "local_response_read_complete"
+        out.append(row)
+    return tuple(out)
+
+
 def _walk_announcement_items(raw: object) -> Iterable[Mapping[str, Any]]:
     if isinstance(raw, list):
         for item in raw:

@@ -21,7 +21,10 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request
 
 from ... import config
-from ...event_providers._announcement_common import _announcement_items
+from ...event_providers._announcement_common import (
+    _announcement_items,
+    _announcement_items_with_acquisition_time,
+)
 from ...event_providers.bybit_announcements import (
     BybitAnnouncementProvider,
     bybit_failure_message,
@@ -275,6 +278,7 @@ def run_no_send_rehearsal(
     allow_live_preflight: bool = False,
     no_send_rehearsal: bool = True,
     opener: Callable[[Request, float], Any] | None = None,
+    acquisition_clock: Callable[[], datetime] | None = None,
     now: datetime | None = None,
 ) -> tuple[BybitAnnouncementsPreflightReport, BybitAnnouncementsRehearsalReport, tuple[Path, Path, Path, Path]]:
     base = Path(namespace_dir).expanduser()
@@ -336,7 +340,12 @@ def run_no_send_rehearsal(
             artifact_namespace=artifact_namespace,
         )
         try:
-            items = _fetch_live_announcement_items(ledger, max_pages=max_pages, limit=limit)
+            items = _fetch_live_announcement_items(
+                ledger,
+                max_pages=max_pages,
+                limit=limit,
+                acquisition_clock=acquisition_clock,
+            )
         except Exception as exc:  # noqa: BLE001 - rehearsal must fail safely
             error_class = type(exc).__name__
             error_message_safe = _safe_error_message(exc)
@@ -692,7 +701,9 @@ def _fetch_live_announcement_items(
     *,
     max_pages: int,
     limit: int,
+    acquisition_clock: Callable[[], datetime] | None = None,
 ) -> tuple[Mapping[str, Any], ...]:
+    clock = acquisition_clock or (lambda: datetime.now(timezone.utc))
     items: list[Mapping[str, Any]] = []
     for page in range(1, max_pages + 1):
         provider = BybitAnnouncementProvider(
@@ -709,12 +720,17 @@ def _fetch_live_announcement_items(
         )
         request = build_bybit_public_request(provider._request_url())
         with opener(request, provider.timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            response_bytes = response.read()
+            acquired_at = clock()
+            payload = json.loads(response_bytes.decode("utf-8"))
             raise_for_bybit_api_error(payload)
         try:
-            page_items = _announcement_items(payload)
+            page_items = _announcement_items_with_acquisition_time(
+                _announcement_items(payload),
+                acquired_at=acquired_at,
+            )
         except ValueError:
-            page_items = []
+            page_items = ()
         items.extend(page_items)
         if len(page_items) < limit:
             break

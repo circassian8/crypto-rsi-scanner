@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Live announcement acquisition time is locally observed
+**Status:** accepted
+**Decision:** For live official-exchange ingestion, canonical `fetched_at` is
+the local UTC time immediately after the complete HTTP response body or
+WebSocket message is read. Provider publication, update, launch, and event
+fields remain source clocks and may not substitute for local acquisition time.
+Any provider-supplied fetch claim is preserved separately. Offline fixtures may
+retain explicitly recorded fixture clocks, but the live Bybit direct/rehearsal
+and Binance paths must stamp this boundary before shared normalization.
+**Why:** Publication time proves when a source document says it appeared; it
+does not prove when this system observed it. Conflating the clocks destroys
+latency measurement and can make post-hoc catalyst evidence look point-in-time.
+**Revisit when:** A transport supplies a stronger trusted receipt clock. Even
+then, preserve both transport receipt and local read-completion clocks rather
+than replacing one with the other.
+
 ## 2026-07-18 - Normalize current Tokenomist v5 unlocks without inventing authority
 **Status:** accepted
 **Decision:** The structured-unlock adapter targets Tokenomist's current v5

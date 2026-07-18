@@ -400,6 +400,10 @@ def test_event_discovery_binance_live_websocket_provider_parses_offline():
     assert len(events) == 1
     assert events[0].provider == "binance_announcements"
     assert events[0].title == "Binance Will List Test Live (TLIVE)"
+    assert events[0].published_at.isoformat() == "2026-06-15T09:00:00+00:00"
+    assert events[0].fetched_at.isoformat() == "2026-06-15T09:00:00+00:00"
+    assert events[0].raw_json["provider_acquired_at"] == "2026-06-15T09:00:00+00:00"
+    assert events[0].raw_json["fetched_at_source"] == "local_response_read_complete"
     assert events[0].raw_json["message_type"] == "DATA"
     assert events[0].raw_json["event"]["event_type"] == "exchange_listing"
 
@@ -473,6 +477,7 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
         limit=2,
         timeout=3.5,
         opener=fake_opener,
+        acquisition_clock=lambda: datetime(2026, 6, 15, 10, 15, tzinfo=timezone.utc),
     )
     events = provider.fetch_events(start, end)
     assert len(events) == 1
@@ -483,6 +488,9 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
     assert event.provider == "bybit_announcements"
     assert event.source_url == "https://announcements.bybit.com/en-US/article/test-live/"
     assert event.published_at.isoformat() == "2026-06-15T09:00:00+00:00"
+    assert event.fetched_at.isoformat() == "2026-06-15T10:15:00+00:00"
+    assert event.raw_json["provider_acquired_at"] == event.fetched_at.isoformat()
+    assert event.raw_json["fetched_at_source"] == "local_response_read_complete"
     assert event.raw_json["event"]["event_type"] == "exchange_listing"
     assert event.raw_json["event"]["event_time"] == "2026-06-15T12:00:00+00:00"
     assert event.raw_json["event"]["event_time_confidence"] == 1.0
