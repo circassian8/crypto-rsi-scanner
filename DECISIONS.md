@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Derive RSI only from captured closed Bybit candles
+**Status:** accepted
+**Decision:** Each authorized Bybit intraday request continues to fetch exactly
+one `interval=60` or `interval=240` response per eligible native instrument, but
+sets the response limit to 200 rather than two. Accept only a reverse-ordered,
+contiguous sequence ending at the exact latest completed candle. Derive the
+latest 14-period Wilder RSI with the scanner's shared SMA-seeded Wilder
+implementation and persist its timeframe, candle-close time, local availability
+time, source lineage, input count, unit, and no-future-data state beside the
+latest bar. Fewer than 15 closed candles is `insufficient_history` with a null
+RSI; never invent or proxy a value. The raw response remains immutable so the
+projection can be fully rederived.
+**Why:** The prior two-row request could prove the latest 1h/4h OHLCV candle but
+could never satisfy Protocol-v2's RSI technical-context requirement. Bybit's
+official V5 kline contract supports 1..1000 rows, defaults to 200, and returns
+rows in reverse start-time order, so 200 supplies bounded warmup history without
+adding a provider request. Closed-contiguous enforcement prevents an open,
+missing, or future candle from influencing RSI.
+**Revisit when:** The official kline contract or shared Wilder implementation
+changes, a genuine response exceeds the bounded payload contract, or the sealed
+Protocol-v2 annex selects a different RSI period. Any replacement must preserve
+exact native identity, closed-candle availability, immutable raw lineage,
+explicit insufficient history, no future data, and the existing request bound.
+
 ## 2026-07-18 - Use one complete Bybit catalog before per-instrument books
 **Status:** accepted
 **Decision:** Execution-quality capture v2 must request one public

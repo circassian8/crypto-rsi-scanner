@@ -33,6 +33,7 @@ _CURRENT_BLOCKERS = (
     "exact_eligible_instrument_set_not_sealed",
     "bybit_public_reachability_unproven_after_recorded_403",
     "genuine_execution_quality_capture_absent",
+    "genuine_intraday_1h_4h_and_rsi_capture_absent",
     "data_sources_not_sealed",
     "partitions_and_untouched_holdout_not_sealed",
     "outcomes_and_costs_not_sealed",
@@ -99,6 +100,7 @@ def current_progress_values() -> dict[str, Any]:
         "next_safe_commands": [
             "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
             "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
+            "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
             "make radar-research-protocol-v2-progress-check PYTHON=.venv/bin/python",
         ],
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},

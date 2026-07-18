@@ -512,10 +512,16 @@ may be added later when a suitable environment already exists.
   radar-intraday-bybit-status` validates the latest immutable capture without a
   call or write. A confirmed `radar-intraday-bybit-capture` performs exactly one
   `interval=60` and one `interval=240` public GET per eligible native
-  instrument, never retries, revalidates the capture/instrument/authority chain
-  after the final response, and publishes only a complete exact-response
-  bundle. The bundle binds the source execution-quality capture and pointer,
-  native instruments, raw bytes, request/provider clocks, normalized bars,
+  instrument, requests at most 200 reverse-ordered candles per interval within
+  the official 1..1000 bound, never retries, revalidates the
+  capture/instrument/authority chain after the final response, and publishes
+  only a complete exact-response bundle. Every response must be one contiguous
+  sequence ending at the exact latest closed candle. Its latest-bar projection
+  includes 14-period Wilder RSI from only those closed candles with exact
+  timeframe, candle-close, availability, lineage, and no-future-data fields;
+  fewer than 15 candles remains explicit `insufficient_history`. The bundle
+  binds the source execution-quality capture and pointer, native instruments,
+  raw bytes, request/provider clocks, normalized bars and RSI context,
   fingerprints, manifest, completion receipt, and latest pointer. Validation
   holds one descriptor-anchored namespace, rederives every bar from raw bytes,
   and rejects drift, symlinks, races, and pointer rollback. The standard review

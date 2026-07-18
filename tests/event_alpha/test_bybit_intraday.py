@@ -15,7 +15,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
 from crypto_rsi_scanner.event_alpha.operations.bybit_intraday import (
     BAR_SCHEMA_VERSION,
     INTERVAL_SECONDS,
+    KLINE_LIMIT,
     KLINE_PATH,
+    RSI_METHOD,
+    RSI_PERIOD,
     BybitIntradayError,
     build_bybit_kline_request,
     completed_kline_cutoff_ms,
@@ -88,7 +91,7 @@ def test_request_uses_exact_latest_completed_bucket_and_public_contract() -> Non
         "symbol": "BTCUSDT",
         "interval": "60",
         "end": "1784289599999",
-        "limit": "2",
+        "limit": "200",
     }
     assert dict(four_hour.query)["end"] == "1784289599999"
     assert completed_kline_cutoff_ms("2026-07-17T12:00:00Z", "60") == (
@@ -137,6 +140,17 @@ def test_normalizer_preserves_native_identity_units_and_latency(
     assert bar.bar_closed is True
     assert bar.point_in_time_status == "captured_after_close"
     assert bar.future_data_used is False
+    assert bar.rsi_status == "insufficient_history"
+    assert bar.rsi_timeframe == label
+    assert bar.rsi_period == RSI_PERIOD == 14
+    assert bar.wilder_rsi is None
+    assert bar.wilder_rsi_unit == "index_0_100"
+    assert bar.rsi_method == RSI_METHOD
+    assert bar.rsi_candle_close_time == end
+    assert bar.rsi_available_at == "2026-07-17T12:30:00.125000Z"
+    assert bar.rsi_source_bar_count == 2
+    assert bar.rsi_source_lineage_id == f"test.bybit.kline.{interval}"
+    assert bar.rsi_future_data_used is False
     assert bar.research_only is True
     assert "api.bybit.com/v5/market/kline" in bar.source_url
 
@@ -169,6 +183,47 @@ def test_response_identity_and_reverse_sort_are_exact() -> None:
     unsorted["result"]["list"].reverse()
     with pytest.raises(BybitIntradayError, match="sort_invalid"):
         _normalize("60", unsorted)
+
+
+def test_contiguous_closed_history_produces_point_in_time_wilder_rsi() -> None:
+    payload = _payload("60")
+    latest_start = int(payload["result"]["list"][0][0])
+    rows = []
+    for offset in range(RSI_PERIOD, -1, -1):
+        start = latest_start - offset * INTERVAL_SECONDS["60"] * 1000
+        close = 100 + (RSI_PERIOD - offset)
+        rows.append(
+            [
+                str(start),
+                str(close - 0.5),
+                str(close + 0.5),
+                str(close - 1),
+                str(close),
+                "10",
+                str(close * 10),
+            ]
+        )
+    payload["result"]["list"] = list(reversed(rows))
+
+    bar = _normalize("60", payload)
+
+    assert KLINE_LIMIT == 200
+    assert bar.rsi_status == "observed"
+    assert bar.rsi_source_bar_count == RSI_PERIOD + 1
+    assert bar.wilder_rsi == 100.0
+    assert bar.rsi_candle_close_time == bar.bar_end_at
+    assert bar.rsi_available_at == bar.response_acquired_at
+    assert bar.rsi_future_data_used is False
+
+
+def test_rsi_history_must_be_contiguous_and_end_at_latest_closed_bar() -> None:
+    payload = _payload("60")
+    payload["result"]["list"][1][0] = str(
+        int(payload["result"]["list"][1][0]) - INTERVAL_SECONDS["60"] * 1000
+    )
+
+    with pytest.raises(BybitIntradayError, match="sequence_not_contiguous"):
+        _normalize("60", payload)
 
 
 @pytest.mark.parametrize(

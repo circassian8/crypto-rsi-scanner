@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make direct Bybit intraday evidence RSI-ready · Codex
+**Why:** The direct Bybit contract requested only two candles per 1h/4h
+response. It could prove a latest closed bar but could never produce the exact
+14-period Wilder RSI context required by Protocol v2.
+**Changes:**
+- Upgraded the offline, live, bar, and immutable-capture contracts to v2. Each
+  existing request now asks for up to 200 candles—Bybit's documented default and
+  within its official 1..1000 limit—without increasing the 60-request maximum.
+- Require every accepted response to be reverse-ordered and contiguous through
+  the exact latest closed bucket. Open, future, missing, duplicate, misordered,
+  or non-contiguous candle history fails closed.
+- Derive the latest 14-period Wilder RSI through the scanner's shared
+  SMA-seeded Wilder implementation. Each bar now carries explicit observed vs
+  insufficient-history status, timeframe, period, value/unit, method,
+  candle-close time, local availability time, source count/lineage, and
+  no-future-data state. Fewer than 15 bars yields null, never a proxy.
+- Updated current Protocol-v2 progress, the operating contract, durable
+  decision, and roadmap. Genuine execution-quality, intraday, and RSI captures
+  remain absent because authorization/reachability prerequisites are unresolved.
+**Verify:** Ran 50 focused intraday/live/capture and Protocol-v2 tests, the
+offline Bybit intraday smoke, the real no-call readiness command, the Protocol-v2
+progress/check gates, `python3 -m compileall -q crypto_rsi_scanner tests`, the
+architecture size/cleanliness gates, and `git diff --check`. Synthetic 15-candle
+history produces RSI 100; two-row fixtures remain explicit insufficient history.
+**Notes/risks:** The official contract was verified at
+`https://bybit-exchange.github.io/docs/v5/market/kline`. No provider call,
+authorization mutation, proxy/VPN/alternate-host bypass, campaign attachment,
+send, trade, order, paper trade, normal RSI write, or `TRIGGERED_FADE` occurred.
+The persisted v2 projection remains Protocol-v2-ineligible until a genuine
+capture is explicitly annex-bound.
+
 ## 2026-07-18 — Make Protocol-v2 readiness lead with current truth · Codex
 **Why:** The primary readiness command printed the immutable 2026-07-16
 freeze-time blocker `execution_venue_not_selected` without first showing that

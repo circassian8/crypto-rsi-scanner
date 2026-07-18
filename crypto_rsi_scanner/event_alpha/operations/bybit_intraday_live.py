@@ -36,6 +36,9 @@ from .bybit_execution_quality_capture import (
 from .bybit_execution_quality_live import _fetch_public_json
 from .bybit_intraday import (
     INTERVAL_SECONDS,
+    KLINE_LIMIT,
+    RSI_METHOD,
+    RSI_PERIOD,
     BybitIntradayError,
     build_bybit_kline_request,
     normalize_bybit_completed_kline,
@@ -47,7 +50,7 @@ from .bybit_intraday_capture import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v1"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v2"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_PROVIDER_REQUESTS = MAX_RADAR_ASSETS * len(INTERVAL_SECONDS)
@@ -281,6 +284,10 @@ def build_bybit_intraday_live_readiness(
         "execution_mode": "perpetual",
         "quote_asset": QUOTE_ASSET,
         "intervals": ["1h", "4h"],
+        "closed_bar_history_limit_per_interval": KLINE_LIMIT,
+        "rsi_period": RSI_PERIOD,
+        "rsi_method": RSI_METHOD,
+        "rsi_context_policy": "observed_or_explicit_insufficient_history",
         "runtime_authorization_env": LIVE_AUTH_ENV,
         "runtime_provider_authorized": authorized,
         "authorization_mutated": False,

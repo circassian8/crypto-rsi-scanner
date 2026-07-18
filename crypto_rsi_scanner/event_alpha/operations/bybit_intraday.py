@@ -14,10 +14,15 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlencode
+
+import pandas as pd
+
+from ...indicators import wilder_rsi
 
 from .bybit_execution_quality import (
     BYBIT_CATEGORY,
@@ -31,13 +36,15 @@ from .bybit_execution_quality import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_v1"
-BAR_SCHEMA_VERSION = "crypto_radar.bybit_intraday_bar.v1"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_v2"
+BAR_SCHEMA_VERSION = "crypto_radar.bybit_intraday_bar.v2"
 KLINE_PATH = "/v5/market/kline"
 OFFICIAL_KLINE_DOC = "https://bybit-exchange.github.io/docs/v5/market/kline"
 INTERVAL_SECONDS = {"60": 60 * 60, "240": 4 * 60 * 60}
 INTERVAL_LABELS = {"60": "1h", "240": "4h"}
-KLINE_LIMIT = 2
+KLINE_LIMIT = 200
+RSI_PERIOD = 14
+RSI_METHOD = "wilder_rma_sma_seed"
 MAX_PROVIDER_CLOCK_SKEW_SECONDS = 60
 _INSTRUMENT_RE = re.compile(r"^[A-Z0-9]{4,32}$")
 _LINEAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -84,6 +91,17 @@ class _BybitIntradayBar:
     bar_closed: bool
     point_in_time_status: str
     future_data_used: bool
+    rsi_status: str
+    rsi_timeframe: str
+    rsi_period: int
+    wilder_rsi: float | None
+    wilder_rsi_unit: str
+    rsi_method: str
+    rsi_candle_close_time: str
+    rsi_available_at: str
+    rsi_source_bar_count: int
+    rsi_source_lineage_id: str
+    rsi_future_data_used: bool
     source_url: str
     request_lineage_id: str
     research_only: bool = True
@@ -96,6 +114,7 @@ class _BybitIntradayBar:
 # multiple public ownership classes in this behavior module.
 BybitIntradayError = _BybitIntradayError
 BybitIntradayBar = _BybitIntradayBar
+_ParsedKline = tuple[int, Decimal, Decimal, Decimal, Decimal, Decimal, Decimal]
 
 
 def _aware_utc(value: datetime | str, field: str) -> datetime:
@@ -221,6 +240,21 @@ def _validated_request(
     return interval, end_ms
 
 
+def _wilder_rsi_value(rows: Sequence[_ParsedKline]) -> tuple[str, float | None]:
+    """Compute latest Wilder RSI from only the closed rows in this response."""
+
+    if len(rows) < RSI_PERIOD + 1:
+        return "insufficient_history", None
+    closes = pd.Series(
+        [float(row[4]) for row in reversed(rows)],
+        dtype="float64",
+    )
+    value = float(wilder_rsi(closes, period=RSI_PERIOD).iloc[-1])
+    if not math.isfinite(value) or not 0.0 <= value <= 100.0:
+        raise BybitIntradayError("wilder_rsi_invalid")
+    return "observed", value
+
+
 def normalize_bybit_completed_kline(
     payload: Mapping[str, Any],
     *,
@@ -257,7 +291,7 @@ def normalize_bybit_completed_kline(
     if provider_at > acquired + timedelta(seconds=MAX_PROVIDER_CLOCK_SKEW_SECONDS):
         raise BybitIntradayError("bybit_kline_provider_clock_future")
 
-    parsed_rows: list[tuple[int, Decimal, Decimal, Decimal, Decimal, Decimal, Decimal]] = []
+    parsed_rows: list[_ParsedKline] = []
     seen_starts: set[int] = set()
     for index, raw in enumerate(rows):
         if not isinstance(raw, list) or len(raw) != 7:
@@ -289,6 +323,11 @@ def normalize_bybit_completed_kline(
     exact = [row for row in parsed_rows if row[0] == expected_start_ms]
     if len(exact) != 1:
         raise BybitIntradayError("latest_completed_kline_missing")
+    expected_starts = [
+        expected_start_ms - index * interval_ms for index in range(len(parsed_rows))
+    ]
+    if [row[0] for row in parsed_rows] != expected_starts:
+        raise BybitIntradayError("completed_kline_sequence_not_contiguous")
     start_ms, open_price, high_price, low_price, close_price, volume, turnover = exact[0]
     end_ms = start_ms + interval_ms
     end_at = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc)
@@ -302,6 +341,7 @@ def normalize_bybit_completed_kline(
     requested_end_at = datetime.fromtimestamp(
         (requested_end_ms + 1) / 1000, tz=timezone.utc
     )
+    rsi_status, latest_rsi = _wilder_rsi_value(parsed_rows)
     return BybitIntradayBar(
         schema_version=BAR_SCHEMA_VERSION,
         venue_id="bybit",
@@ -336,6 +376,17 @@ def normalize_bybit_completed_kline(
         bar_closed=True,
         point_in_time_status="captured_after_close",
         future_data_used=False,
+        rsi_status=rsi_status,
+        rsi_timeframe=INTERVAL_LABELS[interval],
+        rsi_period=RSI_PERIOD,
+        wilder_rsi=latest_rsi,
+        wilder_rsi_unit="index_0_100",
+        rsi_method=RSI_METHOD,
+        rsi_candle_close_time=_iso(end_at),
+        rsi_available_at=_iso(acquired),
+        rsi_source_bar_count=len(parsed_rows),
+        rsi_source_lineage_id=request_lineage_id,
+        rsi_future_data_used=False,
         source_url=_request_url(request),
         request_lineage_id=request_lineage_id,
     )
@@ -421,8 +472,11 @@ __all__ = (
     "CONTRACT_VERSION",
     "INTERVAL_LABELS",
     "INTERVAL_SECONDS",
+    "KLINE_LIMIT",
     "KLINE_PATH",
     "OFFICIAL_KLINE_DOC",
+    "RSI_METHOD",
+    "RSI_PERIOD",
     "BybitIntradayBar",
     "BybitIntradayError",
     "build_bybit_kline_request",
