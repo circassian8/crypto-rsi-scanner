@@ -1,0 +1,170 @@
+{
+  "schema_id": "decision_radar.evm_v2_pool_rpc_bundle",
+  "schema_version": 1,
+  "capture_mode": "fixture",
+  "provider_id": "fixture_evm_rpc",
+  "network_name": "ethereum",
+  "chain_id": "eip155:1",
+  "dex_id": "uniswap_v2",
+  "pool_contract_family": "uniswap_v2_compatible",
+  "pool_address": "0x3333333333333333333333333333333333333333",
+  "token0": {
+    "canonical_asset_id": "usd-coin",
+    "contract_address": "0x1111111111111111111111111111111111111111",
+    "symbol": "USDC"
+  },
+  "token1": {
+    "canonical_asset_id": "ethereum",
+    "contract_address": "0x2222222222222222222222222222222222222222",
+    "symbol": "WETH"
+  },
+  "research_only": true,
+  "rpc_exchanges": [
+    {
+      "request_started_at": "2026-07-18T12:00:00.000Z",
+      "response_received_at": "2026-07-18T12:00:00.100Z",
+      "duration_ms": 80,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_chainId",
+        "params": []
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0x1"
+      }
+    },
+    {
+      "request_started_at": "2026-07-18T12:00:00.100Z",
+      "response_received_at": "2026-07-18T12:00:00.200Z",
+      "duration_ms": 75,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "eth_getBlockByNumber",
+        "params": ["finalized", false]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "number": "0x1312d00",
+          "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "timestamp": "0x665a6480"
+        }
+      }
+    },
+    {
+      "request_started_at": "2026-07-18T12:00:00.200Z",
+      "response_received_at": "2026-07-18T12:00:00.300Z",
+      "duration_ms": 70,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "eth_call",
+        "params": [
+          {
+            "to": "0x3333333333333333333333333333333333333333",
+            "data": "0x0dfe1681"
+          },
+          "0x1312d00"
+        ]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": "0x0000000000000000000000001111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "request_started_at": "2026-07-18T12:00:00.300Z",
+      "response_received_at": "2026-07-18T12:00:00.400Z",
+      "duration_ms": 72,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "eth_call",
+        "params": [
+          {
+            "to": "0x3333333333333333333333333333333333333333",
+            "data": "0xd21220a7"
+          },
+          "0x1312d00"
+        ]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": "0x0000000000000000000000002222222222222222222222222222222222222222"
+      }
+    },
+    {
+      "request_started_at": "2026-07-18T12:00:00.400Z",
+      "response_received_at": "2026-07-18T12:00:00.500Z",
+      "duration_ms": 77,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "eth_call",
+        "params": [
+          {
+            "to": "0x3333333333333333333333333333333333333333",
+            "data": "0x0902f1ac"
+          },
+          "0x1312d00"
+        ]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": "0x0000000000000000000000000000000000000000000000000000011f71fb04500000000000000000000000000000000000000000000000358a750421f4a0100000000000000000000000000000000000000000000000000000000000665a641c"
+      }
+    },
+    {
+      "request_started_at": "2026-07-18T12:00:00.500Z",
+      "response_received_at": "2026-07-18T12:00:00.600Z",
+      "duration_ms": 68,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "eth_call",
+        "params": [
+          {
+            "to": "0x1111111111111111111111111111111111111111",
+            "data": "0x313ce567"
+          },
+          "0x1312d00"
+        ]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+      }
+    },
+    {
+      "request_started_at": "2026-07-18T12:00:00.600Z",
+      "response_received_at": "2026-07-18T12:00:00.700Z",
+      "duration_ms": 65,
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "eth_call",
+        "params": [
+          {
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0x313ce567"
+          },
+          "0x1312d00"
+        ]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000012"
+      }
+    }
+  ]
+}

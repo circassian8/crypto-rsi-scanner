@@ -332,6 +332,18 @@ may be added later when a suitable environment already exists.
   pointer, receipt, snapshot, source-coverage, and accepted raw-source hash
   attestation; an unavailable attempt never replaces it. Unlinked calendar
   events remain context/risk only and cannot manufacture directional bias.
+- **Chain-native DEX/on-chain input:** `make
+  radar-dex-onchain-evm-v2-smoke` validates one exact offline
+  Uniswap-v2-compatible JSON-RPC bundle. The contract binds `eth_chainId`, one
+  node-reported finalized block, pair `token0`/`token1`/`getReserves`, and token
+  decimals; all state calls must use the exact returned block number. It emits
+  token-unit reserve context only and never estimates USD liquidity, direction,
+  actionability, or execution quality. The module has no HTTP client and the
+  fixture makes no call or write. An unpersisted operator-local import is input-
+  shape evidence only: it remains non-authoritative, campaign-detached, annex-
+  unbound, and Protocol-v2-ineligible until a separately authorized immutable
+  capture is implemented and selected in the annex. Do not reuse the v2 ABI for
+  v3/v4 or other pool families.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
   the owner-confirmed Bybit USDT-linear perpetual public-data research surface

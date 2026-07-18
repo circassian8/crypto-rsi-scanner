@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close the first chain-native DEX pool input contract · Codex
+**Why:** The existing DEX/on-chain fixture layer demonstrated product mechanics
+but could not prove exact block identity, pair identity, native reserves, or
+direct-source lineage for future Protocol-v2 evidence.
+**Changes:**
+- Added a narrow offline Uniswap-v2-compatible JSON-RPC normalizer. It requires
+  exact chain ID, one node-reported finalized block, pair token identity and
+  reserves, token decimals, ordered request/response clocks, canonical ABI
+  widths, and one raw-source digest; every state call is pinned to the exact
+  returned block number.
+- Added two explicit point-in-time reserve context rows with base/token units.
+  The contract refuses to estimate USD liquidity or infer price, direction,
+  actionability, or catalyst causality. Fixture and unpersisted operator-import
+  modes remain non-authoritative, campaign-detached, annex-unbound, and
+  Protocol-v2-ineligible.
+- Added a no-call/no-write Make smoke, a deterministic fixture bundle, and
+  focused failures for dynamic/different block tags, chain/token mismatch,
+  malformed ABI, RPC errors, duplicate JSON keys, duplicate IDs, reordered
+  responses, and symlink leaves. Recorded the narrow v2-only boundary in the
+  working agreement, roadmap, and durable decisions.
+**Verify:** `tests/event_alpha/test_evm_v2_pool_snapshot.py` passes 12 tests;
+the Make smoke renders the exact projection; Python compileall passes; and
+architecture cleanliness passes with zero new size violations and zero
+internal/test/documentation old-import references.
+**Notes/risks:** No EVM RPC provider, genuine pool registry, live authorization,
+HTTP client, immutable capture, campaign attachment, score, threshold, route,
+send, trade, order, paper trade, normal RSI write, or Event Alpha fade behavior
+was added. A genuine source selection and separate authorization remain human
+decisions.
+
 ## 2026-07-18 — Prove the closed Daily Operations publication path live · Codex
 **Why:** The single-coordinator fix needed one genuine cadence-eligible cycle to
 prove that observation, publication, owned restart, final receipts, terminal

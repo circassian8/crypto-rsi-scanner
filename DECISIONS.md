@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Start DEX/on-chain evidence with exact finalized EVM pool state
+**Status:** accepted
+**Decision:** The first chain-native DEX/on-chain input contract covers only one
+Uniswap-v2-compatible pair per bundle. It must bind `eth_chainId`, one
+node-reported `finalized` block, pair `token0`, `token1`, and `getReserves`
+calls, plus both token `decimals` calls. Every state call uses the exact numeric
+block returned by the finalized-block query; `latest`, `safe`, `finalized`, or a
+different number at the call boundary fails closed. The normalizer cross-checks
+chain, pair, token, block, ABI widths, clocks, units, and exact source digest.
+It emits token-unit reserve context only: no USD liquidity, price, direction,
+actionability, or causal catalyst is inferred. Fixture bundles and unpersisted
+operator-local imports cannot become evidence authority, campaign input, or
+Protocol-v2 evidence. An operator import may prove only that its input shape is
+eligible for a future immutable capture. The implementation has no HTTP client,
+provider authorization, credential read, send, trade, order, paper trade, RSI
+write, or Event Alpha fade path.
+**Why:** The existing GeckoTerminal/CoinGecko DEX/DefiLlama fixture layer has
+useful product mechanics but lacks native block identity and exact direct-source
+lineage. Ethereum JSON-RPC supports state calls at a specific block, and the
+Uniswap v2 pair interface exposes exact token identity and reserves. Binding
+those calls to one node-reported finalized block provides honest point-in-time
+context without treating an aggregator estimate or reserve ratio as execution
+quality, USD liquidity, or directional evidence.
+**Revisit when:** A specific compliant EVM RPC source and exact pool/contract
+registry are selected for an independently authorized immutable capture, or a
+different DEX contract family gets its own reviewed native-state contract. Do
+not generalize the v2 ABI to v3/v4 or other pool designs.
+
 ## 2026-07-18 - Make Daily Operations the sole live market authority coordinator
 **Status:** accepted
 **Decision:** A live CoinGecko observation may be collected only through the
