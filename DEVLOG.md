@@ -37,7 +37,11 @@ clean current source tree.
 **Verify:** All 48 provider-activation, doctor-conflict, and notification-rehearsal
 tests pass; all 26 Make/architecture contract tests pass, including both
 previous failures. Python compileall, architecture cleanliness with zero new
-violations, and `git diff --check` pass. No provider call occurred.
+violations, and `git diff --check` pass. The full local `make verify` release
+gate then passed 1,397/1,397 standalone compatibility checks, 2,885/2,885 pytest
+tests, alert rendering, fixture backtest, and paper scoreboard. It ran with
+local loopback permission for the dashboard concurrency test; no provider call
+occurred.
 
 ## 2026-07-18 — Preserve provider-native external catalyst timestamps · Codex
 **Why:** Full verification exposed a clock-dependent Polymarket fixture failure.
