@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Preserve direct intraday evidence as immutable annex-detached captures
+**Status:** accepted
+**Decision:** A confirmed direct Bybit 1h/4h capture must retain the exact
+accepted public responses, request/provider timing, source execution-quality
+capture and pointer digest, eligible native instrument projection, rederived
+bars, fingerprints, manifest, completion receipt, and latest pointer in one
+immutable namespace. Publish only after exact response count, post-response
+prerequisite revalidation, and complete local validation pass. Validation must
+hold one descriptor-anchored namespace and rederive every bar from the raw
+bytes. A fresh complete capture may be Protocol-v2 input-quality eligible, but
+remains detached from the campaign, `protocol_v2_evidence_eligible=false`, and
+`protocol_v2_annex_bound=false` until the sealed annex explicitly names its
+capture ID. The standard review archive selects and revalidates only the latest
+complete capture. Readiness and status are no-call/no-write; capture requires
+the separately already-present intraday authorization plus `CONFIRM=1`; the
+stdout collection target remains diagnostic.
+**Why:** A valid normalized candle is not sufficient empirical provenance.
+Without exact provider bytes, a closed source link, immutable publication, and
+annex-detached semantics, later validation could neither reproduce the bar nor
+prove that it was collected from the same execution surface before outcomes
+were known.
+**Revisit when:** The Protocol-v2 annex is ready to preregister exact capture
+IDs and campaign attachment rules before any holdout is identified or read.
+
 ## 2026-07-18 - Gate live intraday collection behind execution-quality proof
 **Status:** accepted
 **Decision:** A Bybit direct-bar readiness/collection attempt must first load and

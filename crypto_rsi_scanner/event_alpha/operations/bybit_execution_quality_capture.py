@@ -1153,6 +1153,7 @@ def load_latest_bybit_execution_quality_capture(
         raise BybitExecutionQualityCaptureError("capture_pointer_unreadable") from exc
     if final_raw != raw:
         raise BybitExecutionQualityCaptureError("capture_pointer_changed_during_read")
+    validated["pointer_sha256"] = _sha256(raw)
     return validated
 
 
@@ -1179,6 +1180,7 @@ def bybit_execution_quality_capture_status(
             "orders": 0,
             "trades": 0,
             "paper_trades": 0,
+            "pointer_sha256": None,
             "normal_rsi_writes": 0,
             "event_alpha_triggered_fade": 0,
         }

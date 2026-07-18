@@ -117,6 +117,7 @@ PROJECT_CANONICAL_ROOT_FILES = (
     "event_radar_daily_operations_cycles.jsonl",
     "event_radar_daily_operations_state.json",
     "radar_bybit_execution_quality_latest.json",
+    "radar_bybit_intraday_latest.json",
     "radar_current_namespace.json",
 )
 PROJECT_CANONICAL_SHARED_DIRECTORIES = (
@@ -136,6 +137,10 @@ PROJECT_DYNAMIC_NAMESPACE_SELECTORS = (
     {
         "kind": "latest_bybit_execution_quality_namespace",
         "path": "radar_bybit_execution_quality_latest.json",
+    },
+    {
+        "kind": "latest_bybit_intraday_namespace",
+        "path": "radar_bybit_intraday_latest.json",
     },
 )
 _OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
@@ -1597,6 +1602,37 @@ def _latest_bybit_execution_quality_namespace(
     }
 
 
+def _latest_bybit_intraday_namespace(
+    payload: bytes,
+) -> tuple[str, dict[str, object]]:
+    from crypto_rsi_scanner.event_alpha.operations.bybit_intraday_capture import (
+        BybitIntradayCaptureError,
+        validate_bybit_intraday_pointer_bytes,
+    )
+
+    try:
+        pointer = validate_bybit_intraday_pointer_bytes(payload)
+    except BybitIntradayCaptureError as exc:
+        raise ValueError("latest Bybit intraday pointer is invalid") from exc
+    namespace = str(pointer["artifact_namespace"])
+    return namespace, {
+        "artifact_namespace": namespace,
+        "capture_id": pointer["capture_id"],
+        "source_execution_quality_capture_id": pointer[
+            "source_execution_quality_capture_id"
+        ],
+        "all_bars_fresh": pointer["all_bars_fresh"],
+        "protocol_v2_input_quality_eligible": pointer[
+            "protocol_v2_input_quality_eligible"
+        ],
+        "protocol_v2_evidence_eligible": pointer[
+            "protocol_v2_evidence_eligible"
+        ],
+        "protocol_v2_annex_bound": pointer["protocol_v2_annex_bound"],
+        "status": "selected",
+    }
+
+
 def _project_artifact_export_plan(
     root: Path,
     *,
@@ -1673,11 +1709,13 @@ def _project_artifact_export_plan(
         "dashboard_pointer_namespace": "current_dashboard_authority_generation",
         "latest_live_no_send_attempt_namespace": "latest_live_no_send_attempt_generation",
         "latest_bybit_execution_quality_namespace": "latest_bybit_execution_quality_capture",
+        "latest_bybit_intraday_namespace": "latest_bybit_intraday_capture",
     }
     selector_loaders = {
         "dashboard_pointer_namespace": _dashboard_pointer_namespace,
         "latest_live_no_send_attempt_namespace": _latest_attempt_namespace,
         "latest_bybit_execution_quality_namespace": _latest_bybit_execution_quality_namespace,
+        "latest_bybit_intraday_namespace": _latest_bybit_intraday_namespace,
     }
     for selector in policy["dynamic_namespace_selectors"]:
         kind = str(selector["kind"])
@@ -1712,6 +1750,20 @@ def _project_artifact_export_plan(
                 raise ValueError(
                     "latest Bybit execution-quality pointer/capture mismatch"
                 )
+        elif kind == "latest_bybit_intraday_namespace":
+            from crypto_rsi_scanner.event_alpha.operations.bybit_intraday_capture import (
+                BybitIntradayCaptureError,
+                load_latest_bybit_intraday_capture,
+            )
+
+            try:
+                validated_capture = load_latest_bybit_intraday_capture(
+                    artifact_root
+                )
+            except BybitIntradayCaptureError as exc:
+                raise ValueError("latest Bybit intraday capture is invalid") from exc
+            if validated_capture.get("artifact_namespace") != namespace:
+                raise ValueError("latest Bybit intraday pointer/capture mismatch")
         directory = artifact_root / namespace
         directory_inventory = _strict_regular_files_under(
             directory,

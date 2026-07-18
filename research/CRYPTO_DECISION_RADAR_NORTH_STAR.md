@@ -887,11 +887,19 @@ close-to-acquisition latency, and rejects open/missing/misidentified bars. Run
 `make radar-intraday-bybit-smoke PYTHON=.venv/bin/python` with zero provider
 calls or writes. Its guarded live collector is implemented but inactive: zero-
 call readiness requires a genuine fresh execution-quality capture for exact
-current Radar authority plus separate intraday authorization, and confirmed
-collection performs exactly two public GETs per eligible instrument with no
-retry or write before revalidating the full prerequisite chain. Immutable
-intraday capture/publication remains absent. CoinGecko sparklines, interpolation,
-derived 4h values, and mark/index bars are not direct substitutes.
+current Radar authority plus separate intraday authorization. Confirmed capture
+performs exactly two public GETs per eligible instrument with no retry, then
+revalidates the full prerequisite chain before the first write. Only a complete
+immutable bundle is published: it binds the source execution-quality capture
+and pointer digest, exact native instruments, accepted raw responses,
+request/provider clocks, normalized bars, fingerprints, manifest, completion
+receipt, and latest pointer. Validation holds one descriptor-anchored namespace
+and rederives every bar from raw bytes; symlink, race, drift, and rollback
+failures close the bundle. Status is no-call/no-write, and the standard review
+archive selects and fully revalidates only the latest completed capture. The
+stdout-only collect target remains diagnostic and writes nothing. CoinGecko
+sparklines, interpolation, derived 4h values, and mark/index bars are not direct
+substitutes.
 
 A fresh complete capture may be `protocol_v2_input_quality_eligible`, but it
 remains `protocol_v2_evidence_eligible=false` and
@@ -919,8 +927,9 @@ The remaining human decisions stay explicit:
   PYTHON=.venv/bin/python` (static/no-network), then run the checked offline
   normalizer with `make radar-execution-quality-bybit-smoke
   PYTHON=.venv/bin/python`. The direct completed-bar fixture gate is `make
-  radar-intraday-bybit-smoke PYTHON=.venv/bin/python`. The live-boundary
-  readiness command is `make
+  radar-intraday-bybit-smoke PYTHON=.venv/bin/python`; its latest immutable
+  capture can be checked with `make radar-intraday-bybit-status
+  PYTHON=.venv/bin/python`. The live-boundary readiness command is `make
   radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python`; it remains
   no-call/no-write. Validate the latest capture without a provider call using
   `make radar-execution-quality-bybit-status PYTHON=.venv/bin/python`. Only an
@@ -931,6 +940,13 @@ The remaining human decisions stay explicit:
   capture exists. Collection is disabled by unsetting
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE`; no provider process or order
   path exists.
+- Direct intraday: after one genuine current execution-quality capture exists,
+  inspect `make radar-intraday-bybit-readiness PYTHON=.venv/bin/python` without
+  a call or write. Only separately present
+  `RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE=1` plus `CONFIRM=1 make
+  radar-intraday-bybit-capture PYTHON=.venv/bin/python` may collect and seal
+  exact 1h/4h responses. Disable the boundary by unsetting that flag. A complete
+  capture remains campaign-detached and annex-ineligible until preregistration.
 - Phone access: private and public readiness/status are non-enabling checks.
   Either route requires its exact `CONFIRM=1 ...-enable` command and is rolled
   back only with the matching confirmed disable command; neither is enabled by

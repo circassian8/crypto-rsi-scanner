@@ -66,11 +66,12 @@ remain explicit in any Protocol-v2 cost annex. See the official
 
 The intended venue-native 1h/4h source is Bybit V5
 `GET /v5/market/kline` on the same exact USDT-linear perpetual instrument IDs.
-The offline completed-bar normalizer and a guarded no-write live collector are
-implemented. The collector remains inactive until a genuine execution-quality
-capture first proves the same current Bybit boundary and separate intraday
-authorization plus confirmation exist. Immutable intraday capture/publication
-is not yet implemented.
+The offline completed-bar normalizer, guarded live boundary, and immutable
+exact-response capture are implemented. They remain inactive until a genuine
+execution-quality capture first proves the same current Bybit boundary and
+separate intraday authorization plus confirmation exist. A completed intraday
+bundle remains detached from the campaign and Protocol-v2 evidence until the
+sealed annex explicitly binds its capture ID.
 
 - Request `category=linear` with exact uppercase `symbol` and explicit
   `interval=60` or `interval=240`. Preserve the exact start/end query, response
@@ -145,11 +146,12 @@ The safe implementation smoke is:
 make radar-execution-quality-bybit-smoke PYTHON=.venv/bin/python
 make radar-intraday-bybit-smoke PYTHON=.venv/bin/python
 make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
+make radar-intraday-bybit-status PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python
 make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 ```
 
-All three commands perform no network call, read no credential, and have no
+All six commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
 already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
@@ -184,8 +186,9 @@ The exact operator sequence is intentionally split:
 - The execution-quality live adapter and immutable capture contract exist but
   are inactive; no genuine capture exists and live spread remains unavailable.
 - The direct 1h/4h completed-bar offline contract exists and is fixture-proven;
-  its separately authorized no-write live collector exists but is inactive, and
-  its immutable capture/publication boundary does not yet exist.
+  its separately authorized live boundary and immutable exact-response capture
+  exist but are inactive behind the missing execution-quality proof and
+  intraday authorization.
 - No capture is Protocol-v2 evidence and no capture ID is annex-bound.
 - Current Bybit reachability remains unverified after the recorded 403.
 - No provider call is planned or attempted by readiness.

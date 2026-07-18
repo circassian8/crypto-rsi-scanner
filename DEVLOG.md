@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal immutable Bybit direct-bar evidence bundles · Codex
+**Why:** The guarded 1h/4h collector could prove request mechanics but could not
+preserve provider bytes or support later reproduction. Direct bars need the
+same closed publication and annex-detached authority semantics as execution
+quality before they can become credible empirical inputs.
+**Changes:**
+- Added an immutable intraday capture contract that binds the exact source
+  execution-quality capture and pointer digest, native instrument set, accepted
+  raw 60/240-minute responses, request/provider clocks, normalized bars,
+  fingerprints, manifest, completion receipt, and stable latest pointer.
+- Revalidates every bar from raw bytes while holding one descriptor-anchored
+  namespace; rejects source/instrument drift, impossible clocks, partial
+  response sets, unmanifested content, symlinks, raw/projection drift, races,
+  corrupt pointers, and rollback. Complete fresh bundles remain campaign-
+  detached, Protocol-v2-ineligible, and immutable until annex binding.
+- Added confirmation-gated capture and no-call/no-write status targets while
+  retaining stdout-only collection as a diagnostic. Readiness now reports the
+  latest capture truth and makes the immutable capture command the ready-state
+  action.
+- Added the latest intraday pointer/namespace to the bounded canonical project
+  artifact policy and made the review exporter fully revalidate it. Updated the
+  working agreement, North Star, decision package, roadmap, and durable
+  decision record.
+**Verify:** 101 focused Bybit/intraday/export/TOCTOU tests passed; whole-project
+compileall, the offline two-bar smoke, real no-call readiness, no-call capture
+status, JSON validation, `git diff --check`, and architecture cleanliness
+passed with zero new violations.
+**Notes/risks:** Real readiness remains honestly blocked by the absent genuine
+execution-quality capture and absent separate intraday authorization. No
+provider call, authorization mutation, retry/bypass, send, order, trade, paper/
+RSI write, fade trigger, campaign attachment, Protocol-v2 admission, threshold,
+score, route, outcome rewrite, or authority publication occurred.
+
 ## 2026-07-18 — Add the guarded Bybit direct-bar live boundary · Codex
 **Why:** The completed-bar normalizer alone could not guarantee that future
 live collection inherits the same exact native instruments and Radar authority

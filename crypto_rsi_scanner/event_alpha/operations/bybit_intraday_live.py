@@ -40,6 +40,11 @@ from .bybit_intraday import (
     build_bybit_kline_request,
     normalize_bybit_completed_kline,
 )
+from .bybit_intraday_capture import (
+    BybitIntradayCaptureError,
+    bybit_intraday_capture_status,
+    persist_bybit_intraday_capture,
+)
 
 
 CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v1"
@@ -50,6 +55,10 @@ READINESS_COMMAND = "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 COLLECT_COMMAND = (
     "CONFIRM=1 make radar-intraday-bybit-collect PYTHON=.venv/bin/python"
 )
+CAPTURE_COMMAND = (
+    "CONFIRM=1 make radar-intraday-bybit-capture PYTHON=.venv/bin/python"
+)
+STATUS_COMMAND = "make radar-intraday-bybit-status PYTHON=.venv/bin/python"
 AUTHORIZATION_ACTION = (
     f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_then_rerun_readiness"
 )
@@ -261,6 +270,7 @@ def build_bybit_intraday_live_readiness(
     request_bound = len(instruments) * len(INTERVAL_SECONDS)
     ready = not reasons
     only_auth_missing = reasons == ["runtime_provider_authorization_absent"]
+    latest_capture = bybit_intraday_capture_status(artifact_base_dir)
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_intraday_live_readiness",
@@ -285,10 +295,21 @@ def build_bybit_intraday_live_readiness(
         "provider_call_planned": False,
         "provider_call_attempted": False,
         "artifact_persisted": False,
+        "capture_publication_available": True,
+        "latest_intraday_capture_status": latest_capture.get("status"),
+        "latest_intraday_capture": latest_capture,
+        "evidence_publication_status": (
+            "latest_immutable_capture_available"
+            if latest_capture.get("status") == "complete"
+            else "no_immutable_capture_available"
+        ),
         "campaign_attached": False,
         "protocol_v2_evidence_eligible": False,
         "reasons": reasons,
-        "next_safe_command": COLLECT_COMMAND if ready else READINESS_COMMAND,
+        "next_safe_command": CAPTURE_COMMAND if ready else READINESS_COMMAND,
+        "readiness_recheck_command": READINESS_COMMAND,
+        "authorized_capture_command": CAPTURE_COMMAND,
+        "diagnostic_collect_command": COLLECT_COMMAND,
         "operator_action_required": (
             AUTHORIZATION_ACTION
             if only_auth_missing
@@ -300,6 +321,7 @@ def build_bybit_intraday_live_readiness(
             AUTHORIZATION_ACTION if not authorized else "none"
         ),
         "collection_confirmation_required": True,
+        "capture_confirmation_required": True,
         "expected_provider_activity": (
             f"collect_exactly_{request_bound}_public_GETs_no_retries"
             if ready
@@ -363,7 +385,7 @@ def _revalidate_prerequisites(
         raise BybitIntradayLiveError("intraday_source_prerequisite_drifted")
 
 
-def collect_authoritative_bybit_intraday(
+def _collect_authoritative_bybit_intraday(
     *,
     artifact_base_dir: str | Path,
     environ: Mapping[str, str] | None = None,
@@ -372,8 +394,8 @@ def collect_authoritative_bybit_intraday(
     resolver: Resolver = resolve_authoritative_dashboard,
     fetch_json: FetchJSON | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
-) -> dict[str, object]:
-    """Collect direct completed bars without persistence or campaign mutation."""
+) -> tuple[dict[str, object], list[BybitCapturedJSONResponse]]:
+    """Collect bars and retain exact responses when the transport exposes them."""
 
     clock = now or (lambda: datetime.now(timezone.utc))
     started = _utc(clock())
@@ -396,6 +418,7 @@ def collect_authoritative_bybit_intraday(
     fetch = fetch_json or _fetch_public_json
     request_count = 0
     bars: list[dict[str, object]] = []
+    captured_responses: list[BybitCapturedJSONResponse] = []
     lineage_seed = hashlib.sha256(
         f"{capture_id}|{_iso(started)}".encode("utf-8")
     ).hexdigest()[:24]
@@ -411,6 +434,13 @@ def collect_authoritative_bybit_intraday(
                 request_count += 1
                 result = fetch(request, timeout_seconds)
                 fallback_acquired = _utc(clock())
+                if isinstance(result, BybitCapturedJSONResponse):
+                    if result.request != request:
+                        raise BybitIntradayLiveError(
+                            "provider_response_request_mismatch",
+                            request_count=request_count,
+                        )
+                    captured_responses.append(result)
                 payload, request_started, acquired = _payload_and_timing(
                     result,
                     fallback_started=fallback_started,
@@ -459,7 +489,7 @@ def collect_authoritative_bybit_intraday(
             "intraday_collection_count_mismatch",
             request_count=request_count,
         )
-    return {
+    summary = {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_intraday_observation_set",
         "status": "complete",
@@ -493,6 +523,71 @@ def collect_authoritative_bybit_intraday(
         ),
         **_SAFETY,
     }
+    return summary, captured_responses
+
+
+def collect_authoritative_bybit_intraday(
+    *,
+    artifact_base_dir: str | Path,
+    environ: Mapping[str, str] | None = None,
+    now: Clock | None = None,
+    capture_loader: CaptureLoader = load_latest_bybit_execution_quality_capture,
+    resolver: Resolver = resolve_authoritative_dashboard,
+    fetch_json: FetchJSON | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    """Collect direct completed bars without persistence or campaign mutation."""
+
+    summary, _responses = _collect_authoritative_bybit_intraday(
+        artifact_base_dir=artifact_base_dir,
+        environ=environ,
+        now=now,
+        capture_loader=capture_loader,
+        resolver=resolver,
+        fetch_json=fetch_json,
+        timeout_seconds=timeout_seconds,
+    )
+    return summary
+
+
+def capture_authoritative_bybit_intraday(
+    *,
+    artifact_base_dir: str | Path,
+    environ: Mapping[str, str] | None = None,
+    now: Clock | None = None,
+    capture_loader: CaptureLoader = load_latest_bybit_execution_quality_capture,
+    resolver: Resolver = resolve_authoritative_dashboard,
+    fetch_json: FetchJSON | None = None,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    """Collect once and seal exact response bytes as immutable research evidence."""
+
+    summary, responses = _collect_authoritative_bybit_intraday(
+        artifact_base_dir=artifact_base_dir,
+        environ=environ,
+        now=now,
+        capture_loader=capture_loader,
+        resolver=resolver,
+        fetch_json=fetch_json,
+        timeout_seconds=timeout_seconds,
+    )
+    request_count = int(summary["provider_request_count"])
+    if len(responses) != request_count:
+        raise BybitIntradayLiveError(
+            "exact_provider_response_capture_unavailable",
+            request_count=request_count,
+        )
+    try:
+        return persist_bybit_intraday_capture(
+            artifact_base_dir,
+            summary=summary,
+            responses=responses,
+        )
+    except BybitIntradayCaptureError as exc:
+        raise BybitIntradayLiveError(
+            f"capture_{exc}",
+            request_count=request_count,
+        ) from exc
 
 
 def _failure_payload(exc: BybitIntradayLiveError) -> dict[str, object]:
@@ -513,17 +608,18 @@ def _failure_payload(exc: BybitIntradayLiveError) -> dict[str, object]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("readiness", "collect"):
+    for name in ("readiness", "collect", "capture", "status"):
         command = commands.add_parser(name)
         command.add_argument(
             "--artifact-base",
             type=Path,
             default=Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR),
         )
-    commands.choices["collect"].add_argument(
-        "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
-    )
-    commands.choices["collect"].add_argument("--confirm", action="store_true")
+    for name in ("collect", "capture"):
+        commands.choices[name].add_argument(
+            "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
+        )
+        commands.choices[name].add_argument("--confirm", action="store_true")
     return parser
 
 
@@ -535,6 +631,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
+    if args.command == "status":
+        payload = bybit_intraday_capture_status(args.artifact_base)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
     if not args.confirm:
         payload = _failure_payload(
             BybitIntradayLiveError("explicit_collection_confirmation_required")
@@ -542,7 +642,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 1
     try:
-        payload = collect_authoritative_bybit_intraday(
+        operation = (
+            capture_authoritative_bybit_intraday
+            if args.command == "capture"
+            else collect_authoritative_bybit_intraday
+        )
+        payload = operation(
             artifact_base_dir=args.artifact_base,
             timeout_seconds=args.timeout_seconds,
         )
@@ -555,13 +660,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = (
     "AUTHORIZATION_ACTION",
+    "CAPTURE_COMMAND",
     "COLLECT_COMMAND",
     "CONTRACT_VERSION",
     "LIVE_AUTH_ENV",
     "MAX_PROVIDER_REQUESTS",
     "READINESS_COMMAND",
+    "STATUS_COMMAND",
     "BybitIntradayLiveError",
+    "_collect_authoritative_bybit_intraday",
     "build_bybit_intraday_live_readiness",
+    "capture_authoritative_bybit_intraday",
     "collect_authoritative_bybit_intraday",
     "main",
 )

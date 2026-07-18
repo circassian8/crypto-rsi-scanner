@@ -8,23 +8,32 @@ import json
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
+from urllib.parse import urlencode
 
 import pytest
 
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
+    PUBLIC_API_BASE,
+    BybitPublicRequest,
     select_bybit_usdt_perpetual_instruments,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_capture import (
+    BybitCapturedJSONResponse,
     BybitExecutionQualityCaptureError,
+)
+from crypto_rsi_scanner.event_alpha.operations.bybit_intraday_capture import (
+    POINTER_FILENAME,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_intraday_live import (
     AUTHORIZATION_ACTION,
+    CAPTURE_COMMAND,
     COLLECT_COMMAND,
     CONTRACT_VERSION,
     LIVE_AUTH_ENV,
     READINESS_COMMAND,
     BybitIntradayLiveError,
     build_bybit_intraday_live_readiness,
+    capture_authoritative_bybit_intraday,
     collect_authoritative_bybit_intraday,
     main,
 )
@@ -62,8 +71,12 @@ def _capture(capture_id: str = "b" * 64) -> dict[str, object]:
         "contract_version": "crypto_radar_bybit_execution_quality_capture_v1",
         "status": "complete",
         "capture_id": capture_id,
-        "artifact_namespace": f"radar_bybit_execution_quality_fixture_{capture_id[:12]}",
+        "artifact_namespace": (
+            "radar_bybit_execution_quality_20260717t120001000000z_"
+            f"{capture_id[:12]}"
+        ),
         "completed_at": "2026-07-17T12:00:01Z",
+        "pointer_sha256": "c" * 64,
         "source_authority": dict(AUTHORITY),
         "eligible_instruments": _instrument_values(),
         "request_count": 2,
@@ -112,6 +125,24 @@ def _fetch(request: object, timeout: float) -> dict[str, object]:
     value = _json(INTRADAY_FIXTURES / f"klines_btcusdt_{interval}.json")
     assert isinstance(value, dict)
     return value
+
+
+def _captured_fetch(
+    request: BybitPublicRequest,
+    timeout: float,
+) -> BybitCapturedJSONResponse:
+    payload = _fetch(request, timeout)
+    raw = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
+    return BybitCapturedJSONResponse(
+        request=request,
+        request_started_at="2026-07-17T12:30:00.100000Z",
+        response_received_at="2026-07-17T12:30:00.125000Z",
+        duration_ms=25,
+        response_url=f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}",
+        http_status=200,
+        content_type="application/json",
+        raw_bytes=raw,
+    )
 
 
 def test_readiness_without_execution_capture_or_auth_is_zero_call_and_closed() -> None:
@@ -174,7 +205,9 @@ def test_authorized_readiness_is_exact_but_still_no_call_or_write() -> None:
     assert payload["ready"] is True
     assert payload["reasons"] == []
     assert payload["execution_quality_capture_id"] == "b" * 64
-    assert payload["next_safe_command"] == COLLECT_COMMAND
+    assert payload["next_safe_command"] == CAPTURE_COMMAND
+    assert payload["diagnostic_collect_command"] == COLLECT_COMMAND
+    assert payload["latest_intraday_capture_status"] == "unavailable"
     assert payload["expected_provider_activity"] == (
         "collect_exactly_2_public_GETs_no_retries"
     )
@@ -304,6 +337,43 @@ def test_post_response_capture_drift_fails_closed() -> None:
         )
 
 
+def test_confirmed_capture_requires_exact_transport_and_seals_bundle(
+    tmp_path: Path,
+) -> None:
+    result = capture_authoritative_bybit_intraday(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=_clock(),
+        capture_loader=lambda _base: _capture(),
+        resolver=_resolver(),
+        fetch_json=_captured_fetch,
+    )
+
+    assert result["status"] == "complete"
+    assert result["artifact_namespace"].startswith("radar_bybit_intraday_")
+    assert result["request_count"] == result["bar_count"] == 2
+    assert result["pointer_validated"] is True
+    assert result["protocol_v2_input_quality_eligible"] is True
+    assert result["protocol_v2_evidence_eligible"] is False
+    assert (tmp_path / POINTER_FILENAME).is_file()
+
+    other = tmp_path / "mapping-only"
+    other.mkdir()
+    with pytest.raises(
+        BybitIntradayLiveError,
+        match="exact_provider_response_capture_unavailable",
+    ):
+        capture_authoritative_bybit_intraday(
+            artifact_base_dir=other,
+            environ={LIVE_AUTH_ENV: "1"},
+            now=_clock(),
+            capture_loader=lambda _base: _capture(),
+            resolver=_resolver(),
+            fetch_json=_fetch,
+        )
+    assert not (other / POINTER_FILENAME).exists()
+
+
 def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -331,10 +401,17 @@ def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     readiness = dry_run("radar-intraday-bybit-readiness")
     collection = dry_run("radar-intraday-bybit-collect")
     confirmed = dry_run("radar-intraday-bybit-collect", confirm=True)
+    capture = dry_run("radar-intraday-bybit-capture")
+    confirmed_capture = dry_run("radar-intraday-bybit-capture", confirm=True)
+    status = dry_run("radar-intraday-bybit-status")
     assert "bybit_intraday_live readiness" in readiness
     assert "bybit_intraday_live collect" not in readiness
     assert "bybit_intraday_live collect" in collection
     assert "--confirm" not in collection
     assert confirmed.count("--confirm") == 1
+    assert "bybit_intraday_live capture" in capture
+    assert "--confirm" not in capture
+    assert confirmed_capture.count("--confirm") == 1
+    assert "bybit_intraday_live status" in status
     assert LIVE_AUTH_ENV not in readiness
     assert f"{LIVE_AUTH_ENV}=1" not in collection
