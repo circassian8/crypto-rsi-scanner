@@ -667,15 +667,14 @@ def _refresh_preserved_campaign_metadata(
         preserved["decision_projection"] = deepcopy(dict(projection))
         for key, value in projection.items():
             preserved[key] = deepcopy(value)
+    join_reasons: set[str] = set()
     if current.get("campaign_calibration_scope") == "candidate_only_not_core_joined":
-        preserved["calibration_eligible"] = False
-        reasons = current.get("calibration_ineligible_reasons")
-        preserved["calibration_ineligible_reasons"] = (
-            deepcopy(list(reasons))
-            if isinstance(reasons, list) and reasons
-            else ["unmatched_outcome_identity"]
-        )
-        preserved["include_in_performance"] = False
+        join_reasons.add("unmatched_outcome_identity")
+    reasons = set(outcome_eligibility.calibration_ineligibility_reasons(preserved))
+    reasons.update(join_reasons)
+    preserved["calibration_ineligible_reasons"] = sorted(reasons)
+    preserved["calibration_eligible"] = not reasons
+    preserved["include_in_performance"] = not reasons
     return preserved
 
 

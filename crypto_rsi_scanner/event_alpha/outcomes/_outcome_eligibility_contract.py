@@ -185,6 +185,7 @@ OUTCOME_INELIGIBLE_REASONS = frozenset(
         "horizon_price_observation_id_missing",
         "horizon_price_source_missing",
         "horizon_return_recompute_mismatch",
+        "historical_price_recovery",
         "synthetic_fixture",
         "unmatched_outcome_identity",
     }

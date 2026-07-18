@@ -33,16 +33,21 @@ result, campaign/source bindings, manifest, completion receipt, and rollback-
 protected pointer. Status and review export must fully rederive that pointer
 target before accepting it. Recovery never enters market-observation history,
 temporal warmup, candidate generation, calibration, or Protocol-v2 evidence.
-No outcome may be mutated until exact response bytes have an immutable capture
-and a separately confirmed ledger-only application proves the baseline is byte-
-identical.
+No outcome may be mutated until exact response bytes have an immutable capture.
+Application is a separate local/no-provider `CONFIRM=1` boundary that holds the
+existing root campaign lock and descriptor-anchored mutable state, revalidates
+capture/source/target/current-ledger truth, changes only exact bound outcome
+rows, proves market-history bytes unchanged, and writes one immutable receipt.
+Any pre-receipt failure restores the exact prior ledger; receipt/current-state
+drift fails closed. Recovered rows retain explicit post-hoc lineage and remain
+permanently excluded from calibration, performance, and Protocol-v2 evidence.
 **Why:** A genuine historical series can close an operational outcome gap, but
 post-hoc acquisition is not point-in-time campaign evidence. A distinct
 authorization, exact window, immutable provenance, and ledger-only boundary
 prevent recovery from manufacturing warmup, routes, or apparent predictive
 evidence.
-**Revisit when:** Immutable capture and confirmed ledger-only application are
-implemented, or a sealed Protocol-v2 annex preregisters a different recovery
+**Revisit when:** A genuine qualifying capture is ready for confirmed local
+application, or a sealed Protocol-v2 annex preregisters a different recovery
 treatment before its holdout is identified or read.
 
 ## 2026-07-18 - Keep overdue outcome price gaps explicit and non-interpolated

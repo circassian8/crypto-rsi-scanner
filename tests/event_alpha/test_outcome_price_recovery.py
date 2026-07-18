@@ -490,6 +490,14 @@ def test_make_targets_keep_readiness_separate_from_confirmed_collection():
         confirm=True,
     )
     status = dry_run("radar-outcome-price-recovery-status")
+    application_command = dry_run("radar-outcome-price-recovery-apply")
+    confirmed_application = dry_run(
+        "radar-outcome-price-recovery-apply",
+        confirm=True,
+    )
+    application_status = dry_run(
+        "radar-outcome-price-recovery-application-status"
+    )
 
     assert "outcome_price_recovery readiness" in readiness
     assert "outcome_price_recovery collect" not in readiness
@@ -501,8 +509,21 @@ def test_make_targets_keep_readiness_separate_from_confirmed_collection():
     assert confirmed_capture.count("--confirm") == 1
     assert "outcome_price_recovery_capture status" in status
     assert "--confirm" not in status
+    assert "outcome_price_recovery_application apply" in application_command
+    assert "--confirm" not in application_command
+    assert confirmed_application.count("--confirm") == 1
+    assert "outcome_price_recovery_application status" in application_status
+    assert "--confirm" not in application_status
     assert recovery.LIVE_AUTH_ENV not in readiness
     assert f"{recovery.LIVE_AUTH_ENV}=1" not in collection
     assert "place-order" not in (
-        readiness + collection + confirmed + capture_command + confirmed_capture + status
+        readiness
+        + collection
+        + confirmed
+        + capture_command
+        + confirmed_capture
+        + status
+        + application_command
+        + confirmed_application
+        + application_status
     ).casefold()

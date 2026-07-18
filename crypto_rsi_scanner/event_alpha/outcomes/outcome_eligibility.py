@@ -196,6 +196,18 @@ def calibration_ineligibility_reasons(row: Mapping[str, Any]) -> tuple[str, ...]
         reasons.add("invalid_outcome_data_source")
     elif data_source == "synthetic_fixture":
         reasons.add("synthetic_fixture")
+    metadata_value = row.get("horizon_metadata")
+    recovery_lineage = (
+        isinstance(metadata_value, Mapping)
+        and any(
+            isinstance(item, Mapping)
+            and item.get("price_source")
+            == "coingecko_market_chart_range_historical_recovery"
+            for item in metadata_value.values()
+        )
+    )
+    if row.get("historical_price_recovery") is True or recovery_lineage:
+        reasons.add("historical_price_recovery")
 
     identity = canonical_outcome_identity(row)
     if not all(identity.values()):

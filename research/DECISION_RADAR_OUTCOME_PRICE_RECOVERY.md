@@ -1,7 +1,8 @@
 # Decision Radar outcome-price recovery v1
 
-Status: diagnostic exact-response contract and immutable capture implemented;
-outcome application is not implemented.
+Status: diagnostic exact-response contract, immutable capture, and separately
+confirmed ledger-only application are implemented. No real capture or
+application exists because the separate provider authorization is absent.
 
 This path exists only to close genuine primary-horizon outcome gaps. It is not
 a second market-observation campaign and must never warm temporal baselines,
@@ -65,6 +66,26 @@ A diagnostic response and immutable capture must:
 - remain excluded from baseline history, campaign observation counts,
   calibration, and Protocol-v2 evidence until a sealed annex says otherwise.
 
+A qualifying immutable capture may be applied only by the closed local
+application boundary. It revalidates the latest capture, exact source binding,
+current outcome ledger, immutable candidate, and target identity while holding
+the existing root-scoped campaign lock. It then:
+
+- changes exactly one bound outcome row per qualifying recovery result;
+- records historical market time, later acquisition time, capture/request/raw
+  response IDs, and the explicit historical-recovery price source;
+- marks the completed row permanently ineligible for calibration, performance,
+  and Protocol-v2 evidence;
+- leaves the market-history baseline byte-identical;
+- writes the ledger atomically and creates one immutable application receipt
+  binding before/after ledger fingerprints and the unchanged baseline;
+- restores the exact prior ledger if any pre-receipt step fails;
+- is idempotent only while the current ledger and baseline still match the
+  immutable receipt; later drift fails closed;
+- holds descriptor-anchored base, state-directory, lock, ledger, history, and
+  receipt identities so a directory or symlink swap cannot redirect the write
+  or rollback.
+
 ## Authorization and commands
 
 Readiness makes no provider call and writes nothing:
@@ -91,17 +112,30 @@ Read-only status makes no provider call or write:
 make radar-outcome-price-recovery-status PYTHON=.venv/bin/python
 ```
 
+After a qualifying immutable capture exists, application is a distinct local
+confirmation. It makes no provider call and does not inspect or create
+authorization:
+
+```text
+CONFIRM=1 make radar-outcome-price-recovery-apply PYTHON=.venv/bin/python
+make radar-outcome-price-recovery-application-status PYTHON=.venv/bin/python
+```
+
 Codex must never create or mutate either authorization. The diagnostic
 collector performs no artifact write. The capture command writes only its
 immutable response namespace and latest pointer; neither command performs an
 outcome mutation, baseline insertion, send, trade, paper trade, RSI write, or
 `TRIGGERED_FADE` creation. The standard review export selects and fully
-revalidates only the latest pointed capture.
+revalidates only the latest pointed capture. The application changes only the
+mutable campaign outcome ledger and creates its immutable receipt inside the
+canonical shared history directory. It never inserts the recovered price into
+market history or changes candidates, routes, scores, thresholds, or authority.
 
 ## Remaining work
 
-Before a recovered price can complete an outcome, add a separate confirmed
-application step that revalidates the exact capture and current target, updates
-only the campaign outcome ledger, preserves historical-recovery provenance,
-and proves the market-history baseline byte-identical before and after.
-Protocol-v2 eligibility remains a later annex decision.
+The operator may later supply the already-defined recovery authorization and
+run the confirmed capture. Only a successful qualifying capture can make the
+separate application command eligible. Until then the real capture pointer and
+application receipt remain honestly absent and DEXE remains `due_missing_price`.
+Historical recovery remains excluded from Protocol-v2 evidence unless a future
+annex is sealed before its holdout is identified or read.

@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Apply recovered outcome prices without baseline drift · Codex
+**Why:** Immutable historical responses could be audited but could not safely
+close the exact overdue campaign row. The final boundary had to mutate only the
+outcome ledger while keeping post-hoc evidence out of temporal baselines and
+calibration.
+**Changes:**
+- Added a separately confirmed, local/no-provider application command plus
+  read-only current-state status. It accepts only the latest fully validated
+  capture, revalidates its exact source/target/current-ledger binding, and
+  changes exactly one campaign outcome row per qualifying result.
+- Added explicit historical-recovery lineage, immutable application receipts,
+  exact before/after ledger fingerprints, byte-identical market-history proof,
+  idempotence, current-state drift rejection, and exact-ledger rollback for any
+  failure before the receipt is durable.
+- Held the existing root campaign lock and one descriptor-anchored base/state
+  transaction across reads, mutation, rollback, and receipt creation. Symlinks,
+  hard links, target replacement, lock contention, and directory swaps fail
+  closed without redirecting either the write or rollback.
+- Made historical recovery a permanent closed calibration-ineligibility reason,
+  including source-lineage-only detection, and fixed monotonic campaign refresh
+  so it recomputes preserved row reasons instead of erasing that firewall.
+- Updated Make targets, operator contract, working agreement, durable decision,
+  and roadmap. The real capture/application state remains absent because the
+  separate recovery authorization is absent; no provider or ledger mutation was
+  attempted.
+**Verify:** 71 focused recovery/capture/application/outcome tests passed; the
+source-export parent-symlink/TOCTOU regression passed; compileall,
+`git diff --check`, and architecture cleanliness passed with zero new size or
+function violations. Real application status made zero calls/writes and
+reported the honest missing-capture pointer. Full `make verify` was skipped
+because this isolated boundary has a narrower security, contract, and
+integration gate.
+**Notes/risks:** A real DEXE completion still requires the human-controlled
+provider authorization, a successful qualifying immutable capture, and a
+separate confirmed local application. Even then the completed row remains
+excluded from calibration, performance, and Protocol-v2 evidence.
+
 ## 2026-07-18 — Seal immutable outcome-price recovery evidence · Codex
 **Why:** The guarded historical query contract could validate a response only
 in process memory. A recovered price cannot be considered for an outcome until

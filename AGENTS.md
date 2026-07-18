@@ -558,9 +558,20 @@ may be added later when a suitable environment already exists.
   `radar-outcome-price-recovery-status` fully rederives the latest capture; the
   fixed review export selects only that validated pointer target. Neither the
   diagnostic nor capture path applies a response or writes campaign baselines,
-  candidates, scores, calibration evidence, or Protocol-v2 evidence. Do not add
-  an application step until a separately confirmed ledger-only mutation is
-  implemented and shown to leave the temporal baseline byte-identical.
+  candidates, scores, calibration evidence, or Protocol-v2 evidence. A
+  qualifying capture may be applied only with `CONFIRM=1 make
+  radar-outcome-price-recovery-apply`; the application is local/no-provider,
+  holds the existing root campaign lock and descriptor-anchored mutable state,
+  revalidates exact capture/source/target/current-ledger truth, changes only the
+  bound campaign outcome rows, leaves market-history bytes identical, and
+  creates one immutable application receipt. Any pre-receipt failure restores
+  the exact prior ledger. Applied rows retain explicit post-hoc acquisition
+  lineage and remain calibration-, performance-, and Protocol-v2-ineligible.
+  `make radar-outcome-price-recovery-application-status` is read-only and
+  accepts an application only while its current ledger and baseline still match
+  the receipt. Neither command creates authorization, sends, trades, orders,
+  paper trades, RSI rows, Event Alpha `TRIGGERED_FADE`, candidates, routes,
+  scores, thresholds, or dashboard authority.
 - **Unified calendar no-send preview:** `make radar-calendar-preview` renders
   checked macro/crypto fixture rows without providers, artifact writes, or sends.
   Integrated cycles normalize raw scheduled/fixture rows exactly once and bind

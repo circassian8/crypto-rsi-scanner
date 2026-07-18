@@ -256,6 +256,29 @@ def test_outcome_contract_rejects_concealed_reasons_and_adversarial_time_evidenc
     concealed["calibration_ineligible_reasons"] = ["synthetic_fixture"]
     assert "outcome_eligibility_reasons_mismatch" in contract.validate_contract(concealed)
 
+
+def test_historical_recovery_is_permanently_calibration_ineligible():
+    explicit = _outcome()
+    explicit["historical_price_recovery"] = True
+    _seal(explicit)
+    assert "historical_price_recovery" in explicit[
+        "calibration_ineligible_reasons"
+    ]
+    assert explicit["calibration_eligible"] is False
+    assert contract.validate_contract(explicit) == []
+
+    lineage_only = _outcome()
+    primary = str(lineage_only["primary_horizon"])
+    lineage_only["horizon_metadata"][primary]["price_source"] = (
+        "coingecko_market_chart_range_historical_recovery"
+    )
+    _seal(lineage_only)
+    assert "historical_price_recovery" in lineage_only[
+        "calibration_ineligible_reasons"
+    ]
+    assert lineage_only["calibration_eligible"] is False
+    assert contract.validate_contract(lineage_only) == []
+
     wrong_lane_horizon = _outcome(primary_horizon="24h")
     assert "primary_horizon_lane_mismatch" in (
         contract.calibration_ineligibility_reasons(wrong_lane_horizon)
