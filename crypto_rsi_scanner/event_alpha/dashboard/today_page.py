@@ -22,6 +22,7 @@ from .layer_coverage import (
 )
 from .maintenance_guidance import maintenance_expiry_guidance
 from .models import DashboardSnapshot
+from .operator_work_queue import operator_work_actions, render_operator_work_queue
 from .presentation import (
     UNAVAILABLE,
     format_duration,
@@ -117,6 +118,7 @@ def render_today_page(
         intro
         + attention
         + metric_summary
+        + render_operator_work_queue(snapshot)
         + maintenance_action
         + warnings
         + controls
@@ -361,6 +363,12 @@ def _operator_warnings(snapshot: DashboardSnapshot) -> str:
     required_coverage_gaps: list[_Constraint] = []
     optional_coverage_gaps: list[_Constraint] = []
     coverage = dashboard_layer_coverage(snapshot)
+    has_campaign_execution_action = any(
+        title.startswith("Bybit USDT-perpetual spread evidence")
+        for _category, title, _detail, _command, _link_label, _href in operator_work_actions(
+            snapshot
+        )
+    )
     for layer in coverage:
         if not layer.action_required:
             continue
@@ -376,7 +384,7 @@ def _operator_warnings(snapshot: DashboardSnapshot) -> str:
             else required_coverage_gaps
         )
         target.append(item)
-    if rows and not spread:
+    if rows and not spread and not has_campaign_execution_action:
         decision_blockers.append((
             "decision:spread",
             "Execution spread unavailable",

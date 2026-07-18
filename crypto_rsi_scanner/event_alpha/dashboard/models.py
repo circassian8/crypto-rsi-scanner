@@ -116,6 +116,7 @@ class DashboardSnapshot(_DashboardSnapshotViews):
     provider_health_read_at: str | None = None
     provider_health_sha256: str | None = None
     provider_health_error: str | None = None
+    campaign_operator_actions: Mapping[str, Any] = field(default_factory=dict)
     research_lab: Mapping[str, Any] = field(default_factory=dict)
 
 

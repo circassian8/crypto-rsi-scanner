@@ -107,6 +107,7 @@ def _render_dashboard_request(
         max_generation_age_hours=app.max_generation_age_hours,
         max_doctor_age_hours=app.max_doctor_age_hours,
         research_root=app.research_root if path == "/research-lab" else None,
+        operator_actions_root=app.research_root,
     )
     _require_generation_binding(snapshot, app.generation_binding)
     _require_current_pointer_binding(

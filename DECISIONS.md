@@ -16,6 +16,31 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Show campaign work only from exact-pointer safe context
+**Status:** accepted
+**Decision:** The dashboard may surface campaign-wide human review, missing
+outcome-price, and Bybit execution-quality work only from the canonical
+`RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json` after a descriptor-anchored,
+bounded read; closed schema and zero-side-effect validation; and an exact
+namespace/run/revision match to the current dashboard pointer. Project only
+bounded identities, counts, symbols, and three allowlisted no-call/no-write
+commands. Label the result historical campaign context, never current-generation
+authority. A missing, oversized, unsafe, stale-pointer, contradictory, or
+command-drifted report suppresses the work panel without weakening or blocking
+the exact current dashboard generation. Dashboard GET/HEAD requests never read
+environment variables and never count as human review events.
+**Why:** A valid zero-idea generation made Today look operationally empty even
+though three receipt-backed ideas await explicit review, one DEXE outcome lacks
+point-in-time price evidence, and trusted Bybit spread coverage is 0/630. Those
+actions already existed in the terminal campaign report; hiding them forced the
+operator to reconcile multiple command-line surfaces, while treating the mutable
+campaign report as current authority would blur the product's trust boundary.
+**Revisit when:** Campaign actions get their own immutable pointer-bound receipt
+or the campaign report schema changes. Any replacement must preserve bounded
+reads, exact pointer reconciliation, command allowlisting, fail-closed
+projection, explicit historical labeling, and the no-call/no-write/no-review-on-
+GET contract.
+
 ## 2026-07-18 - Derive RSI only from captured closed Bybit candles
 **Status:** accepted
 **Decision:** Each authorized Bybit intraday request continues to fetch exactly

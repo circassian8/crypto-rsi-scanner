@@ -188,6 +188,7 @@ def _smoke(
         namespace,
         now=smoke_now,
         research_root=research_root,
+        operator_actions_root=research_root,
     )
     if not snapshot.generation_authoritative:
         reasons = ",".join(snapshot.generation_authority_reasons) or "unknown"

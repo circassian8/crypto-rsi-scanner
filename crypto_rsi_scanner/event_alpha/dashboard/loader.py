@@ -28,6 +28,7 @@ from ..radar import source_independence_store as event_source_independence_store
 from ._source_independence_loader import (
     hydrate_source_independence_references as _hydrate_source_independence_references,
 )
+from .campaign_operator_actions import load_campaign_operator_actions
 from .history import load_dashboard_history, read_unverified_json_object_bytes
 from .models import DashboardLoadError, DashboardSnapshot, build_dashboard_snapshot
 from .research_lab_loader import load_research_lab_snapshot
@@ -170,6 +171,7 @@ def load_dashboard_snapshot(
     max_generation_age_hours: float | None = None,
     max_doctor_age_hours: float | None = None,
     research_root: str | Path | None = None,
+    operator_actions_root: str | Path | None = None,
 ) -> DashboardSnapshot:
     """Load one exact operator generation, retrying only a concurrent revision."""
 
@@ -200,6 +202,12 @@ def load_dashboard_snapshot(
                 )
             return dataclass_replace(
                 snapshot,
+                campaign_operator_actions=load_campaign_operator_actions(
+                    operator_actions_root,
+                    artifact_namespace=snapshot.artifact_namespace,
+                    run_id=snapshot.run_id,
+                    revision=snapshot.revision,
+                ),
                 research_lab=load_research_lab_snapshot(research_root),
             )
         except _GenerationChanged as exc:

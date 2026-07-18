@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Surface genuine open operator work on the dashboard · Codex
+**Why:** The current authority correctly contains zero Decision ideas, but the
+campaign still has three receipt-backed ideas awaiting human review, one DEXE
+outcome missing an admissible point-in-time price, and zero trusted Bybit spread
+observations. Today and Health hid that real work behind generic constraints,
+making a healthy zero-idea generation look operationally empty.
+**Changes:**
+- Added a bounded descriptor-anchored loader for the canonical campaign report.
+  It requires the closed report/queue/safety contracts and exact current
+  namespace/run/revision pointer identity, then projects only bounded counts,
+  review identities, outcome symbols, and allowlisted no-call/no-write commands.
+  Missing, oversized, unsafe, contradictory, pointer-drifted, or command-drifted
+  reports suppress this historical context without changing current authority.
+- Added an `Open operator work` panel to Today and System Health. It now shows
+  the 3 explicit review actions, the DEXE outcome-price gap, and 0/630 Bybit
+  spread coverage separately from the current zero-idea queue, with exact safe
+  readiness/read-only commands and visible no-review-on-dashboard wording.
+- Added campaign-action links to the Health action summary, removed its duplicate
+  generic spread warning when the exact Bybit action is available, and added a
+  responsive three-card presentation. Dashboard GET/HEAD remains read-only and
+  never inspects environment authorization or records a human action.
+- Updated the active roadmap and durable dashboard trust decision.
+**Verify:** Ran 132 focused dashboard loader/read-model/system-page/Daily
+Operations/release-safety/UX/app tests; the one ephemeral-loopback concurrency
+test was rerun with local socket permission after the sandbox correctly denied
+the bind. Ran `make radar-dashboard-smoke PYTHON=.venv/bin/python`, `make
+radar-dashboard-ux-smoke PYTHON=.venv/bin/python`, `python3 -m compileall -q
+crypto_rsi_scanner tests`, the real current-authority render check, architecture
+cleanliness, live HTTP 200 authority-header probe, and `git diff --check`; all
+passed. Visually inspected the restarted owned dashboard at its normal desktop
+size and a temporary 390-pixel phone viewport, then restored the default
+viewport; the three cards remain readable and commands wrap without overflow.
+**Notes/risks:** The campaign report is explicitly historical context, not a new
+authority layer. No provider call, authorization mutation, send, trade, order,
+paper trade, normal RSI write, `TRIGGERED_FADE`, review event, outcome mutation,
+route change, score change, or threshold change occurred.
+
 ## 2026-07-18 — Refresh architecture reports after evidence changes · Codex
 **Why:** The architecture gate regenerated its checked-in inventories after the
 parallel status snapshot used for the preceding commit. Leaving those

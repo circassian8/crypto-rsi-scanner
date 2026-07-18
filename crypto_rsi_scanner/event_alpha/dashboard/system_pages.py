@@ -26,6 +26,10 @@ from .layer_coverage import (
 )
 from .maintenance_guidance import maintenance_expiry_guidance
 from .models import DashboardSnapshot
+from .operator_work_queue import (
+    health_operator_action_items,
+    render_operator_work_queue,
+)
 from .outcomes_page import render_outcomes_page
 from .presentation import (
     UNAVAILABLE,
@@ -93,6 +97,7 @@ def render_health_page(snapshot: DashboardSnapshot) -> str:
             quality=quality,
             coverage=coverage,
         )
+        + render_operator_work_queue(snapshot)
         + _current_contract(snapshot)
         + _maintenance_status_section(snapshot)
         + _layer_coverage_section(coverage)
@@ -151,6 +156,7 @@ def _health_action_summary(
     coverage: tuple[DashboardLayerCoverage, ...],
 ) -> str:
     items: list[tuple[str, str, str, str]] = []
+    campaign_actions = health_operator_action_items(snapshot)
     if not snapshot.generation_authoritative:
         items.append((
             "Current generation is not authoritative",
@@ -172,6 +178,7 @@ def _health_action_summary(
             "danger",
             "#provider-readiness",
         ))
+    items.extend(campaign_actions)
     if missing:
         items.append((
             "Configuration or authorization is missing",
@@ -193,7 +200,15 @@ def _health_action_summary(
             "warning",
             "#market-quality",
         ))
-    if snapshot.current_market_observations and not quality["spread"]:
+    has_campaign_execution_action = any(
+        title.startswith("Bybit USDT-perpetual spread evidence")
+        for title, _detail, _tone, _href in campaign_actions
+    )
+    if (
+        snapshot.current_market_observations
+        and not quality["spread"]
+        and not has_campaign_execution_action
+    ):
         items.append((
             "Spread evidence is unavailable",
             "No current asset has verified execution spread, so actionable execution-quality claims remain capped.",
