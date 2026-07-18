@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Refresh architecture reports after evidence changes · Codex
+**Why:** The architecture gate regenerated its checked-in inventories after the
+parallel status snapshot used for the preceding commit. Leaving those
+deterministic reports uncommitted would make project-health truth lag source.
+**Changes:** Refreshed the current size, class-ownership, transitional-file,
+terminology/naming, and old-import Markdown/JSON reports against the committed
+Protocol-v2 readiness, campaign-review, and Bybit intraday/RSI changes.
+**Verify:** Ran `make architecture-cleanliness-check PYTHON=.venv/bin/python`
+sequentially after this log entry, then `git diff --check`. Status remains OK,
+the size gate passes with zero new violations, transitional/current naming and
+old-import checks remain clean, and functions-over-limit remains zero.
+**Notes/risks:** This is report synchronization only. It made no provider call,
+authorization change, send, trade, order, paper trade, normal RSI write, or
+`TRIGGERED_FADE`, and it did not change runtime policy.
+
 ## 2026-07-18 — Make direct Bybit intraday evidence RSI-ready · Codex
 **Why:** The direct Bybit contract requested only two candles per 1h/4h
 response. It could prove a latest closed bar but could never produce the exact

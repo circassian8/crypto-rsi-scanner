@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 709,
+  "class_count": 710,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10261,
+  "function_count": 10295,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-18T18:04:23.284863+00:00",
+  "generated_at": "2026-07-18T20:59:01.845948+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3024,6 +3024,13 @@
       "status": "accepted_near_threshold"
     },
     {
+      "line_count": 1459,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1450,
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3033,13 +3040,6 @@
     {
       "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1432,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3279,7 +3279,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 498,
+  "public_class_count": 499,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3358,6 +3358,7 @@
     "crypto_rsi_scanner.event_alpha.operations.daily_burn_in_plan": 1,
     "crypto_rsi_scanner.event_alpha.operations.daily_operations_pointer": 1,
     "crypto_rsi_scanner.event_alpha.operations.decision_review_timing": 1,
+    "crypto_rsi_scanner.event_alpha.operations.defillama_mapping_current_review": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_hardening_io": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_hardening_supplement": 1,
     "crypto_rsi_scanner.event_alpha.operations.empirical_replay_core": 1,
@@ -3612,6 +3613,14 @@
         },
         {
           "accepted": true,
+          "line_count": 1459,
+          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1450,
           "path": "crypto_rsi_scanner/config.py",
           "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
@@ -3624,14 +3633,6 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
           "reason": "Closed seven-file research-report projection centralizes exact run bindings, cross-report validation, anchored reads, bounded summaries, and byte-stable rendering.",
           "revisit_condition": "Split when report schema v2 or another report family is introduced, preserving whole-bundle and byte-for-byte validation fixtures.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1432,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
           "threshold": 1200
         },
         {
@@ -3838,6 +3839,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1459,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1450,
         "path": "crypto_rsi_scanner/config.py",
         "threshold": 1200
@@ -3845,11 +3851,6 @@
       {
         "line_count": 1449,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1432,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
@@ -3996,6 +3997,14 @@
           },
           {
             "accepted": true,
+            "line_count": 1459,
+            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1450,
             "path": "crypto_rsi_scanner/config.py",
             "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
@@ -4008,14 +4017,6 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
             "reason": "Closed seven-file research-report projection centralizes exact run bindings, cross-report validation, anchored reads, bounded summaries, and byte-stable rendering.",
             "revisit_condition": "Split when report schema v2 or another report family is introduced, preserving whole-bundle and byte-for-byte validation fixtures.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1432,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
             "threshold": 1200
           },
           {
