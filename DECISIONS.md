@@ -1104,6 +1104,11 @@ non-success; a report is complete
 only after independent OOS coverage is complete. Metrics remain descriptive
 and cannot auto-apply policy. Persisted reports use strict non-boolean schema
 integers, closed splits/categories, bounded ratios, and count-closure checks.
+The readiness surface may summarize proposed case structure and frozen-stage
+completeness, but it must not show per-case split assignments or algorithm
+predictions, write a file, create a human label, or treat a fixture as genuine
+evidence. Human review uses only a separate operator-owned copy of the immutable
+blind template; the frozen corpus is not a labeling surface.
 **Why:** Splitting individual article pairs can leak the same syndicated story
 family into development and test, overstating precision and recall. Family-
 indivisible partitions preserve the intended out-of-sample claim.

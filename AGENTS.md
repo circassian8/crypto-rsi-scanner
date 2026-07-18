@@ -313,13 +313,18 @@ may be added later when a suitable environment already exists.
   alerts disabled, and never sets authorization. Without a currently eligible
   genuine source, use the reported artifact preview and make no provider call.
 - **Source-independence OOS review:** use the
-  `event-alpha-source-independence-oos-export`, `...-validate`, and `...-report`
-  targets to freeze `development`/`review`/`test` by
+  `event-alpha-source-independence-oos-readiness`, `...-export`, `...-validate`,
+  and `...-report` targets to prepare and freeze `development`/`review`/`test` by
   `event_copy_family_id`. Exact source or normalized-content reuse across
   partitions is invalid, pending labels return non-success, and reports remain
-  descriptive. Never change the `0.80` Jaccard threshold, 12-token minimum,
-  normalization, scores, or routes from this workflow without enough
-  independent labels and explicit human approval.
+  descriptive. Readiness is observational: it may validate explicit local
+  inputs/corpus/template/reviews, but writes nothing, calls no provider, creates
+  no label, and never displays per-case split assignments or algorithm
+  predictions. Build genuine source-diverse pairs first; fixtures are not
+  genuine evidence. Label only a separate operator-owned copy of the immutable
+  blind template, never the frozen corpus. Never change the `0.80` Jaccard
+  threshold, 12-token minimum, normalization, scores, or routes from this
+  workflow without enough independent labels and explicit human approval.
 - **Official Decision Radar macro calendar:** use
   `radar-calendar-official-readiness` before the guarded Fed/BLS/BEA producer.
   Live acquisition is off by default and needs the already-present calendar

@@ -17,6 +17,7 @@ from .source_independence_oos import (
     validate_review_rows,
     write_explicit_immutable_output,
 )
+from .source_independence_oos_readiness import build_readiness_report
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -27,6 +28,12 @@ def _parser() -> argparse.ArgumentParser:
         )
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    readiness = commands.add_parser("readiness")
+    readiness.add_argument("--input")
+    readiness.add_argument("--corpus")
+    readiness.add_argument("--template")
+    readiness.add_argument("--reviews")
+    readiness.add_argument("--split-salt-configured", action="store_true")
     export = commands.add_parser("export")
     export.add_argument("--input", required=True)
     export.add_argument("--corpus-out", required=True)
@@ -47,6 +54,16 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "readiness":
+            result = build_readiness_report(
+                input_path=args.input,
+                corpus_path=args.corpus,
+                template_path=args.template,
+                reviews_path=args.reviews,
+                split_salt_configured=args.split_salt_configured,
+            )
+            sys.stdout.write(format_json(result))
+            return 2 if result["status"] == "invalid" else 0
         if args.command == "export":
             result = export_workflow(
                 input_path=args.input,

@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Expose blind OOS labeling readiness · Codex
+**Why:** The frozen source-independence OOS workflow existed, but its first
+three commands required five opaque path/salt variables and there was no
+observational entry point explaining whether genuine cases, a frozen corpus,
+the blind template, or human reviews actually existed. That made “perform
+human labeling” look like an algorithm task when the missing input is a real
+human-curated source-pair corpus.
+**Changes:**
+- Added `make event-alpha-source-independence-oos-readiness`. With no arguments
+  it now reports the real current state, `case_input_required`, the exact case
+  and source field contract, all seven accepted review categories, and the next
+  human action without a provider call or write.
+- Optional explicit paths validate proposed pair structure, frozen corpus,
+  immutable pending template, review bindings/provenance, remaining labels,
+  and descriptive-report coverage. The output never includes per-case split
+  assignments or algorithm predictions and creates no case, family, category,
+  label, corpus, report, or policy decision. Readiness rejects using the
+  immutable template itself as the editable review file.
+- Added a prediction-free proposed-input summary and kept the readiness logic
+  in a separate bounded module. The architecture gate initially caught a
+  177-line public function; it was split into focused stage inspectors before
+  commit, leaving zero new size violations.
+- Updated the operating agreement, frozen partition decision, and roadmap to
+  state that no genuine OOS input/corpus/template/reviews currently exist and
+  that human labeling must use a separate copy of the immutable blind template.
+**Verify:** All 18 frozen OOS workflow/readiness tests pass; Python compileall
+and `git diff --check` pass. The isolated architecture size gate reports
+`pass` with zero new violations. The real no-argument Make target returns
+`case_input_required`, zero providers/writes/threshold/policy changes, false
+prediction/split exposure, and false Protocol-v2 eligibility.
+**Notes/risks:** Readiness does not solve the human data requirement. Genuine,
+source-diverse pairs still need explicit human-curated event-copy family IDs
+and categories before the corpus can be frozen. Existing fixtures and sparse
+single-document source contracts must not be promoted as genuine OOS evidence.
+
 ## 2026-07-18 — Bind DefiLlama mapping review to current authority · Codex
 **Why:** The twentieth campaign cycle changed the exact 30-asset universe, so
 the previously recorded universe digest was already stale. A human mapping

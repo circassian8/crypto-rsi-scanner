@@ -296,6 +296,7 @@ help:
 	@echo "  make event-llm-extract-eval  Run offline LLM raw-extraction eval fixtures"
 	@echo "  make event-alpha-eval  Run offline Event Alpha route/feedback eval fixtures"
 	@echo "  make event-alpha-source-independence-oos-export  Export frozen development/review/test labels; no providers or threshold/routing changes"
+	@echo "  make event-alpha-source-independence-oos-readiness  Inspect frozen corpus and blind-label progress; no providers/writes"
 	@echo "  make event-alpha-source-independence-oos-validate  Read-only reviewed-label/provenance validation; no providers"
 	@echo "  make event-alpha-source-independence-oos-report  Read-only split metrics; no providers or threshold/routing changes"
 	@echo "  make event-alpha-source-independence-storage-report ARTIFACT_NAMESPACE=...  Measure reference/store/export bytes read-only"
@@ -1026,11 +1027,19 @@ radar-research-feedback-mark:
 		$(if $(strip $(RADAR_RESEARCH_LABEL_EVENT_ID)),--label-event-id "$(RADAR_RESEARCH_LABEL_EVENT_ID)",) \
 		--confirm
 
-.PHONY: event-alpha-source-independence-oos-export event-alpha-source-independence-oos-validate event-alpha-source-independence-oos-report event-alpha-source-independence-storage-report
+.PHONY: event-alpha-source-independence-oos-readiness event-alpha-source-independence-oos-export event-alpha-source-independence-oos-validate event-alpha-source-independence-oos-report event-alpha-source-independence-storage-report
 
 event-alpha-source-independence-storage-report:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.source_independence_storage \
 		--namespace-dir "$(EVENT_ALPHA_PROFILE_DIR)"
+
+event-alpha-source-independence-oos-readiness:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.source_independence_oos readiness \
+		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_INPUT)),--input "$(SOURCE_INDEPENDENCE_OOS_INPUT)",) \
+		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_CORPUS)),--corpus "$(SOURCE_INDEPENDENCE_OOS_CORPUS)",) \
+		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_TEMPLATE)),--template "$(SOURCE_INDEPENDENCE_OOS_TEMPLATE)",) \
+		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_REVIEWS)),--reviews "$(SOURCE_INDEPENDENCE_OOS_REVIEWS)",) \
+		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_SPLIT_SALT)),--split-salt-configured,)
 
 event-alpha-source-independence-oos-export:
 	@test -n "$(SOURCE_INDEPENDENCE_OOS_INPUT)" || { echo "SOURCE_INDEPENDENCE_OOS_INPUT is required" >&2; exit 2; }

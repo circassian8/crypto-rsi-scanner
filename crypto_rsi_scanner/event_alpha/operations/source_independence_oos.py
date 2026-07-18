@@ -327,6 +327,48 @@ def build_frozen_corpus(
     return value
 
 
+def summarize_case_input(cases: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Validate proposed pair rows without exposing predictions or split assignment."""
+
+    if isinstance(cases, (str, bytes, bytearray)) or not isinstance(cases, Sequence):
+        raise SourceIndependenceOOSWorkflowError("corpus_cases_must_be_sequence")
+    if not cases:
+        raise SourceIndependenceOOSWorkflowError("corpus_cases_empty")
+    if len(cases) > MAX_CASES:
+        raise SourceIndependenceOOSWorkflowError("corpus_case_limit_exceeded")
+    prepared = [_canonical_input_case(case) for case in cases]
+    case_ids = [row["case_id"] for row in prepared]
+    if len(case_ids) != len(set(case_ids)):
+        raise SourceIndependenceOOSWorkflowError("corpus_case_id_duplicate")
+    providers = sorted(
+        {
+            str(source.get("provider") or "")
+            for row in prepared
+            for source in (row["source_a"], row["source_b"])
+            if str(source.get("provider") or "")
+        }
+    )
+    families = {str(row["event_copy_family_id"]) for row in prepared}
+    return {
+        "status": "valid",
+        "case_count": len(prepared),
+        "event_copy_family_count": len(families),
+        "case_category_counts": dict(
+            sorted(Counter(row["case_category"] for row in prepared).items())
+        ),
+        "distinct_source_providers": providers,
+        "source_provider_count": len(providers),
+        "source_diversity_status": (
+            "multiple_providers" if len(providers) >= 2 else "single_or_missing_provider"
+        ),
+        "algorithm_predictions_exposed": False,
+        "split_assignments_exposed": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
 def validate_frozen_corpus(value: Mapping[str, Any]) -> list[str]:
     """Recompute the complete corpus, including row and split assignments."""
 
@@ -1124,6 +1166,7 @@ __all__ = (
     "load_frozen_corpus",
     "load_review_rows",
     "main",
+    "summarize_case_input",
     "validate_descriptive_report",
     "validate_frozen_corpus",
     "validate_review_rows",
