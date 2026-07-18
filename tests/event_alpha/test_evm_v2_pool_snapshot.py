@@ -78,6 +78,7 @@ def test_exact_finalized_pool_bundle_normalizes_without_inventing_usd_or_directi
 def test_operator_import_is_only_input_quality_eligible_until_immutable_capture_and_annex() -> None:
     bundle = _bundle()
     bundle["capture_mode"] = "operator_local_import"
+    bundle["provider_id"] = "operator_evm_rpc"
 
     row = evm_v2_pool_snapshot.normalize_evm_v2_pool_snapshot(
         _raw(bundle), expected_capture_mode="operator_local_import"

@@ -16,6 +16,31 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Keep EVM pool imports exact-named and detached from current authority
+**Status:** accepted
+**Decision:** A genuine operator-made EVM pool bundle may be validated locally
+without writes, then imported only behind explicit confirmation. Import reads
+the source once, rejects fixture/test/mock/replay paths and provenance plus
+secret-like content, and seals the exact bytes, deterministic normalized
+snapshot, manifest, and completion receipt in one digest-derived immutable
+namespace. Status must re-read the exact source and fully rederive the snapshot,
+identity, artifact set, fingerprints, manifest, and receipt. Imports are
+idempotent only when the existing namespace validates byte-for-byte. No latest
+pointer is created, no campaign or dashboard authority is advanced, and no
+capture becomes Protocol-v2 evidence until its exact ID is human-selected in a
+sealed annex. The receipt records that the source is operator-attested and that
+transport was not captured by the project. Local import makes no provider call
+and creates no provider authorization.
+**Why:** Immutable operator-supplied bytes provide a safe bridge for genuine
+direct RPC evidence when the application has no selected or authorized live RPC
+client. Requiring an exact namespace prevents an imported pool from being
+silently treated as the current DEX/on-chain source, while rederivation prevents
+post-import projection or metadata drift from masquerading as valid evidence.
+**Revisit when:** A specific compliant RPC provider, exact genuine pool/contract
+registry, request budget, and independent live authorization are approved for a
+project-captured transport. That future capture may add a guarded pointer only
+if current-authority semantics and rollback are separately reviewed.
+
 ## 2026-07-18 - Start DEX/on-chain evidence with exact finalized EVM pool state
 **Status:** accepted
 **Decision:** The first chain-native DEX/on-chain input contract covers only one

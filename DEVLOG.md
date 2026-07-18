@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal operator EVM pool imports without auto-publishing · Codex
+**Why:** The finalized-block pool normalizer could prove an input shape but did
+not preserve genuine operator-supplied bytes immutably or provide a closed way
+to revalidate them later.
+**Changes:**
+- Added no-write local validation and a confirmation-gated import that reads one
+  explicit source once, rejects nonlive paths/provenance and secret-like values,
+  and seals the exact bundle plus deterministic projection, manifest, and
+  completion receipt under a digest-derived namespace.
+- Added full read-only capture rederivation: exact artifact set, regular-file
+  identity, raw/projection bytes, chain/pair/block/ABI/clock/unit lineage,
+  capture identity, fingerprints, manifest, and receipt must all agree. Extra
+  leaves, symlinks, partial state, or drift fail closed; exact repeat import is
+  idempotent without rewriting files.
+- Kept authority selection explicit: no latest pointer, campaign/dashboard
+  attachment, Protocol-v2 annex binding, live RPC client, provider call, or
+  authorization was added. The receipt labels the source as operator-attested
+  and transport as not project-captured.
+- Added validate/import/status Make targets and focused coverage for
+  confirmation, no-write validation, source read-once behavior, exact artifact
+  sets, idempotence, fixture/provenance/secret rejection, symlinks, drift,
+  finalized-block causality, and non-overlapping sequential RPC clocks.
+**Verify:** Thirty focused EVM snapshot/capture plus export-TOCTOU tests pass;
+Python compileall and architecture cleanliness pass with zero new size
+violations and zero old-import references. The three new operator targets also
+render the expected no-write/confirmed-import/exact-status commands in dry-run;
+no genuine import or provider call was performed.
+**Notes/risks:** A genuine compliant RPC provider and exact pool/contract
+registry remain human decisions. An imported capture remains explicitly named,
+context-only, annex-unbound, and Protocol-v2-ineligible; no scores, thresholds,
+routes, sends, trades, orders, paper trades, RSI writes, or Event Alpha fade
+behavior changed.
+
 ## 2026-07-18 — Close the first chain-native DEX pool input contract · Codex
 **Why:** The existing DEX/on-chain fixture layer demonstrated product mechanics
 but could not prove exact block identity, pair identity, native reserves, or

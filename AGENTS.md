@@ -340,10 +340,19 @@ may be added later when a suitable environment already exists.
   token-unit reserve context only and never estimates USD liquidity, direction,
   actionability, or execution quality. The module has no HTTP client and the
   fixture makes no call or write. An unpersisted operator-local import is input-
-  shape evidence only: it remains non-authoritative, campaign-detached, annex-
-  unbound, and Protocol-v2-ineligible until a separately authorized immutable
-  capture is implemented and selected in the annex. Do not reuse the v2 ABI for
-  v3/v4 or other pool families.
+  shape evidence only. A confirmed immutable local import becomes explicitly
+  named, operator-attested context authority, but remains campaign/dashboard-
+  detached, annex-unbound, and Protocol-v2-ineligible. Use `make
+  radar-dex-onchain-evm-v2-validate-local` for a no-write operator bundle check;
+  `CONFIRM=1 make radar-dex-onchain-evm-v2-import-local` seals exact bytes,
+  deterministic projection, manifest, and receipt without a provider call; and
+  `make radar-dex-onchain-evm-v2-status` rederives one explicitly named namespace.
+  Local import rejects fixture/test/mock/replay paths or provenance and secret-
+  like content. It publishes no latest pointer, does not attach the campaign or
+  dashboard, and remains Protocol-v2-ineligible until its exact capture ID is
+  selected in a sealed annex. The receipt distinguishes operator-attested input
+  from transport captured by the project. Do not reuse the v2 ABI for v3/v4 or
+  other pool families.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
   the owner-confirmed Bybit USDT-linear perpetual public-data research surface

@@ -153,7 +153,9 @@ def _token(value: object, field: str) -> dict[str, str]:
     }
 
 
-def _exchange(value: object, index: int) -> tuple[dict[str, Any], object, datetime]:
+def _exchange(
+    value: object, index: int
+) -> tuple[dict[str, Any], object, datetime, datetime]:
     if not isinstance(value, Mapping) or set(value) != {
         "duration_ms", "request", "request_started_at", "response",
         "response_received_at",
@@ -207,6 +209,7 @@ def _exchange(value: object, index: int) -> tuple[dict[str, Any], object, dateti
             "duration_ms": duration,
         },
         response.get("result"),
+        started,
         received,
     )
 
@@ -250,6 +253,11 @@ def _bundle_header(
         raise EvmV2PoolSnapshotError("capture_contract_invalid")
 
     provider_id = _identifier(bundle.get("provider_id"), "provider_id")
+    provider_tokens = set(re.split(r"[._-]+", provider_id.casefold()))
+    if capture_mode == CAPTURE_MODE_OPERATOR_IMPORT and provider_tokens.intersection(
+        {"fixture", "mock", "replay", "test"}
+    ):
+        raise EvmV2PoolSnapshotError("operator_provider_provenance_invalid")
     network_name = _identifier(bundle.get("network_name"), "network_name")
     dex_id = _identifier(bundle.get("dex_id"), "dex_id")
     pool_address = _address(bundle.get("pool_address"), "pool_address")
@@ -276,12 +284,15 @@ def _rpc_snapshot(bundle: Mapping[str, object], header: Mapping[str, Any]) -> di
     parsed = [_exchange(value, index) for index, value in enumerate(exchanges, 1)]
     requests = [item[0] for item in parsed]
     results = [item[1] for item in parsed]
-    received_times = [item[2] for item in parsed]
+    started_times = [item[2] for item in parsed]
+    received_times = [item[3] for item in parsed]
     request_ids = [request["id"] for request in requests]
     if len(set(request_ids)) != len(request_ids):
         raise EvmV2PoolSnapshotError("rpc_request_id_duplicate")
     if received_times != sorted(received_times):
         raise EvmV2PoolSnapshotError("rpc_exchange_order_invalid")
+    if any(started_times[index] < received_times[index - 1] for index in range(1, 7)):
+        raise EvmV2PoolSnapshotError("rpc_exchange_overlap_invalid")
 
     _require_request(requests[0], method=ETH_CHAIN_ID, params=[], index=1)
     chain_number, _ = _quantity(results[0], "chain_id_result")
@@ -302,9 +313,13 @@ def _rpc_snapshot(bundle: Mapping[str, object], header: Mapping[str, Any]) -> di
         block.get("timestamp"), "finalized_block_timestamp"
     )
     block_hash = _data(block.get("hash"), "finalized_block_hash", byte_length=32)
-    block_observed_at = datetime.fromtimestamp(
-        block_timestamp, tz=timezone.utc
-    ).isoformat().replace("+00:00", "Z")
+    try:
+        block_datetime = datetime.fromtimestamp(block_timestamp, tz=timezone.utc)
+    except (OSError, OverflowError, ValueError) as exc:
+        raise EvmV2PoolSnapshotError("finalized_block_timestamp_invalid") from exc
+    if block_datetime > received_times[1]:
+        raise EvmV2PoolSnapshotError("finalized_block_time_after_acquisition")
+    block_observed_at = block_datetime.isoformat().replace("+00:00", "Z")
 
     pool_address = header["pool_address"]
     token0 = header["token0"]
