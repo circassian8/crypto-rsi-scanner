@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve a cadence-reserved market failure honestly · Codex
+**Why:** The campaign became eligible for its next genuine CoinGecko
+observation, but local DNS resolution failed after the guarded provider boundary
+was crossed. The terminal attempt and its new cadence reservation must remain
+visible without being mistaken for a counted observation or retried early.
+**Changes:**
+- Ran exactly one already-authorized Daily Operations cycle. Namespace
+  `radar_market_no_send_20260718t134658932571z_4cfb4a20be01` records one
+  attempted request, `ClientConnectorDNSError`, and terminal
+  `provider_request_failed` truth with no observations or publication.
+- Regenerated the campaign report so it retains 17 successful real cycles, 510
+  observations, and the prior strict-clean revision-12 authority while
+  increasing provider failures to four and exposing the new 14:46:59 UTC
+  reservation boundary.
+- Refreshed bounded Daily Operations status and dashboard readiness. No retry,
+  pointer mutation, dashboard restart, send, trade, order, paper trade, RSI
+  write, Event Alpha fade, or authorization change occurred.
+**Verify:** `make radar-market-campaign-report`, `make radar-daily-ops-status`,
+and `make radar-dashboard-readiness` pass. The status reconciles the exact
+failed terminal cycle, and dashboard readiness remains READY for
+`radar_market_no_send_20260718t124637586106z_736f495b1007`.
+**Notes/risks:** Do not retry before 2026-07-18 14:46:59 UTC. At the next
+eligible boundary, re-run readiness first and use the already-authorized normal
+Daily Operations boundary only once; never rapid-cycle or bypass cadence.
+
 ## 2026-07-18 — Close typed DefiLlama fundamentals semantics offline · Codex
 **Why:** The old flat fixture scaffold could demonstrate UI mechanics but did
 not prove the current official free response contract, separate fee meanings,
