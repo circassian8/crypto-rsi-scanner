@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record the twenty-third genuine no-send market cycle · Codex
+**Why:** The evidence-first program requires cadence-eligible point-in-time
+observations before Protocol-v2 freezing or any algorithm calibration. The
+prior exact boundary was 2026-07-18 22:43:28.056973 UTC.
+**Changes:**
+- Rechecked readiness after the boundary; current CoinGecko authorization and
+  cadence were explicitly eligible. Ran one no-send Daily Operations cycle with
+  no early attempt or retry. The request returned HTTP 200 in 1.924 seconds with
+  80 bounded source rows and 30 selected observations.
+- Published immutable namespace
+  `radar_market_no_send_20260718t224409325942z_e00dd1d2f4a2`, its final
+  publication and owned-dashboard operations receipts, and the terminal
+  campaign report. The exact revision-12 dashboard now serves HTTP 200.
+- Advanced campaign truth to 23 cycles / 690 retained / 660 baseline-counted /
+  30 too-close observations. Current-universe turnover and volume remain warm
+  30/30, while the 1h return family advanced from 0/30 to 29/30 warm. The 4h,
+  24h, BTC/ETH-relative, and volatility families remain honestly warming.
+- Rebound the no-call DefiLlama mapping packet to current universe digest
+  `23ef6c2f30b63f3969f3b8157383bf37212a664a02ad3c820ebb563fd98e48ed`;
+  all 30 mappings remain explicit human review work.
+**Verify:** Exact strict doctor passed with zero blockers and warnings; dashboard
+readiness and a loopback HEAD returned the exact namespace/run/revision/operator
+digest; the terminal report reconciles 23 / 690 / 660 and the new maturity
+frontier. The request ledger proves one HTTP 200 request, 30 selected rows, and
+`retry_count=0`. Focused cadence/campaign/Daily Operations suites passed 52,
+80, and 234 tests respectively.
+**Notes/risks:** Current generation is a valid healthy-empty result: 30 market
+snapshots, zero anomalies, zero candidates, zero current outcomes, and no
+invented spread. Campaign outcomes remain 1 matured / 3 pending / 1
+`due_missing_price`; three ideas remain not viewed. A broader pre-cycle
+`verify-fast` run completed 2,915 tests but exposed three follow-up failures:
+the sandbox-blocked loopback socket test plus stale architecture expectations
+around the sole unresolved 1,207-line `style_operator.py`. Those do not weaken
+the exact live publication and are the next focused fix. No sends, trades,
+orders, paper trades, normal RSI rows, or `TRIGGERED_FADE` were created.
+
 ## 2026-07-18 — Make architecture naming scans reproducible · Codex
 **Why:** Re-running the passing architecture gate reordered more than five
 thousand unchanged report rows because top-level documents came from a set and
