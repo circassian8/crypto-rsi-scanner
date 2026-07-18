@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve provider-native external catalyst timestamps · Codex
+**Why:** Full verification exposed a clock-dependent Polymarket fixture failure.
+The file-backed Gamma row carried genuine `createdAt` and `endDate` values, but
+the shared external-event normalizer ignored both, substituted current wall
+time for acquisition, and eventually filtered the evidence out of its original
+June search window.
+**Changes:**
+- Added the provider-native creation and close/end timestamp aliases already
+  used by Polymarket Gamma to the shared external-event projection. Published
+  and scheduled-event time now survive file-backed normalization explicitly.
+- Strengthened the catalyst-search adapter regression to assert the exact
+  normalized Polymarket publication and event times. Existing asset-identity,
+  query-relevance, research-only, and downstream evidence gates are unchanged.
+- No live provider call, authorization, source promotion, directional idea,
+  score, route, threshold, send, trade, order, paper trade, RSI write, or Event
+  Alpha fade trigger was added.
+**Verify:** All 15 discovery-pipeline tests pass, including the previously
+failing multi-provider catalyst-search case; Python compileall, architecture
+cleanliness with zero new violations, and `git diff --check` pass.
+
 ## 2026-07-18 — Keep authorization status metadata secret-safe · Codex
 **Why:** The eligible 16:12 UTC no-send cycle completed one successful bounded
 CoinGecko request, then correctly stopped before publication because strict

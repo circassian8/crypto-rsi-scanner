@@ -264,6 +264,9 @@ def test_event_catalyst_search_live_provider_adapters_are_evidence_only():
             raw = result.result_events[0].raw_event
             assert raw.raw_json["market_anomaly_catalyst_search_source"]["research_only"] is True
             assert raw.raw_json["market_anomaly_catalyst_search_source"]["query"] == query.query
+            if provider.name == "polymarket":
+                assert raw.published_at == now
+                assert raw.raw_json["event"]["event_time"] == "2026-06-20T12:00:00+00:00"
 
     missing_key = event_catalyst_search.CryptoPanicCatalystSearchProvider(live_enabled=True, api_token="")
     result = missing_key.search([query], max_results_per_query=2, now=now)

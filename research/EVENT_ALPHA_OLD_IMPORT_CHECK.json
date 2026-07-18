@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 8537,
+          "line": 8557,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-18T16:43:42.567921+00:00",
+  "generated_at": "2026-07-18T16:48:28.120963+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1177,
-  "input_fingerprint": "924d5907e500c86e0bce72240b9814c780b7c8fffde1f78baa513e83f085f2bf",
+  "input_fingerprint": "56bd21cc522d4f8c79e4d7fdaf6f7e1e6cb868421d7f494da7877dd8de3b79bb",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DEVLOG.md:1784392900",
-    "crypto_rsi_scanner/event_alpha/artifacts/schema/secret_metadata.py:1784392981",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784392886",
-    "research/ARCHITECTURE_SIZE_GATES.md:1784392883",
-    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784393020"
+    "DEVLOG.md:1784393300",
+    "ROADMAP.md:1784393300",
+    "crypto_rsi_scanner/event_providers/_external_common.py:1784393263",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784393032",
+    "research/ARCHITECTURE_SIZE_GATES.md:1784393028"
   ],
-  "newest_source_mtime": 1784393020.1000025,
+  "newest_source_mtime": 1784393305.6960182,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784392877.8623435,
+  "report_mtime": 1784393022.5684779,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1177,
-    "input_fingerprint": "924d5907e500c86e0bce72240b9814c780b7c8fffde1f78baa513e83f085f2bf",
+    "input_fingerprint": "56bd21cc522d4f8c79e4d7fdaf6f7e1e6cb868421d7f494da7877dd8de3b79bb",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DEVLOG.md:1784392900",
-      "crypto_rsi_scanner/event_alpha/artifacts/schema/secret_metadata.py:1784392981",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784392886",
-      "research/ARCHITECTURE_SIZE_GATES.md:1784392883",
-      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784393020"
+      "DEVLOG.md:1784393300",
+      "ROADMAP.md:1784393300",
+      "crypto_rsi_scanner/event_providers/_external_common.py:1784393263",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784393032",
+      "research/ARCHITECTURE_SIZE_GATES.md:1784393028"
     ],
-    "newest_source_mtime": 1784393020.1000025,
+    "newest_source_mtime": 1784393305.6960182,
     "regex_compile_count": 124,
-    "report_mtime": 1784392877.8623435,
-    "scan_duration_seconds": 2.2134,
+    "report_mtime": 1784393022.5684779,
+    "scan_duration_seconds": 2.1722,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 70,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.2134,
+  "scan_duration_seconds": 2.1722,
   "scanned_doc_files": 70,
   "scanned_source_files": 879,
   "scanned_test_files": 222,
