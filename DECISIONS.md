@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Treat public Bybit depth as visible-book evidence only
+**Status:** accepted
+**Decision:** Execution-quality snapshot schema v2 must record the 200-level
+REST limit, `rpi_orders_included=false`, and a visible-public-book liquidity
+scope. Derived impact is a deterministic book walk, not realized execution. Its
+size definition is exact USDT spend for buys and exact USDT proceeds for sells,
+with mid-price impact as the reference. Do not describe these values as complete
+venue liquidity or silently blend them with another source.
+**Why:** Bybit's official order-book contract states that REST is a snapshot and
+that Retail Price Improvement orders are excluded. Without explicit scope and
+method fields, a mathematically correct normalization could still overstate the
+completeness and empirical meaning of its depth/impact evidence.
+**Revisit when:** A separately authorized source observes additional executable
+liquidity or realized fills. Preserve source-specific values rather than
+rewriting historical v2 snapshots or inventing a blended book.
+
 ## 2026-07-18 - Partition the Bybit query universe before the provider boundary
 **Status:** accepted
 **Decision:** Preserve the full liquidity-ranked Radar universe while deriving

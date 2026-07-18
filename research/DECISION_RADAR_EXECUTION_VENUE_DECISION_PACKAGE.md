@@ -54,6 +54,14 @@ Public market-data reachability is not trading eligibility. Every option needs a
 separate current jurisdiction/account decision. No option requests an API key,
 private account data, wallet access, an order endpoint, or permission to trade.
 
+The Bybit normalized snapshot is deliberately narrower than “venue liquidity.”
+It binds the requested 200 visible REST levels, explicitly records that RPI
+orders are excluded by the provider, and labels USDT impact as a deterministic
+walk of those visible levels rather than realized execution. Buy size means
+exact USDT spent; sell size means exact USDT proceeds. These definitions must
+remain explicit in any Protocol-v2 cost annex. See the official
+[Bybit order-book contract](https://bybit-exchange.github.io/docs/v5/market/orderbook).
+
 ## Next point-in-time intraday contract
 
 The intended venue-native 1h/4h source is Bybit V5

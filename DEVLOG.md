@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make Bybit liquidity scope explicit · Codex
+**Why:** The official Bybit REST order-book contract states that its snapshot
+excludes Retail Price Improvement orders. Existing spread/depth math was
+deterministic, but its artifacts did not explicitly distinguish visible public
+levels from complete venue liquidity or realized execution.
+**Changes:**
+- Advanced the normalized execution-quality snapshot to schema v2 and sealed
+  the 200-level cap, visible-public-book scope, and `rpi_orders_included=false`.
+- Added exact impact semantics: deterministic visible-book walk, mid-price
+  reference, exact USDT spend for buys, and exact USDT proceeds for sells.
+- Updated focused tests, the execution decision package, working agreement, and
+  durable decision. No algorithm threshold or observed value was retuned.
+**Verify:** 43 focused Bybit normalizer/live/capture tests, the offline fixture
+smoke, and compileall passed; architecture cleanliness passed with zero new
+violations; `git diff --check` passed.
+**Notes/risks:** Depth and impact remain source-specific derived evidence, not
+realized fills. No provider call/authorization, capture, trade/order, send,
+paper/RSI/fade action, route, score, threshold, or authority changed.
+
 ## 2026-07-18 — Reject an empty Bybit contract intersection · Codex
 **Why:** The public collector could finish all instrument-metadata requests with
 zero exact active contracts and report a complete diagnostic result, while the

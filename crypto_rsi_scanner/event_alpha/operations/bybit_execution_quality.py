@@ -21,7 +21,7 @@ from typing import Any, Mapping, Sequence
 
 
 CONTRACT_VERSION = "crypto_radar_bybit_usdt_perpetual_execution_quality_v1"
-SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_execution_quality.v1"
+SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_execution_quality.v2"
 VENUE_ID = "bybit"
 EXECUTION_MODE = "perpetual"
 BYBIT_CATEGORY = "linear"
@@ -147,11 +147,16 @@ class _BybitExecutionQualitySnapshot:
     best_ask: float
     mid_price: float
     spread_bps: float
+    orderbook_level_limit: int
+    liquidity_scope: str
+    rpi_orders_included: bool
     bid_depth_usdt_by_band: tuple[tuple[int, float], ...]
     ask_depth_usdt_by_band: tuple[tuple[int, float], ...]
     buy_price_impact_bps_by_notional_usdt: tuple[tuple[float, float | None], ...]
     sell_price_impact_bps_by_notional_usdt: tuple[tuple[float, float | None], ...]
     impact_reference: str
+    impact_method: str
+    impact_size_definition: str
     order_book_update_id: int
     order_book_cross_sequence: int
     source_url: str
@@ -177,6 +182,9 @@ class _BybitExecutionQualitySnapshot:
             "best_ask": self.best_ask,
             "mid_price": self.mid_price,
             "spread_bps": self.spread_bps,
+            "orderbook_level_limit": self.orderbook_level_limit,
+            "liquidity_scope": self.liquidity_scope,
+            "rpi_orders_included": self.rpi_orders_included,
             "bid_depth_usdt_by_band": dict(self.bid_depth_usdt_by_band),
             "ask_depth_usdt_by_band": dict(self.ask_depth_usdt_by_band),
             "buy_price_impact_bps_by_notional_usdt": dict(
@@ -186,6 +194,8 @@ class _BybitExecutionQualitySnapshot:
                 self.sell_price_impact_bps_by_notional_usdt
             ),
             "impact_reference": self.impact_reference,
+            "impact_method": self.impact_method,
+            "impact_size_definition": self.impact_size_definition,
             "order_book_update_id": self.order_book_update_id,
             "order_book_cross_sequence": self.order_book_cross_sequence,
             "source_url": self.source_url,
@@ -579,6 +589,9 @@ def normalize_bybit_orderbook(
         best_ask=_float(best_ask),
         mid_price=_float(mid),
         spread_bps=_float(spread_bps),
+        orderbook_level_limit=200,
+        liquidity_scope="bybit_public_rest_visible_levels_only",
+        rpi_orders_included=False,
         bid_depth_usdt_by_band=_depth_by_band(
             bids, mid=mid, bands_bps=bands, side="bids"
         ),
@@ -592,6 +605,10 @@ def normalize_bybit_orderbook(
             bids, mid=mid, notionals=notionals, side="bids"
         ),
         impact_reference="mid_price",
+        impact_method="deterministic_visible_book_walk_not_realized_execution",
+        impact_size_definition=(
+            "exact_usdt_spend_for_buy_and_exact_usdt_proceeds_for_sell"
+        ),
         order_book_update_id=update_id,
         order_book_cross_sequence=sequence,
         source_url=(

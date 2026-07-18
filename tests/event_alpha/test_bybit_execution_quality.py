@@ -128,6 +128,10 @@ def test_orderbook_normalizes_quote_units_freshness_lineage_and_sequences() -> N
     assert payload["best_ask"] == 100.1
     assert payload["mid_price"] == 100.05
     assert payload["spread_bps"] == pytest.approx(9.995002498751)
+    assert payload["schema_version"] == "crypto_radar.bybit_execution_quality.v2"
+    assert payload["orderbook_level_limit"] == 200
+    assert payload["liquidity_scope"] == "bybit_public_rest_visible_levels_only"
+    assert payload["rpi_orders_included"] is False
     assert payload["bid_depth_usdt_by_band"] == {
         5: 1_000.0,
         10: 2_999.0,
@@ -144,6 +148,12 @@ def test_orderbook_normalizes_quote_units_freshness_lineage_and_sequences() -> N
     assert payload["sell_price_impact_bps_by_notional_usdt"][500.0] is not None
     assert payload["buy_price_impact_bps_by_notional_usdt"][10_000.0] is not None
     assert payload["impact_reference"] == "mid_price"
+    assert payload["impact_method"] == (
+        "deterministic_visible_book_walk_not_realized_execution"
+    )
+    assert payload["impact_size_definition"] == (
+        "exact_usdt_spend_for_buy_and_exact_usdt_proceeds_for_sell"
+    )
     assert payload["order_book_update_id"] == 230704
     assert payload["order_book_cross_sequence"] == 1432604333
     assert payload["request_lineage_id"] == "test.bybit.btcusdt.1"

@@ -343,7 +343,10 @@ may be added later when a suitable environment already exists.
   contracts and freezes the resulting IDs only in the Protocol-v2 annex. Run
   `make radar-execution-quality-bybit-smoke` for the offline fixture normalizer;
   it preserves clocks/sequence and computes spread, USDT depth, and
-  USDT-notional impact without silent USD conversion. The separately gated
+  USDT-notional impact without silent USD conversion. Snapshot schema v2 states
+  that the 200-level public REST book excludes RPI orders and labels impact as a
+  deterministic visible-book walk, not realized execution or complete venue
+  liquidity. The separately gated
   public REST adapter and immutable capture contract are implemented but
   inactive. `make radar-execution-quality-bybit-readiness` binds to the exact
   authoritative Radar generation, and `make
