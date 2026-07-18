@@ -10,6 +10,8 @@ import pytest
 
 import crypto_rsi_scanner.event_alpha.radar.market_history as event_market_history
 import crypto_rsi_scanner.event_alpha.radar.market_history_readiness as market_history_readiness
+import crypto_rsi_scanner.event_alpha.radar.market_state as event_market_state
+import crypto_rsi_scanner.event_alpha.radar.market_units as event_market_units
 
 
 NOW = datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)
@@ -93,6 +95,7 @@ def test_market_history_enriches_temporal_features_and_preserves_lineage_and_bas
         provenance_contract_valid=True,
         burn_in_eligible=True,
         burn_in_counted=True,
+        return_unit="fraction",
         volume_zscore_24h=9.9,
         volume_zscore_basis="cross_sectional_log_turnover_proxy",
         market_feature_evidence={
@@ -144,6 +147,13 @@ def test_market_history_enriches_temporal_features_and_preserves_lineage_and_bas
         == event_market_history.TEMPORAL_BASELINE_BASIS
     )
     assert enriched["return_units"]["return_1h"] == "percent_points"
+    assert enriched["return_units"]["temporal_return_1h"] == "percent_points"
+    assert (
+        enriched["return_units"]["temporal_relative_return_vs_btc_1h"]
+        == "percent_points"
+    )
+    assert event_market_units.validate_market_snapshot_units(enriched) == ()
+    assert event_market_state.snapshot_from_market_row(enriched).unit_warnings == ()
     assert result.retained_history[0]["canonical_asset_id"] == "bitcoin"
     assert all(row["observed_at"].endswith("+00:00") for row in result.retained_history)
     retained_current = next(

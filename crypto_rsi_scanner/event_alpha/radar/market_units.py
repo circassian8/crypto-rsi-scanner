@@ -9,6 +9,7 @@ centralized so market-state artifacts cannot be multiplied by 100 twice.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Mapping
 
 
@@ -46,6 +47,23 @@ RETURN_KEYS = (
     "dex_volume_change",
     "dex_liquidity_change",
 )
+
+_TEMPORAL_RETURN_KEY = re.compile(
+    r"temporal_(?:return|return_volatility|relative_return_vs_(?:btc|eth))_[1-9][0-9]*h"
+)
+
+
+def is_return_unit_field(field: object) -> bool:
+    """Return whether ``field`` may carry percentage/fraction unit metadata.
+
+    Rolling market-history enrichment retains its point-in-time derived returns
+    beside the canonical model inputs.  Their names are deliberately closed to
+    the three generated temporal families; arbitrary metadata keys still fail
+    unit validation.
+    """
+
+    text = str(field or "")
+    return text in RETURN_KEYS or _TEMPORAL_RETURN_KEY.fullmatch(text) is not None
 
 
 def infer_return_unit(
@@ -149,9 +167,15 @@ def validate_market_snapshot_units(
         warnings.append("invalid_return_unit_metadata")
         overrides = {}
     for key in overrides or {}:
-        if str(key) not in RETURN_KEYS:
+        if not is_return_unit_field(key):
             warnings.append(f"unknown_return_unit_field:{key}")
-    for key in RETURN_KEYS:
+    validated_fields = list(RETURN_KEYS)
+    validated_fields.extend(
+        str(key)
+        for key in overrides or {}
+        if is_return_unit_field(key) and str(key) not in RETURN_KEYS
+    )
+    for key in validated_fields:
         if key not in snapshot or snapshot.get(key) in (None, ""):
             continue
         parsed = _float(snapshot.get(key))
@@ -186,7 +210,10 @@ def validate_market_snapshot_units(
             if abs(actual) > 50.0 and abs(expected) < 10.0:
                 warnings.append(f"{key}_possible_double_scaled")
     for key, threshold in (("return_1h", 50.0), ("return_4h", 80.0)):
-        actual = normalize_return_percent_points(snapshot.get(key), unit)
+        actual = normalize_return_percent_points(
+            snapshot.get(key),
+            return_unit_for_field(snapshot, key, default=unit),
+        )
         if actual is not None and abs(actual) > threshold:
             warnings.append(f"{key}_extreme_without_unit_context")
     return tuple(dict.fromkeys(warnings))

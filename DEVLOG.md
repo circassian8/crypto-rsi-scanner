@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve valid temporal return units through anomaly scanning · Codex
+**Why:** The current genuine market generation exposed false unit warnings on
+all 30 snapshots. Rolling history correctly declared its derived temporal
+returns as percentage points, but the shared validator treated those exact
+generated field names as unknown. Any future anomaly would have inherited the
+warnings and failed the Decision-v2 unit gate despite valid values.
+**Changes:**
+- Added a closed validator predicate for the three generated temporal return
+  families: horizon returns, return volatility, and BTC/ETH-relative returns.
+  Arbitrary unit-metadata names remain invalid.
+- Validate values for those declared temporal fields instead of merely
+  accepting their names, and apply the 1h/4h extreme check with each field's
+  explicit override rather than the snapshot-wide default.
+- Added an end-to-end rolling-history regression proving that mixed raw
+  fraction and derived percentage-point fields produce a warning-free canonical
+  market snapshot.
+**Verify:** Ran 169 focused market-history, market-enrichment, market-surface,
+Decision-v2, no-send, and doctor tests; all passed. Re-projected the exact 30 cached rows from
+`radar_market_no_send_20260718t224409325942z_e00dd1d2f4a2` without writes:
+30 snapshots, zero anomalies (unchanged), zero warning rows, and zero unit
+warnings. Market-anomaly and integrated-radar offline smokes, Python compileall,
+and diff checks passed.
+**Notes/risks:** Existing immutable generations are not rewritten. The next
+cadence-eligible generation will carry the corrected snapshots. No threshold,
+score, route, provider, authorization, call, spread, send, trade, order, paper
+trade, RSI row, or `TRIGGERED_FADE` changed.
+
 ## 2026-07-18 — Remove the last unresolved production-size warning · Codex
 **Why:** The broad local gate exposed one real project-state drift:
 `style_operator.py` had grown to 1,207 lines without an accepted exception,
