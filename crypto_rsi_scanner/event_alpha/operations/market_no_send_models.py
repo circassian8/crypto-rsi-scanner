@@ -98,7 +98,7 @@ class MarketNoSendReadiness:
     pointer_eligibility_status: str = "pending_complete_strict_doctor"
     artifact_paths: tuple[str, ...] = ()
     universe_policy: str = "bounded_top_liquid_by_total_volume"
-    next_safe_command: str = "make radar-market-no-send"
+    next_safe_command: str = "make radar-daily-ops-cycle"
 
     @property
     def ready(self) -> bool:

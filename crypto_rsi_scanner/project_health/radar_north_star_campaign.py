@@ -5,8 +5,19 @@ from __future__ import annotations
 from typing import Any
 
 MARKET_NO_SEND_GENERATION: dict[str, Any] = {
-    "targets": ["radar-market-no-send-readiness", "radar-market-no-send",
-                "radar-market-no-send-smoke", "radar-market-campaign-report"],
+    "targets": [
+        "radar-market-no-send-readiness",
+        "radar-daily-ops-cycle",
+        "radar-market-no-send",
+        "radar-market-no-send-smoke",
+        "radar-market-campaign-report",
+    ],
+    "operator_cycle_target": "radar-daily-ops-cycle",
+    "compatibility_alias": {
+        "radar-market-no-send": "radar-daily-ops-cycle",
+    },
+    "publication_owner": "decision_radar_daily_operations_v1_1",
+    "direct_low_level_publication": "disabled",
     "default_namespace": "radar_market_no_send",
     "provider": "coingecko",
     "run_mode": "operational",

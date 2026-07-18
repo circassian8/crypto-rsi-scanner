@@ -401,7 +401,7 @@ def test_rate_limit_backoff_and_latest_failure_are_shared_and_sanitized(
     assert readiness.ready is False
     assert readiness.will_call_provider is False
     assert any("shared backoff" in reason for reason in readiness.reasons)
-    assert readiness.next_safe_command == "make radar-market-no-send-readiness"
+    assert readiness.next_safe_command == "make radar-daily-ops-readiness"
 
     calls = 0
 

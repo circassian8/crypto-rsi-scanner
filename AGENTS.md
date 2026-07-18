@@ -483,9 +483,13 @@ may be added later when a suitable environment already exists.
   feature/time-aware warmup, spread limits, artifacts, and next safe command.
   The default minimum observation spacing is 60 minutes; too-close observations
   remain explicit evidence but never enter temporal baselines or advance
-  warmup. `make radar-market-no-send` rechecks authorization, cadence, and shared
-  provider backoff before the adapter and may reserve/attempt at most one bounded
-  live request in one eligible invocation. It never creates authorization. A
+  warmup. `make radar-daily-ops-cycle` is the only public operator cycle: it
+  rechecks authorization, cadence, and shared provider backoff before the adapter
+  and may reserve/attempt at most one bounded live request in one eligible
+  invocation. `make radar-market-no-send` is a compatibility alias for that same
+  coordinator. The lower-level `market_no_send publish` command is disabled; it
+  cannot advance the pointer without the coordinator's explicit receipt-producing
+  transition. The application never creates authorization. A
   stable base-root cadence receipt and bounded attempt ledger survive campaign
   state-directory replacement, and the exact latest-attempt receipt prevents a
   blocked run from reusing an older complete manifest. Campaign reports use
@@ -494,7 +498,8 @@ may be added later when a suitable environment already exists.
   observation time identify exactly one attempt and every terminal field
   agrees. Ambiguous or contradictory cross-artifact representations block the
   report rather than changing counts. Only canonical live/
-  no-send provenance plus a fresh strict doctor may publish. Published
+  no-send provenance plus a fresh strict doctor may enter the coordinator's
+  closed publication transition. Published
   namespaces are immutable, so later live cycles use a new namespace and seed
   their exact history snapshot from `radar_market_history_cache`; fixture/mock
   history remains isolated. `make radar-market-no-send-smoke` proves mechanics

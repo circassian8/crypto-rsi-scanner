@@ -33,6 +33,10 @@ make radar-daily-ops-status PYTHON=.venv/bin/python
 make radar-daily-ops-cycle PYTHON=.venv/bin/python
 ```
 
+`make radar-market-no-send` remains only as a compatibility alias for the same
+Daily Operations cycle. The lower-level collection CLI cannot publish dashboard
+authority by itself.
+
 Every cycle runs readiness before a possible call, makes at most one already-
 authorized CoinGecko no-send observation when cadence permits, uses a unique
 immutable namespace, and strict-doctors before publication. Its immutable

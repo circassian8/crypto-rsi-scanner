@@ -19,7 +19,7 @@ from crypto_rsi_scanner.event_alpha.dashboard.models import DashboardSnapshot
 _CLOCK = "2026-07-14T09:00:00+00:00"
 _NEXT_SAFE_ACTION = (
     "Configure RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH with a fresh non-fixture "
-    "operator-verified snapshot, then run make radar-market-no-send-readiness"
+    "operator-verified snapshot, then run make radar-daily-ops-readiness"
 )
 
 
@@ -688,6 +688,6 @@ def test_calendar_missing_setup_leads_with_health_action_and_hides_commands_in_d
     assert 'href="/health"' in primary
     assert "Review System Health" in primary
     assert "RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH" not in primary
-    assert "make radar-market-no-send-readiness" not in primary
+    assert "make radar-daily-ops-readiness" not in primary
     assert '<summary><span>Calendar readiness and setup instructions</span>' in page
     assert _NEXT_SAFE_ACTION in page

@@ -63,11 +63,11 @@ def next_observation(
         ),
         "blocking_reasons": blocking_reasons,
         "next_safe_operator_command": (
-            "make radar-market-no-send PYTHON=.venv/bin/python"
+            "make radar-daily-ops-cycle PYTHON=.venv/bin/python"
             if eligible
-            else "make radar-market-no-send-readiness PYTHON=.venv/bin/python"
+            else "make radar-daily-ops-readiness PYTHON=.venv/bin/python"
         ),
-        "eligible_run_command": "make radar-market-no-send PYTHON=.venv/bin/python",
+        "eligible_run_command": "make radar-daily-ops-cycle PYTHON=.venv/bin/python",
         "authorization_rechecked_by_command": True,
         "rapid_cycles_do_not_advance_warmup": True,
     }

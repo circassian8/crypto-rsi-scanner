@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-18T10:42:28.672549+00:00`
+- generated_at: `2026-07-18T11:21:37.589821+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -106,7 +106,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py` | 1389 |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 |
-| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1305 |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1317 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
@@ -151,7 +151,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py` | 1389 | Pure frozen shadow-policy, recommendation-seal, final-test, and chronological walk-forward evaluation with no production-policy mutation path. | Split before adding another scenario family or changing the recommendation-seal or walk-forward schemas, and before any growth crosses the 1,500-line blocker. |
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | Route-gate decision logic is dense and behavior-critical for no-send notification eligibility. | When route-decision/gate snapshots cover every lane and quality-gate cap. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
-| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1305 | Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly. | When adding another live-safe market provider or changing the generation transaction boundary. |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1317 | Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly. | When adding another live-safe market provider or changing the generation transaction boundary. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 | Pure bounded targeted-review selection keeps outcome-aware categories, evidence bindings, deterministic ranking, and queue finalization in one policy-neutral path. | Split when another review category family or feedback-ledger integration is proposed, with frozen queue-digest fixtures first. |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is stable and below blocker threshold. | When adding a new enrichment source or cache policy. |
@@ -176,7 +176,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/cli/test_make_targets.py` | 1500 |
 | `tests/event_alpha/test_operator_state.py` | 1499 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1497 |
-| `tests/event_alpha/test_market_no_send.py` | 1492 |
+| `tests/event_alpha/test_market_no_send.py` | 1485 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
 | `tests/event_alpha/test_artifact_schema.py` | 1479 |
 | `tests/event_alpha/test_operator_workflows.py` | 1464 |

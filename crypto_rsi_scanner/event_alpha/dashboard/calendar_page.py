@@ -70,7 +70,7 @@ from .presentation import (
 
 _NEXT_SAFE_ACTION = (
     "Configure RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH with a fresh non-fixture "
-    "operator-verified snapshot, then run make radar-market-no-send-readiness"
+    "operator-verified snapshot, then run make radar-daily-ops-readiness"
 )
 _FILTER_FIELDS = ("search", "importance", "category", "scope", "time")
 _TIME_FILTER_OPTIONS = (

@@ -603,8 +603,8 @@ byte-check, and optional review-feedback workflow is documented in
 
 The supported operator flow is:
 
-1. `make radar-market-no-send-readiness`
-2. `make radar-market-no-send`
+1. `make radar-daily-ops-readiness`
+2. `make radar-daily-ops-cycle`
 3. `make radar-market-no-send-smoke`
 4. `make radar-market-campaign-report`
 
@@ -616,6 +616,10 @@ anomalies, creates canonical Decision ideas, then builds cards, preview,
 outcomes, operator state, the dashboard read model, and a credential-free JSON
 plus Markdown pilot audit. The defaults remain research-only and no-send, with
 zero trades, paper trades, normal RSI writes, or `TRIGGERED_FADE` creation.
+Daily Operations v1.1 exclusively owns pointer publication, final receipts,
+owned-dashboard restart, exact HTTP probing, terminal state, and report refresh.
+`make radar-market-no-send` is a compatibility alias for that coordinator; the
+lower-level `market_no_send publish` command is disabled.
 
 When `RSI_DECISION_RADAR_CALENDAR_SNAPSHOT_PATH` is already configured, the
 same generation validates and copies that local no-network calendar snapshot,

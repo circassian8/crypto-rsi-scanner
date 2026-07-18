@@ -541,6 +541,9 @@
     "schema_version": "crypto_radar_market_provenance_v2"
   },
   "market_no_send_generation": {
+    "compatibility_alias": {
+      "radar-market-no-send": "radar-daily-ops-cycle"
+    },
     "authorization": {
       "authorization_absent_behavior": "safe blocked result, no provider call, credential-free pilot audit, pointer unchanged",
       "authorization_or_cadence_rechecked_by_generation": true,
@@ -573,6 +576,7 @@
       "zero_idea_generation_may_be_clean": true
     },
     "default_namespace": "radar_market_no_send_<lowercase-utc-timestamp>",
+    "direct_low_level_publication": "disabled",
     "defaults": {
       "no_normal_rsi_writes": true,
       "no_paper_trades": true,
@@ -665,8 +669,11 @@
       "burn_in_counted",
       "burn_in_reason"
     ],
+    "operator_cycle_target": "radar-daily-ops-cycle",
+    "publication_owner": "decision_radar_daily_operations_v1_1",
     "targets": [
       "radar-market-no-send-readiness",
+      "radar-daily-ops-cycle",
       "radar-market-no-send",
       "radar-market-no-send-smoke",
       "radar-market-campaign-report"

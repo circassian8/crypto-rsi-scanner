@@ -624,7 +624,7 @@ def test_campaign_report_honors_reserved_provider_call_cadence_without_history(
         "2026-07-13T19:00:00+00:00"
     )
     assert report["next_observation"]["next_safe_operator_command"] == (
-        "make radar-market-no-send-readiness PYTHON=.venv/bin/python"
+        "make radar-daily-ops-readiness PYTHON=.venv/bin/python"
     )
 
 
@@ -920,7 +920,7 @@ def test_campaign_make_target_is_read_only_and_does_not_enable_authorization():
     makefile = Path("Makefile").read_text(encoding="utf-8")
     assert "radar-market-campaign-report:" in makefile
     target = makefile.split("radar-market-campaign-report:\n", 1)[1].split(
-        "radar-market-no-send:\n", 1
+        "radar-market-no-send:", 1
     )[0]
     assert "campaign-report" in target
     assert "--output-dir $(RADAR_MARKET_CAMPAIGN_OUTPUT_DIR)" in target

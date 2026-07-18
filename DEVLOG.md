@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make Daily Operations the sole market authority writer · Codex
+**Why:** One authorized cadence-eligible market observation completed correctly,
+but the legacy direct command then advanced the dashboard pointer without the
+Daily Operations publication/operations receipts or owned restart. The exact
+old dashboard process correctly returned HTTP 503, exposing a second,
+incomplete operator-authority transition.
+**Changes:**
+- Preserved the 10:45:32 UTC CoinGecko observation as genuine historical
+  campaign evidence: one bounded request, no retry, 80 raw rows, 30 selected,
+  zero anomalies/ideas, strict doctor clean, and every no-send/no-trade safety
+  counter zero. Restored exact receipt-backed revision-12 authority
+  `radar_market_no_send_20260718t080415034561z_6d91b49d88b1` through the tested
+  receipt-bound rollback path; pointer SHA-256 is
+  `4bdfd9a57c96b152d0bfee516525aef163e5b45c201f26501ac94735f5b1c4af`, and the
+  owned loopback dashboard again serves exact HTTP 200 identity headers.
+- Made `radar-market-no-send` a compatibility alias for
+  `radar-daily-ops-cycle`. The low-level collection CLI now refuses direct
+  publication unless an internal coordinator supplies the explicit transition;
+  Daily Operations alone owns doctor, sealed attempt audit, pointer, final
+  publication receipt, owned restart, terminal journal, operations receipt,
+  exact HTTP probe, and campaign-report refresh.
+- Pointed every eligible/waiting next-action surface to Daily Operations
+  readiness/cycle, including campaign reports and Calendar guidance. Kept the
+  lower-level market readiness command as a no-network diagnostic only.
+- Regenerated coherent campaign truth: 15 real cycles, 450 retained
+  observations, 420 baseline-counted, 30 too-close, 34 historical assets, 0
+  globally warm assets, 5 historical ideas, 0 current ideas, and 0/450 trusted
+  spread coverage. The 10:45 generation remains visibly
+  `published_legacy_audit`, historically published but not current and without
+  fabricated final receipts.
+- Updated the North Star contracts, operator guide, README, working agreement,
+  durable decision, roadmap, architecture reports, and focused regression
+  coverage. No authorization, scheduler, Bybit adapter, calendar provider,
+  phone route, threshold, score, or execution behavior changed.
+**Verify:** 175 focused market/campaign/Daily Operations/publication/dashboard/
+calendar/Make tests passed; the three namespace/loopback regressions passed
+separately outside the socket-restricted sandbox. Compileall and the export
+parent-symlink/TOCTOU security regression passed. Architecture size and
+cleanliness gates passed with zero new violations. `make verify-fast` passed
+2,807 pytest checks plus the standard offline smokes in 161.31s. Full `make
+verify` passed 1,392/1,392 standalone checks and 2,807/2,807 pytest checks in
+164.12s for its package phase, followed by alert-render, fixture-backtest, and
+paper-scoreboard smokes. Daily Operations readiness made zero provider calls,
+reported the scheduler still uninstalled and cadence waiting, and dashboard
+readiness plus a real loopback HEAD returned exact authority at HTTP 200.
+
 ## 2026-07-18 — Apply recovered outcome prices without baseline drift · Codex
 **Why:** Immutable historical responses could be audited but could not safely
 close the exact overdue campaign row. The final boundary had to mutate only the

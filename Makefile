@@ -335,14 +335,14 @@ help:
 	@echo "  CONFIRM=1 make radar-dashboard-public-enable  Start an unauthenticated temporary public HTTPS link"
 	@echo "  CONFIRM=1 make radar-dashboard-public-disable Stop only the owned temporary public link"
 	@echo "  CONFIRM=1 make radar-dashboard-public-guard   Stop the owned public link if expired or unhealthy"
-	@echo "  make radar-market-no-send-readiness  Check explicit live CoinGecko authorization without a provider call"
+	@echo "  make radar-market-no-send-readiness  Lower-level CoinGecko/cadence diagnostic; no provider call"
 	@echo "  make radar-outcome-price-recovery-readiness  Plan exact historical outcome-price recovery; no call/write"
 	@echo "  CONFIRM=1 make radar-outcome-price-recovery-collect  Diagnostic exact-response recovery; no retry/write"
 	@echo "  CONFIRM=1 make radar-outcome-price-recovery-capture  Seal exact historical responses; no outcome/baseline write"
 	@echo "  make radar-outcome-price-recovery-status  Validate the latest immutable recovery capture; no call/write"
 	@echo "  CONFIRM=1 make radar-outcome-price-recovery-apply  Apply captured prices to exact outcome rows only; no call/baseline write"
 	@echo "  make radar-outcome-price-recovery-application-status  Validate current applied-recovery truth; no call/write"
-	@echo "  make radar-market-no-send          Build, strict-doctor, and publish one fresh live/no-send market generation"
+	@echo "  make radar-market-no-send          Compatibility alias for one closed Daily Operations cycle"
 	@echo "  make radar-market-no-send-smoke    Prove the market generation offline; never updates the dashboard pointer"
 	@echo "  make radar-market-campaign-report  Rebuild the artifact-derived Decision Radar campaign report; no provider call"
 	@echo "  make radar-review-timing-status  Inspect explicit human review timing; no provider call/write"
@@ -1449,61 +1449,8 @@ radar-review-timing-complete:
 		--reviewer-alias "$(RADAR_REVIEWER_ALIAS)" \
 		$(if $(filter 1,$(CONFIRM)),--confirm,)
 
-radar-market-no-send:
-	@finalize_status=0; \
-	record_failure() { \
-		failure_status=$$1; \
-		if test $$finalize_status -eq 0; then finalize_status=$$failure_status; fi; \
-	}; \
-	env RSI_EVENT_ALERTS_ENABLED=0 \
-	RSI_EVENT_ALPHA_RUN_MODE=operational \
-	RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
-	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send run \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
-		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG) \
-		|| record_failure $$?; \
-	if test $$finalize_status -eq 0; then \
-		env RSI_EVENT_ALERTS_ENABLED=0 \
-		RSI_EVENT_ALPHA_RUN_MODE=operational \
-		RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send status \
-			--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-			--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) >/dev/null; \
-		status_code=$$?; \
-		if test $$status_code -eq 0; then \
-			env RSI_EVENT_ALERTS_ENABLED=0 \
-				RSI_EVENT_ALPHA_RUN_MODE=operational \
-				RSI_EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED=0 \
-				RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-				sh -c 'cd "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_NAMESPACE)" && exec "$(RADAR_MARKET_NO_SEND_PYTHON)" "$(RADAR_MARKET_NO_SEND_MAIN)" --event-alpha-artifact-doctor \
-					--event-alpha-profile no_key_live \
-					--event-alpha-artifact-namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) \
-					--event-alpha-artifact-doctor-strict' || record_failure $$?; \
-			if test $$finalize_status -eq 0; then \
-				env RSI_EVENT_ALERTS_ENABLED=0 \
-				RSI_EVENT_ALPHA_RUN_MODE=operational \
-				RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-				$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send publish \
-					--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-					--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) || record_failure $$?; \
-			fi; \
-		else \
-			record_failure $$status_code; \
-		fi; \
-	fi; \
-	env RSI_EVENT_ALERTS_ENABLED=0 \
-	RSI_EVENT_ALPHA_RUN_MODE=operational \
-	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send audit \
-			--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-			--namespace $(RADAR_MARKET_NO_SEND_NAMESPACE) || record_failure $$?; \
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.market_no_send campaign-report \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		--output-dir $(RADAR_MARKET_CAMPAIGN_OUTPUT_DIR) \
-		$(RADAR_MARKET_CAMPAIGN_EVALUATED_AT_ARG) || record_failure $$?; \
-	exit $$finalize_status
+radar-market-no-send: radar-daily-ops-cycle
+	@echo "radar-market-no-send delegates to the receipt-backed Daily Operations coordinator."
 
 radar-market-no-send-smoke:
 	rm -rf $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE)

@@ -183,7 +183,10 @@ def test_current_authority_namespace_blocks_before_live_provider_call(
 
     assert readiness.ready is False
     assert readiness.will_call_provider is False
-    assert "<new-generation>" in readiness.next_safe_command
+    assert readiness.next_safe_command.startswith("Run make radar-daily-ops-cycle")
+    assert "coordinator will choose a new immutable generation" in (
+        readiness.next_safe_command
+    )
     assert result.status == "blocked"
     assert result.provider_call_attempted is False
     assert calls == 0
@@ -224,7 +227,10 @@ def test_existing_generation_namespace_is_single_use_before_live_provider_call(
 
     assert readiness.ready is False
     assert readiness.will_call_provider is False
-    assert "<new-generation>" in readiness.next_safe_command
+    assert readiness.next_safe_command.startswith("Run make radar-daily-ops-cycle")
+    assert "coordinator will choose a new immutable generation" in (
+        readiness.next_safe_command
+    )
     assert result.status == "blocked"
     assert result.provider_call_attempted is False
     assert calls == 0

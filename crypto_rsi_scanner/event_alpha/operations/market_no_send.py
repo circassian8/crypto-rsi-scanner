@@ -18,7 +18,6 @@ from ..artifacts import context as artifact_context
 from ..artifacts import run_ledger
 from ..dashboard.readiness import (
     DashboardReadinessError,
-    publish_current_namespace_pointer,
 )
 from ..radar import market_anomaly_scanner
 from ..radar import market_enrichment
@@ -181,7 +180,7 @@ def build_market_no_send_readiness(
             PILOT_AUDIT_MD_FILENAME,
         ),
         next_safe_command=(
-            "make radar-market-no-send-readiness"
+            "make radar-daily-ops-readiness"
             if (
                 baseline.get("cadence_status") == "waiting"
                 or not provider_state["allowed"]
@@ -1016,9 +1015,22 @@ def publish_market_no_send_generation(
     artifact_namespace: str = DEFAULT_NAMESPACE,
     *,
     now: datetime | str | None = None,
-    publisher: Callable[..., Any] = publish_current_namespace_pointer,
+    publisher: Callable[..., Any] | None = None,
 ) -> Any:
-    """Publish only a complete, fresh, live, authorized, strict-clean run."""
+    """Validate and publish only through an explicit coordinating transition.
+
+    Daily Operations owns the public operator transition because it closes the
+    prepublication audit, final publication receipt, owned-dashboard restart,
+    operations receipt, terminal journal, and campaign report.  Requiring the
+    caller to supply that transition prevents the lower-level collection CLI
+    from advancing operator authority on its own.
+    """
+
+    if publisher is None:
+        raise MarketNoSendError(
+            "direct market generation publication is disabled; "
+            "use make radar-daily-ops-cycle"
+        )
 
     base = _validated_artifact_base(artifact_base_dir)
     namespace = _validated_namespace(artifact_namespace)

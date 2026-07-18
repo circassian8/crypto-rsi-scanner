@@ -25,7 +25,7 @@ make radar-dashboard-authority-status PYTHON=.venv/bin/python
 make radar-dashboard-readiness PYTHON=.venv/bin/python
 make radar-dashboard-smoke PYTHON=.venv/bin/python
 make radar-dashboard-ux-smoke PYTHON=.venv/bin/python
-make radar-market-no-send-readiness PYTHON=.venv/bin/python
+make radar-daily-ops-readiness PYTHON=.venv/bin/python
 ```
 
 Dashboard readiness validates and never updates the pointer. Publishing is a
@@ -54,14 +54,16 @@ integrity failures remain a minimal unavailable response.
 
 Recover without weakening freshness or making an unapproved provider call:
 
-1. Run `make radar-market-no-send-readiness PYTHON=.venv/bin/python`.
+1. Run `make radar-daily-ops-readiness PYTHON=.venv/bin/python`.
 2. Only when it reports the already-authorized provider and cadence as eligible,
-   run `make radar-market-no-send PYTHON=.venv/bin/python`. The command may make
-   at most one bounded request and publishes only after a strict-clean run.
-3. Restart the pointer-bound dashboard so it binds the newly published exact
-   generation. For the installed local job, use
-   `launchctl kickstart -k "gui/$(id -u)/com.nasrenkaraf.crypto-radar-dashboard"`;
-   otherwise stop and rerun `make radar-dashboard PYTHON=.venv/bin/python`.
+   run `make radar-daily-ops-cycle PYTHON=.venv/bin/python`. The coordinator may
+   make at most one bounded request, strict-doctors the generation, writes the
+   closed publication receipts, restarts only the owned dashboard, probes its
+   exact identity, and refreshes campaign truth.
+
+`make radar-market-no-send` is a compatibility alias for that same coordinator.
+The lower-level collection CLI cannot publish dashboard authority directly, so
+there is no separate manual restart step.
 
 Daily Operations v1.1 is the guarded maintainer, but it remains prepared and
 disabled until the operator explicitly installs it. Inspect it without writes
@@ -506,10 +508,10 @@ ratios are labeled as percentages rather than compact currency-like numbers.
 For another manual market observation, always start with:
 
 ```sh
-make radar-market-no-send-readiness PYTHON=.venv/bin/python
+make radar-daily-ops-readiness PYTHON=.venv/bin/python
 ```
 
-Run `make radar-market-no-send PYTHON=.venv/bin/python` only when readiness says
+Run `make radar-daily-ops-cycle PYTHON=.venv/bin/python` only when readiness says
 the already-authorized provider and campaign cadence are eligible. For calendar
 coverage, first supply a fresh non-fixture snapshot through the documented local
 path, then rerun readiness. Do not lower thresholds, invent spread, substitute

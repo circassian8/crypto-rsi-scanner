@@ -16,6 +16,7 @@ import pytest
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
     CURRENT_NAMESPACE_POINTER,
     DashboardReadinessError,
+    publish_current_namespace_pointer,
     read_current_namespace_pointer,
     resolve_authoritative_dashboard,
 )
@@ -162,6 +163,7 @@ def test_unauthorized_cli_attempt_is_successful_and_writes_safe_audit(
     assert audit["candidate_source_mode"] == "preflight_only"
     assert audit["publication"]["status"] == "not_attempted"
     assert market_no_send.LIVE_AUTH_ENV in audit["next_safe_command"]
+    assert "make radar-daily-ops-cycle" in audit["next_safe_command"]
 
 
 def test_fixture_mode_blocks_live_claim_before_provider_call(tmp_path, monkeypatch):
@@ -821,6 +823,7 @@ def test_controlled_live_no_send_generation_publishes_exact_dashboard_authority(
         tmp_path,
         namespace,
         now=checked_at,
+        publisher=publish_current_namespace_pointer,
     )
     pointer = read_current_namespace_pointer(tmp_path)
     assert pointer["artifact_namespace"] == namespace
@@ -1023,6 +1026,7 @@ def test_controlled_live_clean_zero_generation_is_strict_publishable(
         tmp_path,
         namespace,
         now=datetime.now(timezone.utc),
+        publisher=publish_current_namespace_pointer,
     )
     assert read_current_namespace_pointer(tmp_path)["artifact_namespace"] == namespace
 
@@ -1054,6 +1058,7 @@ def test_mock_generation_cannot_replace_existing_fixture_pointer(
             tmp_path,
             "mock_pointer_guard",
             now=_OBSERVED,
+            publisher=publish_current_namespace_pointer,
         )
 
     assert pointer.read_bytes() == b"fixture-authority-stays\n"
@@ -1105,6 +1110,7 @@ def test_live_manifest_without_matching_operator_authority_cannot_replace_pointe
             tmp_path,
             namespace,
             now=_OBSERVED,
+            publisher=publish_current_namespace_pointer,
         )
 
     assert pointer.read_bytes() == b"previous-fixture-pointer\n"
@@ -1132,34 +1138,21 @@ def test_market_make_targets_do_not_force_live_authorization():
     readiness_target = makefile.split("radar-market-no-send-readiness:\n", 1)[1].split(
         "radar-market-campaign-report:\n", 1
     )[0]
-    target = makefile.split("radar-market-no-send:\n", 1)[1].split(
+    target = makefile.split(
+        "radar-market-no-send: radar-daily-ops-cycle\n", 1
+    )[1].split(
         "radar-market-no-send-smoke:", 1
     )[0]
+    daily_operations_target = makefile.split(
+        "radar-daily-ops-cycle:\n", 1
+    )[1].split("radar-daily-ops-install:", 1)[0]
     assert "market_no_send campaign-report" not in readiness_target
-    assert "market_no_send campaign-report" in target
-    assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" not in target and "RSI_EVENT_ALPHA_RUN_MODE=operational" in target
-    assert "--event-alpha-artifact-doctor-strict" in target
-    assert "market_no_send publish" in target
-    assert "market_no_send audit" in target
-    assert "record_failure()" in target
-    assert "finalize_status=$$failure_status" in target
-    assert "|| record_failure $$?" in target
-    assert "|| finalize_status=$$?" not in target
-    assert "status_code=$$?" in target
-    assert "record_failure $$status_code" in target
-    run_position = target.index("market_no_send run")
-    run_success_gate_position = target.index(
-        "if test $$finalize_status -eq 0; then", run_position
-    )
-    status_position = target.index("market_no_send status")
-    doctor_position = target.index("--event-alpha-artifact-doctor-strict")
-    publish_position = target.index("market_no_send publish")
-    audit_position = target.index("market_no_send audit")
-    report_position = target.index("market_no_send campaign-report")
-    exit_position = target.index("exit $$finalize_status")
-    assert run_position < run_success_gate_position < status_position
-    assert status_position < doctor_position < publish_position
-    assert publish_position < audit_position < report_position < exit_position
+    assert "delegates to the receipt-backed Daily Operations coordinator" in target
+    assert "market_no_send run" not in target
+    assert "market_no_send publish" not in target
+    assert "operations.daily_operations cycle" in daily_operations_target
+    assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" not in daily_operations_target
+    assert "RSI_EVENT_ALPHA_RUN_MODE=operational" in daily_operations_target
     assert "radar_market_no_send_$(shell date -u +%Y%m%dt%H%M%Sz)" in makefile
 
 

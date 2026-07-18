@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Make Daily Operations the sole live market authority coordinator
+**Status:** accepted
+**Decision:** A live CoinGecko observation may be collected only through the
+existing authorization and cadence gates, but operator authority may advance
+only inside the closed Daily Operations v1.1 transition. That transition owns
+the strict doctor, immutable prepublication audit, pointer publication, final
+publication receipt, exact owned-dashboard restart, terminal journal,
+operations receipt, HTTP identity probe, and campaign-report refresh. `make
+radar-market-no-send` remains a compatibility alias for `make
+radar-daily-ops-cycle`; it is not a second implementation. The lower-level
+`market_no_send publish` CLI refuses direct operator publication unless an
+internal coordinator supplies the explicit publication transition. Genuine
+complete observations remain countable historical campaign evidence even when
+they do not become current dashboard authority.
+**Why:** A July 18 direct collection completed correctly but briefly advanced
+the pointer without final receipts or an owned restart, leaving the old bound
+dashboard process fail-closed at HTTP 503. Exact receipt-bound rollback restored
+the prior authority while preserving the new observation. One coordinator
+prevents evidence collection, audit truth, pointer truth, and served truth from
+diverging again.
+**Revisit when:** Dashboard authority, process ownership, terminal journaling,
+and report publication move together to a different closed transactional
+coordinator with equivalent receipts, rollback, probes, and fail-closed tests.
+
 ## 2026-07-18 - Keep historical outcome recovery separate from campaign evidence
 **Status:** accepted
 **Decision:** Historical outcome-price recovery may query only the exact

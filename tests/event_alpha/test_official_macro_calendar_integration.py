@@ -16,6 +16,9 @@ from crypto_rsi_scanner.event_alpha.dashboard.calendar_page import (
     render_calendar_page,
 )
 from crypto_rsi_scanner.event_alpha.dashboard.loader import load_dashboard_snapshot
+from crypto_rsi_scanner.event_alpha.dashboard.readiness import (
+    publish_current_namespace_pointer,
+)
 from crypto_rsi_scanner.event_alpha.operations import market_no_send
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_calendar
 from crypto_rsi_scanner.event_alpha.operations import (
@@ -217,6 +220,7 @@ def test_official_macro_pack_reaches_fingerprinted_live_generation_and_dashboard
         artifact_base,
         namespace,
         now=checked_at,
+        publisher=publish_current_namespace_pointer,
     )
     loaded = load_dashboard_snapshot(artifact_base, namespace, now=checked_at)
     assert published.snapshot.generation_authoritative is True
@@ -346,6 +350,7 @@ def test_partial_official_macro_pack_remains_explicit_through_publication(
         artifact_base,
         namespace,
         now=checked_at,
+        publisher=publish_current_namespace_pointer,
     )
     loaded = load_dashboard_snapshot(artifact_base, namespace, now=checked_at)
     page = render_calendar_page(loaded, {})

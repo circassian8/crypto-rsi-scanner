@@ -119,16 +119,19 @@ def readiness_next_command(
         or "already exists" in namespace_blocker
     ):
         return (
-            "Choose RADAR_MARKET_NO_SEND_NAMESPACE=<new-generation>, then run "
-            "make radar-market-no-send"
+            "Run make radar-daily-ops-cycle; the coordinator will choose a new "
+            "immutable generation namespace"
         )
     if namespace_blocker:
         return "Repair or remove the invalid dashboard pointer, then rerun readiness"
     if not authorized:
-        return f"Authorize {authorization_env}=1 outside Codex, then run make radar-market-no-send"
+        return (
+            f"Authorize {authorization_env}=1 outside Codex, then run "
+            "make radar-daily-ops-cycle"
+        )
     if fixture_mode:
-        return "Unset FIXTURE_DIR, then run make radar-market-no-send-readiness"
-    return "make radar-market-no-send"
+        return "Unset FIXTURE_DIR, then run make radar-daily-ops-readiness"
+    return "make radar-daily-ops-cycle"
 
 
 def base_manifest(

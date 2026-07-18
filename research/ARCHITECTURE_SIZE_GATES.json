@@ -1595,7 +1595,7 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1305,
+      "line_count": 1317,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
       "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1086,
+  "file_count": 1087,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-18T10:42:28.672549+00:00",
+  "generated_at": "2026-07-18T11:21:37.589821+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1913,7 +1913,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1305,
+      "line_count": 1317,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "source_kind": "production"
     },
@@ -2089,7 +2089,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1492,
+      "line_count": 1485,
       "path": "tests/event_alpha/test_market_no_send.py",
       "source_kind": "test"
     },
@@ -3860,7 +3860,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1305,
+      "line_count": 1317,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -4024,7 +4024,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1305,
+      "line_count": 1317,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "source_kind": "production"
     },
@@ -4464,7 +4464,7 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1305,
+          "line_count": 1317,
           "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
           "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
           "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
@@ -4673,7 +4673,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1305,
+        "line_count": 1317,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
       },
@@ -4916,7 +4916,7 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1305,
+            "line_count": 1317,
             "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
             "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
             "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
