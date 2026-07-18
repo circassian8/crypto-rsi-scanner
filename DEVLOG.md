@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record the twenty-second genuine no-send market cycle · Codex
+**Why:** The evidence-first plan requires cadence-eligible point-in-time market
+observations before any anomaly or score calibration. The prior exact request
+boundary was 2026-07-18 21:42:55.804241 UTC.
+**Changes:**
+- Re-read Daily Operations readiness after the boundary; it reported existing
+  CoinGecko authorization, eligible cadence, one-request maximum, no-send, and
+  an owned loopback dashboard. Ran exactly one cycle with no early attempt or
+  retry. The provider returned HTTP 200 with 80 bounded rows in 1.36 seconds.
+- Published immutable namespace
+  `radar_market_no_send_20260718t214327701833z_47f8c7785279`, its strict-clean
+  revision-12 operator state, final publication receipt, owned-dashboard
+  operations receipt, and terminal success row. The dashboard restarted under
+  the owned service and now serves this exact authority.
+- Advanced campaign truth to 22 real cycles, 660 retained observations, 630
+  baseline-counted observations, and 30 intentionally too-close observations.
+  The current generation has zero anomalies/canonical ideas; campaign history
+  remains 5 ideas, 1 matured outcome, 3 pending outcomes, and one DEXE
+  `due_missing_price` gap. Trusted spread coverage remains honestly 0/660.
+- Stable-asset 1h and 4h return sample counts advanced from 6/8 to 7/8; 24h and
+  relative-return families remain sparse at 3/8. No threshold was lowered and
+  no future observation was counted. Rebound the no-call DefiLlama human review
+  to the new exact 30-asset universe digest `9a13398225e6c66d...`; all mappings
+  remain explicitly unreviewed.
+- Refreshed the canonical Markdown/JSON campaign reports and active roadmap.
+**Verify:** Daily Operations readiness returned `ready`; the cycle returned
+`succeeded` / `published_and_restarted`; exact-namespace strict doctor returned
+OK with zero blockers and warnings; dashboard readiness returned READY; Daily
+Operations status showed the next boundary at 22:43:28.056973 UTC; loopback HEAD
+returned HTTP 200 with the exact namespace/run/revision/operator digest, and a
+full GET contained the exact namespace, open-work panel, and live 0/30 maturity
+frontier. The campaign report reconciles 22/660/630/30 and the authoritative
+generation's receipt-backed publication state.
+**Notes/risks:** This cycle made one already-authorized CoinGecko market-data
+request. It made no Bybit, catalyst, calendar, DEX/on-chain, fundamentals,
+outcome-recovery, or LLM call; sent no Telegram message; created no trade,
+order, paper trade, normal RSI row, `TRIGGERED_FADE`, human-review event, route,
+score, or policy change. The recurring service remains uninstalled.
+
 ## 2026-07-18 — Explain the real temporal-baseline maturity frontier · Codex
 **Why:** The dashboard correctly said the campaign baseline was warming, but it
 collapsed materially different feature states into one generic warning. That
