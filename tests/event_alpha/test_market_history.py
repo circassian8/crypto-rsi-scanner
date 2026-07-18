@@ -510,6 +510,7 @@ def test_readiness_rejects_rapid_count_warmth_and_reports_every_feature_group():
         now=NOW,
     )
 
+    assert readiness["schema_version"] == 3
     assert readiness["baseline_status"] == "warming"
     assert readiness["baseline_observation_count"] == 8
     assert readiness["baseline_counted_observation_count"] == 2
@@ -525,6 +526,14 @@ def test_readiness_rejects_rapid_count_warmth_and_reports_every_feature_group():
     assert returns_4h["warming_asset_count"] == 0
     assert returns_4h["cold_asset_count"] == 1
     assert returns_4h["other_asset_count"] == 0
+    assert returns_4h["minimum_sample_count"] == 0
+    assert returns_4h["maximum_sample_count"] == 0
+    assert returns_4h["required_sample_count"] == 8
+    assert returns_4h["sample_count_deficit_asset_count"] == 1
+    assert returns_4h["minimum_coverage_seconds"] == 3_600
+    assert returns_4h["maximum_coverage_seconds"] == 3_600
+    assert returns_4h["required_coverage_seconds"] == 39_600
+    assert returns_4h["coverage_deficit_asset_count"] == 1
     assert readiness["baseline_asset_readiness"]["move-token"]["status"] == "warming"
 
 
@@ -556,6 +565,18 @@ def test_long_horizon_history_is_globally_warm_only_when_all_groups_are_warm():
         assert readiness["baseline_feature_readiness"][group]["warming_asset_count"] == 0
         assert readiness["baseline_feature_readiness"][group]["cold_asset_count"] == 0
         assert readiness["baseline_feature_readiness"][group]["other_asset_count"] == 0
+        assert readiness["baseline_feature_readiness"][group][
+            "minimum_sample_count"
+        ] >= 2
+        assert readiness["baseline_feature_readiness"][group][
+            "required_sample_count"
+        ] == 2
+        assert readiness["baseline_feature_readiness"][group][
+            "sample_count_deficit_asset_count"
+        ] == 0
+        assert readiness["baseline_feature_readiness"][group][
+            "coverage_deficit_asset_count"
+        ] == 0
 
     without_eth = [row for row in history if row["canonical_asset_id"] != "ethereum"]
     missing_benchmark = market_history_readiness.assess_market_history_readiness(

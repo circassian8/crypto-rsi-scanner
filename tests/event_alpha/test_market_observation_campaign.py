@@ -926,7 +926,12 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     assert b"1 provider failure and 1 blocked/preflight attempt" in first_markdown
     assert b"Duplicate observations: `0`" in first_markdown
     assert b"Conflicting duplicate observations: `0`" in first_markdown
-    assert b"| Feature group | Warm | Warming | Cold | Other | Status counts |" in first_markdown
+    assert (
+        b"| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | "
+        b"Elapsed min-max / required | Status counts |"
+        in first_markdown
+    )
+    assert b"below)" in first_markdown
     assert b"### Current authoritative universe" in first_markdown
     assert b"### Retained campaign history" in first_markdown
 

@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-18T21:43:36.484895+00:00` from local artifacts only.
+Generated at `2026-07-18T21:50:42.302383+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -87,15 +87,15 @@ Research and decision support only. This report contains no trade recommendation
 
 #### Current-universe feature maturity
 
-| Feature group | Warm | Warming | Cold | Other | Status counts |
-|---|---:|---:|---:|---:|---|
-| btc_eth_relative | 0 | 30 | 0 | 0 | warming=30 |
-| returns_1h | 0 | 30 | 0 | 0 | warming=30 |
-| returns_24h | 0 | 29 | 1 | 0 | cold=1, warming=29 |
-| returns_4h | 0 | 30 | 0 | 0 | warming=30 |
-| turnover | 30 | 0 | 0 | 0 | warm=30 |
-| volatility | 0 | 30 | 0 | 0 | warming=30 |
-| volume | 30 | 0 | 0 | 0 | warm=30 |
+| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
+|---|---:|---:|---:|---:|---|---|---|
+| btc_eth_relative | 0 | 30 | 0 | 0 | 0-3 / 8 (30 below) | 18.93-126.44 / 31 h (1 below) | warming=30 |
+| returns_1h | 0 | 30 | 0 | 0 | 3-7 / 8 (30 below) | 18.93-126.44 / 8 h (0 below) | warming=30 |
+| returns_24h | 0 | 29 | 1 | 0 | 0-3 / 8 (30 below) | 18.93-126.44 / 31 h (1 below) | cold=1, warming=29 |
+| returns_4h | 0 | 30 | 0 | 0 | 2-7 / 8 (30 below) | 18.93-126.44 / 11 h (0 below) | warming=30 |
+| turnover | 30 | 0 | 0 | 0 | 12-21 / 8 (0 below) | 18.93-126.44 / 7 h (0 below) | warm=30 |
+| volatility | 0 | 30 | 0 | 0 | 0-3 / 8 (30 below) | 18.93-126.44 / 31 h (1 below) | warming=30 |
+| volume | 30 | 0 | 0 | 0 | 12-21 / 8 (0 below) | 18.93-126.44 / 7 h (0 below) | warm=30 |
 
 ### Retained campaign history
 
@@ -111,15 +111,15 @@ Research and decision support only. This report contains no trade recommendation
 
 #### Retained-history feature maturity
 
-| Feature group | Warm | Warming | Cold | Other | Status counts |
-|---|---:|---:|---:|---:|---|
-| btc_eth_relative | 0 | 31 | 3 | 0 | cold=3, warming=31 |
-| returns_1h | 0 | 31 | 3 | 0 | cold=3, warming=31 |
-| returns_24h | 0 | 30 | 4 | 0 | cold=4, warming=30 |
-| returns_4h | 0 | 31 | 3 | 0 | cold=3, warming=31 |
-| turnover | 31 | 3 | 0 | 0 | warm=31, warming=3 |
-| volatility | 0 | 31 | 3 | 0 | cold=3, warming=31 |
-| volume | 31 | 3 | 0 | 0 | warm=31, warming=3 |
+| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
+|---|---:|---:|---:|---:|---|---|---|
+| btc_eth_relative | 0 | 31 | 3 | 0 | 0-3 / 8 (34 below) | 5.37-126.44 / 31 h (3 below) | cold=3, warming=31 |
+| returns_1h | 0 | 31 | 3 | 0 | 0-7 / 8 (34 below) | 5.37-126.44 / 8 h (1 below) | cold=3, warming=31 |
+| returns_24h | 0 | 30 | 4 | 0 | 0-3 / 8 (34 below) | 5.37-126.44 / 31 h (3 below) | cold=4, warming=30 |
+| returns_4h | 0 | 31 | 3 | 0 | 0-7 / 8 (34 below) | 5.37-126.44 / 11 h (1 below) | cold=3, warming=31 |
+| turnover | 31 | 3 | 0 | 0 | 2-21 / 8 (3 below) | 5.37-126.44 / 7 h (1 below) | warm=31, warming=3 |
+| volatility | 0 | 31 | 3 | 0 | 0-3 / 8 (34 below) | 5.37-126.44 / 31 h (3 below) | cold=3, warming=31 |
+| volume | 31 | 3 | 0 | 0 | 2-21 / 8 (3 below) | 5.37-126.44 / 7 h (1 below) | warm=31, warming=3 |
 
 ## Outcomes
 

@@ -480,9 +480,38 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
             return fallback
         warm = _non_negative_int(details.get("warm_asset_count"))
         asset_count = _non_negative_int(details.get("asset_count"))
-        if warm is None or asset_count != observed:
+        minimum_sample = _non_negative_int(details.get("minimum_sample_count"))
+        maximum_sample = _non_negative_int(details.get("maximum_sample_count"))
+        required_sample = _non_negative_int(details.get("required_sample_count"))
+        coverage_deficit = _non_negative_int(
+            details.get("coverage_deficit_asset_count")
+        )
+        if (
+            warm is None
+            or asset_count != observed
+            or minimum_sample is None
+            or maximum_sample is None
+            or minimum_sample > maximum_sample
+            or required_sample is None
+            or required_sample <= 0
+            or coverage_deficit is None
+            or coverage_deficit > observed
+        ):
             return fallback
-        summaries.append(f"{label} {warm}/{asset_count}")
+        sample_range = (
+            str(minimum_sample)
+            if minimum_sample == maximum_sample
+            else f"{minimum_sample}-{maximum_sample}"
+        )
+        summaries.append(
+            f"{label} {warm}/{asset_count} ({sample_range}/{required_sample} samples"
+            + (
+                f"; {coverage_deficit} below elapsed coverage"
+                if coverage_deficit
+                else ""
+            )
+            + ")"
+        )
     return (
         f"{fully_warm}/{observed} assets are fully warm. Warm by feature family: "
         + " · ".join(summaries)

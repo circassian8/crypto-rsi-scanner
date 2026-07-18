@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-18T21:20:58.047462+00:00",
+  "generated_at": "2026-07-18T21:56:37.120075+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2143,14 +2143,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1407,
-      "path": "tests/event_alpha/test_core_opportunities.py",
+      "line_count": 1410,
+      "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1405,
-      "path": "tests/event_alpha/test_market_observation_campaign.py",
+      "line_count": 1407,
+      "path": "tests/event_alpha/test_core_opportunities.py",
       "source_kind": "test"
     },
     {

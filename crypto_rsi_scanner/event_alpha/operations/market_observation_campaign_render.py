@@ -410,8 +410,8 @@ def _feature_maturity_lines(value: Any) -> list[str]:
     if not feature_readiness:
         return ["- Feature-level maturity is not yet available for this scope."]
     lines = [
-        "| Feature group | Warm | Warming | Cold | Other | Status counts |",
-        "|---|---:|---:|---:|---:|---|",
+        "| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |",
+        "|---|---:|---:|---:|---:|---|---|---|",
     ]
     for name, raw in sorted(feature_readiness.items()):
         feature = _mapping(raw)
@@ -423,9 +423,35 @@ def _feature_maturity_lines(value: Any) -> list[str]:
             f"| {_md(name)} | {_int(feature.get('warm_asset_count'))} | "
             f"{_int(feature.get('warming_asset_count'))} | "
             f"{_int(feature.get('cold_asset_count'))} | "
-            f"{_int(feature.get('other_asset_count'))} | {_md(counts)} |"
+            f"{_int(feature.get('other_asset_count'))} | "
+            f"{_md(_sample_progress(feature))} | "
+            f"{_md(_coverage_progress(feature))} | {_md(counts)} |"
         )
     return lines
+
+
+def _sample_progress(feature: Mapping[str, Any]) -> str:
+    minimum = _int(feature.get("minimum_sample_count"))
+    maximum = _int(feature.get("maximum_sample_count"))
+    required = _int(feature.get("required_sample_count"))
+    deficit = _int(feature.get("sample_count_deficit_asset_count"))
+    value_range = str(minimum) if minimum == maximum else f"{minimum}-{maximum}"
+    return f"{value_range} / {required} ({deficit} below)"
+
+
+def _coverage_progress(feature: Mapping[str, Any]) -> str:
+    minimum = _hours(feature.get("minimum_coverage_seconds"))
+    maximum = _hours(feature.get("maximum_coverage_seconds"))
+    required = _hours(feature.get("required_coverage_seconds"))
+    deficit = _int(feature.get("coverage_deficit_asset_count"))
+    value_range = minimum if minimum == maximum else f"{minimum}-{maximum}"
+    return f"{value_range} / {required} h ({deficit} below)"
+
+
+def _hours(value: Any) -> str:
+    seconds = _int(value)
+    hours = seconds / 3_600
+    return f"{hours:.2f}".rstrip("0").rstrip(".")
 
 
 def _generation_table(value: Any) -> list[str]:

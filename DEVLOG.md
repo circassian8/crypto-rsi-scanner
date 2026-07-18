@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve sample and elapsed-coverage maturity truth · Codex
+**Why:** `warming` was directionally correct but operationally incomplete. The
+current 30-asset universe includes assets with very different histories, so a
+single status hid the difference between 1h samples at 3-7/8, 4h at 2-7/8, and
+24h/relative/volatility at 0-3/8.
+**Changes:**
+- Advanced market-history readiness to schema v3. Every feature-family aggregate
+  now carries minimum/maximum sample count, required samples, assets below the
+  sample requirement, minimum/maximum elapsed coverage, required coverage, and
+  assets below the elapsed requirement alongside the existing status counts.
+- Extended the exact-pointer campaign loader to require and reconcile those
+  bounded progress fields. Impossible ranges, zero requirements, out-of-range
+  deficit counts, or deficit/range contradictions suppress campaign context
+  rather than rendering false progress.
+- Expanded the canonical campaign report's feature tables with human-readable
+  sample and elapsed ranges. Regenerated the 22-cycle report from local
+  artifacts with zero provider calls; it now shows which groups are sample-
+  limited, which also lack elapsed coverage, and which are genuinely warm.
+- Extended Today's baseline constraint to show each family's warm assets and
+  observed sample range against the requirement. It still states that elapsed
+  coverage is independently required and makes no completion-time forecast.
+- Updated focused tests, the Campaign-v2 decision, the active roadmap, and the
+  generated architecture inventories after the source-size changes.
+**Verify:** Ran 45 focused market-history/cache/campaign/dashboard tests,
+`make radar-dashboard-smoke PYTHON=.venv/bin/python`, `make
+radar-dashboard-ux-smoke PYTHON=.venv/bin/python`, `.venv/bin/python -m
+compileall -q crypto_rsi_scanner tests`, architecture cleanliness, live
+exact-authority dashboard readiness and a 12-page no-write render, JSON/diff
+validation, and a direct current-report projection (`ready`, current 1h range
+3-7/8). A direct current Today render contains the exact 1h and 24h sample/
+elapsed strings. All passed; architecture reports zero new size violations and
+zero oversized functions.
+**Notes/risks:** This is descriptive evidence accounting only. No provider call,
+authorization mutation, future sample, route, score, threshold, outcome,
+review event, send, trade, order, paper trade, normal RSI row, or
+`TRIGGERED_FADE` was created.
+
 ## 2026-07-18 — Record the twenty-second genuine no-send market cycle · Codex
 **Why:** The evidence-first plan requires cadence-eligible point-in-time market
 observations before any anomaly or score calibration. The prior exact request

@@ -58,24 +58,7 @@ def _campaign_report() -> dict[str, object]:
                 "observed_asset_count": 30,
                 "missing_asset_count": 0,
                 "baseline_warm_asset_count": 0,
-                "baseline_feature_readiness": {
-                    name: {
-                        "warm_asset_count": warm,
-                        "warming_asset_count": 30 - warm,
-                        "cold_asset_count": 0,
-                        "other_asset_count": 0,
-                        "asset_count": 30,
-                    }
-                    for name, warm in (
-                        ("btc_eth_relative", 0),
-                        ("returns_1h", 0),
-                        ("returns_24h", 0),
-                        ("returns_4h", 0),
-                        ("turnover", 30),
-                        ("volatility", 0),
-                        ("volume", 30),
-                    )
-                },
+                "baseline_feature_readiness": _baseline_feature_groups(),
             }
         },
         "human_review_queue": {
@@ -173,6 +156,38 @@ def _zero_safety() -> dict[str, int]:
     }
 
 
+def _baseline_feature_groups() -> dict[str, dict[str, int]]:
+    specs = (
+        ("btc_eth_relative", 0, 3, 3, 68_150, 111_600),
+        ("returns_1h", 0, 7, 7, 455_181, 28_800),
+        ("returns_24h", 0, 0, 3, 68_150, 111_600),
+        ("returns_4h", 0, 7, 7, 455_181, 39_600),
+        ("turnover", 30, 21, 21, 455_181, 25_200),
+        ("volatility", 0, 3, 3, 68_150, 111_600),
+        ("volume", 30, 21, 21, 455_181, 25_200),
+    )
+    return {
+        name: {
+            "warm_asset_count": warm,
+            "warming_asset_count": 30 - warm,
+            "cold_asset_count": 0,
+            "other_asset_count": 0,
+            "asset_count": 30,
+            "minimum_sample_count": minimum,
+            "maximum_sample_count": maximum,
+            "required_sample_count": 8,
+            "sample_count_deficit_asset_count": 0 if minimum >= 8 else 30,
+            "minimum_coverage_seconds": minimum_coverage,
+            "maximum_coverage_seconds": 455_181,
+            "required_coverage_seconds": required_coverage,
+            "coverage_deficit_asset_count": (
+                1 if minimum_coverage < required_coverage else 0
+            ),
+        }
+        for name, warm, minimum, maximum, minimum_coverage, required_coverage in specs
+    }
+
+
 def _write_report(root: Path, report: dict[str, object]) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json").write_text(
@@ -211,6 +226,12 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert result["temporal_baseline"]["feature_groups"]["returns_24h"][
         "warm_asset_count"
     ] == 0
+    assert result["temporal_baseline"]["feature_groups"]["returns_1h"][
+        "minimum_sample_count"
+    ] == 7
+    assert result["temporal_baseline"]["feature_groups"]["returns_24h"][
+        "maximum_sample_count"
+    ] == 3
     assert "/private/" not in repr(result)
 
 
@@ -243,6 +264,20 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
         "baseline_feature_readiness"
     ]["returns_24h"]["warm_asset_count"] = 31
     _write_report(tmp_path, contradictory_baseline)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    impossible_progress = _campaign_report()
+    impossible_progress["baseline_maturity"]["current_universe_maturity"][
+        "baseline_feature_readiness"
+    ]["returns_1h"]["minimum_sample_count"] = 9
+    _write_report(tmp_path, impossible_progress)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    hidden_coverage_deficit = _campaign_report()
+    hidden_coverage_deficit["baseline_maturity"]["current_universe_maturity"][
+        "baseline_feature_readiness"
+    ]["returns_24h"]["coverage_deficit_asset_count"] = 0
+    _write_report(tmp_path, hidden_coverage_deficit)
     assert _load(tmp_path)["status"] == "unavailable"
 
 
@@ -292,24 +327,7 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
             "observed_asset_count": 30,
             "missing_asset_count": 0,
             "fully_warm_asset_count": 0,
-            "feature_groups": {
-                name: {
-                    "warm_asset_count": warm,
-                    "warming_asset_count": 30 - warm,
-                    "cold_asset_count": 0,
-                    "other_asset_count": 0,
-                    "asset_count": 30,
-                }
-                for name, warm in (
-                    ("btc_eth_relative", 0),
-                    ("returns_1h", 0),
-                    ("returns_24h", 0),
-                    ("returns_4h", 0),
-                    ("turnover", 30),
-                    ("volatility", 0),
-                    ("volume", 30),
-                )
-            },
+            "feature_groups": _baseline_feature_groups(),
         },
     }
     snapshot = replace(_snapshot(), campaign_operator_actions=root_projection)
@@ -330,8 +348,12 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
     assert today.index("Open operator work") < today.index("Decision constraints")
     assert today.count("Execution spread unavailable") == 0
     assert "0/30 assets are fully warm" in today
-    assert "turnover 30/30" in today
-    assert "24h returns 0/30" in today
+    assert "turnover 30/30 (21/8 samples)" in today
+    assert "1h returns 0/30 (7/8 samples)" in today
+    assert (
+        "24h returns 0/30 (0-3/8 samples; 1 below elapsed coverage)"
+        in today
+    )
     assert health.count('id="human-work-queue"') == 1
     assert health.count("Spread evidence is unavailable") == 0
 

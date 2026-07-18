@@ -10,7 +10,7 @@ from . import market_history
 
 
 MARKET_HISTORY_READINESS_SCHEMA = "event_alpha.market_history_readiness"
-MARKET_HISTORY_READINESS_SCHEMA_VERSION = 2
+MARKET_HISTORY_READINESS_SCHEMA_VERSION = 3
 
 
 def assess_market_history_readiness(
@@ -43,6 +43,9 @@ def assess_market_history_readiness(
     group_counts = {
         group: Counter() for group in market_history.FEATURE_READINESS_GROUPS
     }
+    group_details: dict[str, list[dict[str, Any]]] = {
+        group: [] for group in market_history.FEATURE_READINESS_GROUPS
+    }
     for asset_id in sorted(raw_by_asset):
         groups = _history_feature_groups(asset_id, counted_by_asset, cfg=cfg)
         required = [
@@ -71,6 +74,7 @@ def assess_market_history_readiness(
         }
         for group, details in groups.items():
             group_counts[group][str(details.get("status") or "unknown")] += 1
+            group_details[group].append(dict(details))
     observed_times = [market_history._observation_time(row) for row in canonical]
     counted_times = [
         market_history._observation_time(row)
@@ -100,19 +104,7 @@ def assess_market_history_readiness(
     else:
         status = "warming"
     feature_readiness = {
-        group: {
-            "status_counts": dict(sorted(counts.items())),
-            "warm_asset_count": int(counts.get("warm", 0)),
-            "warming_asset_count": int(counts.get("warming", 0)),
-            "cold_asset_count": int(counts.get("cold", 0)),
-            "other_asset_count": int(
-                sum(counts.values())
-                - counts.get("warm", 0)
-                - counts.get("warming", 0)
-                - counts.get("cold", 0)
-            ),
-            "asset_count": int(sum(counts.values())),
-        }
+        group: _feature_group_summary(counts, group_details[group])
         for group, counts in group_counts.items()
     }
     return {
@@ -147,6 +139,57 @@ def assess_market_history_readiness(
         "baseline_asset_readiness": asset_readiness,
         "rejection_counts": dict(sorted(telemetry.counts.items())),
         "research_only": True,
+    }
+
+
+def _feature_group_summary(
+    counts: Counter[str],
+    details: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    sample_counts = [int(item.get("sample_count") or 0) for item in details]
+    required_samples = [
+        int(item.get("required_sample_count") or 0) for item in details
+    ]
+    coverage_seconds = [
+        int(item.get("coverage_seconds") or 0) for item in details
+    ]
+    required_coverage = [
+        int(item.get("required_coverage_seconds") or 0) for item in details
+    ]
+    return {
+        "status_counts": dict(sorted(counts.items())),
+        "warm_asset_count": int(counts.get("warm", 0)),
+        "warming_asset_count": int(counts.get("warming", 0)),
+        "cold_asset_count": int(counts.get("cold", 0)),
+        "other_asset_count": int(
+            sum(counts.values())
+            - counts.get("warm", 0)
+            - counts.get("warming", 0)
+            - counts.get("cold", 0)
+        ),
+        "asset_count": int(sum(counts.values())),
+        "minimum_sample_count": min(sample_counts, default=0),
+        "maximum_sample_count": max(sample_counts, default=0),
+        "required_sample_count": max(required_samples, default=0),
+        "sample_count_deficit_asset_count": sum(
+            sample < required
+            for sample, required in zip(
+                sample_counts,
+                required_samples,
+                strict=True,
+            )
+        ),
+        "minimum_coverage_seconds": min(coverage_seconds, default=0),
+        "maximum_coverage_seconds": max(coverage_seconds, default=0),
+        "required_coverage_seconds": max(required_coverage, default=0),
+        "coverage_deficit_asset_count": sum(
+            coverage < required
+            for coverage, required in zip(
+                coverage_seconds,
+                required_coverage,
+                strict=True,
+            )
+        ),
     }
 
 

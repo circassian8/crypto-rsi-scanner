@@ -249,13 +249,27 @@ def _project_temporal_baseline(value: Any) -> dict[str, Any]:
                 "asset_count",
             )
         }
+        progress = {
+            field: _count(details.get(field), f"{name}_{field}")
+            for field in (
+                "minimum_sample_count",
+                "maximum_sample_count",
+                "required_sample_count",
+                "sample_count_deficit_asset_count",
+                "minimum_coverage_seconds",
+                "maximum_coverage_seconds",
+                "required_coverage_seconds",
+                "coverage_deficit_asset_count",
+            )
+        }
         if (
             counts["asset_count"] != observed
             or sum(counts[field] for field in counts if field != "asset_count")
             != counts["asset_count"]
         ):
             raise ValueError("campaign_baseline_feature_count_mismatch")
-        groups[name] = counts
+        _validate_feature_progress(progress, asset_count=counts["asset_count"])
+        groups[name] = counts | progress
     return {
         "status": status,
         "expected_asset_count": expected,
@@ -264,6 +278,45 @@ def _project_temporal_baseline(value: Any) -> dict[str, Any]:
         "fully_warm_asset_count": fully_warm,
         "feature_groups": groups,
     }
+
+
+def _validate_feature_progress(
+    progress: Mapping[str, int],
+    *,
+    asset_count: int,
+) -> None:
+    minimum_sample = progress["minimum_sample_count"]
+    maximum_sample = progress["maximum_sample_count"]
+    required_sample = progress["required_sample_count"]
+    sample_deficit = progress["sample_count_deficit_asset_count"]
+    minimum_coverage = progress["minimum_coverage_seconds"]
+    maximum_coverage = progress["maximum_coverage_seconds"]
+    required_coverage = progress["required_coverage_seconds"]
+    coverage_deficit = progress["coverage_deficit_asset_count"]
+    if (
+        minimum_sample > maximum_sample
+        or required_sample <= 0
+        or sample_deficit > asset_count
+        or minimum_coverage > maximum_coverage
+        or required_coverage <= 0
+        or coverage_deficit > asset_count
+    ):
+        raise ValueError("campaign_baseline_feature_progress_invalid")
+    if (
+        (minimum_sample >= required_sample and sample_deficit != 0)
+        or (maximum_sample < required_sample and sample_deficit != asset_count)
+        or (
+            minimum_sample < required_sample <= maximum_sample
+            and not 0 < sample_deficit < asset_count
+        )
+        or (minimum_coverage >= required_coverage and coverage_deficit != 0)
+        or (maximum_coverage < required_coverage and coverage_deficit != asset_count)
+        or (
+            minimum_coverage < required_coverage <= maximum_coverage
+            and not 0 < coverage_deficit < asset_count
+        )
+    ):
+        raise ValueError("campaign_baseline_feature_deficit_count_mismatch")
 
 
 def _project_review_queue(value: Any) -> dict[str, Any]:

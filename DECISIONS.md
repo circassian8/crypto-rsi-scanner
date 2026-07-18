@@ -1901,6 +1901,14 @@ relative groups. Eight samples alone are insufficient when the relevant
 horizon-plus-cadence coverage is still short; every configured required group
 must be warm before the asset is globally warm.
 
+Aggregate operator and campaign projections must preserve, per feature group,
+the minimum and maximum observed sample counts, required sample count, assets
+below that requirement, minimum and maximum elapsed coverage, required elapsed
+coverage, and assets below that requirement. A single `warming` label or total
+observation count is not an adequate progress report. These fields describe
+retained evidence only; they must not forecast a warm time or count hypothetical
+future cycles.
+
 Readiness remains no-network. The live command rechecks the already-existing
 CoinGecko authorization and cadence before the provider adapter, never sets
 authorization itself, and may attempt at most one bounded live request per
