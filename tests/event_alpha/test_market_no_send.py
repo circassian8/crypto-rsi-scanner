@@ -993,6 +993,7 @@ def test_controlled_live_clean_zero_generation_is_strict_publishable(
         "diagnostic_or_sector_excluded=0, classified_anomaly=0, "
         f"no_configured_reaction={len(snapshots)}."
     ) in anomaly_report
+    assert f"Unit validation: warning_rows=0/{len(snapshots)}, warnings=none." in anomaly_report
     assert "Input availability:" in anomaly_report
     assert "healthy-empty classification result" in anomaly_report
     assert "not evidence that market collection was empty" in anomaly_report

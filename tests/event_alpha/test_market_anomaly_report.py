@@ -40,6 +40,7 @@ def test_market_anomaly_zero_result_explains_exact_scan_coverage():
                 "liquidity_usd": 10_000_000,
                 "spread_bps": None,
                 "freshness_status": "fresh",
+                "unit_warnings": ["implausible_normalized_return:return_4h"],
                 "market_data_quality": {"baseline_status": "warming"},
             }
         ],
@@ -54,6 +55,8 @@ def test_market_anomaly_zero_result_explains_exact_scan_coverage():
     assert "spread_bps=0/1" in report
     assert "fresh=1" in report
     assert "warming=1" in report
+    assert "warning_rows=1/1" in report
+    assert "implausible_normalized_return:return_4h=1" in report
     assert "No row satisfied a configured anomaly rule" in report
     assert "not evidence that market collection was empty" in report
     assert "not an anomaly score, threshold distance, route, or tuning queue" in report

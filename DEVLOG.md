@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make anomaly unit health operator-visible · Codex
+**Why:** Snapshot unit validation already protected Decision logic, but the
+operator-facing anomaly report showed feature availability without saying
+whether any evaluated input carried a unit warning. That made a clean scan and
+a conservatively degraded scan look too similar.
+**Changes:**
+- Added exact unit-warning row coverage plus deterministic warning counts to the
+  existing scan-coverage section; no new artifact or reporting layer was added.
+- Extended the focused renderer regression to prove a concrete warning remains
+  visible, and the controlled live/zero publication regression to require a
+  clean `0/N` unit result through strict doctor and publication.
+- Recorded the completed operator-truth improvement in `ROADMAP.md`.
+**Verify:** Ran 3 focused report and controlled-live publication tests; all
+passed. Python compileall passed. The offline market-anomaly smoke passed and
+rendered `warning_rows=0/8, warnings=none` from its exact receipt-bound fixture
+snapshots.
+**Notes/risks:** Report-only semantics. Validation, thresholds, scores, routes,
+providers, authorization, sends, trades, orders, paper trades, RSI writes, and
+`TRIGGERED_FADE` are unchanged. Historical immutable reports remain untouched.
+
 ## 2026-07-18 — Cover healthy-empty truth through live publication · Codex
 **Why:** The new anomaly-report explanation was unit-tested at the renderer,
 but its most important production path is a genuine-mode, zero-idea generation

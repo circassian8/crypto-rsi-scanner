@@ -136,11 +136,20 @@ def _scan_coverage_lines(
         )
         for row in rows
     )
+    unit_warning_rows = sum(bool(_string_list(row.get("unit_warnings"))) for row in rows)
+    unit_warnings = Counter(
+        warning
+        for row in rows
+        for warning in _string_list(row.get("unit_warnings"))
+    )
     return [
         f"- Classifier coverage: evaluated={evaluated}, diagnostic_or_sector_excluded={excluded}, "
         f"classified_anomaly={anomaly_count}, no_configured_reaction={no_reaction}.",
         "- Freshness: " + _counter_summary(freshness) + ".",
         "- Temporal baseline: " + _counter_summary(baseline) + ".",
+        f"- Unit validation: warning_rows={unit_warning_rows}/{len(rows)}, warnings="
+        + _counter_summary(unit_warnings)
+        + ".",
         "- Input availability: "
         + ", ".join(
             f"{field}={feature_counts[field]}/{len(rows)}" for field in feature_fields
