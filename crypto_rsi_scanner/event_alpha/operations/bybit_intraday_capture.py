@@ -46,7 +46,7 @@ from .market_no_send_models import MarketNoSendError
 CONTRACT_VERSION = "crypto_radar_bybit_intraday_capture_v1"
 LIVE_CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v1"
 EXECUTION_CAPTURE_CONTRACT_VERSION = (
-    "crypto_radar_bybit_execution_quality_capture_v1"
+    "crypto_radar_bybit_execution_quality_capture_v2"
 )
 POINTER_FILENAME = "radar_bybit_intraday_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"

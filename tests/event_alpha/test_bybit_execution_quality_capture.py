@@ -84,14 +84,6 @@ def _resolver(
     return resolve
 
 
-def _instrument_payload(symbol: str) -> dict[str, object]:
-    payload = deepcopy(_fixture("instruments_info.json"))
-    payload["result"]["list"] = [
-        row for row in payload["result"]["list"] if row["symbol"] == symbol
-    ]
-    return payload
-
-
 def _orderbook_payload(symbol: str, price: float) -> dict[str, object]:
     payload = deepcopy(_fixture("orderbook_btcusdt.json"))
     payload["result"]["s"] = symbol
@@ -128,7 +120,7 @@ def _captured(
 def _fetch(request: BybitPublicRequest, _timeout: float) -> BybitCapturedJSONResponse:
     query = dict(request.query)
     if request.path.endswith("instruments-info"):
-        payload = _instrument_payload(query["symbol"])
+        payload = deepcopy(_fixture("instruments_info.json"))
     else:
         prices = {"BTCUSDT": 100.0, "ETHUSDT": 50.0}
         payload = _orderbook_payload(query["symbol"], prices[query["symbol"]])
@@ -154,7 +146,7 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     )
 
     assert result["status"] == "complete"
-    assert result["request_count"] == 5
+    assert result["request_count"] == 3
     assert result["observation_count"] == 2
     assert result["evidence_authority_eligible"] is True
     assert result["protocol_v2_input_quality_eligible"] is True
@@ -166,8 +158,12 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     assert (tmp_path / POINTER_FILENAME).is_file()
 
     namespace = tmp_path / result["artifact_namespace"]
+    capture_summary = json.loads((namespace / "capture_summary.json").read_text())
+    assert capture_summary["instrument_catalog_request_count"] == 1
+    assert capture_summary["orderbook_request_count"] == 2
     raw_paths = sorted(namespace.glob("raw_*.json"))
-    assert len(raw_paths) == 5
+    assert len(raw_paths) == 3
+    assert (namespace / "raw_001_instrument_catalog.json").is_file()
     assert all(path.stat().st_size > 0 for path in raw_paths)
     assert load_latest_bybit_execution_quality_capture(tmp_path) == result
 
@@ -206,7 +202,7 @@ def test_capture_rejects_mapping_only_test_transport_before_writes(
     def mapping_fetch(request: BybitPublicRequest, _timeout: float):
         query = dict(request.query)
         if request.path.endswith("instruments-info"):
-            return _instrument_payload(query["symbol"])
+            return deepcopy(_fixture("instruments_info.json"))
         return _orderbook_payload(query["symbol"], 100.0)
 
     with pytest.raises(

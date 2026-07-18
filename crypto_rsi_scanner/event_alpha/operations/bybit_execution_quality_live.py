@@ -56,9 +56,12 @@ from .bybit_execution_quality import (
     ORDERBOOK_PATH,
     PUBLIC_API_BASE,
     QUOTE_ASSET,
+    REQUEST_STRATEGY,
     BybitEligibleInstrument,
     BybitExecutionQualityError,
     BybitPublicRequest,
+    build_bybit_instrument_catalog_request,
+    build_bybit_orderbook_request,
     normalize_bybit_orderbook,
     select_bybit_usdt_perpetual_instruments,
 )
@@ -75,11 +78,12 @@ from .bybit_execution_quality_capture import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v1"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v2"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
-MAX_PROVIDER_REQUESTS = MAX_RADAR_ASSETS * 2
+INSTRUMENT_CATALOG_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+MAX_PROVIDER_REQUESTS = MAX_RADAR_ASSETS + 1
 READINESS_COMMAND = (
     "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
 )
@@ -316,7 +320,7 @@ def build_bybit_execution_quality_live_readiness(
         reasons.append("bybit_provider_query_universe_empty")
     if not authorized:
         reasons.append("runtime_provider_authorization_absent")
-    request_bound = len(query_assets) * 2
+    request_bound = len(query_assets) + 1 if query_assets else 0
     ready = not reasons
     only_authorization_missing = reasons == ["runtime_provider_authorization_absent"]
     latest_capture = bybit_execution_quality_capture_status(artifact_base_dir)
@@ -341,6 +345,9 @@ def build_bybit_execution_quality_live_readiness(
         "preflight_excluded_assets": [dict(row) for row in excluded_assets],
         "maximum_provider_requests_for_current_universe": request_bound,
         "absolute_provider_request_bound": MAX_PROVIDER_REQUESTS,
+        "provider_request_strategy": REQUEST_STRATEGY,
+        "instrument_catalog_request_bound": 1 if query_assets else 0,
+        "orderbook_request_bound": len(query_assets),
         "provider_call_planned": False,
         "provider_call_attempted": False,
         "evidence_authority_eligible": False,
@@ -386,27 +393,6 @@ def build_bybit_execution_quality_live_readiness(
         ),
         **SAFETY,
     }
-
-
-def _instrument_request(asset: Mapping[str, object]) -> BybitPublicRequest:
-    symbol = str(asset["symbol"])
-    return BybitPublicRequest(
-        method="GET",
-        path=INSTRUMENTS_PATH,
-        query=(("category", BYBIT_CATEGORY), ("symbol", f"{symbol}{QUOTE_ASSET}")),
-    )
-
-
-def _orderbook_request(instrument: BybitEligibleInstrument) -> BybitPublicRequest:
-    return BybitPublicRequest(
-        method="GET",
-        path=ORDERBOOK_PATH,
-        query=(
-            ("category", BYBIT_CATEGORY),
-            ("symbol", instrument.instrument_id),
-            ("limit", "200"),
-        ),
-    )
 
 
 def collect_authoritative_bybit_execution_quality(
@@ -479,15 +465,12 @@ def _collect_authoritative_bybit_execution_quality(
     eligible: list[BybitEligibleInstrument] = []
     captured_responses: list[BybitCapturedJSONResponse] = []
     try:
-        for asset in query_assets:
-            request = _instrument_request(asset)
-            requests_attempted += 1
-            payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
-            if captured is not None:
-                captured_responses.append(captured)
-            selected = select_bybit_usdt_perpetual_instruments((asset,), payload)
-            if selected:
-                eligible.append(selected[0])
+        request = build_bybit_instrument_catalog_request()
+        requests_attempted += 1
+        payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
+        if captured is not None:
+            captured_responses.append(captured)
+        eligible.extend(select_bybit_usdt_perpetual_instruments(query_assets, payload))
         if not eligible:
             raise BybitExecutionQualityLiveError("eligible_instrument_set_empty")
 
@@ -499,7 +482,7 @@ def _collect_authoritative_bybit_execution_quality(
             ).encode("utf-8")
         ).hexdigest()[:24]
         for index, instrument in enumerate(eligible, start=1):
-            request = _orderbook_request(instrument)
+            request = build_bybit_orderbook_request(instrument)
             requests_attempted += 1
             payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
             if captured is not None:
@@ -556,7 +539,10 @@ def _collect_authoritative_bybit_execution_quality(
         "provider_call_attempted": requests_attempted > 0,
         "provider_request_succeeded": True,
         "provider_request_count": requests_attempted,
-        "provider_request_bound": len(query_assets) * 2,
+        "provider_request_bound": len(query_assets) + 1,
+        "provider_request_strategy": REQUEST_STRATEGY,
+        "instrument_catalog_request_count": 1,
+        "orderbook_request_count": len(snapshots),
         "retries": 0,
         "redirects_followed": 0,
         "artifact_persisted": False,
@@ -656,7 +642,7 @@ def _fetch_public_json(
 
     query = dict(request.query)
     expected_keys = {
-        INSTRUMENTS_PATH: {"category", "symbol"},
+        INSTRUMENTS_PATH: {"category", "status", "limit"},
         ORDERBOOK_PATH: {"category", "symbol", "limit"},
         KLINE_PATH: {"category", "symbol", "interval", "end", "limit"},
         TICKERS_PATH: {"category", "symbol"},
@@ -671,6 +657,13 @@ def _fetch_public_json(
         or request.path not in expected_keys
         or set(query) != expected_keys[request.path]
         or query.get("category") != BYBIT_CATEGORY
+        or (
+            request.path == INSTRUMENTS_PATH
+            and (
+                query.get("status") != INSTRUMENT_STATUS
+                or query.get("limit") != "1000"
+            )
+        )
         or (request.path == ORDERBOOK_PATH and query.get("limit") != "200")
         or (
             request.path == FUNDING_HISTORY_PATH
@@ -719,8 +712,13 @@ def _fetch_public_json(
             content_type = str(response.headers.get("Content-Type") or "").split(";", 1)[0].strip().casefold()
             if content_type not in {"application/json", "text/json"}:
                 raise BybitExecutionQualityLiveError("provider_content_type_rejected")
-            raw = response.read(MAX_RESPONSE_BYTES + 1)
-            if not raw or len(raw) > MAX_RESPONSE_BYTES:
+            response_limit = (
+                INSTRUMENT_CATALOG_MAX_RESPONSE_BYTES
+                if request.path == INSTRUMENTS_PATH
+                else MAX_RESPONSE_BYTES
+            )
+            raw = response.read(response_limit + 1)
+            if not raw or len(raw) > response_limit:
                 raise BybitExecutionQualityLiveError("provider_response_size_invalid")
         response_received = datetime.now(timezone.utc)
         captured = BybitCapturedJSONResponse(

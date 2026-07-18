@@ -17,7 +17,9 @@ import pytest
 
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import DashboardReadinessError
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
+    REQUEST_STRATEGY,
     BybitPublicRequest,
+    build_bybit_instrument_catalog_request,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live import (
     AUTHORIZATION_ACTION,
@@ -82,14 +84,6 @@ def _resolver(observations: tuple[dict[str, object], ...]):
     return resolve
 
 
-def _instrument_payload(symbol: str) -> dict[str, object]:
-    payload = deepcopy(_fixture("instruments_info.json"))
-    payload["result"]["list"] = [
-        row for row in payload["result"]["list"] if row["symbol"] == symbol
-    ]
-    return payload
-
-
 def _orderbook_payload(symbol: str, price: float) -> dict[str, object]:
     payload = deepcopy(_fixture("orderbook_btcusdt.json"))
     payload["result"]["s"] = symbol
@@ -151,6 +145,9 @@ def test_readiness_is_no_call_and_requires_exact_authority_plus_explicit_auth() 
     assert payload["latest_capture_status"] == "unavailable"
     assert payload["evidence_publication_status"] == "no_immutable_capture_available"
     assert payload["maximum_provider_requests_for_current_universe"] == 2
+    assert payload["provider_request_strategy"] == REQUEST_STRATEGY
+    assert payload["instrument_catalog_request_bound"] == 1
+    assert payload["orderbook_request_bound"] == 1
     assert payload["reasons"] == ["runtime_provider_authorization_absent"]
     assert payload["operator_action_required"] == AUTHORIZATION_ACTION
     assert payload["authorization_action_required"] == AUTHORIZATION_ACTION
@@ -297,7 +294,7 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
         requests.append(request)
         query = dict(request.query)
         if request.path.endswith("instruments-info"):
-            return _instrument_payload(query["symbol"])
+            return deepcopy(_fixture("instruments_info.json"))
         prices = {"BTCUSDT": 100.0, "ETHUSDT": 50.0}
         return _orderbook_payload(query["symbol"], prices[query["symbol"]])
 
@@ -324,7 +321,11 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
         "ETHUSDT",
     ]
     assert result["execution_quality_snapshot_count"] == 2
-    assert result["provider_request_count"] == 5
+    assert result["provider_request_count"] == 3
+    assert result["provider_request_bound"] == 4
+    assert result["provider_request_strategy"] == REQUEST_STRATEGY
+    assert result["instrument_catalog_request_count"] == 1
+    assert result["orderbook_request_count"] == 2
     assert result["provider_request_count"] <= result["provider_request_bound"] <= MAX_PROVIDER_REQUESTS
     assert result["retries"] == 0
     assert result["redirects_followed"] == 0
@@ -339,7 +340,7 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
     assert result["private_data_read"] is False
     assert result["orders_available"] is False
     assert result["writes_performed"] is False
-    assert [request.path for request in requests].count("/v5/market/instruments-info") == 3
+    assert [request.path for request in requests].count("/v5/market/instruments-info") == 1
     assert [request.path for request in requests].count("/v5/market/orderbook") == 2
     assert all("FIGR_HELOC" not in str(request.query) for request in requests)
 
@@ -367,6 +368,29 @@ def test_provider_metadata_with_no_eligible_contract_fails_before_orderbook() ->
     assert [request.path for request in requests] == [
         "/v5/market/instruments-info"
     ]
+
+
+def test_partial_instrument_catalog_fails_before_any_orderbook() -> None:
+    requests: list[BybitPublicRequest] = []
+
+    def fetch(request: BybitPublicRequest, _timeout: float) -> Mapping[str, object]:
+        requests.append(request)
+        payload = deepcopy(_fixture("instruments_info.json"))
+        payload["result"]["nextPageCursor"] = "continuation"
+        return payload
+
+    with pytest.raises(BybitExecutionQualityLiveError) as captured:
+        collect_authoritative_bybit_execution_quality(
+            artifact_base_dir="unused",
+            environ={LIVE_AUTH_ENV: "1"},
+            now=lambda: NOW,
+            resolver=_resolver((_observation("bitcoin", "BTC", 3_000.0),)),
+            fetch_json=fetch,
+        )
+
+    assert captured.value.reason_code == "provider_payload_contract_invalid"
+    assert captured.value.request_count == 1
+    assert requests == [build_bybit_instrument_catalog_request()]
 
 
 class _FakeResponse:
@@ -404,17 +428,18 @@ class _FakeOpener:
 
 
 def test_transport_uses_fixed_public_get_without_credentials_or_redirects() -> None:
-    payload = _instrument_payload("BTCUSDT")
+    payload = deepcopy(_fixture("instruments_info.json"))
     opener = _FakeOpener(payload)
-    request = BybitPublicRequest(
-        method="GET",
-        path="/v5/market/instruments-info",
-        query=(("category", "linear"), ("symbol", "BTCUSDT")),
-    )
+    request = build_bybit_instrument_catalog_request()
 
     captured = _fetch_public_json(request, 10.0, opener=opener)
     assert captured.payload() == payload
     assert captured.raw_bytes == json.dumps(payload).encode("utf-8")
+    assert dict(request.query) == {
+        "category": "linear",
+        "status": "Trading",
+        "limit": "1000",
+    }
     sent = opener.requests[0]
     headers = {key.casefold(): value for key, value in sent.header_items()}
     assert sent.get_method() == "GET"
@@ -424,6 +449,14 @@ def test_transport_uses_fixed_public_get_without_credentials_or_redirects() -> N
     assert "api-key" not in headers
     assert headers["accept"] == "application/json"
     assert "cdn-request-id" in headers
+
+    symbol_scoped = BybitPublicRequest(
+        method="GET",
+        path="/v5/market/instruments-info",
+        query=(("category", "linear"), ("symbol", "BTCUSDT")),
+    )
+    with pytest.raises(BybitExecutionQualityLiveError, match="request_contract"):
+        _fetch_public_json(symbol_scoped, 10.0, opener=_FakeOpener(payload))
 
 
 def test_transport_accepts_only_the_closed_direct_kline_query_shape() -> None:
@@ -500,11 +533,7 @@ class _ForbiddenOpener:
 
 
 def test_transport_classifies_recorded_403_and_never_retries() -> None:
-    request = BybitPublicRequest(
-        method="GET",
-        path="/v5/market/instruments-info",
-        query=(("category", "linear"), ("symbol", "BTCUSDT")),
-    )
+    request = build_bybit_instrument_catalog_request()
 
     with pytest.raises(BybitExecutionQualityLiveError) as captured:
         _fetch_public_json(request, 10.0, opener=_ForbiddenOpener())
@@ -515,11 +544,7 @@ def test_transport_classifies_recorded_403_and_never_retries() -> None:
 
 
 def test_transport_classifies_region_restriction_inside_http_200_payload() -> None:
-    request = BybitPublicRequest(
-        method="GET",
-        path="/v5/market/instruments-info",
-        query=(("category", "linear"), ("symbol", "BTCUSDT")),
-    )
+    request = build_bybit_instrument_catalog_request()
     payload = {"retCode": 10009, "retMsg": "unavailable for your region"}
 
     with pytest.raises(BybitExecutionQualityLiveError) as captured:

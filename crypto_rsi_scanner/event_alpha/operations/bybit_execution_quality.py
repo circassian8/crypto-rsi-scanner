@@ -20,7 +20,7 @@ import re
 from typing import Any, Mapping, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_usdt_perpetual_execution_quality_v1"
+CONTRACT_VERSION = "crypto_radar_bybit_usdt_perpetual_execution_quality_v2"
 SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_execution_quality.v2"
 VENUE_ID = "bybit"
 EXECUTION_MODE = "perpetual"
@@ -29,7 +29,11 @@ QUOTE_ASSET = "USDT"
 CONTRACT_TYPE = "LinearPerpetual"
 INSTRUMENT_STATUS = "Trading"
 MAX_RADAR_ASSETS = 30
-MAX_PLANNED_REQUESTS = MAX_RADAR_ASSETS * 2
+INSTRUMENT_CATALOG_LIMIT = 1000
+MAX_PLANNED_REQUESTS = MAX_RADAR_ASSETS + 1
+REQUEST_STRATEGY = (
+    "one_complete_trading_linear_catalog_then_one_orderbook_per_eligible_instrument"
+)
 DEFAULT_DEPTH_BANDS_BPS = (5, 10, 25, 50)
 DEFAULT_NOTIONALS_USDT = (500.0, 2_000.0, 10_000.0)
 DEFAULT_FRESHNESS_SECONDS = 15.0
@@ -324,7 +328,7 @@ def select_bybit_usdt_perpetual_instruments(
     if result.get("category") != BYBIT_CATEGORY:
         raise BybitExecutionQualityError("bybit_instruments_category_not_linear")
     cursor = result.get("nextPageCursor")
-    if cursor not in (None, ""):
+    if cursor != "":
         raise BybitExecutionQualityError("bybit_instruments_page_incomplete")
     rows = _sequence(result.get("list"), "bybit_instruments_list")
 
@@ -376,17 +380,47 @@ def select_bybit_usdt_perpetual_instruments(
     )
 
 
+def build_bybit_instrument_catalog_request() -> BybitPublicRequest:
+    """Build the one complete active-linear catalog request used by capture v2."""
+
+    return BybitPublicRequest(
+        method="GET",
+        path=INSTRUMENTS_PATH,
+        query=(
+            ("category", BYBIT_CATEGORY),
+            ("status", INSTRUMENT_STATUS),
+            ("limit", str(INSTRUMENT_CATALOG_LIMIT)),
+        ),
+    )
+
+
+def build_bybit_orderbook_request(
+    instrument: BybitEligibleInstrument,
+) -> BybitPublicRequest:
+    """Build one exact 200-level public order-book request."""
+
+    return BybitPublicRequest(
+        method="GET",
+        path=ORDERBOOK_PATH,
+        query=(
+            ("category", BYBIT_CATEGORY),
+            ("symbol", instrument.instrument_id),
+            ("limit", "200"),
+        ),
+    )
+
+
 def build_bybit_public_request_plan(
     instruments: Sequence[BybitEligibleInstrument],
 ) -> BybitPublicRequestPlan:
-    """Build but never execute exact public metadata/book GET descriptions."""
+    """Build but never execute one catalog plus exact public book GETs."""
 
     if not instruments:
         raise BybitExecutionQualityError("eligible_instrument_set_empty")
     if len(instruments) > MAX_RADAR_ASSETS:
         raise BybitExecutionQualityError("eligible_instrument_set_exceeds_30")
     seen: set[str] = set()
-    requests: list[BybitPublicRequest] = []
+    requests: list[BybitPublicRequest] = [build_bybit_instrument_catalog_request()]
     for instrument in instruments:
         if (
             instrument.instrument_id in seen
@@ -397,27 +431,7 @@ def build_bybit_public_request_plan(
         ):
             raise BybitExecutionQualityError("eligible_instrument_contract_invalid")
         seen.add(instrument.instrument_id)
-        requests.extend(
-            (
-                BybitPublicRequest(
-                    method="GET",
-                    path=INSTRUMENTS_PATH,
-                    query=(
-                        ("category", BYBIT_CATEGORY),
-                        ("symbol", instrument.instrument_id),
-                    ),
-                ),
-                BybitPublicRequest(
-                    method="GET",
-                    path=ORDERBOOK_PATH,
-                    query=(
-                        ("category", BYBIT_CATEGORY),
-                        ("symbol", instrument.instrument_id),
-                        ("limit", "200"),
-                    ),
-                ),
-            )
-        )
+        requests.append(build_bybit_orderbook_request(instrument))
     if len(requests) > MAX_PLANNED_REQUESTS:
         raise BybitExecutionQualityError("request_plan_exceeds_bound")
     return BybitPublicRequestPlan(
@@ -681,11 +695,13 @@ __all__ = (
     "DEFAULT_NOTIONALS_USDT",
     "EXECUTION_MODE",
     "INSTRUMENT_STATUS",
+    "INSTRUMENT_CATALOG_LIMIT",
     "MAX_PLANNED_REQUESTS",
     "MAX_RADAR_ASSETS",
     "OFFICIAL_INSTRUMENT_DOC",
     "OFFICIAL_ORDERBOOK_DOC",
     "QUOTE_ASSET",
+    "REQUEST_STRATEGY",
     "SNAPSHOT_SCHEMA_VERSION",
     "VENUE_ID",
     "BybitEligibleInstrument",
@@ -694,6 +710,8 @@ __all__ = (
     "BybitPublicRequest",
     "BybitPublicRequestPlan",
     "bybit_base_symbol_requestable",
+    "build_bybit_instrument_catalog_request",
+    "build_bybit_orderbook_request",
     "build_bybit_public_request_plan",
     "main",
     "normalize_bybit_orderbook",

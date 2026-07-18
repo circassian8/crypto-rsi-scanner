@@ -19,12 +19,15 @@ from .bybit_execution_quality import (
     CONTRACT_TYPE,
     INSTRUMENTS_PATH,
     INSTRUMENT_STATUS,
-    ORDERBOOK_PATH,
+    MAX_RADAR_ASSETS,
     PUBLIC_API_BASE,
     QUOTE_ASSET,
+    REQUEST_STRATEGY,
     BybitEligibleInstrument,
     BybitExecutionQualityError,
     BybitPublicRequest,
+    build_bybit_instrument_catalog_request,
+    build_bybit_orderbook_request,
     normalize_bybit_orderbook,
     select_bybit_usdt_perpetual_instruments,
 )
@@ -56,8 +59,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v1"
-_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v1"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v2"
+_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v2"
 POINTER_FILENAME = "radar_bybit_execution_quality_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
 RECEIPT_FILENAME = "capture_completion_receipt.json"
@@ -66,15 +69,16 @@ AUTHORITY_FILENAME = "source_authority.json"
 UNIVERSE_FILENAME = "radar_universe.json"
 REQUEST_INDEX_FILENAME = "request_index.json"
 OBSERVATIONS_FILENAME = "execution_quality_observations.json"
-MAX_RESPONSE_BYTES = 2 * 1024 * 1024
-MAX_RESPONSES = 60
+MAX_STANDARD_RESPONSE_BYTES = 2 * 1024 * 1024
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+MAX_RESPONSES = MAX_RADAR_ASSETS + 1
 _LOCK_FILENAME = ".radar_bybit_execution_quality.lock"
 _NAMESPACE_RE = re.compile(
     r"^radar_bybit_execution_quality_[0-9]{8}t[0-9]{12}z_[a-f0-9]{12}$"
 )
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 _SAFE_RAW_NAME_RE = re.compile(
-    r"^raw_[0-9]{3}_(?:instrument|orderbook)_[A-Z0-9]{4,32}\.json$"
+    r"^(?:raw_001_instrument_catalog|raw_[0-9]{3}_orderbook_[A-Z0-9]{4,32})\.json$"
 )
 
 
@@ -118,29 +122,6 @@ def _utc_datetime(value: object, field: str) -> datetime:
 
 def _request_url(request: BybitPublicRequest) -> str:
     return f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}"
-
-
-def _instrument_request(asset: Mapping[str, object]) -> BybitPublicRequest:
-    return BybitPublicRequest(
-        method="GET",
-        path=INSTRUMENTS_PATH,
-        query=(
-            ("category", BYBIT_CATEGORY),
-            ("symbol", f"{asset['symbol']}{QUOTE_ASSET}"),
-        ),
-    )
-
-
-def _orderbook_request(instrument: Mapping[str, object]) -> BybitPublicRequest:
-    return BybitPublicRequest(
-        method="GET",
-        path=ORDERBOOK_PATH,
-        query=(
-            ("category", BYBIT_CATEGORY),
-            ("symbol", str(instrument["instrument_id"])),
-            ("limit", "200"),
-        ),
-    )
 
 
 def _request_values(request: BybitPublicRequest) -> dict[str, object]:
@@ -226,6 +207,11 @@ def _response_values(
         raise BybitExecutionQualityCaptureError("captured_response_timing_invalid")
     if response.duration_ms < 0 or response.duration_ms > 120_000:
         raise BybitExecutionQualityCaptureError("captured_response_duration_invalid")
+    response_limit = (
+        MAX_RESPONSE_BYTES
+        if response.request.path == INSTRUMENTS_PATH
+        else MAX_STANDARD_RESPONSE_BYTES
+    )
     if (
         response.transport_contract != TRANSPORT_CONTRACT
         or response.http_status != 200
@@ -236,7 +222,7 @@ def _response_values(
         or response.request.private_data
         or not response.request.research_only
         or not response.raw_bytes
-        or len(response.raw_bytes) > MAX_RESPONSE_BYTES
+        or len(response.raw_bytes) > response_limit
     ):
         raise BybitExecutionQualityCaptureError(
             "captured_response_transport_contract_invalid"
@@ -290,6 +276,8 @@ def _validated_summary_components(
         or summary.get("provider_call_authorized") is not True
         or summary.get("provider_call_attempted") is not True
         or summary.get("provider_request_succeeded") is not True
+        or summary.get("provider_request_strategy") != REQUEST_STRATEGY
+        or summary.get("instrument_catalog_request_count") != 1
         or summary.get("research_only") is not True
         or summary.get("no_send") is not True
         or summary.get("orders_available") is not False
@@ -372,9 +360,10 @@ def _validated_summary_components(
         != len(preflight_excluded_assets)
         or summary.get("eligible_instrument_count") != len(eligible_values)
         or summary.get("execution_quality_snapshot_count") != len(snapshot_values)
+        or summary.get("orderbook_request_count") != len(snapshot_values)
         or len(snapshot_values) != len(eligible_values)
-        or len(responses) != len(provider_query_assets) + len(eligible_values)
-        or summary.get("provider_request_bound") != len(provider_query_assets) * 2
+        or len(responses) != 1 + len(eligible_values)
+        or summary.get("provider_request_bound") != len(provider_query_assets) + 1
         or provider_query_assets != list(expected_query_assets)
         or preflight_excluded_assets != list(expected_excluded_assets)
     ):
@@ -420,30 +409,32 @@ def _validate_capture_inputs(
         snapshot_values,
     ) = _validated_summary_components(summary, responses)
 
-    selected: list[BybitEligibleInstrument] = []
     request_rows: list[dict[str, object]] = []
     raw_rows: list[tuple[str, bytes]] = []
-    for index, asset in enumerate(provider_query_assets, start=1):
-        if not isinstance(asset, Mapping):
-            raise BybitExecutionQualityCaptureError("radar_asset_schema_invalid")
-        expected = _instrument_request(asset)
-        response = responses[index - 1]
-        if response.request != expected:
-            raise BybitExecutionQualityCaptureError("instrument_request_order_drift")
-        symbol = str(dict(expected.query)["symbol"])
-        raw_filename = f"raw_{index:03d}_instrument_{symbol}.json"
-        request_rows.append(
-            _response_values(response, index=index, raw_filename=raw_filename)
+    catalog_request = build_bybit_instrument_catalog_request()
+    catalog_response = responses[0]
+    if catalog_response.request != catalog_request:
+        raise BybitExecutionQualityCaptureError("instrument_request_order_drift")
+    catalog_filename = "raw_001_instrument_catalog.json"
+    request_rows.append(
+        _response_values(
+            catalog_response,
+            index=1,
+            raw_filename=catalog_filename,
         )
-        raw_rows.append((raw_filename, response.raw_bytes))
-        try:
-            selected.extend(
-                select_bybit_usdt_perpetual_instruments((asset,), response.payload())
+    )
+    raw_rows.append((catalog_filename, catalog_response.raw_bytes))
+    try:
+        selected = list(
+            select_bybit_usdt_perpetual_instruments(
+                provider_query_assets,  # type: ignore[arg-type]
+                catalog_response.payload(),
             )
-        except BybitExecutionQualityError as exc:
-            raise BybitExecutionQualityCaptureError(
-                "instrument_response_contract_invalid"
-            ) from exc
+        )
+    except BybitExecutionQualityError as exc:
+        raise BybitExecutionQualityCaptureError(
+            "instrument_response_contract_invalid"
+        ) from exc
 
     selected_values = _canonical_value([row.to_dict() for row in selected])
     if selected_values != eligible_values:
@@ -452,14 +443,14 @@ def _validate_capture_inputs(
     reconstructed_snapshots: list[dict[str, object]] = []
     for offset, (instrument, expected_snapshot) in enumerate(
         zip(selected, snapshot_values, strict=True),
-        start=len(provider_query_assets) + 1,
+        start=2,
     ):
         if not isinstance(expected_snapshot, Mapping):
             raise BybitExecutionQualityCaptureError(
                 "execution_quality_snapshot_schema_invalid"
             )
         response = responses[offset - 1]
-        expected = _orderbook_request(instrument.to_dict())
+        expected = build_bybit_orderbook_request(instrument)
         if response.request != expected:
             raise BybitExecutionQualityCaptureError("orderbook_request_order_drift")
         raw_filename = f"raw_{offset:03d}_orderbook_{instrument.instrument_id}.json"

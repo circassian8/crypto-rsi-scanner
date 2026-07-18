@@ -26,6 +26,8 @@ LIVE_SUMMARY_KEYS = frozenset(
         "preflight_excluded_asset_count", "preflight_excluded_assets",
         "provider_query_asset_count", "provider_query_assets",
         "provider_request_bound", "provider_request_count",
+        "provider_request_strategy", "instrument_catalog_request_count",
+        "orderbook_request_count",
         "provider_request_succeeded", "quote_asset", "radar_assets",
         "recorded_403_policy", "redirects_followed", "requested_radar_asset_count",
         "research_only", "retries", "row_type", "source_authority",

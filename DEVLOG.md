@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Use one complete Bybit catalog per capture · Codex
+**Why:** The first execution-quality live contract planned one instrument-
+metadata request plus one order-book request for every requestable Radar asset.
+Bybit's current official V5 contract supports a 1,000-row instrument page, so
+the per-symbol metadata fan-out was unnecessary, gave candidate mappings
+slightly different acquisition clocks, and doubled the future request boundary.
+**Changes:**
+- Introduced execution-quality offline/live/capture contract v2. One exact
+  `category=linear&status=Trading&limit=1000` catalog is acquired first; its
+  `nextPageCursor` must exist and be empty. Missing/non-empty cursors, malformed
+  catalogs, or zero eligible contracts fail before any order-book request or
+  publication.
+- Reused one canonical request builder for the catalog and one for each
+  200-level exact-instrument order book. The absolute public request bound is
+  now 31 instead of 60; current no-call readiness projects 29 requestable assets
+  and reports a bound of 30 instead of 58. Actual requests are exactly one plus
+  the eligible-instrument count.
+- Updated immutable capture validation to seal one catalog response plus the
+  exact eligible books, preserve their raw bytes/timing/fingerprints, rederive
+  all mappings and observations, reject old symbol-scoped request order, and
+  retain the separate 2 MiB book / 8 MiB catalog response bounds. Dependent
+  intraday and derivatives prerequisites now require the v2 capture contract.
+- Updated the accepted decision, North Star Markdown/JSON, execution-venue
+  package, operator agreement, roadmap, and architecture reports. No Bybit
+  authorization, request, retry, proxy, VPN, alternate host, region bypass,
+  credential, order, trade, send, paper trade, RSI write, route, score, or
+  threshold was added or changed.
+**Verify:** 140 focused execution-quality, capture, intraday, derivatives, and
+operator-readiness tests pass; Python compileall, the offline Bybit smoke,
+no-call readiness/status, architecture cleanliness with zero new size
+violations, JSON validation, and `git diff --check` pass. `verify-fast` completed
+with 2,885 tests passing and only the sandbox-denied loopback concurrency test;
+that exact test passed separately with local loopback permission (1/1), proving
+the failure was environmental rather than a product regression. No provider
+call occurred.
+
 ## 2026-07-18 — Publish the nineteenth no-send market observation cycle · Codex
 **Why:** The enforced hourly cadence became eligible after the prior failed
 publication had still contributed its successful market observations to the

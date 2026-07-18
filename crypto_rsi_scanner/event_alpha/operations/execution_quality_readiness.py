@@ -512,13 +512,13 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             ),
         ),
         supported_offline_adapters=(
-            "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
+            "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
         ),
         supported_live_adapters=(
-            "bybit_usdt_linear_perpetual_public_REST_capture_v1",
+            "bybit_usdt_linear_perpetual_public_REST_capture_v2",
         ),
         supported_evidence_stores=(
-            "immutable_raw_response_manifest_receipt_pointer_v1",
+            "immutable_raw_response_manifest_receipt_pointer_v2",
         ),
         immutable_capture_contract_implemented=True,
         protocol_v2_annex_bound=False,

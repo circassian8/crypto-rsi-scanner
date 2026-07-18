@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Use one complete Bybit catalog before per-instrument books
+**Status:** accepted
+**Decision:** Execution-quality capture v2 must request one public
+`/v5/market/instruments-info` catalog with `category=linear`, `status=Trading`,
+and `limit=1000`, then request one 200-level public order book for each exact
+eligible USDT-linear perpetual. A missing or non-empty `nextPageCursor` is an
+incomplete catalog and fails before every order-book request and publication. The absolute
+request bound is 31 for a 30-asset Radar universe; the actual count is one plus
+the eligible-instrument count. Preserve the catalog as one immutable raw
+response and rederive all candidate joins from it. Do not fall back to one
+metadata request per Radar asset, pagination, retries, alternate hosts, proxies,
+VPNs, or region bypasses.
+**Why:** Bybit's current official V5 contract permits up to 1,000 instruments in
+one response and warns that the default 500-row response is incomplete for the
+linear catalog. One catalog gives every candidate the same point-in-time
+metadata basis, cuts the current worst-case boundary from 58 GETs to 30, and
+retains a fail-closed completeness proof while depth still requires one native
+book per eligible instrument.
+**Revisit when:** The Trading linear catalog exceeds 1,000 rows, the official
+endpoint changes its pagination/limit contract, or a sealed Protocol-v2 annex
+requires a different point-in-time venue snapshot. Any replacement must retain
+complete-catalog evidence, exact identity, bounded calls, raw-byte capture, and
+the no-retry/no-bypass policy.
+
 ## 2026-07-18 - Type authorization status metadata without weakening secret scans
 **Status:** accepted
 **Decision:** Treat `live_authorization_status` as a closed metadata field only

@@ -58,6 +58,10 @@ def test_universe_intersection_never_guesses_multiplier_or_partial_pages() -> No
     partial["result"]["nextPageCursor"] = "next"
     with pytest.raises(BybitExecutionQualityError, match="page_incomplete"):
         select_bybit_usdt_perpetual_instruments(radar, partial)
+    missing = deepcopy(payload)
+    missing["result"].pop("nextPageCursor")
+    with pytest.raises(BybitExecutionQualityError, match="page_incomplete"):
+        select_bybit_usdt_perpetual_instruments(radar, missing)
 
 
 @pytest.mark.parametrize(
@@ -88,13 +92,22 @@ def test_request_plan_is_bounded_public_get_only_and_non_executable() -> None:
     assert payload["venue_id"] == "bybit"
     assert payload["execution_mode"] == "perpetual"
     assert payload["quote_asset"] == "USDT"
-    assert payload["request_count"] == 4
+    assert payload["request_count"] == 3
     assert payload["request_count"] <= MAX_PLANNED_REQUESTS
     assert {row["method"] for row in payload["requests"]} == {"GET"}
     assert {row["path"] for row in payload["requests"]} == {
         "/v5/market/instruments-info",
         "/v5/market/orderbook",
     }
+    assert payload["requests"][0]["query"] == {
+        "category": "linear",
+        "status": "Trading",
+        "limit": "1000",
+    }
+    assert sum(
+        row["path"] == "/v5/market/instruments-info"
+        for row in payload["requests"]
+    ) == 1
     assert all(row["credentials_required"] is False for row in payload["requests"])
     assert all(row["private_data"] is False for row in payload["requests"])
     assert payload["provider_call_authorized"] is False

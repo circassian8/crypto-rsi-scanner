@@ -67,13 +67,13 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "exact_frozen_eligible_instrument_set",
     )
     assert result.supported_offline_adapters == (
-        "bybit_usdt_linear_perpetual_fixture_normalizer_v1",
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
     )
     assert result.supported_live_adapters == (
-        "bybit_usdt_linear_perpetual_public_REST_capture_v1",
+        "bybit_usdt_linear_perpetual_public_REST_capture_v2",
     )
     assert result.supported_evidence_stores == (
-        "immutable_raw_response_manifest_receipt_pointer_v1",
+        "immutable_raw_response_manifest_receipt_pointer_v2",
     )
     assert result.immutable_capture_contract_implemented is True
     assert result.protocol_v2_annex_bound is False
@@ -286,11 +286,11 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "supported_offline_adapters=bybit_usdt_linear_perpetual" in rendered
     assert (
         "supported_live_adapters="
-        "bybit_usdt_linear_perpetual_public_REST_capture_v1"
+        "bybit_usdt_linear_perpetual_public_REST_capture_v2"
     ) in rendered
     assert (
         "supported_evidence_stores="
-        "immutable_raw_response_manifest_receipt_pointer_v1"
+        "immutable_raw_response_manifest_receipt_pointer_v2"
     ) in rendered
     assert "immutable_capture_contract_implemented=true" in rendered
     assert "protocol_v2_annex_bound=false" in rendered
@@ -402,10 +402,10 @@ def test_cli_json_is_structured_static_and_secret_free(
     )
     assert payload["human_decision_confirmed_at"] == "2026-07-17"
     assert payload["supported_offline_adapters"] == [
-        "bybit_usdt_linear_perpetual_fixture_normalizer_v1"
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v2"
     ]
     assert payload["supported_live_adapters"] == [
-        "bybit_usdt_linear_perpetual_public_REST_capture_v1"
+        "bybit_usdt_linear_perpetual_public_REST_capture_v2"
     ]
     assert payload["provider_call_planned"] is False
     assert payload["provider_call_attempted"] is False

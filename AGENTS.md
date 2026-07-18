@@ -426,11 +426,15 @@ may be added later when a suitable environment already exists.
   radar-execution-quality-bybit-status` validates the latest capture; neither
   makes a provider call or write. Capture requires the already-present
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the exact
-  `CONFIRM=1` target, performs at most two fixed-host public GETs per
-  provider-query-eligible current asset, follows no redirects, ignores ambient
-  proxies, and makes no retries. Non-contract-shaped Radar symbols are excluded
-  before the provider boundary; the full ranked universe, exact query subset,
-  and reason-coded exclusions remain immutable in the capture. The initial
+  `CONFIRM=1` target. Capture v2 first requests one complete `Trading` linear
+  instrument catalog with `limit=1000`, requires an explicit empty continuation
+  cursor (missing or non-empty fails closed), and then requests one 200-level book per
+  exact eligible instrument. Its absolute bound is 31 GETs and the current
+  29-candidate universe bound is 30; actual calls are one plus the eligible
+  count. It follows no redirects, ignores ambient proxies, and makes no retries.
+  Non-contract-shaped Radar symbols are excluded before the provider boundary;
+  the full ranked universe, exact query subset, and reason-coded exclusions
+  remain immutable in the capture. The initial
   Radar-symbol-to-Bybit-base join is an auditable candidate join, not confirmed
   canonical identity; exact IDs stay pending human confirmation in the sealed
   Protocol-v2 annex. If no query candidate resolves to an eligible exact active

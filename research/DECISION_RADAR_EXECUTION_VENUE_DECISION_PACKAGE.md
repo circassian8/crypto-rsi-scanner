@@ -37,7 +37,9 @@ are excluded with a reason code. The immutable capture retains the full ranked
 Radar universe, the exact provider-query subset, and every exclusion. The
 remaining exact-symbol join is explicitly a candidate join; human confirmation
 of canonical asset identity remains pending until the Protocol-v2 annex seals
-the exact native instrument IDs.
+the exact native instrument IDs. The single-catalog completeness and limit rule
+follows Bybit's official
+[instruments-info contract](https://bybit-exchange.github.io/docs/v5/market/instrument).
 
 ## Feasibility record
 
@@ -179,9 +181,14 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   authorization already exists. Readiness binds to one exact authoritative
   Radar generation, and status validates the latest capture; neither makes a
   provider call or write. A capture attempt may run only through the additional
-  explicit `CONFIRM=1` boundary, use at most two public GETs per requestable
-  current Radar asset, make no retries, and stop on the first 403, 429, regional
-  restriction, malformed response, or authority failure. Non-contract-shaped
+  explicit `CONFIRM=1` boundary. Capture v2 uses one complete
+  `category=linear&status=Trading&limit=1000` catalog request, rejects a
+  missing or non-empty continuation cursor as incomplete, and then uses one 200-level
+  order-book request per exact eligible instrument. The absolute bound is 31
+  GETs; the current 29-candidate universe bound is 30, while the actual count is
+  one plus the eligible-instrument count. It makes no retries and stops on the
+  first 403, 429, regional restriction, malformed response, or authority
+  failure. Non-contract-shaped
   symbols are rejected before the provider boundary rather than consuming a
   request or silently disappearing. Only a complete run publishes an immutable
   bundle containing the closed authority/full-query-excluded universe, exact
@@ -250,7 +257,9 @@ The exact operator sequence is intentionally split:
 - The exact bounded instrument set is not yet frozen.
 - Current no-call readiness projects 30 Radar assets into 29 provider-query
   candidates and one audited preflight exclusion (`FIGR_HELOC`); this is not a
-  claim that all 29 candidate joins are canonically confirmed contracts.
+  claim that all 29 candidate joins are canonically confirmed contracts. The
+  exact inactive capture-v2 request bound is 30: one complete instrument
+  catalog with an explicit empty continuation cursor plus no more than 29 order books.
 - The execution-quality live adapter and immutable capture contract exist but
   are inactive; no genuine capture exists and live spread remains unavailable.
 - Venue-native ticker/funding/OI/positioning normalization is fixture-proven and

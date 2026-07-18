@@ -91,7 +91,7 @@ def _instrument():
 
 def _capture(capture_id: str = "b" * 64) -> dict[str, object]:
     return {
-        "contract_version": "crypto_radar_bybit_execution_quality_capture_v1",
+        "contract_version": "crypto_radar_bybit_execution_quality_capture_v2",
         "status": "complete",
         "capture_id": capture_id,
         "artifact_namespace": (
