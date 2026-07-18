@@ -367,6 +367,9 @@ may be added later when a suitable environment already exists.
   observations, fingerprints, manifest, completion receipt, and latest pointer. Validation
   holds one descriptor-anchored namespace for the complete read, rederives all
   projections from the raw bytes, and rejects drift or pointer rollback. The
+  exact Radar authority identity and full ranked universe are re-resolved after
+  provider collection and before the first immutable capture write; expiry,
+  replacement, or universe drift leaves no Bybit capture pointer. The
   standard review archive selects and fully revalidates only the latest complete
   capture. A fresh capture may be Protocol-v2 input-quality eligible, but stays
   `protocol_v2_evidence_eligible=false` and `protocol_v2_annex_bound=false`

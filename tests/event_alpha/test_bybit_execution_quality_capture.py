@@ -225,6 +225,43 @@ def test_capture_rejects_mapping_only_test_transport_before_writes(
     assert list(tmp_path.glob("radar_bybit_execution_quality_*")) == []
 
 
+def test_capture_rechecks_exact_authority_after_collection_before_writes(
+    tmp_path: Path,
+) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    first = _resolver(observations)(tmp_path, now=NOW).snapshot
+    replacement = SimpleNamespace(
+        **{
+            **vars(first),
+            "artifact_namespace": "radar_market_no_send_replacement_exact",
+            "run_id": "2026-07-17T12:00:01Z|no_key_live",
+        }
+    )
+    resolve_count = 0
+
+    def drifting_resolver(_base: object, *, now: object) -> object:
+        nonlocal resolve_count
+        assert now == NOW
+        resolve_count += 1
+        return SimpleNamespace(snapshot=first if resolve_count == 1 else replacement)
+
+    with pytest.raises(
+        BybitExecutionQualityLiveError,
+        match="capture_source_authority_drifted_before_publication",
+    ):
+        capture_authoritative_bybit_execution_quality(
+            artifact_base_dir=tmp_path,
+            environ={LIVE_AUTH_ENV: "1"},
+            now=lambda: NOW,
+            resolver=drifting_resolver,
+            fetch_json=_fetch,
+        )
+
+    assert resolve_count == 2
+    assert not (tmp_path / POINTER_FILENAME).exists()
+    assert list(tmp_path.glob("radar_bybit_execution_quality_*")) == []
+
+
 def test_capture_rejects_unallowlisted_summary_fields_before_writes(
     tmp_path: Path,
 ) -> None:

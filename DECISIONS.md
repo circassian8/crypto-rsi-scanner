@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Revalidate Radar authority before Bybit capture publication
+**Status:** accepted
+**Decision:** Resolve current trusted Radar authority once before Bybit
+collection and again after the final provider response but before the first
+immutable capture write. The namespace, run, revision, operator-state digest,
+and full ranked Radar universe must still match. Authority expiry,
+replacement, unreadability, or universe drift fails closed and publishes no
+Bybit capture pointer.
+**Why:** A bounded execution-quality run can span many requests. Start-time
+authority alone cannot prove that the generation remained current at the
+publication boundary, especially near the hourly Daily Operations cycle.
+**Revisit when:** Radar pointer publication and execution-quality capture share
+one descriptor-anchored transaction lock; retain equivalent exact-generation
+proof even if the implementation becomes atomic.
+
 ## 2026-07-18 - Treat public Bybit depth as visible-book evidence only
 **Status:** accepted
 **Decision:** Execution-quality snapshot schema v2 must record the 200-level

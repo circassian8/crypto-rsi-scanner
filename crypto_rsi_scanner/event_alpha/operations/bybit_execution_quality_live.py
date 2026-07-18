@@ -95,6 +95,12 @@ SAFETY = {
     "telegram_sends": 0,
     "writes_performed": False,
 }
+_STABLE_AUTHORITY_KEYS = (
+    "artifact_namespace",
+    "run_id",
+    "revision",
+    "operator_state_sha256",
+)
 
 
 class BybitExecutionQualityLiveError(RuntimeError):
@@ -540,6 +546,34 @@ def _collect_authoritative_bybit_execution_quality(
     return summary, tuple(captured_responses)
 
 
+def _revalidate_capture_source_authority(
+    *,
+    artifact_base_dir: str | Path,
+    summary: Mapping[str, object],
+    checked_at: datetime,
+    resolver: Resolver,
+) -> None:
+    """Require the exact source generation and universe immediately before write."""
+
+    identity, assets, reasons = _load_authoritative_context(
+        artifact_base_dir,
+        now=checked_at,
+        resolver=resolver,
+    )
+    expected = summary.get("source_authority")
+    if reasons or identity is None or not isinstance(expected, Mapping):
+        raise BybitExecutionQualityLiveError(
+            "capture_source_authority_unavailable_before_publication"
+        )
+    if (
+        any(identity.get(key) != expected.get(key) for key in _STABLE_AUTHORITY_KEYS)
+        or [dict(row) for row in assets] != summary.get("radar_assets")
+    ):
+        raise BybitExecutionQualityLiveError(
+            "capture_source_authority_drifted_before_publication"
+        )
+
+
 def capture_authoritative_bybit_execution_quality(
     *,
     artifact_base_dir: str | Path,
@@ -551,10 +585,11 @@ def capture_authoritative_bybit_execution_quality(
 ) -> dict[str, object]:
     """Collect and seal exact public responses without changing Radar authority."""
 
+    clock = now or (lambda: datetime.now(timezone.utc))
     summary, responses = _collect_authoritative_bybit_execution_quality(
         artifact_base_dir=artifact_base_dir,
         environ=environ,
-        now=now,
+        now=clock,
         resolver=resolver,
         fetch_json=fetch_json,
         timeout_seconds=timeout_seconds,
@@ -564,6 +599,12 @@ def capture_authoritative_bybit_execution_quality(
             "exact_provider_response_capture_unavailable",
             request_count=int(summary["provider_request_count"]),
         )
+    _revalidate_capture_source_authority(
+        artifact_base_dir=artifact_base_dir,
+        summary=summary,
+        checked_at=_utc(clock()),
+        resolver=resolver,
+    )
     try:
         return persist_bybit_execution_quality_capture(
             artifact_base_dir,

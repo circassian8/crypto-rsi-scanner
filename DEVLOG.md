@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Recheck Radar authority before Bybit publication · Codex
+**Why:** A live execution-quality collection can span dozens of requests. The
+adapter checked Radar authority only before collection, so an expiry or hourly
+generation replacement during the run could still be followed by publication
+of a capture labeled authority-eligible.
+**Changes:**
+- Added a post-collection, pre-write revalidation of exact namespace, run,
+  revision, operator-state digest, and full ranked Radar universe.
+- Authority loss or drift now fails before any immutable namespace or latest
+  pointer is written. Added a replacement-generation regression proving two
+  authority resolutions and zero capture artifacts.
+- Recorded the publication-boundary invariant in the working agreement and
+  durable decisions.
+**Verify:** 44 focused Bybit normalizer/live/capture tests and compileall passed;
+architecture cleanliness passed with zero new violations; `git diff --check`
+passed.
+**Notes/risks:** Provider responses from a drifted attempt remain unpromoted and
+are not retried. No provider call/authorization, trade/order, send, paper/RSI/
+fade action, score, route, threshold, or Radar authority changed.
+
 ## 2026-07-18 — Make Bybit liquidity scope explicit · Codex
 **Why:** The official Bybit REST order-book contract states that its snapshot
 excludes Retail Price Improvement orders. Existing spread/depth math was
