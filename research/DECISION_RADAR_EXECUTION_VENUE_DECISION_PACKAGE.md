@@ -48,6 +48,42 @@ Public market-data reachability is not trading eligibility. Every option needs a
 separate current jurisdiction/account decision. No option requests an API key,
 private account data, wallet access, an order endpoint, or permission to trade.
 
+## Next point-in-time intraday contract
+
+The intended venue-native 1h/4h source is Bybit V5
+`GET /v5/market/kline` on the same exact USDT-linear perpetual instrument IDs.
+This is a reviewed design constraint, not an implemented or authorized live
+adapter.
+
+- Request `category=linear` with exact uppercase `symbol` and explicit
+  `interval=60` or `interval=240`. Preserve the exact start/end query, response
+  bytes, request/receive clocks, response clock, instrument identity, and one
+  immutable lineage ID.
+- Persist `startTime`, open, high, low, close, base-coin volume, and USDT
+  turnover without silently renaming USDT as USD. The provider returns rows in
+  reverse start-time order; canonical storage must order and deduplicate them
+  explicitly.
+- Exclude every still-open candle. The REST contract says its close is merely
+  the last traded price until the candle closes, so a row is eligible only when
+  its interval end is no later than the captured provider response clock. A
+  partial bar can remain immutable raw evidence but cannot enter a temporal
+  baseline, outcome, or Protocol-v2 partition.
+- Treat direct 1h and direct 4h bars as separate evidence with their own
+  coverage, missingness, and request lineage. Do not relabel CoinGecko
+  sparklines, sparse campaign snapshots, locally interpolated prices, or a
+  four-hour value inferred from an open one-hour bar as direct provider bars.
+- Keep idea availability and human review latency separate from market HTTP
+  latency. `idea_observed_at`, `idea_available_at`, first operator view, review
+  completion, and their clock sources require their own exact audit evidence.
+- Do not attach bars to the campaign or call them Protocol-v2 evidence until a
+  separately authorized immutable capture exists and the sealed annex binds
+  its exact source, freshness, universe, partition, and missing-data rules.
+
+Official contracts reviewed 2026-07-18:
+[Get Kline](https://bybit-exchange.github.io/docs/v5/market/kline),
+[Get Bybit Server Time](https://bybit-exchange.github.io/docs/v5/market/time),
+and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
+
 ## Remaining engineering and sealing work
 
 - Freeze the exact bounded instrument IDs from one complete point-in-time
@@ -74,6 +110,10 @@ private account data, wallet access, an order endpoint, or permission to trade.
 - Seal point-in-time sources, partitions/untouched holdout, outcomes, fees,
   spread/depth/impact rules, latency, universe, routes, episodes, and minimum
   samples in the Protocol-v2 annex.
+- Implement the reviewed closed-candle 1h/4h contract only after the first
+  genuine execution-quality capture proves the permitted Bybit boundary. Give
+  it a separate explicit authorization and request budget; do not broaden the
+  execution-quality flag silently.
 - Resolve the explicit USDT cost-unit policy before any field is represented as
   USD. The offline normalizer reports USDT depth and USDT notionals and does not
   silently assume a 1:1 conversion.

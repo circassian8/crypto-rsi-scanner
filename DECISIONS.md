@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Use closed venue-native Bybit bars for future intraday evidence
+**Status:** accepted
+**Decision:** When the intraday evidence step is implemented, use Bybit V5
+linear-perpetual klines for the same exact frozen instruments, with explicit
+60-minute and 240-minute intervals. Preserve exact requests/responses, provider
+and local clocks, start/end times, OHLC, base-coin volume, USDT turnover, native
+instrument identity, and lineage. Exclude the still-open newest candle from
+baselines and outcomes. Keep direct 1h and 4h coverage separate; never relabel a
+CoinGecko sparkline, sparse observation-to-observation return, interpolation, or
+open-bar aggregation as direct venue evidence. Human review latency uses its own
+audited clocks and is not inferred from provider HTTP latency. Implementation
+requires a separate explicit provider authorization and remains ordered behind
+the first genuine execution-quality capture; no bar is Protocol-v2 evidence
+until the annex binds its exact immutable source and rules.
+**Why:** Bybit documents that REST kline rows carry native OHLC, base volume,
+quote turnover, and reverse start-time ordering, while the latest candle's close
+is only the last traded price before closure. These semantics prevent lookahead,
+partial-bar leakage, unit drift, and the current false shortcut of treating
+sparse or sparkline-derived values as direct point-in-time 1h/4h evidence.
+**Revisit when:** The first permitted immutable execution-quality capture proves
+Bybit reachability and the intraday capture request budget/source annex is ready
+to seal before any holdout is identified or read.
+
 ## 2026-07-18 - Reconcile campaign attempts by exact receipt identity
 **Status:** accepted
 **Decision:** Treat each immutable root `attempt_id` as one individual no-send

@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Define the closed Bybit intraday evidence boundary · Codex
+**Why:** Protocol v2 requires genuine 1h/4h point-in-time evidence, but the
+current campaign has only sparse observation returns and CoinGecko sparkline
+proxies. Implementing against those fields would misstate their source and keep
+temporal warmup logically incomplete.
+**Changes:**
+- Reviewed the official Bybit V5 kline, server-time, and rate-limit contracts
+  for the selected USDT-linear perpetual surface. Recorded exact `60`/`240`
+  interval, reverse ordering, OHLC, base-volume, USDT-turnover, provider-clock,
+  and immutable lineage requirements in the existing venue decision package.
+- Required closed candles only and separated venue-bar coverage, provider HTTP
+  latency, idea availability, and human review latency. CoinGecko sparklines,
+  sparse campaign returns, interpolations, and open-bar aggregation cannot be
+  upgraded into direct venue evidence.
+- Documented the already-implemented execution-quality authorization flag as
+  disabled in `.env.example`; this creates no authorization. Intraday capture
+  remains unimplemented and will require its own explicit boundary after a
+  genuine execution-quality capture proves permitted reachability.
+**Verify:** Documentation links and Markdown structure were inspected; the
+disabled example setting is exact; `git diff --check` passed; static execution
+readiness remained no-network/no-write and correctly reported the Bybit capture
+contract ready but inactive. No code or model behavior changed, so the focused
+documentation gate was used instead of repeating pytest.
+**Notes/risks:** No provider call, authorization mutation, capture, campaign
+attachment, Protocol-v2 evidence promotion, send, trade, order, paper trade,
+RSI write, or fade trigger occurred.
+
 ## 2026-07-18 — Reconcile terminal campaign attempts across audit layers · Codex
 **Why:** Each genuine failed market cycle appeared once in the root attempt
 ledger and once through its namespace generation/audit. The campaign report
