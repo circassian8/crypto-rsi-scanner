@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Cover healthy-empty truth through live publication · Codex
+**Why:** The new anomaly-report explanation was unit-tested at the renderer,
+but its most important production path is a genuine-mode, zero-idea generation
+that remains eligible for strict doctor and dashboard publication.
+**Changes:**
+- Extended the controlled live/no-send publication regression to require the
+  receipt-bound snapshot count, exact evaluated/excluded/anomaly/no-reaction
+  reconciliation, input-availability section, and explicit distinction between
+  a healthy-empty result and an empty market collection.
+- Kept the test on isolated deterministic provider rows. No provider, artifact,
+  route, threshold, score, or runtime behavior changed.
+**Verify:** Ran the focused controlled-live clean-zero publication test; 1 passed
+in 5.99 seconds, including strict doctor and pointer publication.
+**Notes/risks:** Test hardening only. The current immutable authority remains
+unchanged; the next cadence-eligible live/no-send cycle will be the first real
+generation to carry the richer report.
+
 ## 2026-07-18 — Explain healthy-empty anomaly scans with exact inputs · Codex
 **Why:** A genuine 30-asset cycle with zero anomalies rendered only `None`,
 making a successful quiet scan look indistinguishable from missing market data.

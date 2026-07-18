@@ -978,10 +978,24 @@ def test_controlled_live_clean_zero_generation_is_strict_publishable(
 
     namespace_dir = tmp_path / namespace
     core_path = namespace_dir / "event_core_opportunities.jsonl"
+    snapshots = _jsonl(namespace_dir / "event_market_state_snapshots.jsonl")
+    anomaly_report = (
+        namespace_dir / "event_market_anomaly_report.md"
+    ).read_text(encoding="utf-8")
     assert result.complete is True
     assert result.candidates == 0
     assert result.core_rows == 0
     assert result.cards == 0
+    assert len(snapshots) == result.selected_market_rows
+    assert "## Scan Coverage and Gate Inputs" in anomaly_report
+    assert (
+        f"Classifier coverage: evaluated={len(snapshots)}, "
+        "diagnostic_or_sector_excluded=0, classified_anomaly=0, "
+        f"no_configured_reaction={len(snapshots)}."
+    ) in anomaly_report
+    assert "Input availability:" in anomaly_report
+    assert "healthy-empty classification result" in anomaly_report
+    assert "not evidence that market collection was empty" in anomaly_report
     assert core_path.is_file()
     assert core_path.read_bytes() == b""
     before_doctor = json.loads(
