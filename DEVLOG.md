@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Record the twenty-first no-send market cycle · Codex
+**Why:** The CoinGecko cadence boundary became eligible while the evidence-first
+campaign was active. One genuine observation was needed to keep temporal
+baselines advancing without retrying early or weakening feature maturity.
+**Changes:**
+- Ran one authorized Daily Operations cycle. It created and published
+  `radar_market_no_send_20260718t204255477332z_10918132378c`, bound run
+  `2026-07-18T20:42:55.804241+00:00|no_key_live` at revision 12, and completed
+  the immutable attempt, strict-doctor, publication, owned-restart, operations,
+  terminal-journal, pointer, and dashboard-probe chain.
+- Refreshed campaign truth to 21 genuine cycles, 630 retained observations, 600
+  baseline-counted observations, 30 too-close observations, 5 historical ideas,
+  0 current ideas, 1 matured outcome, 3 pending outcomes, and 1 honest
+  `due_missing_price`. All 30 current assets have warm turnover and volume;
+  return, relative-return, and volatility features remain warming. Spread
+  remains unavailable for all 630 observations.
+- Rebound the no-call/no-write DefiLlama mapping review to exact current universe
+  digest `a7cc6e623f2001f91cf1ef300c9ea10a61ff09726ff0c7aa897a8e40dd1aee89`.
+  All 30 mappings remain explicitly unreviewed. The review queue remains 3
+  receipt-backed ideas awaiting first view and 2 excluded legacy/unpublished
+  candidates; no human action was fabricated.
+**Verify:** Daily Operations readiness was eligible before the one request. The
+cycle returned `succeeded` / `published_and_restarted`; strict doctor reported
+0 blockers and 0 warnings; publication and operations receipts matched the
+pointer, run, revision, operator digest, and artifact fingerprints; dashboard
+readiness passed and an exact local HEAD probe returned HTTP 200 with matching
+identity headers. Campaign regeneration and the current DefiLlama mapping review
+made zero provider calls. Parsed the campaign JSON and ran `git diff --check`.
+**Notes/risks:** No send, trade, order, paper trade, normal RSI write,
+`TRIGGERED_FADE`, authorization mutation, or provider retry occurred. No full
+suite was needed for this operational data-only cycle; the exact publication and
+dashboard gates are stronger evidence for the changed artifacts. The next
+eligible CoinGecko boundary is 2026-07-18 21:42:55 UTC; do not retry early.
+
 ## 2026-07-18 — Separate Coinbase announcements from product state · Codex
 **Why:** The source registry named Coinbase capabilities without an implemented
 contract. Coinbase now exposes both an official listing-update channel and a
