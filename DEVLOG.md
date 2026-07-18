@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Advance the hourly Radar baseline with one clean cycle · Codex
+**Why:** The campaign was authorized and cadence-eligible, while its 1h/4h
+features remained cold because earlier observations were irregular or too
+close. One exact eligible cycle was the highest-value safe next action.
+**Changes:**
+- Ran exactly one already-authorized CoinGecko no-send Daily Operations cycle
+  with no retry. It published revision-12 namespace
+  `radar_market_no_send_20260718t034857168543z_0140a5243ae4`, passed strict
+  doctor, and restarted the exact owned loopback dashboard.
+- Regenerated coherent campaign truth: 11 real cycles, 330 retained
+  observations, 300 baseline-counted, 30 too-close, four canonical ideas, one
+  matured outcome, one missing-data outcome, and two pending outcomes. The new
+  spacing produced the first direct 1h temporal sample for 30 assets; 4h remains
+  cold and no asset is globally warm.
+- Rechecked exact dashboard authority and the new Bybit preflight. The latter
+  binds the fresh 30-asset generation, projects 29 provider candidates plus the
+  audited `FIGR_HELOC` exclusion, makes no call/write, and remains blocked only
+  because its separate runtime authorization is absent.
+**Verify:** The cycle reported `published_and_restarted`, one provider attempt
+and success, and zero sends/trades/orders/paper/RSI/fade side effects. Dashboard
+authority/readiness passed; strict doctor is `OK` with zero blockers/warnings;
+campaign counts and pointer history reconcile; the next eligible observation is
+`2026-07-18T04:48:57.289214+00:00`.
+**Notes/risks:** The current DEXE idea is a non-actionable `diagnostic` with high
+risk; no threshold, score, route policy, provider authorization, Bybit capture,
+or Protocol-v2 annex changed. The recurring service remains uninstalled.
+
 ## 2026-07-18 — Recheck Radar authority before Bybit publication · Codex
 **Why:** A live execution-quality collection can span dozens of requests. The
 adapter checked Radar authority only before collection, so an expiry or hourly
