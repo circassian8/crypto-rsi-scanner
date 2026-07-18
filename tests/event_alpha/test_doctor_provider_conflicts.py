@@ -88,6 +88,15 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
                 summary = ledger_rows[0]["response_body_summary_redacted"]
                 assert summary is None or len(summary) <= 320
                 assert ledger_rows[0]["response_body_truncated"] is (len(body) > 2048)
+                assert ledger_rows[0]["accepted_source_artifact"] is None
+                assert ledger_rows[0]["accepted_source_sha256"] is None
+                assert ledger_rows[0]["accepted_source_size_bytes"] is None
+                assert ledger_rows[0]["accepted_source_immutable"] is False
+                assert not list(
+                    base.glob(
+                        f"{event_bybit_announcements_preflight.ACCEPTED_SOURCE_PREFIX}*"
+                    )
+                )
                 assert "Authorization" not in ledger_text
                 assert "api_key" not in ledger_text.casefold()
                 assert "private-cookie" not in ledger_text
@@ -130,6 +139,12 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
             assert ledger_rows[0]["status_code"] == 200
             assert ledger_rows[0]["success"] is False
             assert ledger_rows[0]["error_class"] == "BybitAPIResponseError"
+            assert ledger_rows[0]["accepted_source_artifact"] is None
+            assert not list(
+                base.glob(
+                    f"{event_bybit_announcements_preflight.ACCEPTED_SOURCE_PREFIX}*"
+                )
+            )
             assert "10009" in ledger_rows[0]["response_body_summary_redacted"]
             assert "set-cookie" not in ledger_rows[0]["response_headers_safe"]
             assert "private-cookie" not in json.dumps(ledger_rows[0])
@@ -178,6 +193,218 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_429_403_and_doctor_con
             os.environ.pop(event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None)
         else:
             os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = original_allow
+
+
+def test_bybit_accepted_announcement_source_tamper_and_symlink_block_strict_doctor():
+    import json
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor
+    import crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight as event_bybit_announcements_preflight
+    import crypto_rsi_scanner.event_alpha.providers.official_exchange as event_official_exchange
+
+    class Response:
+        status = 200
+        headers = {"Content-Type": "application/json"}
+
+        def __init__(self):
+            self.payload = json.dumps(
+                {
+                    "retCode": 0,
+                    "retMsg": "OK",
+                    "result": {
+                        "list": [
+                            {
+                                "id": "immutable-source",
+                                "title": "Bybit Lists IMMUTABLE on Spot",
+                                "description": "IMMUTABLE/USDT spot trading opens soon.",
+                                "publishTime": "2026-06-15T11:00:00Z",
+                                "url": "https://announcements.bybit.com/article/immutable",
+                            }
+                        ]
+                    },
+                }
+            ).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _tb):
+            return False
+
+        def read(self):
+            return self.payload
+
+    original_max_pages = os.environ.get(
+        event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES
+    )
+    original_allow = os.environ.get(
+        event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT
+    )
+    try:
+        os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
+        os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = "1"
+        for mutation in (
+            "tamper",
+            "symlink",
+            "missing_report",
+            "missing_projection",
+        ):
+            with TemporaryDirectory() as tmp:
+                base = Path(tmp)
+                _preflight, report, _paths = (
+                    event_bybit_announcements_preflight.run_no_send_rehearsal(
+                        namespace_dir=base,
+                        provider_health_path=base / "event_provider_health.json",
+                        profile="fixture",
+                        artifact_namespace=f"bybit_source_{mutation}",
+                        allow_live_preflight=True,
+                        opener=lambda _request, _timeout: Response(),
+                        acquisition_clock=lambda: datetime(
+                            2026, 6, 15, 16, tzinfo=timezone.utc
+                        ),
+                        now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+                    )
+                )
+                assert report.status == "live_rehearsal_success"
+                assert report.accepted_source_response_count == 1
+                source_path = base / report.accepted_source_artifacts[0]
+                assert (
+                    event_bybit_announcements_preflight.artifact_conflicts(base)[
+                        "bybit_announcements_rehearsal_accepted_source_invalid"
+                    ]
+                    == 0
+                )
+
+                if mutation == "tamper":
+                    source_path.write_bytes(b'{"retCode":0,"result":{"list":[]}}')
+                elif mutation == "symlink":
+                    original = source_path.read_bytes()
+                    source_path.unlink()
+                    replacement = base / "untrusted-source.json"
+                    replacement.write_bytes(original)
+                    source_path.symlink_to(replacement)
+                elif mutation == "missing_report":
+                    (base / event_bybit_announcements_preflight.REHEARSAL_JSON).unlink()
+                else:
+                    (
+                        base
+                        / event_official_exchange.EXCHANGE_ANNOUNCEMENTS_FILENAME
+                    ).unlink()
+
+                conflicts = event_bybit_announcements_preflight.artifact_conflicts(base)
+                assert (
+                    conflicts[
+                        "bybit_announcements_rehearsal_accepted_source_invalid"
+                    ]
+                    > 0
+                )
+                doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+                    inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+                    profile="fixture",
+                    artifact_namespace=f"bybit_source_{mutation}",
+                    include_test_artifacts=True,
+                    strict=True,
+                )
+                assert doctor.bybit_announcements_rehearsal_accepted_source_invalid > 0
+                assert doctor.status == "BLOCKED"
+    finally:
+        if original_max_pages is None:
+            os.environ.pop(
+                event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES, None
+            )
+        else:
+            os.environ[
+                event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES
+            ] = original_max_pages
+        if original_allow is None:
+            os.environ.pop(
+                event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None
+            )
+        else:
+            os.environ[
+                event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT
+            ] = original_allow
+
+
+def test_bybit_oversized_announcement_response_is_not_persisted():
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_providers.bybit_announcements import (
+        BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES,
+    )
+    import crypto_rsi_scanner.event_alpha.providers.bybit_announcements_preflight as event_bybit_announcements_preflight
+
+    class OversizedResponse:
+        status = 200
+        headers = {"Content-Type": "application/json"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _tb):
+            return False
+
+        def read(self, size):
+            assert size == BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES + 1
+            return b"x" * size
+
+    original_max_pages = os.environ.get(
+        event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES
+    )
+    original_allow = os.environ.get(
+        event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT
+    )
+    try:
+        os.environ[event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES] = "1"
+        os.environ[event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT] = "1"
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _preflight, report, _paths = (
+                event_bybit_announcements_preflight.run_no_send_rehearsal(
+                    namespace_dir=base,
+                    provider_health_path=base / "event_provider_health.json",
+                    profile="fixture",
+                    artifact_namespace="bybit_oversized",
+                    allow_live_preflight=True,
+                    opener=lambda _request, _timeout: OversizedResponse(),
+                    now=datetime(2026, 6, 15, 16, tzinfo=timezone.utc),
+                )
+            )
+            ledger = [
+                json.loads(line)
+                for line in (
+                    base / event_bybit_announcements_preflight.REQUEST_LEDGER
+                ).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert report.status == "provider_unavailable"
+            assert report.accepted_source_response_count == 0
+            assert ledger[0]["success"] is False
+            assert ledger[0]["error_class"] == "_BybitResponseTooLargeError"
+            assert ledger[0]["accepted_source_artifact"] is None
+            assert not list(
+                base.glob(
+                    f"{event_bybit_announcements_preflight.ACCEPTED_SOURCE_PREFIX}*"
+                )
+            )
+    finally:
+        if original_max_pages is None:
+            os.environ.pop(
+                event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES, None
+            )
+        else:
+            os.environ[
+                event_bybit_announcements_preflight.ENV_PREFLIGHT_MAX_PAGES
+            ] = original_max_pages
+        if original_allow is None:
+            os.environ.pop(
+                event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT, None
+            )
+        else:
+            os.environ[
+                event_bybit_announcements_preflight.ENV_ALLOW_LIVE_PREFLIGHT
+            ] = original_allow
 
 
 def test_official_exchange_artifact_doctor_conflicts():

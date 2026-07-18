@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 
 UrlOpen = Callable[[Request, float], Any]
 BYBIT_ERROR_SUMMARY_MAX_CHARS = 320
+BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES = 2_000_000
 _MAX_ERROR_RESPONSE_BYTES = 2_048
 _SAFE_RESPONSE_HEADERS = frozenset({
     "cdn-request-id",
@@ -71,6 +72,10 @@ class BybitAPIResponseError(RuntimeError):
         super().__init__(f"Bybit retCode {ret_code}: {ret_msg or 'request rejected'}")
 
 
+class _BybitResponseTooLargeError(RuntimeError):
+    """A Bybit announcement response exceeded the bounded public-data budget."""
+
+
 def _urlopen_with_timeout(request: Request, timeout: float) -> Any:
     return urlopen(request, timeout=timeout)
 
@@ -96,6 +101,24 @@ def raise_for_bybit_api_error(payload: object) -> None:
     if raw_code in (None, "", 0, "0"):
         return
     raise BybitAPIResponseError(raw_code, str(payload.get("retMsg") or ""))
+
+
+def read_bounded_bybit_response(response: Any) -> bytes:
+    """Read one response with a hard byte cap; urllib honors the size hint."""
+    try:
+        raw = response.read(BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES + 1)
+    except TypeError:
+        # Small offline fakes commonly expose ``read()`` without a size
+        # argument. The post-read bound still keeps their contract honest.
+        raw = response.read()
+    if not isinstance(raw, (bytes, bytearray)):
+        raise TypeError("Bybit announcement response body must be bytes")
+    body = bytes(raw)
+    if len(body) > BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES:
+        raise _BybitResponseTooLargeError(
+            "Bybit announcement response exceeds byte budget"
+        )
+    return body
 
 
 def classify_bybit_failure(status_codes: Iterable[int], diagnostic_text: str) -> str | None:
@@ -244,7 +267,7 @@ def fetch_bybit_live_events(self: Any, start: datetime, end: datetime) -> list[R
     try:
         request = build_bybit_public_request(url)
         with self.opener(request, self.timeout) as response:
-            response_bytes = response.read()
+            response_bytes = read_bounded_bybit_response(response)
             acquired_at = self.acquisition_clock()
             raw = json.loads(response_bytes.decode("utf-8"))
         raise_for_bybit_api_error(raw)

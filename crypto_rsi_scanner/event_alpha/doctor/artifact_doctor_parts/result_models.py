@@ -300,6 +300,7 @@ class _DoctorResultProviderEvidenceFields:
     bybit_announcements_rehearsal_live_without_ledger: int = 0
     bybit_announcements_rehearsal_live_without_explicit_allow: int = 0
     bybit_announcements_rehearsal_unsupported_params: int = 0
+    bybit_announcements_rehearsal_accepted_source_invalid: int = 0
     bybit_announcements_rehearsal_forbidden_side_effect_claim: int = 0
     unlock_calendar_preflight_secret_leak: int = 0
     unlock_calendar_preflight_live_without_ledger: int = 0

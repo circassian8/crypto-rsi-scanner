@@ -252,6 +252,7 @@ _CORE_OPPORTUNITY_COVERAGE_FIELDS: tuple[_CounterField, ...] = (
     ('bybit_announcements_rehearsal_live_without_ledger', 'bybit_announcements_rehearsal_live_without_ledger', None),
     ('bybit_announcements_rehearsal_live_without_explicit_allow', 'bybit_announcements_rehearsal_live_without_explicit_allow', None),
     ('bybit_announcements_rehearsal_unsupported_params', 'bybit_announcements_rehearsal_unsupported_params', None),
+    ('bybit_announcements_rehearsal_accepted_source_invalid', 'bybit_announcements_rehearsal_accepted_source_invalid', None),
     ('bybit_announcements_rehearsal_forbidden_side_effect_claim', 'bybit_announcements_rehearsal_forbidden_side_effect_claim', None),
     ('unlock_calendar_preflight_secret_leak', 'unlock_calendar_preflight_secret_leak', None),
     ('unlock_calendar_preflight_live_without_ledger', 'unlock_calendar_preflight_live_without_ledger', None),

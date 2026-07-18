@@ -505,6 +505,40 @@ def test_event_discovery_bybit_live_provider_parses_documented_response_offline(
     ).fetch_events(start, end) == []
 
 
+def test_event_discovery_bybit_live_response_byte_budget_fails_closed():
+    from datetime import datetime, timezone
+
+    import pytest
+
+    from crypto_rsi_scanner.event_providers.bybit_announcements import (
+        BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES,
+        BybitAnnouncementProvider,
+    )
+
+    class OversizedResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _tb):
+            return False
+
+        def read(self, size):
+            assert size == BYBIT_ANNOUNCEMENT_MAX_RESPONSE_BYTES + 1
+            return b"x" * size
+
+    provider = BybitAnnouncementProvider(
+        None,
+        live_enabled=True,
+        opener=lambda _request, _timeout: OversizedResponse(),
+        required=True,
+    )
+    with pytest.raises(RuntimeError, match="response exceeds byte budget"):
+        provider.fetch_events(
+            datetime(2026, 6, 15, tzinfo=timezone.utc),
+            datetime(2026, 6, 16, tzinfo=timezone.utc),
+        )
+
+
 def test_event_discovery_structured_calendar_providers_parse_fixtures():
     import json
     import tempfile

@@ -404,6 +404,7 @@ def test_daily_brief_reflects_planned_research_review_delivery_without_decisions
 
 
 def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_coverage_and_integrated_radar():
+    import hashlib
     import json
     from datetime import datetime, timezone
 
@@ -447,11 +448,14 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             namespace_dir = root / namespace
             calls: list[str] = []
             request_ids: list[str | None] = []
+            response_bytes: list[bytes] = []
 
             def opener(request, _timeout):
                 calls.append(request.full_url)
                 request_ids.append(request.get_header("Cdn-request-id"))
-                return MockBybitResponse(fixture_payload)
+                response = MockBybitResponse(fixture_payload)
+                response_bytes.append(response.payload)
+                return response
 
             _preflight, report, _paths = event_bybit_announcements_preflight.run_no_send_rehearsal(
                 namespace_dir=namespace_dir,
@@ -512,6 +516,10 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert report.provider_generation_id
             assert report.run_id
             assert report.http_successes == 1
+            assert report.accepted_source_response_count == 1
+            assert report.accepted_source_artifacts == (
+                ledger_rows[0]["accepted_source_artifact"],
+            )
             assert report.announcements_inspected == 2
             assert report.official_events_written == 2
             assert report.official_listing_candidates_written == 2
@@ -526,6 +534,20 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             )
             assert all(
                 row["raw_payload_redacted"]["fetched_at_source"] == "local_response_read_complete"
+                for row in announcement_rows
+            )
+            assert all(
+                row["raw_payload_redacted"]["provider_source_artifact"]
+                == report.accepted_source_artifacts[0]
+                for row in announcement_rows
+            )
+            assert all(
+                row["raw_payload_redacted"]["provider_source_sha256"]
+                == ledger_rows[0]["accepted_source_sha256"]
+                for row in announcement_rows
+            )
+            assert all(
+                row["raw_payload_redacted"]["provider_source_immutable"] is True
                 for row in announcement_rows
             )
             activation_rows = event_official_exchange_activation.load_activation_rows(namespace_dir)
@@ -543,6 +565,16 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             assert ledger_rows[0]["live_call_allowed"] is True
             assert ledger_rows[0]["no_send_rehearsal"] is True
             assert ledger_rows[0]["request_id"] == request_ids[0]
+            source_name = ledger_rows[0]["accepted_source_artifact"]
+            source_path = namespace_dir / source_name
+            assert source_path.read_bytes() == response_bytes[0]
+            assert ledger_rows[0]["accepted_source_sha256"] == hashlib.sha256(
+                response_bytes[0]
+            ).hexdigest()
+            assert ledger_rows[0]["accepted_source_size_bytes"] == len(
+                response_bytes[0]
+            )
+            assert ledger_rows[0]["accepted_source_immutable"] is True
             assert ledger_rows[0]["response_body_summary_redacted"] is None
             assert ledger_rows[0]["unsupported_query_params"] == []
             assert ledger_rows[0]["provider_generation_id"] == report.provider_generation_id
@@ -563,8 +595,14 @@ def test_event_alpha_bybit_announcements_rehearsal_mocked_live_success_feeds_cov
             integrated_by_symbol = {str(row.get("symbol") or ""): row for row in integrated_rows}
             assert integrated_by_symbol["TESTSPOT"]["provider_generation_id"] == report.provider_generation_id
             assert integrated_by_symbol["TESTSPOT"]["provider_request_succeeded"] is True
-            assert event_bybit_announcements_preflight.artifact_conflicts(namespace_dir)[
+            bybit_conflicts = event_bybit_announcements_preflight.artifact_conflicts(
+                namespace_dir
+            )
+            assert bybit_conflicts[
                 "bybit_announcements_rehearsal_live_without_ledger"
+            ] == 0
+            assert bybit_conflicts[
+                "bybit_announcements_rehearsal_accepted_source_invalid"
             ] == 0
             assert event_official_exchange_activation.artifact_conflicts(namespace_dir)[
                 "official_exchange_activation_live_without_ledger"

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Seal accepted Bybit announcement response evidence · Codex
+**Why:** A successful bounded official-announcement rehearsal retained its
+normalized rows and request ledger but not the exact accepted response bytes,
+so later review could not independently reproduce or attest the source-to-row
+projection.
+**Changes:**
+- Successful Bybit announcement rehearsal responses are now size-bounded and
+  written once as immutable, digest-addressed source artifacts before their
+  ledger request can be marked successful. The ledger and rehearsal report bind
+  exact artifact name, SHA-256, size, response count, request identity, and
+  normalized-row lineage.
+- Extended the strict artifact doctor to re-open accepted bytes through the
+  descriptor-anchored no-follow reader and reconcile the exact raw file set,
+  digest, size, report, successful result count, and official-exchange
+  projection. Tampered, missing, symlinked, duplicated, secret-like, or
+  unprojected source evidence blocks strict readiness.
+- Applied the same two-megabyte response cap to the direct Bybit announcement
+  reader. Failed HTTP/API responses and oversized bodies retain only bounded,
+  redacted diagnostics and never become accepted raw-source artifacts.
+- Updated the working agreement, durable decision, roadmap, and generated
+  architecture/project-health reports. No provider, authorization, route,
+  threshold, score, notification, trade, paper, RSI, or fade behavior was
+  activated.
+**Verify:** 12 provider-conflict/strict-doctor tests, 29 rehearsal/direct-provider
+tests, and 25 activation/export-security tests pass (66 focused tests total);
+Python compileall, the offline Bybit preflight smoke, architecture cleanliness,
+and `git diff --check` pass.
+**Notes/risks:** Full `make verify` was intentionally skipped for this isolated
+source-attestation boundary; its direct, integrated, doctor, activation,
+TOCTOU, syntax, smoke, and architecture gates cover the touched surfaces.
+Historical successful rehearsal namespaces without accepted bytes remain
+immutable but are not newly upgraded to attested evidence. Real Bybit access
+remains unauthorized and region-blocked; no live request or retry was made.
+
 ## 2026-07-18 — Publish the seventeenth real no-send market cycle · Codex
 **Why:** The one-hour cadence window opened and the evidence-first program
 needs regular genuine observations to warm temporal baselines without lowering

@@ -139,6 +139,7 @@ def apply_preflight_checks(ctx: object, blockers: Messages, warnings: Messages) 
         "bybit_announcements_rehearsal_live_without_ledger",
         "bybit_announcements_rehearsal_live_without_explicit_allow",
         "bybit_announcements_rehearsal_unsupported_params",
+        "bybit_announcements_rehearsal_accepted_source_invalid",
         "bybit_announcements_rehearsal_forbidden_side_effect_claim",
     ):
         count = bybit_announcements_conflicts.get(key, 0)

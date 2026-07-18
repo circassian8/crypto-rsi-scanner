@@ -946,6 +946,11 @@ work.
   derivatives fetching are allowed only for local research
   reports/exports/cache refreshes, not live routing. Event discovery must not
   write live signal/outcome/paper tables or route notifications.
+  A successful bounded Bybit announcement rehearsal must seal the exact
+  accepted response bytes immutably and bind their digest, size, request, report,
+  and normalized projection; strict doctor rejects missing, changed, symlinked,
+  or unprojected bytes. Failed and oversized responses remain bounded redacted
+  diagnostics and must not create accepted source artifacts.
   Ticker-only/ambiguous asset matches must stay below trigger confidence.
   The default manual alias file is `event_discovery_aliases.json`; fixture
   aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture

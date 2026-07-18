@@ -276,6 +276,7 @@ RESULT_FIELD_EXPRESSIONS: tuple[tuple[str, str], ...] = (
     ('bybit_announcements_rehearsal_live_without_ledger', "bybit_announcements_conflicts['bybit_announcements_rehearsal_live_without_ledger']"),
     ('bybit_announcements_rehearsal_live_without_explicit_allow', "bybit_announcements_conflicts['bybit_announcements_rehearsal_live_without_explicit_allow']"),
     ('bybit_announcements_rehearsal_unsupported_params', "bybit_announcements_conflicts['bybit_announcements_rehearsal_unsupported_params']"),
+    ('bybit_announcements_rehearsal_accepted_source_invalid', "bybit_announcements_conflicts['bybit_announcements_rehearsal_accepted_source_invalid']"),
     ('bybit_announcements_rehearsal_forbidden_side_effect_claim', "bybit_announcements_conflicts['bybit_announcements_rehearsal_forbidden_side_effect_claim']"),
     ('unlock_calendar_preflight_secret_leak', "unlock_calendar_conflicts['unlock_calendar_preflight_secret_leak']"),
     ('unlock_calendar_preflight_live_without_ledger', "unlock_calendar_conflicts['unlock_calendar_preflight_live_without_ledger']"),

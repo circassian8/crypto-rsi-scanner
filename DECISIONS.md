@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Accepted official-announcement bytes precede source authority
+**Status:** accepted
+**Decision:** A successful bounded Bybit official-announcement rehearsal must
+persist the exact accepted response body once in its namespace before its
+request ledger may record success. The immutable artifact name, SHA-256, size,
+request identity, result count, rehearsal report, and normalized official-
+exchange rows must reconcile under strict doctor through descriptor-anchored,
+no-follow reads. Missing, changed, symlinked, duplicated, secret-like, or
+unprojected bytes invalidate the rehearsal. HTTP errors, nonzero provider API
+errors, oversized bodies, and other failed requests retain bounded redacted
+diagnostics only and must not create an accepted raw-source artifact. Historical
+namespaces are never silently rewritten to satisfy the newer contract. This
+attestation rule does not create provider authorization or make a rehearsal
+campaign, dashboard, or Protocol-v2 authority.
+**Why:** Normalized rows and a request ledger alone cannot prove exactly which
+provider bytes were accepted. Immutable bytes plus a closed projection chain
+make later source review reproducible while avoiding retention of arbitrary
+failed responses that may contain unsafe diagnostics.
+**Revisit when:** A provider supplies a stronger cryptographic receipt or a
+different official source is activated. Preserve the exact-body evidence and
+closed source-to-row reconciliation unless the replacement offers equal or
+stronger reproducibility and secret safety.
+
 ## 2026-07-18 - Live announcement acquisition time is locally observed
 **Status:** accepted
 **Decision:** For live official-exchange ingestion, canonical `fetched_at` is

@@ -9,6 +9,7 @@ may only accompany the environment gate as operator confirmation.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -33,9 +34,11 @@ from ...event_providers.bybit_announcements import (
     build_bybit_public_request,
     classify_bybit_failure,
     raise_for_bybit_api_error,
+    read_bounded_bybit_response,
 )
 from ..artifacts import paths as event_artifact_paths
 from ..artifacts import schema_v1
+from ..operations.market_no_send_io import read_regular_bytes, write_bytes_immutable
 from . import official_exchange as event_official_exchange
 from . import official_exchange_activation as event_official_exchange_activation
 from . import provider_health as event_provider_health
@@ -45,6 +48,8 @@ from . import request_lineage as event_request_lineage
 PREFLIGHT_JSON = "event_bybit_announcements_preflight.json"
 PREFLIGHT_MD = "event_bybit_announcements_preflight.md"
 REQUEST_LEDGER = "event_bybit_announcements_request_ledger.jsonl"
+ACCEPTED_SOURCE_PREFIX = "event_bybit_announcements_source_"
+ACCEPTED_SOURCE_SUFFIX = ".json"
 REHEARSAL_JSON = "event_bybit_announcements_rehearsal_report.json"
 REHEARSAL_MD = "event_bybit_announcements_rehearsal_report.md"
 ENV_ALLOW_LIVE_PREFLIGHT = "RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT"
@@ -58,6 +63,10 @@ SUPPORTED_PARAMS = ("locale", "type", "tag", "page", "limit")
 SOURCE_PACKS = ("official_exchange_listing_pack", "official_perp_listing_pack", "official_exchange_risk_pack")
 LANES_ENABLED = ("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "RISK_ONLY")
 _TRUTHY = {"1", "true", "yes", "on"}
+_ACCEPTED_SOURCE_NAME_RE = re.compile(
+    rf"^{re.escape(ACCEPTED_SOURCE_PREFIX)}[0-9a-f]{{24}}{re.escape(ACCEPTED_SOURCE_SUFFIX)}$"
+)
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -139,6 +148,8 @@ class BybitAnnouncementsRehearsalReport:
     limit: int
     requests_used: int
     http_successes: int
+    accepted_source_response_count: int
+    accepted_source_artifacts: tuple[str, ...]
     announcements_inspected: int
     exchange_announcements_written: int
     official_events_written: int
@@ -186,6 +197,8 @@ def bybit_announcements_rehearsal_report_row(report: BybitAnnouncementsRehearsal
         "limit": report.limit,
         "requests_used": report.requests_used,
         "http_successes": report.http_successes,
+        "accepted_source_response_count": report.accepted_source_response_count,
+        "accepted_source_artifacts": list(report.accepted_source_artifacts),
         "announcements_inspected": report.announcements_inspected,
         "exchange_announcements_written": report.exchange_announcements_written,
         "official_events_written": report.official_events_written,
@@ -358,13 +371,12 @@ def run_no_send_rehearsal(
             fallback_error_message=error_message_safe,
         )
         if http_successes > 0 and status in {"live_rehearsal_success", "live_rehearsal_no_results", "live_rehearsal_partial"}:
-            items = tuple({
-                **dict(item),
-                "provider_generation_id": generation_id,
-                "provider_request_succeeded": True,
-                "provider_source_artifact": event_artifact_paths.artifact_display_path(exchange_announcements_path),
-                "request_ledger_path": event_artifact_paths.artifact_display_path(ledger_path),
-            } for item in items)
+            items = _bind_rehearsal_item_lineage(
+                items,
+                generation_id=generation_id,
+                exchange_announcements_path=exchange_announcements_path,
+                ledger_path=ledger_path,
+            )
             official_result = event_official_exchange.run_official_exchange_scan_from_items(
                 namespace_dir=base,
                 provider_items={PROVIDER_HEALTH_KEY: items},
@@ -419,6 +431,30 @@ def run_no_send_rehearsal(
         warnings=warnings,
     )
     return preflight, report, (preflight_json, preflight_md, rehearsal_json, rehearsal_md)
+
+
+def _bind_rehearsal_item_lineage(
+    items: Iterable[Mapping[str, Any]],
+    *,
+    generation_id: str,
+    exchange_announcements_path: Path,
+    ledger_path: Path,
+) -> tuple[Mapping[str, Any], ...]:
+    fallback_source = event_artifact_paths.artifact_display_path(
+        exchange_announcements_path
+    )
+    ledger_display = event_artifact_paths.artifact_display_path(ledger_path)
+    return tuple(
+        {
+            **dict(item),
+            "provider_generation_id": generation_id,
+            "provider_request_succeeded": True,
+            "provider_source_artifact": item.get("provider_source_artifact")
+            or fallback_source,
+            "request_ledger_path": ledger_display,
+        }
+        for item in items
+    )
 
 
 def _bybit_rehearsal_artifact_paths(
@@ -495,7 +531,15 @@ def _build_bybit_rehearsal_report(
     run_id: str,
 ) -> BybitAnnouncementsRehearsalReport:
     exchange_count, event_count, candidate_count = _official_result_counts(official_result)
-    requests_used = len(event_request_lineage.generation_rows(_read_jsonl(paths["ledger"]), generation_id))
+    generation_rows = event_request_lineage.generation_rows(
+        _read_jsonl(paths["ledger"]), generation_id
+    )
+    requests_used = len(generation_rows)
+    accepted_source_artifacts = tuple(
+        str(row.get("accepted_source_artifact") or "")
+        for row in generation_rows
+        if bool(row.get("success")) and row.get("accepted_source_artifact")
+    )
     return BybitAnnouncementsRehearsalReport(
         provider=PROVIDER_HEALTH_KEY,
         status=status,
@@ -518,6 +562,8 @@ def _build_bybit_rehearsal_report(
         limit=limit,
         requests_used=requests_used,
         http_successes=http_successes,
+        accepted_source_response_count=len(accepted_source_artifacts),
+        accepted_source_artifacts=accepted_source_artifacts,
         announcements_inspected=len(items),
         exchange_announcements_written=exchange_count,
         official_events_written=event_count,
@@ -597,6 +643,8 @@ def format_rehearsal_report(report: BybitAnnouncementsRehearsalReport) -> str:
         f"run_id: {report.run_id}",
         f"requests_used: {report.requests_used}",
         f"http_successes: {report.http_successes}",
+        f"accepted_source_response_count: {report.accepted_source_response_count}",
+        f"accepted_source_artifacts: {', '.join(report.accepted_source_artifacts) or 'none'}",
         f"max_pages: {report.max_pages}",
         f"limit: {report.limit}",
         f"supported_params: {', '.join(report.supported_params)}",
@@ -731,7 +779,22 @@ def _fetch_live_announcement_items(
             )
         except ValueError:
             page_items = ()
-        items.extend(page_items)
+        source_artifact = str(
+            getattr(response, "accepted_source_artifact", "") or ""
+        )
+        source_sha256 = str(
+            getattr(response, "accepted_source_sha256", "") or ""
+        )
+        items.extend(
+            {
+                **dict(item),
+                "provider_source_artifact": source_artifact or None,
+                "provider_source_sha256": source_sha256 or None,
+                "provider_source_page": page,
+                "provider_source_immutable": bool(source_artifact),
+            }
+            for item in page_items
+        )
         if len(page_items) < limit:
             break
     return tuple(items)
@@ -961,6 +1024,9 @@ class _LedgeredBybitResponse:
         self.artifact_namespace = artifact_namespace
         self.payload: bytes | None = None
         self.entered: Any = None
+        self.accepted_source_artifact: str | None = None
+        self.accepted_source_sha256: str | None = None
+        self.accepted_source_size_bytes: int | None = None
 
     def __enter__(self) -> "_LedgeredBybitResponse":
         if hasattr(self.response, "__enter__"):
@@ -970,32 +1036,61 @@ class _LedgeredBybitResponse:
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
-        finished = datetime.now(timezone.utc)
-        row = _ledger_row(
-            self.request,
-            started_at=self.started_at,
-            finished_at=finished,
-            budget_before=self.budget_before,
-            budget_after=self.budget_after,
-            success=exc is None,
-            response=self.entered or self.response,
-            payload=self.payload,
-            error=exc if isinstance(exc, Exception) else None,
-            provider_generation_id=self.provider_generation_id,
-            run_id=self.run_id,
-            profile=self.profile,
-            artifact_namespace=self.artifact_namespace,
-        )
-        _append_ledger_row(self.ledger_path, row)
-        if hasattr(self.response, "__exit__"):
-            return bool(self.response.__exit__(exc_type, exc, tb))
-        return False
+        return _finish_ledgered_bybit_response(self, exc_type, exc, tb)
 
     def read(self) -> bytes:
         target = self.entered or self.response
-        raw = target.read()
+        raw = read_bounded_bybit_response(target)
         self.payload = raw
         return raw
+
+
+def _finish_ledgered_bybit_response(
+    wrapped: _LedgeredBybitResponse,
+    exc_type: Any,
+    exc: Any,
+    tb: Any,
+) -> bool:
+    finished = datetime.now(timezone.utc)
+    persistence_error: Exception | None = None
+    if exc is None and wrapped.payload is not None:
+        try:
+            artifact, digest, size = _persist_accepted_source_response(
+                wrapped.ledger_path.parent,
+                request=wrapped.request,
+                payload=wrapped.payload,
+            )
+            wrapped.accepted_source_artifact = artifact
+            wrapped.accepted_source_sha256 = digest
+            wrapped.accepted_source_size_bytes = size
+        except Exception as source_exc:  # noqa: BLE001 - fail the rehearsal closed
+            persistence_error = source_exc
+    effective_error = exc if isinstance(exc, Exception) else persistence_error
+    row = _ledger_row(
+        wrapped.request,
+        started_at=wrapped.started_at,
+        finished_at=finished,
+        budget_before=wrapped.budget_before,
+        budget_after=wrapped.budget_after,
+        success=exc is None and persistence_error is None,
+        response=wrapped.entered or wrapped.response,
+        payload=wrapped.payload,
+        error=effective_error,
+        accepted_source_artifact=wrapped.accepted_source_artifact,
+        accepted_source_sha256=wrapped.accepted_source_sha256,
+        accepted_source_size_bytes=wrapped.accepted_source_size_bytes,
+        provider_generation_id=wrapped.provider_generation_id,
+        run_id=wrapped.run_id,
+        profile=wrapped.profile,
+        artifact_namespace=wrapped.artifact_namespace,
+    )
+    _append_ledger_row(wrapped.ledger_path, row)
+    suppressed = False
+    if hasattr(wrapped.response, "__exit__"):
+        suppressed = bool(wrapped.response.__exit__(exc_type, exc, tb))
+    if persistence_error is not None:
+        raise persistence_error
+    return suppressed
 
 
 class RequestBudgetExceeded(RuntimeError):
@@ -1019,6 +1114,9 @@ def _ledger_row(
     response: Any | None = None,
     payload: bytes | None = None,
     error: Exception | None = None,
+    accepted_source_artifact: str | None = None,
+    accepted_source_sha256: str | None = None,
+    accepted_source_size_bytes: int | None = None,
     provider_generation_id: str = "",
     run_id: str = "",
     profile: str | None = None,
@@ -1045,6 +1143,10 @@ def _ledger_row(
         "error_class": type(error).__name__ if error else None,
         "error_message_safe": _safe_error_message(error),
         "request_id": bybit_request_id(request),
+        "accepted_source_artifact": accepted_source_artifact,
+        "accepted_source_sha256": accepted_source_sha256,
+        "accepted_source_size_bytes": accepted_source_size_bytes,
+        "accepted_source_immutable": bool(accepted_source_artifact),
         **response_diagnostics,
         "request_budget_before": budget_before,
         "request_budget_after": budget_after,
@@ -1056,6 +1158,22 @@ def _ledger_row(
         "profile": profile,
         "artifact_namespace": artifact_namespace,
     }
+
+
+def _persist_accepted_source_response(
+    namespace_dir: Path,
+    *,
+    request: Request,
+    payload: bytes,
+) -> tuple[str, str, int]:
+    request_id = str(bybit_request_id(request) or "")
+    identity = hashlib.sha256(
+        (f"{_sanitized_url(request.full_url)}\0{request_id}").encode("utf-8")
+    ).hexdigest()[:24]
+    filename = f"{ACCEPTED_SOURCE_PREFIX}{identity}{ACCEPTED_SOURCE_SUFFIX}"
+    raw = bytes(payload)
+    write_bytes_immutable(namespace_dir / filename, raw)
+    return filename, hashlib.sha256(raw).hexdigest(), len(raw)
 
 
 def _append_ledger_row(path: Path, row: Mapping[str, Any]) -> None:
@@ -1142,6 +1260,7 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
         "bybit_announcements_rehearsal_live_without_ledger": 0,
         "bybit_announcements_rehearsal_live_without_explicit_allow": 0,
         "bybit_announcements_rehearsal_unsupported_params": 0,
+        "bybit_announcements_rehearsal_accepted_source_invalid": 0,
         "bybit_announcements_rehearsal_forbidden_side_effect_claim": 0,
     }
     if namespace_dir is None:
@@ -1186,9 +1305,115 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
         unsupported = row.get("unsupported_query_params")
         if unsupported:
             out["bybit_announcements_rehearsal_unsupported_params"] += len(unsupported) if isinstance(unsupported, list) else 1
+    out["bybit_announcements_rehearsal_accepted_source_invalid"] = (
+        _accepted_source_conflict_count(
+            base,
+            ledger_rows=ledger_rows,
+            rehearsal=rehearsal,
+        )
+    )
     if re.search(r"(?i)\b(send telegram|paper trade|live trade|execute order|triggered_fade created)\b", text):
         out["bybit_announcements_rehearsal_forbidden_side_effect_claim"] = 1
     return out
+
+
+def _accepted_source_conflict_count(
+    base: Path,
+    *,
+    ledger_rows: Iterable[Mapping[str, Any]],
+    rehearsal: Mapping[str, Any],
+) -> int:
+    conflicts = 0
+    expected: dict[str, tuple[str, int]] = {}
+    successful_result_count = 0
+    for row in ledger_rows:
+        artifact = str(row.get("accepted_source_artifact") or "")
+        digest = str(row.get("accepted_source_sha256") or "")
+        try:
+            size = int(row.get("accepted_source_size_bytes"))
+        except (TypeError, ValueError):
+            size = -1
+        success = bool(row.get("success"))
+        immutable = bool(row.get("accepted_source_immutable"))
+        if not success:
+            if artifact or digest or size >= 0 or immutable:
+                conflicts += 1
+            continue
+        if (
+            not _ACCEPTED_SOURCE_NAME_RE.fullmatch(artifact)
+            or not _SHA256_RE.fullmatch(digest)
+            or size <= 0
+            or not immutable
+            or artifact in expected
+        ):
+            conflicts += 1
+            continue
+        expected[artifact] = (digest, size)
+        try:
+            successful_result_count += int(row.get("result_count") or 0)
+        except (TypeError, ValueError):
+            conflicts += 1
+
+    try:
+        observed_names = {
+            entry.name
+            for entry in base.iterdir()
+            if entry.name.startswith(ACCEPTED_SOURCE_PREFIX)
+            and entry.name.endswith(ACCEPTED_SOURCE_SUFFIX)
+        }
+    except OSError:
+        return conflicts + max(1, len(expected))
+    conflicts += len(observed_names.symmetric_difference(expected))
+
+    valid_sources: dict[str, str] = {}
+    for artifact, (digest, size) in expected.items():
+        try:
+            raw = read_regular_bytes(base / artifact)
+        except Exception:  # noqa: BLE001 - any unsafe/missing leaf is a conflict
+            conflicts += 1
+            continue
+        if raw is None or len(raw) != size or hashlib.sha256(raw).hexdigest() != digest:
+            conflicts += 1
+            continue
+        if _secret_like(raw.decode("utf-8", errors="replace")):
+            conflicts += 1
+        valid_sources[artifact] = digest
+
+    report_artifacts = rehearsal.get("accepted_source_artifacts")
+    report_count = rehearsal.get("accepted_source_response_count")
+    if expected and not rehearsal:
+        conflicts += 1
+    elif rehearsal:
+        if (
+            not isinstance(report_artifacts, list)
+            or report_artifacts != list(expected)
+            or report_count != len(expected)
+            or rehearsal.get("announcements_inspected") != successful_result_count
+        ):
+            conflicts += 1
+
+    announcement_rows = _read_jsonl(
+        base / event_official_exchange.EXCHANGE_ANNOUNCEMENTS_FILENAME
+    )
+    sourced_rows = [
+        row for row in announcement_rows if bool(row.get("provider_request_succeeded"))
+    ]
+    if len(sourced_rows) != successful_result_count:
+        conflicts += 1
+    for row in sourced_rows:
+        payload = row.get("raw_payload_redacted")
+        if not isinstance(payload, Mapping):
+            conflicts += 1
+            continue
+        artifact = str(payload.get("provider_source_artifact") or "")
+        digest = str(payload.get("provider_source_sha256") or "")
+        if (
+            valid_sources.get(artifact) != digest
+            or not bool(payload.get("provider_source_immutable"))
+            or row.get("provider_source_artifact") != artifact
+        ):
+            conflicts += 1
+    return conflicts
 
 
 def _read_json(path: Path) -> Mapping[str, Any]:
