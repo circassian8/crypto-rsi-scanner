@@ -31,7 +31,13 @@ point-in-time, complete Bybit instrument snapshot and exact canonical-asset
 mapping, then be frozen in the Protocol-v2 annex before any holdout is defined
 or read. The mapper accepts only `category=linear`, `contractType=LinearPerpetual`,
 `status=Trading`, `quoteCoin=USDT`, `settleCoin=USDT`, and non-prelisting rows.
-It does not guess multiplier contracts such as `1000TOKENUSDT`.
+It does not guess multiplier contracts such as `1000TOKENUSDT`. Before any
+provider call, symbols that cannot form the closed Bybit base-contract shape
+are excluded with a reason code. The immutable capture retains the full ranked
+Radar universe, the exact provider-query subset, and every exclusion. The
+remaining exact-symbol join is explicitly a candidate join; human confirmation
+of canonical asset identity remains pending until the Protocol-v2 annex seals
+the exact native instrument IDs.
 
 ## Feasibility record
 
@@ -95,12 +101,14 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   authorization already exists. Readiness binds to one exact authoritative
   Radar generation, and status validates the latest capture; neither makes a
   provider call or write. A capture attempt may run only through the additional
-  explicit `CONFIRM=1` boundary, use at most two public GETs per current Radar
-  asset, make no retries, and stop on the first 403, 429, regional restriction,
-  malformed response, or authority failure. Only a complete run publishes an
-  immutable bundle containing the closed authority/universe, exact accepted
-  response bytes, request timing, normalized USDT observations, fingerprints,
-  manifest, completion receipt, and latest pointer. The bundle is fully
+  explicit `CONFIRM=1` boundary, use at most two public GETs per requestable
+  current Radar asset, make no retries, and stop on the first 403, 429, regional
+  restriction, malformed response, or authority failure. Non-contract-shaped
+  symbols are rejected before the provider boundary rather than consuming a
+  request or silently disappearing. Only a complete run publishes an immutable
+  bundle containing the closed authority/full-query-excluded universe, exact
+  accepted response bytes, request timing, normalized USDT observations,
+  fingerprints, manifest, completion receipt, and latest pointer. The bundle is fully
   rederived and validated before pointer publication and review export.
 - Keep capture quality distinct from Protocol-v2 evidence authority. A fresh
   complete capture may be `protocol_v2_input_quality_eligible`, but it remains
@@ -140,6 +148,9 @@ probe and does not publish evidence.
 - Protocol-v2 executable protocol remains unfrozen and blocked.
 - Bybit USDT-linear perpetuals are selected as the intended primary surface.
 - The exact bounded instrument set is not yet frozen.
+- Current no-call readiness projects 30 Radar assets into 29 provider-query
+  candidates and one audited preflight exclusion (`FIGR_HELOC`); this is not a
+  claim that all 29 candidate joins are canonically confirmed contracts.
 - The execution-quality live adapter and immutable capture contract exist but
   are inactive; no genuine capture exists and live spread remains unavailable.
 - No capture is Protocol-v2 evidence and no capture ID is annex-bound.

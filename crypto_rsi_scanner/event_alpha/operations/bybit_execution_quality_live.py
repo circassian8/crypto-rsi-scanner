@@ -56,6 +56,10 @@ from .bybit_execution_quality import (
     normalize_bybit_orderbook,
     select_bybit_usdt_perpetual_instruments,
 )
+from .bybit_execution_quality_universe import (
+    BybitExecutionQualityUniverseError,
+    partition_bybit_provider_query_assets as _partition_provider_query_assets,
+)
 from .bybit_execution_quality_capture import (
     BybitCapturedJSONResponse,
     BybitExecutionQualityCaptureError,
@@ -226,6 +230,22 @@ def project_authoritative_radar_assets(
     )
 
 
+def partition_bybit_provider_query_assets(
+    assets: Sequence[Mapping[str, object]],
+) -> tuple[tuple[dict[str, object], ...], tuple[dict[str, object], ...]]:
+    """Exclude non-contract-shaped Radar symbols before any provider request."""
+
+    try:
+        return _partition_provider_query_assets(assets)
+    except BybitExecutionQualityUniverseError as exc:
+        reason = (
+            "radar_asset_query_schema_invalid"
+            if exc.reason_code == "radar_asset_schema_invalid"
+            else exc.reason_code
+        )
+        raise BybitExecutionQualityLiveError(reason) from exc
+
+
 def _load_authoritative_context(
     artifact_base_dir: str | Path,
     *,
@@ -271,9 +291,16 @@ def build_bybit_execution_quality_live_readiness(
         now=checked,
         resolver=resolver,
     )
+    try:
+        query_assets, excluded_assets = partition_bybit_provider_query_assets(assets)
+    except BybitExecutionQualityLiveError as exc:
+        query_assets, excluded_assets = (), ()
+        reasons.append(exc.reason_code)
+    if assets and not query_assets:
+        reasons.append("bybit_provider_query_universe_empty")
     if not authorized:
         reasons.append("runtime_provider_authorization_absent")
-    request_bound = len(assets) * 2
+    request_bound = len(query_assets) * 2
     ready = not reasons
     latest_capture = bybit_execution_quality_capture_status(artifact_base_dir)
     return {
@@ -291,6 +318,10 @@ def build_bybit_execution_quality_live_readiness(
         "current_authority": identity,
         "radar_asset_count": len(assets),
         "radar_assets": [dict(row) for row in assets],
+        "provider_query_asset_count": len(query_assets),
+        "provider_query_assets": [dict(row) for row in query_assets],
+        "preflight_excluded_asset_count": len(excluded_assets),
+        "preflight_excluded_assets": [dict(row) for row in excluded_assets],
         "maximum_provider_requests_for_current_universe": request_bound,
         "absolute_provider_request_bound": MAX_PROVIDER_REQUESTS,
         "provider_call_planned": False,
@@ -393,6 +424,13 @@ def _collect_authoritative_bybit_execution_quality(
         now=started,
         resolver=resolver,
     )
+    try:
+        query_assets, excluded_assets = partition_bybit_provider_query_assets(assets)
+    except BybitExecutionQualityLiveError as exc:
+        query_assets, excluded_assets = (), ()
+        reasons.append(exc.reason_code)
+    if assets and not query_assets:
+        reasons.append("bybit_provider_query_universe_empty")
     if not _enabled(env.get(LIVE_AUTH_ENV)):
         reasons.append("runtime_provider_authorization_absent")
     if reasons:
@@ -407,7 +445,7 @@ def _collect_authoritative_bybit_execution_quality(
     eligible: list[BybitEligibleInstrument] = []
     captured_responses: list[BybitCapturedJSONResponse] = []
     try:
-        for asset in assets:
+        for asset in query_assets:
             request = _instrument_request(asset)
             requests_attempted += 1
             payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
@@ -470,6 +508,10 @@ def _collect_authoritative_bybit_execution_quality(
         "source_authority": identity,
         "radar_assets": [dict(row) for row in assets],
         "requested_radar_asset_count": len(assets),
+        "provider_query_assets": [dict(row) for row in query_assets],
+        "provider_query_asset_count": len(query_assets),
+        "preflight_excluded_assets": [dict(row) for row in excluded_assets],
+        "preflight_excluded_asset_count": len(excluded_assets),
         "eligible_instrument_count": len(eligible),
         "eligible_instruments": [row.to_dict() for row in eligible],
         "execution_quality_snapshot_count": len(snapshots),
@@ -478,7 +520,7 @@ def _collect_authoritative_bybit_execution_quality(
         "provider_call_attempted": requests_attempted > 0,
         "provider_request_succeeded": True,
         "provider_request_count": requests_attempted,
-        "provider_request_bound": len(assets) * 2,
+        "provider_request_bound": len(query_assets) * 2,
         "retries": 0,
         "redirects_followed": 0,
         "artifact_persisted": False,
@@ -726,6 +768,7 @@ __all__ = (
     "capture_authoritative_bybit_execution_quality",
     "collect_authoritative_bybit_execution_quality",
     "main",
+    "partition_bybit_provider_query_assets",
     "project_authoritative_radar_assets",
 )
 

@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close the Bybit provider-query universe before capture · Codex
+**Why:** The fresh top-30 Radar authority includes `FIGR_HELOC`, which cannot
+form a request under the closed Bybit base-symbol contract. The live adapter
+previously discovered malformed symbols only after entering its provider loop,
+and a successful exact-symbol match could be misread as fully confirmed
+canonical identity.
+**Changes:**
+- Added a deterministic pre-provider partition that retains all ranked Radar
+  assets, queries only contract-shaped symbols, and reason-codes every exclusion.
+  An empty query subset fails before fetch; request bounds now count only the
+  exact query subset. The pure closed-universe contract is shared by live
+  preflight and immutable capture validation, keeping the capture module below
+  the 1,200-line architecture target without an exception.
+- Upgraded the immutable Radar-universe projection to schema v2 with the full
+  universe, 29/30 current query candidates, the `FIGR_HELOC` exclusion, and an
+  explicit candidate-join/pending-human-confirmation identity status. Capture
+  validation rederives that partition and rejects schema, ordering, count, or
+  identity drift.
+- Updated the execution decision package, working agreement, roadmap, durable
+  decision, and focused live/capture regressions. No provider authorization or
+  call was created.
+**Verify:** 42 focused Bybit normalizer/live/capture tests and compileall passed.
+Current no-call readiness bound exact revision-12 authority, preserved 30 Radar
+assets, reported 29 provider-query candidates / one preflight exclusion / at
+most 58 requests, and correctly remained blocked only on absent runtime
+authorization. The Bybit fixture smoke and empty capture status passed;
+architecture cleanliness passed with zero new violations, and `git diff
+--check` passed.
+**Notes/risks:** Exact-symbol matches remain candidate joins until a human seals
+the native instrument IDs in the Protocol-v2 annex. No capture exists yet, and
+no send, trade, order, paper trade, RSI write, fade trigger, threshold, route,
+score, authority, or historical artifact changed.
+
 ## 2026-07-18 — Close campaign conclusion grammar and selection state · Codex
 **Why:** The fresh campaign report's detailed limitation was correct, but its
 summary still rendered singular counts as “1 are matured” / “1 attempts,” and a

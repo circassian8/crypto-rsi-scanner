@@ -38,6 +38,12 @@ from .bybit_execution_quality_capture_models import (
     TRANSPORT_CONTRACT,
     BybitCapturedJSONResponse,
 )
+from .bybit_execution_quality_universe import (
+    BybitExecutionQualityUniverseError,
+    build_capture_universe_values,
+    capture_universe_projection_valid,
+    require_provider_query_assets,
+)
 from .market_no_send_io import (
     _open_verified_namespace_dir,
     ensure_safe_namespace_dir,
@@ -70,6 +76,8 @@ _SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 _SAFE_RAW_NAME_RE = re.compile(
     r"^raw_[0-9]{3}_(?:instrument|orderbook)_[A-Z0-9]{4,32}\.json$"
 )
+
+
 def _canonical_bytes(value: object) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode(
         "utf-8"
@@ -256,7 +264,16 @@ def _response_values(
 def _validated_summary_components(
     summary: Mapping[str, object],
     responses: Sequence[BybitCapturedJSONResponse],
-) -> tuple[str, str, dict[str, object], list[object], list[object], list[object]]:
+) -> tuple[
+    str,
+    str,
+    dict[str, object],
+    list[object],
+    list[object],
+    list[object],
+    list[object],
+    list[object],
+]:
     if (
         set(summary) != _LIVE_SUMMARY_KEYS
         or summary.get("contract_version") != _LIVE_CONTRACT_VERSION
@@ -305,12 +322,17 @@ def _validated_summary_components(
         raise BybitExecutionQualityCaptureError("capture_clock_invalid")
     source_authority = summary.get("source_authority")
     radar_assets = summary.get("radar_assets")
+    provider_query_assets = summary.get("provider_query_assets")
+    preflight_excluded_assets = summary.get("preflight_excluded_assets")
     eligible_values = summary.get("eligible_instruments")
     snapshot_values = summary.get("execution_quality_snapshots")
     if (
         not isinstance(source_authority, Mapping)
         or not isinstance(radar_assets, list)
         or not 0 < len(radar_assets) <= 30
+        or not isinstance(provider_query_assets, list)
+        or not provider_query_assets
+        or not isinstance(preflight_excluded_assets, list)
         or not isinstance(eligible_values, list)
         or not eligible_values
         or not isinstance(snapshot_values, list)
@@ -335,23 +357,38 @@ def _validated_summary_components(
     ):
         raise BybitExecutionQualityCaptureError("source_authority_identity_invalid")
     _utc_text(source_authority.get("authority_checked_at"), "authority_checked_at")
+    try:
+        expected_query_assets, expected_excluded_assets = (
+            require_provider_query_assets(radar_assets)  # type: ignore[arg-type]
+        )
+    except BybitExecutionQualityUniverseError as exc:
+        raise BybitExecutionQualityCaptureError(exc.reason_code) from exc
     if (
         len(responses) > MAX_RESPONSES
         or summary.get("provider_request_count") != len(responses)
         or summary.get("requested_radar_asset_count") != len(radar_assets)
+        or summary.get("provider_query_asset_count") != len(provider_query_assets)
+        or summary.get("preflight_excluded_asset_count")
+        != len(preflight_excluded_assets)
         or summary.get("eligible_instrument_count") != len(eligible_values)
         or summary.get("execution_quality_snapshot_count") != len(snapshot_values)
         or len(snapshot_values) != len(eligible_values)
-        or len(responses) != len(radar_assets) + len(eligible_values)
-        or summary.get("provider_request_bound") != len(radar_assets) * 2
+        or len(responses) != len(provider_query_assets) + len(eligible_values)
+        or summary.get("provider_request_bound") != len(provider_query_assets) * 2
+        or provider_query_assets != list(expected_query_assets)
+        or preflight_excluded_assets != list(expected_excluded_assets)
     ):
         raise BybitExecutionQualityCaptureError("capture_count_contract_invalid")
 
     radar_assets = _canonical_value(radar_assets)
+    provider_query_assets = _canonical_value(provider_query_assets)
+    preflight_excluded_assets = _canonical_value(preflight_excluded_assets)
     eligible_values = _canonical_value(eligible_values)
     snapshot_values = _canonical_value(snapshot_values)
     if (
         not isinstance(radar_assets, list)
+        or not isinstance(provider_query_assets, list)
+        or not isinstance(preflight_excluded_assets, list)
         or not isinstance(eligible_values, list)
         or not isinstance(snapshot_values, list)
     ):
@@ -361,6 +398,8 @@ def _validated_summary_components(
         completed_at,
         dict(source_authority),
         radar_assets,
+        provider_query_assets,
+        preflight_excluded_assets,
         eligible_values,
         snapshot_values,
     )
@@ -375,6 +414,8 @@ def _validate_capture_inputs(
         completed_at,
         source_authority,
         radar_assets,
+        provider_query_assets,
+        preflight_excluded_assets,
         eligible_values,
         snapshot_values,
     ) = _validated_summary_components(summary, responses)
@@ -382,7 +423,7 @@ def _validate_capture_inputs(
     selected: list[BybitEligibleInstrument] = []
     request_rows: list[dict[str, object]] = []
     raw_rows: list[tuple[str, bytes]] = []
-    for index, asset in enumerate(radar_assets, start=1):
+    for index, asset in enumerate(provider_query_assets, start=1):
         if not isinstance(asset, Mapping):
             raise BybitExecutionQualityCaptureError("radar_asset_schema_invalid")
         expected = _instrument_request(asset)
@@ -411,7 +452,7 @@ def _validate_capture_inputs(
     reconstructed_snapshots: list[dict[str, object]] = []
     for offset, (instrument, expected_snapshot) in enumerate(
         zip(selected, snapshot_values, strict=True),
-        start=len(radar_assets) + 1,
+        start=len(provider_query_assets) + 1,
     ):
         if not isinstance(expected_snapshot, Mapping):
             raise BybitExecutionQualityCaptureError(
@@ -454,6 +495,8 @@ def _validate_capture_inputs(
         "completed_at": completed_at,
         "source_authority": source_authority,
         "radar_assets": radar_assets,
+        "provider_query_assets": provider_query_assets,
+        "preflight_excluded_assets": preflight_excluded_assets,
         "eligible_instruments": eligible_values,
         "execution_quality_snapshots": snapshot_values,
         "request_rows": request_rows,
@@ -555,15 +598,12 @@ def _capture_file_payloads(
         **prepared["source_authority"],
         "research_only": True,
     }
-    universe_values = {
-        "schema_id": "decision_radar.bybit_execution_quality_radar_universe",
-        "schema_version": 1,
-        "capture_id": capture_id,
-        "asset_count": len(prepared["radar_assets"]),
-        "assets": prepared["radar_assets"],
-        "selection_basis": "exact_authoritative_top_liquid_market_observations",
-        "research_only": True,
-    }
+    universe_values = build_capture_universe_values(
+        capture_id=capture_id,
+        radar_assets=prepared["radar_assets"],
+        provider_query_assets=prepared["provider_query_assets"],
+        preflight_excluded_assets=prepared["preflight_excluded_assets"],
+    )
     observation_values = {
         "schema_id": "decision_radar.bybit_execution_quality_observations",
         "schema_version": 1,
@@ -809,23 +849,10 @@ def _capture_projections(
         or authority.get("schema_version") != 1
         or authority.get("capture_id") != capture_id
         or authority.get("research_only") is not True
-        or set(universe)
-        != {
-            "asset_count",
-            "assets",
-            "capture_id",
-            "research_only",
-            "schema_id",
-            "schema_version",
-            "selection_basis",
-        }
-        or universe.get("schema_id")
-        != "decision_radar.bybit_execution_quality_radar_universe"
-        or universe.get("schema_version") != 1
-        or universe.get("capture_id") != capture_id
-        or universe.get("selection_basis")
-        != "exact_authoritative_top_liquid_market_observations"
-        or universe.get("research_only") is not True
+        or not capture_universe_projection_valid(
+            universe,
+            capture_id=capture_id,
+        )
         or set(observations)
         != {
             "all_fresh",
@@ -964,6 +991,14 @@ def _validate_capture_semantics(
         is not prepared["protocol_v2_input_quality_eligible"]
         or universe.get("asset_count") != len(prepared["radar_assets"])
         or universe.get("assets") != prepared["radar_assets"]
+        or universe.get("provider_query_asset_count")
+        != len(prepared["provider_query_assets"])
+        or universe.get("provider_query_assets")
+        != prepared["provider_query_assets"]
+        or universe.get("preflight_excluded_asset_count")
+        != len(prepared["preflight_excluded_assets"])
+        or universe.get("preflight_excluded_assets")
+        != prepared["preflight_excluded_assets"]
         or observations.get("observation_count")
         != len(prepared["execution_quality_snapshots"])
         or observations.get("observations")

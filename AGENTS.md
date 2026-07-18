@@ -350,11 +350,16 @@ may be added later when a suitable environment already exists.
   radar-execution-quality-bybit-status` validates the latest capture; neither
   makes a provider call or write. Capture requires the already-present
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the exact
-  `CONFIRM=1` target, performs at most two fixed-host public GETs per current
-  asset, follows no redirects, ignores ambient proxies, and makes no retries.
-  A complete capture immutably stores only the closed exact authority/universe,
-  accepted raw responses, request timing, normalized USDT observations,
-  fingerprints, manifest, completion receipt, and latest pointer. Validation
+  `CONFIRM=1` target, performs at most two fixed-host public GETs per
+  provider-query-eligible current asset, follows no redirects, ignores ambient
+  proxies, and makes no retries. Non-contract-shaped Radar symbols are excluded
+  before the provider boundary; the full ranked universe, exact query subset,
+  and reason-coded exclusions remain immutable in the capture. The initial
+  Radar-symbol-to-Bybit-base join is an auditable candidate join, not confirmed
+  canonical identity; exact IDs stay pending human confirmation in the sealed
+  Protocol-v2 annex. A complete capture immutably stores only the closed exact
+  authority/universe, accepted raw responses, request timing, normalized USDT
+  observations, fingerprints, manifest, completion receipt, and latest pointer. Validation
   holds one descriptor-anchored namespace for the complete read, rederives all
   projections from the raw bytes, and rejects drift or pointer rollback. The
   standard review archive selects and fully revalidates only the latest complete

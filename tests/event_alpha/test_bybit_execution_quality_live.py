@@ -29,6 +29,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live impo
     build_bybit_execution_quality_live_readiness,
     collect_authoritative_bybit_execution_quality,
     main,
+    partition_bybit_provider_query_assets,
     project_authoritative_radar_assets,
 )
 
@@ -172,6 +173,36 @@ def test_readiness_fails_closed_when_current_generation_is_not_authoritative() -
     assert payload["expected_provider_activity"] == "none_readiness_only"
 
 
+def test_non_contract_symbol_is_excluded_before_provider_without_hiding_authority() -> None:
+    observations = (
+        _observation("bitcoin", "BTC", 3_000.0),
+        _observation("figure-heloc", "FIGR_HELOC", 2_000.0),
+    )
+    projected = project_authoritative_radar_assets(observations)
+    requestable, excluded = partition_bybit_provider_query_assets(projected)
+
+    assert [row["canonical_asset_id"] for row in requestable] == ["bitcoin"]
+    assert excluded == ({
+        "canonical_asset_id": "figure-heloc",
+        "symbol": "FIGR_HELOC",
+        "liquidity_rank": 2,
+        "liquidity_usd": 2_000.0,
+        "reason_code": "radar_symbol_not_bybit_base_contract_shape",
+    },)
+
+    readiness = build_bybit_execution_quality_live_readiness(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=NOW,
+        resolver=_resolver(observations),
+    )
+    assert readiness["ready"] is True
+    assert readiness["radar_asset_count"] == 2
+    assert readiness["provider_query_asset_count"] == 1
+    assert readiness["preflight_excluded_asset_count"] == 1
+    assert readiness["maximum_provider_requests_for_current_universe"] == 2
+
+
 def test_collection_without_authorization_stops_before_fetch() -> None:
     called = False
 
@@ -192,11 +223,48 @@ def test_collection_without_authorization_stops_before_fetch() -> None:
     assert called is False
 
 
+def test_authorized_collection_with_no_requestable_asset_stops_before_fetch() -> None:
+    called = False
+
+    def forbidden_fetch(_request: object, _timeout: float) -> dict[str, object]:
+        nonlocal called
+        called = True
+        raise AssertionError("provider boundary must not be crossed")
+
+    observations = (_observation("figure-heloc", "FIGR_HELOC", 3_000.0),)
+    readiness = build_bybit_execution_quality_live_readiness(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=NOW,
+        resolver=_resolver(observations),
+    )
+    assert readiness["ready"] is False
+    assert readiness["provider_query_asset_count"] == 0
+    assert readiness["preflight_excluded_asset_count"] == 1
+    assert readiness["maximum_provider_requests_for_current_universe"] == 0
+    assert readiness["reasons"] == ["bybit_provider_query_universe_empty"]
+
+    with pytest.raises(
+        BybitExecutionQualityLiveError,
+        match="bybit_provider_query_universe_empty",
+    ):
+        collect_authoritative_bybit_execution_quality(
+            artifact_base_dir="unused",
+            environ={LIVE_AUTH_ENV: "1"},
+            now=lambda: NOW,
+            resolver=_resolver(observations),
+            fetch_json=forbidden_fetch,
+        )
+
+    assert called is False
+
+
 def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_books() -> None:
     observations = (
         _observation("ethereum", "ETH", 2_000.0),
         _observation("pepe", "PEPE", 1_000.0),
         _observation("bitcoin", "BTC", 3_000.0),
+        _observation("figure-heloc", "FIGR_HELOC", 1_500.0),
     )
     requests: list[BybitPublicRequest] = []
 
@@ -221,7 +289,12 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
     assert result["source_authority"]["artifact_namespace"] == (
         "radar_market_no_send_live_exact"
     )
-    assert result["requested_radar_asset_count"] == 3
+    assert result["requested_radar_asset_count"] == 4
+    assert result["provider_query_asset_count"] == 3
+    assert result["preflight_excluded_asset_count"] == 1
+    assert result["preflight_excluded_assets"][0]["canonical_asset_id"] == (
+        "figure-heloc"
+    )
     assert [row["instrument_id"] for row in result["eligible_instruments"]] == [
         "BTCUSDT",
         "ETHUSDT",
@@ -244,6 +317,7 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
     assert result["writes_performed"] is False
     assert [request.path for request in requests].count("/v5/market/instruments-info") == 3
     assert [request.path for request in requests].count("/v5/market/orderbook") == 2
+    assert all("FIGR_HELOC" not in str(request.query) for request in requests)
 
 
 class _FakeResponse:

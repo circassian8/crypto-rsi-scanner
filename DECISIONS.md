@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Partition the Bybit query universe before the provider boundary
+**Status:** accepted
+**Decision:** Preserve the full liquidity-ranked Radar universe while deriving
+one deterministic provider-query subset before any Bybit request. A symbol that
+cannot form the closed Bybit base-contract shape is excluded with an immutable
+reason code and consumes no provider request. A successful capture stores the
+full universe, exact query subset, and exclusions in universe schema v2. Treat
+exact Radar symbol equals Bybit base coin only as a candidate identity join;
+canonical asset identity remains pending human confirmation when the exact
+native instrument set is sealed in the Protocol-v2 annex. If the query subset
+is empty, fail before the network boundary.
+**Why:** The current authoritative top 30 contains `FIGR_HELOC`, whose underscore
+cannot form a valid request under the existing closed Bybit symbol contract.
+Discovering that only after entering the request loop would consume or fail a
+provider attempt and would obscure whether the asset vanished from the empirical
+universe. Explicit partitioning keeps request bounds honest without overstating
+ticker equality as canonical identity.
+**Revisit when:** The project adopts a separately reviewed canonical
+CoinGecko-to-Bybit instrument registry. That registry must preserve point-in-time
+lineage and ambiguity/rejection evidence rather than silently widening symbol
+guessing.
+
 ## 2026-07-18 - Separate selected execution surface from observed execution evidence
 **Status:** accepted
 **Decision:** Campaign and dashboard-facing reports must state that Bybit

@@ -142,6 +142,7 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
         _observation("ethereum", "ETH", 2_000.0),
         _observation("pepe", "PEPE", 1_000.0),
         _observation("bitcoin", "BTC", 3_000.0),
+        _observation("figure-heloc", "FIGR_HELOC", 1_500.0),
     )
 
     result = capture_authoritative_bybit_execution_quality(
@@ -169,6 +170,25 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     assert len(raw_paths) == 5
     assert all(path.stat().st_size > 0 for path in raw_paths)
     assert load_latest_bybit_execution_quality_capture(tmp_path) == result
+
+    universe = json.loads((namespace / "radar_universe.json").read_text())
+    assert universe["schema_version"] == 2
+    assert universe["asset_count"] == 4
+    assert universe["provider_query_asset_count"] == 3
+    assert universe["preflight_excluded_asset_count"] == 1
+    assert universe["preflight_excluded_assets"] == [{
+        "canonical_asset_id": "figure-heloc",
+        "symbol": "FIGR_HELOC",
+        "liquidity_rank": 3,
+        "liquidity_usd": 1_500.0,
+        "reason_code": "radar_symbol_not_bybit_base_contract_shape",
+    }]
+    assert universe["identity_join_basis"] == (
+        "exact_radar_symbol_equals_bybit_base_coin_candidate_join"
+    )
+    assert universe["canonical_identity_status"] == (
+        "pending_protocol_v2_annex_human_confirmation"
+    )
 
     manifest = json.loads((namespace / "capture_manifest.json").read_text())
     descriptors = {row["name"]: row for row in manifest["artifacts"]}

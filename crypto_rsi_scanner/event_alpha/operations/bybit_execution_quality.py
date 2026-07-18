@@ -266,6 +266,12 @@ def _float(value: Decimal) -> float:
     return round(float(value), 12)
 
 
+def bybit_base_symbol_requestable(value: object) -> bool:
+    """Return whether a Radar symbol can form one exact Bybit base contract ID."""
+
+    return isinstance(value, str) and bool(_ASSET_RE.fullmatch(value.strip().upper()))
+
+
 def select_bybit_usdt_perpetual_instruments(
     radar_assets: Sequence[Mapping[str, object]],
     payload: Mapping[str, object],
@@ -670,6 +676,7 @@ __all__ = (
     "BybitExecutionQualitySnapshot",
     "BybitPublicRequest",
     "BybitPublicRequestPlan",
+    "bybit_base_symbol_requestable",
     "build_bybit_public_request_plan",
     "main",
     "normalize_bybit_orderbook",

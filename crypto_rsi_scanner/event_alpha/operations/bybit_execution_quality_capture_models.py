@@ -23,6 +23,8 @@ LIVE_SUMMARY_KEYS = frozenset(
         "normal_rsi_signal_rows_written", "orders_available", "paper_trades_created",
         "private_data_read", "protocol_v2_evidence_eligible",
         "provider_call_attempted", "provider_call_authorized",
+        "preflight_excluded_asset_count", "preflight_excluded_assets",
+        "provider_query_asset_count", "provider_query_assets",
         "provider_request_bound", "provider_request_count",
         "provider_request_succeeded", "quote_asset", "radar_assets",
         "recorded_403_policy", "redirects_followed", "requested_radar_asset_count",
