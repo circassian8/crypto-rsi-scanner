@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Preserve failed live attempts in the canonical review export · Codex
+**Why:** The required post-push source-with-artifacts export failed closed after
+the genuine CoinGecko request ended as `provider_unavailable`. That terminal
+status is canonical live/no-send audit evidence, but the latest-attempt selector
+still recognized only its older generic terminal labels.
+**Changes:**
+- Added `provider_unavailable` to the closed latest-attempt export contract and
+  required its exact truth: a provider call was attempted, the request did not
+  succeed, and the failed attempt did not count in the Decision campaign.
+- Added positive selection/manifest coverage plus negative regressions for each
+  contradictory status field. Unknown, non-live, non-no-send, malformed, and
+  contradictory attempts still preserve the prior archive and fail closed.
+**Verify:** The focused project-artifact export and source-with-artifacts
+security suites passed, including the parent-symlink/TOCTOU regression. The
+real fixed-name source-with-artifacts export then succeeded against the current
+`provider_unavailable` terminal state without rewriting or discarding it.
+**Notes/risks:** This changes only which already-canonical terminal attempt is
+retained in the review archive. It does not make the failed cycle authoritative,
+count it as an observation, retry a provider, publish a dashboard, or weaken any
+path, fingerprint, secret, or archive transaction gate.
+
 ## 2026-07-18 — Start the evidence-first v2 program and gate public Bybit books · Codex
 **Why:** The live campaign cannot support score changes while cadence is idle,
 1h/4h baselines are cold, spread coverage is zero, and the selected Bybit

@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 7132,
+          "line": 7153,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-18T01:01:45.086941+00:00",
+  "generated_at": "2026-07-18T01:07:33.676780+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1120,
-  "input_fingerprint": "c380f4976b3f74286e16f7b4e64d8ec50757c86b0e66a8cfee2f3b574f0d52de",
+  "input_fingerprint": "0564f037efdab9d6d806d734a8af2e01055ea195ae350b296047554d9a27ae01",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "ROADMAP.md:1784336493",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784336439",
-    "research/ARCHITECTURE_SIZE_GATES.md:1784336436",
-    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784336502",
-    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784336503"
+    "DEVLOG.md:1784336773",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784336513",
+    "research/ARCHITECTURE_SIZE_GATES.md:1784336510",
+    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784336851",
+    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784336851"
   ],
-  "newest_source_mtime": 1784336502.7750485,
+  "newest_source_mtime": 1784336851.3899941,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784336431.1450787,
+  "report_mtime": 1784336505.087508,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1120,
-    "input_fingerprint": "c380f4976b3f74286e16f7b4e64d8ec50757c86b0e66a8cfee2f3b574f0d52de",
+    "input_fingerprint": "0564f037efdab9d6d806d734a8af2e01055ea195ae350b296047554d9a27ae01",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "ROADMAP.md:1784336493",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784336439",
-      "research/ARCHITECTURE_SIZE_GATES.md:1784336436",
-      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784336502",
-      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784336503"
+      "DEVLOG.md:1784336773",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784336513",
+      "research/ARCHITECTURE_SIZE_GATES.md:1784336510",
+      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784336851",
+      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784336851"
     ],
-    "newest_source_mtime": 1784336502.7750485,
+    "newest_source_mtime": 1784336851.3899941,
     "regex_compile_count": 124,
-    "report_mtime": 1784336431.1450787,
-    "scan_duration_seconds": 2.0721,
+    "report_mtime": 1784336505.087508,
+    "scan_duration_seconds": 2.0439,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 66,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.0721,
+  "scan_duration_seconds": 2.0439,
   "scanned_doc_files": 66,
   "scanned_source_files": 846,
   "scanned_test_files": 202,

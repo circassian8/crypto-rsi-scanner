@@ -139,6 +139,80 @@ def test_standard_export_contains_only_manifested_canonical_artifacts(
     assert hashlib.sha256(manifest_raw).hexdigest()
 
 
+def test_provider_unavailable_latest_attempt_is_manifested_canonical_truth(
+    tmp_path: Path,
+) -> None:
+    module = _load_export_module("project_artifact_export_provider_unavailable")
+    root, _current, latest = _project_tree(tmp_path)
+    output = root / "review.zip"
+    attempt_path = root / "event_fade_cache/event_market_no_send_latest_attempt.json"
+    attempt = json.loads(attempt_path.read_bytes())
+    attempt.update(
+        {
+            "decision_radar_campaign_counted": False,
+            "provider_request_succeeded": False,
+            "status": "provider_unavailable",
+        }
+    )
+    attempt_path.write_bytes(_canonical_json(attempt))
+
+    assert module.main(root=root, out=output) == 0
+
+    with zipfile.ZipFile(output) as archive:
+        names = set(archive.namelist())
+        manifest = json.loads(archive.read(_STANDARD_MANIFEST))
+
+    assert f"event_fade_cache/{latest}/attempt.json" in names
+    selected = {
+        row["kind"]: row for row in manifest["selector_results"]
+    }
+    assert selected["latest_live_no_send_attempt_namespace"] == {
+        "artifact_namespace": latest,
+        "attempt_id": "attempt-1",
+        "kind": "latest_live_no_send_attempt_namespace",
+        "provider_call_attempted": True,
+        "path": "event_market_no_send_latest_attempt.json",
+        "status": "selected",
+        "terminal_status": "provider_unavailable",
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("provider_call_attempted", False),
+        ("provider_request_succeeded", True),
+        ("decision_radar_campaign_counted", True),
+    ],
+)
+def test_provider_unavailable_latest_attempt_rejects_contradictory_truth(
+    tmp_path: Path,
+    field: str,
+    value: bool,
+) -> None:
+    module = _load_export_module(
+        f"project_artifact_export_provider_unavailable_invalid_{field}"
+    )
+    root, _current, _latest = _project_tree(tmp_path)
+    output = root / "review.zip"
+    output.write_bytes(b"prior-success")
+    attempt_path = root / "event_fade_cache/event_market_no_send_latest_attempt.json"
+    attempt = json.loads(attempt_path.read_bytes())
+    attempt.update(
+        {
+            "decision_radar_campaign_counted": False,
+            "provider_request_succeeded": False,
+            "status": "provider_unavailable",
+            field: value,
+        }
+    )
+    attempt_path.write_bytes(_canonical_json(attempt))
+
+    assert module.main(root=root, out=output) == 1
+    assert output.read_bytes() == b"prior-success"
+    assert not (root / "review.zip.tmp").exists()
+
+
 def test_optional_project_history_is_exact_disjoint_checksummed_complement(
     tmp_path: Path,
 ) -> None:

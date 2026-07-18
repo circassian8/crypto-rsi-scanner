@@ -1537,8 +1537,21 @@ def _latest_attempt_namespace(payload: bytes) -> tuple[str, dict[str, object]]:
     }
     if any(row.get(key) != value for key, value in required_truth.items()):
         raise ValueError("latest market attempt is not canonical live/no-send evidence")
-    if row.get("status") not in {"blocked", "complete", "failed", "skipped"}:
+    status = row.get("status")
+    if status not in {
+        "blocked",
+        "complete",
+        "failed",
+        "provider_unavailable",
+        "skipped",
+    }:
         raise ValueError("latest market attempt status is invalid")
+    if status == "provider_unavailable" and (
+        row.get("provider_call_attempted") is not True
+        or row.get("provider_request_succeeded") is not False
+        or row.get("decision_radar_campaign_counted") is not False
+    ):
+        raise ValueError("latest provider-unavailable attempt truth is invalid")
     namespace = _project_namespace_component(
         row.get("artifact_namespace"), field="latest attempt namespace"
     )
@@ -1547,7 +1560,7 @@ def _latest_attempt_namespace(payload: bytes) -> tuple[str, dict[str, object]]:
         "attempt_id": row.get("attempt_id"),
         "provider_call_attempted": row.get("provider_call_attempted"),
         "status": "selected",
-        "terminal_status": row.get("status"),
+        "terminal_status": status,
     }
 
 
