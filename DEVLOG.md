@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the twenty-eighth no-send market cycle · Codex
+**Why:** The persisted one-hour cadence became eligible while the existing
+CoinGecko no-send authorization and shared provider health were current. One
+more genuine point-in-time observation advances the temporal evidence program.
+**Changes:**
+- Daily Operations reserved and attempted one request, received HTTP 200 with
+  80 bounded rows in 957 ms, selected 30 observations, retried zero times, and
+  published `radar_market_no_send_20260719t044927301472z_2dbccc8d492f` only
+  after the strict publication transition succeeded.
+- Campaign truth advanced to 28 cycles / 840 retained / 810 baseline-counted /
+  30 too-close observations. All 30 current assets now have warm 1h returns;
+  4h is 29/30 with SHIB at 7/8. Outcomes advanced naturally to 3 matured / 1
+  pending, while the independent DEXE historical-price gap remains explicit.
+**Verify:** The exact live-profile strict doctor reports zero blockers and zero
+warnings; dashboard readiness matches namespace, run, revision 12, and operator
+state; the owned loopback dashboard returned HTTP 200 with the same identity.
+The final publication/operations receipts and campaign report reconcile, and
+the request ledger records one authorized network request with no retry.
+**Notes/risks:** The current generation has zero Decision ideas and 0/30 spread
+coverage because CoinGecko does not supply trusted execution quality. No send,
+trade, order, paper trade, normal RSI write, Event Alpha `TRIGGERED_FADE`, human
+review event, threshold, route, or score change occurred. Next safe observation:
+2026-07-19 05:49:27.870953 UTC; do not run early.
+
 ## 2026-07-19 — Make benchmark alignment causal · Codex
 **Why:** The temporal baseline used a symmetric nearest-time match for BTC/ETH
 benchmarks. An observation up to the configured tolerance after the asset
