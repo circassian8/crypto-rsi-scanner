@@ -759,13 +759,16 @@ def _clean_return_unit(value: object) -> str | None:
 def _first_finite_number(row: Mapping[str, Any], *fields: str) -> float | None:
     for field in fields:
         if field in row and row.get(field) not in (None, ""):
-            value = _finite_number(row.get(field))
-            if value is not None:
-                return value
+            # Preserve ordered field authority even when the selected value is
+            # invalid.  Falling through would let a legacy alias conceal bad
+            # canonical evidence and could make a blocked idea appear usable.
+            return _finite_number(row.get(field))
     return None
 
 
 def _finite_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):

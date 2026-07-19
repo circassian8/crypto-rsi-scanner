@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Fail closed on malformed canonical Decision evidence · Codex
+**Why:** Decision Model numeric alias helpers preserved canonical zeroes but
+still skipped an explicitly supplied malformed canonical value and accepted a
+legacy alias. A non-finite current spread could therefore borrow a valid-looking
+older spread and incorrectly satisfy the actionable spread gate.
+**Changes:**
+- Made Decision scoring and timing/spread policy stop at the first supplied
+  numeric field; invalid canonical evidence is now unavailable rather than an
+  invitation to inspect a legacy alias.
+- Rejected booleans as numeric Decision evidence instead of accepting Python's
+  implicit `True == 1` conversion.
+- Added route-level regressions proving invalid canonical spread and liquidity
+  cannot borrow valid-looking legacy values.
+**Verify:** All 120 focused Decision Model, consistency, surface, fixture-route,
+timing, RSI-context, and market-numeric tests passed. Compileall, architecture
+cleanliness, and the integrated-radar smoke passed.
+**Notes/risks:** Absent or blank canonical fields retain documented compatibility
+fallbacks. This changes no score weight, threshold, provider boundary,
+authorization, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` behavior.
+
 ## 2026-07-19 — Separate baseline maturity from current feature availability · Codex
 **Why:** The campaign report and dashboard used similar “warm” wording for two
 different facts: retained-history sample/coverage maturity and whether the

@@ -1012,13 +1012,16 @@ def _first_number(row: Mapping[str, Any], *keys: str) -> float | None:
     for key in keys:
         if key not in row or row.get(key) in (None, ""):
             continue
-        value = _number(row.get(key))
-        if value is not None:
-            return value
+        # An explicitly supplied canonical value owns the alias slot.  If it
+        # is malformed, fail closed instead of silently borrowing a legacy
+        # representation that may describe different or older evidence.
+        return _number(row.get(key))
     return None
 
 
 def _number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):

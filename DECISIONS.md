@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Invalid canonical Decision numerics cannot borrow aliases
+**Status:** accepted
+**Decision:** For ordered numeric fields used by Decision scoring, timing,
+tradability, and spread policy, fall through to a compatibility alias only when
+the earlier field is absent or blank. An explicitly supplied boolean,
+non-numeric, NaN, or infinite canonical value owns that slot and resolves to
+unavailable; it must not expose a valid-looking legacy value.
+**Why:** A malformed current spread, liquidity measurement, volume statistic,
+or return can otherwise be hidden by an older representation and incorrectly
+improve a score, freshness interpretation, or operator route.
+**Revisit when:** A versioned schema removes every duplicate representation and
+rejects malformed canonical rows before Decision evaluation. The fail-closed
+rule remains required at that ingestion boundary.
+
 ## 2026-07-19 - Bind temporal statistics to their exact input observations
 **Status:** accepted
 **Decision:** Every temporal scalar, return, volatility, and benchmark-relative

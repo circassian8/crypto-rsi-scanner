@@ -166,6 +166,36 @@ def test_market_led_missing_spread_is_provisional_dashboard_only():
     assert result.urgency_score <= 55.0
 
 
+def test_invalid_canonical_market_numbers_do_not_borrow_legacy_aliases():
+    for invalid in (True, "not-a-number", float("nan"), float("inf")):
+        spread_result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                market_state_snapshot={
+                    "spread_bps": invalid,
+                    "bid_ask_spread_bps": 22.0,
+                }
+            )
+        )
+
+        assert spread_result.spread_status == "unavailable"
+        assert spread_result.radar_route == "dashboard_watch"
+        assert spread_result.radar_actionable is False
+        assert "spread_bps" in spread_result.decision_missing_data
+
+    liquidity_result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "liquidity_usd": float("nan"),
+                "order_book_depth_2pct": 12_000_000.0,
+            }
+        )
+    )
+
+    assert liquidity_result.tradability_status == "poor"
+    assert liquidity_result.radar_actionable is False
+    assert "liquidity_usd" in liquidity_result.decision_missing_data
+
+
 def test_proxy_only_market_evidence_is_score_and_route_capped():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(
