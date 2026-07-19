@@ -205,7 +205,7 @@ def test_shadow_surprise_attaches_only_after_route_and_preserves_authority_bytes
     assert refreshed.report_sha256 == pre_report_sha
 
 
-def test_shadow_enrichment_rolls_back_scanner_bundle_when_history_drifts(
+def test_shadow_enrichment_fails_closed_without_path_rollback_when_history_drifts(
     tmp_path,
     monkeypatch,
 ):
@@ -227,7 +227,9 @@ def test_shadow_enrichment_rolls_back_scanner_bundle_when_history_drifts(
         nonlocal drifted
         if (
             not drifted
-            and source == market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME
+            and target == market_anomaly_scanner.MARKET_STATE_SNAPSHOT_FILENAME
+            and isinstance(source, str)
+            and source.endswith(".tmp")
             and kwargs.get("src_dir_fd") is not None
         ):
             drifted = True
@@ -261,10 +263,20 @@ def test_shadow_enrichment_rolls_back_scanner_bundle_when_history_drifts(
 
     assert drifted is True
     assert history_path.read_bytes() == history_before + b"\n"
-    assert {path.name: path.read_bytes() for path in scanner_paths} == scanner_before
+    assert scan.snapshots_path.read_bytes() != scanner_before[scan.snapshots_path.name]
+    assert {
+        path.name: path.read_bytes() for path in scanner_paths[1:]
+    } == {
+        path.name: scanner_before[path.name] for path in scanner_paths[1:]
+    }
+    retained_stages = tuple(
+        path for path in namespace.iterdir() if path.name.endswith(".tmp")
+    )
+    assert len(retained_stages) == 3
     assert {path.name for path in namespace.iterdir()} == {
         market_no_send.HISTORY_FILENAME,
         *scanner_before,
+        *(path.name for path in retained_stages),
     }
 
 

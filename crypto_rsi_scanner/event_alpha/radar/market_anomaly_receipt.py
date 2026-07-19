@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import os
 import stat
+import sys
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,7 +20,9 @@ _STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
 _STAT_SUPPORTS_FOLLOW_SYMLINKS = os.stat in os.supports_follow_symlinks
 _MKDIR_SUPPORTS_DIR_FD = os.mkdir in os.supports_dir_fd
 _RENAME_SUPPORTS_DIR_FD = os.rename in os.supports_dir_fd
-_UNLINK_SUPPORTS_DIR_FD = os.unlink in os.supports_dir_fd
+_IDENTITY_CHANGED_ERRNO = getattr(errno, "ESTALE", errno.EIO)
+_RENAME_EXCL = 0x00000004
+_RENAME_NOREPLACE = 0x00000001
 
 
 def namespace_identity(directory: Path) -> tuple[int, int]:
@@ -37,40 +42,38 @@ def artifact_payloads(
     expected_names: tuple[str, ...],
 ) -> dict[str, bytes]:
     directory = Path(os.path.abspath(Path(directory).expanduser()))
-    descriptor = _open_namespace(directory)
+    namespace = _safe_leaf(directory.name)
+    parent_fd = -1
+    descriptor = -1
     payloads: dict[str, bytes] = {}
     try:
-        status = os.fstat(descriptor)
-        if (status.st_dev, status.st_ino) != namespace_identity:
-            raise RuntimeError("market_anomaly_completion_receipt_invalid:namespace_identity")
+        (
+            parent_fd,
+            parent_status,
+            descriptor,
+            opened_namespace,
+        ) = _open_mutation_namespace(
+            directory.parent,
+            namespace=namespace,
+            expected_namespace_identity=namespace_identity,
+        )
         for supplied, filename in zip(paths, expected_names, strict=True):
             if Path(os.path.abspath(Path(supplied).expanduser())) != directory / filename:
                 raise RuntimeError("market_anomaly_completion_receipt_invalid:path")
-            artifact_fd = -1
-            try:
-                artifact_fd = os.open(
-                    filename,
-                    os.O_RDONLY
-                    | getattr(os, "O_CLOEXEC", 0)
-                    | _required_flag("O_NOFOLLOW"),
-                    dir_fd=descriptor,
-                )
-                if not stat.S_ISREG(os.fstat(artifact_fd).st_mode):
-                    raise RuntimeError(
-                        "market_anomaly_completion_receipt_invalid:artifact_not_regular"
-                    )
-                with os.fdopen(artifact_fd, "rb") as handle:
-                    artifact_fd = -1
-                    payloads[filename] = handle.read()
-            finally:
-                if artifact_fd >= 0:
-                    os.close(artifact_fd)
+            _assert_directory_path_identity(directory.parent, parent_status)
+            _assert_namespace_identity(parent_fd, namespace, opened_namespace)
+            payloads[filename] = _read_regular_leaf(descriptor, filename)
+            _assert_directory_path_identity(directory.parent, parent_status)
+            _assert_namespace_identity(parent_fd, namespace, opened_namespace)
     except OSError as exc:
         raise RuntimeError(
             "market_anomaly_completion_receipt_invalid:artifact_unavailable"
         ) from exc
     finally:
-        os.close(descriptor)
+        if descriptor >= 0:
+            os.close(descriptor)
+        if parent_fd >= 0:
+            os.close(parent_fd)
     return payloads
 
 
@@ -83,7 +86,15 @@ def write_artifacts_atomic(
     expected_existing_sha256: Mapping[str, str] | None = None,
     expected_guarded_sha256: Mapping[str, str] | None = None,
 ) -> tuple[int, int]:
-    """Write one complete scanner bundle through one anchored namespace fd.
+    """Publish one fail-closed scanner bundle through one namespace fd.
+
+    Every leaf is fully persisted and descriptor-verified before any public
+    pathname changes.  Each public rename is atomic, and the complete bundle is
+    trustworthy only when this function returns after full byte and identity
+    validation.  Filesystems do not provide a portable multi-leaf transaction:
+    on failure this function deliberately performs no pathname rollback or
+    cleanup.  A partial public prefix and private stages may remain as
+    non-authoritative evidence for the caller's generation-level doctor.
 
     ``expected_guarded_sha256`` binds extra regular leaves that participate in
     the transaction but must not be rewritten.  They are rechecked before,
@@ -104,12 +115,11 @@ def write_artifacts_atomic(
     parent_path = absolute.parent
     parent_fd = -1
     namespace_fd = -1
-    temporary_names: set[str] = set()
-    backup_names: dict[str, str] = {}
-    installation_intents: dict[str, os.stat_result] = {}
+    staged_names: dict[str, str] = {}
+    staged_descriptors: dict[str, int] = {}
+    staged_statuses: dict[str, os.stat_result] = {}
     installed_names: dict[str, os.stat_result] = {}
     original_leaves: dict[str, os.stat_result | None] = {}
-    transaction_committed = False
     try:
         (
             parent_fd,
@@ -127,11 +137,13 @@ def write_artifacts_atomic(
             expected_existing_sha256=expected_existing_sha256,
         )
         _assert_guarded_sha256(namespace_fd, guarded_sha256)
-        staged_names, staged_statuses = _stage_bundle(
+        _stage_bundle(
             namespace_fd,
             payloads=payloads,
             expected_names=expected_names,
-            temporary_names=temporary_names,
+            staged_names=staged_names,
+            staged_descriptors=staged_descriptors,
+            staged_statuses=staged_statuses,
             parent_path=parent_path,
             parent_status=parent_status,
             parent_fd=parent_fd,
@@ -152,10 +164,8 @@ def write_artifacts_atomic(
             original_leaves=original_leaves,
             expected_existing_sha256=expected_existing_sha256,
             staged_names=staged_names,
+            staged_descriptors=staged_descriptors,
             staged_statuses=staged_statuses,
-            temporary_names=temporary_names,
-            backup_names=backup_names,
-            installation_intents=installation_intents,
             installed_names=installed_names,
             parent_path=parent_path,
             parent_status=parent_status,
@@ -164,33 +174,17 @@ def write_artifacts_atomic(
             opened_namespace=opened_namespace,
             guarded_sha256=guarded_sha256,
         )
-        transaction_committed = True
-        _discard_backups(namespace_fd, expected_names, backup_names)
         return opened_namespace.st_dev, opened_namespace.st_ino
     except (OSError, RuntimeError) as exc:
-        if namespace_fd >= 0 and not transaction_committed:
-            try:
-                _rollback_bundle(
-                    namespace_fd,
-                    expected_names=expected_names,
-                    backup_names=backup_names,
-                    installation_intents=installation_intents,
-                    payloads=payloads,
-                    original_leaves=original_leaves,
-                    expected_existing_sha256=expected_existing_sha256,
-                )
-            except (OSError, RuntimeError) as rollback_exc:
-                raise RuntimeError(
-                    "market_anomaly_completion_receipt_invalid:artifact_rollback"
-                ) from rollback_exc
         if isinstance(exc, RuntimeError):
             raise
         raise RuntimeError(
             "market_anomaly_completion_receipt_invalid:artifact_write"
         ) from exc
     finally:
+        for descriptor in staged_descriptors.values():
+            os.close(descriptor)
         if namespace_fd >= 0:
-            _discard_temporaries(namespace_fd, temporary_names)
             os.close(namespace_fd)
         if parent_fd >= 0:
             os.close(parent_fd)
@@ -283,16 +277,16 @@ def _stage_bundle(
     *,
     payloads: Mapping[str, bytes],
     expected_names: tuple[str, ...],
-    temporary_names: set[str],
+    staged_names: dict[str, str],
+    staged_descriptors: dict[str, int],
+    staged_statuses: dict[str, os.stat_result],
     parent_path: Path,
     parent_status: os.stat_result,
     parent_fd: int,
     namespace: str,
     opened_namespace: os.stat_result,
     guarded_sha256: Mapping[str, str],
-) -> tuple[dict[str, str], dict[str, os.stat_result]]:
-    staged_names: dict[str, str] = {}
-    staged_statuses: dict[str, os.stat_result] = {}
+) -> None:
     for index, name in enumerate(expected_names):
         _assert_transaction_context(
             parent_path,
@@ -304,15 +298,14 @@ def _stage_bundle(
             guarded_sha256=guarded_sha256,
         )
         temporary = f".{name}.{os.getpid()}.{time.time_ns()}.{index}.tmp"
-        temporary_names.add(temporary)
-        status = _stage_leaf(
+        descriptor, status = _stage_leaf(
             namespace_fd,
             temporary=temporary,
             payload=payloads[name],
         )
         staged_names[name] = temporary
+        staged_descriptors[name] = descriptor
         staged_statuses[name] = status
-    return staged_names, staged_statuses
 
 
 def _stage_leaf(
@@ -320,10 +313,11 @@ def _stage_leaf(
     *,
     temporary: str,
     payload: bytes,
-) -> os.stat_result:
+) -> tuple[int, os.stat_result]:
+    succeeded = False
     descriptor = os.open(
         temporary,
-        os.O_WRONLY
+        os.O_RDWR
         | os.O_CREAT
         | os.O_EXCL
         | _required_flag("O_NOFOLLOW")
@@ -332,19 +326,151 @@ def _stage_leaf(
         dir_fd=namespace_fd,
     )
     try:
-        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_size != 0
+        ):
             raise RuntimeError(
                 "market_anomaly_completion_receipt_invalid:temporary_not_regular"
             )
-        with os.fdopen(descriptor, "wb") as handle:
-            descriptor = -1
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-            return os.fstat(handle.fileno())
+        view = memoryview(payload)
+        offset = 0
+        while offset < len(view):
+            written = os.write(descriptor, view[offset:])
+            if written <= 0:
+                raise OSError(errno.EIO, "artifact stage write stalled")
+            offset += written
+        os.fsync(descriptor)
+        persisted = _read_exact_fd(descriptor, maximum_bytes=len(payload))
+        completed = os.fstat(descriptor)
+        if (
+            persisted != payload
+            or not stat.S_ISREG(completed.st_mode)
+            or completed.st_nlink != 1
+            or completed.st_size != len(payload)
+            or not _same_identity(opened, completed)
+        ):
+            raise RuntimeError(
+                "market_anomaly_completion_receipt_invalid:temporary_identity"
+            )
+        succeeded = True
+        return descriptor, completed
     finally:
-        if descriptor >= 0:
+        if not succeeded:
             os.close(descriptor)
+
+
+def _read_exact_fd(descriptor: int, *, maximum_bytes: int) -> bytes:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    remaining = maximum_bytes + 1
+    while remaining:
+        chunk = os.read(descriptor, min(65_536, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _assert_named_stage(
+    namespace_fd: int,
+    temporary: str,
+    expected: os.stat_result,
+) -> None:
+    named = os.stat(
+        _safe_leaf(temporary),
+        dir_fd=namespace_fd,
+        follow_symlinks=False,
+    )
+    if (
+        not stat.S_ISREG(named.st_mode)
+        or named.st_nlink != 1
+        or not _same_file_snapshot(expected, named)
+    ):
+        raise OSError(_IDENTITY_CHANGED_ERRNO, "artifact stage changed")
+
+
+def _rename_noreplace(
+    namespace_fd: int,
+    source: str,
+    destination: str,
+) -> bool:
+    """Use the native Darwin/Linux no-replace rename primitive."""
+
+    source = _safe_leaf(source)
+    destination = _safe_leaf(destination)
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename = getattr(library, "renameatx_np", None)
+        flags = _RENAME_EXCL
+    elif sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        flags = _RENAME_NOREPLACE
+    else:
+        rename = None
+        flags = 0
+    if rename is None:
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:native_noreplace_unsupported"
+        )
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    result = rename(
+        namespace_fd,
+        os.fsencode(source),
+        namespace_fd,
+        os.fsencode(destination),
+        flags,
+    )
+    if result == 0:
+        return True
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        return False
+    if error in {errno.ENOSYS, errno.ENOTSUP, errno.EINVAL}:
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:native_noreplace_unsupported"
+        )
+    raise OSError(error, os.strerror(error))
+
+
+def _verify_published_stage(
+    namespace_fd: int,
+    *,
+    name: str,
+    descriptor: int,
+    staged: os.stat_result,
+    payload: bytes,
+) -> os.stat_result:
+    before = os.fstat(descriptor)
+    persisted = _read_exact_fd(descriptor, maximum_bytes=len(payload))
+    completed = os.fstat(descriptor)
+    named = os.stat(
+        _safe_leaf(name),
+        dir_fd=namespace_fd,
+        follow_symlinks=False,
+    )
+    if (
+        persisted != payload
+        or not _same_identity(staged, before)
+        or not _same_file_snapshot(before, completed)
+        or not _same_file_snapshot(completed, named)
+        or not stat.S_ISREG(named.st_mode)
+        or named.st_nlink != 1
+        or named.st_size != len(payload)
+    ):
+        raise OSError(_IDENTITY_CHANGED_ERRNO, "published artifact changed")
+    return named
 
 
 def _commit_staged_bundle(
@@ -355,10 +481,8 @@ def _commit_staged_bundle(
     original_leaves: Mapping[str, os.stat_result | None],
     expected_existing_sha256: Mapping[str, str] | None,
     staged_names: Mapping[str, str],
+    staged_descriptors: Mapping[str, int],
     staged_statuses: Mapping[str, os.stat_result],
-    temporary_names: set[str],
-    backup_names: dict[str, str],
-    installation_intents: dict[str, os.stat_result],
     installed_names: dict[str, os.stat_result],
     parent_path: Path,
     parent_status: os.stat_result,
@@ -387,29 +511,20 @@ def _commit_staged_bundle(
                 else None
             ),
         )
-        if original_leaves[name] is not None:
-            _backup_leaf(
-                namespace_fd,
-                name=name,
-                index=index,
-                backup_names=backup_names,
-            )
-            _assert_transaction_context(
-                parent_path,
-                parent_status=parent_status,
-                parent_fd=parent_fd,
-                namespace=namespace,
-                namespace_fd=namespace_fd,
-                opened_namespace=opened_namespace,
-                guarded_sha256=guarded_sha256,
-            )
-        installation_intents[name] = staged_statuses[name]
+        _assert_named_stage(
+            namespace_fd,
+            staged_names[name],
+            staged_statuses[name],
+        )
         installed_names[name] = _install_staged_leaf(
             namespace_fd,
             name=name,
             staged_name=staged_names[name],
+            staged_descriptor=staged_descriptors[name],
+            staged_status=staged_statuses[name],
+            payload=payloads[name],
+            target_existed=original_leaves[name] is not None,
         )
-        temporary_names.remove(staged_names[name])
         _assert_transaction_context(
             parent_path,
             parent_status=parent_status,
@@ -418,6 +533,12 @@ def _commit_staged_bundle(
             namespace_fd=namespace_fd,
             opened_namespace=opened_namespace,
             guarded_sha256=guarded_sha256,
+        )
+        _assert_installed_bundle(
+            namespace_fd,
+            payloads=payloads,
+            expected_names=expected_names[: index + 1],
+            installed_names=installed_names,
         )
     _assert_guarded_sha256(namespace_fd, guarded_sha256)
     _assert_installed_bundle(
@@ -430,45 +551,35 @@ def _commit_staged_bundle(
     _assert_guarded_sha256(namespace_fd, guarded_sha256)
 
 
-def _backup_leaf(
-    namespace_fd: int,
-    *,
-    name: str,
-    index: int,
-    backup_names: dict[str, str],
-) -> None:
-    backup = f".{name}.{os.getpid()}.{time.time_ns()}.{index}.rollback"
-    if _leaf_status(namespace_fd, backup) is not None:
-        raise RuntimeError(
-            "market_anomaly_completion_receipt_invalid:artifact_identity"
-        )
-    backup_names[name] = backup
-    os.rename(
-        name,
-        backup,
-        src_dir_fd=namespace_fd,
-        dst_dir_fd=namespace_fd,
-    )
-
-
 def _install_staged_leaf(
     namespace_fd: int,
     *,
     name: str,
     staged_name: str,
+    staged_descriptor: int,
+    staged_status: os.stat_result,
+    payload: bytes,
+    target_existed: bool,
 ) -> os.stat_result:
-    os.rename(
-        staged_name,
-        name,
-        src_dir_fd=namespace_fd,
-        dst_dir_fd=namespace_fd,
-    )
-    written = os.stat(name, dir_fd=namespace_fd, follow_symlinks=False)
-    if not stat.S_ISREG(written.st_mode):
-        raise RuntimeError(
-            "market_anomaly_completion_receipt_invalid:artifact_not_regular"
+    _assert_named_stage(namespace_fd, staged_name, staged_status)
+    if target_existed:
+        os.rename(
+            staged_name,
+            name,
+            src_dir_fd=namespace_fd,
+            dst_dir_fd=namespace_fd,
         )
-    return written
+    elif not _rename_noreplace(namespace_fd, staged_name, name):
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:artifact_identity"
+        )
+    return _verify_published_stage(
+        namespace_fd,
+        name=name,
+        descriptor=staged_descriptor,
+        staged=staged_status,
+        payload=payload,
+    )
 
 
 def _assert_transaction_context(
@@ -484,35 +595,6 @@ def _assert_transaction_context(
     _assert_directory_path_identity(parent_path, parent_status)
     _assert_namespace_identity(parent_fd, namespace, opened_namespace)
     _assert_guarded_sha256(namespace_fd, guarded_sha256)
-
-
-def _discard_backups(
-    namespace_fd: int,
-    expected_names: tuple[str, ...],
-    backup_names: dict[str, str],
-) -> None:
-    for name in expected_names:
-        backup = backup_names.pop(name, None)
-        if backup is None:
-            continue
-        try:
-            os.unlink(backup, dir_fd=namespace_fd)
-        except OSError:
-            # The replacement is fully validated and durable; cleanup cannot
-            # make the old public bundle authoritative again.
-            pass
-    try:
-        os.fsync(namespace_fd)
-    except OSError:
-        pass
-
-
-def _discard_temporaries(namespace_fd: int, temporary_names: set[str]) -> None:
-    for temporary in temporary_names:
-        try:
-            os.unlink(temporary, dir_fd=namespace_fd)
-        except OSError:
-            pass
 
 
 def strict_jsonl(payload: bytes, *, row_type: str) -> tuple[dict[str, Any], ...]:
@@ -599,11 +681,32 @@ def _regular_leaf_status(directory_fd: int, name: str) -> os.stat_result | None:
         raise RuntimeError(
             "market_anomaly_completion_receipt_invalid:artifact_not_regular"
         )
+    if status.st_nlink != 1:
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:artifact_identity"
+        )
     return status
 
 
 def _read_regular_leaf(directory_fd: int, name: str) -> bytes:
+    payload, _status = _read_regular_leaf_snapshot(directory_fd, name)
+    return payload
+
+
+def _read_regular_leaf_snapshot(
+    directory_fd: int,
+    name: str,
+) -> tuple[bytes, os.stat_result]:
     name = _safe_leaf(name)
+    before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    if not stat.S_ISREG(before.st_mode):
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:artifact_not_regular"
+        )
+    if before.st_nlink != 1:
+        raise RuntimeError(
+            "market_anomaly_completion_receipt_invalid:artifact_identity"
+        )
     descriptor = os.open(
         name,
         os.O_RDONLY
@@ -612,16 +715,31 @@ def _read_regular_leaf(directory_fd: int, name: str) -> bytes:
         dir_fd=directory_fd,
     )
     try:
-        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or not _same_file_snapshot(before, opened)
+        ):
             raise RuntimeError(
-                "market_anomaly_completion_receipt_invalid:artifact_not_regular"
+                "market_anomaly_completion_receipt_invalid:artifact_identity"
             )
-        with os.fdopen(descriptor, "rb") as handle:
-            descriptor = -1
-            return handle.read()
+        payload = _read_exact_fd(descriptor, maximum_bytes=opened.st_size)
+        completed = os.fstat(descriptor)
+        after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if (
+            len(payload) != completed.st_size
+            or not stat.S_ISREG(completed.st_mode)
+            or completed.st_nlink != 1
+            or not _same_file_snapshot(opened, completed)
+            or not _same_file_snapshot(completed, after)
+        ):
+            raise RuntimeError(
+                "market_anomaly_completion_receipt_invalid:artifact_identity"
+            )
+        return payload, after
     finally:
-        if descriptor >= 0:
-            os.close(descriptor)
+        os.close(descriptor)
 
 
 def _guarded_sha256_mapping(
@@ -699,12 +817,15 @@ def _assert_original_leaf(
         raise RuntimeError(
             "market_anomaly_completion_receipt_invalid:artifact_identity"
         )
-    if expected_sha256 is not None and (
-        sha256(_read_regular_leaf(directory_fd, name)) != expected_sha256
-    ):
-        raise RuntimeError(
-            "market_anomaly_completion_receipt_invalid:artifact_identity"
-        )
+    if expected_sha256 is not None:
+        payload, observed = _read_regular_leaf_snapshot(directory_fd, name)
+        if (
+            not _same_optional_snapshot(original, observed)
+            or sha256(payload) != expected_sha256
+        ):
+            raise RuntimeError(
+                "market_anomaly_completion_receipt_invalid:artifact_identity"
+            )
 
 
 def _assert_installed_bundle(
@@ -715,94 +836,21 @@ def _assert_installed_bundle(
     installed_names: Mapping[str, os.stat_result],
 ) -> None:
     for name in expected_names:
-        current = _regular_leaf_status(directory_fd, name)
+        try:
+            payload, current = _read_regular_leaf_snapshot(directory_fd, name)
+        except (OSError, RuntimeError) as exc:
+            raise RuntimeError(
+                "market_anomaly_completion_receipt_invalid:artifact_identity"
+            ) from exc
         installed = installed_names.get(name)
         if (
-            current is None
-            or installed is None
+            installed is None
             or not _same_optional_snapshot(installed, current)
-            or sha256(_read_regular_leaf(directory_fd, name))
-            != sha256(payloads[name])
+            or payload != payloads[name]
         ):
             raise RuntimeError(
                 "market_anomaly_completion_receipt_invalid:artifact_identity"
             )
-
-
-def _rollback_bundle(
-    directory_fd: int,
-    *,
-    expected_names: tuple[str, ...],
-    backup_names: dict[str, str],
-    installation_intents: Mapping[str, os.stat_result],
-    payloads: Mapping[str, bytes],
-    original_leaves: Mapping[str, os.stat_result | None],
-    expected_existing_sha256: Mapping[str, str] | None,
-) -> None:
-    for name in reversed(expected_names):
-        backup = backup_names.pop(name, None)
-        if backup is not None:
-            backup_status = _regular_leaf_status(directory_fd, backup)
-            original = original_leaves.get(name)
-            expected_sha256 = (
-                expected_existing_sha256.get(name)
-                if expected_existing_sha256 is not None
-                else None
-            )
-            if backup_status is None:
-                _assert_original_leaf(
-                    directory_fd,
-                    name=name,
-                    original=original,
-                    expected_sha256=expected_sha256,
-                )
-                continue
-            if original is None or not _same_rename_preserved(
-                original,
-                backup_status,
-            ):
-                raise RuntimeError(
-                    "market_anomaly_completion_receipt_invalid:artifact_identity"
-                )
-            if expected_sha256 is not None and (
-                sha256(_read_regular_leaf(directory_fd, backup)) != expected_sha256
-            ):
-                raise RuntimeError(
-                    "market_anomaly_completion_receipt_invalid:artifact_identity"
-                )
-            os.rename(
-                backup,
-                name,
-                src_dir_fd=directory_fd,
-                dst_dir_fd=directory_fd,
-            )
-            continue
-        intended = installation_intents.get(name)
-        if intended is None:
-            continue
-        current = _regular_leaf_status(directory_fd, name)
-        if current is None:
-            continue
-        if (
-            not _same_identity(intended, current)
-            or intended.st_size != current.st_size
-            or intended.st_mtime_ns != current.st_mtime_ns
-            or sha256(_read_regular_leaf(directory_fd, name))
-            != sha256(payloads[name])
-        ):
-            raise RuntimeError(
-                "market_anomaly_completion_receipt_invalid:artifact_identity"
-            )
-        os.unlink(name, dir_fd=directory_fd)
-    os.fsync(directory_fd)
-
-
-def _leaf_status(directory_fd: int, name: str) -> os.stat_result | None:
-    name = _safe_leaf(name)
-    try:
-        return os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-    except FileNotFoundError:
-        return None
 
 
 def _is_sha256(value: object) -> bool:
@@ -840,11 +888,12 @@ def _same_identity(left: os.stat_result, right: os.stat_result) -> bool:
     return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
 
 
-def _same_rename_preserved(left: os.stat_result, right: os.stat_result) -> bool:
+def _same_file_snapshot(left: os.stat_result, right: os.stat_result) -> bool:
     return (
         _same_identity(left, right)
         and left.st_size == right.st_size
         and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
     )
 
 
@@ -876,7 +925,6 @@ def _require_mutation_support() -> None:
             _STAT_SUPPORTS_FOLLOW_SYMLINKS,
             _MKDIR_SUPPORTS_DIR_FD,
             _RENAME_SUPPORTS_DIR_FD,
-            _UNLINK_SUPPORTS_DIR_FD,
         )
     ):
         raise RuntimeError(

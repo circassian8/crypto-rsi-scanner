@@ -78,8 +78,11 @@ def run_scheduled_catalyst_scan(
     observed_at: datetime | str | None = None,
     calendar_provider_name: str = "coinmarketcal",
     calendar_rows: Iterable[Mapping[str, Any]] | None = None,
+    include_empty_unlock_artifacts: bool = True,
 ) -> ScheduledCatalystScanResult:
     """Normalize configured scheduled catalyst fixtures and write artifacts."""
+    if not isinstance(include_empty_unlock_artifacts, bool):
+        raise ValueError("include_empty_unlock_artifacts must be a boolean")
     directory = Path(namespace_dir).expanduser()
     directory.mkdir(parents=True, exist_ok=True)
     observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc))
@@ -161,34 +164,37 @@ def run_scheduled_catalyst_scan(
     unlock_path = directory / UNLOCK_CANDIDATES_FILENAME
     scheduled_report_path = directory / SCHEDULED_CATALYST_REPORT_FILENAME
     unlock_report_path = directory / UNLOCK_RISK_REPORT_FILENAME
-    artifact_names = (
-        SCHEDULED_CATALYSTS_FILENAME,
-        UNLOCK_CANDIDATES_FILENAME,
-        SCHEDULED_CATALYST_REPORT_FILENAME,
-        UNLOCK_RISK_REPORT_FILENAME,
+    include_unlock_artifacts = bool(unlock_rows) or include_empty_unlock_artifacts
+    artifact_payloads = {
+        SCHEDULED_CATALYSTS_FILENAME: _jsonl_bytes(
+            scheduled_path,
+            scheduled_rows,
+        ),
+    }
+    if include_unlock_artifacts:
+        artifact_payloads[UNLOCK_CANDIDATES_FILENAME] = _jsonl_bytes(
+            unlock_path,
+            unlock_rows,
+        )
+    artifact_payloads[SCHEDULED_CATALYST_REPORT_FILENAME] = (
+        format_scheduled_catalyst_report(
+            scheduled_rows,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            warnings=warnings,
+        ).encode("utf-8")
     )
+    if include_unlock_artifacts:
+        artifact_payloads[UNLOCK_RISK_REPORT_FILENAME] = format_unlock_risk_report(
+            unlock_rows,
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            warnings=warnings,
+        ).encode("utf-8")
     market_anomaly_receipt.write_artifacts_atomic(
         directory,
-        payloads={
-            SCHEDULED_CATALYSTS_FILENAME: _jsonl_bytes(
-                scheduled_path,
-                scheduled_rows,
-            ),
-            UNLOCK_CANDIDATES_FILENAME: _jsonl_bytes(unlock_path, unlock_rows),
-            SCHEDULED_CATALYST_REPORT_FILENAME: format_scheduled_catalyst_report(
-                scheduled_rows,
-                profile=profile,
-                artifact_namespace=artifact_namespace,
-                warnings=warnings,
-            ).encode("utf-8"),
-            UNLOCK_RISK_REPORT_FILENAME: format_unlock_risk_report(
-                unlock_rows,
-                profile=profile,
-                artifact_namespace=artifact_namespace,
-                warnings=warnings,
-            ).encode("utf-8"),
-        },
-        expected_names=artifact_names,
+        payloads=artifact_payloads,
+        expected_names=tuple(artifact_payloads),
     )
     return ScheduledCatalystScanResult(
         namespace_dir=directory,

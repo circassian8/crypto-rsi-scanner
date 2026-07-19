@@ -77,6 +77,35 @@ def test_scheduled_catalyst_outputs_refuse_symlink_namespace(tmp_path):
     assert tuple(outside.iterdir()) == ()
 
 
+def test_scheduled_catalyst_can_omit_empty_unlock_artifacts_without_deletion(
+    tmp_path,
+):
+    import crypto_rsi_scanner.event_alpha.radar.scheduled_catalysts as scheduled
+
+    namespace_dir = tmp_path / "artifacts" / "scheduled_without_unlocks"
+    result = scheduled.run_scheduled_catalyst_scan(
+        namespace_dir=namespace_dir,
+        provider_paths={},
+        profile="fixture",
+        artifact_namespace=namespace_dir.name,
+        run_mode="fixture",
+        run_id="run-without-empty-unlocks",
+        observed_at="2026-07-14T00:00:00Z",
+        calendar_rows=(),
+        include_empty_unlock_artifacts=False,
+    )
+
+    assert result.unlock_count == 0
+    assert result.scheduled_path.is_file()
+    assert result.scheduled_report_path.is_file()
+    assert not result.unlock_path.exists()
+    assert not result.unlock_report_path.exists()
+    assert {path.name for path in namespace_dir.iterdir()} == {
+        scheduled.SCHEDULED_CATALYSTS_FILENAME,
+        scheduled.SCHEDULED_CATALYST_REPORT_FILENAME,
+    }
+
+
 def test_scheduled_catalyst_bundle_rejects_namespace_replacement_between_renames(
     tmp_path,
     monkeypatch,
@@ -100,21 +129,22 @@ def test_scheduled_catalyst_bundle_rejects_namespace_replacement_between_renames
     ):
         (replacement / filename).symlink_to(outside)
     original_rename = scheduled.market_anomaly_receipt.os.rename
+    original_noreplace = scheduled.market_anomaly_receipt._rename_noreplace
     swapped = False
 
-    def swapping_rename(source, target, *args, **kwargs):
+    def swapping_noreplace(namespace_fd, source, target):
         nonlocal swapped
-        result = original_rename(source, target, *args, **kwargs)
-        if kwargs.get("src_dir_fd") is not None and not swapped:
+        result = original_noreplace(namespace_fd, source, target)
+        if not swapped:
             original_rename(namespace_dir, displaced)
             original_rename(replacement, namespace_dir)
             swapped = True
         return result
 
     monkeypatch.setattr(
-        scheduled.market_anomaly_receipt.os,
-        "rename",
-        swapping_rename,
+        scheduled.market_anomaly_receipt,
+        "_rename_noreplace",
+        swapping_noreplace,
     )
 
     with pytest.raises(RuntimeError, match="namespace_identity"):

@@ -17,6 +17,51 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Make multi-leaf artifact failure non-destructive · Codex
+**Why:** The shared anomaly/scheduled-catalyst publisher staged a complete
+bundle but closed each staging descriptor before publication, then used backup,
+cleanup, and rollback pathnames after failures. A same-user substitution could
+therefore redirect published bytes or cause a raced replacement to be deleted
+or overwritten while the recovery path tried to restore an earlier bundle.
+**Changes:**
+- Reworked `event_alpha/radar/market_anomaly_receipt.py` so every private
+  `O_EXCL`/no-follow stage remains descriptor-bound through exact byte readback,
+  publication, and final named-leaf verification. New leaves use native macOS/
+  Linux no-replace rename; existing bound regular leaves use one atomic replace.
+- Bound reads to before/opened/completed/after file snapshots and to the exact
+  parent/namespace path. Stage, new-leaf destination, published-leaf, hard-link,
+  guarded-input, and namespace drift now fail without false success.
+- Removed bundle backup, cleanup, and pathname rollback. A failed operation
+  retains any partial public prefix and remaining private stages as
+  non-authoritative evidence; only a complete validated return plus downstream
+  generation receipt/strict doctor can become trusted.
+- Added `include_empty_unlock_artifacts=False` for market-calendar
+  materialization. Empty optional unlock JSONL/report files are now omitted
+  from the original scheduled-catalyst bundle instead of written and then
+  deleted through a check-then-unlink helper; removed that unused deletion API.
+- Added adversarial coverage for stage substitution, concurrent destination,
+  post-publication replacement, namespace replacement during write/read,
+  guarded-history drift, partial-prefix retention, and optional empty-calendar
+  output. Updated `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, and generated
+  architecture reports with the leaf-atomic/generation-fail-closed contract.
+**Verify:** Python compileall passed. The focused anomaly, calendar, no-send,
+shadow-enrichment, namespace, replay-store, and empirical-report suites passed
+85 tests; the final adversarial/integration subset passed 55 tests. Architecture
+cleanliness, market-anomaly smoke, integrated-radar smoke, market-no-send smoke,
+and calendar preview passed. Full `make verify PYTHON=.venv/bin/python` passed
+1,422/1,422 standalone checks and 3,308 pytest tests, then alert-render,
+backtest-fixture, and paper-scoreboard smokes. The first sandboxed full run's
+only failure was the expected local-socket `EPERM`; the identical provider-off
+gate passed outside that sandbox. The final 10-case adversarial writer file,
+including the added hard-link refusal, also passed after the full gate.
+**Notes/risks:** The compatibility function name still contains `atomic`, but
+the documented guarantee is deliberately narrower: individual renames are
+atomic; a portable all-or-nothing transaction over several visible files is
+not claimed. Failed generations may retain private stages and must remain
+non-authoritative. No provider call, authorization mutation, threshold/route/
+score change, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-19 — Record the thirty-fifth Radar market cycle · Codex
 **Why:** The persisted cadence was eligible and the already-present CoinGecko
 authorization passed the read-only readiness boundary, so the evidence-first

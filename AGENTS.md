@@ -744,6 +744,16 @@ may be added later when a suitable environment already exists.
   never return successful publication or become trusted without the existing
   strict doctor/fingerprint gates. Any retention or cleanup policy requires a
   separately reviewed inode-safe mutation boundary.
+  `market_anomaly_receipt.write_artifacts_atomic` is a compatibility-named,
+  leaf-atomic bundle boundary: it fully persists every stage while retaining
+  its descriptor, uses native no-replace creation for absent leaves, verifies
+  every final inode/byte plus the exact namespace path, and returns success only
+  after the complete bundle validates. It does not claim portable multi-leaf
+  atomicity. On any failure, never perform pathname rollback or cleanup; retain
+  a partial public prefix/private stages as non-authoritative generation
+  evidence and require the caller's completion receipt and strict doctor before
+  trust. Optional empty outputs must be omitted before publication rather than
+  written and subsequently deleted.
 - **Bybit native liquidation evidence:**
   `make radar-derivatives-bybit-liquidation-smoke` normalizes checked-in exact
   public `allLiquidation.{instrument_id}` WebSocket message bytes without
@@ -866,15 +876,17 @@ may be added later when a suitable environment already exists.
   are never exported. Publication recomputes scheduled, unlock, and unified
   calendar rows from the same read-once hashed buffers, so rewritten artifact
   digests, duplicate keys, or split reads cannot conceal semantic drift. The
-  scheduled/unlock JSONL and reports are written as one descriptor-anchored
-  no-follow bundle. Absence remains visibly `not_configured`; the
+  scheduled/unlock JSONL and reports are written as one descriptor-anchored,
+  generation-fail-closed bundle; empty optional unlock outputs are omitted
+  before publication. Absence remains visibly `not_configured`; the
   application never guesses a file, enables a provider, or falls back to a
   fixture for a live generation.
   A same-cycle market-anomaly scan may report healthy-empty only through its
   exact completion receipt with matching run/namespace device and inode, paths,
   content hashes, row semantics/lineage, and snapshot/anomaly/queue counts. Its
-  four outputs are likewise one anchored atomic bundle. Generic empty sidecar
-  files remain unavailable.
+  four outputs are likewise one anchored fail-closed bundle whose individual
+  leaf publications are atomic and whose complete truth requires a successful
+  return plus its exact receipt. Generic empty sidecar files remain unavailable.
 - **Decision Radar outcome-price recovery:**
   `make radar-outcome-price-recovery-readiness` is read-only and makes no
   provider call. It derives only exact overdue outcome windows from the

@@ -412,19 +412,20 @@ def test_market_anomaly_scan_fails_closed_on_namespace_swap_during_write(
     namespace_dir.mkdir()
     retired_dir = tmp_path / "retired-market-anomaly-write-race"
     real_rename = market_anomaly_receipt.os.rename
+    real_noreplace = market_anomaly_receipt._rename_noreplace
     swapped = False
 
-    def swap_namespace_before_artifact_replace(source, target, *args, **kwargs):
+    def swap_namespace_before_artifact_replace(namespace_fd, source, target):
         nonlocal swapped
-        if not swapped and kwargs.get("src_dir_fd") is not None:
+        if not swapped:
             swapped = True
             real_rename(namespace_dir, retired_dir)
             namespace_dir.mkdir()
-        return real_rename(source, target, *args, **kwargs)
+        return real_noreplace(namespace_fd, source, target)
 
     monkeypatch.setattr(
-        market_anomaly_receipt.os,
-        "rename",
+        market_anomaly_receipt,
+        "_rename_noreplace",
         swap_namespace_before_artifact_replace,
     )
     with pytest.raises(

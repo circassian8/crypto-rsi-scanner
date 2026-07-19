@@ -13,7 +13,6 @@ from ..radar import calendar as unified_calendar
 from ..radar import scheduled_catalysts
 from .market_no_send_io import (
     read_regular_bytes,
-    remove_regular_artifact,
     write_json_atomic,
 )
 from .market_no_send_models import MarketNoSendError
@@ -60,9 +59,6 @@ def materialize_market_calendar_snapshot(
         run_id=run_id,
         raw_rows=raw_rows,
     )
-    if scan.unlock_count == 0:
-        remove_regular_artifact(scan.unlock_path)
-        remove_regular_artifact(scan.unlock_report_path)
     metadata = _materialization_metadata(
         manifest,
         copy_path=copy_path,
@@ -94,6 +90,7 @@ def _run_scheduled_scan(
         observed_at=observed,
         calendar_provider_name=CALENDAR_PROVIDER_NAME,
         calendar_rows=tuple(_calendar_scheduled_row(row) for row in raw_rows),
+        include_empty_unlock_artifacts=False,
     )
 
 

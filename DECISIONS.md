@@ -16,6 +16,32 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Multi-leaf bundles fail closed without pathname rollback
+**Status:** accepted
+**Decision:** The shared anomaly/scheduled-catalyst bundle publisher must fully
+persist every private no-follow stage while retaining its descriptor, then
+publish new leaves with native Darwin/Linux atomic no-replace semantics and
+replace already-bound regular leaves with descriptor-relative atomic rename.
+It may report success only after every final named leaf still matches the exact
+staged inode and bytes, guarded leaves remain unchanged, and the namespace path
+still names the opened directory. This is a leaf-atomic, generation-fail-closed
+contract, not a claim of portable all-or-nothing multi-file transactionality.
+After any failure, do not rename, unlink, or roll back mutable pathnames; retain
+any partial public prefix and private stages as non-authoritative evidence and
+require the caller's completion receipt/strict doctor before trust. Optional
+empty calendar-unlock outputs must be omitted from the original bundle rather
+than written and subsequently deleted.
+**Why:** The former backup/install/rollback sequence could overwrite or delete
+a same-user replacement during backup cleanup or rollback, and its closed stage
+descriptors allowed a pathname substitution before publication. POSIX does not
+offer a portable atomic transaction over several visible leaves. Descriptor-
+bound stages plus non-destructive failure handling prevent false success and a
+second unsafe mutation; generation receipts and doctors already provide the
+correct authority boundary for incomplete bundles.
+**Revisit when:** Bundle consumers move to one versioned directory or manifest
+pointer that can be switched in a single native operation, with an explicit
+retention policy for superseded directories and equivalent macOS support.
+
 ## 2026-07-19 - Shared artifact writers fail closed on staging substitution
 **Status:** accepted
 **Decision:** Shared immutable and replaceable artifact-byte writes must create

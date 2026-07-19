@@ -23,7 +23,6 @@ _STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
 _STAT_SUPPORTS_FOLLOW_SYMLINKS = os.stat in os.supports_follow_symlinks
 _MKDIR_SUPPORTS_DIR_FD = os.mkdir in os.supports_dir_fd
 _RENAME_SUPPORTS_DIR_FD = os.rename in os.supports_dir_fd
-_UNLINK_SUPPORTS_DIR_FD = os.unlink in os.supports_dir_fd
 _IDENTITY_CHANGED_ERRNO = getattr(errno, "ESTALE", errno.EIO)
 _RENAME_EXCL = 0x00000004
 _RENAME_NOREPLACE = 0x00000001
@@ -424,32 +423,6 @@ def read_regular_bytes(path: Path, *, missing_ok: bool = False) -> bytes | None:
             os.close(descriptor)
 
 
-def remove_regular_artifact(path: Path, *, missing_ok: bool = False) -> None:
-    """Remove one namespace-local regular leaf through a verified directory fd."""
-
-    _require_descriptor_directory_support(mutation=True)
-    namespace_dir, leaf = _safe_leaf_name(path)
-    try:
-        with _open_verified_namespace_dir(namespace_dir) as anchored:
-            base_fd, namespace_fd, namespace, namespace_identity = anchored
-            try:
-                before = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                if missing_ok:
-                    return
-                raise
-            if not stat.S_ISREG(before.st_mode):
-                raise MarketNoSendError("market artifact removal target is not regular")
-            _assert_namespace_identity(base_fd, namespace, namespace_identity)
-            os.unlink(leaf, dir_fd=namespace_fd)
-            _assert_namespace_identity(base_fd, namespace, namespace_identity)
-            os.fsync(namespace_fd)
-    except MarketNoSendError:
-        raise
-    except OSError as exc:
-        raise MarketNoSendError("market artifact removal failed") from exc
-
-
 def parse_json_object_bytes(raw: bytes) -> dict[str, Any]:
     """Parse one exact JSON buffer while rejecting duplicate object keys."""
 
@@ -507,7 +480,6 @@ def _require_descriptor_directory_support(*, mutation: bool) -> None:
             supported
             and _MKDIR_SUPPORTS_DIR_FD
             and _RENAME_SUPPORTS_DIR_FD
-            and _UNLINK_SUPPORTS_DIR_FD
         )
     if not supported:
         raise MarketNoSendError(
@@ -626,7 +598,6 @@ __all__ = [
     "read_json_object",
     "read_jsonl",
     "read_regular_bytes",
-    "remove_regular_artifact",
     "safe_existing_namespace_dir",
     "write_bytes_atomic",
     "write_json_atomic",
