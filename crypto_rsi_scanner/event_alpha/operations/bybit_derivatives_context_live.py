@@ -59,7 +59,7 @@ from .bybit_intraday_live import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v1"
+CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v2"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 READINESS_COMMAND = "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python"
@@ -217,6 +217,7 @@ def build_bybit_derivatives_live_readiness(
             "open_interest_1h",
             "long_short_account_ratio_1h",
         ],
+        "composite_freshness_policy": "oldest_required_provider_response",
         "runtime_authorization_env": LIVE_AUTH_ENV,
         "runtime_provider_authorized": authorized,
         "authorization_mutated": False,
@@ -421,6 +422,7 @@ def _observation_set_summary(
         "eligible_instruments": [row.to_dict() for row in instruments],
         "context_count": len(contexts),
         "contexts": contexts,
+        "composite_freshness_policy": "oldest_required_provider_response",
         "request_timing": request_timing,
         "all_context_fresh": fresh_at_completion,
         "all_context_fresh_at_acquisition": fresh_at_acquisition,

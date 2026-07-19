@@ -51,8 +51,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_capture_v1"
-LIVE_CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v1"
+CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_capture_v2"
+LIVE_CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v2"
 POINTER_FILENAME = "radar_bybit_derivatives_context_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
 RECEIPT_FILENAME = "capture_completion_receipt.json"
@@ -79,8 +79,9 @@ _LIVE_SUMMARY_KEYS = frozenset(
     {
         "all_context_fresh", "all_context_fresh_at_acquisition",
         "all_context_fresh_at_completion", "artifact_persisted",
-        "campaign_attached", "category", "completed_at", "context_count",
-        "context_only", "contexts", "contract_version", "credentials_read",
+        "campaign_attached", "category", "completed_at",
+        "composite_freshness_policy", "context_count", "context_only",
+        "contexts", "contract_version", "credentials_read",
         "decision_policy_applied", "directional_authority",
         "eligible_instrument_count", "eligible_instruments",
         "exact_response_capture_available", "exact_response_capture_count",
@@ -225,6 +226,8 @@ def _validate_summary(summary: Mapping[str, object]) -> tuple[datetime, datetime
         or summary.get("execution_mode") != "perpetual"
         or summary.get("category") != "linear"
         or summary.get("quote_asset") != "USDT"
+        or summary.get("composite_freshness_policy")
+        != "oldest_required_provider_response"
         or summary.get("provider_call_authorized") is not True
         or summary.get("provider_call_attempted") is not True
         or summary.get("provider_request_succeeded") is not True

@@ -34,8 +34,8 @@ from .bybit_execution_quality import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_v1"
-SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_derivatives_context.v1"
+CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_v2"
+SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_derivatives_context.v2"
 TICKERS_PATH = "/v5/market/tickers"
 FUNDING_HISTORY_PATH = "/v5/market/funding/history"
 OPEN_INTEREST_PATH = "/v5/market/open-interest"
@@ -82,6 +82,10 @@ class _BybitDerivativesContextSnapshot:
     contract_type: str
     instrument_status: str
     provider_observed_at: str
+    provider_latest_response_at: str
+    provider_response_span_seconds: float
+    provider_observed_at_policy: str
+    provider_response_times: tuple[tuple[str, str], ...]
     acquired_at: str
     age_seconds: float
     freshness_status: str
@@ -121,6 +125,7 @@ class _BybitDerivativesContextSnapshot:
         value = asdict(self)
         value["source_urls"] = dict(self.source_urls)
         value["request_lineage_ids"] = dict(self.request_lineage_ids)
+        value["provider_response_times"] = dict(self.provider_response_times)
         value["units"] = {
             "prices": "USDT_per_base_asset",
             "mark_index_basis": "basis_points",
@@ -148,6 +153,8 @@ class _ValidatedPayloadParts:
     open_interest_rows: tuple[tuple[Mapping[str, Any], int], ...]
     account_ratio_rows: tuple[tuple[Mapping[str, Any], int], ...]
     observed_at: datetime
+    latest_response_at: datetime
+    provider_response_times: tuple[tuple[str, datetime], ...]
 
 
 def _aware_utc(value: datetime | str, field: str) -> datetime:
@@ -353,8 +360,15 @@ def _validated_payload_parts(
         ("open_interest", _rows(oi_result, label="open_interest", instrument_id=instrument.instrument_id, timestamp_field="timestamp"), oi_at),
         ("account_ratio", _rows(ratio_result, label="account_ratio", instrument_id=instrument.instrument_id, timestamp_field="timestamp"), ratio_at),
     )
-    observed_at = max(ticker_at, funding_at, oi_at, ratio_at)
-    if acquired < observed_at:
+    provider_response_times = (
+        ("ticker", ticker_at),
+        ("funding_history", funding_at),
+        ("open_interest", oi_at),
+        ("account_ratio", ratio_at),
+    )
+    observed_at = min(value for _label, value in provider_response_times)
+    latest_response_at = max(value for _label, value in provider_response_times)
+    if acquired < latest_response_at:
         raise BybitDerivativesContextError("acquisition_precedes_provider_response")
     for label, rows, provider_at in histories:
         if any(timestamp > int(provider_at.timestamp() * 1000) for _row, timestamp in rows):
@@ -366,7 +380,25 @@ def _validated_payload_parts(
         open_interest_rows=tuple(histories[1][1]),
         account_ratio_rows=tuple(histories[2][1]),
         observed_at=observed_at,
+        latest_response_at=latest_response_at,
+        provider_response_times=provider_response_times,
     )
+
+
+def _provider_clock_projection(
+    parts: _ValidatedPayloadParts,
+) -> dict[str, object]:
+    return {
+        "provider_observed_at": _iso(parts.observed_at),
+        "provider_latest_response_at": _iso(parts.latest_response_at),
+        "provider_response_span_seconds": round(
+            (parts.latest_response_at - parts.observed_at).total_seconds(), 6
+        ),
+        "provider_observed_at_policy": "oldest_component_response",
+        "provider_response_times": tuple(
+            (label, _iso(value)) for label, value in parts.provider_response_times
+        ),
+    }
 
 
 def normalize_bybit_derivatives_context(
@@ -464,7 +496,7 @@ def normalize_bybit_derivatives_context(
         settle_asset=instrument.settle_asset,
         contract_type=instrument.contract_type,
         instrument_status=instrument.status,
-        provider_observed_at=_iso(observed_at),
+        **_provider_clock_projection(parts),
         acquired_at=_iso(acquired),
         age_seconds=round(age, 6),
         freshness_status="fresh" if age <= freshness_seconds else "stale",

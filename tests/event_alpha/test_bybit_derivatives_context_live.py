@@ -204,6 +204,9 @@ def test_current_execution_capture_requires_separate_derivatives_auth() -> None:
     assert payload["operator_action_required"] == AUTHORIZATION_ACTION
     assert payload["eligible_instrument_count"] == 1
     assert payload["maximum_provider_requests_for_current_capture"] == 4
+    assert payload["composite_freshness_policy"] == (
+        "oldest_required_provider_response"
+    )
     assert payload["immutable_capture_implemented"] is True
     assert payload["capture_publication_available"] is True
     assert payload["latest_derivatives_capture_status"] == "unavailable"
@@ -324,6 +327,9 @@ def test_authorized_collection_gets_exact_context_without_writes_or_policy() -> 
     assert [request.path for request in requests] == list(PATH_FIXTURES)
     assert payload["status"] == "complete"
     assert payload["context_count"] == 1
+    assert payload["composite_freshness_policy"] == (
+        "oldest_required_provider_response"
+    )
     assert payload["provider_request_count"] == payload["provider_request_bound"] == 4
     assert payload["all_context_fresh"] is True
     assert payload["all_context_fresh_at_acquisition"] is True

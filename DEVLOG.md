@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Make Bybit derivatives freshness composite-safe · Codex
+**Why:** A venue-native derivatives row combines four independent provider
+responses, but v1 dated the whole row from the newest response. One fresh ticker
+could therefore conceal stale funding, open-interest, or positioning evidence.
+**Changes:**
+- Advanced the offline, guarded-live, and immutable-capture contracts to v2.
+  Each normalized context now retains all four provider response times, the
+  oldest and newest clocks, their span, and an explicit
+  `oldest_component_response` observation policy.
+- Made snapshot age/freshness and live completion freshness use the oldest
+  required response. The immutable capture rederives the same projection from
+  exact raw bytes, so a summary cannot claim fresher evidence than its stalest
+  component.
+- Exposed `oldest_required_provider_response` in no-call readiness and the
+  closed live observation-set summary; a regression proves a one-minute-old
+  funding response keeps the composite stale while the other three are fresh.
+- Updated the Crypto Decision Radar North Star, durable decision, roadmap, and
+  static architecture reports. Extracted the clock projection into a bounded
+  helper so the architecture function-size gate remains clean.
+**Verify:** All 75 derivatives, execution-readiness, and project-export tests
+passed. Python compileall and JSON validation passed. The offline Bybit
+derivatives smoke emitted v2 with zero calls/writes/side effects; architecture
+cleanliness passed with zero new violations; exact dashboard readiness remained
+READY for revision 12.
+**Notes/risks:** No live authorization was created or read, no Bybit call was
+made, and the recorded 403/no-retry/no-proxy/no-VPN/no-bypass boundary is
+unchanged. This does not attach evidence, create direction, tune a threshold, or
+permit sends, trades, orders, paper trades, RSI writes, or `TRIGGERED_FADE`.
+
 ## 2026-07-18 — Close future publication on snapshot unit health · Codex
 **Why:** Unit warnings were visible in the anomaly report but were not a closed,
 recomputed publication contract. A future generation could therefore carry a

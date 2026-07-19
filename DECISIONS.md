@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Date composite derivatives context from its oldest response
+**Status:** accepted
+**Decision:** Bybit derivatives context v2 preserves all four component provider
+response clocks and defines `provider_observed_at` as their minimum. It also
+records the newest response, full response-time map, response span, and the
+explicit `oldest_component_response` policy. Snapshot age, freshness, live
+completion freshness, immutable capture rederivation, and Protocol-v2 input-
+quality eligibility all use that conservative clock. One fresh ticker cannot
+hide stale funding, open-interest, or positioning response evidence.
+**Why:** A derivatives context is a composite observation. The prior maximum-
+clock rule described only its newest component and could classify the whole row
+fresh when another provider response was already stale. That would overstate the
+point-in-time evidence available for empirical work.
+**Revisit when:** The source contract provides an atomic multi-metric response
+or a preregistered Protocol-v2 annex defines per-component freshness policies.
+Any replacement must retain every component clock, expose response skew, and
+never make composite freshness more favorable than its stalest required input.
+
 ## 2026-07-18 - Require closed unit health on future live generations
 **Status:** accepted
 **Decision:** Every complete live market generation observed at or after

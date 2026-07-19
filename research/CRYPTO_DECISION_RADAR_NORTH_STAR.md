@@ -918,7 +918,10 @@ The venue-native derivatives context contract separately normalizes supplied
 Bybit ticker, settled-funding, 1h open-interest, and 1h long/short-account-ratio
 responses for the exact selected execution-quality instrument. Run
 `make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python` to prove the
-offline path. It preserves provider clocks and request lineage; keeps USDT,
+offline path. Contract v2 preserves every component provider clock and request
+lineage, dates the composite snapshot from its oldest component response,
+exposes the newest-response clock and total response span, and therefore cannot
+hide one stale input behind another fresh response. It keeps USDT,
 base-asset, fraction, percent-point, and basis-point units explicit; rejects the
 known 100x fraction/percent failure; and plans no more than four public GETs per
 instrument or 120 for the future top-30 intersection. The offline module has no

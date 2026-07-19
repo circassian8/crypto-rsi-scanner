@@ -98,11 +98,17 @@ def test_request_plan_is_bounded_public_get_only_and_non_executable() -> None:
 def test_snapshot_preserves_native_identity_units_clocks_and_point_in_time_values() -> None:
     value = _snapshot().to_dict()
 
-    assert value["schema_version"] == "crypto_radar.bybit_derivatives_context.v1"
+    assert value["schema_version"] == "crypto_radar.bybit_derivatives_context.v2"
     assert value["instrument_id"] == "BTCUSDT"
     assert value["canonical_asset_id"] == "bitcoin"
     assert value["quote_asset"] == value["settle_asset"] == "USDT"
     assert value["provider_observed_at"] == "2026-07-18T07:44:00Z"
+    assert value["provider_latest_response_at"] == "2026-07-18T07:44:00Z"
+    assert value["provider_response_span_seconds"] == 0.0
+    assert value["provider_observed_at_policy"] == "oldest_component_response"
+    assert value["provider_response_times"] == {
+        name: "2026-07-18T07:44:00Z" for name in NAMES
+    }
     assert value["acquired_at"] == "2026-07-18T07:44:01Z"
     assert value["age_seconds"] == 1.0
     assert value["freshness_status"] == "fresh"
@@ -142,6 +148,34 @@ def test_stale_context_remains_stale_without_weakening_freshness() -> None:
     value = _snapshot(acquired_at="2026-07-18T07:45:00Z").to_dict()
 
     assert value["age_seconds"] == 60.0
+    assert value["freshness_status"] == "stale"
+
+
+def test_composite_freshness_uses_oldest_provider_response() -> None:
+    payloads = _payloads()
+    funding = deepcopy(payloads["funding_history"])
+    funding["time"] = 1784360580000
+    payloads["funding_history"] = funding
+
+    value = normalize_bybit_derivatives_context(
+        payloads["ticker"],
+        payloads["funding_history"],
+        payloads["open_interest"],
+        payloads["account_ratio"],
+        instrument=_instrument(),
+        acquired_at="2026-07-18T07:44:01Z",
+        request_lineage_ids={
+            name: f"test.bybit.derivatives.{name}" for name in NAMES
+        },
+    ).to_dict()
+
+    assert value["provider_observed_at"] == "2026-07-18T07:43:00Z"
+    assert value["provider_latest_response_at"] == "2026-07-18T07:44:00Z"
+    assert value["provider_response_span_seconds"] == 60.0
+    assert value["provider_response_times"]["funding_history"] == (
+        "2026-07-18T07:43:00Z"
+    )
+    assert value["age_seconds"] == 61.0
     assert value["freshness_status"] == "stale"
 
 

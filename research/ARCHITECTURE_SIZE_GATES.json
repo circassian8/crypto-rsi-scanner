@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-18T23:58:47.350645+00:00",
+  "generated_at": "2026-07-19T00:08:30.354714+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2022,6 +2022,12 @@
     {
       "limit": 1500,
       "line_count": 1191,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1191,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
     },
@@ -2029,12 +2035,6 @@
       "limit": 1500,
       "line_count": 1188,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1188,
-      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py",
       "source_kind": "production"
     },
     {
