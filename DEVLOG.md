@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Close the KuCoin announcement contract offline · Codex
+**Why:** KuCoin was selected as the next documented first-party catalyst API,
+but its exact response semantics needed to be proven before any live transport,
+authorization, or policy integration could be considered.
+**Changes:**
+- Added a strict synthetic-byte normalizer for the documented public `GET
+  /api/v3/announcements` contract plus a bounded, explicitly non-executable
+  request plan.
+- Bound the exact request window/type/language/page-size identity, response
+  code and field sets, contiguous page coverage, total/count reconciliation,
+  response SHA-256, local acquisition clocks, per-page lineage, stable IDs,
+  official multi-type categories, descriptions, publication clocks, language,
+  and safe official URLs.
+- Kept requested and provider-returned page sizes separate because KuCoin's
+  official example returns a smaller page size than it requests. Partial page
+  prefixes remain `partial`; zero rows become healthy-empty only after complete
+  pagination.
+- Rejected duplicate JSON keys, IDs, lineage, pages, unknown categories,
+  schema extension, count drift, oversized text, unsafe URLs/queries, malformed
+  clocks, and rows outside the requested window.
+- Kept `cTime` explicitly publication-only and left event time unknown. The
+  provider description remains labeled a summary, official categories are not
+  title-reclassified, and the projection has no directional or policy effect.
+- Added two synthetic pages, 19 focused regressions, the no-call/no-write
+  `radar-announcements-kucoin-smoke`, a structured contract record, operator
+  guidance, and coherent roadmap/decision/source-selection status.
+**Verify:** All 19 focused KuCoin tests passed. Python compileall, the offline
+Make smoke, JSON validation, whitespace validation, and architecture
+cleanliness passed; architecture reported zero new size violations.
+**Notes/risks:** Official web research confirmed the exact documented query and
+response example outside the project provider runtime. No KuCoin API call,
+environment authorization, credential, artifact write, live adapter,
+discovery/campaign/dashboard attachment, route, score, threshold, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` was added.
+The next slice is observational readiness and immutable-capture design, not
+activation.
+
 ## 2026-07-19 — Select the next documented official announcement API · Codex
 **Why:** The selected-venue Bybit announcement path is documented but currently
 blocked by honest regional reachability. The project needs an authoritative

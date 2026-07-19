@@ -342,6 +342,19 @@ may be added later when a suitable environment already exists.
   pointer, receipt, snapshot, source-coverage, and accepted raw-source hash
   attestation; an unavailable attempt never replaces it. Unlinked calendar
   events remain context/risk only and cannot manufacture directional bias.
+- **KuCoin official-announcement offline contract:**
+  `make radar-announcements-kucoin-smoke` validates synthetic bytes against the
+  documented public `GET /api/v3/announcements` contract without a provider
+  call, environment read, or write. It closes request/window identity,
+  response code/schema, contiguous bounded pagination, complete/partial and
+  healthy-empty semantics, response hashes, acquisition clocks, stable IDs,
+  official multi-type categories, English language, description-summary
+  status, and official URLs. Provider-returned page size remains separate from
+  requested page size. `cTime` is publication time and never becomes event time
+  or directional authority. The module is campaign-detached, policy-neutral,
+  unauthorized, inactive, and Protocol-v2-ineligible. Do not add a client or
+  live path until separate authorization, confirmation, immutable capture,
+  request ledger, health/backoff, doctor, retention, and annex gates exist.
 - **Tokenomist structured-unlock response contract:**
   `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
   cliff-unlock response shape entirely offline. The closed synthetic fixture

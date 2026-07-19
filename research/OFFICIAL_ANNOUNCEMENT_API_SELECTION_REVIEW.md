@@ -9,8 +9,9 @@ They are viable first-party Catalyst Radar sources and are materially stronger
 activation candidates than guessed Help Center endpoints or flaky third-party
 RSS aggregation.
 
-Select KuCoin as the next **offline contract implementation** and keep Bitget as
-the second implementation candidate. This ordering creates no provider
+KuCoin was selected as the first **offline contract implementation** and that
+strict synthetic-byte contract is now fixture-verified. Bitget remains the
+second implementation candidate. This ordering creates no provider
 authorization and permits no live call:
 
 - KuCoin documents a public/no-permission `GET /api/v3/announcements` endpoint,
@@ -21,8 +22,8 @@ authorization and permits no live call:
   time bounds, cursor pagination, stable IDs, publication clocks, language, and
   official URL, but only 10 rows per page.
 
-Neither endpoint is active in this repository. Implement parsing and closed
-coverage semantics offline first. Any later live capture requires a separate
+Neither endpoint is active in this repository. KuCoin parsing and closed
+coverage semantics now exist only offline. Any later live capture requires a separate
 already-present authorization flag, explicit confirmation, a bounded request
 plan, immutable accepted bytes, and strict doctor success.
 
@@ -87,14 +88,15 @@ after the shared identity, coverage, and clock rules are proven on KuCoin.
 
 ## Implementation boundary
 
-1. Add a strict synthetic-fixture KuCoin response normalizer with no HTTP
-   client, environment read, artifact write, or policy side effect.
-2. Bind exact request parameters, response code, pagination totals, item
-   identity, categories, publication time, language, URL, and explicit units.
-3. Reject response/code/schema extension, duplicate IDs, page/count drift,
-   future or malformed clocks, unsafe URLs, unknown languages, oversized text,
-   secret-like fields, and unbounded pagination.
-4. Add a no-call readiness surface that reports configuration, separate
+1. **Complete:** add a strict synthetic-fixture KuCoin response normalizer with
+   no HTTP client, environment read, artifact write, or policy side effect.
+2. **Complete:** bind exact request parameters, response code, pagination
+   totals, item identity, categories, publication time, language, URL, and
+   response byte digests.
+3. **Complete:** reject response/code/schema extension, duplicate IDs,
+   page/count drift, future or malformed clocks, unsafe URLs, unknown
+   languages, oversized text, secret-like fields, and unbounded pagination.
+4. **Next:** add a no-call readiness surface that reports configuration, separate
    authorization, maximum requests, expected provider activity, rollback, and
    exact next command.
 5. Only after separate operator authorization, add a confirmed bounded capture
@@ -105,8 +107,8 @@ after the shared identity, coverage, and clock rules are proven on KuCoin.
 
 ## Consequences
 
-- KuCoin is selected only as the next offline official-announcement contract;
-  it is not live-enabled, authoritative, or Protocol-v2-admitted.
+- KuCoin's offline official-announcement contract is fixture-verified, but it
+  is not live-enabled, authoritative, or Protocol-v2-admitted.
 - Bitget remains planned as the second documented official API candidate.
 - Bybit remains the selected execution venue and its documented announcement
   endpoint remains useful when permitted reachability exists. KuCoin/Bitget

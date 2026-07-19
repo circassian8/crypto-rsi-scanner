@@ -1,0 +1,59 @@
+{
+  "authority": {
+    "campaign_attached": false,
+    "decision_policy_applied": false,
+    "directional_authority": false,
+    "live_authorized": false,
+    "live_configured": false,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false
+  },
+  "contract_version": "crypto_radar_kucoin_announcements_v1",
+  "endpoint": "GET https://api.kucoin.com/api/v3/announcements",
+  "implemented_at": "2026-07-19",
+  "maximum_request_window_days": 31,
+  "maximum_requests": 20,
+  "maximum_rows": 1000,
+  "mode": "offline_synthetic_fixture_only",
+  "official_documentation": "https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements",
+  "preserved_fields": [
+    "request_parameters",
+    "request_lineage",
+    "response_sha256",
+    "local_acquisition_time",
+    "totalNum",
+    "totalPage",
+    "currentPage",
+    "pageSize",
+    "annId",
+    "annTitle",
+    "annType",
+    "annDesc",
+    "cTime",
+    "language",
+    "annUrl"
+  ],
+  "provider": "kucoin_announcements",
+  "safety": {
+    "authorization_created": false,
+    "environment_reads": 0,
+    "event_alpha_triggered_fade_created": 0,
+    "normal_rsi_writes": 0,
+    "orders": 0,
+    "paper_trades": 0,
+    "provider_calls": 0,
+    "route_or_score_effect": false,
+    "telegram_sends": 0,
+    "trades": 0,
+    "writes": 0
+  },
+  "schema_version": "kucoin_announcement_offline_contract_v1",
+  "semantics": {
+    "complete_pagination_required_for_healthy_empty": true,
+    "description_is_complete_article_body": false,
+    "official_categories_reclassified_from_title": false,
+    "provider_adjusted_page_size_is_explicit": true,
+    "publication_time_is_event_time": false
+  },
+  "status": "implemented_fixture_verified_inactive"
+}

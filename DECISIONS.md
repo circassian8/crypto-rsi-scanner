@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep the KuCoin announcement contract closed before activation
+**Status:** accepted
+**Decision:** Treat the v1 KuCoin announcement implementation as a strict
+offline synthetic-byte contract only. Preserve exact request windows, response
+digests, local acquisition clocks, stable IDs, official multi-type categories,
+language, description-summary status, URLs, and complete-versus-partial page
+coverage. Keep provider-returned page size distinct from requested page size.
+Never infer event time or direction from `cTime`, and do not attach these
+fixtures to discovery, campaign, dashboard, score, route, or Protocol-v2
+authority. A live client remains forbidden until a separate no-call readiness,
+already-present authorization, explicit confirmation, bounded immutable
+capture, ledger, health/backoff, doctor, retention, and annex boundary exists.
+**Why:** KuCoin documents a useful public machine contract, but a permissive
+generic parser or premature activation would hide pagination gaps, conflate
+publication with the actual market event, and make synthetic input look like
+genuine catalyst evidence.
+**Revisit when:** The offline contract has a strict observational readiness and
+immutable capture design, and the human separately authorizes a genuine bounded
+acquisition. Any change must retain fail-closed byte, page, clock, identity,
+URL, safety, and no-direction guarantees.
+
 ## 2026-07-19 - Implement KuCoin's documented announcement contract before Bitget
 **Status:** accepted
 **Decision:** Select KuCoin's documented public/no-permission `GET

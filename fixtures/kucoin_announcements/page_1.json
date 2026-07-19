@@ -1,0 +1,35 @@
+{
+  "code": "200000",
+  "data": {
+    "totalNum": 3,
+    "totalPage": 2,
+    "currentPage": 1,
+    "pageSize": 2,
+    "items": [
+      {
+        "annId": 200003,
+        "annTitle": "ALPHA (ALPHA) Gets Listed on KuCoin",
+        "annType": [
+          "latest-announcements",
+          "new-listings"
+        ],
+        "annDesc": "Trading opens at a separately stated time in the full official notice.",
+        "cTime": 1784424720000,
+        "language": "en_US",
+        "annUrl": "https://www.kucoin.com/announcement/alpha-gets-listed?lang=en_US"
+      },
+      {
+        "annId": 200002,
+        "annTitle": "KuCoin System Maintenance Notice",
+        "annType": [
+          "latest-announcements",
+          "maintenance-updates"
+        ],
+        "annDesc": "A maintenance window will be described in the complete official notice.",
+        "cTime": 1784424660000,
+        "language": "en_US",
+        "annUrl": "https://www.kucoin.com/announcement/system-maintenance?lang=en_US"
+      }
+    ]
+  }
+}
