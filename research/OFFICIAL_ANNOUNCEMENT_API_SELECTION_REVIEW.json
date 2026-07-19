@@ -1,5 +1,5 @@
 {
-  "decision": "implement_kucoin_offline_first_keep_bitget_second",
+    "decision": "retain_kucoin_v1_historical_implement_current_UTA_before_any_live_path_keep_bitget_second",
   "provider_call_performed": false,
   "protocol_v2_eligible": false,
   "research_only": true,
@@ -29,18 +29,23 @@
         "maintenance_system_updates"
       ]
     },
-    "kucoin_announcements": {
+        "kucoin_announcements": {
       "api_channel": "Public",
       "api_permission": "NULL",
       "api_rate_limit_pool": "Public",
       "api_rate_limit_weight": 20,
-      "documented_public_machine_contract": true,
-      "endpoint": "GET https://api.kucoin.com/api/v3/announcements",
+            "documented_public_machine_contract": true,
+            "endpoint": "GET https://api.kucoin.com/api/v3/announcements",
+            "endpoint_lifecycle": "historical_replaced_not_live_eligible",
+            "current_endpoint": "GET https://api.kucoin.com/api/ua/v1/market/announcement",
+            "current_contract_implemented": false,
       "maximum_requested_page_size": 50,
       "pagination": "currentPage_totalPage_totalNum_pageSize",
-      "provider_status": "offline_contract_readiness_and_fixture_capture_doctor_implemented_live_transport_unconfigured_unauthorized",
-      "review_url": "https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements",
-      "selected_first": true
+            "provider_status": "historical_fixture_contract_and_doctor_retained_current_UTA_contract_not_implemented_live_blocked",
+            "review_url": "https://www.kucoin.com/docs-new/rest/ua/get-announcements",
+            "historical_review_url": "https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements",
+            "official_migration_source": "https://www.kucoin.com/docs-new/change-log",
+            "selected_first_historical_offline_order": true
     }
   },
   "closed_semantics": {
@@ -52,7 +57,8 @@
     "source_independence_required": true
   },
   "next_implementation": [
-    "confirmed_bounded_live_transport_only_after_explicit_authorization",
+        "implement_current_kucoin_UTA_contract_and_immutable_doctor",
+        "confirmed_bounded_live_transport_only_after_explicit_authorization",
     "health_backoff_retention_and_explicit_protocol_v2_annex_selection"
   ],
   "safety": {

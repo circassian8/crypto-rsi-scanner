@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Retire KuCoin v1 from the live activation path
+**Status:** accepted
+**Decision:** Keep the implemented `/api/v3/announcements` parser, fixtures, and
+immutable doctor as historical audit evidence only. KuCoin's current official
+change log says `GET /api/ua/v1/market/announcement` replaces that endpoint, so
+readiness must expose no executable v1 plan, permit zero requests, and remain
+blocked even when the legacy authorization flag is present. Implement and
+review a new versioned UTA request/response/pagination contract and matching
+doctor before asking for any provider authorization or building a live command.
+**Why:** A public endpoint being reachable or retained in documentation does not
+make it the current supported contract. Activating a replaced schema would
+create avoidable drift and could turn deprecation or response changes into
+false empty or incomplete catalyst evidence.
+**Revisit when:** The current UTA contract is fixture-closed and its immutable
+doctor passes. That permits consideration of a separate authorization boundary;
+it does not authorize a provider call or policy attachment.
+
 ## 2026-07-19 - Count episodes, dependence, and every trial before Protocol-v2 evaluation
 **Status:** accepted
 **Decision:** Make a predeclared declustered Decision episode—not an observation
@@ -149,7 +166,7 @@ acquisition. Any change must retain fail-closed byte, page, clock, identity,
 URL, safety, and no-direction guarantees.
 
 ## 2026-07-19 - Implement KuCoin's documented announcement contract before Bitget
-**Status:** accepted
+**Status:** superseded
 **Decision:** Select KuCoin's documented public/no-permission `GET
 /api/v3/announcements` as the next offline official-announcement contract.
 Keep Bitget's documented public `GET /api/v2/public/annoucements` as the second
@@ -167,6 +184,8 @@ official witness.
 supports a bounded public capture, or the offline normalizer reveals a contract
 gap that Bitget closes more safely. Reordering must not create authorization or
 weaken immutable-byte, clock, coverage, health, doctor, or annex gates.
+**Superseded by:** `Retire KuCoin v1 from the live activation path`; the UTA
+replacement condition occurred before any live activation.
 
 ## 2026-07-19 - Keep Kraken roadmap context separate from launch evidence
 **Status:** accepted

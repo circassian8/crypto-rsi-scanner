@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Fail KuCoin readiness closed on its UTA migration · Codex
+**Why:** A current official-documentation recheck found that KuCoin's UTA `GET
+/api/ua/v1/market/announcement` replaces the v1 `/api/v3/announcements`
+endpoint. Building a live transport on the historical contract would create a
+known schema/deprecation risk before the first genuine capture.
+**Changes:**
+- Versioned no-call readiness to v2. It preserves the v1 plan as explicitly
+  historical/non-executable, reports the current UTA contract as missing,
+  permits zero provider requests, and cannot be unlocked by an already-present
+  legacy authorization flag.
+- Kept the v1 fixtures, parser, capture bundle, and strict doctor readable as
+  audit evidence, while marking them ineligible for live use or Protocol-v2.
+- Updated the checked KuCoin contract, official-source review, working
+  agreement, roadmap, and durable decisions with the current official endpoint
+  and migration source.
+**Verify:** Focused KuCoin readiness tests, both checked JSON parses, diff
+whitespace validation, compileall, and architecture cleanliness passed.
+**Notes/risks:** No KuCoin or other provider request was attempted. No
+authorization, artifact authority, feature, score, route, threshold, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+changed. The current UTA contract and live transport remain unimplemented.
+
 ## 2026-07-19 — Preregister Protocol-v2 statistical discipline · Codex
 **Why:** Protocol v2 already required independent episodes, frozen partitions,
 minimum samples, and an untouched holdout, but it did not yet state how to

@@ -342,10 +342,13 @@ may be added later when a suitable environment already exists.
   pointer, receipt, snapshot, source-coverage, and accepted raw-source hash
   attestation; an unavailable attempt never replaces it. Unlinked calendar
   events remain context/risk only and cannot manufacture directional bias.
-- **KuCoin official-announcement offline contract:**
+- **KuCoin official-announcement historical offline contract:**
   `make radar-announcements-kucoin-smoke` validates synthetic bytes against the
-  documented public `GET /api/v3/announcements` contract without a provider
-  call, environment read, or write. It closes request/window identity,
+  historical public `GET /api/v3/announcements` contract without a provider
+  call, environment read, or write. KuCoin's current official change log says
+  the UTA `GET /api/ua/v1/market/announcement` endpoint replaces that path, so
+  the v1 contract is fixture/audit evidence only and is prohibited from live
+  use. It closes historical request/window identity,
   response code/schema, contiguous bounded pagination, complete/partial and
   healthy-empty semantics, response hashes, acquisition clocks, stable IDs,
   official multi-type categories, English language, description-summary
@@ -357,18 +360,19 @@ may be added later when a suitable environment already exists.
   request ledger, health/backoff, doctor, retention, and annex gates exist.
   `make radar-announcements-kucoin-readiness` is the non-activating operator
   boundary: it reads only the separate
-  `RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` flag, describes one exact
-  trailing-24-hour plan bounded to 20 public GETs, and reports expected future
-  activity plus `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` as the
-  disable action. It has no HTTP client, filesystem write, or live capture
-  command. `make radar-announcements-kucoin-capture-smoke` proves exact
+  `RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` flag, reports the legacy plan
+  as non-executable, the current UTA contract as unimplemented, and zero current
+  permitted requests, plus `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE`
+  as the disable action. It has no HTTP client, filesystem write, or live
+  capture command. `make radar-announcements-kucoin-capture-smoke` proves exact
   request-ledger, response-byte, normalized-snapshot, manifest, completion-
   receipt, idempotence, and strict-doctor reconciliation inside one disposable
   temporary root, then retains nothing. The capture module explicitly rejects
   `live_public_http` mode, publishes no pointer, and cannot grant source,
   campaign, dashboard, or Protocol-v2 authority. Authorization alone cannot
-  make readiness pass while the live transport remains unimplemented; never
-  create or mutate the flag from code.
+  make readiness pass while the current UTA contract and live transport remain
+  unimplemented; never create or mutate the flag from code, and never activate
+  the superseded endpoint.
 - **Bitget official-announcement offline contract:**
   `make radar-announcements-bitget-smoke` validates synthetic bytes against the
   documented public `GET /api/v2/public/annoucements` contract, preserving the

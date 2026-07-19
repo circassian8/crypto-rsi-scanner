@@ -1,12 +1,15 @@
 # KuCoin Announcement Offline Contract
 
-Status: implemented and fixture-verified on 2026-07-19 UTC.
+Status: **historical v1 contract, fixture-verified, and explicitly ineligible for
+live use** as of 2026-07-19 UTC.
 
 ## Scope
 
-The repository now has a strict offline contract for KuCoin's documented
-public `GET /api/v3/announcements` response. It is an input-contract proof, not
-a live provider activation.
+The repository has a strict offline contract for KuCoin's legacy public `GET
+/api/v3/announcements` response. KuCoin's current change log and Unified
+Trading Account documentation say that `GET /api/ua/v1/market/announcement`
+replaces this endpoint. The v1 implementation therefore remains a historical
+input-contract proof and may not be used as a live provider path.
 
 The implementation validates synthetic bytes only and performs no HTTP call,
 environment lookup, artifact write, notification, routing, scoring, order, or
@@ -23,10 +26,10 @@ make radar-announcements-kucoin-readiness PYTHON=.venv/bin/python
 ```
 
 It reads only whether the dedicated KuCoin authorization flag is already
-present and reports an exact trailing-24-hour request plan, a 20-request upper
-bound, expected future activity, and the disable action. It performs no call or
-write and remains blocked even when authorization is present because the live
-transport and authorized capture command are not implemented.
+present. It reports the current UTA endpoint as not implemented, labels the
+legacy v1 plan historical and non-executable, sets the current request bound to
+zero, and recommends no provider action. It performs no call or write and
+remains blocked even when authorization is present.
 
 Immutable capture mechanics can be proven offline with:
 
@@ -41,7 +44,7 @@ removed. It publishes no pointer. The capture API accepts only explicit
 `offline_fixture` mode today and rejects `live_public_http`, so synthetic bytes
 cannot be relabeled as genuine evidence.
 
-## Closed contract
+## Closed historical v1 contract
 
 - The request identity binds `currentPage`, requested `pageSize`, `annType`,
   `lang`, `startTime`, and `endTime`; the time window is bounded to 31 days.
@@ -70,18 +73,24 @@ cannot be relabeled as genuine evidence.
 
 The contract remains:
 
-- unconfigured and unauthorized;
+- superseded for live use, unconfigured, and unauthorized;
 - detached from Event Alpha discovery, Decision routes, scores, campaign
   authority, dashboard authority, and Protocol v2;
 - context-only and without directional authority;
 - research-only, with zero sends, trades, orders, paper trades, normal RSI
   writes, or Event Alpha `TRIGGERED_FADE` creation.
 
-The no-call readiness, immutable bundle, and strict-doctor mechanics are now
-implemented offline. A later live boundary still requires separately present
-operator authorization, explicit confirmation, bounded no-redirect and
-no-retry transport, health/backoff, retention review, and explicit Protocol-v2
-annex selection.
+The legacy no-call readiness, immutable bundle, and strict-doctor mechanics are
+implemented offline only. Before any live boundary, a new version must close
+the current UTA request/response/pagination contract and its own immutable
+doctor. Only then could separately present operator authorization, explicit
+confirmation, bounded no-redirect/no-retry transport, health/backoff, retention
+review, and Protocol-v2 annex selection be considered.
 
-Official contract reviewed:
+Official current contract and migration evidence reviewed:
+
+- https://www.kucoin.com/docs-new/rest/ua/get-announcements
+- https://www.kucoin.com/docs-new/change-log
+
+Historical v1 contract retained for audit:
 https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements

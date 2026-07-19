@@ -10,6 +10,11 @@
   },
   "contract_version": "crypto_radar_kucoin_announcements_v1",
   "endpoint": "GET https://api.kucoin.com/api/v3/announcements",
+  "endpoint_lifecycle": "historical_replaced_by_UTA_not_live_eligible",
+  "current_endpoint": "GET https://api.kucoin.com/api/ua/v1/market/announcement",
+  "current_endpoint_contract_implemented": false,
+  "current_official_documentation": "https://www.kucoin.com/docs-new/rest/ua/get-announcements",
+  "official_migration_source": "https://www.kucoin.com/docs-new/change-log",
   "implemented_at": "2026-07-19",
   "maximum_request_window_days": 31,
   "maximum_requests": 20,
@@ -48,14 +53,17 @@
   },
   "readiness": {
     "capture_command_available": false,
-    "contract_version": "crypto_radar_kucoin_announcements_readiness_v1",
+    "contract_version": "crypto_radar_kucoin_announcements_readiness_v2",
     "dedicated_authorization_env": "RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE",
-    "immutable_capture_boundary_implemented": true,
-    "maximum_future_requests": 20,
+    "immutable_capture_boundary_implemented": false,
+    "legacy_immutable_capture_boundary_implemented": true,
+    "maximum_future_requests": 0,
+    "legacy_maximum_requests_non_executable": 20,
     "provider_calls": 0,
     "request_window_hours": 24,
-    "status": "implemented_blocked",
-    "strict_capture_doctor_implemented": true,
+    "status": "blocked_current_UTA_contract_not_implemented",
+    "strict_capture_doctor_implemented": false,
+    "legacy_strict_capture_doctor_implemented": true,
     "writes": 0
   },
   "safety": {
@@ -79,5 +87,5 @@
     "provider_adjusted_page_size_is_explicit": true,
     "publication_time_is_event_time": false
   },
-  "status": "implemented_fixture_verified_inactive"
+  "status": "historical_fixture_verified_superseded_for_live_use"
 }
