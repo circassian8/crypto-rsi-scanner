@@ -31,10 +31,23 @@ It reads only the already-present dedicated
 `RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE` flag and reports an exact 31-day
 request plan capped at 20 cursor pages / 200 rows. It never calls the provider,
 writes an artifact, or creates authorization. It remains blocked even when the
-flag exists because immutable capture, strict doctor, and live transport are
-not implemented. The only current safe next command is the offline fixture
-smoke; the disable action is `unset
+flag exists because live transport is not implemented. Its current safe next
+command is the disposable capture smoke; the disable action is `unset
 RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE`.
+
+Immutable capture mechanics can be proven offline with:
+
+```text
+make radar-announcements-bitget-capture-smoke PYTHON=.venv/bin/python
+```
+
+The smoke seals exact synthetic response bytes, canonical cursor-bearing
+request URLs, non-secret request/response clocks, a request ledger, normalized
+snapshot, manifest, and completion receipt in one disposable temporary root.
+Strict doctor re-derives every byte before that root is removed. It publishes
+no pointer. The capture API accepts only explicit `offline_fixture` mode and
+rejects `live_public_http`, so synthetic bytes cannot be relabeled as genuine
+evidence.
 
 ## Closed contract
 
@@ -68,10 +81,11 @@ from discovery, campaign, dashboard, scores, routes, and Protocol v2. It has no
 directional authority and creates no sends, trades, orders, paper trades,
 normal RSI writes, or Event Alpha `TRIGGERED_FADE`.
 
-A later live boundary requires separate operator authorization and confirmation,
-no-redirect/no-retry bounded transport, immutable accepted bytes, request
-ledger, health/backoff, strict doctor, retention review, source-independence
-assessment, and explicit Protocol-v2 annex selection.
+The no-call readiness, immutable bundle, and strict-doctor mechanics are now
+implemented offline. A later live boundary still requires separate operator
+authorization and confirmation, no-redirect/no-retry bounded transport,
+health/backoff, retention review, source-independence assessment, and explicit
+Protocol-v2 annex selection.
 
 Official contract reviewed:
 https://www.bitget.com/api-doc/common/notice/Get-All-Notices

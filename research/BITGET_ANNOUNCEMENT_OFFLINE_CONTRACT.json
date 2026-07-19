@@ -8,6 +8,18 @@
     "protocol_v2_annex_bound": false,
     "protocol_v2_evidence_eligible": false
   },
+  "capture": {
+    "capture_contract_version": "decision_radar_bitget_announcement_capture_v1",
+    "disposable_fixture_smoke": "make radar-announcements-bitget-capture-smoke PYTHON=.venv/bin/python",
+    "immutable_capture_boundary_implemented": true,
+    "live_capture_command_available": false,
+    "live_transport_implemented": false,
+    "pointer_published": false,
+    "strict_capture_doctor_implemented": true,
+    "supported_capture_modes": [
+      "offline_fixture"
+    ]
+  },
   "contract_version": "crypto_radar_bitget_announcements_v2",
   "endpoint": "GET https://api.bitget.com/api/v2/public/annoucements",
   "exact_provider_path_spelling": "annoucements",
@@ -29,16 +41,18 @@
   "provider": "bitget_announcements",
   "safety": {
     "authorization_created": false,
+    "disposable_capture_artifact_writes": 7,
     "environment_reads": 0,
     "event_alpha_triggered_fade_created": 0,
     "normal_rsi_writes": 0,
     "orders": 0,
     "paper_trades": 0,
     "provider_calls": 0,
+    "response_contract_smoke_writes": 0,
+    "retained_artifact_writes": 0,
     "route_or_score_effect": false,
     "telegram_sends": 0,
-    "trades": 0,
-    "writes": 0
+    "trades": 0
   },
   "semantics": {
     "announcement_publication_time_is_event_time": false,

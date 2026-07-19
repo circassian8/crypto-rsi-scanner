@@ -1,8 +1,9 @@
 """Observational readiness for a future Bitget announcement capture.
 
 This module reads only an already-present dedicated authorization flag and
-describes the closed bounded request plan. It has no HTTP client, persistence,
-capture command, source authority, or policy integration.
+describes the closed bounded request plan. It has no HTTP client, live capture
+command, source authority, or policy integration. Immutable capture and strict
+doctor mechanics are available only through a disposable offline fixture smoke.
 """
 
 from __future__ import annotations
@@ -22,15 +23,18 @@ from .bitget_announcements import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bitget_announcements_readiness_v1"
+CONTRACT_VERSION = "crypto_radar_bitget_announcements_readiness_v2"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE"
 READINESS_COMMAND = "make radar-announcements-bitget-readiness PYTHON=.venv/bin/python"
 SMOKE_COMMAND = "make radar-announcements-bitget-smoke PYTHON=.venv/bin/python"
+CAPTURE_SMOKE_COMMAND = (
+    "make radar-announcements-bitget-capture-smoke PYTHON=.venv/bin/python"
+)
 FUTURE_CAPTURE_COMMAND = (
-    "unavailable_until_immutable_capture_doctor_and_live_transport_are_implemented"
+    "unavailable_until_live_transport_and_authorized_capture_command_are_implemented"
 )
 AUTHORIZATION_ACTION = (
-    "none_until_immutable_capture_doctor_and_live_transport_are_implemented"
+    "none_until_live_transport_and_authorized_capture_command_are_implemented"
 )
 ROLLBACK_COMMAND = f"unset {LIVE_AUTH_ENV}"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -68,13 +72,7 @@ def build_bitget_announcement_readiness(
     reasons = []
     if not authorized:
         reasons.append("runtime_provider_authorization_absent")
-    reasons.extend(
-        (
-            "immutable_capture_boundary_not_implemented",
-            "strict_capture_doctor_not_implemented",
-            "live_capture_transport_not_implemented",
-        )
-    )
+    reasons.append("live_capture_transport_not_implemented")
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bitget_announcements_readiness",
@@ -102,9 +100,10 @@ def build_bitget_announcement_readiness(
         "alternate_hosts_allowed": False,
         "proxy_or_vpn_bypass_allowed": False,
         "exact_response_input_contract_implemented": True,
-        "immutable_capture_boundary_implemented": False,
+        "immutable_capture_boundary_implemented": True,
         "capture_command_available": False,
-        "strict_capture_doctor_implemented": False,
+        "offline_capture_smoke_available": True,
+        "strict_capture_doctor_implemented": True,
         "campaign_attached": False,
         "dashboard_authority_eligible": False,
         "context_only": True,
@@ -113,14 +112,15 @@ def build_bitget_announcement_readiness(
         "protocol_v2_annex_bound": False,
         "protocol_v2_evidence_eligible": False,
         "reasons": reasons,
-        "next_safe_command": SMOKE_COMMAND,
+        "next_safe_command": CAPTURE_SMOKE_COMMAND,
+        "capture_smoke_command": CAPTURE_SMOKE_COMMAND,
         "response_contract_smoke_command": SMOKE_COMMAND,
         "readiness_recheck_command": READINESS_COMMAND,
         "future_capture_command": FUTURE_CAPTURE_COMMAND,
         "operator_action_required": (
             AUTHORIZATION_ACTION
             if not authorized
-            else "wait_for_capture_doctor_and_live_transport_implementation"
+            else "wait_for_live_capture_transport_implementation"
         ),
         "authorization_boundary": (
             f"future_capture_requires_already_present_{LIVE_AUTH_ENV}=1_and_"
@@ -157,6 +157,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = (
     "AUTHORIZATION_ACTION",
+    "CAPTURE_SMOKE_COMMAND",
     "CONTRACT_VERSION",
     "FUTURE_CAPTURE_COMMAND",
     "LIVE_AUTH_ENV",

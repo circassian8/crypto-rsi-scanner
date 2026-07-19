@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Prove immutable Bitget capture offline · Codex
+**Why:** The strict Bitget response projection was closed, but exact source
+bytes and transport facts still lacked the immutable bundle and re-deriving
+doctor needed before any future authorized live boundary could be credible.
+**Changes:**
+- Added a provider-detached capture module for already-read Bitget pages. It
+  binds exact cursor-bearing request URLs, sequential request/header/body-read
+  clocks, JSON transport status, lineage, response bytes, and the v2 explicit-
+  empty completion contract.
+- Added descriptor-anchored immutable persistence for exact response pages, a
+  non-secret request ledger, normalized snapshot, manifest, and completion
+  receipt. Strict doctor reconstructs the capture and requires byte equality;
+  identical capture is idempotent and drift/extra leaves fail closed.
+- Kept only `offline_fixture` mode available. `live_public_http` is rejected,
+  fixture evidence is never input/authority eligible, and no pointer or policy
+  path exists.
+- Added a disposable capture smoke, Make/operator wiring, 17 capture
+  regressions, and updated readiness so immutable capture/doctor are true while
+  the missing live transport remains the blocker.
+**Verify:** 44 focused Bitget response/capture/readiness tests, both offline
+smokes, no-call readiness, compileall, structured JSON validation, diff
+whitespace validation, and architecture cleanliness passed.
+**Notes/risks:** No provider call, environment authorization mutation, retained
+fixture artifact, source authority, route, score, threshold, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` was
+created.
+
 ## 2026-07-19 — Require explicit Bitget terminal evidence · Codex
 **Why:** The official Bitget cursor documentation identifies the next cursor
 but does not promise that a short nonempty page means the feed is exhausted.

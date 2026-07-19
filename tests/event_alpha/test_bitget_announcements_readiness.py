@@ -10,6 +10,7 @@ import pytest
 
 from crypto_rsi_scanner.event_alpha.operations.bitget_announcements_readiness import (
     AUTHORIZATION_ACTION,
+    CAPTURE_SMOKE_COMMAND,
     FUTURE_CAPTURE_COMMAND,
     LIVE_AUTH_ENV,
     READINESS_COMMAND,
@@ -34,8 +35,6 @@ def test_absent_authorization_is_explicit_and_never_calls_or_writes() -> None:
     assert value["authorization_mutated"] is False
     assert value["reasons"] == [
         "runtime_provider_authorization_absent",
-        "immutable_capture_boundary_not_implemented",
-        "strict_capture_doctor_not_implemented",
         "live_capture_transport_not_implemented",
     ]
     assert value["provider_call_planned"] is False
@@ -43,7 +42,7 @@ def test_absent_authorization_is_explicit_and_never_calls_or_writes() -> None:
     assert value["provider_request_count"] == 0
     assert value["writes_performed"] is False
     assert value["expected_provider_activity"] == "none_readiness_only"
-    assert value["next_safe_command"] == SMOKE_COMMAND
+    assert value["next_safe_command"] == CAPTURE_SMOKE_COMMAND
     assert value["operator_action_required"] == AUTHORIZATION_ACTION
     assert value["rollback_disable_command"] == ROLLBACK_COMMAND
 
@@ -57,17 +56,17 @@ def test_present_authorization_cannot_unlock_missing_capture_layers() -> None:
     assert value["runtime_provider_authorized"] is True
     assert value["ready"] is False
     assert value["reasons"] == [
-        "immutable_capture_boundary_not_implemented",
-        "strict_capture_doctor_not_implemented",
         "live_capture_transport_not_implemented",
     ]
     assert value["live_capture_configured"] is False
-    assert value["immutable_capture_boundary_implemented"] is False
+    assert value["immutable_capture_boundary_implemented"] is True
     assert value["capture_command_available"] is False
-    assert value["strict_capture_doctor_implemented"] is False
+    assert value["offline_capture_smoke_available"] is True
+    assert value["strict_capture_doctor_implemented"] is True
+    assert value["capture_smoke_command"] == CAPTURE_SMOKE_COMMAND
     assert value["future_capture_command"] == FUTURE_CAPTURE_COMMAND
     assert value["operator_action_required"] == (
-        "wait_for_capture_doctor_and_live_transport_implementation"
+        "wait_for_live_capture_transport_implementation"
     )
     assert value["provider_call_planned"] is False
 

@@ -52,17 +52,17 @@ spacing contract. Never shorten or bypass the effective clock to improve warmup.
 **Status:** accepted
 **Decision:** Expose Bitget's future 31-day cursor request plan and the separate
 `RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE` state through a no-network,
-no-write readiness target. Keep readiness blocked whether the flag is absent or
-present until immutable capture, strict doctor, and live transport are all
-implemented. The current next safe action is the fixture smoke; no provider
-authorization or provider action is requested by this change.
+no-write readiness target. Immutable fixture capture and strict doctor may be
+proven only in a disposable root, but readiness stays blocked whether the flag
+is absent or present until the live transport and authorized capture command
+are implemented. The current next safe action is the capture smoke; no provider
+authorization or provider action is requested.
 **Why:** A visible authorization and request-budget boundary prevents a public
 endpoint or an ambient flag from being mistaken for a complete, authorized,
 auditable evidence path. It also preserves source diversity without silently
 reprioritizing Bitget ahead of the selected KuCoin path.
-**Revisit when:** The immutable Bitget capture/doctor contract is closed and a
-separate human decision authorizes a confirmed bounded live transport with
-health/backoff and retention review.
+**Revisit when:** A separate human decision reprioritizes Bitget and authorizes
+a confirmed bounded live transport with health/backoff and retention review.
 
 ## 2026-07-19 - Preregister anomaly-method research before implementation
 **Status:** accepted

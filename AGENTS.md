@@ -373,22 +373,27 @@ may be added later when a suitable environment already exists.
   `make radar-announcements-bitget-smoke` validates synthetic bytes against the
   documented public `GET /api/v2/public/annoucements` contract, preserving the
   provider's exact `annoucements` spelling. It closes one-month request bounds,
-  required English language, optional type filters, maximum-10 cursor pages,
-  the exact `last annId` cursor chain, complete/partial/healthy-empty truth,
-  response/acquisition clocks and hashes, stable string IDs, official
+  required English language, optional type filters, 10-row pages / maximum 20
+  requests, the exact `last annId` cursor chain, complete/partial/healthy-empty
+  truth, response/acquisition clocks and hashes, stable string IDs, official
   type/subtype pairs, deprecated-description status, and safe official URLs.
+  Only an explicit empty cursor response proves complete coverage; stopping on
+  a full or short nonempty page remains partial with its next cursor.
   `cTime` remains publication time rather than event time or directional
   authority. `make radar-announcements-bitget-readiness` is a separate no-call,
   no-write operator surface: it reads only the dedicated
   `RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE` flag and describes the exact
-  31-day, maximum-20-request cursor plan. It remains blocked even if that flag
-  exists because immutable capture, strict doctor, and live transport are not
-  implemented; its safe action is the fixture smoke, not a provider call. The
-  contract has no client, write, pointer, capture, policy, campaign, dashboard,
-  or Protocol-v2 path. Do not activate it or infer authorization from public
-  access; a later live boundary requires the same separate authorization,
-  confirmation, immutable capture, request-ledger, health/backoff, doctor,
-  retention, and annex gates as KuCoin.
+  31-day, maximum-20-request cursor plan. `make
+  radar-announcements-bitget-capture-smoke` proves exact request-ledger,
+  response-byte, normalized-snapshot, manifest, completion-receipt,
+  idempotence, and strict-doctor reconciliation inside one disposable root,
+  then retains nothing. The capture module rejects `live_public_http`,
+  publishes no pointer, and cannot grant source, campaign, dashboard, or
+  Protocol-v2 authority. Readiness remains blocked even if authorization exists
+  because the live transport is not implemented; its safe action is the
+  capture smoke, not a provider call. Do not activate it or infer authorization
+  from public access; a later live boundary requires separate authorization,
+  confirmation, bounded transport, health/backoff, retention, and annex review.
 - **Tokenomist structured-unlock response contract:**
   `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
   cliff-unlock response shape entirely offline. The closed synthetic fixture
