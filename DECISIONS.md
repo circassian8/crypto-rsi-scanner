@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Bind Bybit runtime timeouts and book freshness to finite policy
+**Status:** accepted
+**Decision:** Every guarded Bybit REST collector must reject a timeout unless
+it is a finite non-boolean real number greater than zero and no more than 30
+seconds, before crossing a provider boundary. The execution-quality order-book
+normalizer must use the declared 15-second freshness threshold exactly; it may
+not accept an alternate runtime threshold unless a future schema explicitly
+persists and validates that policy through live summary, capture, doctor, and
+Protocol-v2 binding.
+**Why:** Boolean and non-finite values can pass ordinary numeric comparisons,
+and an infinite threshold can label arbitrarily old evidence fresh. The current
+snapshot projection does not carry a caller-selected threshold, so accepting
+one would make freshness impossible to reconstruct from immutable evidence.
+One fixed, finite policy keeps the selected Bybit surface deterministic and
+fail-closed without changing authorization or making a provider call.
+**Revisit when:** A versioned evidence schema deliberately supports multiple
+freshness policies and binds the selected finite threshold through every raw,
+normalized, capture, status, doctor, annex, and downstream Decision surface.
+
 ## 2026-07-19 - Multi-leaf bundles fail closed without pathname rollback
 **Status:** accepted
 **Decision:** The shared anomaly/scheduled-catalyst bundle publisher must fully

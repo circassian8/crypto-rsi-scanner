@@ -1212,6 +1212,8 @@
     "execution_quality_live_contract_version": "crypto_radar_bybit_execution_quality_live_v4",
     "execution_quality_capture_contract_version": "crypto_radar_bybit_execution_quality_capture_v4",
     "execution_quality_set_freshness_policy": "each provider observation must remain no more than 15 seconds old when the final sequential order book completes; acquisition and completion freshness remain separate and Protocol-v2 input-quality eligibility uses completion freshness",
+    "orderbook_runtime_freshness_override_permitted": false,
+    "public_rest_timeout_policy": "all guarded Bybit REST collectors require one finite non-boolean real timeout with 0 < seconds <= 30 before provider access",
     "live_adapter_active": false,
     "live_adapter_contract": "exact authoritative Radar generation; separate runtime authorization plus CONFIRM=1; one complete category=linear status=Trading limit=1000 catalog GET that requires an explicit empty continuation cursor and fails closed when it is missing or non-empty, then one 200-level order-book GET per eligible instrument; absolute bound 31 and current 29-candidate bound 30; no retries, redirects, ambient proxies, credentials, private data, orders, trading, or sends; capture mode defines acquired_at as exact response-read completion, validates the sequential request window, and preserves exact accepted response bytes, request timing, acquisition and full-set completion freshness, normalized observations, manifest, completion receipt, and latest pointer",
     "public_rest_adapter_implemented": true,

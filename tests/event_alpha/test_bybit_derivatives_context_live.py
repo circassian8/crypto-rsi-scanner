@@ -377,6 +377,43 @@ def test_collection_retains_acquisition_truth_when_set_ages_at_completion() -> N
     assert payload["maximum_context_age_at_completion_seconds"] == 20.0
 
 
+@pytest.mark.parametrize(
+    "timeout_seconds",
+    (True, False, float("nan"), float("inf"), float("-inf"), 0, -1, 31, "10"),
+)
+def test_collection_rejects_malformed_timeout_before_readiness_or_provider(
+    timeout_seconds: object,
+) -> None:
+    prerequisite_reads = 0
+    provider_calls = 0
+
+    def forbidden_capture_loader(_base: object) -> dict[str, object]:
+        nonlocal prerequisite_reads
+        prerequisite_reads += 1
+        raise AssertionError("invalid timeout must fail before readiness")
+
+    def forbidden_fetch(
+        _request: BybitPublicRequest,
+        _timeout: float,
+    ) -> dict[str, object]:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("invalid timeout must fail before provider access")
+
+    with pytest.raises(
+        BybitDerivativesContextLiveError,
+        match="timeout_seconds_out_of_bounds",
+    ):
+        collect_authoritative_bybit_derivatives(
+            artifact_base_dir="unused",
+            capture_loader=forbidden_capture_loader,
+            fetch_json=forbidden_fetch,
+            timeout_seconds=timeout_seconds,
+        )
+
+    assert prerequisite_reads == provider_calls == 0
+
+
 def test_exact_transport_responses_are_retained_in_memory_but_not_persisted() -> None:
     payload, responses = _collect_authoritative_bybit_derivatives(
         artifact_base_dir="unused",

@@ -55,6 +55,7 @@ from .bybit_execution_quality_capture import (
 from .bybit_execution_quality_live import (
     BybitExecutionQualityLiveError,
     _fetch_public_json,
+    _timeout_seconds_valid,
 )
 from .bybit_intraday_live import (
     BybitIntradayLiveError,
@@ -461,7 +462,7 @@ def _collect_authoritative_bybit_derivatives(
 ) -> tuple[dict[str, object], tuple[BybitCapturedJSONResponse, ...]]:
     clock = now or (lambda: datetime.now(timezone.utc))
     started = _utc(clock())
-    if timeout_seconds <= 0 or timeout_seconds > 30:
+    if not _timeout_seconds_valid(timeout_seconds):
         raise BybitDerivativesContextLiveError("timeout_seconds_out_of_bounds")
     readiness = build_bybit_derivatives_live_readiness(
         artifact_base_dir=artifact_base_dir,

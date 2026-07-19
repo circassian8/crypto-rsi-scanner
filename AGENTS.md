@@ -560,7 +560,11 @@ may be added later when a suitable environment already exists.
   Every book must remain within the 15-second provider-observation age policy
   when the full sequential set completes. Acquisition freshness and completion
   freshness remain separate, and only completion-fresh sets may be Protocol-v2
-  input-quality eligible.
+  input-quality eligible. All guarded Bybit REST collectors accept only a
+  finite non-boolean timeout in `(0, 30]` seconds and reject malformed values
+  before provider access. The order-book normalizer accepts only the declared
+  15-second policy; an alternate threshold requires a future versioned schema
+  that persists it end to end.
   For exact transport captures, normalized `acquired_at` is the accepted
   response-read completion time, not a second independent clock. Immutable
   validation requires every request/response inside the declared capture window

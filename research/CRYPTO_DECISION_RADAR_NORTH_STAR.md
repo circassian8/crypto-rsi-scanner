@@ -916,6 +916,12 @@ evidence and is explicitly Protocol-v2 input-quality-ineligible. Only a complete
 run is published: exact accepted response bytes,
 request timing, the exact Radar authority and universe, normalized observations,
 fingerprints, a completion receipt, and a stable latest pointer are retained.
+All guarded Bybit REST collectors reject booleans, strings, non-finite values,
+and values outside `0 < timeout <= 30` before provider access. Order-book
+normalization is closed to the declared 15-second freshness threshold because
+the current immutable projection has no field for a caller-selected policy; a
+different threshold requires a versioned end-to-end schema rather than a
+runtime override.
 Validation holds
 one descriptor-anchored namespace for the complete read, rederives every
 projection from raw bytes, rejects pointer rollback/drift, and excludes unknown

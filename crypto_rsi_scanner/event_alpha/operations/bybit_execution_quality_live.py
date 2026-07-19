@@ -16,6 +16,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import time
@@ -451,6 +452,16 @@ def collect_authoritative_bybit_execution_quality(
     return summary
 
 
+def _timeout_seconds_valid(value: object) -> bool:
+    """Keep every guarded Bybit transport on one finite timeout boundary."""
+
+    return (
+        type(value) in {int, float}
+        and math.isfinite(float(value))
+        and 0 < float(value) <= 30
+    )
+
+
 def _payload_and_capture(result: FetchResult) -> tuple[Mapping[str, object], BybitCapturedJSONResponse | None]:
     if isinstance(result, BybitCapturedJSONResponse):
         return result.payload(), result
@@ -489,7 +500,7 @@ def _collect_authoritative_bybit_execution_quality(
         reasons.append("runtime_provider_authorization_absent")
     if reasons:
         raise BybitExecutionQualityLiveError(reasons[0])
-    if timeout_seconds <= 0 or timeout_seconds > 30:
+    if not _timeout_seconds_valid(timeout_seconds):
         raise BybitExecutionQualityLiveError("timeout_seconds_out_of_bounds")
     if identity is None:
         raise BybitExecutionQualityLiveError("authoritative_market_generation_unavailable")

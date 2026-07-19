@@ -412,6 +412,39 @@ def test_sequential_books_can_be_fresh_when_acquired_but_stale_at_set_completion
     assert result["maximum_execution_quality_age_policy_seconds"] == 15.0
 
 
+@pytest.mark.parametrize(
+    "timeout_seconds",
+    (True, False, float("nan"), float("inf"), float("-inf"), 0, -1, 31, "10"),
+)
+def test_collection_rejects_malformed_timeout_before_provider_call(
+    timeout_seconds: object,
+) -> None:
+    provider_calls = 0
+
+    def forbidden_fetch(
+        _request: BybitPublicRequest,
+        _timeout: float,
+    ) -> Mapping[str, object]:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("invalid timeout must fail before provider access")
+
+    with pytest.raises(
+        BybitExecutionQualityLiveError,
+        match="timeout_seconds_out_of_bounds",
+    ):
+        collect_authoritative_bybit_execution_quality(
+            artifact_base_dir="unused",
+            environ={LIVE_AUTH_ENV: "1"},
+            now=lambda: NOW,
+            resolver=_resolver((_observation("bitcoin", "BTC", 3_000.0),)),
+            fetch_json=forbidden_fetch,
+            timeout_seconds=timeout_seconds,
+        )
+
+    assert provider_calls == 0
+
+
 def test_provider_metadata_with_no_eligible_contract_fails_before_orderbook() -> None:
     requests: list[BybitPublicRequest] = []
 

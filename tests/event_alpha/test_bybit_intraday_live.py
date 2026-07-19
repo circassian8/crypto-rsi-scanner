@@ -415,6 +415,40 @@ def test_confirmed_capture_requires_exact_transport_and_seals_bundle(
     assert not (other / POINTER_FILENAME).exists()
 
 
+@pytest.mark.parametrize(
+    "timeout_seconds",
+    (True, False, float("nan"), float("inf"), float("-inf"), 0, -1, 31, "10"),
+)
+def test_collection_rejects_malformed_timeout_before_readiness_or_provider(
+    timeout_seconds: object,
+) -> None:
+    prerequisite_reads = 0
+    provider_calls = 0
+
+    def forbidden_capture_loader(_base: object) -> dict[str, object]:
+        nonlocal prerequisite_reads
+        prerequisite_reads += 1
+        raise AssertionError("invalid timeout must fail before readiness")
+
+    def forbidden_fetch(
+        _request: BybitPublicRequest,
+        _timeout: float,
+    ) -> dict[str, object]:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("invalid timeout must fail before provider access")
+
+    with pytest.raises(BybitIntradayLiveError, match="timeout_seconds_out_of_bounds"):
+        collect_authoritative_bybit_intraday(
+            artifact_base_dir="unused",
+            capture_loader=forbidden_capture_loader,
+            fetch_json=forbidden_fetch,
+            timeout_seconds=timeout_seconds,
+        )
+
+    assert prerequisite_reads == provider_calls == 0
+
+
 def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

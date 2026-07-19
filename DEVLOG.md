@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Close Bybit timeout and book-freshness numeric policy · Codex
+**Why:** The guarded Bybit execution, intraday, and derivatives collectors
+bounded ordinary timeout numbers but allowed booleans and non-finite floats;
+the offline order-book normalizer also accepted an arbitrary positive
+freshness threshold without retaining that policy in its projection. `NaN`
+could reach the transport boundary, while infinity could make an aged book
+look fresh.
+**Changes:**
+- Added one shared strict timeout predicate for all three guarded Bybit REST
+  collectors. Only finite real `0 < timeout <= 30` values are accepted;
+  booleans, strings, `NaN`, infinities, zero, negative values, and values above
+  30 seconds fail before provider access.
+- Closed order-book normalization to the declared 15-second freshness policy.
+  The normalizer rejects a boolean, non-finite, or alternate threshold rather
+  than producing a snapshot whose policy cannot be reconstructed from the
+  persisted schema.
+- Added adversarial regressions across execution-quality, direct 1h/4h, and
+  venue-native derivatives collection proving malformed timeouts cause zero
+  readiness/provider calls, plus order-book policy-drift cases.
+**Verify:** The four focused Bybit normalizer/live files passed 98 tests;
+Python compileall, the execution-quality/intraday/derivatives offline smokes,
+and architecture cleanliness passed.
+**Notes/risks:** This is a fail-closed input-contract change only. It makes no
+provider call, creates no authorization, and changes no route, score,
+threshold, dashboard authority, send, trade, order, paper trade, RSI write, or
+Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Make multi-leaf artifact failure non-destructive · Codex
 **Why:** The shared anomaly/scheduled-catalyst publisher staged a complete
 bundle but closed each staging descriptor before publication, then used backup,

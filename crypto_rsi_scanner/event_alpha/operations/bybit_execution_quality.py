@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
@@ -553,7 +554,11 @@ def normalize_bybit_orderbook(
         raise BybitExecutionQualityError("notionals_usdt_invalid")
     for value in notionals:
         _decimal(value, "notional_usdt")
-    if freshness_seconds <= 0:
+    if (
+        type(freshness_seconds) not in {int, float}
+        or not math.isfinite(float(freshness_seconds))
+        or float(freshness_seconds) != DEFAULT_FRESHNESS_SECONDS
+    ):
         raise BybitExecutionQualityError("freshness_seconds_invalid")
     if isinstance(payload.get("retCode"), bool) or payload.get("retCode") != 0:
         raise BybitExecutionQualityError("bybit_orderbook_response_not_ok")

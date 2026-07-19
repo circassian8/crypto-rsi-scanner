@@ -33,7 +33,10 @@ from .bybit_execution_quality_capture import (
     BybitExecutionQualityCaptureError,
     load_latest_bybit_execution_quality_capture,
 )
-from .bybit_execution_quality_live import _fetch_public_json
+from .bybit_execution_quality_live import (
+    _fetch_public_json,
+    _timeout_seconds_valid,
+)
 from .bybit_intraday import (
     INTERVAL_SECONDS,
     KLINE_LIMIT,
@@ -422,7 +425,7 @@ def _collect_authoritative_bybit_intraday(
 
     clock = now or (lambda: datetime.now(timezone.utc))
     started = _utc(clock())
-    if timeout_seconds <= 0 or timeout_seconds > 30:
+    if not _timeout_seconds_valid(timeout_seconds):
         raise BybitIntradayLiveError("timeout_seconds_out_of_bounds")
     readiness = build_bybit_intraday_live_readiness(
         artifact_base_dir=artifact_base_dir,

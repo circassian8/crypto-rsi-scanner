@@ -201,6 +201,23 @@ def test_stale_snapshot_stays_stale_without_weakening_freshness_gate() -> None:
 
 
 @pytest.mark.parametrize(
+    "freshness_seconds",
+    (True, False, float("nan"), float("inf"), float("-inf"), 14.0, 16.0),
+)
+def test_orderbook_rejects_unbound_or_nonfinite_freshness_policy(
+    freshness_seconds: object,
+) -> None:
+    with pytest.raises(BybitExecutionQualityError, match="freshness_seconds_invalid"):
+        normalize_bybit_orderbook(
+            _json("orderbook_btcusdt.json"),
+            instrument=_selected()[0],
+            acquired_at="2026-07-17T12:01:00Z",
+            request_lineage_id="test.bybit.btcusdt.invalid_freshness",
+            freshness_seconds=freshness_seconds,
+        )
+
+
+@pytest.mark.parametrize(
     ("mutation", "error"),
     (
         (lambda row: row["result"].update(s="ETHUSDT"), "instrument_mismatch"),
