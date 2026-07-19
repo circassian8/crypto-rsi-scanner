@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Isolate fixture scanners from live providers · Codex
+**Why:** Artifact-heavy verification exposed that local Event Discovery tests
+inherited the operator's enabled CoinGecko-universe switch. Seven tests each
+waited about 20 seconds on an unintended provider attempt, and the same ambient
+leak could have affected other discovery providers.
+**Changes:**
+- Added one shared list of all eight Event Discovery live-provider switches and
+  autouse isolation in both scanner-facing fixture modules. Each test now uses
+  pytest's scoped restoration, while the explicit fake-live Binance regression
+  can still opt itself in inside its own test boundary.
+- Added a direct invariant test and documented that fixture paths/defaults are
+  not sufficient provider-boundary controls.
+**Verify:** The 38 focused discovery/fade workflow tests passed in 1.67 seconds,
+down from roughly 205 seconds for the same two files. Host-local `make
+verify-fast PYTHON=.venv/bin/python` passed all 3,073 tests in 159.77 seconds,
+followed by clean alert-render, backtest-fixture, and paper-score smokes; the
+prior comparable run took 383.17 seconds and failed only because its sandbox
+denied the dashboard loopback socket.
+**Notes/risks:** Test-only change. It makes no provider call, production config,
+authorization, artifact, route, score, threshold, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` change.
+
 ## 2026-07-19 — Enforce terminal campaign reconciliation · Codex
 **Why:** Daily Operations centralized campaign-report rebuilding in its terminal
 path, but tests proved the ordering only for successful publication. The first

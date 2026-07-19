@@ -6,6 +6,8 @@ import json
 from collections import Counter
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
@@ -13,6 +15,14 @@ globals().update({
     for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
+
+
+@pytest.fixture(autouse=True)
+def _isolate_local_discovery_from_live_providers(monkeypatch):
+    from crypto_rsi_scanner import config
+
+    _force_disable_event_discovery_live(monkeypatch, config)
+
 
 def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     import tempfile

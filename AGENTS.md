@@ -173,7 +173,10 @@ may be added later when a suitable environment already exists.
   archives by mutating input mtimes. Missing optional canonical sources are
   reported as partial coverage, never healthy-empty. Tests that do not
   explicitly verify shipped artifacts use isolated temporary artifact bases;
-  cumulative root stores are excluded from unrelated fixture tests. In an
+  cumulative root stores are excluded from unrelated fixture tests. Local
+  Event Discovery scanner fixtures must also force every live-provider switch
+  off with test-local restoration; fixture paths or default settings alone are
+  not a provider-boundary guarantee. In an
   supported macOS extracted source-with-artifacts review checkout, run `make
   test-artifact-heavy-extracted-checkout PYTHON=python3` before `make
   verify-fast PYTHON=python3`; retain both timing-report pairs as release

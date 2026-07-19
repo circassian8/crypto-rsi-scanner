@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 
@@ -15,6 +17,22 @@ globals().update({
     for name, value in vars(_event_alpha_api_helpers).items()
     if not name.startswith("__")
 })
+
+
+@pytest.fixture(autouse=True)
+def _isolate_local_discovery_from_live_providers(monkeypatch):
+    from crypto_rsi_scanner import config
+
+    _force_disable_event_discovery_live(monkeypatch, config)
+
+
+def test_local_discovery_tests_force_disable_all_live_provider_flags():
+    from crypto_rsi_scanner import config
+
+    assert all(
+        getattr(config, name) is False
+        for name in _EVENT_DISCOVERY_LIVE_FLAG_NAMES
+    )
 
 
 def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():

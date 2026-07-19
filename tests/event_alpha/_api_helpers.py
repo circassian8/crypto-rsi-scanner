@@ -42,6 +42,25 @@ from crypto_rsi_scanner import formatting
 import crypto_rsi_scanner.event_alpha.notifications.provider_status as event_provider_status
 
 
+_EVENT_DISCOVERY_LIVE_FLAG_NAMES = (
+    "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE",
+    "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE",
+    "EVENT_DISCOVERY_CRYPTOPANIC_LIVE",
+    "EVENT_DISCOVERY_GDELT_LIVE",
+    "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE",
+    "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE",
+    "EVENT_DISCOVERY_COINALYZE_LIVE",
+    "EVENT_DISCOVERY_UNIVERSE_LIVE",
+)
+
+
+def _force_disable_event_discovery_live(monkeypatch, config) -> None:
+    """Keep local scanner fixtures independent of ambient provider opt-ins."""
+
+    for name in _EVENT_DISCOVERY_LIVE_FLAG_NAMES:
+        monkeypatch.setattr(config, name, False)
+
+
 
 
 def _event_provider_status_cfg(**overrides):
