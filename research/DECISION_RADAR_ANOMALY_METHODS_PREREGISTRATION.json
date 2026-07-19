@@ -1,0 +1,136 @@
+{
+  "schema_id": "decision_radar.anomaly_methods_preregistration",
+  "schema_version": 1,
+  "status": "research_only_not_implemented",
+  "as_of_date": "2026-07-19",
+  "purpose": "Predeclare the order and evidence gates for future anomaly-method experiments without changing production policy.",
+  "current_engine": {
+    "canonical_temporal_baseline": "strictly_earlier_cadence_counted_same_asset",
+    "canonical_location_scale": "mean_population_standard_deviation",
+    "existing_shadow_features": [
+      "volume_24h",
+      "turnover_24h"
+    ],
+    "existing_shadow_method": "natural_log_median_mad_and_descriptive_upper_tail_rank",
+    "existing_shadow_policy_eligible": false,
+    "independent_live_samples_established": false
+  },
+  "candidate_order": [
+    {
+      "rank": 1,
+      "method": "robust_signed_return_and_relative_return_tails",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "separate_exact_horizon_and_basis_families",
+        "strictly_earlier_point_in_time_inputs",
+        "median_mad_scale",
+        "two_sided_descriptive_ranks_with_sign",
+        "no_p_value_claim"
+      ]
+    },
+    {
+      "rank": 2,
+      "method": "point_in_time_crypto_market_factor_residuals",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "prior_development_data_only_fit",
+        "raw_and_factor_returns_preserved",
+        "no_current_or_future_cross_sectional_leakage",
+        "insufficient_history_remains_unavailable"
+      ]
+    },
+    {
+      "rank": 3,
+      "method": "online_changepoint_context",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "online_only_observation_clock",
+        "run_length_uncertainty_preserved",
+        "separate_from_magnitude_surprise",
+        "no_direction_or_catalyst_manufacture"
+      ]
+    },
+    {
+      "rank": 4,
+      "method": "extreme_value_peaks_over_threshold",
+      "state": "deferred_for_sample_maturity",
+      "requirements": [
+        "sufficient_independent_tail_exceedances",
+        "predeclared_threshold_and_declustering",
+        "predeclared_heteroskedastic_filter",
+        "parameter_stability_and_missing_data_rules"
+      ]
+    },
+    {
+      "rank": 5,
+      "method": "opaque_multivariate_detectors",
+      "state": "deferred",
+      "examples": [
+        "isolation_forest",
+        "autoencoder",
+        "broad_anomaly_ensemble"
+      ],
+      "revisit_requires": [
+        "sealed_explainable_benchmark",
+        "sufficient_independent_episodes",
+        "point_in_time_feature_matrix",
+        "explanation_and_rollback_contract"
+      ]
+    }
+  ],
+  "promotion_evidence": [
+    "genuine_point_in_time_inputs_with_immutable_lineage",
+    "predeclared_episode_grouping",
+    "frozen_development_validation_and_untouched_holdout_partitions",
+    "matured_primary_horizon_outcomes_and_matched_controls",
+    "coverage_missingness_degeneracy_false_positive_and_calibration_reporting",
+    "dependence_aware_uncertainty",
+    "sealed_protocol_v2_parameters_thresholds_minimum_samples_costs_success_failure_and_rollback_rules",
+    "separate_reviewed_promotion_decision"
+  ],
+  "explicitly_unspecified_until_protocol_v2_annex": [
+    "parameters",
+    "thresholds",
+    "minimum_samples",
+    "costs",
+    "route_scope",
+    "success_criteria",
+    "failure_criteria",
+    "rollback_rules"
+  ],
+  "excluded_evidence": [
+    "protocol_v1_final_test",
+    "current_sparse_overlapping_campaign_as_independent_samples"
+  ],
+  "safety": {
+    "routing_eligible": false,
+    "priority_eligible": false,
+    "decision_score_eligible": false,
+    "threshold_change_eligible": false,
+    "publication_authority": false,
+    "auto_apply": false,
+    "research_only": true,
+    "live_provider_calls": 0,
+    "sends": 0,
+    "trades": 0,
+    "orders": 0
+  },
+  "primary_references": [
+    {
+      "title": "Robust Estimation of a Location Parameter",
+      "url": "https://doi.org/10.1214/aoms/1177703732"
+    },
+    {
+      "title": "Bayesian Online Changepoint Detection",
+      "url": "https://arxiv.org/abs/0710.3742"
+    },
+    {
+      "title": "Common Risk Factors in Cryptocurrency",
+      "url": "https://www.nber.org/papers/w25882"
+    },
+    {
+      "title": "Estimation of Tail-Related Risk Measures for Heteroscedastic Financial Time Series: an Extreme Value Approach",
+      "url": "https://doi.org/10.1016/S0927-5398(00)00012-8"
+    }
+  ]
+}

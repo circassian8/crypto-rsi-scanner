@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Preregister anomaly-method research before implementation
+**Status:** accepted
+**Decision:** Keep all production anomaly features and the existing volume/
+turnover robust-surprise shadow unchanged. Study future candidates, in order,
+as (1) separate-horizon robust signed-return and relative-return tails, (2)
+strictly point-in-time crypto market-factor residuals, (3) separate online
+changepoint context, and (4) extreme-value tails only after enough independent
+exceedances exist. Defer Isolation Forest, autoencoders, and broad anomaly
+ensembles until an explainable sealed benchmark, sufficient independent
+episodes, point-in-time feature matrices, and explanation/rollback rules exist.
+Set no parameters, thresholds, minimum samples, costs, route scope, success
+criteria, holdout, or executable evaluation target in this decision.
+**Why:** The live campaign is sparse, overlapping, and not an independent sample;
+implementing or tuning a more complex detector now would invite leakage and
+opportunistic threshold selection. A bounded research order lets evidence
+collection proceed while preserving the exact Protocol-v2 freeze-before-test
+boundary.
+**Revisit when:** Genuine intraday/execution/context inputs, matured episode
+outcomes, matched controls, frozen development/validation/untouched-holdout
+partitions, and a complete Protocol-v2 annex are ready. Any promotion requires
+a separate versioned decision and cannot use Protocol-v1 final-test evidence.
+
 ## 2026-07-19 - Keep Bitget as an offline source-diverse announcement witness
 **Status:** accepted
 **Decision:** Implement Bitget's documented public `GET

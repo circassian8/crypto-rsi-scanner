@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preregister anomaly research without tuning · Codex
+**Why:** Stronger anomaly detection is a North Star need, but the sparse,
+overlapping campaign cannot support honest production tuning yet.
+**Changes:**
+- Added human-readable and structured research records that inventory current
+  canonical and shadow behavior and order future experiments: robust signed-
+  return tails, point-in-time market-factor residuals, changepoint context, and
+  later EVT.
+- Explicitly deferred opaque multivariate detectors and left every parameter,
+  threshold, sample minimum, partition, holdout, route, and score unspecified.
+- Bound any future promotion proposal to genuine point-in-time evidence,
+  episode-level outcomes and matched controls, frozen partitions, dependence-
+  aware uncertainty, a sealed Protocol-v2 annex, and a separate decision.
+- Updated the roadmap and decision log without implementing an algorithm or
+  changing runtime policy, and refreshed the checked project-health reports.
+**Verify:** JSON parsing, `git diff --check`, and architecture cleanliness
+passed.
+**Notes/risks:** No provider call, authorization, artifact write, route/score/
+threshold change, send, trade, order, paper trade, normal RSI write, Event Alpha
+`TRIGGERED_FADE`, holdout access, or Protocol-v2 evidence was created.
+
 ## 2026-07-19 — Add the second official announcement contract · Codex
 **Why:** Catalyst evidence needs source diversity, but Bitget's cursor contract
 must be closed offline before any authorization or live acquisition is debated.
