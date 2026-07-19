@@ -707,8 +707,7 @@ def _market_context_freshness(data: EventMarketConfirmationInput, market: Mappin
             "updated_at",
         )
     )
-    now = _parse_datetime(data.now) or datetime.now(timezone.utc)
-    now = _as_utc(now)
+    now = _evaluation_time(data.now)
     if not market:
         return {
             "status": "missing",
@@ -798,7 +797,7 @@ def _snapshot_freshness(
         "fetched_at",
         "updated_at",
     )
-    now = _as_utc(_parse_datetime(data.now) or datetime.now(timezone.utc))
+    now = _evaluation_time(data.now)
     observed = _parse_datetime(observed_raw)
     fixture_like = _fixture_like_source(source, row)
     allow_stale_fixture = (
@@ -1024,6 +1023,15 @@ def _parse_datetime(value: object) -> datetime | None:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _evaluation_time(value: object) -> datetime:
+    if value in (None, ""):
+        return datetime.now(timezone.utc)
+    parsed = _parse_datetime(value)
+    if parsed is None:
+        raise ValueError("market confirmation evaluation clock is invalid")
+    return _as_utc(parsed)
 
 
 def _as_utc(value: datetime) -> datetime:

@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Explicit evaluation clocks fail closed
+**Status:** accepted
+**Decision:** When a caller explicitly supplies the research/evaluation clock
+used for candidate timestamps, delivery timestamps, freshness, or context age,
+require it to parse as a valid datetime. Do not replace a malformed supplied
+clock with wall time. Booleans, non-finite numerics, and out-of-range epochs are
+never timestamps. A wall-clock default is permitted only when the optional
+clock is genuinely absent.
+**Why:** Substituting `now` manufactures point-in-time recency, while Python's
+boolean-as-integer behavior can silently create 1970-era provider evidence.
+Both make provenance depend on type coercion rather than recorded source truth.
+**Revisit when:** A versioned schema makes every evaluation and provider clock
+mandatory. Then remove absent-clock defaults and retain the same strict parser.
+
 ## 2026-07-19 - Malformed market clocks never become current time
 **Status:** accepted
 **Decision:** Resolve market observation clocks by ordered presence. A supplied

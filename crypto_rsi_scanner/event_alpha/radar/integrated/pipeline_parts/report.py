@@ -356,7 +356,7 @@ def build_integrated_notification_delivery_rows(
 ) -> tuple[dict[str, Any], ...]:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     core_by_id = {str(row.get("core_opportunity_id") or ""): dict(row) for row in core_rows if isinstance(row, Mapping)}
-    observed = _as_utc(_parse_time(generated_at) or datetime.now(timezone.utc)).isoformat()
+    observed = _evaluation_time(generated_at, default=datetime.now(timezone.utc), field_name="integrated delivery generated_at").isoformat()
     zero_candidate_preview = not rows
     lane_specs = (
         ("early_long_research", "Early Long Research", event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value),

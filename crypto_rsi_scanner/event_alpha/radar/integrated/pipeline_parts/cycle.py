@@ -188,7 +188,7 @@ def _integrated_cycle_start(
     input_mode: str,
 ) -> _IntegratedCycleStart:
     wall_started = datetime.now(timezone.utc)
-    research_observed_at = _as_utc(_parse_time(observed_at) or wall_started)
+    research_observed_at = _evaluation_time(observed_at, default=wall_started, field_name="integrated radar observed_at")
     mode = _normalize_input_mode(input_mode)
     namespace_dir = Path(context.namespace_dir)
     namespace_dir.mkdir(parents=True, exist_ok=True)
@@ -916,7 +916,7 @@ def build_integrated_candidates(
     asset_registry: Iterable[event_asset_registry.CanonicalAsset] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Merge sidecar rows into one candidate per canonical family."""
-    observed = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc)).isoformat()
+    observed = _evaluation_time(observed_at, default=datetime.now(timezone.utc), field_name="integrated candidate observed_at").isoformat()
     if asset_registry is None:
         asset_registry = _build_integrated_asset_registry(sidecar_rows)
         sidecar_rows, _resolution_rows = event_instrument_resolver.resolve_sidecar_mapping(

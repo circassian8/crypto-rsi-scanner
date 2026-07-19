@@ -1132,9 +1132,17 @@ def _parse_time(value: object) -> datetime | None:
         return None
     if isinstance(value, datetime):
         return value
+    if isinstance(value, bool):
+        raise ValueError(f"invalid datetime {value!r}")
     if isinstance(value, (int, float)):
-        seconds = float(value) / 1000.0 if float(value) > 10_000_000_000 else float(value)
-        return datetime.fromtimestamp(seconds, tz=timezone.utc)
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            raise ValueError(f"invalid datetime {value!r}")
+        seconds = numeric / 1000.0 if numeric > 10_000_000_000 else numeric
+        try:
+            return datetime.fromtimestamp(seconds, tz=timezone.utc)
+        except (OSError, OverflowError, ValueError) as exc:
+            raise ValueError(f"invalid datetime {value!r}") from exc
     return parse_datetime(value)
 
 

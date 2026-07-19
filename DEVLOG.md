@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require valid explicit Radar evaluation clocks · Codex
+**Why:** Integrated candidate/delivery generation and market confirmation
+silently replaced a malformed explicitly supplied evaluation clock with wall
+time. Separately, Python booleans were accepted as Unix timestamps by calendar
+and derivatives adapters. Either behavior corrupts point-in-time provenance.
+**Changes:**
+- Added one focused integrated evaluation-clock helper: missing optional clocks
+  retain their documented default, while a supplied invalid clock raises before
+  candidate, run, or delivery timestamps are created.
+- Market confirmation now applies the same fail-closed rule to its explicit
+  evaluation clock for both market and supplemental evidence freshness.
+- Scheduled-catalyst and derivatives timestamp parsers now reject booleans,
+  non-finite numerics, and out-of-range epochs instead of treating them as valid
+  provider/evaluation time.
+- Added focused regressions across candidates, deliveries, market confirmation,
+  scheduled context, and derivatives context.
+**Verify:** All 91 focused clock, market-confirmation, evidence-quality,
+numeric-finiteness, market-surface, and scheduled-namespace tests passed.
+Compileall and architecture cleanliness passed; the integrated-radar smoke's
+strict doctor reported zero blockers and warnings.
+**Notes/risks:** Valid aware/naive ISO clocks and finite Unix second/millisecond
+timestamps remain compatible. Missing optional clocks retain existing defaults.
+No provider call, authorization, threshold, score, route, send, trade, order,
+paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Record the thirty-first no-send market cycle · Codex
 **Why:** The one-hour campaign cadence became eligible with existing CoinGecko
 authorization. One more genuine observation was needed to advance the temporal

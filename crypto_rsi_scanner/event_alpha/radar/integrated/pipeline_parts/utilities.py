@@ -65,6 +65,19 @@ def _parse_time(value: datetime | str | None) -> datetime | None:
             return None
     return None
 
+def _evaluation_time(
+    value: datetime | str | None,
+    *,
+    default: datetime,
+    field_name: str,
+) -> datetime:
+    if value in (None, ""):
+        return _as_utc(default)
+    parsed = _parse_time(value)
+    if parsed is None:
+        raise ValueError(f"{field_name} is invalid")
+    return _as_utc(parsed)
+
 def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
@@ -97,6 +110,7 @@ __all__ = (
     '_artifact_has_absolute_operator_path',
     '_json_ready',
     '_parse_time',
+    '_evaluation_time',
     '_as_utc',
     '_text',
     '_int',
