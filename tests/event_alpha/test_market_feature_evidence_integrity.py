@@ -41,6 +41,7 @@ def _market_row() -> dict[str, object]:
         "liquidity_usd": 50_000_000.0,
         "freshness_status": "fresh",
         "market_history_observation_id": "mhobs-current",
+        "market_feature_evidence_contract_version": 1,
         "market_feature_evidence": {
             "liquidity_usd": {
                 "basis": "provider_observed",
@@ -205,18 +206,27 @@ def test_schema_blocks_a_writer_that_drops_history_feature_evidence():
 
 
 def test_pre_contract_history_snapshot_remains_readable():
-    historical = market_state.snapshot_from_market_row({
-        **_market_row(),
-        "market_history_observation_id": None,
-        "market_feature_evidence": {},
-    }).to_dict()
-    historical["row_type"] = "event_market_state_snapshot"
-    historical["market_history_observation_id"] = "legacy-history-id"
+    source = _market_row()
+    source.pop("market_feature_evidence_contract_version")
+    source.pop("market_feature_evidence")
+    source["market_history_observation_id"] = "legacy-history-id"
 
+    historical = market_state.snapshot_from_market_row(source).to_dict()
+    historical["row_type"] = "event_market_state_snapshot"
+
+    assert historical["market_history_observation_id"] == "legacy-history-id"
     assert "market_feature_evidence_contract_version" not in historical
     assert schema_v1.validate_row_against_schema(
         historical, "market_state_snapshot_v1"
     ) == []
+
+
+def test_snapshot_rejects_invalid_claimed_feature_evidence_contract_version():
+    source = _market_row()
+    source["market_feature_evidence_contract_version"] = 2
+
+    with pytest.raises(ValueError, match="contract_version"):
+        market_state.snapshot_from_market_row(source)
 
 
 @pytest.mark.parametrize(

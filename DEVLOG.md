@@ -17,6 +17,61 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve unversioned history rows at the projection boundary · Codex
+**Why:** The full release gate exposed four shadow-surprise regressions after
+the temporal-evidence contract was versioned forward. Raw rows that carried a
+pre-contract history observation ID but neither v1 nor feature evidence were
+still rejected by runtime projection, even though the schema correctly keeps
+those historical rows readable.
+**Changes:**
+- Made runtime projection require the closed history/temporal-evidence pair
+  only when the input explicitly claims contract v1 or supplies feature
+  evidence that will be emitted as v1.
+- Reject unsupported explicit feature-evidence contract versions before
+  projection, while preserving genuine unversioned history-only input.
+- Strengthened the compatibility regression to pass the legacy row through
+  the real constructor and restored all four shadow-surprise integration
+  routes.
+**Verify:** 38 focused market-feature, shadow-surprise, Bybit-transport, and
+architecture-report tests passed; `make architecture-size-gates PYTHON=python3`
+passed with zero new violations; `python3 -m compileall -q crypto_rsi_scanner
+tests` passed; and the final `make verify PYTHON=python3` passed with 1,417/
+1,417 standalone tests, 3,151 pytest tests, alert rendering, offline fixture
+backtest, and paper scoreboard. The first full run exposed the four
+compatibility regressions; the next exposed the temporary 151-line size-gate
+violation; both were fixed before the recorded green release gate.
+**Notes/risks:** This does not reinterpret or rewrite any historical artifact,
+weaken v1 schema validation, alter a feature/threshold/route/score, or cross a
+provider, send, trade, order, paper-trade, normal-RSI-write, or Event Alpha
+`TRIGGERED_FADE` boundary.
+
+## 2026-07-19 — Align guarded Bybit transport with 200-bar intraday capture · Codex
+**Why:** The direct intraday builder had already been upgraded to request 200
+closed bars so a 14-period Wilder RSI could be derived from immutable provider
+evidence, but the shared fixed-host HTTP guard still accepted only the obsolete
+two-row query. The first otherwise-authorized intraday capture would therefore
+have failed locally before its provider boundary.
+**Changes:**
+- Made the guarded Bybit transport use the canonical `KLINE_LIMIT=200` from the
+  intraday contract instead of a duplicate stale literal.
+- Replaced the hand-built two-row transport test with an end-to-end request
+  built by `build_bybit_kline_request`; it proves the 200-bar request is
+  accepted and the obsolete two-row shape is rejected before opening a
+  connection.
+- Rechecked the current official Bybit V5 kline and instruments contracts. The
+  API still permits up to 1,000 kline rows and the existing catalog cursor gate
+  already rejects a partial instrument page.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`; 157 focused
+Bybit execution-quality, intraday, derivatives, capture, and readiness tests;
+all three offline Bybit smokes; and `make architecture-cleanliness-check
+PYTHON=python3` passed.
+**Notes/risks:** No Bybit request, authorization mutation, credential read,
+threshold/score/route change, send, trade, order, paper trade, normal RSI
+write, campaign attachment, or Event Alpha `TRIGGERED_FADE` occurred. Live
+execution, intraday, and derivatives capture remain separately unauthorized
+and fail closed on the recorded 403 without proxy, VPN, alternate-host, or
+region bypass.
+
 ## 2026-07-19 — Record the thirty-second no-send market cycle · Codex
 **Why:** The persisted one-hour cadence became eligible with the existing
 CoinGecko authorization and no shared-provider backoff. This was the next safe

@@ -139,21 +139,10 @@ def snapshot_from_market_row(
         row.get("market_history_observation_id"),
         field_name="market_history_observation_id",
     )
-    market_feature_evidence = event_market_feature_evidence.canonical_projection(
-        row.get("market_feature_evidence"),
-        expected_current_observation_id=market_history_observation_id,
+    market_feature_evidence = _project_market_feature_evidence(
+        row,
+        market_history_observation_id=market_history_observation_id,
     )
-    has_temporal_evidence = event_market_feature_evidence.contains_temporal_evidence(
-        market_feature_evidence
-    )
-    if market_history_observation_id is not None and not has_temporal_evidence:
-        raise ValueError(
-            "market_feature_evidence_invalid:value:missing_for_history_observation"
-        )
-    if market_history_observation_id is None and has_temporal_evidence:
-        raise ValueError(
-            "market_feature_evidence_invalid:value:market_history_observation_id_missing"
-        )
     normalized_return_units = {
         name: event_market_units.RETURN_UNIT_PERCENT_POINTS
         for name, value in normalized_returns.items()
@@ -229,6 +218,43 @@ def snapshot_from_market_row(
         warnings=tuple(dict.fromkeys(warnings)),
     )
     return snapshot
+
+
+def _project_market_feature_evidence(
+    row: Mapping[str, Any],
+    *,
+    market_history_observation_id: str | None,
+) -> dict[str, Any]:
+    projection = event_market_feature_evidence.canonical_projection(
+        row.get("market_feature_evidence"),
+        expected_current_observation_id=market_history_observation_id,
+    )
+    contract_version = row.get("market_feature_evidence_contract_version")
+    if contract_version is not None and (
+        type(contract_version) is not int
+        or contract_version != event_market_feature_evidence.CONTRACT_VERSION
+    ):
+        raise ValueError("market_feature_evidence_invalid:value:contract_version")
+    has_temporal_evidence = event_market_feature_evidence.contains_temporal_evidence(
+        projection
+    )
+    contract_is_claimed = (
+        contract_version == event_market_feature_evidence.CONTRACT_VERSION
+        or bool(projection)
+    )
+    if (
+        contract_is_claimed
+        and market_history_observation_id is not None
+        and not has_temporal_evidence
+    ):
+        raise ValueError(
+            "market_feature_evidence_invalid:value:missing_for_history_observation"
+        )
+    if market_history_observation_id is None and has_temporal_evidence:
+        raise ValueError(
+            "market_feature_evidence_invalid:value:market_history_observation_id_missing"
+        )
+    return projection
 
 
 def _optional_string(value: object, *, field_name: str) -> str | None:

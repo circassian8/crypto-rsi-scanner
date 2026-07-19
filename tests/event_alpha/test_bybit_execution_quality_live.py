@@ -20,6 +20,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
     REQUEST_STRATEGY,
     BybitPublicRequest,
     build_bybit_instrument_catalog_request,
+    select_bybit_usdt_perpetual_instruments,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live import (
     AUTHORIZATION_ACTION,
@@ -36,6 +37,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live impo
     main,
     partition_bybit_provider_query_assets,
     project_authoritative_radar_assets,
+)
+from crypto_rsi_scanner.event_alpha.operations.bybit_intraday import (
+    KLINE_LIMIT,
+    build_bybit_kline_request,
 )
 
 
@@ -524,22 +529,24 @@ def test_transport_accepts_only_the_closed_direct_kline_query_shape() -> None:
             / "klines_btcusdt_60.json"
         ).read_text(encoding="utf-8")
     )
-    request = BybitPublicRequest(
-        method="GET",
-        path="/v5/market/kline",
-        query=(
-            ("category", "linear"),
-            ("symbol", "BTCUSDT"),
-            ("interval", "60"),
-            ("end", "1784289599999"),
-            ("limit", "2"),
-        ),
+    instruments = select_bybit_usdt_perpetual_instruments(
+        _fixture("radar_assets.json"),
+        _fixture("instruments_info.json"),
+    )
+    instrument = next(
+        row for row in instruments if row.instrument_id == "BTCUSDT"
+    )
+    request = build_bybit_kline_request(
+        instrument,
+        interval="60",
+        as_of=datetime(2026, 7, 17, 12, 30, tzinfo=timezone.utc),
     )
 
     captured = _fetch_public_json(request, 10.0, opener=_FakeOpener(payload))
 
     assert captured.payload() == payload
     assert captured.request == request
+    assert dict(request.query)["limit"] == str(KLINE_LIMIT) == "200"
     assert captured.response_url.startswith(
         "https://api.bybit.com/v5/market/kline?"
     )
@@ -548,7 +555,7 @@ def test_transport_accepts_only_the_closed_direct_kline_query_shape() -> None:
         method="GET",
         path=request.path,
         query=tuple(
-            (key, "3" if key == "limit" else value)
+            (key, "2" if key == "limit" else value)
             for key, value in request.query
         ),
     )
