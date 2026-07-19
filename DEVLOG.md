@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirtieth no-send market cycle · Codex
+**Why:** The persisted CoinGecko reservation became eligible at 07:50:59 UTC,
+so the evidence campaign needed exactly one authorized cadence-respecting
+observation to advance its temporal baselines and refresh terminal publication
+truth.
+**Changes:**
+- Ran one Daily Operations cycle under the already-present CoinGecko
+  authorization. Its only request returned HTTP 200 with 80 bounded rows and
+  zero retries; 30 liquidity-ranked observations entered the live/no-send
+  campaign.
+- Published and restarted exact revision-12 namespace
+  `radar_market_no_send_20260719t075136584503z_c6de7445c038` with immutable
+  publication and operations receipts.
+- Advanced campaign truth to 30 successful cycles, 900 retained observations,
+  870 baseline-counted observations, and 30 too-close observations. The 29
+  established current assets now have seven long-horizon samples; Hedera is the
+  sole newer three-sample asset. No anomaly or current Decision idea qualified.
+- Regenerated the canonical campaign report and reserved the next observation
+  for `2026-07-19T08:51:37.241940+00:00`.
+**Verify:** Daily Operations returned `published_and_restarted`; exact strict
+doctor reported zero blockers/warnings; dashboard readiness selected the new
+namespace; local HEAD returned HTTP 200 with the exact namespace, run, revision,
+and operator-state digest; campaign report reported `real_cycles=30`,
+`real_candidates=5`, and `provider_calls=0` during report generation.
+**Notes/risks:** Spread remains 0/900 because CoinGecko is not execution-quality
+evidence. Current ideas remain zero, historical ideas remain five, and outcomes
+remain four matured plus one `due_missing_price`. No authorization was created,
+no threshold or score was tuned, and there were zero sends, trades, orders,
+paper trades, normal RSI writes, or Event Alpha `TRIGGERED_FADE` creations.
+
 ## 2026-07-19 — Refresh pre-cycle campaign truth · Codex
 **Why:** Before the next cadence-eligible live/no-send observation, the
 canonical campaign report needed one local-artifact-only reconciliation so its
