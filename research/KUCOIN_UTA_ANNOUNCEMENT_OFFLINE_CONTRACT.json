@@ -1,0 +1,79 @@
+{
+  "schema_id": "decision_radar.kucoin_uta_announcement_offline_contract",
+  "schema_version": 1,
+  "status": "current_fixture_verified_capture_not_implemented",
+  "implemented_at": "2026-07-19",
+  "provider": "kucoin_announcements",
+  "contract_version": "crypto_radar_kucoin_uta_announcements_v1",
+  "endpoint": "GET https://api.kucoin.com/api/ua/v1/market/announcement",
+  "replaces_historical_endpoint": "GET https://api.kucoin.com/api/v3/announcements",
+  "official_documentation": "https://www.kucoin.com/docs-new/rest/ua/get-announcements",
+  "official_migration_source": "https://www.kucoin.com/docs-new/change-log",
+  "api_channel": "Public",
+  "api_permission": "NULL",
+  "api_rate_limit_pool": "Public",
+  "api_rate_limit_weight": 20,
+  "local_bounds": {
+    "maximum_request_window_days": 31,
+    "maximum_requested_page_size": 50,
+    "maximum_requests": 20,
+    "maximum_rows": 1000,
+    "maximum_response_bytes_per_page": 2000000
+  },
+  "request_fields": [
+    "language",
+    "type",
+    "pageNumber",
+    "pageSize",
+    "startTime",
+    "endTime"
+  ],
+  "response_fields": [
+    "totalNumber",
+    "totalPage",
+    "pageNumber",
+    "pageSize",
+    "list",
+    "id",
+    "title",
+    "type",
+    "description",
+    "releaseTime",
+    "language",
+    "url"
+  ],
+  "capture": {
+    "exact_uta_response_hashes_preserved": true,
+    "immutable_current_capture_implemented": false,
+    "strict_current_capture_doctor_implemented": false,
+    "live_transport_implemented": false,
+    "historical_v1_capture_live_eligible": false
+  },
+  "authority": {
+    "live_authorized": false,
+    "campaign_attached": false,
+    "dashboard_authority_eligible": false,
+    "directional_authority": false,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false
+  },
+  "semantics": {
+    "complete_pagination_required_for_healthy_empty": true,
+    "publication_time_is_event_time": false,
+    "description_is_complete_article_body": false,
+    "official_categories_reclassified_from_title": false
+  },
+  "safety": {
+    "research_only": true,
+    "provider_calls": 0,
+    "authorization_created": false,
+    "writes": 0,
+    "route_or_score_effect": false,
+    "telegram_sends": 0,
+    "trades": 0,
+    "orders": 0,
+    "paper_trades": 0,
+    "normal_rsi_writes": 0,
+    "event_alpha_triggered_fade_created": 0
+  }
+}

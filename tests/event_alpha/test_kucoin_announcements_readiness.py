@@ -12,7 +12,9 @@ from crypto_rsi_scanner.event_alpha.operations.kucoin_announcements_readiness im
     AUTHORIZATION_ACTION,
     CAPTURE_SMOKE_COMMAND,
     CURRENT_ANNOUNCEMENTS_PATH,
+    CURRENT_CONTRACT_VERSION,
     CURRENT_OFFICIAL_API_DOC,
+    CURRENT_SMOKE_COMMAND,
     FUTURE_CAPTURE_COMMAND,
     LIVE_AUTH_ENV,
     READINESS_COMMAND,
@@ -37,8 +39,7 @@ def test_absent_authorization_is_explicit_and_never_calls_or_writes() -> None:
     assert value["authorization_mutated"] is False
     assert value["reasons"] == [
         "runtime_provider_authorization_absent",
-        "legacy_endpoint_superseded_for_live_use",
-        "current_uta_response_contract_not_implemented",
+        "current_uta_immutable_capture_not_implemented",
         "live_capture_transport_not_implemented",
     ]
     assert value["provider_call_planned"] is False
@@ -46,7 +47,8 @@ def test_absent_authorization_is_explicit_and_never_calls_or_writes() -> None:
     assert value["provider_request_count"] == 0
     assert value["writes_performed"] is False
     assert value["expected_provider_activity"] == "none_readiness_only"
-    assert value["next_safe_command"] == READINESS_COMMAND
+    assert value["next_safe_command"] == CURRENT_SMOKE_COMMAND
+    assert value["current_response_contract_smoke_command"] == CURRENT_SMOKE_COMMAND
     assert value["legacy_capture_smoke_command"] == CAPTURE_SMOKE_COMMAND
     assert value["legacy_response_contract_smoke_command"] == SMOKE_COMMAND
     assert value["operator_action_required"] == AUTHORIZATION_ACTION
@@ -62,15 +64,17 @@ def test_present_authorization_cannot_unlock_superseded_or_unimplemented_capture
     assert value["runtime_provider_authorized"] is True
     assert value["ready"] is False
     assert value["reasons"] == [
-        "legacy_endpoint_superseded_for_live_use",
-        "current_uta_response_contract_not_implemented",
+        "current_uta_immutable_capture_not_implemented",
         "live_capture_transport_not_implemented"
     ]
-    assert value["provider_contract_configured"] is False
+    assert value["provider_contract_configured"] is True
     assert value["current_contract"]["path"] == CURRENT_ANNOUNCEMENTS_PATH
+    assert value["current_contract"]["contract_version"] == CURRENT_CONTRACT_VERSION
     assert value["current_contract"]["official_api_doc"] == CURRENT_OFFICIAL_API_DOC
-    assert value["current_contract"]["status"] == "not_implemented"
-    assert value["current_contract"]["request_plan"] is None
+    assert value["current_contract"]["status"] == (
+        "offline_fixture_verified_capture_not_implemented"
+    )
+    assert value["current_contract"]["request_plan"] == value["request_plan"]
     assert value["legacy_contract"]["status"] == (
         "fixture_verified_historical_not_live_eligible"
     )
@@ -83,29 +87,29 @@ def test_present_authorization_cannot_unlock_superseded_or_unimplemented_capture
     assert value["legacy_strict_capture_doctor_implemented"] is True
     assert value["future_capture_command"] == FUTURE_CAPTURE_COMMAND
     assert value["operator_action_required"] == (
-        "unset_unreviewed_authorization_and_wait_for_current_UTA_contract_implementation"
+        "unset_unreviewed_authorization_and_wait_for_current_UTA_capture_implementation"
     )
     assert value["provider_call_planned"] is False
 
 
 def test_request_window_and_future_activity_are_exact_and_bounded() -> None:
     value = build_kucoin_announcement_readiness(environ={}, now=NOW)
-    plan = value["legacy_contract"]["request_plan"]
+    plan = value["request_plan"]
 
     assert value["request_window_start"] == "2026-07-18T02:00:00Z"
     assert value["request_window_end"] == "2026-07-19T02:00:00Z"
-    assert value["maximum_provider_request_count"] == 0
+    assert value["maximum_provider_request_count"] == 20
     assert value["legacy_maximum_provider_request_count"] == 20
     assert plan["initial_query"]["startTime"] == 1784340000000
     assert plan["initial_query"]["endTime"] == 1784426400000
-    assert plan["initial_query"]["currentPage"] == 1
+    assert plan["initial_query"]["pageNumber"] == 1
     assert plan["initial_query"]["pageSize"] == 50
-    assert plan["initial_query"]["annType"] == "latest-announcements"
-    assert plan["initial_query"]["lang"] == "en_US"
+    assert plan["initial_query"]["type"] == "latest-announcements"
+    assert plan["initial_query"]["language"] == "en_US"
     assert value[
         "expected_provider_activity_if_future_authorized_capture_is_implemented"
-    ] == "unknown_until_the_current_UTA_request_and_pagination_contract_is_closed"
-    assert value["exact_response_input_contract_implemented"] is False
+    ] == "between_1_and_20_current_UTA_public_GETs_no_redirects_or_retries"
+    assert value["exact_response_input_contract_implemented"] is True
     assert value["legacy_exact_response_input_contract_implemented"] is True
     assert value["redirects_allowed"] is False
     assert value["retries_allowed"] is False

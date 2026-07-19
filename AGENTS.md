@@ -373,6 +373,16 @@ may be added later when a suitable environment already exists.
   make readiness pass while the current UTA contract and live transport remain
   unimplemented; never create or mutate the flag from code, and never activate
   the superseded endpoint.
+  The current UTA response contract is now independently fixture-closed by
+  `make radar-announcements-kucoin-uta-smoke`: it binds exact
+  `language`/`type`/`pageNumber`/`pageSize`/time queries, the renamed
+  total/page/list and item schemas, exact UTA raw-response hashes, lineage,
+  publication clocks, categories, and conservative local bounds. Readiness
+  reports that parser separately from the still-missing current-version
+  immutable capture/doctor and live transport. The UTA smoke makes no call or
+  write and grants no authority. Do not reuse the historical v1 capture doctor
+  for UTA bytes; implement a version-matching immutable doctor before any
+  authorization action.
 - **Bitget official-announcement offline contract:**
   `make radar-announcements-bitget-smoke` validates synthetic bytes against the
   documented public `GET /api/v2/public/annoucements` contract, preserving the

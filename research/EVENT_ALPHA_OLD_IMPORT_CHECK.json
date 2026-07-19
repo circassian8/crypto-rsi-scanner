@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 3706,
+          "line": 3722,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 3706,
+          "line": 3722,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 10139,
+          "line": 10165,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T03:17:59.064445+00:00",
+  "generated_at": "2026-07-19T03:25:55.821517+00:00",
   "include_runtime_artifacts": false,
-  "input_file_count": 1216,
-  "input_fingerprint": "6f8f14b42225f845527d169a4b2afc5514094868e4cbac04ffd7698b0d408685",
+  "input_file_count": 1219,
+  "input_fingerprint": "f22ef47a03a186f9138eba4acd82ab646902f73e708b7878c2659aed3ecb8533",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "AGENTS.md:1784431039",
-    "DECISIONS.md:1784431061",
-    "DEVLOG.md:1784431068",
-    "ROADMAP.md:1784431050",
-    "crypto_rsi_scanner/event_alpha/operations/kucoin_announcements_readiness.py:1784430934"
+    "AGENTS.md:1784431537",
+    "DECISIONS.md:1784431537",
+    "DEVLOG.md:1784431537",
+    "Makefile:1784431430",
+    "ROADMAP.md:1784431537"
   ],
-  "newest_source_mtime": 1784431076.3576105,
+  "newest_source_mtime": 1784431553.0859683,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784430597.3921819,
+  "report_mtime": 1784431079.0656757,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2509,28 +2509,28 @@
     "cache_status": "miss",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
-    "input_file_count": 1216,
-    "input_fingerprint": "6f8f14b42225f845527d169a4b2afc5514094868e4cbac04ffd7698b0d408685",
+    "input_file_count": 1219,
+    "input_fingerprint": "f22ef47a03a186f9138eba4acd82ab646902f73e708b7878c2659aed3ecb8533",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784431039",
-      "DECISIONS.md:1784431061",
-      "DEVLOG.md:1784431068",
-      "ROADMAP.md:1784431050",
-      "crypto_rsi_scanner/event_alpha/operations/kucoin_announcements_readiness.py:1784430934"
+      "AGENTS.md:1784431537",
+      "DECISIONS.md:1784431537",
+      "DEVLOG.md:1784431537",
+      "Makefile:1784431430",
+      "ROADMAP.md:1784431537"
     ],
-    "newest_source_mtime": 1784431076.3576105,
+    "newest_source_mtime": 1784431553.0859683,
     "regex_compile_count": 124,
-    "report_mtime": 1784430597.3921819,
-    "scan_duration_seconds": 2.349,
+    "report_mtime": 1784431079.0656757,
+    "scan_duration_seconds": 2.3744,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 78,
+    "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
     "scanned_script_files": 4,
-    "scanned_source_files": 898,
-    "scanned_test_files": 234,
+    "scanned_source_files": 899,
+    "scanned_test_files": 235,
     "skipped_artifact_files": 3114,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
@@ -2557,10 +2557,10 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.349,
-  "scanned_doc_files": 78,
-  "scanned_source_files": 898,
-  "scanned_test_files": 234,
+  "scan_duration_seconds": 2.3744,
+  "scanned_doc_files": 79,
+  "scanned_source_files": 899,
+  "scanned_test_files": 235,
   "schema_version": "event_alpha_old_import_check_v1",
   "skipped_artifact_files": 3114,
   "skipped_dirs": 67,

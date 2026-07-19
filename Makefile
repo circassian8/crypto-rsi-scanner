@@ -1556,6 +1556,10 @@ radar-announcements-kucoin-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_announcements \
 		--fixture-dir fixtures/kucoin_announcements
 
+radar-announcements-kucoin-uta-smoke:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_uta_announcements \
+		--fixture-dir fixtures/kucoin_uta_announcements
+
 radar-announcements-kucoin-capture-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_announcements_capture \
 		--fixture-dir fixtures/kucoin_announcements

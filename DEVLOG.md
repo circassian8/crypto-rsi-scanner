@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Close the current KuCoin UTA response contract offline · Codex
+**Why:** After retiring KuCoin's replaced v1 endpoint from live consideration,
+the current UTA schema needed its own exact offline contract before any capture
+or authorization boundary could be designed honestly.
+**Changes:**
+- Added a separate current-endpoint adapter for public `GET
+  /api/ua/v1/market/announcement`, binding exact renamed query/data/item fields,
+  conservative page/window/request/byte bounds, complete/partial/healthy-empty
+  coverage, IDs, categories, clocks, safe URLs, and no-direction semantics.
+- Reused only the closed common semantic validation while retaining the hashes
+  of the original UTA response bytes, UTA schema/version, endpoint, query
+  identity, acquisition clocks, and lineage.
+- Added current-schema fixtures, 12 focused adapter regressions, an offline Make
+  smoke, and readiness v3. Readiness exposes the current parser as complete but
+  keeps current immutable capture/doctor and live transport false; an ambient
+  flag remains unable to trigger work.
+- Added the structured/current contract record and updated the working
+  agreement, roadmap, source review, and durable decision boundary.
+**Verify:** 17 focused UTA adapter/readiness tests, current UTA smoke, compileall,
+structured JSON validation, diff whitespace validation, and architecture
+cleanliness passed.
+**Notes/risks:** No provider call, authorization mutation, persisted capture,
+source/campaign/dashboard authority, feature, score, route, threshold, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+changed. Current UTA immutable capture and live transport remain unimplemented.
+
 ## 2026-07-19 — Fail KuCoin readiness closed on its UTA migration · Codex
 **Why:** A current official-documentation recheck found that KuCoin's UTA `GET
 /api/ua/v1/market/announcement` replaces the v1 `/api/v3/announcements`

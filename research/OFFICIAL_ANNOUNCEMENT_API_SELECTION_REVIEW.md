@@ -24,11 +24,12 @@ provider authorization and permits no live API call:
   time bounds, cursor pagination, stable IDs, publication clocks, language, and
   official URL, but only 10 rows per page.
 
-Neither provider is active in this repository. KuCoin's current UTA contract is
-not implemented; Bitget remains offline-only. Any later live capture requires a
-current versioned contract, separate already-present authorization flag,
-explicit confirmation, bounded request plan, immutable accepted bytes, and
-strict doctor success.
+Neither provider is active in this repository. KuCoin's current UTA response
+contract is now fixture-closed, but its current-version immutable capture/doctor
+and live transport are not implemented; Bitget remains offline-only. Any later
+live capture requires a current immutable doctor, separate already-present
+authorization flag, explicit confirmation, bounded request plan, immutable
+accepted bytes, and strict doctor success.
 
 ## Official evidence reviewed
 
@@ -114,8 +115,8 @@ total/page-count contract rather than being forced into one pagination model.
    response bytes, request ledger, normalized snapshot, fingerprints, manifest,
    and completion receipt; strict doctor re-derives the bundle and no pointer is
    published. `live_public_http` mode is explicitly rejected.
-6. **Next:** implement and fixture-test the current UTA response/pagination
-   contract and a matching immutable doctor. Only after that and separate
+6. **Current parser complete; capture next:** implement and fixture-test a
+   matching current UTA immutable doctor. Only after that and separate
    operator authorization may a confirmed bounded live transport be considered,
    with no redirects, retries, alternate hosts, proxies, VPNs, or region bypass,
    plus health/backoff and retention review.
@@ -134,7 +135,8 @@ total/page-count contract rather than being forced into one pagination model.
 
 - KuCoin's historical response and immutable-capture contracts are fixture-
   verified, superseded for live use, and not authoritative or Protocol-v2-
-  admitted. The current UTA contract is not yet implemented.
+  admitted. The current UTA response contract is fixture-verified; its matching
+  capture doctor and live transport are not implemented.
 - Bitget's second offline contract is implemented, but remains unconfigured,
   unauthorized, inactive, and Protocol-v2-ineligible.
 - Bybit remains the selected execution venue and its documented announcement

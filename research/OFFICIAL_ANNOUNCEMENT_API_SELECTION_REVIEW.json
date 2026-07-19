@@ -38,10 +38,11 @@
             "endpoint": "GET https://api.kucoin.com/api/v3/announcements",
             "endpoint_lifecycle": "historical_replaced_not_live_eligible",
             "current_endpoint": "GET https://api.kucoin.com/api/ua/v1/market/announcement",
-            "current_contract_implemented": false,
+            "current_contract_implemented": true,
+            "current_immutable_capture_implemented": false,
       "maximum_requested_page_size": 50,
       "pagination": "currentPage_totalPage_totalNum_pageSize",
-            "provider_status": "historical_fixture_contract_and_doctor_retained_current_UTA_contract_not_implemented_live_blocked",
+            "provider_status": "current_UTA_fixture_contract_implemented_capture_doctor_and_live_transport_blocked",
             "review_url": "https://www.kucoin.com/docs-new/rest/ua/get-announcements",
             "historical_review_url": "https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements",
             "official_migration_source": "https://www.kucoin.com/docs-new/change-log",
@@ -57,7 +58,7 @@
     "source_independence_required": true
   },
   "next_implementation": [
-        "implement_current_kucoin_UTA_contract_and_immutable_doctor",
+        "implement_current_kucoin_UTA_immutable_capture_and_doctor",
         "confirmed_bounded_live_transport_only_after_explicit_authorization",
     "health_backoff_retention_and_explicit_protocol_v2_annex_selection"
   ],

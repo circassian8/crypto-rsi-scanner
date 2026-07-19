@@ -1,0 +1,23 @@
+{
+  "code": "200000",
+  "data": {
+    "totalNumber": 3,
+    "totalPage": 2,
+    "pageNumber": 2,
+    "pageSize": 2,
+    "list": [
+      {
+        "id": 200001,
+        "title": "KuCoin Research Promotion",
+        "type": [
+          "latest-announcements",
+          "activities"
+        ],
+        "description": "This promotional category is not listing evidence.",
+        "releaseTime": 1784424600000,
+        "language": "en_US",
+        "url": "https://www.kucoin.com/announcement/research-promotion?lang=en_US"
+      }
+    ]
+  }
+}

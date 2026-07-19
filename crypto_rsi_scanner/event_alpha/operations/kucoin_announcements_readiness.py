@@ -20,29 +20,32 @@ from .kucoin_announcements import (
     PROVIDER_ID,
     build_kucoin_announcement_request_plan,
 )
+from .kucoin_uta_announcements import (
+    ANNOUNCEMENTS_PATH as CURRENT_ANNOUNCEMENTS_PATH,
+    CONTRACT_VERSION as CURRENT_CONTRACT_VERSION,
+    OFFICIAL_API_DOC as CURRENT_OFFICIAL_API_DOC,
+    OFFICIAL_MIGRATION_SOURCE,
+    build_kucoin_uta_announcement_request_plan,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_kucoin_announcements_readiness_v2"
+CONTRACT_VERSION = "crypto_radar_kucoin_announcements_readiness_v3"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE"
-CURRENT_ANNOUNCEMENTS_PATH = "/api/ua/v1/market/announcement"
-CURRENT_OFFICIAL_API_DOC = (
-    "https://www.kucoin.com/docs-new/rest/ua/get-announcements"
-)
-OFFICIAL_MIGRATION_SOURCE = (
-    "https://www.kucoin.com/docs-new/change-log"
-)
 READINESS_COMMAND = (
     "make radar-announcements-kucoin-readiness PYTHON=.venv/bin/python"
 )
 SMOKE_COMMAND = "make radar-announcements-kucoin-smoke PYTHON=.venv/bin/python"
+CURRENT_SMOKE_COMMAND = (
+    "make radar-announcements-kucoin-uta-smoke PYTHON=.venv/bin/python"
+)
 CAPTURE_SMOKE_COMMAND = (
     "make radar-announcements-kucoin-capture-smoke PYTHON=.venv/bin/python"
 )
 FUTURE_CAPTURE_COMMAND = (
-    "unavailable_until_current_UTA_contract_live_transport_and_authorized_capture_command_are_implemented"
+    "unavailable_until_current_UTA_immutable_capture_doctor_live_transport_and_authorized_capture_command_are_implemented"
 )
 AUTHORIZATION_ACTION = (
-    "none_current_UTA_contract_implementation_and_review_required_before_authorization_action"
+    "none_current_UTA_immutable_capture_and_doctor_required_before_authorization_action"
 )
 ROLLBACK_COMMAND = f"unset {LIVE_AUTH_ENV}"
 DEFAULT_WINDOW_HOURS = 24
@@ -74,6 +77,10 @@ def build_kucoin_announcement_readiness(
     env = os.environ if environ is None else environ
     authorized = _enabled(env.get(LIVE_AUTH_ENV))
     window_start = checked - timedelta(hours=DEFAULT_WINDOW_HOURS)
+    current_plan = build_kucoin_uta_announcement_request_plan(
+        start_time=window_start,
+        end_time=checked,
+    )
     legacy_plan = build_kucoin_announcement_request_plan(
         start_time=window_start,
         end_time=checked,
@@ -83,8 +90,7 @@ def build_kucoin_announcement_readiness(
         reasons.append("runtime_provider_authorization_absent")
     reasons.extend(
         (
-            "legacy_endpoint_superseded_for_live_use",
-            "current_uta_response_contract_not_implemented",
+            "current_uta_immutable_capture_not_implemented",
             "live_capture_transport_not_implemented",
         )
     )
@@ -96,12 +102,13 @@ def build_kucoin_announcement_readiness(
         "checked_at": _iso(checked),
         "provider": PROVIDER_ID,
         "source_class": "official_exchange",
-        "provider_contract_configured": False,
+        "provider_contract_configured": True,
         "current_contract": {
-            "status": "not_implemented",
+            "status": "offline_fixture_verified_capture_not_implemented",
             "path": CURRENT_ANNOUNCEMENTS_PATH,
+            "contract_version": CURRENT_CONTRACT_VERSION,
             "official_api_doc": CURRENT_OFFICIAL_API_DOC,
-            "request_plan": None,
+            "request_plan": current_plan,
         },
         "legacy_contract": {
             "status": "fixture_verified_historical_not_live_eligible",
@@ -117,8 +124,8 @@ def build_kucoin_announcement_readiness(
         "request_window_hours": DEFAULT_WINDOW_HOURS,
         "request_window_start": _iso(window_start),
         "request_window_end": _iso(checked),
-        "request_plan": None,
-        "maximum_provider_request_count": 0,
+        "request_plan": current_plan,
+        "maximum_provider_request_count": MAX_RESPONSE_PAGES,
         "legacy_maximum_provider_request_count": MAX_RESPONSE_PAGES,
         "provider_call_planned": False,
         "provider_call_attempted": False,
@@ -127,7 +134,7 @@ def build_kucoin_announcement_readiness(
         "retries_allowed": False,
         "alternate_hosts_allowed": False,
         "proxy_or_vpn_bypass_allowed": False,
-        "exact_response_input_contract_implemented": False,
+        "exact_response_input_contract_implemented": True,
         "legacy_exact_response_input_contract_implemented": True,
         "immutable_capture_boundary_implemented": False,
         "legacy_immutable_capture_boundary_implemented": True,
@@ -142,7 +149,8 @@ def build_kucoin_announcement_readiness(
         "protocol_v2_annex_bound": False,
         "protocol_v2_evidence_eligible": False,
         "reasons": reasons,
-        "next_safe_command": READINESS_COMMAND,
+        "next_safe_command": CURRENT_SMOKE_COMMAND,
+        "current_response_contract_smoke_command": CURRENT_SMOKE_COMMAND,
         "legacy_capture_smoke_command": CAPTURE_SMOKE_COMMAND,
         "legacy_response_contract_smoke_command": SMOKE_COMMAND,
         "readiness_recheck_command": READINESS_COMMAND,
@@ -150,7 +158,7 @@ def build_kucoin_announcement_readiness(
         "operator_action_required": (
             AUTHORIZATION_ACTION
             if not authorized
-            else "unset_unreviewed_authorization_and_wait_for_current_UTA_contract_implementation"
+            else "unset_unreviewed_authorization_and_wait_for_current_UTA_capture_implementation"
         ),
         "authorization_boundary": (
             "the_legacy_v1_endpoint_is_not_live_eligible;future_current_UTA_capture_"
@@ -159,7 +167,7 @@ def build_kucoin_announcement_readiness(
         ),
         "expected_provider_activity": "none_readiness_only",
         "expected_provider_activity_if_future_authorized_capture_is_implemented": (
-            "unknown_until_the_current_UTA_request_and_pagination_contract_is_closed"
+            f"between_1_and_{MAX_RESPONSE_PAGES}_current_UTA_public_GETs_no_redirects_or_retries"
         ),
         "rollback_disable_command": ROLLBACK_COMMAND,
         "research_only": True,
@@ -197,7 +205,9 @@ __all__ = (
     "CAPTURE_SMOKE_COMMAND",
     "CONTRACT_VERSION",
     "CURRENT_ANNOUNCEMENTS_PATH",
+    "CURRENT_CONTRACT_VERSION",
     "CURRENT_OFFICIAL_API_DOC",
+    "CURRENT_SMOKE_COMMAND",
     "FUTURE_CAPTURE_COMMAND",
     "LIVE_AUTH_ENV",
     "OFFICIAL_MIGRATION_SOURCE",

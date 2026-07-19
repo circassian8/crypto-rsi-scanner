@@ -53,15 +53,15 @@
   },
   "readiness": {
     "capture_command_available": false,
-    "contract_version": "crypto_radar_kucoin_announcements_readiness_v2",
+    "contract_version": "crypto_radar_kucoin_announcements_readiness_v3",
     "dedicated_authorization_env": "RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE",
     "immutable_capture_boundary_implemented": false,
     "legacy_immutable_capture_boundary_implemented": true,
-    "maximum_future_requests": 0,
+    "maximum_future_requests": 20,
     "legacy_maximum_requests_non_executable": 20,
     "provider_calls": 0,
     "request_window_hours": 24,
-    "status": "blocked_current_UTA_contract_not_implemented",
+    "status": "blocked_current_UTA_capture_not_implemented",
     "strict_capture_doctor_implemented": false,
     "legacy_strict_capture_doctor_implemented": true,
     "writes": 0

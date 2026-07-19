@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep KuCoin UTA parsing separate from historical v1 capture
+**Status:** accepted
+**Decision:** Implement the current `GET /api/ua/v1/market/announcement`
+request/response contract as a separately versioned offline adapter. Preserve
+the hashes of exact UTA response bytes and the renamed UTA schema; reuse only
+the already-closed common announcement semantics. Do not relabel the historical
+v1 immutable doctor as UTA-compatible. Readiness may report the current parser
+as implemented but must keep current capture/doctor and live transport false.
+**Why:** The two endpoints express the same domain with different request and
+response identities. Converting fields for semantic validation is safe only if
+the original bytes, schema version, endpoint, query, and lineage remain the
+authority; sharing the old capture identity would hide provider-contract drift.
+**Revisit when:** A current-version UTA immutable capture and re-deriving doctor
+pass offline regressions. Live use still requires a later separate authorization
+and confirmed bounded transport decision.
+
 ## 2026-07-19 - Retire KuCoin v1 from the live activation path
 **Status:** accepted
 **Decision:** Keep the implemented `/api/v3/announcements` parser, fixtures, and
