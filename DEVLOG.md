@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require current derivatives evidence for crowding routes · Codex
+**Why:** Decision v2 treated top-level crowding labels and OI/funding metrics as
+current even when their derivatives snapshot was stale, unknown, malformed, or
+missing freshness. That could raise derivatives confirmation to 85 and route a
+late move into Fade / Exhaustion Review using obsolete perp evidence.
+**Changes:**
+- Added ordered, fail-closed derivatives snapshot and freshness resolution; an
+  invalid canonical snapshot cannot expose a valid-looking compatibility alias.
+- Limited crowding recognition and the 78/85 derivatives-confirmation scores to
+  snapshots with recognized fresh or controlled fixture freshness.
+- Stale/missing/malformed derivatives now score as unavailable confirmation,
+  retain the fade-confirmation penalty, and cannot select the crowding route.
+- Added end-to-end route regressions plus offline Bybit derivatives coverage.
+**Verify:** All 185 focused Decision, route, surface, market-numeric, and Bybit
+derivatives tests passed. Compileall, architecture cleanliness, and the
+integrated-radar smoke passed.
+**Notes/risks:** Current valid derivatives behavior is unchanged. Historical
+stale context may remain visible as evidence, but cannot drive a current route.
+No provider call, authorization, threshold, score weight, send, trade, order,
+paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Require recognized freshness for verified spread · Codex
 **Why:** Spread policy accepted any unrecognized explicit freshness value—and
 even no freshness at all—as long as a numeric spread existed. A malformed

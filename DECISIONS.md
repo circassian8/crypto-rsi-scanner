@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Current crowding routes require fresh derivatives
+**Status:** accepted
+**Decision:** Treat derivatives crowding as current Decision evidence only when
+the highest-authority canonical derivatives snapshot is a mapping and its
+ordered freshness status is recognized as fresh. Stale, missing, unknown,
+malformed, or alias-hidden snapshots cannot raise derivatives confirmation,
+remove the fade confirmation penalty, or select Fade / Exhaustion Review.
+**Why:** Open interest, funding, positioning, and liquidation conditions decay
+quickly. A historical crowding label is useful context but cannot justify a
+current perp-oriented operator route.
+**Revisit when:** A versioned provider-clock contract supplies per-component
+acquisition age plus full-set completion freshness. It must be at least as
+strict as the current recognized-fresh gate and preserve stale context only as
+non-routing history.
+
 ## 2026-07-19 - Verified spread requires recognized freshness
 **Status:** accepted
 **Decision:** A numeric spread can be classified as verified only when the

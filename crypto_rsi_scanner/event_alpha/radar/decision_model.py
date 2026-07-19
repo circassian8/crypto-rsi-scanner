@@ -940,32 +940,57 @@ def _liquidity_score(market: Mapping[str, Any], *, cfg: RadarDecisionConfig) -> 
 
 
 def _derivatives_score(data: Mapping[str, Any]) -> float:
-    snapshot = data.get("derivatives_state_snapshot") or data.get("derivatives_snapshot")
-    if not isinstance(snapshot, Mapping):
+    snapshot = _derivatives_snapshot(data)
+    if snapshot is None:
         return 30.0
-    freshness = str(
-        data.get("coinalyze_freshness_status")
-        or snapshot.get("derivatives_snapshot_freshness_status")
-        or snapshot.get("freshness_status")
-        or ""
-    ).casefold()
-    score = 78.0 if freshness in {"fresh", "fixture_allowed_stale"} else 48.0
+    if _derivatives_freshness(data, snapshot) not in {
+        "fresh",
+        "fixture_allowed_stale",
+    }:
+        return 30.0
+    score = 78.0
     if _has_crowding(data):
         score = max(score, 85.0)
     return score
 
 
 def _has_crowding(data: Mapping[str, Any]) -> bool:
+    snapshot = _derivatives_snapshot(data)
+    if snapshot is None or _derivatives_freshness(data, snapshot) not in {
+        "fresh",
+        "fixture_allowed_stale",
+    }:
+        return False
     if str(data.get("crowding_class") or "").casefold() in {"moderate", "high", "extreme"}:
         return True
     if _texts(data.get("crowding_exhaustion_evidence")):
         return True
-    snapshot = data.get("derivatives_state_snapshot") or data.get("derivatives_snapshot")
-    if not isinstance(snapshot, Mapping):
-        return False
     oi = _first_number(snapshot, "open_interest_delta_4h", "open_interest_delta_24h", "open_interest_delta")
     funding_z = _first_number(snapshot, "funding_zscore", "funding_rate_zscore")
     return bool((oi is not None and abs(oi) >= 25) or (funding_z is not None and abs(funding_z) >= 2))
+
+
+def _derivatives_snapshot(data: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    for field in ("derivatives_state_snapshot", "derivatives_snapshot"):
+        if field not in data or data.get(field) in (None, ""):
+            continue
+        value = data.get(field)
+        return value if isinstance(value, Mapping) else None
+    return None
+
+
+def _derivatives_freshness(
+    data: Mapping[str, Any],
+    snapshot: Mapping[str, Any],
+) -> str:
+    for owner, field in (
+        (data, "coinalyze_freshness_status"),
+        (snapshot, "derivatives_snapshot_freshness_status"),
+        (snapshot, "freshness_status"),
+    ):
+        if field in owner and owner.get(field) not in (None, ""):
+            return str(owner.get(field)).strip().casefold()
+    return ""
 
 
 def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
