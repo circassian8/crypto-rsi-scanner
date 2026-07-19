@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the twenty-sixth no-send market cycle · Codex
+**Why:** The durable reservation expired with existing CoinGecko authorization
+present, so one genuine observation was due to continue warming the temporal
+baseline and keep campaign, publication, and dashboard truth current.
+**Changes:**
+- Ran exactly one bounded Daily Operations cycle. CoinGecko returned HTTP 200
+  with 80 rows in one request, selected 30 current top-liquidity observations,
+  made no retry, and published/restarted the exact revision-12 namespace
+  `radar_market_no_send_20260719t024647460963z_02a7a81ca5e2`.
+- Regenerated the canonical campaign Markdown/JSON report. Campaign truth is
+  now 26 real cycles, 780 retained observations, 750 baseline-counted
+  observations, 30 too-close observations, five historical and zero current
+  ideas, one matured/three pending/one missing-price outcome, and 0/780 trusted
+  spread observations.
+- Preserved honest maturity: turnover and volume are warm for all 30 current
+  assets; 1h and 4h returns are warm for 29/30, with SHIB at 6/8 and 5/8
+  samples; 24h, relative, and volatility families remain warming.
+- Updated `ROADMAP.md` with the exact authority, campaign counters, maturity
+  frontier, and next eligible boundary at 2026-07-19 03:46:47.948812 UTC.
+**Verify:** Daily Operations ended `succeeded/published_and_restarted`; the
+provider ledger records one HTTP 200 request, 80 results, and zero retries.
+Strict artifact doctor passed with 0 blockers/0 warnings; dashboard authority
+and explicit-namespace readiness returned exact authoritative/READY results.
+The campaign report reconciles 26 cycles and its current pointer. Safety fields
+remain zero.
+**Notes/risks:** No Telegram send, trade, order, paper trade, normal RSI write,
+or Event Alpha `TRIGGERED_FADE` occurred. No authorization was created or
+changed. Bybit remains separately unauthorized and spread coverage remains
+zero; no score, route, threshold, outcome, or human review event was
+manufactured.
+
 ## 2026-07-19 — Make market readiness cadence coherent · Codex
 **Why:** After a failed provider attempt, raw readiness exposed the old history
 eligibility time while a separate reason correctly enforced a later durable
