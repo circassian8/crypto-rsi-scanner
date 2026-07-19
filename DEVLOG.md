@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Harden integrated liquidity evidence selection · Codex
+**Why:** Integrated DEX/protocol merge helpers still resolved numeric aliases by
+truthiness and accepted non-finite floats. A canonical zero pool, depth, spread,
+volume, or TVL could expose a conflicting legacy value, while infinity could
+pass the liquidity-sanity threshold or dominate representative selection.
+**Changes:**
+- Added finite, boolean-safe, non-negative ordered numeric resolution for DEX
+  liquidity snapshots, family market depth/spread, DEX representative ranking,
+  and protocol TVL representative ranking.
+- Made an invalid supplied higher-priority value fail closed instead of being
+  treated as missing or replaced by a lower-priority alias.
+- Added regressions proving canonical zero liquidity blocks sanity, canonical
+  zero spread is not replaced by a wide legacy spread, infinity is rejected,
+  and zero-valued DEX/protocol rows cannot outrank genuinely observed rows via
+  conflicting aliases.
+**Verify:** All 10 focused numeric/merge-policy tests and 107 adjacent Radar
+pipeline, evidence-quality, DefiLlama, operator-workflow, and Decision-v2 tests
+passed. Compileall and architecture cleanliness passed with zero new
+violations. The integrated-radar fixture smoke and strict doctor completed with
+zero blockers/warnings and retained all route/card/dashboard safety checks.
+Full `verify-fast` was not repeated because the immediately preceding shared
+source-boundary commit passed all 3,092 tests and this follow-up is covered by
+the focused merge, pipeline, Decision, architecture, smoke, and doctor gates.
+**Notes/risks:** Valid finite non-negative evidence retains existing behavior.
+Malformed or conflicting context may now select a different representative or
+remain liquidity-unsafe, which is the intended fail-closed correction. No
+threshold, score, provider authorization/call, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Record the cadence-eligible CoinGecko timeout · Codex
 **Why:** The hourly reservation elapsed with existing authorization and clear
 provider backoff, so the next genuine market observation was eligible. Provider

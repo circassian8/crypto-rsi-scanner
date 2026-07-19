@@ -237,3 +237,76 @@ def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():
     assert row["spread_bps"] == 0
     assert row["spread_status"] == "verified"
     assert market_no_send_features.finite_float(True) is None
+
+
+def test_integrated_liquidity_checks_preserve_zero_and_reject_invalid_values():
+    from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts import merge_policy
+
+    assert merge_policy._float_value(float("inf")) is None
+    assert merge_policy._float_value(True) is None
+    assert merge_policy._dex_liquidity_sane({
+        "dex_liquidity_snapshot": {
+            "pool_liquidity_usd": 0,
+            "liquidity_usd": 2_000_000,
+        },
+        "pool_liquidity_usd": 3_000_000,
+    }) is False
+    assert merge_policy._dex_liquidity_sane({
+        "dex_liquidity_snapshot": {"pool_liquidity_usd": float("inf")},
+    }) is False
+    assert merge_policy._family_liquidity_sane([{
+        "market_snapshot": {
+            "liquidity_usd": 0,
+            "order_book_depth_2pct": 2_000_000,
+            "spread_bps": 0,
+        },
+    }]) is False
+    assert merge_policy._family_liquidity_sane([{
+        "market_snapshot": {
+            "liquidity_usd": 2_000_000,
+            "spread_bps": 0,
+            "bid_ask_spread_bps": 300,
+        },
+    }]) is True
+    assert merge_policy._family_liquidity_sane([{
+        "market_snapshot": {
+            "liquidity_usd": float("inf"),
+            "spread_bps": 0,
+        },
+    }]) is False
+
+
+def test_integrated_representatives_rank_canonical_zero_not_legacy_alias():
+    from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts import merge_policy
+
+    dex_zero = {
+        "candidate_id": "dex-zero",
+        "row_type": "event_dex_pool_state",
+        "pool_liquidity_usd": 0,
+        "liquidity_usd": 10_000_000,
+        "dex_volume_24h": 0,
+        "volume_24h": 10_000_000,
+    }
+    dex_observed = {
+        "candidate_id": "dex-observed",
+        "row_type": "event_dex_pool_state",
+        "pool_liquidity_usd": 1_000,
+        "dex_volume_24h": 1_000,
+    }
+    protocol_zero = {
+        "candidate_id": "protocol-zero",
+        "row_type": "event_protocol_fundamentals",
+        "tvl_usd": 0,
+        "tvl": 10_000_000,
+    }
+    protocol_observed = {
+        "candidate_id": "protocol-observed",
+        "row_type": "event_protocol_fundamentals",
+        "tvl_usd": 1_000,
+    }
+
+    assert merge_policy._best_dex_row([dex_zero, dex_observed])["candidate_id"] == "dex-observed"
+    assert (
+        merge_policy._best_protocol_row([protocol_zero, protocol_observed])["candidate_id"]
+        == "protocol-observed"
+    )

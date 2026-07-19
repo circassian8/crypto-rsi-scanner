@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from .runtime import *
 
 
@@ -102,10 +104,40 @@ def _percent_value(value: Any) -> float | None:
 
 
 def _float_value(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+    return number if math.isfinite(number) else None
+
+
+def _numeric_alias_resolution(
+    *sources: tuple[Mapping[str, Any], tuple[str, ...]],
+    minimum: float | None = None,
+) -> tuple[float | None, bool]:
+    """Resolve ordered numeric aliases and report invalid supplied evidence."""
+
+    for source, keys in sources:
+        for key in keys:
+            if key not in source:
+                continue
+            raw = source.get(key)
+            if raw is None or (isinstance(raw, str) and not raw.strip()):
+                continue
+            value = _float_value(raw)
+            if value is None or (minimum is not None and value < minimum):
+                return None, True
+            return value, False
+    return None, False
+
+
+def _numeric_alias_value(
+    *sources: tuple[Mapping[str, Any], tuple[str, ...]],
+    minimum: float | None = None,
+) -> float | None:
+    return _numeric_alias_resolution(*sources, minimum=minimum)[0]
 
 
 def _asset_lookup_keys(row: Mapping[str, Any]) -> set[str]:
@@ -342,8 +374,12 @@ def _dex_liquidity_sane(row: Mapping[str, Any] | None) -> bool:
     if not isinstance(row, Mapping):
         return False
     snapshot = _snapshot_from_row(row, "dex_liquidity_snapshot")
-    liquidity = _float_value(snapshot.get("pool_liquidity_usd") or snapshot.get("liquidity_usd") or row.get("pool_liquidity_usd") or row.get("liquidity_usd"))
-    if liquidity is None:
+    liquidity, invalid = _numeric_alias_resolution(
+        (snapshot, ("pool_liquidity_usd", "liquidity_usd")),
+        (row, ("pool_liquidity_usd", "liquidity_usd")),
+        minimum=0.0,
+    )
+    if invalid or liquidity is None:
         return False
     if liquidity < 250_000:
         return False
@@ -355,8 +391,16 @@ def _family_liquidity_sane(rows: Iterable[Mapping[str, Any]]) -> bool:
         market = row.get("market_snapshot") if isinstance(row.get("market_snapshot"), Mapping) else row.get("market_state_snapshot")
         if not isinstance(market, Mapping):
             continue
-        liquidity = _float_value(market.get("liquidity_usd") or market.get("order_book_depth_2pct") or market.get("depth_2pct_usd"))
-        spread = _float_value(market.get("spread_bps") or market.get("bid_ask_spread_bps"))
+        liquidity, liquidity_invalid = _numeric_alias_resolution(
+            (market, ("liquidity_usd", "order_book_depth_2pct", "depth_2pct_usd")),
+            minimum=0.0,
+        )
+        spread, spread_invalid = _numeric_alias_resolution(
+            (market, ("spread_bps", "bid_ask_spread_bps")),
+            minimum=0.0,
+        )
+        if liquidity_invalid or spread_invalid:
+            continue
         if liquidity is not None and liquidity >= 250_000 and (spread is None or spread <= 150):
             return True
     return False
@@ -597,8 +641,14 @@ def _best_dex_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         candidates,
         key=lambda row: (
             -1 if _dex_row_is_suspicious_low_liquidity(row) else 0,
-            _float_value(row.get("pool_liquidity_usd") or row.get("liquidity_usd")) or 0.0,
-            _float_value(row.get("dex_volume_24h") or row.get("volume_24h")) or 0.0,
+            _numeric_alias_value(
+                (row, ("pool_liquidity_usd", "liquidity_usd")),
+                minimum=0.0,
+            ) or 0.0,
+            _numeric_alias_value(
+                (row, ("dex_volume_24h", "volume_24h")),
+                minimum=0.0,
+            ) or 0.0,
         ),
         reverse=True,
     )[0]
@@ -617,7 +667,10 @@ def _best_protocol_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         candidates,
         key=lambda row: (
             1 if _protocol_growth(row) or _protocol_deterioration(row) else 0,
-            _float_value(row.get("tvl_usd") or row.get("tvl")) or 0.0,
+            _numeric_alias_value(
+                (row, ("tvl_usd", "tvl")),
+                minimum=0.0,
+            ) or 0.0,
         ),
         reverse=True,
     )[0]
