@@ -180,14 +180,14 @@ def _review_timing_lines(
 ) -> list[str]:
     lines = [
         "Human review is counted only through explicit confirmed actions; dashboard GET/HEAD and health probes never create timing evidence.",
-        f"- Status: `{_text(value.get('status'))}`",
+        f"- Recorded-action status: `{_text(value.get('status'))}`",
         f"- Receipt-backed ideas eligible for review timing: `{_int(queue.get('eligible_idea_count'))}`",
         f"- Awaiting explicit human action: `{_int(queue.get('action_required_count'))}`",
         f"- Not yet viewed: `{_int(queue.get('not_viewed_count'))}`",
         f"- In review: `{_int(queue.get('in_review_count'))}`",
         f"- Review queue command: `{_md(queue.get('operator_queue_command')) or 'unavailable'}`",
         f"- Ledger events: `{_int(value.get('ledger_event_count'))}`",
-        f"- Idea records: `{_int(value.get('idea_record_count'))}`",
+        f"- Ideas with recorded human action: `{_int(value.get('idea_record_count'))}`",
         f"- First views: `{_int(value.get('first_view_record_count'))}`",
         f"- Completed reviews: `{_int(value.get('completed_review_record_count'))}`",
         f"- Incomplete reviews: `{_int(value.get('incomplete_review_record_count'))}`",

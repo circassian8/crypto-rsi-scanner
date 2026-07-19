@@ -21,7 +21,11 @@ def _parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     status = subparsers.add_parser(
-        "status", help="Read the bounded point-in-time review-timing report"
+        "status",
+        help=(
+            "Read recorded human-action timing only; use queue to discover "
+            "eligible ideas"
+        ),
     )
     status.add_argument("--evaluated-at")
     queue = subparsers.add_parser(

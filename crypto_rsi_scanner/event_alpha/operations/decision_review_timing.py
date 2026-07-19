@@ -35,6 +35,7 @@ SCHEMA_ID = "decision_radar.idea_review_timing_event"
 SCHEMA_VERSION = 1
 REPORT_SCHEMA_ID = "decision_radar.idea_review_timing_report"
 REPORT_SCHEMA_VERSION = 1
+REVIEW_QUEUE_COMMAND = "make radar-review-timing-queue PYTHON=.venv/bin/python"
 LEDGER_FILENAME = "event_decision_radar_review_timing_events.jsonl"
 LEDGER_DIRECTORY = "radar_market_history_cache"
 EVENT_TYPES = frozenset({"first_viewed", "review_completed"})
@@ -564,6 +565,16 @@ def build_review_timing_report(
         "events_in_window_count": len(selected),
         "events_after_evaluated_at_count": len(all_events) - len(selected),
         "idea_record_count": len(records),
+        "idea_record_count_definition": (
+            "unique_exact_namespace_idea_pairs_with_at_least_one_recorded_"
+            "explicit_human_action"
+        ),
+        "report_scope": "recorded_explicit_human_actions_only",
+        "eligible_idea_discovery_scope": "separate_receipt_backed_review_queue",
+        "eligible_idea_discovery_command": REVIEW_QUEUE_COMMAND,
+        "zero_idea_records_meaning": (
+            "no_explicit_human_actions_recorded_not_no_eligible_ideas"
+        ),
         "first_view_record_count": first_count,
         "completed_review_record_count": complete_count,
         "incomplete_review_record_count": len(records) - complete_count,
@@ -1116,6 +1127,7 @@ __all__ = (
     "LEDGER_DIRECTORY",
     "LEDGER_FILENAME",
     "REPORT_SCHEMA_ID",
+    "REVIEW_QUEUE_COMMAND",
     "SCHEMA_ID",
     "build_review_timing_event",
     "build_review_timing_report",

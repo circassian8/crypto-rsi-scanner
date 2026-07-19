@@ -1145,7 +1145,10 @@ complete, action-required, and skipped counts plus exact idea identities. It
 must not embed machine paths or per-idea confirmed action commands. Therefore
 `ledger_event_count=0` cannot be presented as if no review work exists, and a
 queue row still does not become a measured view until the explicit confirmed
-event is written.
+event is written. The standalone timing-status report remains a ledger-only
+projection, but it must explicitly define its recorded-action scope, define
+what its idea-record count means, and point to the queue command so
+`no_events` cannot be mistaken for `no_eligible_ideas`.
 **Why:** Automated requests cannot prove operator attention, while mutable or
 unbound timestamps would create look-ahead and attribution ambiguity. Explicit
 actions preserve the human/system boundary and exact idea lineage. Separating

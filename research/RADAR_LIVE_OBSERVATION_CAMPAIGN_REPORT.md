@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-19T10:54:47.569863+00:00` from local artifacts only.
+Generated at `2026-07-19T11:29:24.396123+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -160,14 +160,14 @@ These rows remain unresolved because the exact retained price history does not c
 ## Human review timing
 
 Human review is counted only through explicit confirmed actions; dashboard GET/HEAD and health probes never create timing evidence.
-- Status: `no_events`
+- Recorded-action status: `no_events`
 - Receipt-backed ideas eligible for review timing: `3`
 - Awaiting explicit human action: `3`
 - Not yet viewed: `3`
 - In review: `0`
 - Review queue command: `make radar-review-timing-queue PYTHON=.venv/bin/python`
 - Ledger events: `0`
-- Idea records: `0`
+- Ideas with recorded human action: `0`
 - First views: `0`
 - Completed reviews: `0`
 - Incomplete reviews: `0`

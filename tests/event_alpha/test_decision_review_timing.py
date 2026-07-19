@@ -340,6 +340,16 @@ def test_status_without_ledger_is_clean_no_event_report(tmp_path: Path) -> None:
     assert report["status"] == "no_events"
     assert report["ledger_event_count"] == 0
     assert report["records"] == []
+    assert report["report_scope"] == "recorded_explicit_human_actions_only"
+    assert report["idea_record_count_definition"].endswith(
+        "recorded_explicit_human_action"
+    )
+    assert report["eligible_idea_discovery_command"] == (
+        "make radar-review-timing-queue PYTHON=.venv/bin/python"
+    )
+    assert report["zero_idea_records_meaning"] == (
+        "no_explicit_human_actions_recorded_not_no_eligible_ideas"
+    )
     assert report["provider_calls"] == 0
 
 
@@ -606,6 +616,9 @@ def test_campaign_markdown_labels_explicit_review_timing_as_annex_ineligible() -
     assert "Protocol-v2 evidence eligible: `false`" in markdown
     assert "Receipt-backed ideas eligible for review timing: `3`" in markdown
     assert "Awaiting explicit human action: `2`" in markdown
+    assert "Recorded-action status: `complete`" in markdown
+    assert "Ideas with recorded human action: `1`" in markdown
+    assert "- Idea records:" not in markdown
     assert "make radar-review-timing-queue PYTHON=.venv/bin/python" in markdown
 
 

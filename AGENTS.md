@@ -774,7 +774,11 @@ may be added later when a suitable environment already exists.
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
   Human review timing uses the separate append-only shared campaign ledger
   `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
-  `make radar-review-timing-status` is read-only/no-network. `make
+  `make radar-review-timing-status` is read-only/no-network and reports only
+  explicit actions already present in that ledger. Its `no_events` status and
+  zero idea-record count never assert that the eligible review queue is empty;
+  the output names its recorded-action scope and points to the separate queue.
+  `make
   radar-review-timing-queue` is likewise read-only/no-network and discovers
   every campaign-counted idea with valid final publication plus owned-dashboard
   operations receipts, revalidates its exact source generation, and prints the

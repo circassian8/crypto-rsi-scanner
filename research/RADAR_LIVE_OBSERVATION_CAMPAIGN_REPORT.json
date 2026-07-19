@@ -6725,7 +6725,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "64116ac1e5d43fdd6273aa1a723f1172a9ee3b48d936cd600b2331944a46ed05",
     "candidate_rows_supplied": 5,
-    "contract_digest": "5794fb1dbd6534d30955fcf72886241026dc730a94ee23229ac1462334342d46",
+    "contract_digest": "f99947d711a46c9affea53ee349a409dad2046398e4e997204730a49876c168e",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "5a0b2e443d58e7f8e0f31a1eefb81a1ddbe26d7dbe95479bc21ed77ec9a2b0d6",
     "core_rows_supplied": 5,
@@ -6740,7 +6740,7 @@
       "not_evaluated": 0,
       "opposed": 1
     },
-    "evaluated_at": "2026-07-19T10:54:47.569863+00:00",
+    "evaluated_at": "2026-07-19T11:29:24.396123+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -7083,7 +7083,7 @@
         }
       ]
     },
-    "input_binding_digest": "e21c0aa26da82768b086b182468a03c72c27d387489cb7720e3ff726ae628f12",
+    "input_binding_digest": "7b8482e3aedf33d180240c075588c77dd7dfbb1166cb165600214af983022329",
     "matched_control_available": false,
     "matured_episode_count": 2,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -7454,7 +7454,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "d59a2670b2f40130aa3c7b9d4d6fc56ec09d4beae7b40aa96d3e772c64383182",
+    "source_episode_contract_digest": "346df7777cc980f1a71c5bde0eb85f303abedd9b8402d310eb55ac4f5212bb0f",
     "source_episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -7465,7 +7465,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-19T10:54:47.569863+00:00",
+  "generated_at": "2026-07-19T11:29:24.396123+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -7482,7 +7482,7 @@
     "eligible_idea_count": 3,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-19T10:54:47.569863+00:00",
+    "generated_at": "2026-07-19T11:29:24.396123+00:00",
     "in_review_count": 0,
     "not_viewed_count": 3,
     "operator_action_commands_available_via_queue": true,
@@ -7557,13 +7557,16 @@
     "completed_review_record_count": 0,
     "dashboard_reads_recorded_as_human_actions": false,
     "decision_campaign_attachment": "descriptive_exact_identity",
+    "eligible_idea_discovery_command": "make radar-review-timing-queue PYTHON=.venv/bin/python",
+    "eligible_idea_discovery_scope": "separate_receipt_backed_review_queue",
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-19T10:54:47.569863+00:00",
+    "generated_at": "2026-07-19T11:29:24.396123+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
+    "idea_record_count_definition": "unique_exact_namespace_idea_pairs_with_at_least_one_recorded_explicit_human_action",
     "incomplete_review_record_count": 0,
     "latency_seconds_definition": "idea_available_at_to_review_completed_at",
     "ledger_event_count": 0,
@@ -7573,6 +7576,7 @@
     "protocol_v2_evidence_eligible": false,
     "provider_calls": 0,
     "records": [],
+    "report_scope": "recorded_explicit_human_actions_only",
     "research_only": true,
     "row_type": "decision_radar_idea_review_timing_report",
     "safety": {
@@ -7589,7 +7593,8 @@
     },
     "schema_id": "decision_radar.idea_review_timing_report",
     "schema_version": 1,
-    "status": "no_events"
+    "status": "no_events",
+    "zero_idea_records_meaning": "no_explicit_human_actions_recorded_not_no_eligible_ideas"
   },
   "measurement_program": "decision_radar_live_observation_campaign_v2",
   "measurement_scope": {
@@ -8108,7 +8113,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260719t095347969563z_9c44c8df7384",
-    "authority_checked_at": "2026-07-19T10:54:47.569863+00:00",
+    "authority_checked_at": "2026-07-19T11:29:24.396123+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -8461,7 +8466,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "f814875f323dc0a0fec338debb9ba8f3289dade5c20e238c7885e56133fe1424",
+    "audit_digest": "41548f0d57bd552e8c487d4c443b17e2810933329236b23a64709ea1256849c6",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -8773,7 +8778,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "d59a2670b2f40130aa3c7b9d4d6fc56ec09d4beae7b40aa96d3e772c64383182",
+    "episode_contract_digest": "346df7777cc980f1a71c5bde0eb85f303abedd9b8402d310eb55ac4f5212bb0f",
     "episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "episode_records_supplied": 5,
     "exact_outcome_join_count": 5,
@@ -8814,7 +8819,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "d59a2670b2f40130aa3c7b9d4d6fc56ec09d4beae7b40aa96d3e772c64383182",
+    "contract_digest": "346df7777cc980f1a71c5bde0eb85f303abedd9b8402d310eb55ac4f5212bb0f",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -8996,7 +9001,7 @@
         "window_end_exclusive_at": "2026-07-19T02:47:37.287740+00:00"
       }
     ],
-    "evaluated_at": "2026-07-19T10:54:47.569863+00:00",
+    "evaluated_at": "2026-07-19T11:29:24.396123+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

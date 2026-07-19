@@ -374,9 +374,7 @@ def campaign_queue_projection(queue: Mapping[str, Any]) -> dict[str, Any]:
             queue.get("events_after_evaluated_at_count")
         ),
         "records": record_projection,
-        "operator_queue_command": (
-            "make radar-review-timing-queue PYTHON=.venv/bin/python"
-        ),
+        "operator_queue_command": timing.REVIEW_QUEUE_COMMAND,
         "operator_action_commands_available_via_queue": True,
         "absolute_paths_or_action_commands_embedded": False,
         "dashboard_reads_recorded_as_human_actions": False,

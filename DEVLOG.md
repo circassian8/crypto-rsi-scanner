@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Clarify recorded review actions versus queued ideas · Codex
+**Why:** The dashboard and review queue correctly showed three receipt-backed
+ideas awaiting explicit review, while `radar-review-timing-status` showed
+`no_events` and zero idea records. Those facts are compatible—the latter is an
+action-ledger projection—but its standalone wording made them look
+contradictory.
+**Changes:**
+- Made the timing report declare its recorded-explicit-action scope, define an
+  idea record as an exact namespace/idea pair with at least one recorded human
+  action, state that zero records does not mean zero eligible ideas, and point
+  to the read-only queue command.
+- Reused one canonical queue-command constant and clarified the CLI help.
+- Changed campaign Markdown to label the recorded-action status and “Ideas
+  with recorded human action,” keeping eligible/not-viewed/in-review queue
+  counts separate and unchanged. Regenerated the canonical campaign report so
+  current checked evidence now shows 3 eligible / 3 awaiting action beside 0
+  recorded human-action ideas.
+**Verify:** 36 focused review-timing, campaign, and dashboard operator-action
+tests passed; `python3 -m compileall -q crypto_rsi_scanner tests` and `git diff
+--check` passed. The real no-network status now emits the explicit scope and
+queue command with zero provider calls; the real queue still reports exactly
+3 eligible / 3 not-viewed ideas. `make radar-market-campaign-report
+PYTHON=python3` refreshed the canonical report with zero provider calls.
+Architecture cleanliness and size gates passed with zero new violations.
+**Notes/risks:** No human view/completion was fabricated, and no ledger,
+provider, authorization, pointer, score, route, outcome, send, trade, order,
+paper-trade, normal-RSI-write, or Event Alpha `TRIGGERED_FADE` boundary changed.
+The immediately preceding logical change already passed the full local release
+gate, so this additive wording/metadata change used focused verification rather
+than repeating the 3,171-test package gate.
+
 ## 2026-07-19 — Separate provider attempts from terminal invocations · Codex
 **Why:** A safe cadence-blocked re-entry became the latest Daily Operations
 cycle and replaced the dashboard's visible DNS/provider failure with
