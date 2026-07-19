@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v14 records the owner-confirmed primary research
+Execution-quality readiness v15 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -946,17 +946,22 @@ reports long or short gross mid-mark return, net visible-book return, and their
 USDT drag, normalized to entry mid notional. It never adds `spread_bps`
 separately, and it is not realized execution.
 
-The v2 round-trip projection also binds the instrument catalog's `qtyStep`,
-`minOrderQty`, `maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue` together
-with a causal catalog clock and lineage. It rejects quantities below the
-minimum, quantities above both order-style maxima, and entry or exit visible
-quote value below the minimum notional. It reports market versus marketable-
-limit quantity eligibility without selecting either order style. Bybit's
+The v3 round-trip projection binds a separate instrument-catalog snapshot to
+each book leg. Entry constraints must be causal to the entry book; exit
+constraints must have a distinct lineage, be refreshed after entry, and remain
+causal to the exit book. Both snapshots must identify the exact same native
+instrument, while each independently supplies `qtyStep`, `minOrderQty`,
+`maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue`. The reconciled quantity
+must align to both steps and satisfy each leg's own minimum, maxima, and visible
+quote-value minimum. The projection reports market versus marketable-limit
+eligibility per leg plus their same-style intersection, but permits the two
+legs to have different eligible styles because the primitive does not select
+an order style. Bybit's
 [instrument contract](https://bybit-exchange.github.io/docs/v5/market/instrument)
-states that the maximum order quantities change over time, so each future
-catalog capture revalidates them and the Protocol-v2 constraint-freshness
-policy remains explicitly unsealed. Size selection, quantity rounding from a
-USDT tier, order style, fees, funding, latency, beyond-book liquidity, and
+states that maximum order quantities change over time, so reusing entry
+constraints for an exit is invalid. The Protocol-v2 constraint-freshness policy
+remains explicitly unsealed. Size selection, quantity rounding from a USDT
+tier, order style, fees, funding, latency, beyond-book liquidity, and
 unavailable-cost behavior remain unsealed; therefore
 `protocol_v2_cost_model_sealed=false` remains correct.
 
@@ -966,8 +971,9 @@ uses the exact entry-book mid, floors the implied underlying-token quantity to
 `qtyStep`, never exceeds the supplied mid-notional, and proves that the
 shortfall is strictly less than one quantity-step notional. Minimum quantity,
 minimum notional, dynamic market/limit maxima, catalog causality, and book
-identity remain enforced before the derived quantity is joined to the v2
-entry/exit walk. The target is deliberately not labeled a quote-spend budget:
+identity remain enforced before the derived quantity is joined through target-
+notional composite v2 to the v3 entry/exit walk with separate per-leg
+constraint evidence. The target is deliberately not labeled a quote-spend budget:
 a marketable buy can spend more, and a marketable sell can receive less,
 because spread and walked depth are part of the observed leg. The system has
 not chosen the final USDT tier set, adopted the floor rule as Protocol-v2

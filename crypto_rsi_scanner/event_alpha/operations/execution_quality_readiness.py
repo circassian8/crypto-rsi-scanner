@@ -23,7 +23,7 @@ from .bybit_execution_quality import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v14"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v15"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -99,6 +99,13 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "minimum_notional_enforced_on_entry_and_exit_visible_quote_value": True,
     "order_style_quantity_eligibility_reported": True,
     "entry_exit_order_style_policy_sealed": False,
+    "dynamic_constraints_revalidated_per_leg": True,
+    "separate_entry_exit_constraint_lineages_required": True,
+    "exit_constraint_snapshot_required_after_entry": True,
+    "constraint_values_may_change_between_legs": True,
+    "per_leg_order_style_eligibility_reported": True,
+    "round_trip_same_style_intersection_reported": True,
+    "same_order_style_required_by_primitive": False,
     "target_notional_sizing_implemented": True,
     "target_notional_sizing_schema_version": (
         TARGET_NOTIONAL_SIZING_SCHEMA_VERSION
@@ -696,9 +703,9 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             ),
         ),
         supported_offline_adapters=(
-            "bybit_usdt_linear_perpetual_fixture_normalizer_v4",
-            "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v2",
-            "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v1",
+            "bybit_usdt_linear_perpetual_fixture_normalizer_v5",
+            "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
+            "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -744,6 +751,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "catalog_bound_minimum_quantity_minimum_notional_and_dynamic_order_style_maximums_are_preserved_and_enforced",
             "market_and_marketable_limit_quantity_eligibility_are_reported_without_selecting_an_order_style",
             "instrument_constraint_freshness_policy_remains_unsealed_because_Bybit_changes_maximums_over_time",
+            "entry_and_exit_each_require_a_distinct_causal_catalog_snapshot_and_may_have_different_dynamic_constraints",
+            "per_leg_order_style_eligibility_and_the_same_style_intersection_are_reported_without_forcing_one_style_across_both_legs",
             "caller_supplied_USDT_target_mid_notional_can_be_floored_to_qtyStep_and_reconciled_through_both_books",
             "the_sized_mid_notional_never_exceeds_the_reference_target_and_its_shortfall_is_less_than_one_step_notional",
             "the_target_is_not_a_quote_spend_budget_because_marketable_spread_and_impact_can_move_actual_quote_value",
@@ -826,6 +835,20 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"{str(value['instrument_constraints_freshness_policy_sealed']).casefold()} "
         "entry_exit_order_style_policy_sealed="
         f"{str(value['entry_exit_order_style_policy_sealed']).casefold()}",
+        "dynamic_constraints_revalidated_per_leg="
+        f"{str(value['dynamic_constraints_revalidated_per_leg']).casefold()} "
+        "separate_entry_exit_constraint_lineages_required="
+        f"{str(value['separate_entry_exit_constraint_lineages_required']).casefold()} "
+        "exit_constraint_snapshot_required_after_entry="
+        f"{str(value['exit_constraint_snapshot_required_after_entry']).casefold()}",
+        "constraint_values_may_change_between_legs="
+        f"{str(value['constraint_values_may_change_between_legs']).casefold()} "
+        "per_leg_order_style_eligibility_reported="
+        f"{str(value['per_leg_order_style_eligibility_reported']).casefold()} "
+        "round_trip_same_style_intersection_reported="
+        f"{str(value['round_trip_same_style_intersection_reported']).casefold()} "
+        "same_order_style_required_by_primitive="
+        f"{str(value['same_order_style_required_by_primitive']).casefold()}",
         "minimum_order_quantity_enforced="
         f"{str(value['minimum_order_quantity_enforced']).casefold()} "
         "minimum_notional_enforced_on_entry_and_exit_visible_quote_value="

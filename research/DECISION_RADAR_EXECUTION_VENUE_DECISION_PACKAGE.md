@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v14`. Run
+`crypto_radar_execution_quality_readiness_v15`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -106,10 +106,10 @@ remain unsealed; this rule does not manufacture a round-trip cost.
 Equal numeric USDT lookup sizes are not a round-trip identity. The buy curve is
 defined by exact USDT spent, while the sell curve is defined by exact USDT
 proceeds; those values generally correspond to different base quantities. The
-offline v2 round-trip primitive now carries one exact `qtyStep`-aligned
-underlying-token quantity across two distinct fresh books and walks the correct
-entry/exit sides for a long or short. It reports gross mid-mark return, net
-visible-book return, and native-USDT drag without adding spread twice. Bybit's
+offline v3 round-trip primitive now carries one exact underlying-token quantity
+across two distinct fresh books and walks the correct entry/exit sides for a
+long or short. It reports gross mid-mark return, net visible-book return, and
+native-USDT drag without adding spread twice. Bybit's
 current [USDT-contract quantity documentation](https://www.bybit.com/en/help-center/article/Order-Cost-USDT-Contract)
 defines contract quantity in the underlying token. This is not realized
 execution. Protocol v2 still must seal how USDT tiers select and round that
@@ -117,22 +117,25 @@ quantity, along with snapshots, order style, fees, funding, latency,
 beyond-book slippage, unavailable-cost behavior, and the final cost application
 policy.
 
-The v2 projection now also binds the exact catalog values for `minOrderQty`,
-`maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue`, together with a causal
-catalog observation clock and lineage. It rejects a quantity below the minimum,
-above both order-style maxima, or with entry/exit visible quote value below the
-minimum notional. It reports market versus marketable-limit quantity eligibility
-without choosing either style. Bybit documents those maxima as dynamic, so the
-future v5 capture preserves and revalidates them on every complete catalog; the
-annex-level constraint freshness policy remains unsealed.
+The v3 projection binds separate exact catalog snapshots to the entry and exit
+legs. The entry catalog must precede its book; the exit catalog must use a
+distinct lineage, be refreshed after entry, and precede its own book. Both must
+name the same native instrument, while each independently supplies `qtyStep`,
+`minOrderQty`, `maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue`. The
+quantity must align to both steps and satisfy each leg's own limits and visible
+quote minimum. It reports per-leg market versus marketable-limit eligibility
+and their same-style intersection without selecting either style or requiring
+the same style on both legs. Bybit documents those maxima as dynamic, so the
+entry snapshot cannot be reused as timeless exit evidence; the annex-level
+constraint freshness and order-style policies remain unsealed.
 
 A separate offline v1 projection can now turn a caller-supplied native-USDT
 entry-mid reference into a venue-valid candidate quantity. It derives the exact
 entry mid from the same book, floors the implied underlying-token quantity to
 `qtyStep`, never exceeds the target mid-notional, and bounds the shortfall to
-less than one step notional. It then joins that exact quantity to the v2
-entry/exit walk and proves instrument, catalog, book, quantity, and notional
-identity. This target is not a quote-spend budget: a marketable buy may spend
+less than one step notional. Target composite v2 then joins that exact quantity
+to the v3 entry/exit walk and proves instrument, per-leg catalog, book,
+quantity, and notional identity. This target is not a quote-spend budget: a marketable buy may spend
 more and a marketable sell may receive less after spread and depth impact. The
 final target tier set, adoption of this floor rule, and order style remain
 unsealed Protocol-v2 decisions.

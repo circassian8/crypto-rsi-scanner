@@ -42,11 +42,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v13"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v14"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_target_mid_notional_floor_sizing_catalog_bound_dynamic_instrument_"
-    "constraints_quantity_reconciled_round_trip_"
+    "with_target_mid_notional_floor_sizing_separate_entry_exit_catalog_bound_"
+    "dynamic_instrument_constraints_quantity_reconciled_round_trip_"
     "primitive_mid_reference_impact_semantics_native_"
     "Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_cost_unit_"
     "detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
@@ -133,7 +133,7 @@ _EXPECTED_EXECUTION_DECISION = {
     "round_trip_base_quantity_policy_sealed": False,
     "round_trip_size_basis": "same_exact_base_quantity_across_distinct_books",
     "round_trip_visible_book_schema_version": (
-        "crypto_radar.bybit_visible_book_round_trip.v2"
+        "crypto_radar.bybit_visible_book_round_trip.v3"
     ),
     "round_trip_visible_book_order_style": "immediately_marketable_book_walk",
     "round_trip_visible_book_cost_basis": "entry_mid_notional_usdt",
@@ -164,12 +164,19 @@ _EXPECTED_EXECUTION_DECISION = {
     "minimum_notional_enforced_on_entry_and_exit_visible_quote_value": True,
     "order_style_quantity_eligibility_reported": True,
     "entry_exit_order_style_policy_sealed": False,
+    "dynamic_constraints_revalidated_per_leg": True,
+    "separate_entry_exit_constraint_lineages_required": True,
+    "exit_constraint_snapshot_required_after_entry": True,
+    "constraint_values_may_change_between_legs": True,
+    "per_leg_order_style_eligibility_reported": True,
+    "round_trip_same_style_intersection_reported": True,
+    "same_order_style_required_by_primitive": False,
     "target_notional_sizing_implemented": True,
     "target_notional_sizing_schema_version": (
         "crypto_radar.bybit_target_entry_mid_notional_sizing.v1"
     ),
     "target_notional_round_trip_schema_version": (
-        "crypto_radar.bybit_target_notional_visible_book_round_trip.v1"
+        "crypto_radar.bybit_target_notional_visible_book_round_trip.v2"
     ),
     "target_notional_input_unit": "USDT",
     "target_notional_reference": "entry_mid_price",
@@ -534,6 +541,17 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         (
             "instrument_constraints_freshness_policy_sealed=false "
             "entry_exit_order_style_policy_sealed=false"
+        ),
+        (
+            "dynamic_constraints_revalidated_per_leg=true "
+            "separate_entry_exit_constraint_lineages_required=true "
+            "exit_constraint_snapshot_required_after_entry=true"
+        ),
+        (
+            "constraint_values_may_change_between_legs=true "
+            "per_leg_order_style_eligibility_reported=true "
+            "round_trip_same_style_intersection_reported=true "
+            "same_order_style_required_by_primitive=false"
         ),
         (
             "minimum_order_quantity_enforced=true "

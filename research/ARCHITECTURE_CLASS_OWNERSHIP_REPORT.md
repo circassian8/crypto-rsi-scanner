@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T22:58:27.054025+00:00`
+- generated_at: `2026-07-19T23:14:03.660716+00:00`
 - public_class_count: `511`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `1`
@@ -309,4 +309,4 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | function | lines | public |
 |---|---|---:|---:|
-| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 195 | true |
+| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 226 | true |

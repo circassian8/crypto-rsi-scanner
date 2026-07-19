@@ -257,14 +257,17 @@ def test_round_trip_reconciles_one_exact_base_quantity_across_distinct_books(
         _json("orderbook_btcusdt.json"),
         _json("orderbook_btcusdt_exit.json"),
         instrument=_selected()[0],
+        exit_instrument=_selected()[0],
         position_side=position_side,
         base_quantity="15.000",
         entry_acquired_at="2026-07-17T12:00:01Z",
         exit_acquired_at="2026-07-17T13:00:01Z",
         entry_request_lineage_id=f"test.{position_side}.entry",
         exit_request_lineage_id=f"test.{position_side}.exit",
-        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
-        instrument_constraints_lineage_id="test.linear.catalog",
+        entry_instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        entry_instrument_constraints_lineage_id="test.linear.catalog.entry",
+        exit_instrument_constraints_observed_at="2026-07-17T12:59:59Z",
+        exit_instrument_constraints_lineage_id="test.linear.catalog.exit",
     ).to_dict()
 
     assert result["schema_version"] == ROUND_TRIP_SCHEMA_VERSION
@@ -272,26 +275,50 @@ def test_round_trip_reconciles_one_exact_base_quantity_across_distinct_books(
     assert result["base_asset"] == "BTC"
     assert result["quote_asset"] == "USDT"
     assert result["base_quantity"] == "15"
-    assert result["quantity_step"] == "0.001"
-    assert result["minimum_order_quantity"] == "0.001"
-    assert result["maximum_limit_order_quantity"] == "1190"
-    assert result["maximum_market_order_quantity"] == "500"
-    assert result["minimum_notional_value_usdt"] == "5"
-    assert result["entry_notional_meets_minimum"] is True
-    assert result["exit_notional_meets_minimum"] is True
-    assert result["limit_order_quantity_eligible"] is True
-    assert result["market_order_quantity_eligible"] is True
-    assert result["quantity_eligible_order_styles"] == [
+    entry_constraints = result["entry_instrument_constraints"]
+    exit_constraints = result["exit_instrument_constraints"]
+    assert entry_constraints["quantity_step"] == "0.001"
+    assert exit_constraints["quantity_step"] == "0.001"
+    assert entry_constraints["minimum_order_quantity"] == "0.001"
+    assert exit_constraints["minimum_order_quantity"] == "0.001"
+    assert entry_constraints["maximum_limit_order_quantity"] == "1190"
+    assert exit_constraints["maximum_limit_order_quantity"] == "1190"
+    assert entry_constraints["maximum_market_order_quantity"] == "500"
+    assert exit_constraints["maximum_market_order_quantity"] == "500"
+    assert entry_constraints["minimum_notional_value_usdt"] == "5"
+    assert exit_constraints["minimum_notional_value_usdt"] == "5"
+    assert entry_constraints["visible_quote_value_meets_minimum_notional"] is True
+    assert exit_constraints["visible_quote_value_meets_minimum_notional"] is True
+    assert entry_constraints["quantity_aligned_to_step"] is True
+    assert exit_constraints["quantity_aligned_to_step"] is True
+    assert entry_constraints["quantity_eligible_order_styles"] == [
         "market",
         "marketable_limit",
     ]
+    assert exit_constraints["quantity_eligible_order_styles"] == [
+        "market",
+        "marketable_limit",
+    ]
+    assert result["round_trip_quantity_eligible_order_styles"] == [
+        "market",
+        "marketable_limit",
+    ]
+    assert result["order_style_available_on_both_legs"] is True
     assert result["order_style_selected"] is False
-    assert result["instrument_constraints_bound_to_catalog"] is True
-    assert result["instrument_constraints_observed_at"] == (
+    assert entry_constraints["observed_at"] == (
         "2026-07-17T11:59:59Z"
     )
-    assert result["instrument_constraints_lineage_id"] == "test.linear.catalog"
-    assert result["instrument_constraints_causal_to_entry"] is True
+    assert exit_constraints["observed_at"] == "2026-07-17T12:59:59Z"
+    assert entry_constraints["lineage_id"] == "test.linear.catalog.entry"
+    assert exit_constraints["lineage_id"] == "test.linear.catalog.exit"
+    assert entry_constraints["causal_to_leg"] is True
+    assert exit_constraints["causal_to_leg"] is True
+    assert result["instrument_identity_reconciled"] is True
+    assert result["constraint_lineages_distinct"] is True
+    assert result["constraint_snapshots_ordered"] is True
+    assert result["dynamic_constraints_revalidated_per_leg"] is True
+    assert result["constraint_values_changed_between_legs"] is False
+    assert result["quantity_aligned_to_entry_and_exit_steps"] is True
     assert result["instrument_constraints_freshness_policy_sealed"] is False
     assert result["instrument_maximums_dynamic"] is True
     assert result["quantity_unit"] == "base_asset"
@@ -371,14 +398,17 @@ def test_target_notional_sizing_reconciles_into_exact_round_trip(
         _json("orderbook_btcusdt.json"),
         _json("orderbook_btcusdt_exit.json"),
         instrument=_selected()[0],
+        exit_instrument=_selected()[0],
         position_side=position_side,
         target_entry_mid_notional_usdt="1500.75",
         entry_acquired_at="2026-07-17T12:00:01Z",
         exit_acquired_at="2026-07-17T13:00:01Z",
         entry_request_lineage_id=f"test.target.{position_side}.entry",
         exit_request_lineage_id=f"test.target.{position_side}.exit",
-        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
-        instrument_constraints_lineage_id="test.target.catalog",
+        entry_instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        entry_instrument_constraints_lineage_id="test.target.catalog.entry",
+        exit_instrument_constraints_observed_at="2026-07-17T12:59:59Z",
+        exit_instrument_constraints_lineage_id="test.target.catalog.exit",
     ).to_dict()
 
     assert result["schema_version"] == TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION
@@ -471,6 +501,22 @@ def test_target_notional_sizing_fails_closed(
             "request_lineage_not_distinct",
         ),
         (
+            {
+                "entry_instrument_constraints_lineage_id": "same.catalog",
+                "exit_instrument_constraints_lineage_id": "same.catalog",
+            },
+            "constraints_lineage_not_distinct",
+        ),
+        (
+            {
+                "exit_instrument": replace(
+                    _selected()[0],
+                    canonical_asset_id="not-bitcoin",
+                )
+            },
+            "instrument_identity_mismatch",
+        ),
+        (
             {"exit_acquired_at": "2026-07-17T13:01:00Z"},
             "round_trip_snapshot_not_fresh",
         ),
@@ -483,14 +529,17 @@ def test_round_trip_invalid_quantity_identity_freshness_and_depth_fail_closed(
 ) -> None:
     arguments: dict[str, object] = {
         "instrument": _selected()[0],
+        "exit_instrument": _selected()[0],
         "position_side": "long",
         "base_quantity": "15",
         "entry_acquired_at": "2026-07-17T12:00:01Z",
         "exit_acquired_at": "2026-07-17T13:00:01Z",
         "entry_request_lineage_id": "test.roundtrip.entry",
         "exit_request_lineage_id": "test.roundtrip.exit",
-        "instrument_constraints_observed_at": "2026-07-17T11:59:59Z",
-        "instrument_constraints_lineage_id": "test.linear.catalog",
+        "entry_instrument_constraints_observed_at": "2026-07-17T11:59:59Z",
+        "entry_instrument_constraints_lineage_id": "test.linear.catalog.entry",
+        "exit_instrument_constraints_observed_at": "2026-07-17T12:59:59Z",
+        "exit_instrument_constraints_lineage_id": "test.linear.catalog.exit",
     }
     arguments.update(kwargs)
     with pytest.raises(BybitExecutionQualityError, match=error):
@@ -507,19 +556,71 @@ def test_round_trip_rejects_reused_or_reversed_provider_snapshot_order() -> None
             _json("orderbook_btcusdt_exit.json"),
             _json("orderbook_btcusdt.json"),
             instrument=_selected()[0],
+            exit_instrument=_selected()[0],
             position_side="long",
             base_quantity="15",
             entry_acquired_at="2026-07-17T13:00:01Z",
             exit_acquired_at="2026-07-17T12:00:01Z",
             entry_request_lineage_id="test.reversed.entry",
             exit_request_lineage_id="test.reversed.exit",
-            instrument_constraints_observed_at="2026-07-17T11:59:59Z",
-            instrument_constraints_lineage_id="test.linear.catalog",
+            entry_instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+            entry_instrument_constraints_lineage_id="test.linear.catalog.entry",
+            exit_instrument_constraints_observed_at="2026-07-17T12:59:59Z",
+            exit_instrument_constraints_lineage_id="test.linear.catalog.exit",
         )
 
 
 def test_round_trip_reports_quantity_eligibility_without_selecting_order_style() -> None:
-    instrument = replace(
+    exit_instrument = replace(
+        _selected()[0],
+        quantity_step="0.002",
+        minimum_order_quantity="0.002",
+        maximum_market_order_quantity="10",
+    )
+
+    result = model_bybit_visible_book_round_trip(
+        _json("orderbook_btcusdt.json"),
+        _json("orderbook_btcusdt_exit.json"),
+        instrument=_selected()[0],
+        exit_instrument=exit_instrument,
+        position_side="long",
+        base_quantity="15",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        exit_acquired_at="2026-07-17T13:00:01Z",
+        entry_request_lineage_id="test.limitonly.entry",
+        exit_request_lineage_id="test.limitonly.exit",
+        entry_instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        entry_instrument_constraints_lineage_id="test.limitonly.catalog.entry",
+        exit_instrument_constraints_observed_at="2026-07-17T12:59:59Z",
+        exit_instrument_constraints_lineage_id="test.limitonly.catalog.exit",
+    ).to_dict()
+
+    assert result["entry_instrument_constraints"][
+        "market_order_quantity_eligible"
+    ] is True
+    assert result["exit_instrument_constraints"][
+        "market_order_quantity_eligible"
+    ] is False
+    assert result["exit_instrument_constraints"][
+        "limit_order_quantity_eligible"
+    ] is True
+    assert result["entry_instrument_constraints"]["quantity_step"] == "0.001"
+    assert result["exit_instrument_constraints"]["quantity_step"] == "0.002"
+    assert result["quantity_aligned_to_entry_and_exit_steps"] is True
+    assert result["round_trip_quantity_eligible_order_styles"] == [
+        "marketable_limit"
+    ]
+    assert result["order_style_available_on_both_legs"] is True
+    assert result["constraint_values_changed_between_legs"] is True
+    assert result["order_style_selected"] is False
+
+
+def test_round_trip_keeps_per_leg_styles_when_no_single_style_spans_both() -> None:
+    entry_instrument = replace(
+        _selected()[0],
+        maximum_limit_order_quantity="10",
+    )
+    exit_instrument = replace(
         _selected()[0],
         maximum_market_order_quantity="10",
     )
@@ -527,74 +628,175 @@ def test_round_trip_reports_quantity_eligibility_without_selecting_order_style()
     result = model_bybit_visible_book_round_trip(
         _json("orderbook_btcusdt.json"),
         _json("orderbook_btcusdt_exit.json"),
-        instrument=instrument,
+        instrument=entry_instrument,
+        exit_instrument=exit_instrument,
         position_side="long",
         base_quantity="15",
         entry_acquired_at="2026-07-17T12:00:01Z",
         exit_acquired_at="2026-07-17T13:00:01Z",
-        entry_request_lineage_id="test.limitonly.entry",
-        exit_request_lineage_id="test.limitonly.exit",
-        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
-        instrument_constraints_lineage_id="test.linear.catalog",
+        entry_request_lineage_id="test.splitstyles.entry",
+        exit_request_lineage_id="test.splitstyles.exit",
+        entry_instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        entry_instrument_constraints_lineage_id=(
+            "test.splitstyles.catalog.entry"
+        ),
+        exit_instrument_constraints_observed_at="2026-07-17T12:59:59Z",
+        exit_instrument_constraints_lineage_id=(
+            "test.splitstyles.catalog.exit"
+        ),
     ).to_dict()
 
-    assert result["market_order_quantity_eligible"] is False
-    assert result["limit_order_quantity_eligible"] is True
-    assert result["quantity_eligible_order_styles"] == ["marketable_limit"]
+    assert result["entry_instrument_constraints"][
+        "quantity_eligible_order_styles"
+    ] == ["market"]
+    assert result["exit_instrument_constraints"][
+        "quantity_eligible_order_styles"
+    ] == ["marketable_limit"]
+    assert result["round_trip_quantity_eligible_order_styles"] == []
+    assert result["order_style_available_on_both_legs"] is False
     assert result["order_style_selected"] is False
 
 
 @pytest.mark.parametrize(
-    ("instrument_changes", "quantity", "constraints_observed_at", "error"),
+    (
+        "entry_changes",
+        "exit_changes",
+        "quantity",
+        "entry_constraints_at",
+        "exit_constraints_at",
+        "error",
+    ),
     (
         (
             {"minimum_order_quantity": "0.01"},
+            {},
             "0.001",
             "2026-07-17T11:59:59Z",
-            "below_minimum_order_quantity",
+            "2026-07-17T12:59:59Z",
+            "entry_base_quantity_below_minimum_order_quantity",
+        ),
+        (
+            {},
+            {"minimum_order_quantity": "0.01"},
+            "0.001",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T12:59:59Z",
+            "exit_base_quantity_below_minimum_order_quantity",
+        ),
+        (
+            {
+                "quantity_step": "0.002",
+                "minimum_order_quantity": "0.002",
+            },
+            {},
+            "15.001",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T12:59:59Z",
+            "entry_base_quantity_not_aligned_to_quantity_step",
+        ),
+        (
+            {},
+            {
+                "quantity_step": "0.002",
+                "minimum_order_quantity": "0.002",
+            },
+            "15.001",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T12:59:59Z",
+            "exit_base_quantity_not_aligned_to_quantity_step",
         ),
         (
             {
                 "maximum_limit_order_quantity": "10",
                 "maximum_market_order_quantity": "10",
             },
+            {},
             "15",
             "2026-07-17T11:59:59Z",
-            "exceeds_all_order_style_maximums",
+            "2026-07-17T12:59:59Z",
+            "entry_base_quantity_exceeds_all_order_style_maximums",
         ),
         (
             {},
+            {
+                "maximum_limit_order_quantity": "10",
+                "maximum_market_order_quantity": "10",
+            },
+            "15",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T12:59:59Z",
+            "exit_base_quantity_exceeds_all_order_style_maximums",
+        ),
+        (
+            {},
+            {},
             "0.001",
             "2026-07-17T11:59:59Z",
+            "2026-07-17T12:59:59Z",
             "entry_notional_below_instrument_minimum",
         ),
         (
             {},
+            {"minimum_notional_value_usdt": "2000"},
+            "15",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T12:59:59Z",
+            "exit_notional_below_instrument_minimum",
+        ),
+        (
+            {},
+            {},
             "15",
             "2026-07-17T12:00:00.001Z",
-            "constraints_observed_after_entry",
+            "2026-07-17T12:59:59Z",
+            "entry_instrument_constraints_observed_after_entry",
+        ),
+        (
+            {},
+            {},
+            "15",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T13:00:00.001Z",
+            "exit_instrument_constraints_observed_after_exit",
+        ),
+        (
+            {},
+            {},
+            "15",
+            "2026-07-17T11:59:59Z",
+            "2026-07-17T11:59:59.500000Z",
+            "exit_instrument_constraints_not_revalidated_after_entry",
         ),
     ),
 )
 def test_round_trip_instrument_constraints_fail_closed(
-    instrument_changes: dict[str, str],
+    entry_changes: dict[str, str],
+    exit_changes: dict[str, str],
     quantity: str,
-    constraints_observed_at: str,
+    entry_constraints_at: str,
+    exit_constraints_at: str,
     error: str,
 ) -> None:
     with pytest.raises(BybitExecutionQualityError, match=error):
         model_bybit_visible_book_round_trip(
             _json("orderbook_btcusdt.json"),
             _json("orderbook_btcusdt_exit.json"),
-            instrument=replace(_selected()[0], **instrument_changes),
+            instrument=replace(_selected()[0], **entry_changes),
+            exit_instrument=replace(_selected()[0], **exit_changes),
             position_side="long",
             base_quantity=quantity,
             entry_acquired_at="2026-07-17T12:00:01Z",
             exit_acquired_at="2026-07-17T13:00:01Z",
             entry_request_lineage_id="test.constraints.entry",
             exit_request_lineage_id="test.constraints.exit",
-            instrument_constraints_observed_at=constraints_observed_at,
-            instrument_constraints_lineage_id="test.linear.catalog",
+            entry_instrument_constraints_observed_at=entry_constraints_at,
+            entry_instrument_constraints_lineage_id=(
+                "test.constraints.catalog.entry"
+            ),
+            exit_instrument_constraints_observed_at=exit_constraints_at,
+            exit_instrument_constraints_lineage_id=(
+                "test.constraints.catalog.exit"
+            ),
         )
 
 

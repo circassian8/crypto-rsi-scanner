@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v14 must expose those remaining cost fields rather
+  Execution-quality readiness v15 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -593,22 +593,25 @@ may be added later when a suitable environment already exists.
   remains unsealed.
   Buy impact uses exact USDT spent and sell impact uses exact USDT proceeds.
   Equal numeric USDT lookup sizes do not prove equal base-asset quantity. The
-  offline round-trip v2 primitive instead walks two distinct fresh books with
-  one exact `qtyStep`-aligned underlying-token quantity, as defined for Bybit
+  offline round-trip v3 primitive instead walks two distinct fresh books with
+  one exact underlying-token quantity, as defined for Bybit
   USDT-linear contracts, and reports the visible-book drag against entry-mid
-  notional. It also binds the catalog's minimum quantity, market/limit maximum
-  quantities, minimum notional, causal clock, and lineage; rejects quantities
-  below the minimum, above both style maxima, or below minimum visible quote
-  value on either leg; and reports quantity eligibility per order style without
-  selecting one. Bybit changes maximums over time, so each catalog capture must
-  preserve and revalidate them while the annex-level constraint freshness
-  policy remains unsealed. It is not realized execution and must not add
+  notional. It binds a separate exact catalog snapshot and lineage to each leg:
+  entry constraints precede entry, exit constraints are refreshed after entry
+  and precede exit, and both identify the same native instrument. The quantity
+  must align to both `qtyStep` values and satisfy each leg's own minimum,
+  market/limit maxima, and visible-quote minimum. It reports per-leg order-style
+  eligibility and their same-style intersection without selecting a style or
+  requiring the same style across legs. Bybit changes maximums over time, so an
+  entry catalog is never reused as timeless exit evidence; the annex-level
+  constraint freshness policy remains unsealed. It is not realized execution and must not add
   `spread_bps` again.
   The offline target-notional v1 projection accepts a caller-supplied native-
   USDT entry-mid reference, derives the exact entry-book mid, floors the
   underlying-token quantity to `qtyStep`, never exceeds the target mid-
   notional, and bounds the shortfall below one step notional. It joins that
-  exact quantity to the v2 round trip and fails on catalog, book, identity,
+  exact quantity through target-notional composite v2 to the v3 round trip and
+  fails on catalog, book, identity,
   minimum, maximum, or notional drift. The target is not a quote-spend budget:
   marketable spread and depth can make a buy spend more or a sell receive less.
   Do not treat this capability as selection of the final tier set, adoption of

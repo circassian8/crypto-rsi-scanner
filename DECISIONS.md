@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Revalidate dynamic Bybit constraints at each round-trip leg
+**Status:** accepted as an offline correctness contract; Protocol-v2 policy remains unsealed
+**Decision:** A quantity-reconciled Bybit round trip must bind separate,
+distinct-lineage instrument-catalog snapshots to entry and exit. Entry
+constraints must be causal to the entry book. Exit constraints must be
+observed after entry, use a different lineage, and remain causal to the exit
+book. Both snapshots must identify the same exact native instrument, but their
+dynamic values may differ. The common base quantity must align to both
+`qtyStep` values and satisfy each leg's own minimum quantity, market/limit
+maximums, and visible-quote minimum. Report order-style eligibility per leg and
+their same-style intersection without selecting a style or requiring both legs
+to use the same style.
+**Why:** Bybit explicitly treats order maxima as dynamic. Reusing the entry
+catalog for a later exit can falsely claim that a quantity remains admissible,
+while forcing one timeless value would discard valid observed changes. Per-leg
+evidence preserves causal operator truth without inventing an order policy.
+**Revisit when:** The first genuine entry/exit capture exists and the Protocol-
+v2 annex is ready to seal catalog freshness, allowed constraint changes,
+entry/exit order styles, size tiers, and unavailable-cost behavior.
+
 ## 2026-07-20 - Size a supplied Bybit target by conservative venue-step floor
 **Status:** accepted as an offline capability; not yet sealed as Protocol-v2 policy
 **Decision:** A caller-supplied native-USDT target may be interpreted only as an

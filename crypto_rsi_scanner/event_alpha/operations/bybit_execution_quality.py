@@ -21,14 +21,14 @@ import re
 from typing import Any, Mapping, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_usdt_perpetual_execution_quality_v4"
+CONTRACT_VERSION = "crypto_radar_bybit_usdt_perpetual_execution_quality_v5"
 SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_execution_quality.v2"
-ROUND_TRIP_SCHEMA_VERSION = "crypto_radar.bybit_visible_book_round_trip.v2"
+ROUND_TRIP_SCHEMA_VERSION = "crypto_radar.bybit_visible_book_round_trip.v3"
 TARGET_NOTIONAL_SIZING_SCHEMA_VERSION = (
     "crypto_radar.bybit_target_entry_mid_notional_sizing.v1"
 )
 TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION = (
-    "crypto_radar.bybit_target_notional_visible_book_round_trip.v1"
+    "crypto_radar.bybit_target_notional_visible_book_round_trip.v2"
 )
 VENUE_ID = "bybit"
 EXECUTION_MODE = "perpetual"
@@ -250,6 +250,39 @@ class _BybitVisibleBookLeg:
 
 
 @dataclass(frozen=True)
+class _BybitLegInstrumentConstraints:
+    """Dynamic venue order constraints revalidated for one exact book leg."""
+
+    snapshot_role: str
+    instrument_id: str
+    quantity_step: str
+    minimum_order_quantity: str
+    maximum_limit_order_quantity: str
+    maximum_market_order_quantity: str
+    minimum_notional_value_usdt: str
+    base_quantity: str
+    visible_quote_value_usdt: float
+    quantity_aligned_to_step: bool
+    quantity_meets_minimum: bool
+    visible_quote_value_meets_minimum_notional: bool
+    limit_order_quantity_eligible: bool
+    market_order_quantity_eligible: bool
+    quantity_eligible_order_styles: tuple[str, ...]
+    observed_at: str
+    lineage_id: str
+    causal_to_leg: bool
+    maximums_dynamic: bool
+    source_url: str
+
+    def to_dict(self) -> dict[str, object]:
+        value = asdict(self)
+        value["quantity_eligible_order_styles"] = list(
+            self.quantity_eligible_order_styles
+        )
+        return value
+
+
+@dataclass(frozen=True)
 class _BybitVisibleBookRoundTrip:
     """Quantity-reconciled long/short entry and exit visible-book projection."""
 
@@ -262,21 +295,17 @@ class _BybitVisibleBookRoundTrip:
     quote_asset: str
     position_side: str
     base_quantity: str
-    quantity_step: str
-    minimum_order_quantity: str
-    maximum_limit_order_quantity: str
-    maximum_market_order_quantity: str
-    minimum_notional_value_usdt: str
-    entry_notional_meets_minimum: bool
-    exit_notional_meets_minimum: bool
-    limit_order_quantity_eligible: bool
-    market_order_quantity_eligible: bool
-    quantity_eligible_order_styles: tuple[str, ...]
+    entry_instrument_constraints: _BybitLegInstrumentConstraints
+    exit_instrument_constraints: _BybitLegInstrumentConstraints
+    instrument_identity_reconciled: bool
+    constraint_lineages_distinct: bool
+    constraint_snapshots_ordered: bool
+    dynamic_constraints_revalidated_per_leg: bool
+    constraint_values_changed_between_legs: bool
+    quantity_aligned_to_entry_and_exit_steps: bool
+    round_trip_quantity_eligible_order_styles: tuple[str, ...]
+    order_style_available_on_both_legs: bool
     order_style_selected: bool
-    instrument_constraints_bound_to_catalog: bool
-    instrument_constraints_observed_at: str
-    instrument_constraints_lineage_id: str
-    instrument_constraints_causal_to_entry: bool
     instrument_constraints_freshness_policy_sealed: bool
     instrument_maximums_dynamic: bool
     instrument_constraints_source_url: str
@@ -305,8 +334,14 @@ class _BybitVisibleBookRoundTrip:
         value = asdict(self)
         value["entry"] = self.entry.to_dict()
         value["exit"] = self.exit.to_dict()
-        value["quantity_eligible_order_styles"] = list(
-            self.quantity_eligible_order_styles
+        value["entry_instrument_constraints"] = (
+            self.entry_instrument_constraints.to_dict()
+        )
+        value["exit_instrument_constraints"] = (
+            self.exit_instrument_constraints.to_dict()
+        )
+        value["round_trip_quantity_eligible_order_styles"] = list(
+            self.round_trip_quantity_eligible_order_styles
         )
         return value
 
@@ -409,6 +444,7 @@ BybitPublicRequest = _BybitPublicRequest
 BybitPublicRequestPlan = _BybitPublicRequestPlan
 BybitExecutionQualitySnapshot = _BybitExecutionQualitySnapshot
 BybitVisibleBookLeg = _BybitVisibleBookLeg
+BybitLegInstrumentConstraints = _BybitLegInstrumentConstraints
 BybitVisibleBookRoundTrip = _BybitVisibleBookRoundTrip
 BybitTargetNotionalSizing = _BybitTargetNotionalSizing
 BybitTargetNotionalRoundTrip = _BybitTargetNotionalRoundTrip
@@ -893,6 +929,113 @@ def _instrument_order_constraints(
     )
 
 
+def _venue_instrument_identity(
+    instrument: BybitEligibleInstrument,
+) -> tuple[object, ...]:
+    return (
+        instrument.canonical_asset_id,
+        instrument.radar_symbol,
+        instrument.instrument_id,
+        instrument.base_asset,
+        instrument.quote_asset,
+        instrument.settle_asset,
+        instrument.contract_type,
+        instrument.status,
+        instrument.launch_time_ms,
+        instrument.delivery_time_ms,
+    )
+
+
+def _quantity_eligible_order_styles(
+    *,
+    quantity: Decimal,
+    constraints: tuple[Decimal, Decimal, Decimal, Decimal, Decimal],
+    snapshot_role: str,
+) -> tuple[str, ...]:
+    (
+        quantity_step,
+        minimum_order_quantity,
+        maximum_limit_order_quantity,
+        maximum_market_order_quantity,
+        _minimum_notional_value_usdt,
+    ) = constraints
+    if quantity % quantity_step != 0:
+        raise BybitExecutionQualityError(
+            f"{snapshot_role}_base_quantity_not_aligned_to_quantity_step"
+        )
+    if quantity < minimum_order_quantity:
+        raise BybitExecutionQualityError(
+            f"{snapshot_role}_base_quantity_below_minimum_order_quantity"
+        )
+    eligible = tuple(
+        style
+        for style, maximum in (
+            ("market", maximum_market_order_quantity),
+            ("marketable_limit", maximum_limit_order_quantity),
+        )
+        if quantity <= maximum
+    )
+    if not eligible:
+        raise BybitExecutionQualityError(
+            f"{snapshot_role}_base_quantity_exceeds_all_order_style_maximums"
+        )
+    return eligible
+
+
+def _leg_instrument_constraints(
+    *,
+    instrument: BybitEligibleInstrument,
+    constraints: tuple[Decimal, Decimal, Decimal, Decimal, Decimal],
+    quantity: Decimal,
+    visible_quote_value: Decimal,
+    eligible_order_styles: tuple[str, ...],
+    snapshot_role: str,
+    observed_at: datetime,
+    lineage_id: str,
+) -> BybitLegInstrumentConstraints:
+    (
+        quantity_step,
+        minimum_order_quantity,
+        maximum_limit_order_quantity,
+        maximum_market_order_quantity,
+        minimum_notional_value_usdt,
+    ) = constraints
+    if visible_quote_value < minimum_notional_value_usdt:
+        raise BybitExecutionQualityError(
+            f"{snapshot_role}_notional_below_instrument_minimum"
+        )
+    return BybitLegInstrumentConstraints(
+        snapshot_role=snapshot_role,
+        instrument_id=instrument.instrument_id,
+        quantity_step=_canonical_decimal_text(quantity_step),
+        minimum_order_quantity=_canonical_decimal_text(minimum_order_quantity),
+        maximum_limit_order_quantity=_canonical_decimal_text(
+            maximum_limit_order_quantity
+        ),
+        maximum_market_order_quantity=_canonical_decimal_text(
+            maximum_market_order_quantity
+        ),
+        minimum_notional_value_usdt=_canonical_decimal_text(
+            minimum_notional_value_usdt
+        ),
+        base_quantity=_canonical_decimal_text(quantity),
+        visible_quote_value_usdt=_float(visible_quote_value),
+        quantity_aligned_to_step=True,
+        quantity_meets_minimum=True,
+        visible_quote_value_meets_minimum_notional=True,
+        limit_order_quantity_eligible=(
+            "marketable_limit" in eligible_order_styles
+        ),
+        market_order_quantity_eligible="market" in eligible_order_styles,
+        quantity_eligible_order_styles=eligible_order_styles,
+        observed_at=observed_at.isoformat().replace("+00:00", "Z"),
+        lineage_id=lineage_id,
+        causal_to_leg=True,
+        maximums_dynamic=True,
+        source_url=OFFICIAL_INSTRUMENT_DOC,
+    )
+
+
 def size_bybit_target_entry_mid_notional(
     entry_payload: Mapping[str, object],
     *,
@@ -1047,14 +1190,17 @@ def model_bybit_visible_book_round_trip(
     exit_payload: Mapping[str, object],
     *,
     instrument: BybitEligibleInstrument,
+    exit_instrument: BybitEligibleInstrument,
     position_side: str,
     base_quantity: object,
     entry_acquired_at: str,
     exit_acquired_at: str,
     entry_request_lineage_id: str,
     exit_request_lineage_id: str,
-    instrument_constraints_observed_at: str,
-    instrument_constraints_lineage_id: str,
+    entry_instrument_constraints_observed_at: str,
+    entry_instrument_constraints_lineage_id: str,
+    exit_instrument_constraints_observed_at: str,
+    exit_instrument_constraints_lineage_id: str,
     freshness_seconds: float = DEFAULT_FRESHNESS_SECONDS,
 ) -> BybitVisibleBookRoundTrip:
     """Model one quantity-identical visible-book round trip without execution.
@@ -1070,28 +1216,37 @@ def model_bybit_visible_book_round_trip(
         raise BybitExecutionQualityError("position_side_invalid")
     if entry_request_lineage_id == exit_request_lineage_id:
         raise BybitExecutionQualityError("entry_exit_request_lineage_not_distinct")
-    if not _TOKEN_RE.fullmatch(instrument_constraints_lineage_id):
+    if (
+        not _TOKEN_RE.fullmatch(entry_instrument_constraints_lineage_id)
+        or not _TOKEN_RE.fullmatch(exit_instrument_constraints_lineage_id)
+    ):
         raise BybitExecutionQualityError(
             "instrument_constraints_lineage_id_invalid"
         )
-    quantity = _decimal(base_quantity, "base_quantity")
-    (
-        quantity_step,
-        minimum_order_quantity,
-        maximum_limit_order_quantity,
-        maximum_market_order_quantity,
-        minimum_notional_value_usdt,
-    ) = _instrument_order_constraints(instrument)
-    if quantity % quantity_step != 0:
-        raise BybitExecutionQualityError("base_quantity_not_aligned_to_quantity_step")
-    if quantity < minimum_order_quantity:
-        raise BybitExecutionQualityError("base_quantity_below_minimum_order_quantity")
-    limit_order_quantity_eligible = quantity <= maximum_limit_order_quantity
-    market_order_quantity_eligible = quantity <= maximum_market_order_quantity
-    if not (limit_order_quantity_eligible or market_order_quantity_eligible):
+    if (
+        entry_instrument_constraints_lineage_id
+        == exit_instrument_constraints_lineage_id
+    ):
         raise BybitExecutionQualityError(
-            "base_quantity_exceeds_all_order_style_maximums"
+            "entry_exit_instrument_constraints_lineage_not_distinct"
         )
+    if _venue_instrument_identity(instrument) != _venue_instrument_identity(
+        exit_instrument
+    ):
+        raise BybitExecutionQualityError("entry_exit_instrument_identity_mismatch")
+    quantity = _decimal(base_quantity, "base_quantity")
+    entry_constraint_values = _instrument_order_constraints(instrument)
+    exit_constraint_values = _instrument_order_constraints(exit_instrument)
+    entry_eligible_styles = _quantity_eligible_order_styles(
+        quantity=quantity,
+        constraints=entry_constraint_values,
+        snapshot_role="entry",
+    )
+    exit_eligible_styles = _quantity_eligible_order_styles(
+        quantity=quantity,
+        constraints=exit_constraint_values,
+        snapshot_role="exit",
+    )
 
     entry_snapshot = normalize_bybit_orderbook(
         entry_payload,
@@ -1102,7 +1257,7 @@ def model_bybit_visible_book_round_trip(
     )
     exit_snapshot = normalize_bybit_orderbook(
         exit_payload,
-        instrument=instrument,
+        instrument=exit_instrument,
         acquired_at=exit_acquired_at,
         request_lineage_id=exit_request_lineage_id,
         freshness_seconds=freshness_seconds,
@@ -1126,9 +1281,13 @@ def model_bybit_visible_book_round_trip(
     )
     entry_acquired = _utc_datetime(entry_snapshot.acquired_at, "entry_acquired_at")
     exit_acquired = _utc_datetime(exit_snapshot.acquired_at, "exit_acquired_at")
-    constraints_observed = _utc_datetime(
-        instrument_constraints_observed_at,
-        "instrument_constraints_observed_at",
+    entry_constraints_observed = _utc_datetime(
+        entry_instrument_constraints_observed_at,
+        "entry_instrument_constraints_observed_at",
+    )
+    exit_constraints_observed = _utc_datetime(
+        exit_instrument_constraints_observed_at,
+        "exit_instrument_constraints_observed_at",
     )
     if not (
         exit_observed > entry_observed
@@ -1136,9 +1295,20 @@ def model_bybit_visible_book_round_trip(
         and exit_acquired > entry_acquired
     ):
         raise BybitExecutionQualityError("entry_exit_snapshot_order_invalid")
-    if constraints_observed > entry_observed:
+    if entry_constraints_observed > entry_observed:
         raise BybitExecutionQualityError(
-            "instrument_constraints_observed_after_entry"
+            "entry_instrument_constraints_observed_after_entry"
+        )
+    if exit_constraints_observed > exit_observed:
+        raise BybitExecutionQualityError(
+            "exit_instrument_constraints_observed_after_exit"
+        )
+    if not (
+        exit_constraints_observed > entry_observed
+        and exit_constraints_observed > entry_constraints_observed
+    ):
+        raise BybitExecutionQualityError(
+            "exit_instrument_constraints_not_revalidated_after_entry"
         )
 
     entry_action = "buy" if position_side == "long" else "sell"
@@ -1165,13 +1335,34 @@ def model_bybit_visible_book_round_trip(
         gross_return = quantity * (entry_mid - exit_mid)
         net_return = entry_quote - exit_quote
     total_cost = entry_cost + exit_cost
-    if entry_quote < minimum_notional_value_usdt:
-        raise BybitExecutionQualityError("entry_notional_below_instrument_minimum")
-    if exit_quote < minimum_notional_value_usdt:
-        raise BybitExecutionQualityError("exit_notional_below_instrument_minimum")
+    entry_constraints = _leg_instrument_constraints(
+        instrument=instrument,
+        constraints=entry_constraint_values,
+        quantity=quantity,
+        visible_quote_value=entry_quote,
+        eligible_order_styles=entry_eligible_styles,
+        snapshot_role="entry",
+        observed_at=entry_constraints_observed,
+        lineage_id=entry_instrument_constraints_lineage_id,
+    )
+    exit_constraints = _leg_instrument_constraints(
+        instrument=exit_instrument,
+        constraints=exit_constraint_values,
+        quantity=quantity,
+        visible_quote_value=exit_quote,
+        eligible_order_styles=exit_eligible_styles,
+        snapshot_role="exit",
+        observed_at=exit_constraints_observed,
+        lineage_id=exit_instrument_constraints_lineage_id,
+    )
     if (gross_return - net_return) != total_cost:
         raise BybitExecutionQualityError("round_trip_cost_identity_mismatch")
     total_cost_bps = total_cost / entry_mid_notional * Decimal(10_000)
+    round_trip_eligible_styles = tuple(
+        style
+        for style in ("market", "marketable_limit")
+        if style in entry_eligible_styles and style in exit_eligible_styles
+    )
     return BybitVisibleBookRoundTrip(
         schema_version=ROUND_TRIP_SCHEMA_VERSION,
         venue_id=VENUE_ID,
@@ -1182,36 +1373,19 @@ def model_bybit_visible_book_round_trip(
         quote_asset=instrument.quote_asset,
         position_side=position_side,
         base_quantity=_canonical_decimal_text(quantity),
-        quantity_step=_canonical_decimal_text(quantity_step),
-        minimum_order_quantity=_canonical_decimal_text(minimum_order_quantity),
-        maximum_limit_order_quantity=_canonical_decimal_text(
-            maximum_limit_order_quantity
+        entry_instrument_constraints=entry_constraints,
+        exit_instrument_constraints=exit_constraints,
+        instrument_identity_reconciled=True,
+        constraint_lineages_distinct=True,
+        constraint_snapshots_ordered=True,
+        dynamic_constraints_revalidated_per_leg=True,
+        constraint_values_changed_between_legs=(
+            entry_constraint_values != exit_constraint_values
         ),
-        maximum_market_order_quantity=_canonical_decimal_text(
-            maximum_market_order_quantity
-        ),
-        minimum_notional_value_usdt=_canonical_decimal_text(
-            minimum_notional_value_usdt
-        ),
-        entry_notional_meets_minimum=True,
-        exit_notional_meets_minimum=True,
-        limit_order_quantity_eligible=limit_order_quantity_eligible,
-        market_order_quantity_eligible=market_order_quantity_eligible,
-        quantity_eligible_order_styles=tuple(
-            style
-            for style, eligible in (
-                ("market", market_order_quantity_eligible),
-                ("marketable_limit", limit_order_quantity_eligible),
-            )
-            if eligible
-        ),
+        quantity_aligned_to_entry_and_exit_steps=True,
+        round_trip_quantity_eligible_order_styles=round_trip_eligible_styles,
+        order_style_available_on_both_legs=bool(round_trip_eligible_styles),
         order_style_selected=False,
-        instrument_constraints_bound_to_catalog=True,
-        instrument_constraints_observed_at=constraints_observed.isoformat().replace(
-            "+00:00", "Z"
-        ),
-        instrument_constraints_lineage_id=instrument_constraints_lineage_id,
-        instrument_constraints_causal_to_entry=True,
         instrument_constraints_freshness_policy_sealed=False,
         instrument_maximums_dynamic=True,
         instrument_constraints_source_url=OFFICIAL_INSTRUMENT_DOC,
@@ -1244,14 +1418,17 @@ def model_bybit_target_notional_visible_book_round_trip(
     exit_payload: Mapping[str, object],
     *,
     instrument: BybitEligibleInstrument,
+    exit_instrument: BybitEligibleInstrument,
     position_side: str,
     target_entry_mid_notional_usdt: object,
     entry_acquired_at: str,
     exit_acquired_at: str,
     entry_request_lineage_id: str,
     exit_request_lineage_id: str,
-    instrument_constraints_observed_at: str,
-    instrument_constraints_lineage_id: str,
+    entry_instrument_constraints_observed_at: str,
+    entry_instrument_constraints_lineage_id: str,
+    exit_instrument_constraints_observed_at: str,
+    exit_instrument_constraints_lineage_id: str,
     freshness_seconds: float = DEFAULT_FRESHNESS_SECONDS,
 ) -> BybitTargetNotionalRoundTrip:
     """Join conservative target-mid sizing to the exact quantity round trip."""
@@ -1262,22 +1439,37 @@ def model_bybit_target_notional_visible_book_round_trip(
         target_entry_mid_notional_usdt=target_entry_mid_notional_usdt,
         entry_acquired_at=entry_acquired_at,
         entry_request_lineage_id=entry_request_lineage_id,
-        instrument_constraints_observed_at=instrument_constraints_observed_at,
-        instrument_constraints_lineage_id=instrument_constraints_lineage_id,
+        instrument_constraints_observed_at=(
+            entry_instrument_constraints_observed_at
+        ),
+        instrument_constraints_lineage_id=(
+            entry_instrument_constraints_lineage_id
+        ),
         freshness_seconds=freshness_seconds,
     )
     round_trip = model_bybit_visible_book_round_trip(
         entry_payload,
         exit_payload,
         instrument=instrument,
+        exit_instrument=exit_instrument,
         position_side=position_side,
         base_quantity=sizing.sized_base_quantity,
         entry_acquired_at=entry_acquired_at,
         exit_acquired_at=exit_acquired_at,
         entry_request_lineage_id=entry_request_lineage_id,
         exit_request_lineage_id=exit_request_lineage_id,
-        instrument_constraints_observed_at=instrument_constraints_observed_at,
-        instrument_constraints_lineage_id=instrument_constraints_lineage_id,
+        entry_instrument_constraints_observed_at=(
+            entry_instrument_constraints_observed_at
+        ),
+        entry_instrument_constraints_lineage_id=(
+            entry_instrument_constraints_lineage_id
+        ),
+        exit_instrument_constraints_observed_at=(
+            exit_instrument_constraints_observed_at
+        ),
+        exit_instrument_constraints_lineage_id=(
+            exit_instrument_constraints_lineage_id
+        ),
         freshness_seconds=freshness_seconds,
     )
     identity_reconciled = (
@@ -1286,11 +1478,12 @@ def model_bybit_target_notional_visible_book_round_trip(
         and sizing.base_asset == round_trip.base_asset
         and sizing.quote_asset == round_trip.quote_asset
         and sizing.sized_base_quantity == round_trip.base_quantity
-        and sizing.quantity_step == round_trip.quantity_step
+        and sizing.quantity_step
+        == round_trip.entry_instrument_constraints.quantity_step
         and sizing.instrument_constraints_observed_at
-        == round_trip.instrument_constraints_observed_at
+        == round_trip.entry_instrument_constraints.observed_at
         and sizing.instrument_constraints_lineage_id
-        == round_trip.instrument_constraints_lineage_id
+        == round_trip.entry_instrument_constraints.lineage_id
     )
     same_entry_book = (
         sizing.entry_provider_observed_at == round_trip.entry.provider_observed_at
@@ -1469,15 +1662,24 @@ def run_fixture_smoke(fixture_directory: Path) -> dict[str, object]:
             orderbook_payload,
             exit_orderbook_payload,
             instrument=btc,
+            exit_instrument=btc,
             position_side="long",
             target_entry_mid_notional_usdt="1500.75",
             entry_acquired_at="2026-07-17T12:00:01Z",
             exit_acquired_at="2026-07-17T13:00:01Z",
             entry_request_lineage_id="fixture.bybit.btcusdt.entry.20260717",
             exit_request_lineage_id="fixture.bybit.btcusdt.exit.20260717",
-            instrument_constraints_observed_at="2026-07-17T11:59:59Z",
-            instrument_constraints_lineage_id=(
+            entry_instrument_constraints_observed_at=(
+                "2026-07-17T11:59:59Z"
+            ),
+            entry_instrument_constraints_lineage_id=(
                 "fixture.bybit.linear.catalog.20260717"
+            ),
+            exit_instrument_constraints_observed_at=(
+                "2026-07-17T12:59:59Z"
+            ),
+            exit_instrument_constraints_lineage_id=(
+                "fixture.bybit.linear.catalog.exit.20260717"
             ),
         )
     )
@@ -1540,6 +1742,7 @@ __all__ = (
     "BybitEligibleInstrument",
     "BybitExecutionQualityError",
     "BybitExecutionQualitySnapshot",
+    "BybitLegInstrumentConstraints",
     "BybitPublicRequest",
     "BybitPublicRequestPlan",
     "BybitVisibleBookLeg",

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T22:58:23.751485+00:00`
+- generated_at: `2026-07-19T23:14:00.396595+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -54,9 +54,9 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | category | id | lines/count |
 |---|---|---:|
-| `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1564 |
+| `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
 | `file_over_1500_lines` | `file:tests/cli/test_make_targets.py` | 1570 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip` | 195 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip` | 226 |
 
 ## Architecture Gates
 
@@ -90,7 +90,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1564 |
+| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1497 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 |
@@ -165,7 +165,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1564 |
+| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1210 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1205 |
@@ -219,7 +219,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1564 |
+| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
 | `tests/cli/test_make_targets.py` | 1570 |
 
 ## Existing Violations

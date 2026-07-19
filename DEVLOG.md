@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Revalidate dynamic Bybit constraints per book leg · Codex
+**Why:** The quantity-reconciled round trip reused one entry-time catalog row
+for both legs even though Bybit documents its order maxima as dynamic. That
+could claim false exit admissibility after venue constraints changed.
+**Changes:**
+- Advanced the offline round-trip projection to v3. Entry and exit now require
+  separate, distinct-lineage catalog snapshots ordered causally around their
+  exact books, with exact native-instrument identity preserved.
+- Revalidate the shared underlying-token quantity against each leg's own
+  `qtyStep`, minimum quantity, market/limit maxima, and minimum visible quote
+  value. Per-leg style eligibility and the same-style intersection are exposed
+  without selecting a style or requiring both legs to use the same one.
+- Advanced target-notional composite to v2, execution-quality readiness to
+  v15, and current Protocol-v2 progress to v14. Updated the North Star,
+  execution decision package, working agreement, durable decision, roadmap,
+  fixture smoke, and regressions while keeping constraint freshness, final
+  sizes/styles/costs, genuine evidence, and the annex unsealed.
+- Kept quantitative source line counts as advisory telemetry, as already
+  decided. The larger cohesive implementation did not trigger a release block;
+  bounded network/artifact reads remain enforced as security controls.
+**Verify:** 306 focused Bybit execution, capture, intraday, derivatives,
+liquidation, readiness, and Protocol-v2 tests passed. Python compileall, the
+offline Bybit smoke, static readiness, current/frozen Protocol-v2 checks, North
+Star JSON validation, diff check, and architecture cleanliness passed; the
+architecture size report remained `gate_status=pass` with size counts advisory.
+**Notes/risks:** No provider call, authorization, credential/private-data read,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` was added. A genuine capture and the human-approved Protocol-
+v2 cost annex remain required before empirical use.
+
 ## 2026-07-20 — Connect Bybit target notional to exact venue quantity · Codex
 **Why:** The quantity-reconciled book walk still required a manually supplied
 base quantity. A deterministic bridge from a native-USDT research reference is

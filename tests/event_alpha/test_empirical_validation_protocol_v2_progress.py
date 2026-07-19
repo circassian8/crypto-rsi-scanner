@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v13")
+    assert values["progress_version"].endswith("_v14")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -80,7 +80,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
         "same_exact_base_quantity_across_distinct_books"
     )
     assert decision["round_trip_visible_book_schema_version"] == (
-        "crypto_radar.bybit_visible_book_round_trip.v2"
+        "crypto_radar.bybit_visible_book_round_trip.v3"
     )
     assert decision["round_trip_visible_book_order_style"] == (
         "immediately_marketable_book_walk"
@@ -106,12 +106,19 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["instrument_constraints_causality_required"] is True
     assert decision["instrument_constraints_freshness_policy_sealed"] is False
     assert decision["entry_exit_order_style_policy_sealed"] is False
+    assert decision["dynamic_constraints_revalidated_per_leg"] is True
+    assert decision["separate_entry_exit_constraint_lineages_required"] is True
+    assert decision["exit_constraint_snapshot_required_after_entry"] is True
+    assert decision["constraint_values_may_change_between_legs"] is True
+    assert decision["per_leg_order_style_eligibility_reported"] is True
+    assert decision["round_trip_same_style_intersection_reported"] is True
+    assert decision["same_order_style_required_by_primitive"] is False
     assert decision["target_notional_sizing_implemented"] is True
     assert decision["target_notional_sizing_schema_version"] == (
         "crypto_radar.bybit_target_entry_mid_notional_sizing.v1"
     )
     assert decision["target_notional_round_trip_schema_version"] == (
-        "crypto_radar.bybit_target_notional_visible_book_round_trip.v1"
+        "crypto_radar.bybit_target_notional_visible_book_round_trip.v2"
     )
     assert decision["target_notional_input_unit"] == "USDT"
     assert decision["target_notional_reference"] == "entry_mid_price"
@@ -318,10 +325,17 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "round_trip_base_quantity_reconciliation_implemented=true" in output.out
     assert "round_trip_base_quantity_policy_sealed=false" in output.out
     assert "same_exact_base_quantity_across_distinct_books" in output.out
-    assert "crypto_radar.bybit_visible_book_round_trip.v2" in output.out
+    assert "crypto_radar.bybit_visible_book_round_trip.v3" in output.out
     assert "instrument_order_constraints_implemented=true" in output.out
     assert "instrument_maximums_dynamic=true" in output.out
     assert "instrument_constraints_freshness_policy_sealed=false" in output.out
+    assert "dynamic_constraints_revalidated_per_leg=true" in output.out
+    assert "separate_entry_exit_constraint_lineages_required=true" in output.out
+    assert "exit_constraint_snapshot_required_after_entry=true" in output.out
+    assert "constraint_values_may_change_between_legs=true" in output.out
+    assert "per_leg_order_style_eligibility_reported=true" in output.out
+    assert "round_trip_same_style_intersection_reported=true" in output.out
+    assert "same_order_style_required_by_primitive=false" in output.out
     assert "target_notional_sizing_implemented=true" in output.out
     assert "target_notional_input_unit=USDT reference=entry_mid_price" in output.out
     assert "rounding=floor_to_quantity_step" in output.out
