@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-second no-send market cycle · Codex
+**Why:** The persisted one-hour cadence became eligible with the existing
+CoinGecko authorization and no shared-provider backoff. This was the next safe
+chance to extend genuine point-in-time baselines after forward-versioning the
+new temporal-evidence contract.
+**Changes:**
+- Ran exactly one bounded Daily Operations cycle: one CoinGecko request
+  returned HTTP 200 with 80 rows, selected 30 top-liquid observations, and made
+  no retry.
+- Published receipt-backed namespace
+  `radar_market_no_send_20260719t095347969563z_9c44c8df7384`, revision 12,
+  with operator-state digest
+  `2266f887b85b2fb4dc9bfaa1fc6193289e6a75125240e369594e9b629f8d1e7b`.
+  Strict doctor is 0 blockers / 0 warnings and the exact owned dashboard is
+  HTTP 200.
+- All 30 snapshots carry the new temporal-evidence contract version, exact
+  history observation ID, and nonempty evidence map. The scan honestly found
+  zero anomalies and therefore created zero current Decision ideas.
+- Refreshed campaign truth to 32 successful cycles / 960 retained / 930
+  baseline-counted / 30 too-close observations, 5 historical ideas / 0
+  current, 4 matured outcomes / 0 pending / 1 `due_missing_price`, and 0/960
+  trusted spread observations. Twenty-six current assets remain fully warm.
+**Verify:** Daily Operations returned `published_and_restarted`; publication
+and operations receipts agree on namespace/run/revision/operator digest;
+dashboard readiness is `READY`; the owned PID returns exact HTTP 200 identity
+headers; all 30 snapshots have closed feature-evidence pairs; the refreshed
+campaign report is authoritative and internally reconciled.
+**Notes/risks:** The next safe boundary is
+`2026-07-19T10:53:48.732731Z`. No anomaly, idea, spread, notification, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` was
+manufactured. Bybit execution/intraday/derivatives authorization remains absent
+and no Bybit request occurred.
+
 ## 2026-07-19 — Version temporal-evidence enforcement forward · Codex
 **Why:** The new closed history/evidence pair was initially enforced against
 every stored snapshot. Immutable pre-contract live generations already carried
