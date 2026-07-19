@@ -389,6 +389,12 @@ def _classify_namespace(
         return STATUS_ACTIVE_PROVIDER_REHEARSAL, "provider no-send rehearsal namespace", None
     if namespace == "radar_market_history_cache":
         return STATUS_ACTIVE_LIVE_REHEARSAL, "shared live/no-send market observation history", None
+    if namespace.startswith("radar_bybit_liquidation_transcript_"):
+        return (
+            STATUS_MANUAL_REVIEW,
+            "detached operator liquidation application-payload transcript",
+            None,
+        )
     if namespace.startswith("radar_market_no_send"):
         return STATUS_ACTIVE_LIVE_REHEARSAL, "Decision Radar live/no-send observation generation", None
     if "burn_in" in namespace or namespace.startswith("notify_") or namespace.endswith("_live"):
@@ -590,6 +596,11 @@ def _write_namespace_status_markers(base: Path, registry: dict[str, Any], *, now
             continue
         namespace = str(row.get("namespace") or "")
         if not namespace:
+            continue
+        if namespace.startswith("radar_bybit_liquidation_transcript_"):
+            # This detached capture has an exact immutable inventory.  Its
+            # lifecycle state is projected from the root registry and never
+            # injected into the sealed namespace as an unmanifested leaf.
             continue
         event_alpha_namespace_status.write_namespace_status(base / namespace, row, now=now)
         event_alpha_namespace_status.refresh_namespace_status(

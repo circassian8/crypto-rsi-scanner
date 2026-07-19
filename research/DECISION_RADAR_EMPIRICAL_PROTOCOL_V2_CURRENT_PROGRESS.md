@@ -33,7 +33,10 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - no genuine Bybit REST funding/open-interest/positioning capture exists;
 - Bybit liquidation evidence is a separate public-WebSocket surface. The exact
   `allLiquidation.{instrument_id}` message normalizer is implemented and
-  fixture-proven, but no live listener, runtime authorization, immutable
+  fixture-proven. Detached immutable operator-transcript import is also
+  implemented for exact subscribe, acknowledgement, and observed data
+  application payloads, but it proves neither project-owned transport nor
+  continuous stream coverage. No live listener, runtime authorization, genuine
   capture, or Protocol-v2 binding exists;
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
@@ -51,4 +54,5 @@ make radar-execution-quality-readiness PYTHON=.venv/bin/python
 make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python
 make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python
+make radar-derivatives-bybit-liquidation-capture-smoke PYTHON=.venv/bin/python
 ```

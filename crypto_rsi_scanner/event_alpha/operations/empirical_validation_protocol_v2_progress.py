@@ -31,10 +31,10 @@ from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness impor
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v3"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v4"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_native_liquidation_contract"
+    "with_detached_native_liquidation_import"
 )
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
@@ -62,6 +62,7 @@ _NEXT_SAFE_COMMANDS = (
     "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
     "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python",
     "make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python",
+    "make radar-derivatives-bybit-liquidation-capture-smoke PYTHON=.venv/bin/python",
     "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
     "make radar-outcome-price-recovery-readiness PYTHON=.venv/bin/python",
     "make radar-review-timing-queue PYTHON=.venv/bin/python",
@@ -138,8 +139,13 @@ def current_progress_values() -> dict[str, Any]:
                 "Sell": "short_position_liquidated",
             },
             "offline_exact_message_normalizer_implemented": True,
-            "live_listener_implemented": False,
-            "immutable_capture_implemented": False,
+            "operator_transcript_immutable_import_implemented": True,
+            "operator_import_scope": "selected_application_payloads",
+            "operator_import_coverage_status": "observed_messages_only",
+            "operator_import_coverage_complete": False,
+            "project_websocket_listener_implemented": False,
+            "project_transport_capture_implemented": False,
+            "genuine_capture_present": False,
             "runtime_authorization_created": False,
             "provider_connection_attempted": False,
             "protocol_v2_annex_bound": False,
@@ -234,8 +240,13 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
             "Sell": "short_position_liquidated",
         },
         "offline_exact_message_normalizer_implemented": True,
-        "live_listener_implemented": False,
-        "immutable_capture_implemented": False,
+        "operator_transcript_immutable_import_implemented": True,
+        "operator_import_scope": "selected_application_payloads",
+        "operator_import_coverage_status": "observed_messages_only",
+        "operator_import_coverage_complete": False,
+        "project_websocket_listener_implemented": False,
+        "project_transport_capture_implemented": False,
+        "genuine_capture_present": False,
         "runtime_authorization_created": False,
         "provider_connection_attempted": False,
         "protocol_v2_annex_bound": False,
@@ -298,7 +309,9 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         (
             "native_liquidation_surface="
             f"{liquidation['transport']}:{liquidation['topic_template']} "
-            "offline_normalizer=true live_listener=false immutable_capture=false"
+            "offline_normalizer=true detached_import=true "
+            "project_listener=false project_transport_capture=false "
+            "genuine_capture=false coverage=observed_messages_only"
         ),
         (
             "provider_calls=0 credential_reads=0 environment_reads=0 file_reads=0 "

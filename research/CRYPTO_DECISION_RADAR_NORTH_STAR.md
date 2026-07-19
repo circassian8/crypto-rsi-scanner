@@ -963,6 +963,23 @@ policy-neutral, input-quality-ineligible, annex-unbound, and Protocol-v2-
 ineligible. Coinalyze is optional secondary Catalyst-Radar corroboration, not a
 substitute for the chosen venue-native derivatives or execution surface.
 
+Native liquidation events remain a separate Bybit public-WebSocket surface.
+The exact offline `allLiquidation.{instrument_id}` message contract is joined
+by a detached, confirmation-gated operator-transcript import. It preserves the
+supplied subscribe, acknowledgement, and observed data application payloads,
+operator clocks, deterministic normalized events, manifest, and completion
+receipt in one immutable namespace. The package claims only
+`observed_messages_only` coverage, publishes no latest pointer, and stays
+campaign-, dashboard-, policy-, directional-, input-quality-, and Protocol-v2-
+detached. In particular, application payloads do not prove TLS, WebSocket frame
+bytes, project-owned transport, stream continuity, dropped-message absence, or
+liquidation absence during silent intervals. The disposable offline gate is
+`make radar-derivatives-bybit-liquidation-capture-smoke
+PYTHON=.venv/bin/python`; local validation and confirmed import require an
+explicit transcript path, and status requires the exact returned namespace.
+This audit boundary does not replace the still-missing separately authorized,
+permitted, project-owned bounded listener capture.
+
 The direct intraday offline contract likewise validates exact latest-completed
 Bybit trade-price candles independently at 1h and 4h. It cuts requests off just
 before the current bucket, preserves native instrument identity, OHLC,

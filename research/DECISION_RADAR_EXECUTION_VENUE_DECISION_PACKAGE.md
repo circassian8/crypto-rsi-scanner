@@ -126,14 +126,33 @@ instrument identity, message/event/receipt clocks, provider side, documented
 liquidated-position semantics, base-asset size, bankruptcy price, and derived
 USDT notional. It rejects duplicate JSON keys, non-finite or nonpositive values,
 identity/schema drift, and events later than their containing message. It does
-not open a socket or create authorization, persistence, aggregation, policy,
-direction, or Protocol-v2 eligibility. A genuine listener and immutable
-windowed capture remain separate future work and require an explicit boundary;
-until then, liquidation evidence is unavailable. The offline proof is:
+not open a socket or create authorization, aggregation, policy, direction, or
+Protocol-v2 eligibility. A separate confirmation-gated local-import boundary
+can now seal operator-attested subscribe, acknowledgement, and observed data
+application payloads into one exact immutable namespace with normalized events,
+manifest, and completion receipt. It publishes no latest pointer and explicitly
+claims neither TLS/WebSocket framing, project-owned transport, gap-free stream
+coverage, silent-interval absence, campaign/dashboard authority, nor Protocol-v2
+evidence. A genuine project listener and bounded window capture remain separate
+future work and require explicit authorization and a permitted endpoint; until
+then, liquidation coverage remains unavailable. The offline proofs are:
 
 ```sh
 make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python
+make radar-derivatives-bybit-liquidation-capture-smoke PYTHON=.venv/bin/python
 ```
+
+An operator-supplied transcript can be checked without writes using:
+
+```sh
+make radar-derivatives-bybit-liquidation-validate-local \
+  BYBIT_LIQUIDATION_TRANSCRIPT=/absolute/path/to/transcript.json \
+  PYTHON=.venv/bin/python
+```
+
+Sealing it additionally requires `CONFIRM=1`; status always requires the exact
+returned namespace. Neither command infers a latest capture or attaches it to
+product evidence.
 
 Official contracts reviewed 2026-07-19:
 [All Liquidation](https://bybit-exchange.github.io/docs/v5/websocket/public/all-liquidation)

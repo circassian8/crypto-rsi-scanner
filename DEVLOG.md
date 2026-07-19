@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Seal detached Bybit liquidation transcripts · Codex
+**Why:** Protocol v2 needs venue-native liquidation evidence, but an
+operator-supplied WebSocket application transcript cannot honestly prove a
+project-owned connection, frame transport, continuity, or complete observation
+window. We needed a useful audit bridge without promoting partial bytes into
+campaign or Decision authority.
+**Changes:**
+- Added a confirmation-gated local validate/import/status boundary for one
+  exact Bybit `allLiquidation.{instrument_id}` subscribe, acknowledgement, and
+  observed-data transcript. It preserves the source and decoded application
+  bytes, rederives normalized events, and seals fingerprints, a bounded ledger,
+  manifest, and receipt without publishing a latest pointer.
+- Held one canonical artifact-root descriptor and cooperative lock across
+  source ancestry validation, staged publication, immutable reuse, and semantic
+  revalidation. Exact concurrent imports resolve to one write plus one verified
+  reuse; source/namespace/ancestor swaps, interrupted writes, extra leaves,
+  symlinks, hardlinks, drift, oversized projections, and identity collisions
+  fail closed.
+- Closed payload semantics around strict subscribe/ack correlation, causal
+  launch/message/event clocks, canonical Decimal-based occurrence identity,
+  duplicate rejection, finite values, total-event bounds, fixture/test lineage,
+  and secret scanning both before and after JSON escape decoding.
+- Made every persisted/result surface explicit that coverage is only
+  `observed_messages_only`: source identity is operator-attested and unverified;
+  transport, provider connection, frame/TLS evidence, continuity, input,
+  pointer, campaign, dashboard, policy, direction, and Protocol-v2 authority
+  are false. All no-send/no-order/no-trade/no-paper/no-RSI/no-`TRIGGERED_FADE`
+  counters are closed and Radar-scoped.
+- Added offline Make commands, current Protocol-v2 progress truth, lifecycle
+  classification without mutating the sealed namespace, North Star/venue docs,
+  a durable decision, and export regressions proving standard-review exclusion
+  plus optional noncanonical-history retention.
+**Verify:** Final focused stack passed 91 tests across liquidation stream/capture,
+Protocol-v2 progress, lifecycle, and project export. Both liquidation smokes,
+the Protocol-v2 progress check, Make-target wiring regression, compileall, JSON
+validation, North Star static check, export parent-symlink regression, and architecture cleanliness passed;
+final independent review reported zero blockers. `verify-fast` passed 3,235
+tests and hit one sandbox-only loopback-bind denial; that exact dashboard
+concurrency regression passed separately outside the socket-restricted sandbox
+(1 passed), so no product failure remained.
+**Notes/risks:** No provider request, WebSocket connection, environment or
+credential lookup, send, trade, order, paper trade, normal RSI write, route,
+score, threshold, or Event Alpha `TRIGGERED_FADE` was added. A genuine bounded
+liquidation capture still requires a separately authorized, permitted,
+project-owned listener and remains an explicit Protocol-v2 blocker.
+
 ## 2026-07-19 — Record the thirty-fourth no-send market cycle · Codex
 **Why:** The hourly cadence boundary became eligible while the already-present
 CoinGecko authorization remained valid. One bounded observation was needed to

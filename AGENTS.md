@@ -717,12 +717,24 @@ may be added later when a suitable environment already exists.
   provider `Buy` = long-position-liquidated and `Sell` =
   short-position-liquidated semantics, native base size, bankruptcy price,
   derived USDT notional, exact source fingerprint, and causal clocks. This is
-  only an offline input contract: no live listener, immutable capture,
-  authorization, campaign attachment, direction, or Protocol-v2 eligibility
-  exists. Do not substitute the four-request REST derivatives bundle or
-  Coinalyze for required native liquidation evidence. Any live WebSocket
-  boundary requires a separate explicit authorization and must stop on the
-  recorded reachability restriction without proxy, VPN, or regional bypass.
+  only an offline input contract. A separate detached operator-import boundary
+  now supports `radar-derivatives-bybit-liquidation-capture-smoke`,
+  `...-validate-local`, confirmed `...-import-local`, and exact-namespace
+  `...-status`. It seals exact supplied subscribe, acknowledgement, and observed
+  data application payloads, their operator clocks, deterministic event
+  projection, manifest, and completion receipt into one immutable namespace;
+  it publishes no latest pointer. The import is explicitly limited to selected
+  application payloads: it does not prove TLS or WebSocket framing, project-
+  owned transport, uninterrupted stream coverage, absence of dropped messages,
+  or absence of liquidations during silent intervals. It grants no live
+  listener, authorization, campaign/dashboard authority, direction, input-
+  quality eligibility, or Protocol-v2 evidence. Operator mode rejects
+  fixture/test/mock/replay provenance and requires `CONFIRM=1`; validation and
+  status make no provider call. Do not substitute the four-request REST
+  derivatives bundle or Coinalyze for required native liquidation evidence.
+  Any live WebSocket boundary requires a separate explicit authorization and
+  must stop on the recorded reachability restriction without proxy, VPN, or
+  regional bypass.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,

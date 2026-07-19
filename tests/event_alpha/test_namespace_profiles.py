@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 
 from crypto_rsi_scanner.event_alpha.namespace import lifecycle
+from crypto_rsi_scanner.event_alpha.operations import bybit_liquidation_capture
 
 # --- Migrated from tests/test_indicators.py; keep standalone-compatible. ---
 from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
@@ -30,6 +33,7 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
         "catalyst_frame_validation",
         "decision_radar_research_lab",
         "quality_validation",
+        "radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab",
         "research_send",
         "shim_report",
         "source_enrichment",
@@ -47,6 +51,7 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
         "catalyst_frame_validation",
         "decision_radar_research_lab",
         "quality_validation",
+        "radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab",
         "research_send",
         "source_enrichment",
     ):
@@ -80,6 +85,44 @@ def test_market_no_send_campaign_namespaces_are_live_rehearsals(tmp_path: Path):
 
     assert all(row["status"] == "active_live_rehearsal" for row in rows.values())
     assert not [row for row in rows.values() if row["status"] == "unknown"]
+
+
+def test_lifecycle_report_never_injects_a_marker_into_liquidation_capture(
+    tmp_path: Path,
+) -> None:
+    artifact_base = tmp_path / "artifacts"
+    source_dir = tmp_path / "operator_inputs"
+    report_dir = tmp_path / "reports"
+    artifact_base.mkdir()
+    source_dir.mkdir()
+    source = source_dir / "transcript.json"
+    transcript = json.loads(bybit_liquidation_capture._smoke_transcript())
+    transcript["capture_mode"] = "operator_import"
+    source.write_text(json.dumps(transcript), encoding="utf-8")
+    captured = bybit_liquidation_capture.import_bybit_liquidation_transcript(
+        artifact_base,
+        transcript_path=source,
+        confirm=True,
+    )
+    namespace = str(captured["artifact_namespace"])
+    namespace_dir = artifact_base / namespace
+    before = {path.name for path in namespace_dir.iterdir()}
+
+    registry = lifecycle.write_namespace_lifecycle_report(
+        artifact_base,
+        out_dir=report_dir,
+        now=datetime(2026, 7, 19, 14, 0, tzinfo=timezone.utc),
+    )
+
+    row = next(item for item in registry["namespaces"] if item["namespace"] == namespace)
+    assert row["status"] == "manual_review"
+    assert row["safe_for_send_readiness"] is False
+    assert {path.name for path in namespace_dir.iterdir()} == before
+    assert "event_alpha_namespace_status.json" not in before
+    assert bybit_liquidation_capture.validate_bybit_liquidation_capture(
+        artifact_base,
+        namespace=namespace,
+    )["status"] == "complete"
 
 
 def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namespaces():

@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v3")
+    assert values["progress_version"].endswith("_v4")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -59,8 +59,13 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert liquidation["transport"] == "public_websocket"
     assert liquidation["topic_template"] == "allLiquidation.{instrument_id}"
     assert liquidation["offline_exact_message_normalizer_implemented"] is True
-    assert liquidation["live_listener_implemented"] is False
-    assert liquidation["immutable_capture_implemented"] is False
+    assert liquidation["operator_transcript_immutable_import_implemented"] is True
+    assert liquidation["operator_import_scope"] == "selected_application_payloads"
+    assert liquidation["operator_import_coverage_status"] == "observed_messages_only"
+    assert liquidation["operator_import_coverage_complete"] is False
+    assert liquidation["project_websocket_listener_implemented"] is False
+    assert liquidation["project_transport_capture_implemented"] is False
+    assert liquidation["genuine_capture_present"] is False
     assert liquidation["provider_connection_attempted"] is False
     assert liquidation["protocol_v2_evidence_eligible"] is False
     assert "historical_outcome_recovery_incomplete" in values[
@@ -120,7 +125,9 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     version_drift = progress.current_progress_values()
     version_drift["progress_version"] = "decision_radar_progress_unknown"
     liquidation_drift = progress.current_progress_values()
-    liquidation_drift["native_liquidation_contract"]["live_listener_implemented"] = True
+    liquidation_drift["native_liquidation_contract"][
+        "project_websocket_listener_implemented"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -175,9 +182,12 @@ def test_progress_human_output_and_make_targets_are_explicit(
     )
     assert "- genuine_bybit_liquidation_stream_capture_absent" in output.out
     assert "native_liquidation_surface=public_websocket:" in output.out
-    assert "offline_normalizer=true live_listener=false" in output.out
+    assert "offline_normalizer=true detached_import=true" in output.out
+    assert "project_listener=false project_transport_capture=false" in output.out
+    assert "genuine_capture=false coverage=observed_messages_only" in output.out
     assert "offline/readiness/queue only; no provider calls" in output.out
     assert "radar-derivatives-bybit-liquidation-smoke" in output.out
+    assert "radar-derivatives-bybit-liquidation-capture-smoke" in output.out
     assert "radar-outcome-price-recovery-readiness" in output.out
     assert "event-alpha-source-independence-oos-readiness" in output.out
     assert "provider_calls=0" in output.out

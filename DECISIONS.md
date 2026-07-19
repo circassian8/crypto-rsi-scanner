@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep operator-imported liquidation transcripts non-authoritative
+**Status:** accepted
+**Decision:** A local Bybit liquidation transcript may immutably preserve and
+rederive exact operator-supplied subscribe, acknowledgement, and observed data
+application payloads, but it must publish no latest pointer and claim only
+`observed_messages_only` coverage. It cannot claim project-owned transport,
+TLS/WebSocket framing, uninterrupted stream continuity, absence of dropped
+messages, or absence of liquidations during silence. Keep every such capture
+campaign-, dashboard-, policy-, direction-, input-quality-, and Protocol-v2-
+detached even when its internal artifact package validates cleanly.
+**Why:** Exact application bytes and deterministic normalization are useful
+audit evidence, but an operator-supplied fragment cannot prove the transport or
+continuous bounded observation window needed for empirical liquidation rates.
+Calling it authoritative would turn unknown collection gaps into false market
+evidence.
+**Revisit when:** A separately authorized, permitted, project-owned listener can
+seal a genuine bounded window with connection, heartbeat, disconnect, and
+continuity evidence. It must stop on the recorded Bybit restriction and may not
+use a proxy, VPN, alternate regional host, or secondary provider to conceal a
+native-source failure.
+
 ## 2026-07-19 - Preserve provider-attempt truth across later skipped invocations
 **Status:** accepted
 **Decision:** Persist the latest terminal Daily Operations invocation and the
@@ -45,8 +66,10 @@ instrument identity, provider event/message/receipt clocks, provider side,
 documented liquidated-position semantics, base-asset size, bankruptcy price,
 and USDT notional. The existing REST funding/open-interest/positioning bundle
 does not imply liquidation coverage, and Coinalyze cannot substitute for native
-Protocol-v2 evidence. The offline normalizer grants no live-listener,
-authorization, persistence, aggregation, directional, or evidence authority.
+Protocol-v2 evidence. The offline normalizer alone grants no live-listener,
+authorization, aggregation, directional, or evidence authority. Detached
+operator-import persistence, when present, remains governed by the separate
+non-authoritative transcript decision above.
 **Why:** Bybit exposes all-liquidation events through a public WebSocket rather
 than the V5 REST market catalog. Collapsing the surfaces would report a required
 field as covered when no native liquidation observation was collected.

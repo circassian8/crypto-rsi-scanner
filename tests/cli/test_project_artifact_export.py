@@ -88,6 +88,17 @@ def _project_tree(tmp_path: Path) -> tuple[Path, str, str]:
     )
     _write(artifact_root / "old_fixture/result.json", b'{"fixture":true}\n')
     _write(artifact_root / "historical_rows.jsonl", b'{"historical":true}\n')
+    liquidation_namespace = (
+        "radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab"
+    )
+    _write(
+        artifact_root / liquidation_namespace / "capture_manifest.json",
+        b'{"detached":true}\n',
+    )
+    _write(
+        artifact_root / liquidation_namespace / "application_payload_003.bin",
+        b'{"topic":"allLiquidation.BTCUSDT"}',
+    )
     _write(artifact_root / ".runtime.lock", b"machine-local\n")
     return root, current, latest
 
@@ -124,9 +135,13 @@ def test_standard_export_contains_only_manifested_canonical_artifacts(
     } == expected_artifacts
     assert "event_fade_cache/old_fixture/result.json" not in names
     assert "event_fade_cache/historical_rows.jsonl" not in names
+    assert not any(
+        name.startswith("event_fade_cache/radar_bybit_liquidation_transcript_")
+        for name in names
+    )
     assert "event_fade_cache/.runtime.lock" not in names
     assert manifest["entry_count"] == len(expected_artifacts)
-    assert manifest["excluded_history_count"] == 2
+    assert manifest["excluded_history_count"] == 4
     assert manifest["excluded_noise"] == ["event_fade_cache/.runtime.lock"]
     assert manifest["canonical_selection_is_closed"] is True
     assert manifest["canonical_source_coverage_status"] == "partial"
@@ -235,12 +250,26 @@ def test_optional_project_history_is_exact_disjoint_checksummed_complement(
     expected_history = {
         "event_fade_cache/old_fixture/result.json",
         "event_fade_cache/historical_rows.jsonl",
+        "event_fade_cache/radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab/capture_manifest.json",
+        "event_fade_cache/radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab/application_payload_003.bin",
     }
     assert names == expected_history | {_HISTORY_MANIFEST, _HISTORY_CHECKSUMS}
     assert {row["path"] for row in manifest["entries"]} == expected_history
     assert manifest["complement_of_standard_project_selection"] is True
     assert manifest["canonical_artifacts_included"] is False
     assert manifest["local_artifacts_deleted_or_moved"] is False
+    detached_rows = [
+        row
+        for row in manifest["entries"]
+        if "radar_bybit_liquidation_transcript_" in row["path"]
+    ]
+    assert len(detached_rows) == 2
+    assert {row["role"] for row in detached_rows} == {
+        "noncanonical_namespace_artifact"
+    }
+    assert {row["semantic_ids"]["historical_or_noncanonical"] for row in detached_rows} == {
+        True
+    }
     assert checksums == "".join(
         f"{hashlib.sha256((root / path).read_bytes()).hexdigest()}  {path}\n"
         for path in sorted(expected_history)
