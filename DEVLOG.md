@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve canonical outcome arithmetic inputs · Codex
+**Why:** Playbook outcome metrics still selected returns, excursions, benchmark
+returns, entry prices, and OHLC fallbacks by truthiness. Explicit zero evidence
+could therefore be replaced by a legacy value, changing underperformance and
+MFE/MAE labels that future Protocol-v2 analysis must reproduce exactly.
+**Changes:**
+- Made primary, BTC, alt-basket, 72h/7d, MFE, and MAE inputs resolve by ordered
+  presence with finite validation, preserving explicit zeroes.
+- Made invalid or non-positive supplied entry prices fail closed rather than
+  falling through to a legacy field or later observed close; the price-series
+  fallback remains available only when no entry field was supplied.
+- Made high/low/close extreme selection require positive finite prices, and
+  rejected booleans as numeric outcome evidence.
+- Added regressions for zero benchmark arithmetic, zero MFE/MAE, non-finite
+  canonical values, invalid entry fallback, and malformed OHLC extremes.
+**Verify:** All 15 focused numeric/outcome tests and 104 broader alert outcome,
+artifact-doctor, burn-in, dashboard, observation, eligibility, operator, and
+JSONL outcome tests passed. Compileall and architecture cleanliness passed with
+zero new violations. The integrated-radar smoke completed with a strict doctor
+at zero blockers/warnings and rendered all fixture dashboard surfaces.
+Full `verify-fast` was not repeated because the shared source-boundary change
+earlier in this prompt passed all 3,092 tests and this outcome-only follow-up is
+covered by the focused outcome, eligibility, architecture, smoke, and doctor
+gates.
+**Notes/risks:** Valid finite inputs retain their values. Historical rows with
+conflicting zero/legacy aliases or invalid prices may now produce corrected
+metrics or remain unavailable; historical artifacts are not rewritten. No
+threshold, score, route, provider authorization/call, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Harden integrated liquidity evidence selection · Codex
 **Why:** Integrated DEX/protocol merge helpers still resolved numeric aliases by
 truthiness and accepted non-finite floats. A canonical zero pool, depth, spread,

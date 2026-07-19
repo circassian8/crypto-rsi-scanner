@@ -23,10 +23,15 @@ def compute_playbook_outcome_metrics(
         (dict(item) for item in price_rows),
         key=lambda item: _dt(item.get("timestamp")) or datetime.max.replace(tzinfo=timezone.utc),
     )
-    entry = _num(entry_price) or _num(row.get("entry_reference_price")) or _num(row.get("market_price"))
-    if entry is None and observed is not None:
+    entry, entry_invalid = _numeric_alias_resolution(
+        ({"entry_price": entry_price}, ("entry_price",)),
+        (row, ("entry_reference_price", "market_price")),
+        minimum=0.0,
+        exclusive=True,
+    )
+    if entry is None and not entry_invalid and observed is not None:
         first = _first_after(prices, observed)
-        entry = _num(first.get("close")) if first else None
+        entry = _positive_price(first, "close") if first else None
 
     metrics: dict[str, Any] = {
         "volatility_hit": None,
@@ -54,8 +59,16 @@ def compute_playbook_outcome_metrics(
     if trough is not None:
         metrics["time_to_trough_hours"] = _hours_between(observed, _dt(trough.get("timestamp")))
 
-    mfe = _num(returns.get("max_favorable_excursion") or row.get("max_favorable_excursion"))
-    mae = _num(returns.get("max_adverse_excursion") or row.get("max_adverse_excursion"))
+    mfe = _numeric_alias_value(
+        (returns, ("max_favorable_excursion",)),
+        (row, ("max_favorable_excursion",)),
+        minimum=0.0,
+    )
+    mae = _numeric_alias_value(
+        (returns, ("max_adverse_excursion",)),
+        (row, ("max_adverse_excursion",)),
+        minimum=0.0,
+    )
     if mfe is not None and mae is not None and mae > 0:
         metrics["mfe_mae_ratio"] = mfe / mae
 
@@ -69,18 +82,31 @@ def compute_playbook_outcome_metrics(
         else None
     )
 
-    return_72h = _num(returns.get("return_72h") or row.get("return_72h"))
-    return_7d = _num(returns.get("return_7d") or row.get("return_7d"))
+    return_72h = _numeric_alias_value(
+        (returns, ("return_72h",)), (row, ("return_72h",)),
+    )
+    return_7d = _numeric_alias_value(
+        (returns, ("return_7d",)), (row, ("return_7d",)),
+    )
     up_leg = _up_leg_from_prices(entry, window)
     if expected_direction == "up_then_fade" or success_metric == "mfe_mae":
         metrics["up_then_fade_hit"] = bool(up_leg is not None and up_leg > 0.05 and ((return_72h or 0) < 0 or (return_7d or 0) < 0))
 
-    primary_return = _num(returns.get("primary_horizon_return") or row.get("primary_horizon_return"))
-    btc_return = _num(row.get("btc_primary_horizon_return") or row.get("btc_return_primary") or row.get("benchmark_btc_return"))
-    alt_return = _num(
-        row.get("alt_basket_primary_horizon_return")
-        or row.get("alt_basket_return_primary")
-        or row.get("benchmark_alt_basket_return")
+    primary_return = _numeric_alias_value(
+        (returns, ("primary_horizon_return",)),
+        (row, ("primary_horizon_return",)),
+    )
+    btc_return = _numeric_alias_value(
+        (row, (
+            "btc_primary_horizon_return", "btc_return_primary", "benchmark_btc_return",
+        )),
+    )
+    alt_return = _numeric_alias_value(
+        (row, (
+            "alt_basket_primary_horizon_return",
+            "alt_basket_return_primary",
+            "benchmark_alt_basket_return",
+        )),
     )
     if primary_return is not None and btc_return is not None:
         metrics["underperformance_vs_btc"] = primary_return - btc_return
@@ -91,9 +117,9 @@ def compute_playbook_outcome_metrics(
     if event_time is not None and prices:
         start = _first_after(prices, event_time)
         end = _first_after(prices, observed)
-        start_close = _num(start.get("close")) if start else None
-        end_close = _num(end.get("close")) if end else None
-        if start_close and end_close:
+        start_close = _positive_price(start, "close") if start else None
+        end_close = _positive_price(end, "close") if end else None
+        if start_close is not None and end_close is not None:
             metrics["event_window_return"] = (end_close - start_close) / start_close
     return metrics
 
@@ -140,7 +166,7 @@ def _catalyst_found_after_anomaly(row: Mapping[str, Any]) -> bool | None:
 
 
 def _up_leg_from_prices(entry: float, rows: Iterable[Mapping[str, Any]]) -> float | None:
-    values = [_num(row.get("high")) or _num(row.get("close")) for row in rows]
+    values = [_positive_price(row, "high", "close") for row in rows]
     values = [value for value in values if value is not None]
     return None if not values else (max(values) - entry) / entry
 
@@ -148,7 +174,7 @@ def _up_leg_from_prices(entry: float, rows: Iterable[Mapping[str, Any]]) -> floa
 def _extreme(rows: Iterable[Mapping[str, Any]], *, key: str, fallback: str, mode: str) -> Mapping[str, Any] | None:
     valid = []
     for row in rows:
-        value = _num(row.get(key)) or _num(row.get(fallback))
+        value = _positive_price(row, key, fallback)
         if value is not None:
             valid.append((value, row))
     if not valid:
@@ -191,8 +217,57 @@ def _dt(value: object) -> datetime | None:
 
 
 def _num(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _numeric_alias_value(
+    *sources: tuple[Mapping[str, Any], tuple[str, ...]],
+    minimum: float | None = None,
+    exclusive: bool = False,
+) -> float | None:
+    """Resolve the first supplied numeric field without truthiness fallback."""
+
+    return _numeric_alias_resolution(
+        *sources,
+        minimum=minimum,
+        exclusive=exclusive,
+    )[0]
+
+
+def _numeric_alias_resolution(
+    *sources: tuple[Mapping[str, Any], tuple[str, ...]],
+    minimum: float | None = None,
+    exclusive: bool = False,
+) -> tuple[float | None, bool]:
+    """Return the ordered numeric value and whether supplied evidence was invalid."""
+
+    for source, keys in sources:
+        for key in keys:
+            if key not in source:
+                continue
+            raw = source.get(key)
+            if raw is None or (isinstance(raw, str) and not raw.strip()):
+                continue
+            value = _num(raw)
+            if value is None:
+                return None, True
+            if minimum is not None and (
+                value < minimum or (exclusive and value == minimum)
+            ):
+                return None, True
+            return value, False
+    return None, False
+
+
+def _positive_price(row: Mapping[str, Any], *keys: str) -> float | None:
+    return _numeric_alias_value(
+        (row, tuple(keys)),
+        minimum=0.0,
+        exclusive=True,
+    )

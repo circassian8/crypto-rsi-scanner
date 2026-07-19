@@ -310,3 +310,70 @@ def test_integrated_representatives_rank_canonical_zero_not_legacy_alias():
         merge_policy._best_protocol_row([protocol_zero, protocol_observed])["candidate_id"]
         == "protocol-observed"
     )
+
+
+def test_outcome_metrics_preserve_zero_and_fail_closed_on_invalid_aliases():
+    from crypto_rsi_scanner.event_alpha.outcomes import outcome_artifacts
+
+    row = {
+        "observed_at": "2026-07-19T06:00:00Z",
+        "entry_reference_price": 10,
+        "primary_horizon_return": 0.5,
+        "max_favorable_excursion": 0.8,
+        "max_adverse_excursion": 0.4,
+        "btc_primary_horizon_return": 0,
+        "btc_return_primary": 0.2,
+        "alt_basket_primary_horizon_return": 0,
+        "alt_basket_return_primary": 0.3,
+    }
+    metrics = outcome_artifacts.compute_playbook_outcome_metrics(
+        row,
+        returns={
+            "primary_horizon_return": 0,
+            "max_favorable_excursion": 0,
+            "max_adverse_excursion": 0.1,
+        },
+    )
+
+    assert metrics["underperformance_vs_btc"] == 0
+    assert metrics["underperformance_vs_alt_basket"] == 0
+    assert metrics["mfe_mae_ratio"] == 0
+
+    invalid = outcome_artifacts.compute_playbook_outcome_metrics(
+        row,
+        returns={
+            "primary_horizon_return": float("inf"),
+            "max_favorable_excursion": float("inf"),
+            "max_adverse_excursion": 0.1,
+        },
+    )
+    assert invalid["underperformance_vs_btc"] is None
+    assert invalid["underperformance_vs_alt_basket"] is None
+    assert invalid["mfe_mae_ratio"] is None
+    assert outcome_artifacts._num(True) is None
+
+    invalid_entry = outcome_artifacts.compute_playbook_outcome_metrics(
+        {**row, "entry_reference_price": 0},
+        price_rows=[{
+            "timestamp": "2026-07-19T07:00:00Z",
+            "close": 20,
+        }],
+        returns={"primary_horizon_return": 0},
+    )
+    assert invalid_entry["underperformance_vs_btc"] is None
+    assert invalid_entry["underperformance_vs_alt_basket"] is None
+
+
+def test_outcome_price_extremes_do_not_fallback_from_invalid_canonical_price():
+    from crypto_rsi_scanner.event_alpha.outcomes import outcome_artifacts
+
+    rows = [{
+        "timestamp": "2026-07-19T07:00:00Z",
+        "high": 0,
+        "low": float("inf"),
+        "close": 20,
+    }]
+
+    assert outcome_artifacts._up_leg_from_prices(10, rows) is None
+    assert outcome_artifacts._extreme(rows, key="high", fallback="close", mode="max") is None
+    assert outcome_artifacts._extreme(rows, key="low", fallback="close", mode="min") is None
