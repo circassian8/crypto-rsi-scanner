@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the twenty-ninth no-send market cycle · Codex
+**Why:** The exact hourly campaign cadence elapsed with existing CoinGecko
+authorization, clear provider backoff, and an owned healthy dashboard. Another
+genuine point-in-time observation was needed to advance the 24h, benchmark-
+relative, and volatility baselines without lowering any maturity threshold.
+**Changes:**
+- Performed exactly one confirmed Daily Operations cycle. One `/coins/markets`
+  request returned HTTP 200 with 80 bounded rows in 1.195 seconds and no retry;
+  the exact top-liquid projection retained 30 market observations.
+- Published immutable namespace
+  `radar_market_no_send_20260719t054955751146z_dc1657d62164`, sealed its final
+  publication and owned-dashboard operations receipts, and restarted the exact
+  loopback dashboard.
+- Refreshed terminal campaign truth to 29 successful cycles / 870 retained / 840
+  baseline-counted / 30 too-close observations. One pending outcome matured
+  naturally, leaving 4 matured, 0 pending, and 1 unchanged `due_missing_price`.
+- Advanced the current-universe temporal baselines while retaining honest
+  warming state: volume, turnover, and 1h returns are warm for all 30 assets;
+  4h returns are warm for 29/30; 24h, BTC/ETH-relative, and volatility remain
+  below their exact sample/coverage requirements. No anomaly or Decision idea
+  was manufactured.
+**Verify:** The generation's strict doctor reports `OK`, authoritative, 0
+blockers, and 0 warnings at revision 12. Publication/pointer/operations receipts
+agree on namespace, run, revision, operator digest, and pointer digest.
+`make radar-dashboard-readiness PYTHON=.venv/bin/python` returned READY, and a
+loopback HEAD returned HTTP 200 with the exact namespace, run, revision, and
+operator-state digest headers. The terminal campaign report agrees on counts,
+authority, outcomes, and the next boundary at 2026-07-19 06:49:56.372340 UTC.
+**Notes/risks:** Trusted spread remains 0/870 and the current generation is a
+healthy zero-idea result. Telegram sends, trades, orders, paper trades, normal
+RSI writes, and Event Alpha `TRIGGERED_FADE` all remain zero. The recurring
+service remains intentionally uninstalled.
+
 ## 2026-07-19 — Preserve zero evidence across operator reports · Codex
 **Why:** Several operator-facing tables, research-card details, and opportunity
 audits still used truthiness fallback. Exact zero liquidity, anomaly strength,
