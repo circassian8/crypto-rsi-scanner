@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ctypes
 import errno
 import json
 import os
 import re
 import stat
+import sys
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -23,6 +25,8 @@ _MKDIR_SUPPORTS_DIR_FD = os.mkdir in os.supports_dir_fd
 _RENAME_SUPPORTS_DIR_FD = os.rename in os.supports_dir_fd
 _UNLINK_SUPPORTS_DIR_FD = os.unlink in os.supports_dir_fd
 _IDENTITY_CHANGED_ERRNO = getattr(errno, "ESTALE", errno.EIO)
+_RENAME_EXCL = 0x00000004
+_RENAME_NOREPLACE = 0x00000001
 
 
 def ensure_safe_namespace_dir(path: Path) -> None:
@@ -89,72 +93,224 @@ def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     write_bytes_atomic(path, (("\n".join(lines) + "\n") if lines else "").encode("utf-8"))
 
 
-def write_bytes_immutable(path: Path, data: bytes) -> None:
-    """Atomically create a regular leaf while refusing replacement.
+def _safe_component(value: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or "\x00" in value
+        or value in {".", ".."}
+        or Path(value).name != value
+    ):
+        raise MarketNoSendError("market artifact target has an unsafe leaf name")
+    return value
 
-    A fully written temporary file is hard-linked into the final name through
-    the verified namespace descriptor.  The link operation is atomic and
-    fails when the immutable target already exists.
-    """
 
-    _require_descriptor_directory_support(mutation=True)
-    if os.link not in os.supports_dir_fd:
-        raise MarketNoSendError("immutable artifact creation is unsupported")
-    namespace_dir, leaf = _safe_leaf_name(path)
-    temporary = f".{leaf}.{os.getpid()}.{time.time_ns()}.immutable"
+def _read_exact_fd(descriptor: int, *, maximum_bytes: int) -> bytes:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    remaining = maximum_bytes + 1
+    while remaining:
+        chunk = os.read(descriptor, min(65_536, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _open_and_write_stage(
+    namespace_fd: int,
+    temporary: str,
+    data: bytes,
+) -> tuple[int, os.stat_result]:
+    """Write exact bytes while retaining the inode-bound descriptor."""
+
+    temporary = _safe_component(temporary)
+    if not isinstance(data, bytes):
+        raise MarketNoSendError("market artifact payload must be bytes")
+    descriptor: int | None = None
     flags = (
-        os.O_WRONLY
+        os.O_RDWR
         | os.O_CREAT
         | os.O_EXCL
         | os.O_NOFOLLOW
         | getattr(os, "O_CLOEXEC", 0)
     )
+    try:
+        descriptor = os.open(temporary, flags, 0o600, dir_fd=namespace_fd)
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_size != 0
+        ):
+            raise OSError(errno.EINVAL, "market artifact stage is not private")
+        view = memoryview(data)
+        offset = 0
+        while offset < len(view):
+            written = os.write(descriptor, view[offset:])
+            if written <= 0:
+                raise OSError(errno.EIO, "market artifact stage write stalled")
+            offset += written
+        os.fsync(descriptor)
+        persisted = _read_exact_fd(descriptor, maximum_bytes=len(data))
+        completed = os.fstat(descriptor)
+        if (
+            persisted != data
+            or not stat.S_ISREG(completed.st_mode)
+            or completed.st_nlink != 1
+            or completed.st_size != len(data)
+            or not _same_identity(opened, completed)
+        ):
+            raise OSError(errno.EIO, "market artifact stage verification failed")
+        return descriptor, completed
+    except BaseException:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+
+
+def _assert_named_stage(
+    namespace_fd: int,
+    temporary: str,
+    expected: os.stat_result,
+) -> None:
+    named = os.stat(
+        _safe_component(temporary),
+        dir_fd=namespace_fd,
+        follow_symlinks=False,
+    )
+    if (
+        not stat.S_ISREG(named.st_mode)
+        or named.st_nlink != 1
+        or not _same_file_snapshot(expected, named)
+    ):
+        raise OSError(_IDENTITY_CHANGED_ERRNO, "market artifact stage changed")
+
+
+def _verify_published_stage(
+    namespace_fd: int,
+    leaf: str,
+    descriptor: int,
+    staged: os.stat_result,
+    data: bytes,
+) -> None:
+    before = os.fstat(descriptor)
+    persisted = _read_exact_fd(descriptor, maximum_bytes=len(data))
+    completed = os.fstat(descriptor)
+    named = os.stat(
+        _safe_component(leaf),
+        dir_fd=namespace_fd,
+        follow_symlinks=False,
+    )
+    if (
+        persisted != data
+        or not _same_identity(staged, before)
+        or not _same_file_snapshot(before, completed)
+        or not _same_file_snapshot(completed, named)
+        or not stat.S_ISREG(named.st_mode)
+        or named.st_nlink != 1
+        or named.st_size != len(data)
+    ):
+        raise OSError(
+            _IDENTITY_CHANGED_ERRNO,
+            "market artifact published identity mismatch",
+        )
+
+
+def _rename_noreplace(
+    namespace_fd: int,
+    source: str,
+    destination: str,
+) -> bool:
+    """Use the host's atomic no-replace rename for one exact namespace."""
+
+    source = _safe_component(source)
+    destination = _safe_component(destination)
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename = getattr(library, "renameatx_np", None)
+        flags = _RENAME_EXCL
+    elif sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        flags = _RENAME_NOREPLACE
+    else:
+        rename = None
+        flags = 0
+    if rename is None:
+        raise MarketNoSendError(
+            "native no-replace artifact creation is unsupported"
+        )
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    result = rename(
+        namespace_fd,
+        os.fsencode(source),
+        namespace_fd,
+        os.fsencode(destination),
+        flags,
+    )
+    if result == 0:
+        return True
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        return False
+    if error in {errno.ENOSYS, errno.ENOTSUP, errno.EINVAL}:
+        raise MarketNoSendError(
+            "native no-replace artifact creation is unsupported"
+        )
+    raise OSError(error, os.strerror(error))
+
+
+def _rename_replace(namespace_fd: int, source: str, destination: str) -> None:
+    os.rename(
+        _safe_component(source),
+        _safe_component(destination),
+        src_dir_fd=namespace_fd,
+        dst_dir_fd=namespace_fd,
+    )
+
+
+def write_bytes_immutable(path: Path, data: bytes) -> None:
+    """Atomically create a regular leaf while refusing replacement.
+
+    A fully written temporary remains open through one native no-replace
+    rename and final byte/identity verification. Failed or raced stages are
+    retained; cleanup never unlinks a mutable pathname.
+    """
+
+    _require_descriptor_directory_support(mutation=True)
+    namespace_dir, leaf = _safe_leaf_name(path)
+    temporary = f".{leaf}.{os.getpid()}.{time.time_ns()}.immutable"
     descriptor: int | None = None
-    temporary_exists = False
     try:
         with _open_verified_namespace_dir(namespace_dir) as anchored:
             base_fd, namespace_fd, namespace, namespace_identity = anchored
             try:
-                descriptor = os.open(temporary, flags, 0o600, dir_fd=namespace_fd)
-                temporary_exists = True
-                opened = os.fstat(descriptor)
-                if not stat.S_ISREG(opened.st_mode):
-                    raise OSError(errno.EINVAL, "immutable artifact temporary is not regular")
-                with os.fdopen(descriptor, "wb") as handle:
-                    descriptor = None
-                    handle.write(data)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                _assert_namespace_identity(base_fd, namespace, namespace_identity)
-                os.link(
-                    temporary,
-                    leaf,
-                    src_dir_fd=namespace_fd,
-                    dst_dir_fd=namespace_fd,
-                    follow_symlinks=False,
-                )
-                created = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
-                staged = os.stat(temporary, dir_fd=namespace_fd, follow_symlinks=False)
-                if not stat.S_ISREG(created.st_mode) or not _same_file_snapshot(
-                    created, staged
-                ):
-                    raise OSError(errno.EIO, "immutable artifact identity mismatch")
-                os.unlink(temporary, dir_fd=namespace_fd)
-                temporary_exists = False
-                _assert_namespace_identity(base_fd, namespace, namespace_identity)
-                os.fsync(namespace_fd)
-            finally:
-                if descriptor is not None:
-                    os.close(descriptor)
-                    descriptor = None
-                if temporary_exists:
-                    try:
-                        os.unlink(temporary, dir_fd=namespace_fd)
-                    except FileNotFoundError:
-                        pass
-                    temporary_exists = False
-    except FileExistsError as exc:
-        raise MarketNoSendError("immutable artifact already exists") from exc
+                os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise MarketNoSendError("immutable artifact already exists")
+            descriptor, staged = _open_and_write_stage(
+                namespace_fd,
+                temporary,
+                data,
+            )
+            _assert_named_stage(namespace_fd, temporary, staged)
+            _assert_namespace_identity(base_fd, namespace, namespace_identity)
+            if not _rename_noreplace(namespace_fd, temporary, leaf):
+                raise MarketNoSendError("immutable artifact already exists")
+            _verify_published_stage(namespace_fd, leaf, descriptor, staged, data)
+            _assert_namespace_identity(base_fd, namespace, namespace_identity)
+            os.fsync(namespace_fd)
     except MarketNoSendError:
         raise
     except OSError as exc:
@@ -165,69 +321,38 @@ def write_bytes_immutable(path: Path, data: bytes) -> None:
 
 
 def write_bytes_atomic(path: Path, data: bytes) -> None:
-    """Atomically replace a regular leaf through a verified namespace fd."""
+    """Atomically replace a leaf while retaining an inode-bound stage fd."""
 
     _require_descriptor_directory_support(mutation=True)
     namespace_dir, leaf = _safe_leaf_name(path)
     temporary = f".{leaf}.{os.getpid()}.{time.time_ns()}.tmp"
-    flags = (
-        os.O_WRONLY
-        | os.O_CREAT
-        | os.O_EXCL
-        | os.O_NOFOLLOW
-        | getattr(os, "O_CLOEXEC", 0)
-    )
     descriptor: int | None = None
-    temporary_exists = False
     try:
         with _open_verified_namespace_dir(namespace_dir) as anchored:
             base_fd, namespace_fd, namespace, namespace_identity = anchored
             try:
-                try:
-                    existing = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
-                except FileNotFoundError:
-                    existing = None
-                if existing is not None and not stat.S_ISREG(existing.st_mode):
-                    raise MarketNoSendError("market artifact target is not a regular file")
-                descriptor = os.open(temporary, flags, 0o600, dir_fd=namespace_fd)
-                temporary_exists = True
-                opened_temporary = os.fstat(descriptor)
-                if not stat.S_ISREG(opened_temporary.st_mode):
-                    raise OSError(errno.EINVAL, "market artifact temporary is not regular")
-                with os.fdopen(descriptor, "wb") as handle:
-                    descriptor = None
-                    handle.write(data)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                _assert_namespace_identity(base_fd, namespace, namespace_identity)
-                try:
-                    current = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
-                except FileNotFoundError:
-                    current = None
-                if current is not None and not stat.S_ISREG(current.st_mode):
-                    raise MarketNoSendError("market artifact target is not a regular file")
-                os.rename(
-                    temporary,
-                    leaf,
-                    src_dir_fd=namespace_fd,
-                    dst_dir_fd=namespace_fd,
-                )
-                temporary_exists = False
-                written = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
-                if not stat.S_ISREG(written.st_mode):
-                    raise OSError(errno.EINVAL, "market artifact replacement is not regular")
-                _assert_namespace_identity(base_fd, namespace, namespace_identity)
-                os.fsync(namespace_fd)
-            finally:
-                if descriptor is not None:
-                    os.close(descriptor)
-                    descriptor = None
-                if temporary_exists:
-                    try:
-                        os.unlink(temporary, dir_fd=namespace_fd)
-                    except FileNotFoundError:
-                        pass
-                    temporary_exists = False
+                existing = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                existing = None
+            if existing is not None and not stat.S_ISREG(existing.st_mode):
+                raise MarketNoSendError("market artifact target is not a regular file")
+            descriptor, staged = _open_and_write_stage(
+                namespace_fd,
+                temporary,
+                data,
+            )
+            _assert_named_stage(namespace_fd, temporary, staged)
+            _assert_namespace_identity(base_fd, namespace, namespace_identity)
+            try:
+                current = os.stat(leaf, dir_fd=namespace_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                current = None
+            if current is not None and not stat.S_ISREG(current.st_mode):
+                raise MarketNoSendError("market artifact target is not a regular file")
+            _rename_replace(namespace_fd, temporary, leaf)
+            _verify_published_stage(namespace_fd, leaf, descriptor, staged, data)
+            _assert_namespace_identity(base_fd, namespace, namespace_identity)
+            os.fsync(namespace_fd)
     except MarketNoSendError:
         raise
     except OSError as exc:
@@ -482,10 +607,7 @@ def _safe_namespace(value: str) -> str:
 
 def _safe_leaf_name(path: Path) -> tuple[Path, str]:
     target = Path(path).expanduser().absolute()
-    leaf = target.name
-    if not leaf or leaf in {".", ".."} or Path(leaf).name != leaf:
-        raise MarketNoSendError("market artifact target has an unsafe leaf name")
-    return target.parent, leaf
+    return target.parent, _safe_component(target.name)
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

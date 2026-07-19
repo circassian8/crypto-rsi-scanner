@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Fail closed on shared writer stage substitution · Codex
+**Why:** The shared immutable and replaceable artifact writers closed their
+temporary descriptor before publication. A same-user pathname substitution
+could therefore publish different bytes while returning success, and their
+cleanup could unlink a raced replacement by name.
+**Changes:**
+- Kept one private `O_EXCL`/no-follow staging descriptor open through exact
+  byte readback, publication, and final inode/snapshot verification for both
+  shared byte writers.
+- Replaced immutable hard-link publication with native Darwin
+  `renameatx_np(RENAME_EXCL)` or Linux `renameat2(RENAME_NOREPLACE)`, failing
+  closed when the host lacks that primitive. Replaceable control-state writes
+  retain descriptor-relative atomic rename and now receive the same final
+  identity and byte verification.
+- Removed name-based temporary cleanup. Normal publication leaves no stage;
+  interrupted, unsupported, or raced publication retains the observed stage as
+  non-authoritative evidence and returns failure rather than risking deletion
+  of an unowned pathname.
+- Added adversarial tests for immutable and replaceable stage substitution,
+  preservation of replacement inodes on failure, unsupported no-replace hosts,
+  exact normal bytes, immutable reuse refusal, and clean normal completion.
+  Updated the operator agreement, durable security decision, roadmap, and
+  generated architecture reports.
+**Verify:** The affected execution, intraday, derivatives, calendar,
+outcome-recovery, announcement, DEX, publication-receipt, and shared market
+artifact suites passed 233 focused tests. KuCoin v1/UTA, Bitget, and EVM v2
+offline capture smokes, compileall, diff check, and architecture cleanliness
+passed with zero new size violations. Full
+`make verify PYTHON=.venv/bin/python` passed 1,421/1,421 standalone checks and
+3,302/3,302 pytest checks, plus alert rendering, the 33-observation offline
+backtest fixture, and the read-only paper scoreboard.
+**Notes/risks:** A same-user-writable directory can still be changed after any
+finite verification point; this boundary guarantees detected substitution
+cannot return success and remains subject to strict caller fingerprints and
+doctors. Sequential multi-leaf publication and inode-safe explicit removal are
+separate design work. No provider call, authorization, pointer policy, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+changed.
+
 ## 2026-07-19 — Make detached Bybit publication no-replace · Codex
 **Why:** The liquidation transcript publisher used ordinary directory rename,
 which can replace a concurrently created empty destination, and its

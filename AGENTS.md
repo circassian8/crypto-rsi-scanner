@@ -731,6 +731,19 @@ may be added later when a suitable environment already exists.
   manifest drift, unsafe paths, symlinks, races, invalid feedback, bounds
   violations, report/supplement splices, or secret findings fail closed and
   preserve any prior successful output.
+- **Shared artifact-byte publication:**
+  `market_no_send_io.write_bytes_immutable` and `write_bytes_atomic` must keep
+  the exact `O_EXCL`/no-follow staging descriptor open through publication,
+  read back the exact bytes, and verify that the published regular single-link
+  leaf is the same inode and snapshot. Immutable creation uses only native
+  Darwin/Linux atomic no-replace rename and fails closed when unavailable;
+  replaceable control-state publication uses descriptor-relative atomic rename
+  plus the same post-publication verification. Never unlink a failed or raced
+  staging pathname: retain it as non-authoritative evidence and let the caller
+  fail. A same-user namespace race may leave a raced leaf in place, but it must
+  never return successful publication or become trusted without the existing
+  strict doctor/fingerprint gates. Any retention or cleanup policy requires a
+  separately reviewed inode-safe mutation boundary.
 - **Bybit native liquidation evidence:**
   `make radar-derivatives-bybit-liquidation-smoke` normalizes checked-in exact
   public `allLiquidation.{instrument_id}` WebSocket message bytes without

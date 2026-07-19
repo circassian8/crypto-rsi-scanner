@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Shared artifact writers fail closed on staging substitution
+**Status:** accepted
+**Decision:** Shared immutable and replaceable artifact-byte writes must create
+one private no-follow stage, keep its descriptor open, read back the exact
+bytes, and verify the descriptor-bound inode against the final named leaf after
+publication. Immutable leaves use native Darwin/Linux atomic no-replace rename
+and fail closed when that primitive is unavailable. Replaceable control-state
+leaves use descriptor-relative atomic rename and the same final byte, inode,
+snapshot, regular-file, and single-link checks. Never unlink a failed or raced
+temporary pathname by name. Retain the observed residue as non-authoritative
+and report failure; strict caller fingerprints and doctors remain required
+before any resulting artifact can become trusted.
+**Why:** Closing a staging descriptor before publication allowed a same-user
+pathname substitution to publish different bytes while the writer returned
+success. Check-then-unlink cleanup could then delete an unowned replacement.
+Holding the descriptor and verifying after rename eliminates false success,
+while non-destructive failure handling avoids turning a detected race into a
+second unsafe mutation. The contract deliberately does not claim that a
+same-user-writable directory cannot be changed after the check.
+**Revisit when:** A portable descriptor-native replacement and conditional
+unlink primitive can strengthen the boundary without weakening macOS support
+or deleting a pathname whose identity changed. Sequential multi-leaf bundle
+transactionality remains a separate design problem and is not implied here.
+
 ## 2026-07-19 - Keep Tokenomist fixture capture separate from live unlock authority
 **Status:** accepted
 **Decision:** Tokenomist v5 may have a strict immutable synthetic-fixture
