@@ -156,7 +156,12 @@ def render_market_observation_table(rows: Iterable[Mapping[str, Any]]) -> str:
             _h(_return_label(row, "return_4h")),
             _h(_return_label(row, "return_24h")),
             _h(_market_number(row.get("volume_zscore_24h"))),
-            _h(_market_number(row.get("liquidity_usd") or row.get("volume_24h"), money=True)),
+            _h(
+                _market_number(
+                    _first_present(row.get("liquidity_usd"), row.get("volume_24h")),
+                    money=True,
+                )
+            ),
             _h(_observation_baseline_status(row)),
             _h(row.get("spread_status") or _observation_quality(row).get("spread_basis") or "unknown"),
             _h(row.get("freshness_status") or "unknown"),
@@ -199,7 +204,13 @@ def render_market_anomaly_evidence_table(
                     or "unclassified"
                 ),
                 _h(row.get("observed_at") or state.get("observed_at") or "not recorded"),
-                _h(_market_number(row.get("anomaly_strength") or row.get("anomaly_score"))),
+                _h(
+                    _market_number(
+                        _first_present(
+                            row.get("anomaly_strength"), row.get("anomaly_score")
+                        )
+                    )
+                ),
                 _h(_return_label(evidence, "return_24h")),
                 _h(row.get("freshness_status") or state.get("freshness_status") or "unknown"),
                 _h(
@@ -462,6 +473,10 @@ def _finite_number(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _first_present(*values: object) -> object | None:
+    return next((value for value in values if value not in (None, "")), None)
 
 
 def _token(value: object) -> str:

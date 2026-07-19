@@ -362,8 +362,8 @@ def _scheduled_catalyst_lines(
         lines.extend([
             f"- Unlock time: {_display_text(components.get('unlock_time') or event.get('unlock_time')) or 'unknown'}",
             f"- Unlock type: {_display_text(components.get('unlock_type') or event.get('unlock_type')) or 'unknown'}",
-            f"- Unlock pct circulating: {_display_text(components.get('unlock_pct_circulating_supply') or event.get('unlock_pct_circulating_supply')) or 'n/a'}",
-            f"- Unlock vs 30d ADV: {_display_text(components.get('unlock_vs_30d_adv') or event.get('unlock_vs_30d_adv')) or 'n/a'}",
+            f"- Unlock pct circulating: {_display_text(_first_present(components.get('unlock_pct_circulating_supply'), event.get('unlock_pct_circulating_supply'))) or 'n/a'}",
+            f"- Unlock vs 30d ADV: {_display_text(_first_present(components.get('unlock_vs_30d_adv'), event.get('unlock_vs_30d_adv'))) or 'n/a'}",
             f"- Structured unlock proof: {str(bool(components.get('structured_unlock_evidence') or event.get('structured_unlock_evidence'))).lower()}",
         ])
     confirms = _list_strings(components.get("what_confirms"))
@@ -487,7 +487,7 @@ def _list_strings(value: Any) -> list[str]:
     return [str(value)]
 
 def _display_text(value: Any) -> str | None:
-    text = str(value or "").strip()
+    text = str("" if value is None else value).strip()
     if text.casefold() in {
         "",
         "unknown",
@@ -503,6 +503,10 @@ def _display_text(value: Any) -> str | None:
     }:
         return None
     return text
+
+
+def _first_present(*values: Any) -> Any:
+    return next((value for value in values if value not in (None, "")), None)
 
 def _source_acquisition_lines(
     entry: event_watchlist.EventWatchlistEntry | None,
@@ -573,7 +577,7 @@ def _source_acquisition_lines(
         f"- Source pack: {pack_name}",
         f"- Coverage status: {coverage_status or 'unknown'}",
         f"- Evidence absence meaningful: {str(bool(absence_meaningful)).lower()}",
-        f"- Source quality prior/cap: {components.get('source_quality_prior') or assessment.source_quality_prior}/{components.get('source_confidence_cap') or assessment.confidence_cap}",
+        f"- Source quality prior/cap: {_first_present(components.get('source_quality_prior'), assessment.source_quality_prior)}/{_first_present(components.get('source_confidence_cap'), assessment.confidence_cap)}",
         "- Source can prove: " + _source_contract_text(contract.get("source_can_prove")),
         "- Source cannot prove: " + _source_contract_text(contract.get("source_cannot_prove")),
         "- Relevant playbooks: " + _source_contract_text(contract.get("source_useful_playbooks")),
@@ -587,7 +591,7 @@ def _source_acquisition_lines(
         ),
         (
             f"- Final verdict after refresh: {components.get('final_opportunity_level') or components.get('opportunity_level') or 'not available'} "
-            f"/ {components.get('final_opportunity_score') or components.get('opportunity_score_final') or 'n/a'} "
+            f"/ {_first_present(components.get('final_opportunity_score'), components.get('opportunity_score_final'), 'n/a')} "
             f"source={components.get('final_verdict_source') or 'not available'}"
         ),
         "- Accepted evidence reasons: " + ("; ".join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else "none"),

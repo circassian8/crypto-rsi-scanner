@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve zero evidence across operator reports · Codex
+**Why:** Several operator-facing tables, research-card details, and opportunity
+audits still used truthiness fallback. Exact zero liquidity, anomaly strength,
+unlock size, event age, or quality score could therefore appear unavailable or
+be silently replaced by a conflicting legacy value.
+**Changes:**
+- Made exact-generation market diagnostics prefer present zero liquidity and
+  anomaly strength over legacy aliases.
+- Made research-card source, derivatives, unlock, lifecycle, and final-score
+  detail distinguish zero from missing.
+- Made opportunity audit evidence, market, derivatives, DEX, protocol, incident,
+  and final-score lines preserve zero-valued canonical evidence.
+- Added focused cross-surface regressions that deliberately supply conflicting
+  nonzero fallbacks behind canonical zero values.
+**Verify:** All 98 zero-presentation, numeric-finiteness, operator-presentation,
+and dashboard tests passed on the host, including the loopback concurrency test;
+all 78 adjacent evidence-acquisition, incident, CoreOpportunity, watchlist-router,
+and namespace-integration tests passed. Compileall, `git diff --check`, and
+architecture cleanliness were clean. Full `verify-fast` was not repeated because
+the immediately preceding shared-layer commit passed all 3,079 tests and these
+rendering-only changes have focused coverage across every touched surface.
+**Notes/risks:** This changes presentation precedence only. It does not change a
+threshold, score calculation, route, provider authorization, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` behavior.
+
 ## 2026-07-19 — Preserve zero event age and derivatives reporting · Codex
 **Why:** A completed-move gate used `value or -1`, so exact event age zero was
 treated as missing. The derivatives report likewise rendered a neutral funding

@@ -41,6 +41,13 @@ from .opportunity_audit_values import (
 )
 
 
+def _first_present(*values: Any, default: Any = None) -> Any:
+    return next(
+        (value for value in values if value not in (None, "")),
+        default,
+    )
+
+
 def format_opportunity_audit(
     target: str,
     *,
@@ -319,7 +326,7 @@ def _impact_and_evidence_quality_audit_lines(row: Mapping[str, Any], components:
         "",
         "## Evidence quality decision",
         f"- source/evidence: {components.get('source_class') or row.get('source_class') or 'unknown'} / {components.get('evidence_specificity') or row.get('evidence_specificity') or 'unknown'}",
-        f"- evidence score: {components.get('evidence_quality_score') or row.get('evidence_quality_score') or 'n/a'}",
+        f"- evidence score: {_first_present(components.get('evidence_quality_score'), row.get('evidence_quality_score'), default='n/a')}",
         "",
     ]
 
@@ -327,20 +334,20 @@ def _impact_and_evidence_quality_audit_lines(row: Mapping[str, Any], components:
 def _market_confirmation_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
     return [
         "## Market confirmation decision",
-        f"- market level/score: {components.get('market_confirmation_level') or row.get('market_confirmation_level') or 'unknown'} / {components.get('market_confirmation_score') or row.get('market_confirmation_score') or 'n/a'}",
+        f"- market level/score: {components.get('market_confirmation_level') or row.get('market_confirmation_level') or 'unknown'} / {_first_present(components.get('market_confirmation_score'), row.get('market_confirmation_score'), default='n/a')}",
         f"- market freshness: {components.get('market_context_freshness_status') or row.get('market_context_freshness_status') or 'unknown'} "
         f"age={_market_age_value(components, row)} "
         f"cap_applied={components.get('market_context_freshness_cap_applied') if components.get('market_context_freshness_cap_applied') is not None else row.get('market_context_freshness_cap_applied')}",
         f"- market reasons: {_list_value(components.get('market_confirmation_reasons') or row.get('market_confirmation_reasons'))}",
         f"- market missing: {_list_value(components.get('market_confirmation_missing_fields') or row.get('market_confirmation_missing_fields'))}",
         f"- derivatives confirmation: {components.get('derivatives_confirmation_level') or row.get('derivatives_confirmation_level') or 'unknown'} / "
-        f"{components.get('derivatives_confirmation_score') or row.get('derivatives_confirmation_score') or 'n/a'} "
+        f"{_first_present(components.get('derivatives_confirmation_score'), row.get('derivatives_confirmation_score'), default='n/a')} "
         f"freshness={components.get('derivatives_freshness_status') or row.get('derivatives_freshness_status') or 'unknown'}",
         f"- DEX liquidity confirmation: {components.get('dex_liquidity_level') or row.get('dex_liquidity_level') or 'unknown'} / "
-        f"{components.get('dex_liquidity_score') or row.get('dex_liquidity_score') or 'n/a'} "
+        f"{_first_present(components.get('dex_liquidity_score'), row.get('dex_liquidity_score'), default='n/a')} "
         f"freshness={components.get('dex_freshness_status') or row.get('dex_freshness_status') or 'unknown'}",
         f"- protocol metrics confirmation: {components.get('protocol_metrics_level') or row.get('protocol_metrics_level') or 'unknown'} / "
-        f"{components.get('protocol_metrics_score') or row.get('protocol_metrics_score') or 'n/a'} "
+        f"{_first_present(components.get('protocol_metrics_score'), row.get('protocol_metrics_score'), default='n/a')} "
         f"freshness={components.get('protocol_metrics_freshness_status') or row.get('protocol_metrics_freshness_status') or 'unknown'}",
         "",
     ]
@@ -366,7 +373,7 @@ def _opportunity_lane_audit_lines(row: Mapping[str, Any], components: Mapping[st
 def _final_verdict_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
     return [
         "## Final opportunity verdict",
-        f"- level/score: {components.get('final_opportunity_level') or row.get('final_opportunity_level') or components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('final_opportunity_score') or row.get('final_opportunity_score') or components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",
+        f"- level/score: {components.get('final_opportunity_level') or row.get('final_opportunity_level') or components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {_first_present(components.get('final_opportunity_score'), row.get('final_opportunity_score'), components.get('opportunity_score_final'), row.get('opportunity_score_final'), default='n/a')}",
         f"- source/reason: {components.get('final_verdict_source') or row.get('final_verdict_source') or 'initial'} / {components.get('final_verdict_reason') or row.get('final_verdict_reason') or 'none'}",
         f"- reasons: {_list_value(components.get('opportunity_verdict_reasons') or row.get('opportunity_verdict_reasons'))}",
         f"- why local-only: {_human_reason_value(components.get('why_local_only') or row.get('why_local_only')) or 'none'}",
@@ -626,7 +633,7 @@ def _near_miss_lines(
             f"provider={provider or 'unknown'} "
             f"verdict={before or near_miss.opportunity_level_before}->{after or row.get('opportunity_level') or near_miss.opportunity_level_before} "
             f"score={score_before if score_before is not None else near_miss.opportunity_score_before}"
-            f"->{score_after if score_after is not None else row.get('opportunity_score_final') or 'n/a'} "
+            f"->{score_after if score_after is not None else _first_present(row.get('opportunity_score_final'), default='n/a')} "
             f"market_confirmation={market_before if market_before is not None else 'n/a'}->{market_after if market_after is not None else 'n/a'} "
             f"status={status or 'pending'}"
         )
@@ -676,7 +683,7 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- source mission: {assessment.source_mission}",
         f"- provider coverage: {merged.get('provider_coverage_status') or assessment.provider_coverage_status}",
         f"- evidence absence meaningful: {str(bool(merged.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
-        f"- source quality prior/cap: {merged.get('source_quality_prior') or assessment.source_quality_prior}/{merged.get('source_confidence_cap') or assessment.confidence_cap}",
+        f"- source quality prior/cap: {_first_present(merged.get('source_quality_prior'), assessment.source_quality_prior)}/{_first_present(merged.get('source_confidence_cap'), assessment.confidence_cap)}",
         f"- source can prove: {_source_contract_text(contract.get('source_can_prove'))}",
         f"- source cannot prove: {_source_contract_text(contract.get('source_cannot_prove'))}",
         f"- relevant playbooks: {_source_contract_text(contract.get('source_useful_playbooks'))}",
@@ -691,7 +698,7 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         ),
         (
             f"- final post-refresh verdict: {merged.get('final_opportunity_level') or merged.get('opportunity_level') or 'unknown'} "
-            f"/ {merged.get('final_opportunity_score') or merged.get('opportunity_score_final') or 'n/a'} "
+            f"/ {_first_present(merged.get('final_opportunity_score'), merged.get('opportunity_score_final'), default='n/a')} "
             f"source={merged.get('final_verdict_source') or 'initial'} "
             f"reason={merged.get('final_verdict_reason') or 'none'}"
         ),
@@ -1136,7 +1143,7 @@ def _incident_lines(
         f"- incident_id: {incident_id}",
         f"- canonical name: {source.get('canonical_name') or source.get('canonical_incident_name') or components.get('canonical_incident_name') or 'unknown'}",
         f"- relevance: {source.get('incident_relevance_status') or components.get('incident_relevance_status') or 'unknown'} "
-        f"score={source.get('incident_relevance_score') or components.get('incident_relevance_score') or 'n/a'}",
+        f"score={_first_present(source.get('incident_relevance_score'), components.get('incident_relevance_score'), default='n/a')}",
         f"- persistence reason: {source.get('canonical_persistence_reason') or components.get('canonical_persistence_reason') or 'unknown'}",
         f"- relevance reasons: {_list_value(source.get('incident_relevance_reasons') or components.get('incident_relevance_reasons'))}",
         (
@@ -1177,7 +1184,7 @@ def _incident_lines(
         f"- current cause status: {source.get('current_cause_status') or source.get('cause_status') or components.get('cause_status') or 'unknown'}",
         f"- claim history: {_claim_history_value(claim_history)}",
         f"- conflicting claims: {_list_value(source.get('conflicting_claims') or components.get('conflicting_claims'))}",
-        f"- source updates: {source.get('source_update_count') or len(source.get('source_raw_ids') or []) or 'unknown'} "
+        f"- source updates: {_first_present(source.get('source_update_count'), len(source.get('source_raw_ids') or []) if source.get('source_raw_ids') is not None else None, default='unknown')} "
         f"(independent={source.get('independent_source_count') if type(source.get('independent_source_count')) is int else 'legacy-unassessed'}; "
         f"corroborations={source.get('independent_corroboration_count') if type(source.get('independent_corroboration_count')) is int else 'legacy-unassessed'})",
         f"- market reaction vs causal mechanism: observed={str(bool(reaction_observed)).lower()} "

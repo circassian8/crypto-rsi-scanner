@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1139,
+  "file_count": 1140,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T05:28:23.601796+00:00",
+  "generated_at": "2026-07-19T05:37:13.837506+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2021,6 +2021,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1195,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1194,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py",
       "source_kind": "production"
@@ -2035,12 +2041,6 @@
       "limit": 1500,
       "line_count": 1193,
       "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1188,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
     {

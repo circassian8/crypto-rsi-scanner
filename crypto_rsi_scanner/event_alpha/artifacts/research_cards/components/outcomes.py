@@ -49,6 +49,10 @@ def _list_value(value: Any) -> list[Any]:
     return [value] if isinstance(value, str) else list(value or [])
 
 
+def _first_present(*values: Any) -> Any:
+    return next((value for value in values if value not in (None, "")), None)
+
+
 def _impact_hypothesis_context(
     entry: event_watchlist.EventWatchlistEntry,
     components: Mapping[str, Any],
@@ -101,7 +105,10 @@ def _impact_hypothesis_context(
         "digest_eligible": digest_eligible,
         "why_digest_ineligible": why_digest_ineligible,
         "final_opportunity_level": final_opportunity_level,
-        "final_opportunity_score": components.get("final_opportunity_score") or components.get("opportunity_score_final"),
+        "final_opportunity_score": _first_present(
+            components.get("final_opportunity_score"),
+            components.get("opportunity_score_final"),
+        ),
         "verdict_reasons": _list_value(components.get("opportunity_verdict_reasons") or []),
         "missing_requirements": _list_value(components.get("missing_requirements") or []),
         "manual_verification_items": _list_value(components.get("manual_verification_items") or []),
@@ -427,8 +434,8 @@ def _monitor_lines(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mappi
         f"- Volume z-score / volume-to-market-cap: {_monitor_value(row, 'volume_zscore_24h')} / {_monitor_value(row, 'volume_to_market_cap')}",
         f"- Derivatives crowding: {_monitor_value(row, 'derivatives_crowding')}",
         f"- Supply pressure: {_monitor_value(row, 'supply_pressure')}",
-        f"- Event countdown hours: {_monitor_value(row, 'event_countdown_hours') or 'n/a'}",
-        f"- Event age hours: {_monitor_value(row, 'event_age_hours') or 'n/a'}",
+        f"- Event countdown hours: {_first_present(_monitor_value(row, 'event_countdown_hours'), 'n/a')}",
+        f"- Event age hours: {_first_present(_monitor_value(row, 'event_age_hours'), 'n/a')}",
         "- Monitor data is observation-only and cannot create TRIGGERED_FADE.",
     ]
     return lines
