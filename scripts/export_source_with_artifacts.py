@@ -1640,6 +1640,25 @@ def _latest_bybit_intraday_namespace(
             "source_execution_quality_capture_id"
         ],
         "all_bars_fresh": pointer["all_bars_fresh"],
+        "all_bars_fresh_at_acquisition": pointer[
+            "all_bars_fresh_at_acquisition"
+        ],
+        "all_bars_fresh_at_completion": pointer[
+            "all_bars_fresh_at_completion"
+        ],
+        "intraday_set_freshness_policy": pointer[
+            "intraday_set_freshness_policy"
+        ],
+        "maximum_provider_response_age_at_completion_seconds": pointer[
+            "maximum_provider_response_age_at_completion_seconds"
+        ],
+        "maximum_provider_response_age_policy_seconds": pointer[
+            "maximum_provider_response_age_policy_seconds"
+        ],
+        "minimum_bar_recency_remaining_at_completion_seconds": pointer[
+            "minimum_bar_recency_remaining_at_completion_seconds"
+        ],
+        "bar_recency_policy": pointer["bar_recency_policy"],
         "protocol_v2_input_quality_eligible": pointer[
             "protocol_v2_input_quality_eligible"
         ],

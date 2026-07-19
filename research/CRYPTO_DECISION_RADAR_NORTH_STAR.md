@@ -962,7 +962,13 @@ close-to-acquisition latency, and rejects open/missing/misidentified bars.
 Contract v3 marks a bar fresh only when both the completed bar remains inside
 its interval recency window and the provider response is no more than 15
 seconds old; the two component states and ages remain explicit, and a provider
-response cannot predate the completed candle it contains. Run
+response cannot predate the completed candle it contains. Guarded live/capture
+v4 then re-evaluates every bar-close and provider-response clock when the final
+sequential request completes. Acquisition and completion freshness, the maximum
+provider-response age, and the minimum remaining bar-recency window stay
+explicit; only completion freshness can qualify the set as Protocol-v2 input.
+A complete aged set remains immutable evidence but is not input-quality
+eligible. Run
 `make radar-intraday-bybit-smoke PYTHON=.venv/bin/python` with zero provider
 calls or writes. Its guarded live collector is implemented but inactive: zero-
 call readiness requires a genuine fresh execution-quality capture for exact
@@ -973,8 +979,9 @@ immutable bundle is published: it binds the source execution-quality capture
 and pointer digest, exact native instruments, accepted raw responses,
 request/provider clocks, normalized bars, fingerprints, manifest, completion
 receipt, and latest pointer. Validation holds one descriptor-anchored namespace
-and rederives every bar from raw bytes; symlink, race, drift, and rollback
-failures close the bundle. Status is no-call/no-write, and the standard review
+and rederives every bar plus the final-set freshness projection from raw bytes;
+request timing must remain one sequential response window, and symlink, race,
+drift, and rollback failures close the bundle. Status is no-call/no-write, and the standard review
 archive selects and fully revalidates only the latest completed capture. The
 stdout-only collect target remains diagnostic and writes nothing. CoinGecko
 sparklines, interpolation, derived 4h values, and mark/index bars are not direct

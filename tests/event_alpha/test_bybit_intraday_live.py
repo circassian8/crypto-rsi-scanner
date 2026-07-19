@@ -114,8 +114,17 @@ def _resolver(source: dict[str, object] | None = None):
     return resolve
 
 
-def _clock():
-    ticks = iter(NOW + timedelta(milliseconds=200 * index) for index in range(20))
+def _clock(*, completed_offset_ms: int = 1_000):
+    ticks = iter(
+        (
+            NOW,
+            NOW + timedelta(milliseconds=200),
+            NOW + timedelta(milliseconds=400),
+            NOW + timedelta(milliseconds=600),
+            NOW + timedelta(milliseconds=800),
+            NOW + timedelta(milliseconds=completed_offset_ms),
+        )
+    )
     return lambda: next(ticks)
 
 
@@ -133,10 +142,16 @@ def _captured_fetch(
 ) -> BybitCapturedJSONResponse:
     payload = _fetch(request, timeout)
     raw = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
+    interval = dict(request.query)["interval"]
+    offset_ms = 100 if interval == "60" else 300
     return BybitCapturedJSONResponse(
         request=request,
-        request_started_at="2026-07-17T12:30:00.100000Z",
-        response_received_at="2026-07-17T12:30:00.125000Z",
+        request_started_at=(NOW + timedelta(milliseconds=offset_ms))
+        .isoformat()
+        .replace("+00:00", "Z"),
+        response_received_at=(NOW + timedelta(milliseconds=offset_ms + 25))
+        .isoformat()
+        .replace("+00:00", "Z"),
         duration_ms=25,
         response_url=f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}",
         http_status=200,
@@ -290,6 +305,12 @@ def test_authorized_collection_gets_exact_1h_4h_bars_without_writes() -> None:
     assert all(row["bar_closed"] is True for row in payload["bars"])
     assert all(row["future_data_used"] is False for row in payload["bars"])
     assert payload["all_bars_fresh"] is True
+    assert payload["all_bars_fresh_at_acquisition"] is True
+    assert payload["all_bars_fresh_at_completion"] is True
+    assert payload["intraday_set_freshness_policy"] == (
+        "every_bar_fresh_at_capture_completion"
+    )
+    assert payload["maximum_provider_response_age_policy_seconds"] == 15.0
     assert payload["provider_request_count"] == payload["provider_request_bound"] == 2
     assert payload["retries"] == payload["redirects_followed"] == 0
     assert payload["artifact_persisted"] is False
@@ -298,6 +319,26 @@ def test_authorized_collection_gets_exact_1h_4h_bars_without_writes() -> None:
     assert payload["writes_performed"] is False
     assert payload["orders_available"] is False
     assert payload["trades_created"] == payload["telegram_sends"] == 0
+
+
+def test_collection_rechecks_every_bar_at_full_set_completion() -> None:
+    payload = collect_authoritative_bybit_intraday(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=_clock(completed_offset_ms=20_000),
+        capture_loader=lambda _base: _capture(),
+        resolver=_resolver(),
+        fetch_json=_fetch,
+    )
+
+    assert all(row["freshness_status"] == "fresh" for row in payload["bars"])
+    assert payload["all_bars_fresh_at_acquisition"] is True
+    assert payload["all_bars_fresh_at_completion"] is False
+    assert payload["all_bars_fresh"] is False
+    assert payload[
+        "maximum_provider_response_age_at_completion_seconds"
+    ] == 19.9
+    assert payload["minimum_bar_recency_remaining_at_completion_seconds"] > 0
 
 
 def test_collection_stops_on_first_failure_without_retry() -> None:

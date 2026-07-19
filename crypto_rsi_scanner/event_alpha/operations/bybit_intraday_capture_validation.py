@@ -18,6 +18,11 @@ from .bybit_intraday_capture import (
     _validate_common,
     validate_bybit_intraday_pointer_bytes,
 )
+from .bybit_intraday_set_freshness import (
+    common_freshness_matches,
+    common_freshness_values,
+    freshness_contract_valid,
+)
 
 
 def _validate_publication_objects(
@@ -31,8 +36,13 @@ def _validate_publication_objects(
     pointer: Mapping[str, object] | None = None,
 ) -> None:
     common_keys = {
-        "all_bars_fresh", "artifact_namespace", "bar_count",
-        "campaign_attached", "capture_id", "completed_at", "contract_version",
+        "all_bars_fresh", "all_bars_fresh_at_acquisition",
+        "all_bars_fresh_at_completion", "artifact_namespace", "bar_count",
+        "bar_recency_policy", "campaign_attached", "capture_id",
+        "completed_at", "contract_version", "intraday_set_freshness_policy",
+        "maximum_provider_response_age_at_completion_seconds",
+        "maximum_provider_response_age_policy_seconds",
+        "minimum_bar_recency_remaining_at_completion_seconds",
         "protocol_v2_annex_bound", "protocol_v2_evidence_eligible",
         "protocol_v2_input_quality_eligible", "request_count", "research_only",
         "source_execution_quality_capture_id",
@@ -59,9 +69,8 @@ def _validate_publication_objects(
         or type(receipt.get("request_count")) is not int
         or not 1 <= receipt["request_count"] <= MAX_RESPONSES
         or receipt.get("bar_count") != receipt.get("request_count")
-        or type(receipt.get("all_bars_fresh")) is not bool
-        or receipt.get("protocol_v2_input_quality_eligible")
-        is not receipt.get("all_bars_fresh")
+        or not freshness_contract_valid(receipt)
+        or not common_freshness_matches(manifest, receipt)
         or manifest.get("venue_id") != "bybit"
         or manifest.get("execution_mode") != "perpetual"
         or manifest.get("quote_asset") != "USDT"
@@ -150,15 +159,22 @@ def _validate_projection_objects(
         or instruments.get("research_only") is not True
         or set(bars)
         != {
-            "all_bars_fresh", "bar_count", "bars", "capture_id",
-            "research_only", "schema_id", "schema_version",
+            "all_bars_fresh", "all_bars_fresh_at_acquisition",
+            "all_bars_fresh_at_completion", "bar_count",
+            "bar_recency_policy", "bars", "capture_id",
+            "intraday_set_freshness_policy",
+            "maximum_provider_response_age_at_completion_seconds",
+            "maximum_provider_response_age_policy_seconds",
+            "minimum_bar_recency_remaining_at_completion_seconds",
+            "protocol_v2_input_quality_eligible", "research_only",
+            "schema_id", "schema_version",
         }
         or bars.get("schema_id") != "decision_radar.bybit_intraday_bars"
         or bars.get("schema_version") != 1
         or bars.get("capture_id") != capture_id
         or bars.get("bar_count") != len(prepared["bars"])
         or bars.get("bars") != prepared["bars"]
-        or bars.get("all_bars_fresh") is not prepared["all_bars_fresh"]
+        or not common_freshness_matches(bars, prepared)
         or bars.get("research_only") is not True
     ):
         raise BybitIntradayCaptureError("capture_projection_drift")
@@ -185,10 +201,7 @@ def _validated_capture_result(
         "bars": prepared["bars"],
         "request_count": request_count,
         "bar_count": len(prepared["bars"]),
-        "all_bars_fresh": prepared["all_bars_fresh"],
-        "protocol_v2_input_quality_eligible": prepared[
-            "protocol_v2_input_quality_eligible"
-        ],
+        **common_freshness_values(prepared),
         "protocol_v2_evidence_eligible": False,
         "protocol_v2_annex_bound": False,
         "campaign_attached": False,

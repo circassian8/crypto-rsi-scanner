@@ -532,7 +532,13 @@ may be added later when a suitable environment already exists.
   raw bytes, request/provider clocks, normalized bars and RSI context,
   fingerprints, manifest, completion receipt, and latest pointer. Validation
   holds one descriptor-anchored namespace, rederives every bar from raw bytes,
-  and rejects drift, symlinks, races, and pointer rollback. The standard review
+  requires one exact sequential request/response window, and re-evaluates every
+  bar-close and provider-response clock when the final request completes. It
+  preserves acquisition/completion freshness, maximum provider-response age,
+  and minimum remaining bar-recency; Protocol-v2 input-quality eligibility uses
+  completion freshness. A complete aged set remains exact evidence but is not
+  input-quality eligible. Validation rejects drift, symlinks, races, and pointer
+  rollback. The standard review
   archive selects and fully revalidates only the latest complete capture. A
   fresh bundle may be input-quality eligible but remains campaign-detached,
   `protocol_v2_evidence_eligible=false`, and

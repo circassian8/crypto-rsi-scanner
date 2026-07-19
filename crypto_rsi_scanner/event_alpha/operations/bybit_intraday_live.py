@@ -48,9 +48,17 @@ from .bybit_intraday_capture import (
     bybit_intraday_capture_status,
     persist_bybit_intraday_capture,
 )
+from .bybit_intraday_set_freshness import (
+    BAR_RECENCY_POLICY,
+    FRESHNESS_POLICY,
+    MAXIMUM_PROVIDER_AGE_SECONDS,
+    _BybitIntradaySetFreshnessError,
+    live_summary_freshness_values,
+    project_intraday_set_freshness,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v3"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v4"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_PROVIDER_REQUESTS = MAX_RADAR_ASSETS * len(INTERVAL_SECONDS)
@@ -288,6 +296,14 @@ def build_bybit_intraday_live_readiness(
         "rsi_period": RSI_PERIOD,
         "rsi_method": RSI_METHOD,
         "rsi_context_policy": "observed_or_explicit_insufficient_history",
+        "intraday_set_freshness_policy": FRESHNESS_POLICY,
+        "maximum_provider_response_age_policy_seconds": (
+            MAXIMUM_PROVIDER_AGE_SECONDS
+        ),
+        "bar_recency_policy": BAR_RECENCY_POLICY,
+        "protocol_v2_input_quality_rule": (
+            "every_bar_must_remain_fresh_at_full_set_completion"
+        ),
         "runtime_authorization_env": LIVE_AUTH_ENV,
         "runtime_provider_authorized": authorized,
         "authorization_mutated": False,
@@ -496,6 +512,16 @@ def _collect_authoritative_bybit_intraday(
             "intraday_collection_count_mismatch",
             request_count=request_count,
         )
+    try:
+        set_freshness = project_intraday_set_freshness(
+            bars,
+            completed_at=completed,
+        )
+    except _BybitIntradaySetFreshnessError as exc:
+        raise BybitIntradayLiveError(
+            exc.reason_code,
+            request_count=request_count,
+        ) from exc
     summary = {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_intraday_observation_set",
@@ -514,7 +540,7 @@ def _collect_authoritative_bybit_intraday(
         "eligible_instruments": [row.to_dict() for row in instruments],
         "bar_count": len(bars),
         "bars": bars,
-        "all_bars_fresh": all(row["freshness_status"] == "fresh" for row in bars),
+        **live_summary_freshness_values(set_freshness),
         "provider_call_authorized": True,
         "provider_call_attempted": request_count > 0,
         "provider_request_succeeded": True,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.util
@@ -181,6 +182,11 @@ def test_capture_seals_exact_raw_responses_and_rederives_every_bar(
     assert result["status"] == "complete"
     assert result["request_count"] == result["bar_count"] == 2
     assert result["all_bars_fresh"] is True
+    assert result["all_bars_fresh_at_acquisition"] is True
+    assert result["all_bars_fresh_at_completion"] is True
+    assert result["intraday_set_freshness_policy"] == (
+        "every_bar_fresh_at_capture_completion"
+    )
     assert result["protocol_v2_input_quality_eligible"] is True
     assert result["protocol_v2_evidence_eligible"] is False
     assert result["protocol_v2_annex_bound"] is False
@@ -224,9 +230,40 @@ def test_summary_or_response_projection_drift_is_rejected_before_writes(
             summary=summary,
             responses=list(reversed(responses)),
         )
+    freshness_drift = deepcopy(summary)
+    freshness_drift[
+        "maximum_provider_response_age_at_completion_seconds"
+    ] += 1.0
+    with pytest.raises(BybitIntradayCaptureError, match="freshness_summary_mismatch"):
+        persist_bybit_intraday_capture(
+            tmp_path,
+            summary=freshness_drift,
+            responses=responses,
+        )
 
     assert not (tmp_path / POINTER_FILENAME).exists()
     assert list(tmp_path.glob("radar_bybit_intraday_*")) == []
+
+
+def test_capture_preserves_aged_set_but_blocks_input_quality(
+    tmp_path: Path,
+) -> None:
+    summary, responses = _collected(completed_offset_ms=20_000)
+
+    result = persist_bybit_intraday_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+
+    assert result["all_bars_fresh_at_acquisition"] is True
+    assert result["all_bars_fresh_at_completion"] is False
+    assert result["all_bars_fresh"] is False
+    assert result["protocol_v2_input_quality_eligible"] is False
+    assert result[
+        "maximum_provider_response_age_at_completion_seconds"
+    ] == 19.9
+    assert result["pointer_validated"] is True
 
 
 def test_source_instrument_and_capture_window_drift_fail_before_writes(
@@ -262,6 +299,22 @@ def test_source_instrument_and_capture_window_drift_fail_before_writes(
             tmp_path,
             summary=short_window,
             responses=responses,
+        )
+
+    overlapping_summary = deepcopy(summary)
+    overlapping_summary["bars"][1]["request_started_at"] = (
+        "2026-07-17T12:30:00.120000Z"
+    )
+    overlapping_responses = list(responses)
+    overlapping_responses[1] = replace(
+        overlapping_responses[1],
+        request_started_at="2026-07-17T12:30:00.120000Z",
+    )
+    with pytest.raises(BybitIntradayCaptureError, match="outside_capture_window"):
+        persist_bybit_intraday_capture(
+            tmp_path,
+            summary=overlapping_summary,
+            responses=overlapping_responses,
         )
 
     assert not (tmp_path / POINTER_FILENAME).exists()
@@ -317,15 +370,12 @@ def test_capture_rejects_symlinked_artifact_and_pointer_rollback(
 
     bars_path.unlink()
     backup.rename(bars_path)
-    earlier = deepcopy(summary)
-    earlier["completed_at"] = (NOW + timedelta(milliseconds=500)).isoformat().replace(
-        "+00:00", "Z"
-    )
+    earlier, earlier_responses = _collected(completed_offset_ms=500)
     with pytest.raises(BybitIntradayCaptureError, match="rollback_rejected"):
         persist_bybit_intraday_capture(
             tmp_path,
             summary=earlier,
-            responses=responses,
+            responses=earlier_responses,
         )
 
 
@@ -405,6 +455,11 @@ def test_project_review_export_selects_and_revalidates_latest_intraday_capture(
     assert selected["capture_id"] == capture["capture_id"]
     assert selected["source_execution_quality_capture_id"] == "b" * 64
     assert selected["all_bars_fresh"] is True
+    assert selected["all_bars_fresh_at_acquisition"] is True
+    assert selected["all_bars_fresh_at_completion"] is True
+    assert selected["intraday_set_freshness_policy"] == (
+        "every_bar_fresh_at_capture_completion"
+    )
     assert selected["protocol_v2_input_quality_eligible"] is True
     assert selected["protocol_v2_evidence_eligible"] is False
     assert selected["protocol_v2_annex_bound"] is False

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T00:37:56.836497+00:00`
+- generated_at: `2026-07-19T00:59:45.317949+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -124,6 +124,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1198 |
+| `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1193 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1193 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py` | 1191 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1188 |
@@ -131,7 +132,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1186 |
 | `crypto_rsi_scanner/event_alpha/doctor/checks/operations.py` | 1183 |
 | `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1181 |
-| `crypto_rsi_scanner/event_fade.py` | 1181 |
 
 ## Accepted Production Files Over 1200 Lines
 

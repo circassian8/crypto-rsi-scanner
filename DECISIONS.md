@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Date sequential intraday sets at full capture completion
+**Status:** accepted
+**Decision:** Bybit intraday live/capture v4 preserves whether every native 1h
+and 4h bar was fresh at its own acquisition, then re-evaluates every bar-close
+and provider-response clock when the final sequential response completes. The
+15-second provider-response policy and interval-specific bar-recency policy both
+apply at that full-set boundary. Manifests, receipts, pointers, bar projections,
+and review-export selection bind acquisition/completion state, maximum provider
+age, minimum remaining bar-recency, and the derived input-quality decision.
+Request timing must also prove one ordered non-overlapping response window. A
+complete aged set remains immutable exact-response evidence but sets
+`protocol_v2_input_quality_eligible=false`.
+**Why:** Up to 60 direct-bar requests run sequentially. An early response can be
+fresh when received and stale before the collection finishes; preserving only
+per-response freshness would overstate the point-in-time set available to
+Protocol-v2 research.
+**Revisit when:** Bybit offers an atomic multi-instrument completed-bar snapshot,
+or a preregistered streaming/synchronization contract defines a stronger common
+cutoff. Any replacement must retain exact per-response clocks and must not let
+individually fresh arrivals hide an aged set.
+
 ## 2026-07-19 - Bind exact book acquisition to response completion
 **Status:** accepted
 **Decision:** Bybit execution-quality live/capture v4 defines a persisted

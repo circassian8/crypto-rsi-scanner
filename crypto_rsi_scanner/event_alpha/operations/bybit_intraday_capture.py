@@ -31,6 +31,18 @@ from .bybit_intraday import (
     build_bybit_kline_request,
     normalize_bybit_completed_kline,
 )
+from .bybit_intraday_set_freshness import (
+    BAR_RECENCY_POLICY,
+    FRESHNESS_POLICY,
+    MAXIMUM_PROVIDER_AGE_SECONDS,
+    _BybitIntradaySetFreshnessError,
+    common_freshness_values,
+    freshness_contract_valid,
+    live_summary_freshness_matches,
+    live_summary_freshness_values,
+    project_intraday_set_freshness,
+    require_exact_response_window,
+)
 from .market_no_send_io import (
     _open_verified_namespace_dir,
     ensure_safe_namespace_dir,
@@ -43,8 +55,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_capture_v3"
-LIVE_CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v3"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_capture_v4"
+LIVE_CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v4"
 EXECUTION_CAPTURE_CONTRACT_VERSION = (
     "crypto_radar_bybit_execution_quality_capture_v4"
 )
@@ -71,11 +83,17 @@ _SAFE_RAW_RE = re.compile(
 )
 _LIVE_SUMMARY_KEYS = frozenset(
     {
-        "all_bars_fresh", "artifact_persisted", "bar_count", "bars",
-        "campaign_attached", "completed_at", "contract_version",
+        "all_bars_fresh", "all_bars_fresh_at_acquisition",
+        "all_bars_fresh_at_completion", "artifact_persisted",
+        "bar_count", "bar_recency_policy", "bars", "campaign_attached",
+        "completed_at", "contract_version",
         "credentials_read", "eligible_instrument_count", "eligible_instruments",
         "execution_mode", "intervals", "no_send", "normal_rsi_signal_rows_written",
         "orders_available", "paper_trades_created", "private_data_read",
+        "intraday_set_freshness_policy",
+        "maximum_provider_response_age_at_completion_seconds",
+        "maximum_provider_response_age_policy_seconds",
+        "minimum_bar_recency_remaining_at_completion_seconds",
         "protocol_v2_evidence_eligible", "provider_call_attempted",
         "provider_call_authorized", "provider_request_bound",
         "provider_request_count", "provider_request_succeeded", "quote_asset",
@@ -465,24 +483,21 @@ def _validate_capture_inputs(
         _utc_datetime(started, "capture_started_at")
     ):
         raise BybitIntradayCaptureError("source_execution_capture_after_intraday_start")
-    for row in request_rows:
-        request_started = _utc_datetime(
-            row["request_started_at"], "request_started_at"
+    try:
+        require_exact_response_window(
+            responses,
+            started_at=_utc_datetime(started, "capture_started_at"),
+            completed_at=_utc_datetime(completed, "capture_completed_at"),
         )
-        response_received = _utc_datetime(
-            row["response_received_at"], "response_received_at"
+        freshness = project_intraday_set_freshness(
+            bars,
+            completed_at=_utc_datetime(completed, "capture_completed_at"),
         )
-        if (
-            request_started < _utc_datetime(started, "capture_started_at")
-            or response_received > _utc_datetime(completed, "capture_completed_at")
-        ):
-            raise BybitIntradayCaptureError("captured_response_outside_capture_window")
-    all_fresh = all(
-        isinstance(row, Mapping) and row.get("freshness_status") == "fresh"
-        for row in bars
-    )
-    if summary.get("all_bars_fresh") is not all_fresh:
+    except _BybitIntradaySetFreshnessError as exc:
+        raise BybitIntradayCaptureError(exc.reason_code) from exc
+    if not live_summary_freshness_matches(summary, freshness):
         raise BybitIntradayCaptureError("intraday_freshness_summary_mismatch")
+    freshness_values = live_summary_freshness_values(freshness)
     return {
         "started_at": started,
         "completed_at": completed,
@@ -491,8 +506,8 @@ def _validate_capture_inputs(
         "bars": bars,
         "request_rows": request_rows,
         "raw_rows": raw_rows,
-        "all_bars_fresh": all_fresh,
-        "protocol_v2_input_quality_eligible": all_fresh,
+        **freshness_values,
+        "protocol_v2_input_quality_eligible": freshness.fresh_at_completion,
     }
 
 
@@ -571,7 +586,7 @@ def _capture_payloads(
         "capture_id": capture_id,
         "bar_count": len(prepared["bars"]),
         "bars": prepared["bars"],
-        "all_bars_fresh": prepared["all_bars_fresh"],
+        **common_freshness_values(prepared),
         "research_only": True,
     }
     request_index = {
@@ -631,10 +646,7 @@ def _publication_values(
         "source_execution_quality_pointer_sha256": source["pointer_sha256"],
         "request_count": len(prepared["request_rows"]),
         "bar_count": len(prepared["bars"]),
-        "all_bars_fresh": prepared["all_bars_fresh"],
-        "protocol_v2_input_quality_eligible": prepared[
-            "protocol_v2_input_quality_eligible"
-        ],
+        **common_freshness_values(prepared),
         "protocol_v2_evidence_eligible": False,
         "protocol_v2_annex_bound": False,
         "campaign_attached": False,
@@ -791,8 +803,13 @@ def _parse_json(raw: bytes) -> dict[str, Any]:
 def validate_bybit_intraday_pointer_bytes(raw: bytes) -> dict[str, Any]:
     pointer = _parse_json(raw)
     expected = {
-        "all_bars_fresh", "artifact_namespace", "bar_count", "campaign_attached",
-        "capture_id", "completed_at", "contract_version",
+        "all_bars_fresh", "all_bars_fresh_at_acquisition",
+        "all_bars_fresh_at_completion", "artifact_namespace", "bar_count",
+        "bar_recency_policy", "campaign_attached", "capture_id",
+        "completed_at", "contract_version", "intraday_set_freshness_policy",
+        "maximum_provider_response_age_at_completion_seconds",
+        "maximum_provider_response_age_policy_seconds",
+        "minimum_bar_recency_remaining_at_completion_seconds",
         "protocol_v2_annex_bound", "protocol_v2_evidence_eligible",
         "protocol_v2_input_quality_eligible", "receipt", "request_count",
         "research_only", "schema_id", "schema_version",
@@ -817,9 +834,7 @@ def validate_bybit_intraday_pointer_bytes(raw: bytes) -> dict[str, Any]:
         or type(pointer.get("request_count")) is not int
         or not 1 <= pointer["request_count"] <= MAX_RESPONSES
         or pointer.get("bar_count") != pointer.get("request_count")
-        or type(pointer.get("all_bars_fresh")) is not bool
-        or pointer.get("protocol_v2_input_quality_eligible")
-        is not pointer.get("all_bars_fresh")
+        or not freshness_contract_valid(pointer)
         or pointer.get("protocol_v2_evidence_eligible") is not False
         or pointer.get("protocol_v2_annex_bound") is not False
         or pointer.get("campaign_attached") is not False
@@ -1077,7 +1092,12 @@ def validate_bybit_intraday_capture(
     common_fields = (
         "completed_at", "source_execution_quality_capture_id",
         "source_execution_quality_pointer_sha256", "request_count", "bar_count",
-        "all_bars_fresh", "protocol_v2_input_quality_eligible",
+        "all_bars_fresh", "all_bars_fresh_at_acquisition",
+        "all_bars_fresh_at_completion", "intraday_set_freshness_policy",
+        "maximum_provider_response_age_at_completion_seconds",
+        "maximum_provider_response_age_policy_seconds",
+        "minimum_bar_recency_remaining_at_completion_seconds",
+        "bar_recency_policy", "protocol_v2_input_quality_eligible",
     )
     if any(receipt.get(key) != manifest.get(key) for key in common_fields) or (
         pointer is not None
@@ -1134,6 +1154,16 @@ def bybit_intraday_capture_status(
             "bars": [],
             "request_count": 0,
             "bar_count": 0,
+            "all_bars_fresh": False,
+            "all_bars_fresh_at_acquisition": False,
+            "all_bars_fresh_at_completion": False,
+            "intraday_set_freshness_policy": FRESHNESS_POLICY,
+            "maximum_provider_response_age_at_completion_seconds": None,
+            "maximum_provider_response_age_policy_seconds": (
+                MAXIMUM_PROVIDER_AGE_SECONDS
+            ),
+            "minimum_bar_recency_remaining_at_completion_seconds": None,
+            "bar_recency_policy": BAR_RECENCY_POLICY,
             "protocol_v2_input_quality_eligible": False,
             "protocol_v2_evidence_eligible": False,
             "protocol_v2_annex_bound": False,

@@ -133,6 +133,13 @@ separate intraday authorization plus confirmation exist. A completed intraday
 bundle remains detached from the campaign and Protocol-v2 evidence until the
 sealed annex explicitly binds its capture ID.
 
+Guarded live/capture v4 treats the native set as one sequential point-in-time
+collection. It preserves each bar's acquisition freshness, re-evaluates every
+bar-close and provider-response clock when the final request completes, and
+uses only that completion state for input-quality eligibility. An early response
+that ages past 15 seconds before completion therefore cannot leave the set
+eligible; the exact aged bundle may still be retained for audit.
+
 - Request `category=linear` with exact uppercase `symbol` and explicit
   `interval=60` or `interval=240`. Preserve the exact start/end query, response
   bytes, request/receive clocks, response clock, instrument identity, and one
@@ -278,8 +285,8 @@ The exact operator sequence is intentionally split:
   boundary by the absent execution-quality capture and separate authorization.
 - The direct 1h/4h completed-bar offline contract exists and is fixture-proven;
   its separately authorized live boundary and immutable exact-response capture
-  exist but are inactive behind the missing execution-quality proof and
-  intraday authorization.
+  exist with full-set completion freshness and exact sequential timing, but are
+  inactive behind the missing execution-quality proof and intraday authorization.
 - No capture is Protocol-v2 evidence and no capture ID is annex-bound.
 - Current Bybit reachability remains unverified after the recorded 403.
 - No provider call is planned or attempted by readiness.

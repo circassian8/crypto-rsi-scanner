@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require full-set freshness for Bybit intraday bars · Codex
+**Why:** Direct 1h/4h collection can issue up to 60 sequential requests. A bar
+could be fresh when received, age past the 15-second provider-response policy
+before the last request completed, and still leave the prior set-level summary
+input-quality eligible.
+**Changes:**
+- Advanced guarded intraday live/capture contracts to v4. The collector now
+  preserves acquisition freshness and re-evaluates every bar-close and provider
+  clock at full-set completion; `all_bars_fresh` and Protocol-v2 input-quality
+  eligibility use the conservative completion result.
+- Added one closed projection that binds maximum provider-response age, its
+  exact 15-second policy, minimum remaining interval-specific bar recency, and
+  both acquisition/completion states through summaries, bar projections,
+  manifests, receipts, pointers, validated results, status, and review-export
+  selection.
+- Required exact captured responses to form one ordered non-overlapping window
+  inside the declared collection interval. Immutable validation rederives the
+  new projection from accepted raw bytes; drifted summaries fail before writes.
+- Kept a complete aged capture as immutable audit evidence while forcing
+  `protocol_v2_input_quality_eligible=false`. The offline per-bar v3 schema and
+  its completed-candle/provider-response rules remain unchanged.
+- Updated the North Star, venue decision package, working agreement, durable
+  decision, roadmap, exporter selector, and generated architecture reports.
+**Verify:** 38 focused intraday normalizer/live/capture tests passed, including
+an individually fresh but completion-stale set, exact sequential-window
+rejection, summary drift, immutable aged capture, rollback, and project-export
+revalidation. Another 74 execution-quality/readiness/Protocol-v2 progress tests
+passed. Python compileall and North Star JSON validation passed. The offline
+intraday smoke made zero calls/writes; live readiness/status emitted v4 and
+stopped before the provider boundary because the execution capture and separate
+authorization are absent. Protocol-v2 readiness/check remained closed;
+architecture cleanliness passed with zero new violations; exact dashboard
+readiness remained revision-12 `READY`; `git diff --check` passed.
+**Notes/risks:** No Bybit or other provider call occurred and no authorization
+was created. The recorded 403/no-retry/no-proxy/no-VPN/no-bypass rule and all
+no-send/no-trade/no-order/no-paper/no-RSI-write/no-`TRIGGERED_FADE` protections
+remain unchanged. No genuine intraday capture exists, no annex was bound, and
+no score, route, threshold, or historical artifact changed.
+
 ## 2026-07-19 — Record the twenty-fifth no-send market cycle · Codex
 **Why:** The campaign reached its next cadence boundary with existing
 authorization present. A real observation was needed both to continue warming
