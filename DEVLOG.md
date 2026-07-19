@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the thirty-eighth no-send market cycle · Codex
+**Why:** The persisted provider reservation expired with existing CoinGecko
+authorization still present, making one new point-in-time observation eligible
+for the research campaign.
+**Changes:**
+- Performed exactly one cadence-gated no-send request. CoinGecko returned HTTP
+  200 with 80 bounded rows in 784 ms and no retry; 30 top-liquidity snapshots
+  were retained in `radar_market_no_send_20260719t234519880892z_5da362f6c3b8`.
+- Published immutable final-publication and owned-dashboard operations receipts
+  for revision 12, pointer SHA-256
+  `3bd11ad729e272238117425dab3138d28ecc3fb0fafa8f08c11f5717240b28c4`,
+  and operator-state SHA-256
+  `32309398d2c9fceef113d70a697e6354c5779ce469c57a3dafa20c6f7fca1ec8`.
+- Refreshed campaign truth to 38 successful cycles / 1,140 retained / 1,110
+  baseline-counted / 30 too-close observations. The current generation remains
+  honestly 29 warming / 1 cold with zero anomaly/current idea and no spread;
+  retained current-universe history is future-evaluation-ready for 27/30 assets.
+**Verify:** Strict live doctor reported 0 blockers and 0 warnings. Dashboard
+readiness and authority status passed, and loopback HEAD returned HTTP 200 with
+the exact namespace, run, revision, and operator-state digest. Campaign pointer,
+publication receipt, operations receipt, request ledger, and safety counters
+reconciled exactly.
+**Notes/risks:** No Telegram send, trade, order, paper trade, normal RSI write,
+Event Alpha `TRIGGERED_FADE`, authorization mutation, route change, or threshold
+change occurred. The next provider boundary is
+`2026-07-20T00:45:20.832390+00:00`; do not call early.
+
 ## 2026-07-20 — Connect two immutable Bybit captures to round-trip evidence · Codex
 **Why:** The venue arithmetic could revalidate independent entry and exit
 constraints, but no closed read-only path joined two immutable capture bundles
