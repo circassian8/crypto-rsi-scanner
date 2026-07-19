@@ -942,6 +942,60 @@ def test_no_provider_attempt_does_not_advance_last_attempted_observation(
     assert state["last_attempted_observation"] == previous_attempt
 
 
+def test_later_skipped_invocation_preserves_bound_last_provider_attempt(
+    tmp_path: Path,
+) -> None:
+    fake = _Boundaries()
+    fake.run_failure = True
+
+    failed = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=50,
+        dependencies=fake.dependencies(),
+    )
+    failed_state = read_json_object(tmp_path / STATE_FILENAME)
+    failed_row = read_jsonl(tmp_path / CYCLE_LEDGER_FILENAME)[-1]
+
+    assert failed.status == "failed"
+    assert failed_state["last_provider_attempt_cycle_id"] == failed.cycle_id
+    assert failed_state["last_provider_attempt_status"] == "failed"
+    assert failed_state["last_provider_attempt_reason"] == "generation_failed"
+    assert failed_state["last_provider_attempt_namespace"] == (
+        failed.artifact_namespace
+    )
+    assert failed_state["last_provider_attempted_at"] == NOW.isoformat()
+    assert failed_state["last_provider_attempt_terminal_at"] == (
+        failed_row["recorded_at"]
+    )
+    assert failed_state["last_provider_request_succeeded"] is False
+    assert failed_row["provider_attempted_at"] == NOW.isoformat()
+
+    fake.run_failure = False
+    fake.readiness_status = "blocked"
+    fake.cadence_status = "waiting"
+    fake.token_hex = lambda size: ("c" if size == 16 else "d") * (size * 2)
+    skipped = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=50,
+        dependencies=fake.dependencies(),
+    )
+    state = read_json_object(tmp_path / STATE_FILENAME)
+
+    assert skipped.status == "skipped"
+    assert state["last_cycle_id"] == skipped.cycle_id
+    assert state["last_cycle_status"] == "skipped"
+    assert state["last_cycle_reason"] == "observation_cadence_waiting"
+    assert state["provider_call_attempted"] is False
+    assert state["last_provider_attempt_cycle_id"] == failed.cycle_id
+    assert state["last_provider_attempt_status"] == "failed"
+    assert state["last_provider_attempt_reason"] == "generation_failed"
+    assert state["last_provider_attempt_namespace"] == failed.artifact_namespace
+    assert state["last_provider_attempted_at"] == NOW.isoformat()
+    assert state["last_provider_request_succeeded"] is False
+
+
 def test_restart_failure_rolls_back_previous_pointer(tmp_path: Path) -> None:
     fake = _Boundaries()
     fake.restart_results = [False, True]

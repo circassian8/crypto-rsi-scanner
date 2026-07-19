@@ -292,7 +292,12 @@ may be added later when a suitable environment already exists.
   boundary again. Historical `authorization_at_last_cycle` remains distinct
   from the expiring persisted `current_authorization_status` and
   `current_provider_call_eligibility`; dashboard GET/HEAD never inspects the
-  environment. When maintenance is disabled, cadence is eligible, and authority
+  environment. The latest terminal invocation and the latest invocation that
+  actually crossed the provider boundary are separate persisted facts; a later
+  cadence skip or readiness block must never hide the preceding provider result.
+  Legacy state may recover that distinction only from the bounded immutable
+  cycle journal, without rewriting artifacts. When maintenance is disabled,
+  cadence is eligible, and authority
   is within 90 minutes of expiry, Today and System Health show the remaining
   time, the exact no-provider readiness command, and the separately confirmed
   install/disable commands without running them. The LaunchAgent stays

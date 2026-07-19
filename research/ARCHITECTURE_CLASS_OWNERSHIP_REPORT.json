@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10554,
+  "function_count": 10558,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-19T10:55:21.577840+00:00",
+  "generated_at": "2026-07-19T11:21:45.445260+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3010,15 +3010,15 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1466,
-      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+      "line_count": 1484,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1465,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "line_count": 1466,
+      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3082,6 +3082,13 @@
     {
       "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3606,18 +3613,18 @@
         },
         {
           "accepted": true,
-          "line_count": 1466,
-          "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-          "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
-          "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
+          "line_count": 1484,
+          "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+          "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
+          "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
           "threshold": 1200
         },
         {
           "accepted": true,
-          "line_count": 1465,
-          "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-          "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
-          "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+          "line_count": 1466,
+          "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+          "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
+          "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
           "threshold": 1200
         },
         {
@@ -3694,6 +3701,14 @@
         },
         {
           "accepted": true,
+          "line_count": 1333,
+          "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+          "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
+          "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
+          "threshold": 1200
+        },
+        {
+          "accepted": true,
           "line_count": 1310,
           "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
           "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
@@ -3730,14 +3745,6 @@
           "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
           "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
           "revisit_condition": "When adding a new enrichment source or cache policy.",
-          "threshold": 1200
-        },
-        {
-          "accepted": true,
-          "line_count": 1272,
-          "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-          "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
-          "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
           "threshold": 1200
         },
         {
@@ -3838,13 +3845,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1466,
-        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+        "line_count": 1484,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
         "threshold": 1200
       },
       {
-        "line_count": 1465,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+        "line_count": 1466,
+        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
       },
       {
@@ -3893,6 +3900,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1333,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1310,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
@@ -3915,11 +3927,6 @@
       {
         "line_count": 1275,
         "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1272,
-        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
         "threshold": 1200
       },
       {
@@ -3990,18 +3997,18 @@
           },
           {
             "accepted": true,
-            "line_count": 1466,
-            "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-            "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
-            "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
+            "line_count": 1484,
+            "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+            "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
+            "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
             "threshold": 1200
           },
           {
             "accepted": true,
-            "line_count": 1465,
-            "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-            "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
-            "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+            "line_count": 1466,
+            "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+            "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
+            "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
             "threshold": 1200
           },
           {
@@ -4078,6 +4085,14 @@
           },
           {
             "accepted": true,
+            "line_count": 1333,
+            "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+            "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
+            "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
+            "threshold": 1200
+          },
+          {
+            "accepted": true,
             "line_count": 1310,
             "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
             "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
@@ -4114,14 +4129,6 @@
             "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
             "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
             "revisit_condition": "When adding a new enrichment source or cache policy.",
-            "threshold": 1200
-          },
-          {
-            "accepted": true,
-            "line_count": 1272,
-            "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-            "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
-            "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
             "threshold": 1200
           },
           {

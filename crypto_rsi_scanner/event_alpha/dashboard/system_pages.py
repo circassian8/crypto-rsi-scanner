@@ -440,6 +440,15 @@ def _maintenance_status_context(snapshot: DashboardSnapshot) -> dict[str, object
         ),
         {},
     )
+    latest_provider_attempt = next(
+        (
+            row
+            for row in reversed(snapshot.maintenance_cycles)
+            if row.get("provider_call_attempted") is True
+            and row.get("status") in {"succeeded", "failed"}
+        ),
+        {},
+    )
     enabled = service.get("enabled")
     prepared = service.get("prepared")
     if enabled is True:
@@ -482,6 +491,7 @@ def _maintenance_status_context(snapshot: DashboardSnapshot) -> dict[str, object
         "state": state,
         "current": current,
         "latest_constraint": latest_constraint,
+        "latest_provider_attempt": latest_provider_attempt,
         "maintenance_label": maintenance_label,
         "maintenance_tone": maintenance_tone,
         "scheduler_healthy": scheduler_healthy,
@@ -504,6 +514,8 @@ def _maintenance_status_values(
     current = snapshot.maintenance_current_status
     latest_constraint = context["latest_constraint"]
     assert isinstance(latest_constraint, Mapping)
+    latest_provider_attempt = context["latest_provider_attempt"]
+    assert isinstance(latest_provider_attempt, Mapping)
     clock = context["clock"]
     maintenance_label = str(context["maintenance_label"])
     maintenance_tone = str(context["maintenance_tone"])
@@ -589,10 +601,41 @@ def _maintenance_status_values(
                 else current.get("current_provider_call_eligibility")
             ),
         ),
-        ("Last cycle", badge(state.get("last_cycle_status"))),
+        ("Last invocation", badge(state.get("last_cycle_status"))),
         (
-            "Last cycle reason",
+            "Last invocation reason",
             humanize_reason(state.get("last_cycle_reason")),
+        ),
+        (
+            "Last provider attempt",
+            badge(
+                state.get("last_provider_attempt_status")
+                or latest_provider_attempt.get("status")
+            ),
+        ),
+        (
+            "Last provider attempt reason",
+            humanize_reason(
+                state.get("last_provider_attempt_reason")
+                or latest_provider_attempt.get("reason")
+            ),
+        ),
+        (
+            "Last provider request",
+            _provider_request_badge(
+                state.get("last_provider_request_succeeded"),
+                fallback=latest_provider_attempt,
+            ),
+        ),
+        (
+            "Last provider attempt recorded",
+            time_element(
+                present_time(
+                    state.get("last_provider_attempt_terminal_at")
+                    or latest_provider_attempt.get("recorded_at"),
+                    now=clock,
+                )
+            ),
         ),
         (
             "Latest skip / block reason",
@@ -610,6 +653,24 @@ def _maintenance_status_values(
             _boolean_badge(state.get("research_only"), false_tone="danger"),
         ),
     )
+
+
+def _provider_request_badge(
+    succeeded: object,
+    *,
+    fallback: Mapping[str, object],
+) -> object:
+    value = (
+        succeeded
+        if isinstance(succeeded, bool)
+        else fallback.get("provider_request_succeeded")
+    )
+    attempted = fallback.get("provider_call_attempted")
+    if value is True:
+        return badge("Succeeded", tone="positive")
+    if value is False or attempted is True:
+        return badge("Failed", tone="danger")
+    return badge("Not recorded", tone="muted")
 
 
 def _maintenance_expiry_action(snapshot: DashboardSnapshot) -> str:

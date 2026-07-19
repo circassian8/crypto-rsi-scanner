@@ -228,6 +228,7 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
         or not _optional_nonnegative_int(row.get("scheduler_runs"))
         or not _optional_boolean(row.get("pointer_invalidated"))
         or not _optional_boolean(row.get("authorization_at_last_cycle"))
+        or not _optional_provider_attempt_state(row)
         or not _zero_safety_counters(row)
     ):
         return {}
@@ -241,6 +242,13 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
         "last_cycle_namespace",
         "last_readiness_check",
         "last_attempted_observation",
+        "last_provider_attempt_cycle_id",
+        "last_provider_attempt_status",
+        "last_provider_attempt_reason",
+        "last_provider_attempt_namespace",
+        "last_provider_attempted_at",
+        "last_provider_attempt_terminal_at",
+        "last_provider_request_succeeded",
         "last_successful_publication",
         "last_successful_namespace",
         "next_eligible_observation_at",
@@ -264,6 +272,47 @@ def _project_state(row: Mapping[str, Any]) -> dict[str, Any]:
     projected = {field: row.get(field) for field in fields}
     projected["pointer_invalidated"] = row.get("pointer_invalidated") is True
     return projected
+
+
+def _optional_provider_attempt_state(row: Mapping[str, Any]) -> bool:
+    fields = (
+        "last_provider_attempt_cycle_id",
+        "last_provider_attempt_status",
+        "last_provider_attempt_reason",
+        "last_provider_attempt_namespace",
+        "last_provider_attempted_at",
+        "last_provider_attempt_terminal_at",
+        "last_provider_request_succeeded",
+    )
+    values = tuple(row.get(field) for field in fields)
+    if all(value is None for value in values):
+        return True
+    if any(value is None for value in values):
+        return False
+    return bool(
+        row.get("last_provider_attempt_status") in {"succeeded", "failed"}
+        and _required_safe_tokens(
+            row,
+            (
+                "last_provider_attempt_cycle_id",
+                "last_provider_attempt_status",
+                "last_provider_attempt_reason",
+            ),
+        )
+        and _optional_safe_namespace(
+            row.get("last_provider_attempt_namespace"), required=True
+        )
+        and _required_aware_timestamps(
+            row,
+            (
+                "last_provider_attempted_at",
+                "last_provider_attempt_terminal_at",
+            ),
+        )
+        and isinstance(row.get("last_provider_request_succeeded"), bool)
+        and row.get("last_attempted_observation")
+        == row.get("last_provider_attempted_at")
+    )
 
 
 def _project_current_status(
@@ -382,6 +431,7 @@ def _project_cycles(
 
 
 def _project_cycle(row: Mapping[str, Any]) -> dict[str, Any]:
+    provider_attempted_at = row.get("provider_attempted_at")
     if (
         row.get("contract_version") != 1
         or row.get("row_type") != "decision_radar_daily_operations_cycle"
@@ -403,6 +453,11 @@ def _project_cycle(row: Mapping[str, Any]) -> dict[str, Any]:
             ),
         )
         or not _optional_boolean(row.get("pointer_invalidated"))
+        or not _optional_aware_timestamps(row, ("provider_attempted_at",))
+        or (
+            provider_attempted_at is not None
+            and row.get("provider_call_attempted") is not True
+        )
         or not _zero_safety_counters(row)
     ):
         return {}
@@ -415,6 +470,7 @@ def _project_cycle(row: Mapping[str, Any]) -> dict[str, Any]:
         "status",
         "reason",
         "provider_call_attempted",
+        "provider_attempted_at",
         "provider_request_succeeded",
         "pointer_published",
         "dashboard_restarted",

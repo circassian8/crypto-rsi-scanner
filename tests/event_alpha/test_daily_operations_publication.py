@@ -596,6 +596,31 @@ def test_current_operations_contract_allows_later_non_success_cycle(
     assert "operations_receipt_current_maintenance_state_mismatch" in drifted.errors
 
 
+def test_current_operations_contract_rejects_partial_provider_attempt_projection(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    publication.reconcile_current_publication(
+        tmp_path,
+        dashboard={"owned": True, "running": True, "reason": "owned_running"},
+        recorded_at=NOW,
+    )
+    state_path = tmp_path / publication.STATE_FILENAME
+    state = read_json_object(state_path)
+    state["last_provider_attempt_status"] = "failed"
+    write_json_atomic(state_path, state)
+
+    result = publication.validate_final_publication_contract(
+        tmp_path,
+        NAMESPACE,
+        require_current=True,
+        require_operations=True,
+    )
+
+    assert result.valid is False
+    assert "operations_receipt_current_maintenance_state_mismatch" in result.errors
+
+
 @pytest.mark.parametrize("counter_value", ("not-an-integer", "0", False, 0.0, None))
 def test_malformed_receipt_counter_returns_closed_invalid_result(
     tmp_path: Path,

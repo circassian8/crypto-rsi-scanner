@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from .market_no_send_io import write_json_atomic
 
@@ -94,6 +94,38 @@ def persist_current_status(
     return path
 
 
+def provider_attempt_state_values(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    previous: Mapping[str, Any],
+) -> dict[str, object]:
+    """Project the newest provider-backed terminal cycle into bounded state."""
+
+    latest = next(
+        (
+            row
+            for row in reversed(rows)
+            if row.get("status") in {"succeeded", "failed"}
+            and row.get("provider_call_attempted") is True
+        ),
+        {},
+    )
+    attempted_at = latest.get("provider_attempted_at")
+    if attempted_at is None and latest:
+        attempted_at = previous.get("last_attempted_observation")
+    return {
+        "last_provider_attempt_cycle_id": latest.get("cycle_id"),
+        "last_provider_attempt_status": latest.get("status"),
+        "last_provider_attempt_reason": latest.get("reason"),
+        "last_provider_attempt_namespace": latest.get("artifact_namespace"),
+        "last_provider_attempted_at": attempted_at,
+        "last_provider_attempt_terminal_at": latest.get("recorded_at"),
+        "last_provider_request_succeeded": latest.get(
+            "provider_request_succeeded"
+        ),
+    }
+
+
 def _provider_call_eligibility(readiness: Any) -> str:
     market = getattr(readiness, "market", None)
     dashboard = getattr(readiness, "dashboard", None)
@@ -152,4 +184,5 @@ __all__ = (
     "READINESS_COMMAND",
     "current_status_values",
     "persist_current_status",
+    "provider_attempt_state_values",
 )

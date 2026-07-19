@@ -1113,9 +1113,18 @@ def _record_terminal(
             dashboard_restarted=result.dashboard_restarted,
             pointer_rolled_back=result.pointer_rolled_back,
             pointer_invalidated=result.pointer_invalidated,
+            provider_attempted_at=(
+                attempted_observation_at if result.provider_call_attempted else None
+            ),
         ),
     )
     previous = _read_state(base)
+    provider_attempt_state = (
+        daily_operations_current_status.provider_attempt_state_values(
+            rows=read_jsonl(base / CYCLE_LEDGER_FILENAME),
+            previous=previous,
+        )
+    )
     succeeded = result.status == "succeeded"
     state = {
         "contract_version": CONTRACT_VERSION,
@@ -1132,6 +1141,7 @@ def _record_terminal(
             (attempted_observation_at if result.provider_call_attempted else None)
             or previous.get("last_attempted_observation")
         ),
+        **provider_attempt_state,
         "last_successful_publication": (
             now.isoformat()
             if succeeded
@@ -1219,7 +1229,15 @@ def _cycle_row(
     dashboard_restarted: bool = False,
     pointer_rolled_back: bool = False,
     pointer_invalidated: bool = False,
+    provider_attempted_at: str | None = None,
 ) -> dict[str, object]:
+    parsed_provider_attempted_at = None
+    if provider_call_attempted:
+        if provider_attempted_at is None:
+            raise DailyOperationsError("provider attempt timestamp is missing")
+        parsed_provider_attempted_at = _parse_timestamp(
+            provider_attempted_at
+        ).isoformat()
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_daily_operations_cycle",
@@ -1229,6 +1247,7 @@ def _cycle_row(
         "status": status,
         "reason": _safe_reason(reason),
         "provider_call_attempted": provider_call_attempted is True,
+        "provider_attempted_at": parsed_provider_attempted_at,
         "provider_request_succeeded": provider_request_succeeded is True,
         "pointer_published": pointer_published is True,
         "dashboard_restarted": dashboard_restarted is True,

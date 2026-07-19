@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Separate provider attempts from terminal invocations · Codex
+**Why:** A safe cadence-blocked re-entry became the latest Daily Operations
+cycle and replaced the dashboard's visible DNS/provider failure with
+“observation cadence waiting.” The immutable journal and campaign report were
+correct, but the primary operator surface obscured why the reservation existed.
+**Changes:**
+- Added a closed latest-provider-attempt projection alongside the existing
+  latest-invocation state. It preserves the exact cycle, namespace,
+  attempt/terminal clocks, terminal reason/status, and request outcome across
+  later skipped or blocked invocations.
+- Bound attempted terminal rows to their provider-attempt timestamp, projected
+  the new optional group through the bounded dashboard reader, and made partial
+  state fail strict publication validation. Legacy state uses only a read-only
+  fallback from the bounded cycle journal; no historical artifact is rewritten.
+- Renamed the health field to “Last invocation” and added distinct provider
+  attempt/request fields. A temporary read-only server rendered the current
+  authority with “Skipped / Observation cadence waiting” beside the retained
+  “Failed / Provider request failed”; browser console inspection was clean.
+- Kept the coordinator below its hard architecture limit by placing the pure
+  projection in the existing current-status companion. Updated the working
+  agreement, roadmap, durable decision, and generated architecture reports.
+**Verify:** 80 focused Daily Operations/publication/dashboard tests passed. A
+broader dashboard set passed 495 tests in the sandbox; its single ephemeral
+loopback concurrency test passed separately with local socket permission.
+`python3 -m compileall -q crypto_rsi_scanner tests`, dashboard smoke, dashboard
+UX smoke, exact-current dashboard readiness, and architecture cleanliness all
+passed; size gates report zero new violations. Final `make verify
+PYTHON=python3` passed 1,417/1,417 standalone tests, 3,171 pytest tests, alert
+rendering, the offline fixture backtest, and the paper scoreboard.
+**Notes/risks:** No provider call, retry, pointer mutation, dashboard authority
+change, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred. The live 10:54 UTC CoinGecko failure and the later
+cadence skip remain separate immutable journal facts.
+
 ## 2026-07-19 — Record the cadence-eligible CoinGecko DNS failure · Codex
 **Why:** The one-hour observation boundary elapsed with existing CoinGecko
 authorization, so Daily Operations was eligible to make one bounded no-send

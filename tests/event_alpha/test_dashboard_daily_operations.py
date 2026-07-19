@@ -76,6 +76,13 @@ def _maintenance_state() -> dict[str, object]:
         "last_cycle_namespace": "radar_market_no_send_3",
         "last_readiness_check": "2026-07-12T05:59:00+00:00",
         "last_attempted_observation": "2026-07-12T06:00:00+00:00",
+        "last_provider_attempt_cycle_id": "cycle-3",
+        "last_provider_attempt_status": "succeeded",
+        "last_provider_attempt_reason": "published_and_restarted",
+        "last_provider_attempt_namespace": "radar_market_no_send_3",
+        "last_provider_attempted_at": "2026-07-12T06:00:00+00:00",
+        "last_provider_attempt_terminal_at": "2026-07-12T06:02:00+00:00",
+        "last_provider_request_succeeded": True,
         "last_successful_publication": "2026-07-12T06:02:00+00:00",
         "last_successful_namespace": "radar_market_no_send_3",
         "next_eligible_observation_at": "2026-07-12T07:00:00+00:00",
@@ -142,6 +149,9 @@ def _cycle(index: int, status: str, reason: str) -> dict[str, object]:
         "status": status,
         "reason": reason,
         "provider_call_attempted": attempted,
+        "provider_attempted_at": (
+            f"2026-07-12T0{index}:00:00+00:00" if attempted else None
+        ),
         "provider_request_succeeded": succeeded,
         "pointer_published": succeeded,
         "dashboard_restarted": succeeded,
@@ -232,6 +242,10 @@ def test_maintenance_history_is_bounded_allowlisted_and_non_authoritative(
     assert "plist_path" not in snapshot.maintenance_service
     assert snapshot.maintenance_state["scheduler_healthy"] is True
     assert snapshot.maintenance_state["authorization_at_last_cycle"] is True
+    assert snapshot.maintenance_state["last_provider_attempt_status"] == (
+        "succeeded"
+    )
+    assert snapshot.maintenance_state["last_provider_request_succeeded"] is True
     assert snapshot.maintenance_state["pointer_invalidated"] is False
     assert "authorization_header" not in snapshot.maintenance_state
     assert snapshot.maintenance_current_status["current_authorization_status"] == "not_authorized"
@@ -242,6 +256,9 @@ def test_maintenance_history_is_bounded_allowlisted_and_non_authoritative(
         "cycle-3",
     ]
     assert all("provider_token" not in row for row in snapshot.maintenance_cycles)
+    assert snapshot.maintenance_cycles[-1]["provider_attempted_at"] == (
+        "2026-07-12T03:00:00+00:00"
+    )
     assert all(row["pointer_invalidated"] is False for row in snapshot.maintenance_cycles)
     metadata = snapshot.maintenance_history_metadata[
         maintenance_history.CYCLE_LEDGER_FILENAME
@@ -325,10 +342,16 @@ def test_health_and_run_history_render_daily_operations_truth() -> None:
         "Not authorized",
         "Current provider-call eligibility",
         "Scheduler health",
+        "Last invocation",
+        "Last provider attempt",
+        "Last provider attempt reason",
+        "Last provider request",
+        "Last provider attempt recorded",
         "Latest skip / block reason",
         "Provider backoff active",
     ):
         assert label in health
+    assert "Succeeded" in health
     assert 'datetime="2026-07-14T16:00:00Z"' in health
     assert "does not inspect launchd or call a provider" in health
     assert "Daily maintenance cycle ledger" in history
@@ -339,6 +362,49 @@ def test_health_and_run_history_render_daily_operations_truth() -> None:
     assert "Dashboard restarted" in history
     assert "Historical / not current" in history
     assert "Maintenance telemetry / non-authoritative" in history
+
+
+def test_health_keeps_latest_provider_failure_visible_after_later_skip() -> None:
+    source = _snapshot()
+    legacy_state = {
+        **_maintenance_state(),
+        "last_cycle_id": "cycle-4",
+        "last_cycle_status": "skipped",
+        "last_cycle_reason": "observation_cadence_waiting",
+        "last_cycle_namespace": "radar_market_no_send_4",
+        "provider_call_attempted": False,
+        "pointer_published": False,
+        "dashboard_restarted": False,
+    }
+    for field in (
+        "last_provider_attempt_cycle_id",
+        "last_provider_attempt_status",
+        "last_provider_attempt_reason",
+        "last_provider_attempt_namespace",
+        "last_provider_attempted_at",
+        "last_provider_attempt_terminal_at",
+        "last_provider_request_succeeded",
+    ):
+        legacy_state.pop(field)
+    snapshot = replace(
+        source,
+        maintenance_service=_service_state(),
+        maintenance_state=legacy_state,
+        maintenance_current_status=_current_status(),
+        maintenance_cycles=(
+            _cycle(3, "failed", "provider_request_failed"),
+            _cycle(4, "skipped", "observation_cadence_waiting"),
+        ),
+    )
+
+    health = render_health_page(snapshot)
+
+    assert "Last invocation" in health
+    assert "Observation cadence waiting" in health
+    assert "Last provider attempt" in health
+    assert "Provider request failed" in health
+    assert "Last provider request" in health
+    assert "Failed" in health
 
 
 def test_run_history_separates_attempt_publication_operations_and_current() -> None:

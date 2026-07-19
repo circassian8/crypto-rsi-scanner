@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Preserve provider-attempt truth across later skipped invocations
+**Status:** accepted
+**Decision:** Persist the latest terminal Daily Operations invocation and the
+latest terminal invocation that crossed the provider boundary as separate
+facts. A later cadence skip, authorization block, or readiness block may become
+the latest invocation but must not replace the preceding provider attempt's
+cycle, namespace, attempted/terminal clocks, terminal status, reason, or request
+outcome. Treat the provider-attempt projection as one closed optional group;
+partial state fails validation. Historical state may use the bounded immutable
+cycle journal as a read-only display fallback and must not be rewritten merely
+to improve dashboard wording.
+**Why:** “Last cycle” previously changed from a genuine DNS/provider failure to
+“cadence waiting” when the operator safely re-entered the command. The campaign
+journal remained correct, but the primary health surface obscured the failure
+that explains why the cadence reservation exists.
+**Revisit when:** A versioned state contract replaces the optional compatibility
+group. It must retain the two independent timelines and exact journal binding;
+it may remove the legacy fallback only after all supported authority states
+carry the closed projection.
+
 ## 2026-07-19 - Keep Bybit liquidations as a separate native stream contract
 **Status:** accepted
 **Decision:** Protocol-v2 liquidation context for the selected Bybit

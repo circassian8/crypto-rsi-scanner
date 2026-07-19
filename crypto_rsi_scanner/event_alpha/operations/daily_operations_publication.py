@@ -960,10 +960,44 @@ def _valid_current_maintenance_state(
             )
         )
         or not _valid_identity(state.get("scheduler_reason"))
+        or not _valid_optional_provider_attempt_state(state)
         or not _safe_receipt(state)
     ):
         return False
     return True
+
+
+def _valid_optional_provider_attempt_state(state: Mapping[str, Any]) -> bool:
+    fields = (
+        "last_provider_attempt_cycle_id",
+        "last_provider_attempt_status",
+        "last_provider_attempt_reason",
+        "last_provider_attempt_namespace",
+        "last_provider_attempted_at",
+        "last_provider_attempt_terminal_at",
+        "last_provider_request_succeeded",
+    )
+    values = tuple(state.get(field) for field in fields)
+    if all(value is None for value in values):
+        return True
+    if any(value is None for value in values):
+        return False
+    return bool(
+        state.get("last_provider_attempt_status") in {"succeeded", "failed"}
+        and all(
+            _valid_identity(state.get(field))
+            for field in (
+                "last_provider_attempt_cycle_id",
+                "last_provider_attempt_reason",
+                "last_provider_attempt_namespace",
+            )
+        )
+        and _valid_timestamp(state.get("last_provider_attempted_at"))
+        and _valid_timestamp(state.get("last_provider_attempt_terminal_at"))
+        and isinstance(state.get("last_provider_request_succeeded"), bool)
+        and state.get("last_attempted_observation")
+        == state.get("last_provider_attempted_at")
+    )
 
 
 def _valid_identity(value: object) -> bool:
