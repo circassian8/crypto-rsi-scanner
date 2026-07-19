@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the cadence-eligible CoinGecko DNS failure · Codex
+**Why:** The observation boundary was eligible and the already-present
+CoinGecko authorization was current, so Daily Operations was permitted to make
+one bounded no-send request. The sandbox could not resolve the provider host;
+that terminal attempt still needed to remain visible without a retry or
+authority drift.
+**Changes:**
+- Ran exactly one cadence-eligible Daily Operations cycle. It recorded
+  `radar_market_no_send_20260719t155006851644z_a508931f4454` as
+  `provider_unavailable` after `ClientConnectorDNSError`; no provider response,
+  market observation, candidate, publication, or dashboard restart was
+  manufactured.
+- Refreshed canonical campaign truth to eight provider failures while retaining
+  34 successful cycles, 1,020 observations, 990 baseline-counted observations,
+  and the prior revision-12 authority
+  `radar_market_no_send_20260719t132456823505z_1f6f530fbb36`.
+- Preserved the one-attempt reservation through
+  `2026-07-19T16:50:07.747704+00:00`; no outside-sandbox retry was made after the
+  provider boundary had already been crossed.
+- Revalidated the unchanged pointer-bound DefiLlama review and corrected the
+  active roadmap to its exact current market-universe and mapping-review
+  digests; all 30 mappings remain explicitly unreviewed.
+**Verify:** Daily Operations status identifies cycle
+`f21841b9f8378698272b12129586cf14` as the latest terminal and provider-backed
+attempt, reports `waiting_cadence`, and retains all safety counters at zero.
+Dashboard authority status reports the previous namespace as authoritative with
+exact pointer revalidation. The campaign-report diff changes only terminal
+attempt/cadence/audit truth and its derived digests/timestamps.
+**Notes/risks:** The failure is environmental/provider-transport evidence, not
+an algorithm result. It sent no Telegram message, created no trade/order/paper
+trade, wrote no normal RSI signal, and created no Event Alpha
+`TRIGGERED_FADE`. The scheduler remains uninstalled and the next provider call
+must pass a fresh readiness check after the recorded boundary.
+
 ## 2026-07-19 — Seal detached Bybit liquidation transcripts · Codex
 **Why:** Protocol v2 needs venue-native liquidation evidence, but an
 operator-supplied WebSocket application transcript cannot honestly prove a

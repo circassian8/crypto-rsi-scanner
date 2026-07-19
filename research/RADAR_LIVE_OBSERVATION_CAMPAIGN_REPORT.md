@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-19T13:28:17.602776+00:00` from local artifacts only.
+Generated at `2026-07-19T15:50:08.621018+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -20,7 +20,7 @@ Research and decision support only. This report contains no trade recommendation
 - Explicit first-view records: `0`
 - Completed human reviews: `0`
 - Ideas awaiting explicit review action: `3`
-- Provider failures: `7`
+- Provider failures: `8`
 - Preflight/blocked attempts: `1`
 - Event Alpha catalyst burn-in: `separate_not_aggregated`
 - Historical market-provenance v2 fields: `read_only_adapter`
@@ -245,6 +245,7 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 | radar_market_no_send_20260719t014535150908z_a6733972aeef | 2026-07-19T01:45:35.634625+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 | radar_market_no_send_20260719t065058608772z_a2dc7f3da485 | 2026-07-19T06:50:59.259079+00:00 | provider_unavailable | true | TimeoutError |
 | radar_market_no_send_20260719t105409195530z_30c5e86a453c | 2026-07-19T10:54:09.995373+00:00 | provider_unavailable | true | ClientConnectorDNSError |
+| radar_market_no_send_20260719t155006851644z_a508931f4454 | 2026-07-19T15:50:07.747704+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 
 | Namespace | Observed at | Status | Provider attempted | Failure class |
 |---|---|---|---|---|
@@ -262,14 +263,14 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 
 ## Next observation
 
-- Next eligible time: `2026-07-19T14:24:57.648234+00:00`
+- Next eligible time: `2026-07-19T16:50:07.747704+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 34 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 7 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 29/34 warm retained assets; exact current-universe status is warming with 29/30 warm assets. Pointer history contains 30 bound generations and current authority is radar_market_no_send_20260719t132456823505z_1f6f530fbb36. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 34 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 8 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 29/34 warm retained assets; exact current-universe status is warming with 29/30 warm assets. Pointer history contains 30 bound generations and current authority is radar_market_no_send_20260719t132456823505z_1f6f530fbb36. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.
