@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep Kraken roadmap context separate from launch evidence
+**Status:** accepted
+**Decision:** Treat Kraken's official listing roadmap as planned-listing or
+scheduled-risk context only. It cannot prove funding, trading launch,
+tradability, strict catalyst eligibility, or directional bias. An actual Kraken
+launch claim requires an exact official publication acquired through an
+approved supported transport; delisting and operational notices remain a
+separate regional-risk role. `kraken_announcements` stays planned,
+unimplemented, unconfigured, unauthorized, and Protocol-v2-ineligible because
+the reviewed official surfaces expose human-readable pages/social channels but
+no documented stable announcement REST, WebSocket, RSS, or equivalent machine
+contract.
+**Why:** Kraken explicitly says roadmap inclusion is not a guaranteed listing
+and funding/trading remain unsupported until a separate official announcement.
+Collapsing roadmap discovery, launch publication, and regional risk notices
+would invent event clocks and overstate catalyst and tradability evidence.
+**Revisit when:** The operator selects exact source roles and approves either a
+documented machine contract or a bounded first-party page/local-import contract
+after access, terms, retention, redistribution, clock, coverage, and regional
+semantics are reviewed. Any live acquisition still requires separate explicit
+authorization, immutable bytes, strict doctor, and annex selection.
+
 ## 2026-07-19 - Preserve derivatives freshness through full-set publication
 **Status:** accepted
 **Decision:** Bybit derivatives live/capture v3 re-evaluates every composite

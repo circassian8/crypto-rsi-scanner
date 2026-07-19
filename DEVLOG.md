@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Separate Kraken roadmap context from launch evidence · Codex
+**Why:** Kraken is already recognized as an official-exchange source identity,
+but the project had no closed decision about what its listing roadmap, launch
+posts, and delisting notices can actually prove. Treating those surfaces as one
+feed would invent event clocks and overstate catalyst or tradability evidence.
+**Changes:**
+- Reviewed current first-party Kraken listing-roadmap, roadmap-policy, asset-
+  launch, delisting, and fork/migration sources. Recorded the exact findings and
+  URLs in Markdown plus a structured review contract.
+- Split the source into three roles: roadmap entries are planned-listing/
+  scheduled-risk context only; exact official launch publications are required
+  to claim funding or trading availability; delisting/migration/suspension
+  notices remain regional operational-risk context.
+- Recorded that the reviewed official surfaces expose human-readable pages and
+  social channels but no documented stable announcement REST, WebSocket, RSS,
+  or equivalent machine contract. Absence from this bounded review is not a
+  universal nonexistence claim.
+- Kept `kraken_announcements` planned, unimplemented, unconfigured,
+  unauthorized, campaign-detached, and Protocol-v2-ineligible. Documented the
+  exact machine-or-bounded-page/local-import, terms, clock, coverage, immutable-
+  byte, authorization, doctor, and annex gates required before implementation.
+- Updated the durable decision and roadmap without adding a provider layer.
+**Verify:** Both review files passed JSON and whitespace validation. Thirteen
+focused source-registry and source-coverage tests passed. Architecture
+cleanliness remained green with zero new size violations.
+**Notes/risks:** Web research read only the linked official Kraken sources; the
+project made no Kraken/provider call and created no parser, transport,
+authorization, score, route, threshold, evidence authority, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Enumerate the real Protocol-v2 evidence frontier · Codex
 **Why:** The separate current-progress surface correctly superseded the frozen
 contract's old venue placeholders, but still collapsed most remaining work into

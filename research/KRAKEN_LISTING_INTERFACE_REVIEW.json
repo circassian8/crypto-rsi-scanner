@@ -1,0 +1,71 @@
+{
+  "decision": "separate_planned_listing_context_from_trading_launch_and_operational_risk",
+  "provider_registry_id": "kraken_announcements",
+  "provider_status": "planned_unimplemented_unconfigured_unauthorized",
+  "protocol_v2_eligible": false,
+  "provider_call_performed": false,
+  "research_only": true,
+  "reviewed_at": "2026-07-19",
+  "reviewed_sources": [
+    {
+      "finding": "official roadmap exposes planned token chain and network integrations but disclaims guaranteed listing or current funding and trading",
+      "url": "https://www.kraken.com/listings"
+    },
+    {
+      "finding": "official roadmap explanation separates committee-approved planning from eventual funding and trading availability",
+      "url": "https://blog.kraken.com/product/accelerating-new-listings-at-kraken"
+    },
+    {
+      "finding": "official dated blog articles may explicitly state that asset trading is live but no stable machine announcement contract was documented",
+      "url": "https://blog.kraken.com/product/asset-listings/asset-is-available-for-trading"
+    },
+    {
+      "finding": "official support section exposes human-readable delisting migration regional and pair-removal notices",
+      "url": "https://support.kraken.com/sections/delistings"
+    },
+    {
+      "finding": "official policy directs fork airdrop migration and new-asset communication to email blog and social channels",
+      "url": "https://support.kraken.com/articles/115013895208-general-statement-on-forks-airdrops-and-addition-of-new-cryptocurrencies"
+    }
+  ],
+  "source_roles": {
+    "listing_roadmap": {
+      "role": "planned_listing_or_scheduled_risk_context_only",
+      "documented_machine_contract_found": false,
+      "proves_current_trading": false,
+      "creates_directional_bias": false
+    },
+    "trading_launch_announcement": {
+      "role": "strict_catalyst_only_after_exact_official_publication_capture",
+      "approved_project_transport": false,
+      "authoritative_machine_evidence_available": false
+    },
+    "delisting_and_operational_risk": {
+      "role": "regional_risk_context_after_exact_source_and_clock_validation",
+      "documented_machine_contract_found": false,
+      "unavailable_region_means_no_event": false
+    }
+  },
+  "revisit_requires": [
+    "explicit_source_role_selection",
+    "documented_machine_contract_or_explicit_bounded_first_party_page_or_local_import_approval",
+    "applicable_access_terms_retention_and_redistribution_review",
+    "explicit_provider_authorization",
+    "closed_offline_normalizer",
+    "bounded_no_redirect_no_retry_capture",
+    "immutable_accepted_source_bytes",
+    "publication_stated_event_and_local_read_completion_clocks",
+    "regional_coverage_request_ledger_health_and_backoff",
+    "strict_doctor",
+    "explicit_protocol_v2_annex_selection"
+  ],
+  "safety": {
+    "authorization_created": false,
+    "event_alpha_triggered_fade_created": 0,
+    "normal_rsi_signal_rows_written": 0,
+    "paper_trades_created": 0,
+    "telegram_sends": 0,
+    "trades_or_orders_created": 0
+  },
+  "schema_version": "kraken_listing_interface_review_v1"
+}
