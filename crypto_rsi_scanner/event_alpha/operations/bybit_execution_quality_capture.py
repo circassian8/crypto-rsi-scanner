@@ -38,6 +38,7 @@ from .bybit_execution_quality_capture_models import (
     REQUEST_ROW_KEYS as _REQUEST_ROW_KEYS,
     TRANSPORT_CONTRACT,
     BybitCapturedJSONResponse,
+    _execution_capture_namespace,
 )
 from .bybit_execution_quality_set_freshness import (
     _BybitExecutionQualitySetFreshnessError, common_freshness_matches,
@@ -45,6 +46,7 @@ from .bybit_execution_quality_set_freshness import (
     observation_freshness_contract_valid, observation_freshness_matches,
     observation_freshness_values, prepared_freshness_values,
     prepared_summary_freshness_matches, project_execution_quality_set_freshness,
+    exact_response_acquisition_matches, require_exact_response_window,
 )
 from .bybit_execution_quality_universe import (
     BybitExecutionQualityUniverseError,
@@ -64,8 +66,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v3"
-_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v3"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v4"
+_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v4"
 POINTER_FILENAME = "radar_bybit_execution_quality_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
 RECEIPT_FILENAME = "capture_completion_receipt.json"
@@ -414,6 +416,15 @@ def _validate_capture_inputs(
         snapshot_values,
     ) = _validated_summary_components(summary, responses)
 
+    try:
+        require_exact_response_window(
+            responses,
+            started_at=_utc_datetime(started_at, "capture_started_at"),
+            completed_at=_utc_datetime(completed_at, "capture_completed_at"),
+        )
+    except _BybitExecutionQualitySetFreshnessError as exc:
+        raise BybitExecutionQualityCaptureError(exc.reason_code) from exc
+
     request_rows: list[dict[str, object]] = []
     raw_rows: list[tuple[str, bytes]] = []
     catalog_request = build_bybit_instrument_catalog_request()
@@ -458,6 +469,10 @@ def _validate_capture_inputs(
         expected = build_bybit_orderbook_request(instrument)
         if response.request != expected:
             raise BybitExecutionQualityCaptureError("orderbook_request_order_drift")
+        if not exact_response_acquisition_matches(expected_snapshot, response):
+            raise BybitExecutionQualityCaptureError(
+                "snapshot_acquisition_response_clock_mismatch"
+            )
         raw_filename = f"raw_{offset:03d}_orderbook_{instrument.instrument_id}.json"
         request_rows.append(
             _response_values(response, index=offset, raw_filename=raw_filename)
@@ -545,20 +560,6 @@ def _source_summary_from_persisted(
 
 def _artifact_descriptor(name: str, role: str, raw: bytes) -> dict[str, object]:
     return {"name": name, "role": role, **_fingerprint(raw)}
-
-
-def _capture_namespace(prepared: Mapping[str, object]) -> tuple[str, str]:
-    completed = _utc_datetime(prepared["completed_at"], "capture_completed_at")
-    seed = _canonical_bytes(
-        {
-            "completed_at": prepared["completed_at"],
-            "source_authority": prepared["source_authority"],
-            "raw_sha256": [_sha256(raw) for _name, raw in prepared["raw_rows"]],
-        }
-    )
-    capture_id = _sha256(seed)
-    timestamp = completed.strftime("%Y%m%dt%H%M%S%fz")
-    return f"radar_bybit_execution_quality_{timestamp}_{capture_id[:12]}", capture_id
 
 
 @contextmanager
@@ -733,7 +734,7 @@ def persist_bybit_execution_quality_capture(
 
     base = Path(artifact_base_dir).expanduser().absolute()
     prepared = _validate_capture_inputs(summary, responses)
-    namespace, capture_id = _capture_namespace(prepared)
+    namespace, capture_id = _execution_capture_namespace(prepared)
     namespace_dir = base / namespace
     if not _NAMESPACE_RE.fullmatch(namespace):
         raise BybitExecutionQualityCaptureError("capture_namespace_invalid")
@@ -985,7 +986,7 @@ def _validate_capture_semantics(
         raise BybitExecutionQualityCaptureError("capture_projection_contract_invalid")
     source_summary = _source_summary_from_persisted(summary)
     prepared = _validate_capture_inputs(source_summary, responses)
-    derived_namespace, derived_capture_id = _capture_namespace(prepared)
+    derived_namespace, derived_capture_id = _execution_capture_namespace(prepared)
     if (
         derived_namespace != namespace
         or derived_capture_id != capture_id

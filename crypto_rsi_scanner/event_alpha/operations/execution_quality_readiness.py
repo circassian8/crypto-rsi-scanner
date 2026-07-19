@@ -515,10 +515,10 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
         ),
         supported_live_adapters=(
-            "bybit_usdt_linear_perpetual_public_REST_capture_v3",
+            "bybit_usdt_linear_perpetual_public_REST_capture_v4",
         ),
         supported_evidence_stores=(
-            "immutable_raw_response_manifest_receipt_pointer_v3",
+            "immutable_raw_response_manifest_receipt_pointer_v4",
         ),
         immutable_capture_contract_implemented=True,
         protocol_v2_annex_bound=False,

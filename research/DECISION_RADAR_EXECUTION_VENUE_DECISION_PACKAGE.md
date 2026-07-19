@@ -181,7 +181,7 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   authorization already exists. Readiness binds to one exact authoritative
   Radar generation, and status validates the latest capture; neither makes a
   provider call or write. A capture attempt may run only through the additional
-  explicit `CONFIRM=1` boundary. Capture v3 uses one complete
+  explicit `CONFIRM=1` boundary. Capture v4 uses one complete
   `category=linear&status=Trading&limit=1000` catalog request, rejects a
   missing or non-empty continuation cursor as incomplete, and then uses one 200-level
   order-book request per exact eligible instrument. The absolute bound is 31
@@ -201,6 +201,10 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   `protocol_v2_input_quality_eligible` only when every book is still within the
   15-second policy at that completion time; valid but aged sets remain immutable
   evidence with input-quality eligibility false.
+- Bind exact acquisition to transport truth. For an immutable capture,
+  `acquired_at` is the corresponding response-read completion time. Every
+  request/response must fit the declared capture window and remain sequential;
+  the raw response index and normalized book must carry the identical clock.
 - Keep capture quality distinct from Protocol-v2 evidence authority. A fresh
   complete capture may be `protocol_v2_input_quality_eligible`, but it remains
   `protocol_v2_evidence_eligible=false` and `protocol_v2_annex_bound=false`

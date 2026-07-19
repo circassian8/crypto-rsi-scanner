@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Mapping, Sequence
 
 from .bybit_execution_quality import DEFAULT_FRESHNESS_SECONDS
+from .bybit_execution_quality_capture_models import BybitCapturedJSONResponse
 
 
 FRESHNESS_POLICY = "every_book_fresh_at_capture_completion"
@@ -82,6 +83,41 @@ def project_execution_quality_set_freshness(
         fresh_at_acquisition=acquisition_fresh,
         fresh_at_completion=completion_fresh,
         maximum_age_at_completion_seconds=round(max(ages), 6),
+    )
+
+
+def require_exact_response_window(
+    responses: Sequence[BybitCapturedJSONResponse],
+    *,
+    started_at: datetime,
+    completed_at: datetime,
+) -> None:
+    """Require one ordered exact transport sequence inside the capture window."""
+
+    started = _aware_utc(started_at)
+    completed = _aware_utc(completed_at)
+    prior_received: datetime | None = None
+    for response in responses:
+        request_started = _aware_utc(response.request_started_at)
+        response_received = _aware_utc(response.response_received_at)
+        if (
+            request_started < started
+            or response_received > completed
+            or (prior_received is not None and request_started < prior_received)
+        ):
+            raise _BybitExecutionQualitySetFreshnessError(
+                "captured_response_outside_capture_window"
+            )
+        prior_received = response_received
+
+
+def exact_response_acquisition_matches(
+    snapshot: Mapping[str, object], response: BybitCapturedJSONResponse
+) -> bool:
+    """Tie a normalized book to the exact local response-read completion."""
+
+    return _aware_utc(snapshot.get("acquired_at")) == _aware_utc(
+        response.response_received_at
     )
 
 
@@ -212,6 +248,7 @@ __all__ = (
     "_BybitExecutionQualitySetFreshnessError",
     "common_freshness_matches",
     "common_freshness_values",
+    "exact_response_acquisition_matches",
     "live_summary_freshness_matches",
     "live_summary_freshness_values",
     "observation_freshness_contract_valid",
@@ -220,4 +257,5 @@ __all__ = (
     "prepared_freshness_values",
     "prepared_summary_freshness_matches",
     "project_execution_quality_set_freshness",
+    "require_exact_response_window",
 )

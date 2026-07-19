@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -103,13 +104,16 @@ def _orderbook_payload(symbol: str, price: float) -> dict[str, object]:
 def _captured(
     request: BybitPublicRequest,
     payload: dict[str, object],
+    *,
+    received_at: datetime = NOW,
 ) -> BybitCapturedJSONResponse:
     raw = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
+    received_text = received_at.isoformat().replace("+00:00", "Z")
     return BybitCapturedJSONResponse(
         request=request,
-        request_started_at="2026-07-17T12:00:00.900000Z",
-        response_received_at="2026-07-17T12:00:00.950000Z",
-        duration_ms=50,
+        request_started_at=received_text,
+        response_received_at=received_text,
+        duration_ms=0,
         response_url=f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}",
         http_status=200,
         content_type="application/json",
@@ -118,14 +122,23 @@ def _captured(
 
 
 def _fetch(request: BybitPublicRequest, _timeout: float) -> BybitCapturedJSONResponse:
-    query = dict(request.query)
-    if request.path.endswith("instruments-info"):
-        payload = deepcopy(_fixture("instruments_info.json"))
-    else:
-        prices = {"BTCUSDT": 100.0, "ETHUSDT": 50.0}
-        payload = _orderbook_payload(query["symbol"], prices[query["symbol"]])
-    return _captured(request, payload)
+    return _fetch_at(NOW)(request, _timeout)
 
+
+def _fetch_at(received_at: datetime):
+    def fetch(
+        request: BybitPublicRequest,
+        _timeout: float,
+    ) -> BybitCapturedJSONResponse:
+        query = dict(request.query)
+        if request.path.endswith("instruments-info"):
+            payload = deepcopy(_fixture("instruments_info.json"))
+        else:
+            prices = {"BTCUSDT": 100.0, "ETHUSDT": 50.0}
+            payload = _orderbook_payload(query["symbol"], prices[query["symbol"]])
+        return _captured(request, payload, received_at=received_at)
+
+    return fetch
 
 def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     tmp_path: Path,
@@ -172,6 +185,18 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     assert len(raw_paths) == 3
     assert (namespace / "raw_001_instrument_catalog.json").is_file()
     assert all(path.stat().st_size > 0 for path in raw_paths)
+    observation_projection = json.loads(
+        (namespace / "execution_quality_observations.json").read_text()
+    )
+    request_index = json.loads((namespace / "request_index.json").read_text())
+    orderbook_requests = [
+        row
+        for row in request_index["requests"]
+        if row["request"]["path"].endswith("orderbook")
+    ]
+    assert [row["acquired_at"] for row in observation_projection["observations"]] == [
+        row["response_received_at"] for row in orderbook_requests
+    ]
     assert load_latest_bybit_execution_quality_capture(tmp_path) == result
 
     universe = json.loads((namespace / "radar_universe.json").read_text())
@@ -214,8 +239,6 @@ def test_capture_keeps_stale_complete_set_but_denies_protocol_input_quality(
     clock_values = iter(
         (
             started,
-            datetime(2026, 7, 17, 12, 0, 1, tzinfo=timezone.utc),
-            datetime(2026, 7, 17, 12, 0, 14, tzinfo=timezone.utc),
             datetime(2026, 7, 17, 12, 0, 16, tzinfo=timezone.utc),
             rechecked,
         )
@@ -371,6 +394,65 @@ def test_capture_rejects_completion_freshness_summary_drift_before_writes(
     assert list(tmp_path.glob("radar_bybit_execution_quality_*")) == []
 
 
+def test_capture_rejects_snapshot_acquisition_response_clock_drift_before_writes(
+    tmp_path: Path,
+) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    summary, responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: NOW,
+        resolver=_resolver(observations),
+        fetch_json=_fetch,
+    )
+    snapshot = summary["execution_quality_snapshots"][0]
+    snapshot["acquired_at"] = "2026-07-17T12:00:00.900000Z"
+    snapshot["age_seconds"] = 0.9
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="snapshot_acquisition_response_clock_mismatch",
+    ):
+        persist_bybit_execution_quality_capture(
+            tmp_path,
+            summary=summary,
+            responses=responses,
+        )
+
+    assert not (tmp_path / POINTER_FILENAME).exists()
+
+
+def test_capture_rejects_response_outside_declared_window_before_writes(
+    tmp_path: Path,
+) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    summary, responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: NOW,
+        resolver=_resolver(observations),
+        fetch_json=_fetch,
+    )
+    changed = list(responses)
+    changed[0] = replace(
+        changed[0],
+        request_started_at="2026-07-17T12:00:00.900000Z",
+        response_received_at="2026-07-17T12:00:00.950000Z",
+    )
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="captured_response_outside_capture_window",
+    ):
+        persist_bybit_execution_quality_capture(
+            tmp_path,
+            summary=summary,
+            responses=tuple(changed),
+        )
+
+    assert not (tmp_path / POINTER_FILENAME).exists()
+
+
 def test_latest_capture_fails_closed_after_raw_response_drift(tmp_path: Path) -> None:
     observations = (_observation("bitcoin", "BTC", 3_000.0),)
     result = capture_authoritative_bybit_execution_quality(
@@ -467,7 +549,7 @@ def test_capture_pointer_rejects_rollback_to_an_older_complete_capture(
         environ={LIVE_AUTH_ENV: "1"},
         now=lambda: later,
         resolver=_resolver(observations, expected_now=later),
-        fetch_json=_fetch,
+        fetch_json=_fetch_at(later),
     )
     pointer_path = tmp_path / POINTER_FILENAME
     pointer_before = pointer_path.read_bytes()
@@ -513,7 +595,7 @@ def test_new_capture_refuses_to_replace_a_corrupt_existing_pointer(
             environ={LIVE_AUTH_ENV: "1"},
             now=lambda: later,
             resolver=_resolver(observations, expected_now=later),
-            fetch_json=_fetch,
+            fetch_json=_fetch_at(later),
         )
 
     assert pointer_path.read_bytes() == corrupt_bytes

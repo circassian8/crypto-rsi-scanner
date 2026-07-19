@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Bind exact Bybit acquisition to response completion · Codex
+**Why:** Exact transport evidence already preserved response-read completion,
+but normalized execution books used a second independently sampled clock. The
+immutable validator did not require those two acquisition truths to agree.
+**Changes:**
+- Advanced guarded execution-quality live/capture contracts to v4. Exact
+  captures now normalize each book with its accepted response-read completion
+  time; mapping-only diagnostic collection retains a local injected clock but
+  remains ineligible for immutable publication.
+- Required every captured request/response to fit the declared capture window,
+  preserved sequential request timing, and required each normalized book's
+  `acquired_at` to exactly match its response-index timestamp.
+- Updated intraday and derivatives prerequisite fixtures to require execution
+  capture v4, plus current static readiness, the North Star, decision package,
+  working agreement, durable decision, roadmap, and generated architecture
+  reports.
+- Added exact clock-join, clock-drift, and outside-window regressions while
+  retaining the v3 full-set completion-freshness behavior.
+**Verify:** 119 focused execution-quality readiness/normalizer/live/capture and
+downstream intraday/derivatives prerequisite tests passed. Python compileall and
+North Star JSON validation passed. The offline execution-quality smoke made zero
+provider calls; static readiness reported capture/evidence-store v4; architecture
+cleanliness passed with zero new violations; dashboard readiness remained exact
+and READY. `git diff --check` passed.
+**Notes/risks:** No Bybit or other provider call occurred and no authorization
+was created. The recorded 403/no-retry/no-proxy/no-VPN/no-bypass boundary and
+all no-send/no-trade/no-order/no-paper/no-RSI-write/no-`TRIGGERED_FADE`
+protections remain unchanged. Existing immutable history was not rewritten.
+
 ## 2026-07-19 — Require full-set freshness for sequential Bybit books · Codex
 **Why:** The existing execution-quality capture classified each order book at
 its own acquisition time. In a sequential top-universe collection, early books

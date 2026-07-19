@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Bind exact book acquisition to response completion
+**Status:** accepted
+**Decision:** Bybit execution-quality live/capture v4 defines a persisted
+order book's `acquired_at` as the corresponding exact transport response's
+read-completion time. Immutable validation requires each request and response to
+remain inside the declared capture window, preserves sequential request timing,
+and requires the normalized acquisition clock to equal its response-index clock.
+Mapping-only diagnostic collection may use its injected local clock, but it
+cannot enter the immutable exact-response capture boundary.
+**Why:** Capturing exact response timing while normalizing against a second clock
+left two competing acquisition truths. A drifted or injected second clock could
+misstate freshness even though the accepted transport evidence already carried
+the correct local availability time.
+**Revisit when:** A stronger monotonic/wall-clock binding or signed provider
+availability clock is adopted. Any replacement must retain an exact deterministic
+join between raw transport timing and every normalized book.
+
 ## 2026-07-19 - Date execution-quality sets at full capture completion
 **Status:** accepted
 **Decision:** Bybit execution-quality live/capture v3 preserves whether every

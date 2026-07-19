@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import hashlib
+import json
+from typing import Mapping
 
 from .bybit_execution_quality import BybitPublicRequest
 from .bybit_execution_quality_capture_errors import (
@@ -79,10 +83,38 @@ class BybitCapturedJSONResponse:
             ) from exc
 
 
+def _execution_capture_namespace(
+    prepared: Mapping[str, object],
+) -> tuple[str, str]:
+    completed = datetime.fromisoformat(
+        str(prepared["completed_at"]).replace("Z", "+00:00")
+    ).astimezone(timezone.utc)
+    raw_hashes = [
+        hashlib.sha256(raw).hexdigest()
+        for _name, raw in prepared["raw_rows"]  # type: ignore[union-attr]
+    ]
+    seed = (
+        json.dumps(
+            {
+                "completed_at": prepared["completed_at"],
+                "source_authority": prepared["source_authority"],
+                "raw_sha256": raw_hashes,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    capture_id = hashlib.sha256(seed).hexdigest()
+    timestamp = completed.strftime("%Y%m%dt%H%M%S%fz")
+    return f"radar_bybit_execution_quality_{timestamp}_{capture_id[:12]}", capture_id
+
+
 __all__ = (
     "LIVE_SUMMARY_KEYS",
     "PERSISTED_SUMMARY_EXTRA_KEYS",
     "REQUEST_ROW_KEYS",
     "TRANSPORT_CONTRACT",
     "BybitCapturedJSONResponse",
+    "_execution_capture_namespace",
 )

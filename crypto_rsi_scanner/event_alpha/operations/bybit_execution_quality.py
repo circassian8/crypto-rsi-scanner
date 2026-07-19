@@ -381,7 +381,7 @@ def select_bybit_usdt_perpetual_instruments(
 
 
 def build_bybit_instrument_catalog_request() -> BybitPublicRequest:
-    """Build the one complete active-linear catalog request used by capture v3."""
+    """Build the one complete active-linear catalog request used by capture v4."""
 
     return BybitPublicRequest(
         method="GET",

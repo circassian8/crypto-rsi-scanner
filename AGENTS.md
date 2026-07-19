@@ -441,7 +441,7 @@ may be added later when a suitable environment already exists.
   radar-execution-quality-bybit-status` validates the latest capture; neither
   makes a provider call or write. Capture requires the already-present
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the exact
-  `CONFIRM=1` target. Capture v3 first requests one complete `Trading` linear
+  `CONFIRM=1` target. Capture v4 first requests one complete `Trading` linear
   instrument catalog with `limit=1000`, requires an explicit empty continuation
   cursor (missing or non-empty fails closed), and then requests one 200-level book per
   exact eligible instrument. Its absolute bound is 31 GETs and the current
@@ -451,6 +451,10 @@ may be added later when a suitable environment already exists.
   when the full sequential set completes. Acquisition freshness and completion
   freshness remain separate, and only completion-fresh sets may be Protocol-v2
   input-quality eligible.
+  For exact transport captures, normalized `acquired_at` is the accepted
+  response-read completion time, not a second independent clock. Immutable
+  validation requires every request/response inside the declared capture window
+  and exact equality between each book's acquisition and response time.
   Non-contract-shaped Radar symbols are excluded before the provider boundary;
   the full ranked universe, exact query subset, and reason-coded exclusions
   remain immutable in the capture. The initial

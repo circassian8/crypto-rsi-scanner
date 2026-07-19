@@ -65,7 +65,7 @@ def _instrument_values() -> list[dict[str, object]]:
 
 def _execution_capture(capture_id: str = "b" * 64) -> dict[str, object]:
     return {
-        "contract_version": "crypto_radar_bybit_execution_quality_capture_v3",
+        "contract_version": "crypto_radar_bybit_execution_quality_capture_v4",
         "status": "complete",
         "capture_id": capture_id,
         "artifact_namespace": (

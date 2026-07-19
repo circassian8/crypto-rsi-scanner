@@ -899,7 +899,7 @@ depth bands, and USDT-notional price impact without treating USDT as USD. A
 separately gated public REST adapter and immutable capture contract are
 implemented but inactive. Readiness and capture status make no provider call or
 write. A confirmed capture requires the already-present dedicated authorization
-flag. Capture v3 performs one complete
+flag. Capture v4 performs one complete
 `category=linear&status=Trading&limit=1000` instrument-catalog GET, rejects any
 missing or non-empty continuation cursor as incomplete, and then performs one 200-level order-book
 GET per exact eligible instrument. Its absolute bound is 31 and the current
@@ -917,6 +917,12 @@ one descriptor-anchored namespace for the complete read, rederives every
 projection from raw bytes, rejects pointer rollback/drift, and excludes unknown
 provider fields from the closed capture summary. The standard review archive
 selects and fully revalidates only the latest completed capture.
+For exact-response capture v4, each normalized order book uses the corresponding
+accepted transport response's read-completion time as `acquired_at`. The
+immutable validator requires all requests and responses to remain inside the
+declared capture window, preserve sequential timing, and match each book's
+acquisition clock exactly; a second injected clock cannot make the evidence
+appear fresher.
 
 The venue-native derivatives context contract separately normalizes supplied
 Bybit ticker, settled-funding, 1h open-interest, and 1h long/short-account-ratio

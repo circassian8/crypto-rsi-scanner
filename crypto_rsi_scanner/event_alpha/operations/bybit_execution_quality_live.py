@@ -84,7 +84,7 @@ from .bybit_execution_quality_set_freshness import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v3"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v4"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -182,6 +182,24 @@ def _utc(value: datetime) -> datetime:
 
 def _iso(value: datetime) -> str:
     return _utc(value).isoformat().replace("+00:00", "Z")
+
+
+def _captured_response_received_at(
+    captured: BybitCapturedJSONResponse,
+) -> datetime:
+    try:
+        value = datetime.fromisoformat(
+            captured.response_received_at.replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise BybitExecutionQualityLiveError(
+            "response_received_at_invalid"
+        ) from exc
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise BybitExecutionQualityLiveError(
+            "response_received_at_timezone_missing"
+        )
+    return value.astimezone(timezone.utc)
 
 
 def _positive_number(value: object, label: str) -> float:
@@ -499,7 +517,11 @@ def _collect_authoritative_bybit_execution_quality(
             payload, captured = _payload_and_capture(fetch(request, timeout_seconds))
             if captured is not None:
                 captured_responses.append(captured)
-            acquired = _utc(clock())
+            acquired = (
+                _captured_response_received_at(captured)
+                if captured is not None
+                else _utc(clock())
+            )
             snapshot = normalize_bybit_orderbook(
                 payload,
                 instrument=instrument,
