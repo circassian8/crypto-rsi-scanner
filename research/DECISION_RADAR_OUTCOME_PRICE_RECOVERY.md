@@ -84,8 +84,15 @@ the existing root-scoped campaign lock. It then:
 - writes the ledger atomically and creates one immutable application receipt
   binding before/after ledger fingerprints and the unchanged baseline;
 - restores the exact prior ledger if any pre-receipt step fails;
-- is idempotent only while the current ledger and baseline still match the
-  immutable receipt; later drift fails closed;
+- keeps the immutable whole-ledger and baseline fingerprints as receipt-time
+  transaction evidence while current status validates the receipt's exact
+  capture provenance and exactly one current recovered target per bound
+  identity;
+- remains applied and idempotent through unrelated later history or ledger
+  growth, but fails closed if an exact recovered target is mutated, removed, or
+  duplicated;
+- reports `pending_application` only after a no-write replay of the full current
+  apply preconditions succeeds under the campaign lock;
 - holds descriptor-anchored base, state-directory, lock, ledger, history, and
   receipt identities so a directory or symlink swap cannot redirect the write
   or rollback.

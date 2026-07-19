@@ -164,11 +164,22 @@ def _fixture(
         _candidate(suffix="target", symbol="DEXE", coin_id="dexe"),
         _candidate(suffix="control", symbol="CTRL", coin_id="control-token"),
     ]
+    core_rows: list[dict[str, object]] = []
+    for candidate in candidates:
+        core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+            candidate,
+            projection=decision_model_values(candidate),
+        )
+        assert core is not None
+        core["integrated_candidate_id"] = candidate["candidate_id"]
+        core["run_id"] = f"{_OBSERVED.isoformat()}|no_key_live"
+        core_rows.append(core)
     write_countable_generation(
         tmp_path,
         _NAMESPACE,
         _OBSERVED.isoformat(),
         candidates=candidates,
+        core_rows=core_rows,
     )
     state_dir = tmp_path / LIVE_HISTORY_CACHE_NAMESPACE
     state_dir.mkdir(parents=True)
@@ -256,7 +267,7 @@ def _fixture(
         "research_only": True,
     }
     capture = {
-        "capture_contract_version": "decision_radar_outcome_price_recovery_capture_v1",
+        "contract_version": "decision_radar_outcome_price_recovery_capture_v1",
         "capture_id": "a" * 64,
         "artifact_namespace": "radar_outcome_price_recovery_fixture",
         "completed_at": _ACQUIRED.isoformat(),
@@ -369,6 +380,10 @@ def test_application_is_idempotent_and_status_is_read_only(
     assert second["writes_performed"] is False
     assert second["application_receipt"] == first["application_receipt"]
     assert status["status"] == "applied"
+    assert status["receipt_time_state_status"] == "validated"
+    assert status["current_validation_scope"] == "exact_recovered_targets"
+    assert status["current_recovered_target_status"] == "exact_match"
+    assert status["current_recovered_target_count"] == 1
     assert status["writes_performed"] is False
     assert status["provider_calls"] == 0
     assert fixture["ledger_path"].read_bytes() == ledger_after
@@ -414,13 +429,126 @@ def test_campaign_refresh_preserves_recovery_firewall(
         candidate,
         namespace=_NAMESPACE,
     ) is True
+    status = application.outcome_price_recovery_application_status(tmp_path)
+    assert status["status"] == "applied"
+    assert status["current_recovered_target_status"] == "exact_match"
 
 
-@pytest.mark.parametrize("artifact", ("history", "ledger"))
-def test_applied_receipt_rejects_current_state_drift(
+def test_pending_status_preflights_exact_application_without_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    artifact: str,
+):
+    fixture = _fixture(tmp_path, monkeypatch)
+    before = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+
+    assert status["status"] == "pending_application"
+    assert status["reason"] == "confirmed_application_required"
+    assert status["applicability_status"] == "applicable"
+    assert status["applicability_validation_scope"] == (
+        "exact_current_apply_preconditions"
+    )
+    assert status["applicable_target_count"] == 1
+    assert status["provider_calls"] == 0
+    assert status["writes_performed"] is False
+    assert not list(
+        (tmp_path / LIVE_HISTORY_CACHE_NAMESPACE).glob(
+            f"{application.APPLICATION_RECEIPT_PREFIX}*"
+        )
+    )
+    after = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+
+
+def test_pending_status_fails_closed_when_target_is_no_longer_applicable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    fixture = _fixture(tmp_path, monkeypatch)
+    rows = market_no_send_io.read_jsonl(fixture["ledger_path"])
+    target = next(row for row in rows if row["symbol"] == "DEXE")
+    target["maturation_state"] = "matured"
+    market_no_send_io.write_jsonl(fixture["ledger_path"], rows)
+    ledger_before = fixture["ledger_path"].read_bytes()
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "recovery_application_target_invalid"
+    assert status["writes_performed"] is False
+    assert fixture["ledger_path"].read_bytes() == ledger_before
+    assert not list(
+        (tmp_path / LIVE_HISTORY_CACHE_NAMESPACE).glob(
+            f"{application.APPLICATION_RECEIPT_PREFIX}*"
+        )
+    )
+
+
+def test_unrelated_post_receipt_growth_remains_applied_and_idempotent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    fixture = _fixture(tmp_path, monkeypatch)
+    first = application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED,
+    )
+    history_rows = market_no_send_io.read_jsonl(fixture["history_path"])
+    history_rows.append(
+        _history_row(symbol="OTHER", coin_id="other-token", price=50.0)
+    )
+    market_no_send_io.write_jsonl(fixture["history_path"], history_rows)
+    ledger_rows = market_no_send_io.read_jsonl(fixture["ledger_path"])
+    unrelated = deepcopy(next(row for row in ledger_rows if row["symbol"] == "CTRL"))
+    unrelated.update({
+        "outcome_identity_key": "f" * 64,
+        "source_artifact_namespace": "unrelated-generation",
+        "candidate_id": "candidate-unrelated",
+        "core_opportunity_id": "core-unrelated",
+        "symbol": "OTHER",
+        "coin_id": "other-token",
+    })
+    ledger_rows.append(unrelated)
+    market_no_send_io.write_jsonl(fixture["ledger_path"], ledger_rows)
+    history_after_growth = fixture["history_path"].read_bytes()
+    ledger_after_growth = fixture["ledger_path"].read_bytes()
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+    second = application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED + timedelta(hours=1),
+    )
+
+    assert status["status"] == "applied"
+    assert status["receipt_time_state_status"] == "validated"
+    assert status["current_validation_scope"] == "exact_recovered_targets"
+    assert status["current_recovered_target_status"] == "exact_match"
+    assert status["current_recovered_target_count"] == 1
+    assert second["status"] == "already_applied"
+    assert second["application_receipt"] == first["application_receipt"]
+    assert second["current_validation_scope"] == "exact_recovered_targets"
+    assert second["current_recovered_target_count"] == 1
+    assert second["writes_performed"] is False
+    assert fixture["history_path"].read_bytes() == history_after_growth
+    assert fixture["ledger_path"].read_bytes() == ledger_after_growth
+
+
+@pytest.mark.parametrize("drift", ("mutated", "removed", "duplicated"))
+def test_applied_receipt_rejects_exact_target_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
 ):
     fixture = _fixture(tmp_path, monkeypatch)
     application.apply_outcome_price_recovery(
@@ -428,19 +556,19 @@ def test_applied_receipt_rejects_current_state_drift(
         confirm=True,
         applied_at=_APPLIED,
     )
-    if artifact == "history":
-        rows = market_no_send_io.read_jsonl(fixture["history_path"])
-        rows[0]["price"] = 999.0
-        market_no_send_io.write_jsonl(fixture["history_path"], rows)
+    rows = market_no_send_io.read_jsonl(fixture["ledger_path"])
+    target = next(row for row in rows if row["symbol"] == "DEXE")
+    if drift == "mutated":
+        target["outcome_label"] = "tampered"
+    elif drift == "removed":
+        rows.remove(target)
     else:
-        rows = market_no_send_io.read_jsonl(fixture["ledger_path"])
-        control = next(row for row in rows if row["symbol"] == "CTRL")
-        control["outcome_label"] = "tampered"
-        market_no_send_io.write_jsonl(fixture["ledger_path"], rows)
+        rows.append(deepcopy(target))
+    market_no_send_io.write_jsonl(fixture["ledger_path"], rows)
 
     with pytest.raises(
         recovery.OutcomePriceRecoveryError,
-        match="recovery_application_current_state_drift",
+        match="recovery_application_current_target_drift",
     ):
         application.apply_outcome_price_recovery(
             tmp_path,
@@ -449,7 +577,7 @@ def test_applied_receipt_rejects_current_state_drift(
         )
     status = application.outcome_price_recovery_application_status(tmp_path)
     assert status["status"] == "unavailable"
-    assert status["reason"] == "recovery_application_current_state_drift"
+    assert status["reason"] == "recovery_application_current_target_drift"
     assert status["writes_performed"] is False
 
 
@@ -767,4 +895,144 @@ def test_application_status_rejects_semantically_rewritten_receipt(
 
     assert status["status"] == "unavailable"
     assert status["reason"] == "recovery_application_receipt_invalid"
+    assert status["writes_performed"] is False
+
+
+@pytest.mark.parametrize(("field", "value"), (
+    ("capture_artifact_namespace", "different-capture-namespace"),
+    ("capture_pointer_sha256", "d" * 64),
+    ("capture_receipt_sha256", "e" * 64),
+    ("no_result_count", 1),
+))
+def test_application_status_rejects_receipt_capture_provenance_tamper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+):
+    _fixture(tmp_path, monkeypatch)
+    result = application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED,
+    )
+    receipt_path = (
+        tmp_path / LIVE_HISTORY_CACHE_NAMESPACE / result["application_receipt"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt[field] = value
+    receipt_path.unlink()
+    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "recovery_application_receipt_invalid"
+    assert status["writes_performed"] is False
+
+
+def test_application_status_rejects_non_integer_receipt_row_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _fixture(tmp_path, monkeypatch)
+    result = application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED,
+    )
+    receipt_path = (
+        tmp_path / LIVE_HISTORY_CACHE_NAMESPACE / result["application_receipt"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["outcome_row_count_before"] = "2"
+    receipt["outcome_row_count_after"] = "2"
+    receipt_path.unlink()
+    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "recovery_application_receipt_invalid"
+    assert status["writes_performed"] is False
+
+
+@pytest.mark.parametrize(("field", "value"), (
+    ("request_count", 2),
+    ("qualifying_price_count", 0),
+    ("qualifying_price_count", True),
+))
+def test_applied_status_revalidates_capture_result_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+):
+    fixture = _fixture(tmp_path, monkeypatch)
+    application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED,
+    )
+    fixture["capture"][field] = value
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "recovery_application_capture_invalid"
+    assert status["writes_performed"] is False
+
+
+def test_application_receipt_rejects_duplicate_request_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _fixture(tmp_path, monkeypatch)
+    result = application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED,
+    )
+    receipt_path = (
+        tmp_path / LIVE_HISTORY_CACHE_NAMESPACE / result["application_receipt"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    duplicate = deepcopy(receipt["target_changes"][0])
+    duplicate["outcome_identity_key"] = "d" * 64
+    receipt["target_changes"].append(duplicate)
+    receipt["applied_outcome_count"] = 2
+
+    with pytest.raises(
+        recovery.OutcomePriceRecoveryError,
+        match="recovery_application_receipt_invalid",
+    ):
+        application.validate_application_receipt_values(receipt)
+
+
+@pytest.mark.parametrize("link_kind", ("symlink", "hardlink"))
+def test_application_status_rejects_linked_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    link_kind: str,
+):
+    _fixture(tmp_path, monkeypatch)
+    result = application.apply_outcome_price_recovery(
+        tmp_path,
+        confirm=True,
+        applied_at=_APPLIED,
+    )
+    receipt_path = (
+        tmp_path / LIVE_HISTORY_CACHE_NAMESPACE / result["application_receipt"]
+    )
+    detached = tmp_path / f"detached-{link_kind}-receipt.json"
+    receipt_path.rename(detached)
+    if link_kind == "symlink":
+        receipt_path.symlink_to(detached)
+    else:
+        receipt_path.hardlink_to(detached)
+
+    status = application.outcome_price_recovery_application_status(tmp_path)
+
+    assert status["status"] == "unavailable"
+    assert status["reason"] == "recovery_application_receipt_unreadable"
     assert status["writes_performed"] is False

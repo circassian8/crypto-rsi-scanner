@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Reconcile recovery status at exact targets · Codex
+**Why:** The recovery application status treated receipt-time whole-file
+fingerprints as a permanent freeze. A normal unrelated campaign append could
+therefore make a valid immutable application receipt look unavailable, while a
+capture with a qualifying count could be advertised as pending without proving
+that its exact target was still applicable.
+**Changes:**
+- Made pending status replay the full application preconditions under the
+  descriptor-anchored campaign lock without writing: capture counts, source
+  binding, candidate, target contract, exact change count, and unchanged final
+  state must all reconcile before `pending_application` is returned.
+- Kept immutable receipt schema v1 and its whole-history/ledger fingerprints as
+  transaction-time evidence. Applied and already-applied status now separately
+  validate exact capture namespace/digests/counts and one exact current target
+  per `(source_artifact_namespace, outcome_identity_key)`.
+- Added explicit runtime applicability/current-target fields. Unrelated later
+  history or ledger growth remains applied and idempotent; target mutation,
+  removal, or duplication remains a blocker.
+- Hardened receipt row-count and request/target uniqueness validation, exact
+  capture result counts, and linked-receipt rejection. Added a valid-Core
+  campaign-refresh regression proving canonical refresh preserves an exact
+  recovered target.
+- Kept the main operator module inside the architecture limits by extracting
+  the unchanged immutable v1 receipt validator into one focused private
+  contract module.
+**Verify:** 64 focused recovery application, immutable capture, and recovery
+contract tests passed in 1.34 seconds. Compileall, `git diff --check`, the
+read-only real application status, architecture cleanliness, and both focused
+architecture-report regressions passed. The final local `make verify
+PYTHON=python3` release gate passed with 1,417/1,417 standalone tests, 3,188
+package tests in 171.58 seconds, alert-render smoke, fixture backtest smoke, and
+the paper scoreboard. An earlier full-gate attempt correctly exposed the new
+module-size threshold crossing; the receipt-contract extraction fixed it before
+the clean final rerun.
+**Notes/risks:** No receipt bytes were rewritten and no recovery was collected
+or applied to the real campaign. Status/preflight makes no provider call and no
+write. This does not loosen exact recovered-target drift, eligibility, routes,
+scores, or safety boundaries; no send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` path changed.
+
 ## 2026-07-19 — Keep post-hoc recovery outside episode evidence · Codex
 **Why:** Historical outcome-price recovery was already marked permanently
 ineligible for calibration and performance, but the campaign episode and

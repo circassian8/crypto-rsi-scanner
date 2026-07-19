@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1151,
+  "file_count": 1152,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T12:30:50.352759+00:00",
+  "generated_at": "2026-07-19T12:56:00.255064+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2257,6 +2257,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1038,
+      "path": "tests/event_alpha/test_outcome_price_recovery_application.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1031,
       "path": "tests/event_alpha/test_empirical_research_reports.py",
       "source_kind": "test"
@@ -2301,12 +2307,6 @@
       "limit": 1500,
       "line_count": 925,
       "path": "tests/event_alpha/test_notification_operations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 918,
-      "path": "tests/event_alpha/test_evidence_quality.py",
       "source_kind": "test"
     }
   ],

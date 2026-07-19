@@ -24,7 +24,6 @@ from ..outcomes import outcome_eligibility
 from . import market_observation_outcomes
 from .market_no_send_history_cache import LIVE_HISTORY_CACHE_NAMESPACE
 from .market_no_send_io import (
-    parse_json_object_bytes,
     parse_jsonl_bytes,
     read_regular_bytes,
 )
@@ -44,15 +43,18 @@ from .outcome_price_recovery_application_io import (
     write_application_state_atomic,
     write_application_state_immutable,
 )
+from .outcome_price_recovery_application_receipt import (
+    APPLICATION_CONTRACT_VERSION,
+    APPLICATION_RECEIPT_PREFIX,
+    APPLICATION_RECEIPT_SUFFIX,
+    application_receipt_name,
+    validate_application_receipt_bytes,
+    validate_application_receipt_values,
+)
 from .outcome_price_recovery_error import OutcomePriceRecoveryError
 from .outcome_price_recovery_request import OutcomePriceRecoveryRequest
 
 
-APPLICATION_CONTRACT_VERSION = (
-    "decision_radar_outcome_price_recovery_application_v1"
-)
-APPLICATION_RECEIPT_PREFIX = "event_outcome_price_recovery_application_"
-APPLICATION_RECEIPT_SUFFIX = ".json"
 APPLY_COMMAND = (
     "CONFIRM=1 make radar-outcome-price-recovery-apply PYTHON=.venv/bin/python"
 )
@@ -64,42 +66,6 @@ _OUTCOME_FILENAME = "event_decision_radar_campaign_outcomes.jsonl"
 _CANDIDATE_FILENAME = "event_integrated_radar_candidates.jsonl"
 _RECOVERY_PRICE_SOURCE = "coingecko_market_chart_range_historical_recovery"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
-_RECEIPT_KEYS = {
-    "schema_id",
-    "schema_version",
-    "status",
-    "application_contract_version",
-    "capture_contract_version",
-    "capture_id",
-    "capture_artifact_namespace",
-    "capture_pointer_sha256",
-    "capture_receipt_sha256",
-    "applied_at",
-    "application_receipt",
-    "provider_calls",
-    "applied_outcome_count",
-    "no_result_count",
-    "baseline_before",
-    "baseline_after",
-    "baseline_byte_identical",
-    "outcome_ledger_before",
-    "outcome_ledger_after",
-    "outcome_row_count_before",
-    "outcome_row_count_after",
-    "target_changes",
-    "calibration_eligible",
-    "protocol_v2_annex_bound",
-    "protocol_v2_evidence_eligible",
-    "research_only",
-    "no_send",
-    "orders",
-    "trades",
-    "paper_trades",
-    "normal_rsi_writes",
-    "event_alpha_triggered_fade",
-    "writes_performed",
-}
 
 
 def apply_outcome_price_recovery(
@@ -119,19 +85,42 @@ def apply_outcome_price_recovery(
     application_time = _utc(applied_at or datetime.now(timezone.utc))
     if application_time < _aware(capture.get("completed_at")):
         raise OutcomePriceRecoveryError("recovery_application_clock_invalid")
-    results = capture.get("results")
-    if not isinstance(results, list) or len(results) != capture.get("request_count"):
-        raise OutcomePriceRecoveryError("recovery_application_capture_invalid")
-    qualifying = [
-        dict(row) for row in results
-        if isinstance(row, Mapping) and row.get("qualifying_price_found") is True
-    ]
+    results, qualifying = _validated_capture_results(capture)
     if not qualifying:
         return _no_work_result(capture)
     receipt_name = application_receipt_name(str(capture["capture_id"]))
     state_dir = base / LIVE_HISTORY_CACHE_NAMESPACE
     ledger_path = state_dir / _OUTCOME_FILENAME
     with locked_recovery_application_state(base) as state:
+        existing_receipt_raw = read_application_state_optional(
+            state,
+            receipt_name,
+            "recovery_application_receipt",
+        )
+        if existing_receipt_raw is not None:
+            existing_receipt = validate_application_receipt_bytes(
+                existing_receipt_raw
+            )
+            current_ledger = read_application_state_required(
+                state,
+                _OUTCOME_FILENAME,
+                "recovery_application_ledger",
+            )
+            recovered_target_count = _validate_current_application_state(
+                capture=capture,
+                receipt=existing_receipt,
+                rows=_parse_rows(current_ledger),
+                qualifying=qualifying,
+            )
+            return {
+                **existing_receipt,
+                "contract_version": APPLICATION_CONTRACT_VERSION,
+                "status": "already_applied",
+                "receipt_sha256": _sha256(existing_receipt_raw),
+                **_current_target_validation(recovered_target_count),
+                "provider_calls": 0,
+                **_safety(writes_performed=False),
+            }
         prior_history = read_application_state_required(
             state,
             _HISTORY_FILENAME,
@@ -143,31 +132,6 @@ def apply_outcome_price_recovery(
             "recovery_application_ledger",
         )
         prior_rows = _parse_rows(prior_ledger)
-        existing_receipt_raw = read_application_state_optional(
-            state,
-            receipt_name,
-            "recovery_application_receipt",
-        )
-        if existing_receipt_raw is not None:
-            existing_receipt = validate_application_receipt_bytes(
-                existing_receipt_raw
-            )
-            _validate_current_application_state(
-                capture=capture,
-                receipt=existing_receipt,
-                rows=prior_rows,
-                qualifying=qualifying,
-                history_raw=prior_history,
-                ledger_raw=prior_ledger,
-            )
-            return {
-                **existing_receipt,
-                "contract_version": APPLICATION_CONTRACT_VERSION,
-                "status": "already_applied",
-                "receipt_sha256": _sha256(existing_receipt_raw),
-                "provider_calls": 0,
-                **_safety(writes_performed=False),
-            }
         requests = tuple(
             recovery_request_from_values(row["request"])
             for row in qualifying
@@ -188,6 +152,9 @@ def apply_outcome_price_recovery(
             )
         parsed_updated = _parse_rows(updated_ledger)
         _assert_only_target_rows_changed(prior_rows, parsed_updated, changes)
+        _assert_changes_match_capture(
+            capture=capture, qualifying=qualifying, changes=changes
+        )
         baseline_before = _fingerprint(prior_history)
         receipt = _application_receipt(
             capture=capture,
@@ -264,6 +231,7 @@ def outcome_price_recovery_application_status(
         return _unavailable_status(exc.reason_code)
     receipt_name = application_receipt_name(str(capture["capture_id"]))
     try:
+        _results, qualifying_rows = _validated_capture_results(capture)
         with locked_recovery_application_state(base) as state:
             raw = read_application_state_optional(
                 state,
@@ -271,7 +239,15 @@ def outcome_price_recovery_application_status(
                 "recovery_application_receipt",
             )
             if raw is None:
-                qualifying = int(capture.get("qualifying_price_count") or 0)
+                qualifying = len(qualifying_rows)
+                if qualifying:
+                    applicable_target_count = _preflight_current_application(
+                        base=base,
+                        state=state,
+                        capture=capture,
+                        qualifying=qualifying_rows,
+                        receipt_name=receipt_name,
+                    )
                 return {
                     "contract_version": APPLICATION_CONTRACT_VERSION,
                     "status": "pending_application" if qualifying else "no_work",
@@ -282,6 +258,13 @@ def outcome_price_recovery_application_status(
                     ),
                     "capture_id": capture.get("capture_id"),
                     "qualifying_price_count": qualifying,
+                    **({
+                        "applicability_status": "applicable",
+                        "applicability_validation_scope": (
+                            "exact_current_apply_preconditions"
+                        ),
+                        "applicable_target_count": applicable_target_count,
+                    } if qualifying else {}),
                     "provider_calls": 0,
                     "next_safe_command": APPLY_COMMAND if qualifying else STATUS_COMMAND,
                     **_safety(writes_performed=False),
@@ -291,29 +274,16 @@ def outcome_price_recovery_application_status(
                 raise OutcomePriceRecoveryError(
                     "recovery_application_receipt_capture_mismatch"
                 )
-            results = capture.get("results")
-            qualifying_rows = [
-                dict(row) for row in results
-                if isinstance(row, Mapping)
-                and row.get("qualifying_price_found") is True
-            ] if isinstance(results, list) else []
-            history_raw = read_application_state_required(
-                state,
-                _HISTORY_FILENAME,
-                "recovery_application_history",
-            )
             ledger_raw = read_application_state_required(
                 state,
                 _OUTCOME_FILENAME,
                 "recovery_application_ledger",
             )
-            _validate_current_application_state(
+            recovered_target_count = _validate_current_application_state(
                 capture=capture,
                 receipt=receipt,
                 rows=_parse_rows(ledger_raw),
                 qualifying=qualifying_rows,
-                history_raw=history_raw,
-                ledger_raw=ledger_raw,
             )
     except OutcomePriceRecoveryError as exc:
         return _unavailable_status(
@@ -325,6 +295,7 @@ def outcome_price_recovery_application_status(
         "contract_version": APPLICATION_CONTRACT_VERSION,
         "status": "applied",
         "receipt_sha256": _sha256(raw),
+        **_current_target_validation(recovered_target_count),
         "provider_calls": 0,
         "next_safe_command": (
             "make radar-market-campaign-report PYTHON=.venv/bin/python"
@@ -345,128 +316,6 @@ def _no_work_result(capture: Mapping[str, Any]) -> dict[str, Any]:
         "next_safe_command": STATUS_COMMAND,
         **_safety(writes_performed=False),
     }
-
-
-def application_receipt_name(capture_id: str) -> str:
-    if not _SHA256_RE.fullmatch(str(capture_id or "")):
-        raise OutcomePriceRecoveryError(
-            "recovery_application_capture_id_invalid"
-        )
-    return f"{APPLICATION_RECEIPT_PREFIX}{capture_id}{APPLICATION_RECEIPT_SUFFIX}"
-
-
-def validate_application_receipt_bytes(raw: bytes) -> dict[str, Any]:
-    try:
-        value = parse_json_object_bytes(raw)
-    except (MarketNoSendError, ValueError) as exc:
-        raise OutcomePriceRecoveryError(
-            "recovery_application_receipt_invalid"
-        ) from exc
-    validate_application_receipt_values(value)
-    return value
-
-
-def validate_application_receipt_values(value: Mapping[str, Any]) -> None:
-    if set(value) != _RECEIPT_KEYS or any((
-        value.get("schema_id")
-        != "decision_radar.outcome_price_recovery_application_receipt",
-        value.get("schema_version") != 1,
-        value.get("status") != "applied",
-        value.get("application_contract_version")
-        != APPLICATION_CONTRACT_VERSION,
-        value.get("capture_contract_version") != CAPTURE_CONTRACT_VERSION,
-        not _SHA256_RE.fullmatch(str(value.get("capture_id") or "")),
-        not _NAMESPACE_RE.fullmatch(
-            str(value.get("capture_artifact_namespace") or "")
-        ),
-        not _SHA256_RE.fullmatch(str(value.get("capture_pointer_sha256") or "")),
-        not _SHA256_RE.fullmatch(str(value.get("capture_receipt_sha256") or "")),
-        value.get("application_receipt")
-        != application_receipt_name(str(value.get("capture_id") or "")),
-        value.get("provider_calls") != 0,
-        type(value.get("applied_outcome_count")) is not int,
-        value.get("applied_outcome_count", 0) <= 0,
-        type(value.get("no_result_count")) is not int,
-        value.get("no_result_count", -1) < 0,
-        value.get("baseline_byte_identical") is not True,
-        value.get("outcome_row_count_before")
-        != value.get("outcome_row_count_after"),
-        value.get("calibration_eligible") is not False,
-        value.get("protocol_v2_annex_bound") is not False,
-        value.get("protocol_v2_evidence_eligible") is not False,
-        not _safety_valid(value, writes_performed=True),
-    )):
-        raise OutcomePriceRecoveryError("recovery_application_receipt_invalid")
-    try:
-        applied_at = _aware(value.get("applied_at"))
-    except OutcomePriceRecoveryError as exc:
-        raise OutcomePriceRecoveryError(
-            "recovery_application_receipt_invalid"
-        ) from exc
-    before = value.get("baseline_before")
-    after = value.get("baseline_after")
-    ledger_before = value.get("outcome_ledger_before")
-    ledger_after = value.get("outcome_ledger_after")
-    changes = value.get("target_changes")
-    if (
-        not _fingerprint_valid(before)
-        or after != before
-        or not _fingerprint_valid(ledger_before)
-        or not _fingerprint_valid(ledger_after)
-        or ledger_after == ledger_before
-        or not isinstance(changes, list)
-        or len(changes) != value.get("applied_outcome_count")
-    ):
-        raise OutcomePriceRecoveryError("recovery_application_receipt_invalid")
-    identities: set[str] = set()
-    for change in changes:
-        required_text = (
-            "request_id",
-            "outcome_identity_key",
-            "source_artifact_namespace",
-            "candidate_id",
-            "primary_horizon",
-            "price_observation_id",
-        )
-        try:
-            price_observed_at = _aware(change.get("price_observed_at"))
-        except (AttributeError, OutcomePriceRecoveryError) as exc:
-            raise OutcomePriceRecoveryError(
-                "recovery_application_receipt_invalid"
-            ) from exc
-        if (
-            not isinstance(change, Mapping)
-            or set(change) != {
-                "request_id", "outcome_identity_key", "source_artifact_namespace",
-                "candidate_id", "target_before_sha256", "target_after_sha256",
-                "primary_horizon", "price_observed_at", "price_usd",
-                "price_observation_id", "raw_response_sha256",
-            }
-            or not _SHA256_RE.fullmatch(str(change.get("target_before_sha256") or ""))
-            or not _SHA256_RE.fullmatch(str(change.get("target_after_sha256") or ""))
-            or not _SHA256_RE.fullmatch(str(change.get("raw_response_sha256") or ""))
-            or change.get("target_before_sha256") == change.get("target_after_sha256")
-            or not _positive_number(change.get("price_usd"))
-            or any(
-                type(change.get(field)) is not str
-                or not str(change.get(field)).strip()
-                for field in required_text
-            )
-            or not _SHA256_RE.fullmatch(
-                str(change.get("outcome_identity_key") or "")
-            )
-            or not _NAMESPACE_RE.fullmatch(
-                str(change.get("source_artifact_namespace") or "")
-            )
-            or change.get("primary_horizon")
-            not in outcome_eligibility.OUTCOME_HORIZONS
-            or price_observed_at > applied_at
-            or change.get("outcome_identity_key") in identities
-        ):
-            raise OutcomePriceRecoveryError(
-                "recovery_application_receipt_invalid"
-            )
-        identities.add(change["outcome_identity_key"])
 
 
 def _revalidate_capture_sources(
@@ -707,24 +556,36 @@ def _validate_current_application_state(
     receipt: Mapping[str, Any],
     rows: Sequence[Mapping[str, Any]],
     qualifying: Sequence[Mapping[str, Any]],
-    history_raw: bytes,
-    ledger_raw: bytes,
-) -> None:
+) -> int:
     if receipt.get("capture_id") != capture.get("capture_id"):
         raise OutcomePriceRecoveryError(
             "recovery_application_receipt_capture_mismatch"
         )
+    request_count = capture.get("request_count")
+    if any((
+        receipt.get("capture_artifact_namespace")
+        != capture.get("artifact_namespace"),
+        receipt.get("capture_pointer_sha256")
+        != capture.get("pointer_sha256"),
+        receipt.get("capture_receipt_sha256")
+        != capture.get("receipt_sha256"),
+        receipt.get("capture_contract_version")
+        != capture.get("contract_version"),
+        receipt.get("applied_outcome_count") != len(qualifying),
+        type(request_count) is not int,
+        isinstance(request_count, int) and request_count < len(qualifying),
+        (
+            isinstance(request_count, int)
+            and receipt.get("no_result_count")
+            != request_count - len(qualifying)
+        ),
+    )):
+        raise OutcomePriceRecoveryError(
+            "recovery_application_receipt_invalid"
+        )
     changes = receipt.get("target_changes")
     if not isinstance(changes, list) or len(changes) != len(qualifying):
         raise OutcomePriceRecoveryError("recovery_application_receipt_invalid")
-    if (
-        _fingerprint(history_raw) != receipt.get("baseline_after")
-        or _fingerprint(ledger_raw) != receipt.get("outcome_ledger_after")
-        or len(rows) != receipt.get("outcome_row_count_after")
-    ):
-        raise OutcomePriceRecoveryError(
-            "recovery_application_current_state_drift"
-        )
     for change, result in zip(changes, qualifying, strict=True):
         request = recovery_request_from_values(result["request"])
         if not _change_matches_capture(
@@ -750,6 +611,143 @@ def _validate_current_application_state(
         ):
             raise OutcomePriceRecoveryError(
                 "recovery_application_current_target_drift"
+            )
+    return len(changes)
+
+
+def _preflight_current_application(
+    *,
+    base: Path,
+    state: AnchoredRecoveryApplicationState,
+    capture: Mapping[str, Any],
+    qualifying: Sequence[Mapping[str, Any]],
+    receipt_name: str,
+) -> int:
+    """Prove the current ledger can accept the capture without writing it."""
+
+    history_raw = read_application_state_required(
+        state,
+        _HISTORY_FILENAME,
+        "recovery_application_history",
+    )
+    ledger_raw = read_application_state_required(
+        state,
+        _OUTCOME_FILENAME,
+        "recovery_application_ledger",
+    )
+    prior_rows = _parse_rows(ledger_raw)
+    requests = tuple(
+        recovery_request_from_values(row["request"])
+        for row in qualifying
+    )
+    _revalidate_capture_sources(base, capture, requests, history_raw)
+    application_time = _utc(datetime.now(timezone.utc))
+    if application_time < _aware(capture.get("completed_at")):
+        raise OutcomePriceRecoveryError("recovery_application_clock_invalid")
+    updated_rows, changes = _updated_ledger_rows(
+        base=base,
+        capture=capture,
+        prior_rows=prior_rows,
+        qualifying=qualifying,
+        applied_at=application_time,
+        receipt_name=receipt_name,
+    )
+    updated_ledger = _jsonl_bytes(
+        base / LIVE_HISTORY_CACHE_NAMESPACE / _OUTCOME_FILENAME,
+        updated_rows,
+    )
+    if updated_ledger == ledger_raw or len(changes) != len(qualifying):
+        raise OutcomePriceRecoveryError(
+            "recovery_application_exact_change_count_invalid"
+        )
+    _assert_only_target_rows_changed(
+        prior_rows,
+        _parse_rows(updated_ledger),
+        changes,
+    )
+    _assert_changes_match_capture(
+        capture=capture,
+        qualifying=qualifying,
+        changes=changes,
+    )
+    if (
+        read_application_state_required(
+            state,
+            _HISTORY_FILENAME,
+            "recovery_application_history",
+        ) != history_raw
+        or read_application_state_required(
+            state,
+            _OUTCOME_FILENAME,
+            "recovery_application_ledger",
+        ) != ledger_raw
+    ):
+        raise OutcomePriceRecoveryError(
+            "recovery_application_preflight_state_drift"
+        )
+    return len(changes)
+
+
+def _validated_capture_results(
+    capture: Mapping[str, Any],
+) -> tuple[list[Any], list[dict[str, Any]]]:
+    results = capture.get("results")
+    request_count = capture.get("request_count")
+    qualifying_count = capture.get("qualifying_price_count")
+    if (
+        not isinstance(results, list)
+        or type(request_count) is not int
+        or request_count < 0
+        or len(results) != request_count
+        or type(qualifying_count) is not int
+        or qualifying_count < 0
+        or qualifying_count > request_count
+        or not all(isinstance(row, Mapping) for row in results)
+    ):
+        raise OutcomePriceRecoveryError(
+            "recovery_application_capture_invalid"
+        )
+    qualifying = [
+        dict(row) for row in results
+        if isinstance(row, Mapping)
+        and row.get("qualifying_price_found") is True
+    ]
+    if len(qualifying) != qualifying_count:
+        raise OutcomePriceRecoveryError(
+            "recovery_application_capture_invalid"
+        )
+    return results, qualifying
+
+
+def _current_target_validation(target_count: int) -> dict[str, Any]:
+    return {
+        "receipt_time_state_status": "validated",
+        "current_validation_scope": "exact_recovered_targets",
+        "current_recovered_target_status": "exact_match",
+        "current_recovered_target_count": target_count,
+    }
+
+
+def _assert_changes_match_capture(
+    *,
+    capture: Mapping[str, Any],
+    qualifying: Sequence[Mapping[str, Any]],
+    changes: Sequence[Mapping[str, Any]],
+) -> None:
+    if len(changes) != len(qualifying):
+        raise OutcomePriceRecoveryError(
+            "recovery_application_exact_change_count_invalid"
+        )
+    for change, result in zip(changes, qualifying, strict=True):
+        request = recovery_request_from_values(result["request"])
+        if not _change_matches_capture(
+            change,
+            result=result,
+            request=request,
+            capture=capture,
+        ):
+            raise OutcomePriceRecoveryError(
+                "recovery_application_source_binding_drift"
             )
 
 
@@ -1026,19 +1024,6 @@ def _safety(*, writes_performed: bool) -> dict[str, Any]:
         "event_alpha_triggered_fade": 0,
         "writes_performed": writes_performed,
     }
-
-
-def _safety_valid(value: Mapping[str, Any], *, writes_performed: bool) -> bool:
-    return all((
-        value.get("research_only") is True,
-        value.get("no_send") is True,
-        value.get("orders") == 0,
-        value.get("trades") == 0,
-        value.get("paper_trades") == 0,
-        value.get("normal_rsi_writes") == 0,
-        value.get("event_alpha_triggered_fade") == 0,
-        value.get("writes_performed") is writes_performed,
-    ))
 
 
 def _unavailable_status(

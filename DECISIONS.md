@@ -1053,9 +1053,17 @@ Application is a separate local/no-provider `CONFIRM=1` boundary that holds the
 existing root campaign lock and descriptor-anchored mutable state, revalidates
 capture/source/target/current-ledger truth, changes only exact bound outcome
 rows, proves market-history bytes unchanged, and writes one immutable receipt.
-Any pre-receipt failure restores the exact prior ledger; receipt/current-state
-drift fails closed. Recovered rows retain explicit post-hoc lineage and remain
-permanently excluded from calibration, performance, and Protocol-v2 evidence.
+Any pre-receipt failure restores the exact prior ledger; receipt or exact
+recovered-target drift fails closed. The immutable whole-history and
+whole-ledger fingerprints
+are transaction-time evidence, not a permanent freeze on later unrelated
+campaign growth. Pending status must replay the exact apply preconditions under
+the campaign lock without writing. After a receipt exists, current status must
+reconcile its exact capture provenance and exactly one current recovered target
+per bound identity; unrelated history or ledger additions do not invalidate the
+receipt, while target mutation, removal, or duplication does. Recovered rows
+retain explicit post-hoc lineage and remain permanently excluded from
+calibration, performance, and Protocol-v2 evidence.
 Campaign episode inputs must therefore mark their returns unavailable with
 `historical_price_recovery_not_point_in_time`, and Decision episode scorecards
 must contract-exclude those representatives rather than count them as matured
