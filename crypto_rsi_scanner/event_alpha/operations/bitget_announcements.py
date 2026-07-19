@@ -17,8 +17,8 @@ from typing import Any, Mapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 
-CONTRACT_VERSION = "crypto_radar_bitget_announcements_v1"
-SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bitget_announcements.v1"
+CONTRACT_VERSION = "crypto_radar_bitget_announcements_v2"
+SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bitget_announcements.v2"
 PROVIDER_ID = "bitget_announcements"
 SOURCE_CLASS = "official_exchange"
 PUBLIC_API_BASE = "https://api.bitget.com"
@@ -178,6 +178,7 @@ def build_bitget_announcement_request_plan(
         "initial_query": params,
         "initial_url": f"{PUBLIC_API_BASE}{ANNOUNCEMENTS_PATH}?{urlencode(params)}",
         "pagination_policy": "next_cursor_is_last_annId_from_previous_response",
+        "pagination_completion_policy": "explicit_empty_response_required",
         "maximum_request_count": MAX_RESPONSE_PAGES,
         "maximum_response_rows": MAX_RESPONSE_ROWS,
         "maximum_response_bytes_per_page": MAX_RESPONSE_BYTES_PER_PAGE,
@@ -376,7 +377,7 @@ def normalize_bitget_announcement_pages(
         )
         if len(rows) > limit:
             raise BitgetAnnouncementError("response_requested_limit_exceeded")
-        if page < count and len(rows) != limit:
+        if page < count and not rows:
             raise BitgetAnnouncementError("response_pagination_after_terminal_page")
         digest = hashlib.sha256(body).hexdigest()
         normalized = [
@@ -406,7 +407,7 @@ def normalize_bitget_announcement_pages(
     publication_times = [row["publication_time_unix_ms"] for row in announcements]
     if publication_times != sorted(publication_times, reverse=True):
         raise BitgetAnnouncementError("announcement_publication_order_invalid")
-    complete = row_counts[str(count)] < limit
+    complete = row_counts[str(count)] == 0
     return {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
         "contract_version": CONTRACT_VERSION,
@@ -415,7 +416,11 @@ def normalize_bitget_announcement_pages(
         "endpoint": f"GET {PUBLIC_API_BASE}{ANNOUNCEMENTS_PATH}",
         "path_spelling_verified": "annoucements",
         "official_api_doc": OFFICIAL_API_DOC,
-        "request_parameters": {**params, "cursorPolicy": "last_annId"},
+        "request_parameters": {
+            **params,
+            "cursorPolicy": "last_annId",
+            "terminalPolicy": "explicitEmptyResponse",
+        },
         "request_cursors": [cursor for cursor in request_cursors],
         "request_count_observed": count,
         "maximum_request_count": MAX_RESPONSE_PAGES,
@@ -425,6 +430,10 @@ def normalize_bitget_announcement_pages(
         "coverage_status": "complete" if complete else "partial",
         "coverage_complete": complete,
         "healthy_empty": complete and not announcements,
+        "completion_evidence": (
+            "explicit_empty_terminal_response" if complete else "not_observed"
+        ),
+        "terminal_empty_page_number": count if complete else None,
         "next_cursor": None if complete else prior_last_id,
         "response_row_count_by_page": row_counts,
         "response_sha256_by_page": response_hashes,
@@ -452,9 +461,17 @@ def run_fixture_smoke(fixture_dir: Path) -> dict[str, object]:
     bodies = tuple(path.read_bytes() for path in sorted(fixture_dir.glob("page_*.json")))
     snapshot = normalize_bitget_announcement_pages(
         bodies,
-        acquired_at_by_page=("2026-07-19T01:35:01Z", "2026-07-19T01:35:02Z"),
-        request_lineage_ids=("fixture.bitget.page1", "fixture.bitget.page2"),
-        request_cursors=(None, "900002"),
+        acquired_at_by_page=(
+            "2026-07-19T01:35:01Z",
+            "2026-07-19T01:35:02Z",
+            "2026-07-19T01:35:03Z",
+        ),
+        request_lineage_ids=(
+            "fixture.bitget.page1",
+            "fixture.bitget.page2",
+            "fixture.bitget.page3",
+        ),
+        request_cursors=(None, "900002", "900001"),
         start_time="2026-07-19T00:00:00Z",
         end_time="2026-07-19T01:35:00Z",
         limit=2,

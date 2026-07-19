@@ -23,16 +23,21 @@ from crypto_rsi_scanner.event_alpha.operations.bitget_announcements import (
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "bitget_announcements"
 START = "2026-07-19T00:00:00Z"
 END = "2026-07-19T01:35:00Z"
-ACQUIRED = ("2026-07-19T01:35:01Z", "2026-07-19T01:35:02Z")
-LINEAGES = ("fixture.bitget.page1", "fixture.bitget.page2")
-CURSORS = (None, "900002")
+ACQUIRED = (
+    "2026-07-19T01:35:01Z",
+    "2026-07-19T01:35:02Z",
+    "2026-07-19T01:35:03Z",
+)
+LINEAGES = (
+    "fixture.bitget.page1",
+    "fixture.bitget.page2",
+    "fixture.bitget.page3",
+)
+CURSORS = (None, "900002", "900001")
 
 
-def _bodies() -> tuple[bytes, bytes]:
-    return (
-        (FIXTURE_DIR / "page_1.json").read_bytes(),
-        (FIXTURE_DIR / "page_2.json").read_bytes(),
-    )
+def _bodies() -> tuple[bytes, ...]:
+    return tuple(path.read_bytes() for path in sorted(FIXTURE_DIR.glob("page_*.json")))
 
 
 def _payloads() -> list[dict[str, object]]:
@@ -86,6 +91,7 @@ def test_request_plan_preserves_official_path_and_no_call_boundary() -> None:
     }
     assert plan["maximum_request_count"] == 20
     assert plan["maximum_response_rows"] == 200
+    assert plan["pagination_completion_policy"] == "explicit_empty_response_required"
     assert plan["credentials_required"] is False
     assert plan["provider_call_authorized"] is False
     assert plan["provider_call_attempted"] is False
@@ -95,16 +101,22 @@ def test_request_plan_preserves_official_path_and_no_call_boundary() -> None:
 def test_complete_cursor_prefix_preserves_exact_lineage_and_semantics() -> None:
     value = _normalize()
 
+    assert value["contract_version"] == "crypto_radar_bitget_announcements_v2"
+    assert value["schema_version"] == "crypto_radar.bitget_announcements.v2"
     assert value["coverage_status"] == "complete"
     assert value["coverage_complete"] is True
     assert value["healthy_empty"] is False
     assert value["accepted_announcement_count"] == 3
-    assert value["request_cursors"] == [None, "900002"]
+    assert value["request_cursors"] == [None, "900002", "900001"]
+    assert value["request_parameters"]["terminalPolicy"] == "explicitEmptyResponse"
     assert value["next_cursor"] is None
-    assert value["response_row_count_by_page"] == {"1": 2, "2": 1}
+    assert value["completion_evidence"] == "explicit_empty_terminal_response"
+    assert value["terminal_empty_page_number"] == 3
+    assert value["response_row_count_by_page"] == {"1": 2, "2": 1, "3": 0}
     assert value["provider_request_time_by_page"] == {
         "1": "2026-07-19T01:35:00.500000Z",
         "2": "2026-07-19T01:35:01.500000Z",
+        "3": "2026-07-19T01:35:02.500000Z",
     }
     rows = value["announcements"]
     assert [row["announcement_id"] for row in rows] == ["900003", "900002", "900001"]
@@ -128,7 +140,20 @@ def test_full_last_page_is_partial_and_exposes_next_cursor() -> None:
     assert value["coverage_status"] == "partial"
     assert value["coverage_complete"] is False
     assert value["healthy_empty"] is False
+    assert value["completion_evidence"] == "not_observed"
+    assert value["terminal_empty_page_number"] is None
     assert value["next_cursor"] == "900002"
+
+
+def test_short_nonempty_final_page_remains_partial_and_exposes_next_cursor() -> None:
+    value = _normalize(_bodies()[:2])
+
+    assert value["coverage_status"] == "partial"
+    assert value["coverage_complete"] is False
+    assert value["accepted_announcement_count"] == 3
+    assert value["response_row_count_by_page"] == {"1": 2, "2": 1}
+    assert value["completion_evidence"] == "not_observed"
+    assert value["next_cursor"] == "900001"
 
 
 def test_empty_first_page_is_complete_healthy_empty() -> None:
@@ -139,11 +164,12 @@ def test_empty_first_page_is_complete_healthy_empty() -> None:
     assert value["coverage_status"] == "complete"
     assert value["healthy_empty"] is True
     assert value["accepted_announcement_count"] == 0
+    assert value["completion_evidence"] == "explicit_empty_terminal_response"
 
 
 def test_cursor_must_equal_last_prior_announcement_id() -> None:
     with pytest.raises(BitgetAnnouncementError, match="response_cursor_chain_invalid"):
-        _normalize(cursors=(None, "wrong"))
+        _normalize(cursors=(None, "wrong", "900001"))
 
 
 def test_opaque_safe_string_ids_survive_the_cursor_chain() -> None:
@@ -151,7 +177,10 @@ def test_opaque_safe_string_ids_survive_the_cursor_chain() -> None:
     payloads[0]["data"][0]["annId"] = "notice-A_3"
     payloads[0]["data"][1]["annId"] = "notice-A_2"
     payloads[1]["data"][0]["annId"] = "notice-A_1"
-    value = _normalize(_encode(payloads), cursors=(None, "notice-A_2"))
+    value = _normalize(
+        _encode(payloads),
+        cursors=(None, "notice-A_2", "notice-A_1"),
+    )
 
     assert [row["announcement_id"] for row in value["announcements"]] == [
         "notice-A_3",
@@ -160,13 +189,13 @@ def test_opaque_safe_string_ids_survive_the_cursor_chain() -> None:
     ]
 
 
-def test_nonterminal_short_page_cannot_be_followed() -> None:
+def test_explicit_empty_terminal_page_cannot_be_followed() -> None:
     payloads = _payloads()
-    payloads[0]["data"] = payloads[0]["data"][:1]
+    payloads[1]["data"] = []
     with pytest.raises(
         BitgetAnnouncementError, match="response_pagination_after_terminal_page"
     ):
-        _normalize(_encode(payloads), cursors=(None, "900003"))
+        _normalize(_encode(payloads), cursors=(None, "900002", "900002"))
 
 
 def test_provider_rows_cannot_exceed_requested_limit() -> None:
@@ -192,7 +221,7 @@ def test_filtered_request_rejects_other_announcement_types() -> None:
         (lambda values: values[0]["data"][0].update({"annSubType": "futures_maintenance"}), "announcement_type_subtype_invalid"),
         (lambda values: values[0]["data"][0].update({"language": "zh_CN"}), "announcement_language_invalid"),
         (lambda values: values[0]["data"][0].update({"annUrl": "https://example.com/support/articles/900003"}), "announcement_url_invalid"),
-        (lambda values: values[1]["data"][0].update({"annId": "900003"}), "announcement_identity_duplicate"),
+        (lambda values: values[0]["data"][0].update({"annId": "900002"}), "announcement_identity_duplicate"),
         (lambda values: values[1]["data"][0].update({"cTime": "1784424780000"}), "announcement_publication_order_invalid"),
         (lambda values: values[0].update({"requestTime": 1784426000000}), "response_request_time_outside_acquisition_window"),
     ],

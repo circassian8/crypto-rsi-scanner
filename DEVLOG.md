@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require explicit Bitget terminal evidence · Codex
+**Why:** The official Bitget cursor documentation identifies the next cursor
+but does not promise that a short nonempty page means the feed is exhausted.
+The v1 fixture contract could therefore overstate partial coverage as complete.
+**Changes:**
+- Versioned the offline contract and snapshot to v2. Complete coverage now
+  requires an explicit empty terminal response; a stopped full or short
+  nonempty prefix remains partial and exposes its next cursor.
+- Allowed a short nonempty page to be followed, rejected every page after an
+  explicit empty response, and persisted exact completion evidence and the
+  terminal empty page number.
+- Added a third empty fixture page and regressions for explicit completion,
+  short-prefix partial truth, cursor chaining, healthy-empty, and post-terminal
+  rejection.
+- Updated the structured/human contract, roadmap, and durable decision without
+  adding transport, capture, authorization, or source authority.
+**Verify:** 26 focused Bitget parser/readiness tests, the offline fixture smoke,
+compileall, JSON validation, `git diff --check`, and architecture cleanliness
+passed.
+**Notes/risks:** This is offline synthetic-contract hardening only. No provider
+call, environment authorization mutation, artifact publication, route, score,
+threshold, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` was created.
+
 ## 2026-07-19 — Record the twenty-sixth no-send market cycle · Codex
 **Why:** The durable reservation expired with existing CoinGecko authorization
 present, so one genuine observation was due to continue warming the temporal

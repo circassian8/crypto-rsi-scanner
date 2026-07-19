@@ -8,7 +8,7 @@
     "protocol_v2_annex_bound": false,
     "protocol_v2_evidence_eligible": false
   },
-  "contract_version": "crypto_radar_bitget_announcements_v1",
+  "contract_version": "crypto_radar_bitget_announcements_v2",
   "endpoint": "GET https://api.bitget.com/api/v2/public/annoucements",
   "exact_provider_path_spelling": "annoucements",
   "implemented_at": "2026-07-19",
@@ -19,10 +19,12 @@
   "mode": "offline_synthetic_fixture_only",
   "official_documentation": "https://www.bitget.com/api-doc/common/notice/Get-All-Notices",
   "pagination": {
-    "complete_when_final_page_short_or_empty": true,
+    "complete_when_explicit_empty_response": true,
     "first_cursor": null,
     "next_cursor": "last_annId_from_previous_response",
-    "provider_total_available": false
+    "provider_total_available": false,
+    "short_nonempty_page_is_terminal": false,
+    "stopped_nonempty_prefix_status": "partial"
   },
   "provider": "bitget_announcements",
   "safety": {

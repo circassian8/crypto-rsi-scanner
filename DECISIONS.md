@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Require an explicit empty response to close Bitget coverage
+**Status:** accepted
+**Decision:** In Bitget announcement contract v2, treat every stopped nonempty
+cursor prefix as partial, including a short page. Continue a short nonempty page
+with its final `annId` when another supplied response exists, and accept
+complete coverage only when the terminal response is explicitly empty. Reject
+any supplied page after that empty response. Healthy-empty still requires an
+empty first response.
+**Why:** Bitget documents the next cursor as the prior response's final
+`annId`, but does not document a short-page-is-terminal guarantee or a total
+count. Treating a short page as completion could silently hide additional
+official announcements.
+**Revisit when:** Bitget publishes a stable, versioned terminal or total-count
+guarantee and fixtures plus a separately reviewed contract prove it. Never infer
+completion merely to reduce requests.
+
 ## 2026-07-19 - Make effective provider cadence the readiness headline
 **Status:** accepted
 **Decision:** Preserve the next time implied by successful observation history

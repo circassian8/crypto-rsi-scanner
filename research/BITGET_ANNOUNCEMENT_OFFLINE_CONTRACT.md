@@ -41,14 +41,17 @@ RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE`.
 - The request binds a maximum 31-day publication-time window, required
   `en_US`, optional documented announcement type, and a 1–10 row limit.
 - Pagination begins without a cursor. Every later cursor must equal the final
-  `annId` from the preceding full page. A short or empty final page proves
-  complete coverage; a full final page remains partial with its next cursor.
+  `annId` from the preceding nonempty page. The official contract does not say
+  that a short nonempty page is terminal, so stopping on any nonempty page is
+  partial and exposes its final `annId` as the next cursor. Only an explicit
+  empty cursor response proves complete coverage.
 - A failed/truncated prefix never means no announcements. Healthy-empty
   requires one complete empty first page.
 - The exact response schema requires `code=00000`, `msg=success`, provider
   request time, and documented item fields. Duplicate JSON keys, schema drift,
-  cursor breaks, nonterminal short pages, duplicate IDs, bad clocks, unsafe
-  URLs, and unknown type/subtype pairs fail closed.
+  cursor breaks, pages after an explicit empty response, duplicate IDs, bad
+  clocks, unsafe URLs, and unknown type/subtype pairs fail closed. Short
+  nonempty pages may be followed and never prove completion by themselves.
 - Provider request time must be within 60 seconds of local body-read completion.
   Exact response SHA-256, acquisition time, request lineage, cursor, and row
   count survive projection.
