@@ -15,7 +15,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v9"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v10"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -276,6 +276,11 @@ class _ExecutionQualityReadiness:
     required_snapshot_fields_scope: str
     selected_native_snapshot_fields: tuple[str, ...]
     generic_cross_venue_projection_available: bool
+    selected_impact_reference: str
+    selected_side_impact_includes_crossing_half_spread: bool
+    standalone_spread_addition_to_selected_side_impact_permitted: bool
+    round_trip_impact_requires_entry_and_exit_snapshots: bool
+    impact_cost_application_policy_sealed: bool
     selection_blockers: tuple[str, ...]
     operator_decision: str
     implications: tuple[str, ...]
@@ -376,6 +381,19 @@ def _execution_quality_readiness_dict(
         "selected_native_snapshot_fields": list(value.selected_native_snapshot_fields),
         "generic_cross_venue_projection_available": (
             value.generic_cross_venue_projection_available
+        ),
+        "selected_impact_reference": value.selected_impact_reference,
+        "selected_side_impact_includes_crossing_half_spread": (
+            value.selected_side_impact_includes_crossing_half_spread
+        ),
+        "standalone_spread_addition_to_selected_side_impact_permitted": (
+            value.standalone_spread_addition_to_selected_side_impact_permitted
+        ),
+        "round_trip_impact_requires_entry_and_exit_snapshots": (
+            value.round_trip_impact_requires_entry_and_exit_snapshots
+        ),
+        "impact_cost_application_policy_sealed": (
+            value.impact_cost_application_policy_sealed
         ),
         "selection_blockers": list(value.selection_blockers),
         "operator_decision": value.operator_decision,
@@ -647,6 +665,11 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         ),
         selected_native_snapshot_fields=BYBIT_NATIVE_METRICS,
         generic_cross_venue_projection_available=False,
+        selected_impact_reference="mid_price",
+        selected_side_impact_includes_crossing_half_spread=True,
+        standalone_spread_addition_to_selected_side_impact_permitted=False,
+        round_trip_impact_requires_entry_and_exit_snapshots=True,
+        impact_cost_application_policy_sealed=False,
         selection_blockers=(
             "eligible_instrument_set_not_frozen",
             "bybit_public_endpoint_reachability_unverified_after_recorded_403",
@@ -665,6 +688,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "primary_cost_depth_and_impact_currency_is_native_USDT_without_USD_equivalence",
             "selected_bybit_capability_uses_only_native_USDT_depth_and_notional_fields",
             "generic_USD_projection_is_inactive_and_unavailable",
+            "side_specific_visible_book_impact_from_mid_already_includes_half_spread",
+            "adding_standalone_spread_to_the_same_side_impact_would_double_count",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -732,6 +757,15 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         + ",".join(result.selected_native_snapshot_fields),
         "generic_cross_venue_projection_available="
         f"{str(result.generic_cross_venue_projection_available).casefold()}",
+        f"selected_impact_reference={result.selected_impact_reference}",
+        "selected_side_impact_includes_crossing_half_spread="
+        f"{str(result.selected_side_impact_includes_crossing_half_spread).casefold()}",
+        "standalone_spread_addition_to_selected_side_impact_permitted="
+        f"{str(result.standalone_spread_addition_to_selected_side_impact_permitted).casefold()}",
+        "round_trip_impact_requires_entry_and_exit_snapshots="
+        f"{str(result.round_trip_impact_requires_entry_and_exit_snapshots).casefold()} "
+        "impact_cost_application_policy_sealed="
+        f"{str(result.impact_cost_application_policy_sealed).casefold()}",
         f"eligible_instrument_selection_rule={result.eligible_instrument_selection_rule}",
         f"eligible_instrument_set_frozen={str(result.eligible_instrument_set_frozen).casefold()}",
         "jurisdiction_and_account_eligibility_confirmed=true "

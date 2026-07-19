@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v9 records the owner-confirmed primary research
+Execution-quality readiness v10 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -923,6 +923,14 @@ The selected capability and snapshot projection use the real native fields:
 an inactive cross-venue placeholder, not the selected Bybit schema, and no
 generic conversion is available. Readiness must keep these scopes separate so
 an operator cannot mistake an unperformed USD conversion for observed evidence.
+
+Side-specific visible-book impact is measured from `mid_price`. A marketable
+buy therefore already contains the ask-side half-spread and a marketable sell
+already contains the bid-side half-spread, plus any additional walked depth.
+Consumers must not add `spread_bps` again to the same side impact. A complete
+round-trip estimate needs separate entry and exit snapshots and the selected
+side at each boundary. The eventual entry/exit snapshot policy remains
+unsealed; this closes the primitive math, not the Protocol-v2 cost decision.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread, USDT

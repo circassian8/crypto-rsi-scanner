@@ -47,7 +47,11 @@ observation clock, freshness rule, and policy and cannot replace native Bybit
 evidence. The selected Bybit capability and snapshot projection must therefore
 use native `*_usdt_*` depth and notional-impact fields; generic `*_usd_*` fields
 remain an inactive future interface and are not selected evidence. This unit
-decision does not seal fees, order style, notional tiers,
+boundary also preserves the normalizer's mid-price reference: each side impact
+already includes its crossing half-spread, so standalone spread must not be
+added to the same side impact. A round trip still requires separate entry and
+exit snapshots and a later sealed application policy. This unit decision does
+not seal fees, order style, notional tiers,
 slippage, funding treatment, latency cost, unavailable-cost handling, or the
 final Protocol-v2 annex.
 **Why:** The accepted venue decision and normalizer already preserve USDT and

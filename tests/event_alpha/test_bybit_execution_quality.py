@@ -160,6 +160,11 @@ def test_orderbook_normalizes_quote_units_freshness_lineage_and_sequences() -> N
     assert payload["buy_price_impact_bps_by_notional_usdt"][500.0] is not None
     assert payload["sell_price_impact_bps_by_notional_usdt"][500.0] is not None
     assert payload["buy_price_impact_bps_by_notional_usdt"][10_000.0] is not None
+    buy_top = payload["buy_price_impact_bps_by_notional_usdt"][500.0]
+    sell_top = payload["sell_price_impact_bps_by_notional_usdt"][500.0]
+    assert buy_top == pytest.approx(payload["spread_bps"] / 2.0)
+    assert sell_top == pytest.approx(payload["spread_bps"] / 2.0)
+    assert buy_top + sell_top == pytest.approx(payload["spread_bps"])
     assert payload["impact_reference"] == "mid_price"
     assert payload["impact_method"] == (
         "deterministic_visible_book_walk_not_realized_execution"

@@ -17,6 +17,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - primary cost currency: native USDT, with no USD conversion or 1:1 equivalence;
 - selected execution-quality fields: native USDT depth and USDT-notional
   side-impact fields; the generic USD projection is inactive and unavailable;
+- each side impact is mid-referenced and already includes its crossing
+  half-spread, so standalone spread cannot be added to that same side; the
+  round-trip entry/exit snapshot policy remains unsealed;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;

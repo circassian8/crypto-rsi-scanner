@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v9`. Run
+`crypto_radar_execution_quality_readiness_v10`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -94,6 +94,14 @@ sequences. Generic `*_usd_*` fields remain an explicitly inactive future cross-
 venue interface. They are not required by the selected adapter, and no generic
 USD projection is available. This prevents the readiness catalog from implying
 that native USDT evidence was converted when it was not.
+
+The visible-book impact primitive is also closed against double counting. Each
+buy or sell impact value is measured from `mid_price`, so the market-crossing
+half-spread for that side is already included before any extra depth is walked.
+Do not add standalone `spread_bps` to the same side impact. A round trip needs
+an entry-side impact from the entry snapshot and an exit-side impact from the
+exit snapshot. Which snapshots, sizes, and order style Protocol v2 will use
+remain unsealed; this rule does not manufacture a round-trip cost.
 
 ## Venue-native derivatives context contract
 

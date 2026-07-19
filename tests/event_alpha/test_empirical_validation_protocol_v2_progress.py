@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v8")
+    assert values["progress_version"].endswith("_v9")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -62,6 +62,14 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
         "_usd_" in field for field in decision["selected_native_snapshot_fields"]
     )
     assert decision["generic_cross_venue_projection_available"] is False
+    assert decision["selected_impact_reference"] == "mid_price"
+    assert decision["selected_side_impact_includes_crossing_half_spread"] is True
+    assert (
+        decision["standalone_spread_addition_to_selected_side_impact_permitted"]
+        is False
+    )
+    assert decision["round_trip_impact_requires_entry_and_exit_snapshots"] is True
+    assert decision["impact_cost_application_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -179,6 +187,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     native_field_drift["confirmed_execution_decision"][
         "selected_native_snapshot_fields"
     ] = ["bid_depth_usd_by_band"]
+    impact_drift = progress.current_progress_values()
+    impact_drift["confirmed_execution_decision"][
+        "standalone_spread_addition_to_selected_side_impact_permitted"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -192,6 +204,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         cost_unit_drift,
         cost_model_drift,
         native_field_drift,
+        impact_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -239,6 +252,8 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "fee_rate_authority_status=unsealed_public_reference" in output.out
     assert "selected_native_snapshot_fields=best_bid,best_ask,mid_price" in output.out
     assert "generic_cross_venue_projection_available=false" in output.out
+    assert "selected_side_impact_reference=mid_price" in output.out
+    assert "standalone_spread_addition_permitted=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

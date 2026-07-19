@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Prevent Bybit spread and impact double counting · Codex
+**Why:** The order-book normalizer measures each side's visible-book impact from
+mid price. That already includes the crossing half-spread, but operator truth
+did not state the implication and a later cost model could add spread twice.
+**Changes:**
+- Bumped execution-quality readiness to v10 and explicitly recorded that each
+  selected side impact includes its crossing half-spread, standalone spread
+  addition is forbidden, and a round trip requires entry and exit snapshots.
+- Added a direct normalizer regression proving that symmetric top-of-book buy
+  and sell impacts each equal half the observed spread and sum to one spread.
+- Advanced current Protocol-v2 progress to v9 with fail-closed impact semantics
+  and updated the North Star, decision package, progress note, collaboration
+  contracts, and focused readiness regressions.
+**Verify:** `48 passed` across the focused order-book, readiness, and current-
+progress suites; Python compileall and North Star JSON parsing passed; static
+readiness/progress checks passed with zero provider/file/environment/holdout
+effects; architecture cleanliness passed with zero new size violations; diff
+hygiene passed.
+**Notes/risks:** The primitive math is closed; entry/exit snapshot selection,
+order style, sizes, fees, slippage, funding, latency, unavailable-cost handling,
+and the final cost model remain unsealed. No provider call, authorization,
+capture, route, score, threshold, send, trade, order, paper trade, RSI write, or
+Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-19 — Keep selected Bybit metrics native to USDT · Codex
 **Why:** The selected adapter emits native USDT depth and notional-impact fields,
 but its feasibility row still inherited generic `*_usd_*` placeholders. That
