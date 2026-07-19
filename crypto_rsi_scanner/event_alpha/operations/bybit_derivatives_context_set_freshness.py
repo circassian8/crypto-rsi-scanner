@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import math
 from typing import Mapping, Sequence
 
 from .bybit_derivatives_context import (
@@ -196,6 +197,7 @@ def freshness_contract_valid(value: Mapping[str, object]) -> bool:
         type(acquisition) is bool
         and type(completion) is bool
         and type(maximum_age) is float
+        and math.isfinite(maximum_age)
         and maximum_age >= 0
         and (not completion or acquisition)
         and (not completion or maximum_age <= MAXIMUM_CONTEXT_AGE_SECONDS)

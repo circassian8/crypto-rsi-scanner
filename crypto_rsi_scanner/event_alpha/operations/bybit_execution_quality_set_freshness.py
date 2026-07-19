@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import math
 from typing import Mapping, Sequence
 
 from .bybit_execution_quality import DEFAULT_FRESHNESS_SECONDS
@@ -237,6 +238,7 @@ def observation_freshness_contract_valid(value: Mapping[str, object]) -> bool:
         type(value.get("all_fresh_at_acquisition")) is bool
         and type(value.get("all_fresh_at_completion")) is bool
         and type(value.get("maximum_age_at_completion_seconds")) in {int, float}
+        and math.isfinite(float(value["maximum_age_at_completion_seconds"]))
         and value["maximum_age_at_completion_seconds"] >= 0
         and _exact_projection_matches(value, expected)
     )

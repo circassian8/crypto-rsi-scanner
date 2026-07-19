@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Reject non-finite Bybit freshness evidence · Codex
+**Why:** The immutable Bybit execution-quality, intraday, and derivatives
+freshness contracts required numeric age fields but did not consistently
+require them to be finite. A stale/ineligible projection containing positive
+infinity—and an intraday projection with non-finite remaining bar recency—could
+therefore survive contract validation even though it was not meaningful audit
+evidence.
+**Changes:**
+- Required finite non-negative completion ages in execution-quality observation,
+  pointer, receipt, and manifest validation.
+- Required finite completion age and finite remaining bar recency in the
+  intraday set contract, including already-ineligible retained captures.
+- Required finite completion age in the derivatives-context set contract.
+- Added direct numeric-contract regressions for infinity, negative infinity,
+  and NaN, plus pointer/receipt regressions for the execution-quality
+  publication surface.
+**Verify:** All 49 focused Bybit capture/freshness tests passed, followed by all
+166 Bybit execution-quality, intraday, derivatives, readiness, and Protocol-v2
+progress tests. Compileall and architecture cleanliness passed with zero new
+violations; all three offline Bybit smokes passed. Full `verify-fast` was not
+repeated because this closed validator change is covered across every affected
+capture family and the broader release gate already passed earlier in the
+active goal.
+**Notes/risks:** Finite stale ages remain valid immutable evidence and remain
+Protocol-v2 input-quality ineligible. No genuine Bybit call, authorization,
+credential, score, threshold, route, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Preserve canonical temporal-history measurements · Codex
 **Why:** Temporal-history normalization still continued through numeric aliases
 after a supplied canonical value failed parsing. A malformed canonical price,

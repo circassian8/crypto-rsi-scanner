@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import math
 from typing import Mapping, Sequence
 
 from .bybit_execution_quality_capture_models import BybitCapturedJSONResponse
@@ -245,8 +246,10 @@ def freshness_contract_valid(value: Mapping[str, object]) -> bool:
         type(acquisition) is bool
         and type(completion) is bool
         and type(maximum_age) is float
+        and math.isfinite(maximum_age)
         and maximum_age >= 0
         and type(minimum_remaining) is float
+        and math.isfinite(minimum_remaining)
         and (not completion or acquisition)
         and (
             not completion

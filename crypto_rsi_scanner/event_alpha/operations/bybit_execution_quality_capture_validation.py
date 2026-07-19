@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import os
 import stat
@@ -213,6 +214,9 @@ def validate_capture_pointer_bytes(raw: bytes) -> dict[str, Any]:
         != FRESHNESS_POLICY
         or type(pointer.get("maximum_execution_quality_age_at_completion_seconds"))
         not in {int, float}
+        or not math.isfinite(
+            float(pointer["maximum_execution_quality_age_at_completion_seconds"])
+        )
         or pointer.get("maximum_execution_quality_age_at_completion_seconds") < 0
         or pointer.get("maximum_execution_quality_age_policy_seconds")
         != MAXIMUM_AGE_SECONDS
@@ -311,6 +315,9 @@ def validate_capture_contracts(
         != FRESHNESS_POLICY
         or type(receipt.get("maximum_execution_quality_age_at_completion_seconds"))
         not in {int, float}
+        or not math.isfinite(
+            float(receipt["maximum_execution_quality_age_at_completion_seconds"])
+        )
         or receipt.get("maximum_execution_quality_age_at_completion_seconds") < 0
         or receipt.get("maximum_execution_quality_age_policy_seconds")
         != MAXIMUM_AGE_SECONDS

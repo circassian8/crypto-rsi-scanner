@@ -34,6 +34,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live impo
     _collect_authoritative_bybit_execution_quality,
     capture_authoritative_bybit_execution_quality,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_capture_validation import (
+    validate_capture_contracts,
+    validate_capture_pointer_bytes,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -599,6 +603,47 @@ def test_new_capture_refuses_to_replace_a_corrupt_existing_pointer(
         )
 
     assert pointer_path.read_bytes() == corrupt_bytes
+
+
+def test_capture_contract_rejects_non_finite_completion_age(tmp_path: Path) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    result = capture_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: NOW,
+        resolver=_resolver(observations),
+        fetch_json=_fetch,
+    )
+    namespace = tmp_path / result["artifact_namespace"]
+    pointer = json.loads((tmp_path / POINTER_FILENAME).read_text())
+    pointer["maximum_execution_quality_age_at_completion_seconds"] = float("inf")
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="capture_pointer_contract_invalid",
+    ):
+        validate_capture_pointer_bytes(json.dumps(pointer).encode("utf-8"))
+
+    receipt_path = namespace / "capture_completion_receipt.json"
+    manifest_path = namespace / "capture_manifest.json"
+    receipt_raw = receipt_path.read_bytes()
+    manifest_raw = manifest_path.read_bytes()
+    receipt = json.loads(receipt_raw)
+    manifest = json.loads(manifest_raw)
+    receipt["maximum_execution_quality_age_at_completion_seconds"] = float("inf")
+    manifest["maximum_execution_quality_age_at_completion_seconds"] = float("inf")
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="capture_manifest_contract_invalid",
+    ):
+        validate_capture_contracts(
+            str(result["artifact_namespace"]),
+            receipt=receipt,
+            receipt_raw=receipt_raw,
+            manifest=manifest,
+            manifest_raw=manifest_raw,
+        )
 
 
 def test_project_review_export_selects_and_revalidates_latest_capture(
