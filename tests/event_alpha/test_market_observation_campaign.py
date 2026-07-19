@@ -449,6 +449,10 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
         == "decision_radar_campaign_contract"
         for row in (*first["authoritative_generations"], *first["non_authoritative_complete_generations"])
     )
+    markdown = market_observation_campaign_render.format_campaign_report(first)
+    assert "Latest exact-generation row readiness" in markdown
+    assert "Retained-history maturity and latest point-in-time feature availability are separate" in markdown
+    assert "Retained-history feature maturity for current-universe assets" in markdown
 
 
 def test_final_receipts_reconcile_attempt_publication_operations_and_current(

@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T07:46:21.349455+00:00",
+  "generated_at": "2026-07-19T08:00:45.698205+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2143,7 +2143,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1410,
+      "line_count": 1414,
       "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },

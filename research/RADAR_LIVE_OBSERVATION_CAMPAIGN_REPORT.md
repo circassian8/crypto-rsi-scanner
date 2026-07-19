@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-19T07:51:59.610417+00:00` from local artifacts only.
+Generated at `2026-07-19T07:59:58.250434+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -88,12 +88,15 @@ Research and decision support only. This report contains no trade recommendation
 - Exact authority assets: `30`
 - Assets found in retained history: `30`
 - Missing current assets: `0`
-- Warm current assets: `0`
+- Fully warm retained-history baselines: `0`
 - Current-universe retained observations: `855`
 - Current-universe baseline-counted observations: `829`
 - Missing asset IDs: `none`
+- Latest exact-generation row readiness: `warming=30`
 
-#### Current-universe feature maturity
+Retained-history maturity and latest point-in-time feature availability are separate. The table below measures sample depth and elapsed coverage for the exact current asset set; it does not claim that every latest-row feature exists.
+
+#### Retained-history feature maturity for current-universe assets
 
 | Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
 |---|---:|---:|---:|---:|---|---|---|

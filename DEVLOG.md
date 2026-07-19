@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Separate baseline maturity from current feature availability · Codex
+**Why:** The campaign report and dashboard used similar “warm” wording for two
+different facts: retained-history sample/coverage maturity and whether the
+latest exact row actually produced a point-in-time feature. After a two-hour
+provider gap, 29 assets had mature 1h history while the newest cycle correctly
+lacked a current 1h value, making the old presentation easy to misread.
+**Changes:**
+- Renamed the current-universe table and headline counts as retained-history
+  baseline maturity.
+- Added the latest exact generation's independent row-readiness counts to the
+  canonical Markdown report.
+- Clarified the dashboard constraint copy and campaign snapshot labels so
+  current-row readiness remains visibly separate from historical maturity.
+- Regenerated the canonical 30-cycle campaign report with the closed wording.
+**Verify:** All 118 focused campaign-report, campaign-action, dashboard,
+concurrency, and UX tests passed (the loopback test ran with its required local
+socket permission). Compileall and architecture cleanliness passed with zero
+new violations. Dashboard smoke rendered 14 pages and UX smoke rendered nine
+pages; campaign report regeneration retained 30 real cycles, five historical
+candidates, and zero provider calls by the report.
+**Notes/risks:** This is an operator-truth and presentation change only. No
+feature computation, baseline rule, provider call, authorization, score,
+threshold, route, send, trade, order, paper trade, normal RSI write, or Event
+Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Record the thirtieth no-send market cycle · Codex
 **Why:** The persisted CoinGecko reservation became eligible at 07:50:59 UTC,
 so the evidence campaign needed exactly one authorized cadence-respecting

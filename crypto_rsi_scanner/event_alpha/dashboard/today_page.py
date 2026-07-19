@@ -513,9 +513,12 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
             + ")"
         )
     return (
-        f"{fully_warm}/{observed} assets are fully warm. Warm by feature family: "
+        f"{fully_warm}/{observed} assets have fully warm retained-history baselines. "
+        "Historical maturity by feature family: "
         + " · ".join(summaries)
-        + ". Each family still requires enough independent samples and elapsed coverage."
+        + ". These counts measure retained sample depth and elapsed coverage, not whether "
+        "the latest cycle produced every point-in-time feature; current rows keep their "
+        "own readiness state."
     )
 
 
@@ -765,8 +768,8 @@ def _campaign_snapshot(snapshot: DashboardSnapshot) -> str:
         f"{spread_count}/{len(observations)}" if observations else UNAVAILABLE
     )
     exact_items = (
-        ("Baseline", baseline),
-        ("Warm / warming / cold", maturity_counts),
+        ("Current-row baseline", baseline),
+        ("Current rows · warm / warming / cold", maturity_counts),
         ("Spread coverage", spread_coverage),
     )
     if str(snapshot.operator_state.get("run_mode") or "").casefold() == "fixture":

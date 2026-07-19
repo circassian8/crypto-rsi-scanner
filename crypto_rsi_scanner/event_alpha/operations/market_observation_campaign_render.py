@@ -84,7 +84,12 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
     ])
     lines.extend(_generation_table(report.get("non_authoritative_complete_generations")))
-    lines.extend(_baseline_maturity_section(baseline))
+    lines.extend(
+        _baseline_maturity_section(
+            baseline,
+            current_generation=_current_authoritative_generation(report),
+        )
+    )
     lines.extend([
         "",
         "## Outcomes",
@@ -220,8 +225,14 @@ def _review_timing_lines(
     return lines
 
 
-def _baseline_maturity_section(baseline: Mapping[str, Any]) -> list[str]:
+def _baseline_maturity_section(
+    baseline: Mapping[str, Any],
+    *,
+    current_generation: Mapping[str, Any],
+) -> list[str]:
     current = _mapping(baseline.get("current_universe_maturity"))
+    current_quality = _mapping(current_generation.get("data_quality"))
+    latest_row_statuses = _mapping(current_quality.get("baseline_status_counts"))
     lines = [
         "",
         "## Baseline maturity",
@@ -232,12 +243,19 @@ def _baseline_maturity_section(baseline: Mapping[str, Any]) -> list[str]:
         f"- Exact authority assets: `{_int(current.get('expected_asset_count'))}`",
         f"- Assets found in retained history: `{_int(current.get('observed_asset_count'))}`",
         f"- Missing current assets: `{_int(current.get('missing_asset_count'))}`",
-        f"- Warm current assets: `{_int(current.get('baseline_warm_asset_count'))}`",
+        f"- Fully warm retained-history baselines: `{_int(current.get('baseline_warm_asset_count'))}`",
         f"- Current-universe retained observations: `{_int(current.get('baseline_observation_count'))}`",
         f"- Current-universe baseline-counted observations: `{_int(current.get('baseline_counted_observation_count'))}`",
         f"- Missing asset IDs: `{_joined(current.get('missing_asset_ids')) or 'none'}`",
+        f"- Latest exact-generation row readiness: `{_counts(latest_row_statuses) if latest_row_statuses else 'unavailable'}`",
         "",
-        "#### Current-universe feature maturity",
+        (
+            "Retained-history maturity and latest point-in-time feature availability are "
+            "separate. The table below measures sample depth and elapsed coverage for the "
+            "exact current asset set; it does not claim that every latest-row feature exists."
+        ),
+        "",
+        "#### Retained-history feature maturity for current-universe assets",
         "",
         *_feature_maturity_lines(current.get("baseline_feature_readiness")),
         "",
@@ -258,6 +276,17 @@ def _baseline_maturity_section(baseline: Mapping[str, Any]) -> list[str]:
         *_feature_maturity_lines(baseline.get("baseline_feature_readiness")),
     ]
     return lines
+
+
+def _current_authoritative_generation(
+    report: Mapping[str, Any],
+) -> dict[str, Any]:
+    for raw in report.get("authoritative_generations") or ():
+        row = _mapping(raw)
+        publication = _mapping(row.get("publication"))
+        if publication.get("currently_authoritative") is True:
+            return row
+    return {}
 
 
 def _route_lines(route_counts: Mapping[str, Any]) -> list[str]:

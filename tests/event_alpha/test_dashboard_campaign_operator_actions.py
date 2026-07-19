@@ -347,7 +347,8 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
         assert "CONFIRM=1" not in page
     assert today.index("Open operator work") < today.index("Decision constraints")
     assert today.count("Execution spread unavailable") == 0
-    assert "0/30 assets are fully warm" in today
+    assert "0/30 assets have fully warm retained-history baselines" in today
+    assert "not whether the latest cycle produced every point-in-time feature" in today
     assert "turnover 30/30 (21/8 samples)" in today
     assert "1h returns 0/30 (7/8 samples)" in today
     assert (

@@ -187,8 +187,11 @@ def test_today_baseline_snapshot_does_not_invent_zeroes_without_market_rows() ->
     page = render_today_page(snapshot, query={})
     section = page.split("<h2>Baseline maturity</h2>", 1)[1].split("</section>", 1)[0]
 
-    assert "<dt>Baseline</dt><dd>Unavailable</dd>" in section
-    assert "<dt>Warm / warming / cold</dt><dd>Unavailable</dd>" in section
+    assert "<dt>Current-row baseline</dt><dd>Unavailable</dd>" in section
+    assert (
+        "<dt>Current rows · warm / warming / cold</dt><dd>Unavailable</dd>"
+        in section
+    )
     assert "<dt>Spread coverage</dt><dd>Unavailable</dd>" in section
     assert "0 / 0 / 0" not in section
     assert "0/0" not in section
