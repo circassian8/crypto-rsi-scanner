@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the cadence-eligible CoinGecko DNS failure · Codex
+**Why:** The one-hour observation boundary elapsed with existing CoinGecko
+authorization, so Daily Operations was eligible to make one bounded no-send
+request. The attempt needed to advance campaign truth even if the provider was
+unreachable.
+**Changes:**
+- Ran readiness after the exact cadence boundary, then one Daily Operations
+  cycle. The attempt failed closed on sandbox DNS resolution before receiving a
+  provider response and published no generation.
+- Re-entered the same guarded command outside the sandbox as required for a
+  network diagnosis. Its stable attempt/cadence ledger correctly blocked a
+  second provider call and returned `observation_cadence_waiting`.
+- Rebuilt the canonical campaign report. It now records 7 provider failures,
+  keeps 32 successful cycles / 960 retained / 930 baseline-counted / 30
+  too-close observations, and sets the next safe boundary to
+  `2026-07-19T11:54:09.995373Z`.
+**Verify:** `make radar-daily-ops-status`, `make
+radar-market-campaign-report`, `make radar-dashboard-authority-status`, and
+`make radar-dashboard-readiness` passed without a provider call. Revision 12
+remains authoritative and exact; the dashboard is ready.
+**Notes/risks:** One CoinGecko request was attempted and failed; no retry,
+pointer publication/invalidation, dashboard restart, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Do not retry
+before the persisted next boundary.
+
 ## 2026-07-19 — Separate native Bybit liquidation evidence from REST context · Codex
 **Why:** Protocol v2 requires liquidation context, but Bybit exposes it through
 the public `allLiquidation` WebSocket rather than any endpoint in the existing
