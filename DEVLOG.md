@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Fail closed on malformed market observation clocks · Codex
+**Why:** Market-state normalization and catalyst-queue scheduling replaced an
+explicitly malformed observation timestamp with the current wall clock. That
+could make invalid evidence appear freshly observed and extend its catalyst
+search deadline.
+**Changes:**
+- Market-state snapshots now reject a malformed selected observation clock and
+  no longer infer `fresh` from a merely truthy invalid row timestamp.
+- Catalyst-search queues resolve anomaly, snapshot, and fallback clocks by
+  ordered presence; an invalid higher-authority clock cannot borrow a valid
+  lower alias or wall time.
+- Added focused regressions for malformed canonical clocks, freshness, alias
+  precedence, and exact deadline derivation.
+**Verify:** All 42 focused market timestamp, alias-precedence, market-surface,
+and anomaly-report tests passed. Compileall, architecture cleanliness, and the
+integrated-radar smoke passed; its strict doctor reported zero blockers and
+warnings.
+**Notes/risks:** A genuinely absent optional clock retains the existing
+wall-clock fallback. Valid explicit run clocks and existing thresholds/routes
+are unchanged. No provider call, authorization, score tuning, send, trade,
+order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Require current derivatives evidence for crowding routes · Codex
 **Why:** Decision v2 treated top-level crowding labels and OI/funding metrics as
 current even when their derivatives snapshot was stale, unknown, malformed, or

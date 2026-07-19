@@ -497,7 +497,7 @@ def build_catalyst_search_queue(
             continue
         anomaly_id = str(anomaly.get("market_anomaly_id") or anomaly.get("anomaly_id") or "")
         snapshot = anomaly.get("market_state_snapshot") if isinstance(anomaly.get("market_state_snapshot"), Mapping) else {}
-        row_observed = _parse_time(anomaly.get("observed_at") or snapshot.get("observed_at") or observed_at)
+        row_observed = _queue_observed_at(anomaly, snapshot, observed_at)
         search_deadline = row_observed + timedelta(hours=max(0.5, float(cfg.search_deadline_hours)))
         suggested_packs = _string_list(
             anomaly.get("suggested_source_packs_to_search") or anomaly.get("suggested_source_packs")
@@ -1112,7 +1112,23 @@ def _liquidity_tier_from_row(row: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _parse_time(value: object) -> datetime:
+def _queue_observed_at(
+    anomaly: Mapping[str, Any],
+    snapshot: Mapping[str, Any],
+    observed_at: datetime | str | None,
+) -> datetime:
+    for field_name, value in (
+        ("anomaly observed_at", anomaly.get("observed_at")),
+        ("snapshot observed_at", snapshot.get("observed_at")),
+        ("fallback observed_at", observed_at),
+    ):
+        if value in (None, ""):
+            continue
+        return _parse_time(value, field_name=field_name)
+    return datetime.now(timezone.utc)
+
+
+def _parse_time(value: object, *, field_name: str) -> datetime:
     if isinstance(value, datetime):
         return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, str) and value.strip():
@@ -1121,7 +1137,7 @@ def _parse_time(value: object) -> datetime:
             return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
         except ValueError:
             pass
-    return datetime.now(timezone.utc)
+    raise ValueError(f"market anomaly catalyst queue {field_name} is invalid")
 
 
 def _string_list(value: object) -> list[str]:

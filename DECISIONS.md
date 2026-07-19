@@ -16,6 +16,19 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Malformed market clocks never become current time
+**Status:** accepted
+**Decision:** Resolve market observation clocks by ordered presence. A supplied
+but invalid higher-authority clock fails closed and cannot borrow a lower alias
+or the current wall clock. A timestamp can imply freshness only after it parses
+as an actual aware observation time. Wall-clock fallback remains limited to the
+legacy case where no optional clock was claimed at all.
+**Why:** Replacing malformed evidence with `now` manufactures recency and can
+extend a catalyst-search deadline from an unauditable origin.
+**Revisit when:** A versioned schema makes every observation clock mandatory.
+At that point, remove the missing-clock fallback rather than weakening the
+malformed-clock rejection.
+
 ## 2026-07-19 - Current crowding routes require fresh derivatives
 **Status:** accepted
 **Decision:** Treat derivatives crowding as current Decision evidence only when

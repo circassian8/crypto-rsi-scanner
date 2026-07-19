@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T08:38:11.541141+00:00`
+- generated_at: `2026-07-19T08:47:20.277917+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -128,10 +128,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py` | 1194 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1193 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1193 |
+| `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1192 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1188 |
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1186 |
 | `crypto_rsi_scanner/event_alpha/doctor/checks/operations.py` | 1183 |
-| `crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py` | 1181 |
 
 ## Accepted Production Files Over 1200 Lines
 

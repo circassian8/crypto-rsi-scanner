@@ -119,7 +119,7 @@ def snapshot_from_market_row(
     freshness = str(
         row.get("market_context_freshness_status")
         or row.get("freshness_status")
-        or ("fresh" if row.get("observed_at") or row.get("timestamp") else "unknown")
+        or ("fresh" if _has_valid_row_observation_time(row) else "unknown")
     )
     source = str(row.get("market_data_source") or row.get("source") or "fixture")
     normalized_return_units = {
@@ -356,15 +356,34 @@ def benchmark_rows(market_rows: list[Mapping[str, Any]]) -> tuple[Mapping[str, A
 
 
 def _observed_at(row: Mapping[str, Any], observed_at: datetime | str | None) -> datetime:
-    value = observed_at or row.get("observed_at") or row.get("timestamp")
+    for field_name, value in (
+        ("observed_at argument", observed_at),
+        ("observed_at", row.get("observed_at")),
+        ("timestamp", row.get("timestamp")),
+    ):
+        if value in (None, ""):
+            continue
+        parsed = _parse_observation_time(value)
+        if parsed is None:
+            raise ValueError(f"market state {field_name} is invalid")
+        return parsed
+    return datetime.now(timezone.utc)
+
+
+def _has_valid_row_observation_time(row: Mapping[str, Any]) -> bool:
+    value = _first_present_value(row, "observed_at", "timestamp")
+    return value is not None and _parse_observation_time(value) is not None
+
+
+def _parse_observation_time(value: object) -> datetime | None:
     if isinstance(value, datetime):
         return _as_utc(value)
     if isinstance(value, str) and value.strip():
         try:
             return _as_utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
         except ValueError:
-            pass
-    return datetime.now(timezone.utc)
+            return None
+    return None
 
 
 def _percent_value(value: object, *, unit: str | None) -> float | None:
