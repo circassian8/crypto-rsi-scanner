@@ -603,12 +603,12 @@ def _write_namespace_status_markers(base: Path, registry: dict[str, Any], *, now
         namespace = str(row.get("namespace") or "")
         if not namespace:
             continue
-        if namespace.startswith(
+        if row.get("status") == STATUS_QUARANTINE or namespace.startswith(
             ("radar_bybit_liquidation_transcript_", "radar_tokenomist_v5_")
         ):
-            # This detached capture has an exact immutable inventory.  Its
-            # lifecycle state is projected from the root registry and never
-            # injected into the sealed namespace as an unmanifested leaf.
+            # Detached captures and retained quarantine have exact inventories.
+            # Project lifecycle state from the root registry; never inject an
+            # unmanifested leaf into either tree.
             continue
         event_alpha_namespace_status.write_namespace_status(base / namespace, row, now=now)
         event_alpha_namespace_status.refresh_namespace_status(

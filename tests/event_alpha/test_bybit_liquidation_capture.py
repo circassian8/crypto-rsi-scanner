@@ -883,7 +883,10 @@ def test_interrupted_staging_write_does_not_poison_retry(
             confirm=True,
         )
     assert not (artifact_base / str(prospective["artifact_namespace"])).exists()
-    assert list(artifact_base.iterdir()) == []
+    quarantines = list(artifact_base.glob("tmp_bybit_liquidation_stage_*"))
+    assert len(quarantines) == 1
+    assert quarantines[0].is_dir()
+    assert len(list(quarantines[0].iterdir())) == 2
 
     monkeypatch.setattr(capture.capture_io, "_write_leaf", original)
     retried = capture.import_bybit_liquidation_transcript(
@@ -893,9 +896,10 @@ def test_interrupted_staging_write_does_not_poison_retry(
     )
     assert retried["status"] == "complete"
     assert retried["writes_performed"] is True
+    assert quarantines[0].is_dir()
 
 
-def test_staging_path_swap_never_leaves_attacker_final_and_retry_succeeds(
+def test_staging_path_swap_fails_without_mutating_attacker_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -904,32 +908,30 @@ def test_staging_path_swap_never_leaves_attacker_final_and_retry_succeeds(
     source = _source(tmp_path)
     prospective = capture.validate_local_transcript(source)
     final_name = str(prospective["artifact_namespace"])
-    original_rename = capture.capture_io.os.rename
+    original_noreplace = capture.capture_io._rename_directory_noreplace
     swapped = False
+    stolen_name: str | None = None
 
-    def swapping_rename(
+    def swapping_noreplace(
+        base_fd: int,
         source_name: str,
         destination_name: str,
-        *args: object,
-        **kwargs: object,
-    ) -> None:
-        nonlocal swapped
+    ) -> bool:
+        nonlocal stolen_name, swapped
         if destination_name == final_name and not swapped:
             swapped = True
-            source_fd = kwargs["src_dir_fd"]
-            assert isinstance(source_fd, int)
-            stolen = f"{source_name}.stolen"
-            original_rename(
+            stolen_name = f"{source_name}.stolen"
+            os.rename(
                 source_name,
-                stolen,
-                src_dir_fd=source_fd,
-                dst_dir_fd=source_fd,
+                stolen_name,
+                src_dir_fd=base_fd,
+                dst_dir_fd=base_fd,
             )
-            os.mkdir(source_name, 0o700, dir_fd=source_fd)
+            os.mkdir(source_name, 0o700, dir_fd=base_fd)
             replacement_fd = os.open(
                 source_name,
                 os.O_RDONLY | os.O_DIRECTORY,
-                dir_fd=source_fd,
+                dir_fd=base_fd,
             )
             try:
                 poison_fd = os.open(
@@ -941,9 +943,13 @@ def test_staging_path_swap_never_leaves_attacker_final_and_retry_succeeds(
                 os.close(poison_fd)
             finally:
                 os.close(replacement_fd)
-        original_rename(source_name, destination_name, *args, **kwargs)
+        return original_noreplace(base_fd, source_name, destination_name)
 
-    monkeypatch.setattr(capture.capture_io.os, "rename", swapping_rename)
+    monkeypatch.setattr(
+        capture.capture_io,
+        "_rename_directory_noreplace",
+        swapping_noreplace,
+    )
     with pytest.raises(capture.BybitLiquidationCaptureError, match="identity_drift"):
         capture.import_bybit_liquidation_transcript(
             artifact_base,
@@ -951,9 +957,16 @@ def test_staging_path_swap_never_leaves_attacker_final_and_retry_succeeds(
             confirm=True,
         )
     assert swapped is True
-    assert not (artifact_base / final_name).exists()
+    assert stolen_name is not None
+    assert (artifact_base / stolen_name).is_dir()
+    assert (artifact_base / final_name / "poison.bin").is_file()
 
-    monkeypatch.setattr(capture.capture_io.os, "rename", original_rename)
+    shutil.rmtree(artifact_base / final_name)
+    monkeypatch.setattr(
+        capture.capture_io,
+        "_rename_directory_noreplace",
+        original_noreplace,
+    )
     retried = capture.import_bybit_liquidation_transcript(
         artifact_base,
         transcript_path=source,
@@ -961,6 +974,195 @@ def test_staging_path_swap_never_leaves_attacker_final_and_retry_succeeds(
     )
     assert retried["status"] == "complete"
     assert retried["artifact_namespace"] == final_name
+    assert (artifact_base / stolen_name).is_dir()
+
+
+def test_native_no_replace_preserves_concurrent_empty_final(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_base = tmp_path / "artifacts"
+    artifact_base.mkdir()
+    original_noreplace = capture.capture_io._rename_directory_noreplace
+    raced_identity: tuple[int, int] | None = None
+
+    def create_peer_then_publish(
+        base_fd: int,
+        source_name: str,
+        destination_name: str,
+    ) -> bool:
+        nonlocal raced_identity
+        os.mkdir(destination_name, 0o700, dir_fd=base_fd)
+        peer = os.stat(destination_name, dir_fd=base_fd, follow_symlinks=False)
+        raced_identity = (peer.st_dev, peer.st_ino)
+        return original_noreplace(base_fd, source_name, destination_name)
+
+    monkeypatch.setattr(
+        capture.capture_io,
+        "_rename_directory_noreplace",
+        create_peer_then_publish,
+    )
+    with capture.capture_io.hold_anchored_base(
+        artifact_base,
+        exclusive=True,
+    ) as anchored:
+        created = capture.capture_io.publish_bundle_atomically(
+            anchored,
+            namespace="final_capture",
+            files=(("payload.bin", b"owned"),),
+        )
+
+    peer = (artifact_base / "final_capture").stat()
+    assert created is False
+    assert raced_identity == (peer.st_dev, peer.st_ino)
+    assert list((artifact_base / "final_capture").iterdir()) == []
+    quarantines = list(artifact_base.glob("tmp_bybit_liquidation_stage_*"))
+    assert len(quarantines) == 1
+    assert (quarantines[0] / "payload.bin").read_bytes() == b"owned"
+
+
+def test_replaced_staging_directory_is_never_removed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_base = tmp_path / "artifacts"
+    artifact_base.mkdir()
+    replacement_identity: tuple[int, int] | None = None
+    stolen_name: str | None = None
+
+    def replace_stage_then_interrupt(
+        base_fd: int,
+        source_name: str,
+        _destination_name: str,
+    ) -> bool:
+        nonlocal replacement_identity, stolen_name
+        stolen_name = f"{source_name}.stolen"
+        os.rename(
+            source_name,
+            stolen_name,
+            src_dir_fd=base_fd,
+            dst_dir_fd=base_fd,
+        )
+        os.mkdir(source_name, 0o700, dir_fd=base_fd)
+        replacement = os.stat(
+            source_name,
+            dir_fd=base_fd,
+            follow_symlinks=False,
+        )
+        replacement_identity = (replacement.st_dev, replacement.st_ino)
+        raise RuntimeError("injected stage substitution")
+
+    monkeypatch.setattr(
+        capture.capture_io,
+        "_rename_directory_noreplace",
+        replace_stage_then_interrupt,
+    )
+    with pytest.raises(
+        capture.capture_io.BybitLiquidationCaptureIOError,
+        match="staging_quarantine_identity_drift",
+    ):
+        with capture.capture_io.hold_anchored_base(
+            artifact_base,
+            exclusive=True,
+        ) as anchored:
+            capture.capture_io.publish_bundle_atomically(
+                anchored,
+                namespace="final_capture",
+                files=(("payload.bin", b"owned"),),
+            )
+
+    assert stolen_name is not None
+    assert (artifact_base / stolen_name / "payload.bin").read_bytes() == b"owned"
+    replacements = [
+        path
+        for path in artifact_base.glob("tmp_bybit_liquidation_stage_*")
+        if path.name != stolen_name
+    ]
+    assert len(replacements) == 1
+    replacement = replacements[0].stat()
+    assert replacement_identity == (replacement.st_dev, replacement.st_ino)
+    assert list(replacements[0].iterdir()) == []
+
+
+def test_replaced_staging_leaf_is_never_unlinked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_base = tmp_path / "artifacts"
+    artifact_base.mkdir()
+    original_write = capture.capture_io._write_leaf
+
+    def replace_leaf_then_interrupt(
+        directory_fd: int,
+        name: str,
+        raw: bytes,
+    ) -> None:
+        original_write(directory_fd, name, raw)
+        os.rename(
+            name,
+            "owned_original.bin",
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        replacement_fd = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=directory_fd,
+        )
+        try:
+            os.write(replacement_fd, b"replacement")
+        finally:
+            os.close(replacement_fd)
+        raise RuntimeError("injected leaf substitution")
+
+    monkeypatch.setattr(capture.capture_io, "_write_leaf", replace_leaf_then_interrupt)
+    with pytest.raises(
+        capture.capture_io.BybitLiquidationCaptureIOError,
+        match="directory_inventory_bound_exceeded",
+    ):
+        with capture.capture_io.hold_anchored_base(
+            artifact_base,
+            exclusive=True,
+        ) as anchored:
+            capture.capture_io.publish_bundle_atomically(
+                anchored,
+                namespace="final_capture",
+                files=(("payload.bin", b"owned"),),
+            )
+
+    quarantines = list(artifact_base.glob("tmp_bybit_liquidation_stage_*"))
+    assert len(quarantines) == 1
+    assert (quarantines[0] / "payload.bin").read_bytes() == b"replacement"
+    assert (quarantines[0] / "owned_original.bin").read_bytes() == b"owned"
+
+
+def test_unsupported_native_no_replace_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_base = tmp_path / "artifacts"
+    artifact_base.mkdir()
+    monkeypatch.setattr(capture.capture_io.sys, "platform", "unsupported")
+
+    with pytest.raises(
+        capture.capture_io.BybitLiquidationCaptureIOError,
+        match="bundle_no_replace_rename_unsupported",
+    ):
+        with capture.capture_io.hold_anchored_base(
+            artifact_base,
+            exclusive=True,
+        ) as anchored:
+            capture.capture_io.publish_bundle_atomically(
+                anchored,
+                namespace="final_capture",
+                files=(("payload.bin", b"owned"),),
+            )
+
+    assert not (artifact_base / "final_capture").exists()
+    quarantines = list(artifact_base.glob("tmp_bybit_liquidation_stage_*"))
+    assert len(quarantines) == 1
+    assert (quarantines[0] / "payload.bin").read_bytes() == b"owned"
 
 
 def test_validation_rejects_ancestor_swap_instead_of_following_evil_copy(

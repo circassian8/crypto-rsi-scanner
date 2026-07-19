@@ -37,6 +37,7 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
         "research_send",
         "shim_report",
         "source_enrichment",
+        "tmp_bybit_liquidation_stage_123_456",
         "tmp_nonexistent_cli_test",
     ):
         (tmp_path / namespace).mkdir()
@@ -45,6 +46,7 @@ def test_known_architecture_and_manual_review_namespaces_are_not_unknown(tmp_pat
     rows = {row["namespace"]: row for row in registry["namespaces"]}
 
     assert rows["shim_report"]["status"] == "active_architecture_report"
+    assert rows["tmp_bybit_liquidation_stage_123_456"]["status"] == "quarantine"
     assert rows["tmp_nonexistent_cli_test"]["status"] == "quarantine"
     for namespace in (
         "catalyst_frame_e2e",
@@ -123,6 +125,41 @@ def test_lifecycle_report_never_injects_a_marker_into_liquidation_capture(
         artifact_base,
         namespace=namespace,
     )["status"] == "complete"
+
+
+def test_lifecycle_report_never_mutates_retained_staging_quarantine(
+    tmp_path: Path,
+) -> None:
+    artifact_base = tmp_path / "artifacts"
+    report_dir = tmp_path / "reports"
+    quarantine = artifact_base / "tmp_bybit_liquidation_stage_123_456"
+    quarantine.mkdir(parents=True)
+    (quarantine / "partial.bin").write_bytes(b"retained")
+    before = {
+        path.name: path.read_bytes()
+        for path in quarantine.iterdir()
+        if path.is_file()
+    }
+
+    registry = lifecycle.write_namespace_lifecycle_report(
+        artifact_base,
+        out_dir=report_dir,
+        now=datetime(2026, 7, 19, 14, 0, tzinfo=timezone.utc),
+    )
+
+    row = next(
+        item
+        for item in registry["namespaces"]
+        if item["namespace"] == quarantine.name
+    )
+    assert row["status"] == "quarantine"
+    assert row["safe_for_send_readiness"] is False
+    assert {
+        path.name: path.read_bytes()
+        for path in quarantine.iterdir()
+        if path.is_file()
+    } == before
+    assert not (quarantine / "event_alpha_namespace_status.json").exists()
 
 
 def test_event_alpha_artifact_doctor_scopes_readiness_to_claimed_provider_namespaces():

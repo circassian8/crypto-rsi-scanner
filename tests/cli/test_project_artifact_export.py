@@ -113,6 +113,12 @@ def _project_tree(tmp_path: Path) -> tuple[Path, str, str]:
             artifact_root / tokenomist_namespace / name,
             _canonical_json({"synthetic_fixture": True, "name": name}),
         )
+    _write(
+        artifact_root
+        / "tmp_bybit_liquidation_stage_123_456"
+        / "partial_payload.bin",
+        b'{"retained_quarantine":true}\n',
+    )
     _write(artifact_root / ".runtime.lock", b"machine-local\n")
     return root, current, latest
 
@@ -157,9 +163,13 @@ def test_standard_export_contains_only_manifested_canonical_artifacts(
         name.startswith("event_fade_cache/radar_tokenomist_v5_")
         for name in names
     )
+    assert not any(
+        name.startswith("event_fade_cache/tmp_bybit_liquidation_stage_")
+        for name in names
+    )
     assert "event_fade_cache/.runtime.lock" not in names
     assert manifest["entry_count"] == len(expected_artifacts)
-    assert manifest["excluded_history_count"] == 9
+    assert manifest["excluded_history_count"] == 10
     assert manifest["excluded_noise"] == ["event_fade_cache/.runtime.lock"]
     assert manifest["canonical_selection_is_closed"] is True
     assert manifest["canonical_source_coverage_status"] == "partial"
@@ -275,6 +285,7 @@ def test_optional_project_history_is_exact_disjoint_checksummed_complement(
         "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/normalized_snapshot.json",
         "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/capture_manifest.json",
         "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/capture_completion_receipt.json",
+        "event_fade_cache/tmp_bybit_liquidation_stage_123_456/partial_payload.bin",
     }
     assert names == expected_history | {_HISTORY_MANIFEST, _HISTORY_CHECKSUMS}
     assert {row["path"] for row in manifest["entries"]} == expected_history
@@ -306,6 +317,14 @@ def test_optional_project_history_is_exact_disjoint_checksummed_complement(
         row["semantic_ids"]["historical_or_noncanonical"]
         for row in tokenomist_rows
     } == {True}
+    quarantine_rows = [
+        row
+        for row in manifest["entries"]
+        if "tmp_bybit_liquidation_stage_" in row["path"]
+    ]
+    assert len(quarantine_rows) == 1
+    assert quarantine_rows[0]["role"] == "noncanonical_namespace_artifact"
+    assert quarantine_rows[0]["semantic_ids"]["historical_or_noncanonical"] is True
     assert checksums == "".join(
         f"{hashlib.sha256((root / path).read_bytes()).hexdigest()}  {path}\n"
         for path in sorted(expected_history)

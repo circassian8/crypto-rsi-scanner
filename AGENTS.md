@@ -744,7 +744,14 @@ may be added later when a suitable environment already exists.
   `...-status`. It seals exact supplied subscribe, acknowledgement, and observed
   data application payloads, their operator clocks, deterministic event
   projection, manifest, and completion receipt into one immutable namespace;
-  it publishes no latest pointer. The import is explicitly limited to selected
+  it publishes no latest pointer. Final directory publication uses native
+  Darwin/Linux atomic no-replace semantics and fails closed when unsupported;
+  it never uses ordinary replacement rename. Interrupted writes and raced
+  staging identities are never deleted or renamed by mutable pathname. Retain
+  each exact `tmp_bybit_liquidation_stage_*` tree as quarantine, project its
+  lifecycle state without injecting a marker, exclude it from the standard
+  review ZIP, and keep it only in the optional history complement. The import
+  is explicitly limited to selected
   application payloads: it does not prove TLS or WebSocket framing, project-
   owned transport, uninterrupted stream coverage, absence of dropped messages,
   or absence of liquidations during silent intervals. It grants no live

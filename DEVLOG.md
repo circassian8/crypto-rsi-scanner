@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Make detached Bybit publication no-replace · Codex
+**Why:** The liquidation transcript publisher used ordinary directory rename,
+which can replace a concurrently created empty destination, and its
+check-then-delete staging cleanup could remove an unowned replacement. Both are
+unsafe foundations for later genuine evidence capture.
+**Changes:**
+- Replaced ordinary rename with native Darwin `renameatx_np(RENAME_EXCL)` or
+  Linux `renameat2(RENAME_NOREPLACE)`, with fail-closed behavior when the native
+  primitive is unavailable. A concurrent destination now keeps its exact inode
+  and contents.
+- Removed every name-based leaf/directory cleanup and the post-publication
+  quarantine rename. Interrupted writes, destination races, and staging
+  identity drift retain uniquely named `tmp_bybit_liquidation_stage_*` trees;
+  the publisher never deletes or relocates a mutable raced pathname.
+- Added adversarial coverage for an empty-final race, staging-directory and
+  staging-leaf substitution, unsupported no-replace platforms, post-publish
+  identity drift, interrupted-write retry, and retained quarantine identity.
+- Classified retained stages as quarantine without injecting lifecycle marker
+  files. Standard project export excludes them; the optional history archive
+  preserves their exact noncanonical complement. Updated the durable Bybit
+  capture policy, operator agreement, roadmap, and generated architecture
+  reports.
+**Verify:** The focused Bybit/Tokenomist/lifecycle/export security stack passed
+119 tests. The detached liquidation capture smoke, compileall, diff check, and
+architecture cleanliness passed with zero new size violations. Full
+`make verify PYTHON=.venv/bin/python` passed 1,421/1,421 standalone checks and
+3,297/3,297 pytest checks, plus alert rendering, the 33-observation offline
+backtest fixture, and the read-only paper scoreboard.
+**Notes/risks:** No provider call, WebSocket, authorization read, latest
+pointer, campaign/dashboard/directional/input/Protocol-v2 authority, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+was added. Retained quarantine is intentionally not auto-cleaned; any future
+retention action needs its own explicit inode-safe policy. The next prerequisite
+is the separately scoped shared byte-publisher substitution fix.
+
 ## 2026-07-19 — Close the Tokenomist v5 fixture capture boundary · Codex
 **Why:** Protocol v2 needs structured-unlock context, but the existing
 Tokenomist v5 fixture normalizer did not prove immutable request/source

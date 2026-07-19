@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T17:09:57.974639+00:00",
+  "generated_at": "2026-07-19T19:12:55.711810+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2155,6 +2155,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1369,
+      "path": "tests/event_alpha/test_bybit_liquidation_capture.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1319,
       "path": "tests/event_alpha/test_fade_review_workflows.py",
       "source_kind": "test"
@@ -2211,12 +2217,6 @@
       "limit": 1500,
       "line_count": 1206,
       "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1167,
-      "path": "tests/event_alpha/test_bybit_liquidation_capture.py",
       "source_kind": "test"
     },
     {

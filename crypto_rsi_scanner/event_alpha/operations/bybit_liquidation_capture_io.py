@@ -9,12 +9,14 @@ publication.
 from __future__ import annotations
 
 from contextlib import contextmanager
+import ctypes
 from dataclasses import dataclass
 import errno
 import fcntl
 import os
 from pathlib import Path
 import stat
+import sys
 import time
 from typing import Iterator, Sequence
 
@@ -24,6 +26,8 @@ from . import common
 _FORBIDDEN_SOURCE_PARTS = frozenset(
     {"fixture", "fixtures", "mock", "mocks", "replay", "replays", "test", "tests"}
 )
+_RENAME_EXCL = 0x00000004
+_RENAME_NOREPLACE = 0x00000001
 
 
 class BybitLiquidationCaptureIOError(RuntimeError):
@@ -371,9 +375,66 @@ def reject_secret_bytes(raw: bytes) -> None:
 
 
 def _safe_leaf(name: str) -> str:
-    if not name or Path(name).name != name or name in {".", ".."}:
+    if (
+        not isinstance(name, str)
+        or not name
+        or "\x00" in name
+        or Path(name).name != name
+        or name in {".", ".."}
+    ):
         raise BybitLiquidationCaptureIOError("bundle_artifact_name_invalid")
     return name
+
+
+def _rename_directory_noreplace(
+    base_fd: int,
+    source: str,
+    destination: str,
+) -> bool:
+    """Atomically publish one directory without replacing a peer's leaf."""
+
+    source = _safe_leaf(source)
+    destination = _safe_leaf(destination)
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename = getattr(library, "renameatx_np", None)
+        flags = _RENAME_EXCL
+    elif sys.platform.startswith("linux"):
+        rename = getattr(library, "renameat2", None)
+        flags = _RENAME_NOREPLACE
+    else:
+        rename = None
+        flags = 0
+    if rename is None:
+        raise BybitLiquidationCaptureIOError(
+            "bundle_no_replace_rename_unsupported"
+        )
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    result = rename(
+        base_fd,
+        os.fsencode(source),
+        base_fd,
+        os.fsencode(destination),
+        flags,
+    )
+    if result == 0:
+        return True
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        return False
+    if error in {errno.ENOSYS, errno.ENOTSUP, errno.EINVAL}:
+        raise BybitLiquidationCaptureIOError(
+            "bundle_no_replace_rename_unsupported"
+        )
+    raise OSError(error, os.strerror(error))
 
 
 def bounded_entry_names(directory_fd: int, *, maximum: int) -> frozenset[str]:
@@ -480,31 +541,56 @@ def read_regular_at(directory_fd: int, name: str, *, maximum_bytes: int) -> byte
             os.close(descriptor)
 
 
-def _cleanup_staging(
+def _retain_staging_quarantine(
     base_fd: int,
     staging: str,
     staging_fd: int,
+    expected_identity: os.stat_result,
     allowed_names: frozenset[str],
-) -> None:
+) -> tuple[str, ...]:
+    """Verify and retain an interrupted stage without name-based deletion."""
+
     try:
+        opened = os.fstat(staging_fd)
         current = os.stat(staging, dir_fd=base_fd, follow_symlinks=False)
-        if not _same_identity(current, os.fstat(staging_fd)):
-            raise BybitLiquidationCaptureIOError("staging_cleanup_unsafe")
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or not stat.S_ISDIR(current.st_mode)
+            or not _same_identity(expected_identity, opened)
+            or not _same_identity(opened, current)
+        ):
+            raise BybitLiquidationCaptureIOError(
+                "staging_quarantine_identity_drift"
+            )
         actual = bounded_entry_names(staging_fd, maximum=len(allowed_names))
         if not actual <= allowed_names:
-            raise BybitLiquidationCaptureIOError("staging_cleanup_unsafe")
+            raise BybitLiquidationCaptureIOError("staging_quarantine_unsafe")
         for name in actual:
             info = os.stat(name, dir_fd=staging_fd, follow_symlinks=False)
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                raise BybitLiquidationCaptureIOError("staging_cleanup_unsafe")
-            os.unlink(name, dir_fd=staging_fd)
-        os.fsync(staging_fd)
-        os.rmdir(staging, dir_fd=base_fd)
-        os.fsync(base_fd)
+                raise BybitLiquidationCaptureIOError(
+                    "staging_quarantine_unsafe"
+                )
+        current_after = os.stat(staging, dir_fd=base_fd, follow_symlinks=False)
+        if not _same_identity(opened, current_after):
+            raise BybitLiquidationCaptureIOError(
+                "staging_quarantine_identity_drift"
+            )
+        # There is no portable conditional unlink-by-inode operation. Never
+        # unlink a leaf or directory by name after a separate identity check:
+        # an unowned replacement could win that gap. The unique tmp_ stage is
+        # retained as explicit quarantine, and a retry uses a fresh name.
+        return tuple(sorted(actual))
     except BybitLiquidationCaptureIOError:
         raise
+    except (FileNotFoundError, NotADirectoryError) as exc:
+        raise BybitLiquidationCaptureIOError(
+            "staging_quarantine_identity_drift"
+        ) from exc
     except OSError as exc:
-        raise BybitLiquidationCaptureIOError("staging_cleanup_failed") from exc
+        raise BybitLiquidationCaptureIOError(
+            "staging_quarantine_failed"
+        ) from exc
 
 
 def publish_bundle_atomically(
@@ -513,11 +599,12 @@ def publish_bundle_atomically(
     namespace: str,
     files: Sequence[tuple[str, bytes]],
 ) -> bool:
-    """Publish a complete directory by one descriptor-relative rename.
+    """Publish a complete directory by one native no-replace rename.
 
     Returns ``False`` when a concurrent writer already published ``namespace``.
-    Any interrupted sequential write remains private to an owned staging
-    directory and is removed before returning an error.
+    Any interrupted sequential write remains private to a uniquely named
+    ``tmp_`` quarantine directory. Nothing is unlinked or renamed through a
+    mutable pathname during failure handling.
     """
 
     if not anchored.exclusive:
@@ -527,11 +614,11 @@ def publish_bundle_atomically(
     if not files or len({name for name, _raw in files}) != len(files):
         raise BybitLiquidationCaptureIOError("bundle_file_set_invalid")
     allowed = frozenset(_safe_leaf(name) for name, _raw in files)
-    staging = f"{final}.staging.{os.getpid()}.{time.time_ns()}"
+    staging = f"tmp_bybit_liquidation_stage_{os.getpid()}_{time.time_ns()}"
     base_fd = anchored.descriptor
     staging_fd: int | None = None
+    staging_identity: os.stat_result | None = None
     created_staging = False
-    renamed = False
     try:
         base_identity = os.fstat(base_fd)
         if not _same_identity(anchored.identity, base_identity):
@@ -546,6 +633,15 @@ def publish_bundle_atomically(
         created_staging = True
         staging_fd = os.open(staging, _directory_flags(), dir_fd=base_fd)
         staging_identity = os.fstat(staging_fd)
+        named_staging = os.stat(
+            staging,
+            dir_fd=base_fd,
+            follow_symlinks=False,
+        )
+        if not stat.S_ISDIR(staging_identity.st_mode) or not _same_identity(
+            staging_identity, named_staging
+        ):
+            raise BybitLiquidationCaptureIOError("staging_identity_drift")
         for name, raw in files:
             _write_leaf(staging_fd, name, raw)
         if bounded_entry_names(staging_fd, maximum=len(allowed)) != allowed:
@@ -560,64 +656,63 @@ def publish_bundle_atomically(
         except FileNotFoundError:
             pass
         else:
-            _cleanup_staging(base_fd, staging, staging_fd, allowed)
+            _retain_staging_quarantine(
+                base_fd,
+                staging,
+                staging_fd,
+                staging_identity,
+                allowed,
+            )
             created_staging = False
             return False
-        # A valid peer's final directory is nonempty, so POSIX rename cannot
-        # replace it; ENOTEMPTY is caught below and this staging tree is cleaned.
-        try:
-            os.rename(staging, final, src_dir_fd=base_fd, dst_dir_fd=base_fd)
-        except OSError as exc:
-            if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY}:
-                raise
-            _cleanup_staging(base_fd, staging, staging_fd, allowed)
+        renamed = _rename_directory_noreplace(base_fd, staging, final)
+        if not renamed:
+            _retain_staging_quarantine(
+                base_fd,
+                staging,
+                staging_fd,
+                staging_identity,
+                allowed,
+            )
             created_staging = False
             return False
-        renamed = True
         created_staging = False
         published = os.stat(final, dir_fd=base_fd, follow_symlinks=False)
         if not stat.S_ISDIR(published.st_mode) or not _same_identity(
             staging_identity, published
         ):
-            quarantine = f".{final}.quarantine.{os.getpid()}.{time.time_ns()}"
-            os.rename(final, quarantine, src_dir_fd=base_fd, dst_dir_fd=base_fd)
-            quarantined = os.stat(
-                quarantine,
-                dir_fd=base_fd,
-                follow_symlinks=False,
-            )
-            if not _same_identity(published, quarantined):
-                raise BybitLiquidationCaptureIOError(
-                    "bundle_publish_quarantine_drift"
-                )
-            renamed = False
-            os.fsync(base_fd)
             raise BybitLiquidationCaptureIOError("bundle_publish_identity_drift")
         base_after = os.stat(base, follow_symlinks=False)
         if not _same_identity(base_identity, base_after):
             raise BybitLiquidationCaptureIOError("artifact_base_identity_drift")
         os.fsync(base_fd)
         return True
-    except BybitLiquidationCaptureIOError:
-        if created_staging and base_fd is not None and staging_fd is not None:
-            _cleanup_staging(base_fd, staging, staging_fd, allowed)
-            created_staging = False
-        raise
-    except OSError as exc:
-        if created_staging and base_fd is not None and staging_fd is not None:
-            _cleanup_staging(base_fd, staging, staging_fd, allowed)
-            created_staging = False
-        raise BybitLiquidationCaptureIOError("atomic_bundle_publication_failed") from exc
-    except Exception as exc:
-        if created_staging and base_fd is not None and staging_fd is not None:
-            _cleanup_staging(base_fd, staging, staging_fd, allowed)
-            created_staging = False
-        raise BybitLiquidationCaptureIOError("atomic_bundle_publication_failed") from exc
+    except BaseException as exc:
+        if (
+            created_staging
+            and staging_fd is not None
+            and staging_identity is not None
+        ):
+            try:
+                _retain_staging_quarantine(
+                    base_fd,
+                    staging,
+                    staging_fd,
+                    staging_identity,
+                    allowed,
+                )
+            except BybitLiquidationCaptureIOError as quarantine_exc:
+                raise quarantine_exc from exc
+        if isinstance(exc, BybitLiquidationCaptureIOError):
+            raise
+        if not isinstance(exc, Exception):
+            raise
+        raise BybitLiquidationCaptureIOError(
+            "atomic_bundle_publication_failed"
+        ) from exc
     finally:
         if staging_fd is not None:
             os.close(staging_fd)
-        if renamed:
-            created_staging = False
 
 
 __all__ = (

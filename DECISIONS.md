@@ -55,11 +55,20 @@ TLS/WebSocket framing, uninterrupted stream continuity, absence of dropped
 messages, or absence of liquidations during silence. Keep every such capture
 campaign-, dashboard-, policy-, direction-, input-quality-, and Protocol-v2-
 detached even when its internal artifact package validates cleanly.
+Publish the final namespace only with native Darwin/Linux atomic no-replace
+semantics and fail closed when that primitive is unavailable. Never clean up a
+failed stage or post-publication identity drift by unlinking, removing, or
+renaming a mutable pathname. Retain the exact unique
+`tmp_bybit_liquidation_stage_*` tree as quarantine, classify it from the root
+without injecting lifecycle files, exclude it from the standard review ZIP,
+and preserve it only in the optional history complement.
 **Why:** Exact application bytes and deterministic normalization are useful
 audit evidence, but an operator-supplied fragment cannot prove the transport or
 continuous bounded observation window needed for empirical liquidation rates.
 Calling it authoritative would turn unknown collection gaps into false market
-evidence.
+evidence. Ordinary directory rename may replace a concurrently created empty
+destination, while check-then-delete cleanup can remove an unowned replacement;
+native no-replace plus non-destructive quarantine closes both mutation paths.
 **Revisit when:** A separately authorized, permitted, project-owned listener can
 seal a genuine bounded window with connection, heartbeat, disconnect, and
 continuity evidence. It must stop on the recorded Bybit restriction and may not
