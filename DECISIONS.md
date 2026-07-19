@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Generated North Star owns evidence-cycle authority truth
+**Status:** accepted
+**Decision:** The Event Alpha North Star generator must own the complete
+`evidence_cycle_operator_authority` value and its Markdown rendering. The
+checked JSON, Markdown, and burn-in artifacts must be exactly reproducible by
+the generator from their recorded generation clock. Do not maintain a manual
+operator-authority section that disappears during the explicit
+`event-alpha-radar-north-star` authoring target.
+**Why:** The checked contract correctly distinguished profile capability from
+current authorization and recorded zero-side-effect readiness, but that value
+had been inserted only into the generated artifacts. Regeneration therefore
+silently removed safety-critical provider-boundary truth while still exiting
+successfully. One generator-owned projection plus an exact checked-artifact
+regression makes drift visible before it can be committed.
+**Revisit when:** A versioned North Star schema replaces this generator. The
+replacement must preserve the same exact generated-artifact reproducibility and
+must not weaken the explicit-authorization, no-fixture-fallback, no-send, or
+zero-call readiness contract.
+
 ## 2026-07-19 - Bind Bybit runtime timeouts and book freshness to finite policy
 **Status:** accepted
 **Decision:** Every guarded Bybit REST collector must reject a timeout unless

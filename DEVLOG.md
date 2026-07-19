@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Generate evidence-cycle operator authority from source · Codex
+**Why:** The checked Event Alpha North Star accurately recorded current
+authorization boundaries and zero-side-effect readiness, but its
+`evidence_cycle_operator_authority` value and Markdown section were not owned by
+the generator. Running the documented authoring target could silently delete
+that safety contract while reporting success.
+**Changes:**
+- Added one source-owned evidence-cycle operator-authority contract covering
+  current explicit authorization, capability-versus-authorization separation,
+  zero provider/network/write/send readiness effects, no live fixture fallback,
+  rejected local provenance, unavailable adapters, LLM opt-ins, request bounds,
+  provider health, and the confirmation-gated writing cycle.
+- `build_north_star()` now copies that closed value and the Markdown formatter
+  renders the operator section from it before the real/no-send market contract.
+- Added focused assertions for every critical safety field and a whole-artifact
+  regression that rebuilds the checked North Star and burn-in JSON/Markdown
+  exactly from each artifact's recorded generation clock.
+- Kept `tests/cli/test_make_targets.py` below its architecture limit by placing
+  the exact checked-artifact regression in a dedicated CLI test module and
+  registering it with the standalone compatibility runner; all 1,423
+  standalone test identities remain unique.
+- Regenerated the checked North Star and burn-in artifacts through the explicit
+  authoring target; semantic content is preserved while generator ownership is
+  now complete.
+**Verify:** Four focused generation, exact-artifact, project-health, and
+inventory tests passed. The explicit `make event-alpha-radar-north-star`
+authoring target completed with zero provider/send/trade/paper/RSI/
+`TRIGGERED_FADE` effects. Python compileall passed; standalone inventory lists
+1,423 unique identities including the new module; final architecture
+cleanliness passed with zero new size violations. The first architecture pass
+correctly caught the monolithic CLI test at 1,518 lines, prompting the dedicated
+test-module split before commit.
+**Notes/risks:** This changes only static contract generation and tests. It does
+not create authorization, call a provider, activate an adapter, alter a route or
+score, send, trade, order, paper trade, write normal RSI rows, or create Event
+Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Record the thirty-sixth Radar market cycle · Codex
 **Why:** The persisted one-hour cadence became eligible and the already-present
 CoinGecko authorization passed the read-only readiness boundary, so the live

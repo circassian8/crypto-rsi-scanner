@@ -509,6 +509,40 @@ HUMAN_LABELING_ROLE = {
         "manual labels do not authorize sends, trades, paper trades, RSI writes, or TRIGGERED_FADE creation",
     ],
 }
+EVIDENCE_CYCLE_OPERATOR_AUTHORITY: dict[str, Any] = {
+    "readiness_target": "event-alpha-evidence-cycle-readiness",
+    "guarded_cycle_target": "event-alpha-evidence-validation-cycle",
+    "profile_capability_is_current_authorization": False,
+    "current_authorization_source": "already-present explicit environment/.env flags only",
+    "readiness_side_effects": {
+        "provider_calls": 0,
+        "network_calls": 0,
+        "writes": 0,
+        "sends": 0,
+    },
+    "live_fixture_fallback": False,
+    "rejected_live_local_inputs": ["fixture", "test", "mock", "replay"],
+    "unavailable_until_real_adapter": ["coinalyze", "sports_fixtures"],
+    "provider_health": "existing persisted event_source backoff/circuit breaker",
+    "llm_requirement": (
+        "optional; relationship, extractor, and catalyst-frame OpenAI stages each need "
+        "matching current explicit authorization plus credential presence; fixture LLM stays offline"
+    ),
+    "request_bound_scope": (
+        "evidence-acquisition planner fan-out only; excludes discovery, market, enrichment, "
+        "and LLM requests"
+    ),
+    "guarded_cycle_requirements": [
+        "bounded readiness pass",
+        "at least one currently eligible genuine source",
+        "unique namespace",
+        "no-send",
+        "CONFIRM=1",
+    ],
+    "absent_authorization_behavior": (
+        "blocked before writes with zero provider calls and an artifact-preview next command"
+    ),
+}
 BURN_IN_CONTRACT = {
     "duration_days": 30,
     "min_live_no_send_cycles": 20,
@@ -582,6 +616,7 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "architecture": deepcopy(ARCHITECTURE_COMPONENTS),
         "source_authority_policy": deepcopy(SOURCE_AUTHORITY_POLICY),
         "llm_catalyst_frame_binding_policy": deepcopy(LLM_CATALYST_FRAME_BINDING_POLICY),
+        "evidence_cycle_operator_authority": deepcopy(EVIDENCE_CYCLE_OPERATOR_AUTHORITY),
         "catalyst_attribution_policy": deepcopy(CATALYST_ATTRIBUTION_POLICY),
         "source_independence_policy": deepcopy(SOURCE_INDEPENDENCE_POLICY),
         "shadow_temporal_surprise_policy": deepcopy(SHADOW_TEMPORAL_SURPRISE_POLICY),
@@ -995,6 +1030,53 @@ def _append_catalyst_attribution_north_star(
     lines.append("")
 
 
+def _append_evidence_cycle_operator_authority(
+    lines: list[str], payload: Mapping[str, Any]
+) -> None:
+    authority = (
+        payload.get("evidence_cycle_operator_authority")
+        if isinstance(payload.get("evidence_cycle_operator_authority"), Mapping)
+        else {}
+    )
+    side_effects = (
+        authority.get("readiness_side_effects")
+        if isinstance(authority.get("readiness_side_effects"), Mapping)
+        else {}
+    )
+    fixture_fallback = authority.get("live_fixture_fallback")
+    fixture_fallback_display = "forbidden" if fixture_fallback is False else fixture_fallback
+    lines.extend(
+        [
+            "## Evidence-Cycle Operator Authority",
+            "",
+            f"- readiness_target: `{authority.get('readiness_target')}`",
+            f"- guarded_cycle_target: `{authority.get('guarded_cycle_target')}`",
+            "- profile_capability_is_current_authorization: "
+            f"`{authority.get('profile_capability_is_current_authorization')}`",
+            f"- current_authorization_source: `{authority.get('current_authorization_source')}`",
+            "- readiness_side_effects: `"
+            f"provider_calls={side_effects.get('provider_calls')}, "
+            f"network_calls={side_effects.get('network_calls')}, "
+            f"writes={side_effects.get('writes')}, sends={side_effects.get('sends')}`",
+            f"- live_fixture_fallback: `{fixture_fallback_display}`",
+            "- rejected_live_local_inputs: `"
+            + ", ".join(str(item) for item in authority.get("rejected_live_local_inputs", []))
+            + "`",
+            "- unavailable_until_real_adapter: `"
+            + ", ".join(str(item) for item in authority.get("unavailable_until_real_adapter", []))
+            + "`",
+            f"- provider_health: `{authority.get('provider_health')}`",
+            f"- LLM_requirement: `{authority.get('llm_requirement')}`",
+            f"- request_bound_scope: `{authority.get('request_bound_scope')}`",
+            "- guarded_cycle_requirements: `"
+            + ", ".join(str(item) for item in authority.get("guarded_cycle_requirements", []))
+            + "`",
+            f"- absent_authorization_behavior: `{authority.get('absent_authorization_behavior')}`",
+            "",
+        ]
+    )
+
+
 def format_north_star(payload: Mapping[str, Any]) -> str:
     lines = [
         "# Event Alpha Radar North Star — Catalyst Radar",
@@ -1048,10 +1130,10 @@ def format_north_star(payload: Mapping[str, Any]) -> str:
             "- Cards lead with Crypto Decision Radar and retain Catalyst Radar Classification as a secondary strict-catalyst section.",
             "- Dashboard is primary; notifications route attention; every surface remains research-only and human-decision-required.",
             "",
-            "## Guarded Real/No-Send Market Generation",
-            "",
         ]
     )
+    _append_evidence_cycle_operator_authority(lines, payload)
+    lines.extend(["## Guarded Real/No-Send Market Generation", ""])
     market_generation = payload.get("market_no_send_generation") if isinstance(payload.get("market_no_send_generation"), Mapping) else {}
     for key, value in market_generation.items():
         if isinstance(value, Mapping):

@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-15T12:19:39.566648+00:00`
+- generated_at: `2026-07-19T20:50:24.201459+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -373,7 +373,7 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - rejected_live_local_inputs: `fixture, test, mock, replay`
 - unavailable_until_real_adapter: `coinalyze, sports_fixtures`
 - provider_health: `existing persisted event_source backoff/circuit breaker`
-- LLM_requirement: `optional; relationship, extractor, and catalyst-frame OpenAI stages each need their matching current explicit authorization plus credential presence; fixture LLM stays offline`
+- LLM_requirement: `optional; relationship, extractor, and catalyst-frame OpenAI stages each need matching current explicit authorization plus credential presence; fixture LLM stays offline`
 - request_bound_scope: `evidence-acquisition planner fan-out only; excludes discovery, market, enrichment, and LLM requests`
 - guarded_cycle_requirements: `bounded readiness pass, at least one currently eligible genuine source, unique namespace, no-send, CONFIRM=1`
 - absent_authorization_behavior: `blocked before writes with zero provider calls and an artifact-preview next command`

@@ -1513,6 +1513,11 @@ work.
   authoring paths; daily burn-in uses `--check-burn-in-contract`. Test real
   subprocess behavior against temporary/fake repository roots and assert
   tracked or sentinel bytes remain unchanged.
+  The North Star generator owns the complete
+  `evidence_cycle_operator_authority` JSON projection and matching Markdown
+  section. Checked North Star and burn-in artifacts must reproduce exactly from
+  their recorded generation clock; never hand-insert an operator contract that
+  the generator would erase on its next explicit authoring run.
 - Storage: additive `ALTER` in `_migrate`; bump a `meta` flag for one-time data
   migrations so they run exactly once.
 - External calls **fail soft** (log + degrade; never crash the scan).

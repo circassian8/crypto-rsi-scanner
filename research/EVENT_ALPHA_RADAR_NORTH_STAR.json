@@ -401,7 +401,41 @@
       "percent_points_10_0_normalized_percent": 10.0
     }
   },
-  "generated_at": "2026-07-15T12:19:39.566648+00:00",
+  "evidence_cycle_operator_authority": {
+    "absent_authorization_behavior": "blocked before writes with zero provider calls and an artifact-preview next command",
+    "current_authorization_source": "already-present explicit environment/.env flags only",
+    "guarded_cycle_requirements": [
+      "bounded readiness pass",
+      "at least one currently eligible genuine source",
+      "unique namespace",
+      "no-send",
+      "CONFIRM=1"
+    ],
+    "guarded_cycle_target": "event-alpha-evidence-validation-cycle",
+    "live_fixture_fallback": false,
+    "llm_requirement": "optional; relationship, extractor, and catalyst-frame OpenAI stages each need matching current explicit authorization plus credential presence; fixture LLM stays offline",
+    "profile_capability_is_current_authorization": false,
+    "provider_health": "existing persisted event_source backoff/circuit breaker",
+    "readiness_side_effects": {
+      "network_calls": 0,
+      "provider_calls": 0,
+      "sends": 0,
+      "writes": 0
+    },
+    "readiness_target": "event-alpha-evidence-cycle-readiness",
+    "rejected_live_local_inputs": [
+      "fixture",
+      "test",
+      "mock",
+      "replay"
+    ],
+    "request_bound_scope": "evidence-acquisition planner fan-out only; excludes discovery, market, enrichment, and LLM requests",
+    "unavailable_until_real_adapter": [
+      "coinalyze",
+      "sports_fixtures"
+    ]
+  },
+  "generated_at": "2026-07-19T20:50:24.201459+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -459,50 +493,16 @@
     "short_ticker_identity": "token_boundary_plus_crypto_context_or_dollar_ticker_required",
     "validation_integrity": "canonical_validation_payload_sha256_required"
   },
-  "evidence_cycle_operator_authority": {
-    "absent_authorization_behavior": "blocked before writes with zero provider calls and an artifact-preview next command",
-    "current_authorization_source": "already-present explicit environment/.env flags only",
-    "guarded_cycle_requirements": [
-      "bounded readiness pass",
-      "at least one currently eligible genuine source",
-      "unique namespace",
-      "no-send",
-      "CONFIRM=1"
-    ],
-    "guarded_cycle_target": "event-alpha-evidence-validation-cycle",
-    "live_fixture_fallback": false,
-    "llm_requirement": "optional; relationship, extractor, and catalyst-frame OpenAI stages each need matching current explicit authorization plus credential presence; fixture LLM stays offline",
-    "profile_capability_is_current_authorization": false,
-    "provider_health": "existing persisted event_source backoff/circuit breaker",
-    "readiness_side_effects": {
-      "network_calls": 0,
-      "provider_calls": 0,
-      "sends": 0,
-      "writes": 0
-    },
-    "readiness_target": "event-alpha-evidence-cycle-readiness",
-    "request_bound_scope": "evidence-acquisition planner fan-out only; excludes discovery, market, enrichment, and LLM requests",
-    "rejected_live_local_inputs": [
-      "fixture",
-      "test",
-      "mock",
-      "replay"
-    ],
-    "unavailable_until_real_adapter": [
-      "coinalyze",
-      "sports_fixtures"
-    ]
-  },
   "market_no_send_generation": {
-    "compatibility_alias": {
-      "radar-market-no-send": "radar-daily-ops-cycle"
-    },
     "authorization": {
       "absent_behavior": "safe blocked result, no provider call, bounded local no-send attempt/audit/campaign-report evidence, pointer unchanged",
       "created_or_modified_by_application": false,
       "eligible_invocation_live_request_max": 1,
       "existing_explicit_environment_flag": "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1",
       "inferred_from_cache": false
+    },
+    "compatibility_alias": {
+      "radar-market-no-send": "radar-daily-ops-cycle"
     },
     "dashboard_pointer_policy": {
       "current_authoritative_namespace_is_immutable": true,
@@ -542,6 +542,7 @@
       "no_triggered_fade": true,
       "research_only": true
     },
+    "direct_low_level_publication": "disabled",
     "exact_attempt_policy": {
       "blocked_attempt_may_reuse_older_complete_manifest": false,
       "bounded_attempt_ledger": "event_market_no_send_attempts.jsonl",
@@ -578,6 +579,7 @@
       "historical_market_provenance_adapter": "read_only_no_rewrite",
       "name": "decision_radar_live_observation_campaign_v2"
     },
+    "operator_cycle_target": "radar-daily-ops-cycle",
     "outcome_policy": {
       "automatic_threshold_or_route_changes": false,
       "campaign_outcome_ledger": "radar_market_history_cache/event_decision_radar_campaign_outcomes.jsonl",
@@ -642,6 +644,7 @@
       "validation_errors"
     ],
     "provider": "coingecko",
+    "publication_owner": "decision_radar_daily_operations_v1_1",
     "request_telemetry": {
       "allowed_fields": [
         "endpoint_path",
@@ -666,9 +669,6 @@
       ],
       "provider_health_must_reconcile": true
     },
-    "direct_low_level_publication": "disabled",
-    "operator_cycle_target": "radar-daily-ops-cycle",
-    "publication_owner": "decision_radar_daily_operations_v1_1",
     "run_mode": "operational",
     "targets": [
       "radar-market-no-send-readiness",

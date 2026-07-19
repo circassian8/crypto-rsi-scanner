@@ -606,6 +606,7 @@ def test_architecture_baseline_json_contains_file_counts_and_inventory():
     assert "tests/rsi/test_paper_risk.py" in payload["tests_package_files"]
     assert "tests/cli/test_parser.py" in payload["tests_package_files"]
     assert "tests/cli/test_make_targets.py" in payload["tests_package_files"]
+    assert "tests/cli/test_radar_north_star_generation.py" in payload["tests_package_files"]
     assert ".github/workflows/verify.yml" in payload["github_actions_workflows"]
     assert "event-alpha-integrated-radar-smoke" in payload["makefile_event_targets"]
     assert payload["namespace_inventory"]["base_dir"] == "event_fade_cache"
@@ -908,6 +909,25 @@ def test_event_alpha_radar_north_star_generation_writes_contract():
     assert market_generation["outcome_policy"]["pending_placeholder_per_canonical_decision_candidate"] is True
     assert payload["decision_model_v2"]["market_data_quality_caps"]["proxy_only_can_be_actionable_or_rapid"] is False
     assert payload["decision_model_v2"]["market_data_quality_caps"]["missing_or_stale_spread_urgency_max"] == 55
+    evidence_cycle_authority = payload["evidence_cycle_operator_authority"]
+    assert evidence_cycle_authority["readiness_target"] == "event-alpha-evidence-cycle-readiness"
+    assert evidence_cycle_authority["guarded_cycle_target"] == "event-alpha-evidence-validation-cycle"
+    assert evidence_cycle_authority["profile_capability_is_current_authorization"] is False
+    assert evidence_cycle_authority["readiness_side_effects"] == {
+        "provider_calls": 0,
+        "network_calls": 0,
+        "writes": 0,
+        "sends": 0,
+    }
+    assert evidence_cycle_authority["live_fixture_fallback"] is False
+    assert evidence_cycle_authority["rejected_live_local_inputs"] == [
+        "fixture",
+        "test",
+        "mock",
+        "replay",
+    ]
+    assert "CONFIRM=1" in evidence_cycle_authority["guarded_cycle_requirements"]
+    assert "zero provider calls" in evidence_cycle_authority["absent_authorization_behavior"]
     assert payload["source_activation_order"] == list(radar_north_star.SOURCE_ACTIVATION_ORDER)
     assert payload["telegram_sends"] == 0
     assert payload["trades_created"] == 0
@@ -920,6 +940,10 @@ def test_event_alpha_radar_north_star_generation_writes_contract():
     assert "crypto_radar_market_provenance_v2" in markdown
     assert "event_market_history.jsonl" in markdown
     assert "market_data_quality_caps" in markdown
+    assert "## Evidence-Cycle Operator Authority" in markdown
+    assert "- profile_capability_is_current_authorization: `False`" in markdown
+    assert "- readiness_side_effects: `provider_calls=0, network_calls=0, writes=0, sends=0`" in markdown
+    assert "- live_fixture_fallback: `forbidden`" in markdown
 
 
 def test_event_alpha_radar_north_star_project_health_status_and_blocker(tmp_path):

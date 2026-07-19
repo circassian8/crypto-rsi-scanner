@@ -2,16 +2,16 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T20:30:24.623915+00:00`
+- generated_at: `2026-07-19T20:53:29.502907+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
-- v3_gate_status: `accepted_with_documented_exceptions`
+- v3_gate_status: `pending`
 - v3_auto_accept_ready: `False`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `25`
+- production_files_over_1200_lines: `26`
 - accepted_production_files_over_1200_lines: `25`
-- unresolved_production_files_over_1200_lines: `0`
+- unresolved_production_files_over_1200_lines: `1`
 - production_size_gate_status: `warning`
 - production_files_over_1500_lines: `0`
 - production_files_over_2000_lines: `0`
@@ -70,7 +70,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 25 | accepted_exception |
+| `production_files_over_1200_lines` | 26 | target_gap |
 | `production_files_over_1500_lines` | 0 | blocker |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | accepted_exception |
@@ -112,6 +112,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1276 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
+| `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
@@ -128,7 +129,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py` | 1194 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py` | 1194 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1193 |
-| `crypto_rsi_scanner/project_health/radar_north_star.py` | 1193 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1192 |
 | `crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py` | 1188 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model_surfaces.py` | 1187 |
@@ -167,7 +167,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| none | 0 |
+| `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
 
 ## Largest Test Files
 
@@ -177,10 +177,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_operator_state.py` | 1499 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1497 |
 | `tests/event_alpha/test_decision_model_v2.py` | 1490 |
+| `tests/cli/test_make_targets.py` | 1489 |
 | `tests/event_alpha/test_radar_dashboard.py` | 1485 |
 | `tests/event_alpha/test_market_surfaces.py` | 1483 |
 | `tests/event_alpha/test_artifact_schema.py` | 1479 |
-| `tests/cli/test_make_targets.py` | 1465 |
 | `tests/event_alpha/test_operator_workflows.py` | 1464 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
 | `tests/event_alpha/test_market_observation_campaign.py` | 1450 |
@@ -208,7 +208,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_quality_feedback.py` | 1040 |
 | `tests/event_alpha/test_outcome_price_recovery_application.py` | 1038 |
 | `tests/event_alpha/test_empirical_research_reports.py` | 1031 |
-| `tests/test_indicators.py` | 1029 |
+| `tests/test_indicators.py` | 1030 |
 | `tests/event_alpha/test_market_history.py` | 1001 |
 | `tests/event_alpha/test_official_macro_calendar_acquisition.py` | 999 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 996 |

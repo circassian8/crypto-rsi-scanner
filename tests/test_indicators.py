@@ -867,6 +867,7 @@ _CLI_TEST_MODULES = (
     "tests.cli.test_make_targets",
     "tests.cli.test_observed_outcome_cli",
     "tests.cli.test_parser",
+    "tests.cli.test_radar_north_star_generation",
 )
 
 
