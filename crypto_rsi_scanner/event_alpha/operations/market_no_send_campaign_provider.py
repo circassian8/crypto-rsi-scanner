@@ -199,14 +199,11 @@ def _sanitized_telemetry(
 ) -> dict[str, Any]:
     started = _aware_time(value.get("request_started_at")) or attempted_at
     ended = _aware_time(value.get("request_ended_at")) or attempted_at
-    return {
+    projected = {
+        **dict(value),
         "endpoint_path": "/coins/markets",
         "request_started_at": _utc(started).isoformat(),
         "request_ended_at": _utc(ended).isoformat(),
-        "duration_ms": _nonnegative_int(value.get("duration_ms")),
-        "http_status": _http_status(value.get("http_status")),
-        "result_count": _nonnegative_int(value.get("result_count")),
-        "retry_count": _nonnegative_int(value.get("retry_count")),
         "error_class": error_class,
         "cache_behavior": (
             value.get("cache_behavior")
@@ -214,21 +211,12 @@ def _sanitized_telemetry(
             else "network"
         ),
     }
-
-
-def _nonnegative_int(value: object) -> int:
-    try:
-        return max(0, int(value or 0))
-    except (TypeError, ValueError):
-        return 0
-
-
-def _http_status(value: object) -> int | None:
-    try:
-        status = int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-    return status if status is not None and 100 <= status <= 599 else None
+    return market_no_send_provider.safe_request_telemetry(
+        projected,
+        fallback_result_count=0,
+        succeeded=False,
+        fallback_error_class=error_class,
+    )
 
 
 def _blocked(reason: str, *, disabled_until: str | None = None) -> dict[str, Any]:

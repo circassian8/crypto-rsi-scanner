@@ -286,7 +286,12 @@ def _request_telemetry(
     values.setdefault("retry_count", 0)
     values["error_class"] = error_class
     values.setdefault("cache_behavior", "network")
-    return values
+    return safe_request_telemetry(
+        values,
+        fallback_result_count=result_count,
+        succeeded=error_class is None,
+        fallback_error_class=error_class,
+    )
 
 
 def safe_request_telemetry(

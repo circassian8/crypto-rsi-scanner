@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Harden shared provider failure telemetry · Codex
+**Why:** The campaign writes provider health and a cross-namespace failure
+receipt before the final request ledger. Those earlier layers still used
+permissive integer conversion, so malformed duration/status/retry evidence could
+raise or enter health state even though final ledger serialization was strict.
+**Changes:**
+- Reused the bounded strict-JSON telemetry projector in the provider telemetry
+  constructor before success/failure health is persisted.
+- Reused the same projector for the shared latest-failure receipt while
+  retaining its local attempted-time fallback, exact error class, cache
+  allowlist, secret-key stripping, and zero-result semantics.
+- Removed the duplicate permissive count/status converters from the shared
+  campaign-provider module.
+- Added regressions for NaN/infinity, booleans, zero results, invalid cache
+  labels, forbidden request keys, local clock fallback, and strict JSON at both
+  the provider-health and shared-receipt boundaries.
+**Verify:** All 64 numeric, market/no-send, campaign-guard, and attempt tests
+passed, followed by all 98 Daily Operations, publication, service,
+current-status, dashboard-operation, and campaign-attempt tests. Compileall and
+architecture cleanliness passed with zero new violations. The offline
+market/no-send smoke completed with a strict doctor at zero blockers/warnings.
+Full `verify-fast` was not repeated because the shared source-boundary gate
+earlier in this prompt passed all 3,092 tests and this provider-state follow-up
+is covered by the focused campaign, Daily Operations, architecture, smoke, and
+doctor gates.
+**Notes/risks:** Valid finite telemetry is unchanged. A malformed provider field
+now becomes zero/unavailable before any health artifact is written; the failed
+attempt remains recorded and cannot become authority. No provider call,
+threshold, score, route, send, trade, order, paper trade, normal RSI write, or
+Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Preserve exact terminal request telemetry · Codex
 **Why:** Final market request-ledger serialization still used truthiness and
 permissive integer conversion. An explicit zero result count could become the

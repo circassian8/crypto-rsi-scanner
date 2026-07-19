@@ -354,6 +354,60 @@ def test_request_telemetry_uses_fallback_only_for_missing_or_blank_counts():
     assert unavailable["http_status"] is None
 
 
+def test_shared_failure_telemetry_reuses_strict_numeric_projection():
+    from crypto_rsi_scanner.event_alpha.operations import (
+        market_no_send_campaign_provider,
+    )
+
+    attempted_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    telemetry = market_no_send_campaign_provider._sanitized_telemetry(
+        {
+            "duration_ms": float("inf"),
+            "http_status": float("nan"),
+            "result_count": 0,
+            "retry_count": True,
+            "cache_behavior": "credential_cache",
+            "headers": {"authorization": "must-not-survive"},
+        },
+        attempted_at=attempted_at,
+        error_class="TimeoutError",
+    )
+
+    assert telemetry["duration_ms"] == 0
+    assert telemetry["http_status"] is None
+    assert telemetry["result_count"] == 0
+    assert telemetry["retry_count"] == 0
+    assert telemetry["cache_behavior"] == "network"
+    assert telemetry["request_started_at"] == attempted_at.isoformat()
+    assert telemetry["request_ended_at"] == attempted_at.isoformat()
+    assert "headers" not in telemetry
+    json.dumps(telemetry, allow_nan=False)
+
+
+def test_provider_health_telemetry_is_strict_before_it_is_persisted():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_provider
+
+    started_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    telemetry = market_no_send_provider._request_telemetry(
+        {
+            "duration_ms": float("inf"),
+            "http_status": float("nan"),
+            "retry_count": True,
+        },
+        started_at=started_at,
+        started_monotonic=0,
+        result_count=0,
+        error_class="TimeoutError",
+    )
+
+    assert telemetry["duration_ms"] == 0
+    assert telemetry["http_status"] is None
+    assert telemetry["result_count"] == 0
+    assert telemetry["retry_count"] == 0
+    assert telemetry["error_class"] == "TimeoutError"
+    json.dumps(telemetry, allow_nan=False)
+
+
 def test_validation_prices_reject_nonfinite_and_shadowed_invalid_values():
     import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 
