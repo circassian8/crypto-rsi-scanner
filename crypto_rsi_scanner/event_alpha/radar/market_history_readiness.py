@@ -216,12 +216,21 @@ def _history_feature_groups(
             required=market_history._required_coverage(cfg, horizon_hours=0),
         )
     for hours in sorted(cfg.return_horizons_hours):
-        values = market_history._historical_returns(observations, hours=hours, cfg=cfg)
-        details = _feature_details(
+        samples = market_history._historical_return_samples(
             observations,
+            hours=hours,
+            cfg=cfg,
+        )
+        evidence_rows = [
+            row
+            for sample in samples
+            for row in sample.evidence_rows
+        ]
+        details = _feature_details(
+            evidence_rows,
             cfg=cfg,
             required=market_history._required_coverage(cfg, horizon_hours=hours),
-            sample_count=len(values),
+            sample_count=len(samples),
         )
         for feature in (
             f"return_zscore_{hours}h",
@@ -246,17 +255,22 @@ def _history_feature_groups(
                     "required_coverage_seconds": 0,
                 }
                 continue
-            values = market_history._historical_relative_returns(
+            samples = market_history._historical_relative_return_samples(
                 observations,
                 benchmark,
                 hours=hours,
                 cfg=cfg,
             )
+            evidence_rows = [
+                row
+                for sample in samples
+                for row in sample.evidence_rows
+            ]
             warmup[feature] = _feature_details(
-                observations,
+                evidence_rows,
                 cfg=cfg,
                 required=market_history._required_coverage(cfg, horizon_hours=hours),
-                sample_count=len(values),
+                sample_count=len(samples),
             )
     return market_history._group_feature_readiness(warmup, cfg=cfg)
 

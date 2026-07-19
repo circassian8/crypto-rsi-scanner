@@ -531,6 +531,61 @@ def test_temporal_evidence_identity_failures_are_closed():
         ])
 
 
+def test_readiness_coverage_uses_exact_return_and_benchmark_inputs():
+    history = [
+        _row(
+            "move-token",
+            NOW - timedelta(hours=10),
+            price=None,
+            volume=900,
+        ),
+        _row(
+            "move-token",
+            NOW - timedelta(hours=5),
+            price=100,
+            volume=1_000,
+        ),
+        _row(
+            "move-token",
+            NOW - timedelta(hours=1),
+            price=110,
+            volume=1_100,
+        ),
+        _row(
+            "bitcoin",
+            NOW - timedelta(hours=5),
+            price=200,
+            volume=5_000,
+            symbol="BTC",
+        ),
+        _row(
+            "bitcoin",
+            NOW - timedelta(hours=1),
+            price=210,
+            volume=5_100,
+            symbol="BTC",
+        ),
+    ]
+
+    readiness = market_history_readiness.assess_market_history_readiness(
+        history,
+        now=NOW,
+        config=_config(
+            min_baseline_observations=3,
+            return_horizons_hours=(4,),
+            eth_asset_ids=("bitcoin",),
+        ),
+    )
+
+    move_groups = readiness["baseline_asset_readiness"]["move-token"][
+        "feature_readiness"
+    ]
+    assert move_groups["returns_4h"]["sample_count"] == 1
+    assert move_groups["returns_4h"]["coverage_seconds"] == 4 * 3_600
+    assert move_groups["btc_eth_relative"]["sample_count"] == 1
+    assert move_groups["btc_eth_relative"]["coverage_seconds"] == 4 * 3_600
+
+
 def test_warmup_is_explicit_and_does_not_replace_proxy_before_ready():
     history = [
         _row("move-token", NOW - timedelta(hours=2), price=100, volume=1_000),
@@ -834,8 +889,8 @@ def test_readiness_rejects_rapid_count_warmth_and_reports_every_feature_group():
     assert returns_4h["maximum_sample_count"] == 0
     assert returns_4h["required_sample_count"] == 8
     assert returns_4h["sample_count_deficit_asset_count"] == 1
-    assert returns_4h["minimum_coverage_seconds"] == 3_600
-    assert returns_4h["maximum_coverage_seconds"] == 3_600
+    assert returns_4h["minimum_coverage_seconds"] == 0
+    assert returns_4h["maximum_coverage_seconds"] == 0
     assert returns_4h["required_coverage_seconds"] == 39_600
     assert returns_4h["coverage_deficit_asset_count"] == 1
     assert readiness["baseline_asset_readiness"]["move-token"]["status"] == "warming"

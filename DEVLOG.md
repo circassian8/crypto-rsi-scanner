@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Reconcile readiness with exact temporal inputs · Codex
+**Why:** Feature enrichment measured return-family coverage from exact usable
+endpoints and anchors, while the separate readiness report still measured the
+entire retained asset span. Unusable price rows or missing benchmark pairs could
+therefore make readiness claim more temporal coverage than the statistic had.
+**Changes:**
+- Made direct-return and volatility readiness derive coverage from the exact
+  historical endpoint/anchor samples used by enrichment.
+- Made BTC/ETH-relative readiness derive coverage from the exact asset and
+  benchmark endpoint/anchor samples.
+- Defined zero derived samples as zero usable coverage instead of displaying
+  unrelated raw cache span.
+- Added a regression with a distant price-missing row proving it cannot inflate
+  either direct-return or benchmark-relative readiness.
+**Verify:** All 70 market-history, cache, campaign, and no-send tests and all 118
+dashboard/campaign surface tests passed; compileall, diff checks, and
+architecture cleanliness passed with zero new violations. The no-send smoke
+completed with a strict-clean doctor. A real read-only Daily Operations
+readiness refresh made no provider call, preserved current maturity (4h warm
+29/30), and kept the next safe boundary at 2026-07-19 06:49:56.372340 UTC.
+Full `verify-fast` was not repeated because the immediately preceding shared-
+core commit passed all 3,088 tests and this consistency follow-up is covered by
+the focused readiness, campaign, surface, smoke, and architecture gates.
+**Notes/risks:** Complete usable history is unchanged. Sparse history may show
+less coverage or stay cold/warming, which is the intended fail-closed truth. No
+threshold, score, route policy, provider authorization, provider call, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+behavior changed.
+
 ## 2026-07-19 — Bind temporal features to exact observation inputs · Codex
 **Why:** Temporal feature values were calculated from filtered scalar rows or
 specific horizon endpoints and anchors, but their evidence metadata named only
