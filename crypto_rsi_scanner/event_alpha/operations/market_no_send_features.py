@@ -330,8 +330,14 @@ def _normalization_audit(
         "provider": provider,
         "data_mode": data_mode,
         "observed_at": observed_at.isoformat(),
-        "direct_feature_count": sum(int(row.get("direct_market_feature_count") or 0) for row in rows),
-        "proxy_feature_count": sum(int(row.get("proxy_market_feature_count") or 0) for row in rows),
+        "direct_feature_count": sum(
+            _first_nonnegative_count((row, "direct_market_feature_count"))
+            for row in rows
+        ),
+        "proxy_feature_count": sum(
+            _first_nonnegative_count((row, "proxy_market_feature_count"))
+            for row in rows
+        ),
         "spread_available_count": sum(1 for row in rows if row.get("spread_bps") is not None),
         "candidate_source_mode": source_mode,
         "measurement_program": DECISION_RADAR_MEASUREMENT_PROGRAM,
@@ -375,17 +381,15 @@ def market_quality_counts_from_rows(
         if row_unit_warnings:
             unit_warning_rows += 1
             unit_warnings.update(row_unit_warnings)
-        direct += int(
-            quality.get("direct_feature_count")
-            or snapshot.get("direct_market_feature_count")
-            or row.get("direct_market_feature_count")
-            or 0
+        direct += _first_nonnegative_count(
+            (quality, "direct_feature_count"),
+            (snapshot, "direct_market_feature_count"),
+            (row, "direct_market_feature_count"),
         )
-        proxy += int(
-            quality.get("proxy_feature_count")
-            or snapshot.get("proxy_market_feature_count")
-            or row.get("proxy_market_feature_count")
-            or 0
+        proxy += _first_nonnegative_count(
+            (quality, "proxy_feature_count"),
+            (snapshot, "proxy_market_feature_count"),
+            (row, "proxy_market_feature_count"),
         )
         status = str(quality.get("baseline_status") or "not_evaluated")
         statuses[status] += 1
@@ -531,8 +535,14 @@ def generation_data_quality(
         "baseline_status_counts": dict(sorted(statuses.items())),
         "baseline_warm_assets": statuses.get("warm", 0),
         "baseline_warming_assets": statuses.get("warming", 0) + statuses.get("cold", 0),
-        "direct_feature_count": sum(int(row.get("direct_market_feature_count") or 0) for row in materialized),
-        "proxy_feature_count": sum(int(row.get("proxy_market_feature_count") or 0) for row in materialized),
+        "direct_feature_count": sum(
+            _first_nonnegative_count((row, "direct_market_feature_count"))
+            for row in materialized
+        ),
+        "proxy_feature_count": sum(
+            _first_nonnegative_count((row, "proxy_market_feature_count"))
+            for row in materialized
+        ),
         "spread_available_count": sum(1 for row in materialized if row.get("spread_bps") is not None),
         "history_schema_version": history_summary.get("schema_version"),
         "history_artifact": history_filename,
@@ -548,6 +558,24 @@ def finite_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _first_nonnegative_count(
+    *sources: tuple[Mapping[str, Any], str],
+) -> int:
+    """Return the first supplied count without letting invalid evidence fall through."""
+
+    for source, field in sources:
+        if field not in source:
+            continue
+        value = source.get(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        parsed = finite_float(value)
+        if parsed is None or parsed < 0 or not parsed.is_integer():
+            return 0
+        return int(parsed)
+    return 0
 
 
 def _any_finite(row: Mapping[str, Any], *fields: str) -> bool:

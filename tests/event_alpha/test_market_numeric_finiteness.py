@@ -239,6 +239,74 @@ def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():
     assert market_no_send_features.finite_float(True) is None
 
 
+def test_market_quality_counts_preserve_zero_and_close_invalid_counts():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+
+    rows = [
+        {
+            "market_state_snapshot": {
+                "market_data_quality": {
+                    "direct_feature_count": 0,
+                    "proxy_feature_count": 0,
+                },
+                "direct_market_feature_count": 7,
+                "proxy_market_feature_count": 8,
+            },
+            "direct_market_feature_count": 9,
+            "proxy_market_feature_count": 10,
+        },
+        {
+            "market_state_snapshot": {
+                "market_data_quality": {
+                    "direct_feature_count": float("inf"),
+                    "proxy_feature_count": True,
+                },
+                "direct_market_feature_count": 11,
+                "proxy_market_feature_count": 12,
+            },
+            "direct_market_feature_count": 13,
+            "proxy_market_feature_count": 14,
+        },
+        {
+            "market_state_snapshot": {
+                "market_data_quality": {
+                    "direct_feature_count": -1,
+                    "proxy_feature_count": 1.5,
+                },
+                "direct_market_feature_count": 15,
+                "proxy_market_feature_count": 16,
+            },
+        },
+    ]
+
+    counts = market_no_send_features.market_quality_counts_from_rows(rows)
+
+    assert counts["direct_feature_count"] == 0
+    assert counts["proxy_feature_count"] == 0
+
+
+def test_market_quality_counts_fall_back_only_when_canonical_count_is_blank():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+
+    counts = market_no_send_features.market_quality_counts_from_rows([
+        {
+            "market_state_snapshot": {
+                "market_data_quality": {
+                    "direct_feature_count": None,
+                    "proxy_feature_count": " ",
+                },
+                "direct_market_feature_count": "4",
+                "proxy_market_feature_count": 2.0,
+            },
+            "direct_market_feature_count": 9,
+            "proxy_market_feature_count": 10,
+        },
+    ])
+
+    assert counts["direct_feature_count"] == 4
+    assert counts["proxy_feature_count"] == 2
+
+
 def test_integrated_liquidity_checks_preserve_zero_and_reject_invalid_values():
     from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts import merge_policy
 

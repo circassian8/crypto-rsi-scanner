@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve canonical market-quality counts · Codex
+**Why:** Campaign, doctor, and dashboard quality aggregation still selected
+direct/proxy feature counts by truthiness. An explicit canonical zero could be
+replaced by a conflicting legacy count, while boolean, non-finite, negative, or
+fractional values could be truncated, raise, or expose a lower-priority value.
+**Changes:**
+- Added presence-ordered non-negative integer count resolution for candidate
+  quality aggregation, normalization audits, and generation quality summaries.
+- Preserved explicit zero as authoritative, allowed fallback only for a truly
+  absent/blank field, and made malformed supplied counts close to zero without
+  exposing legacy aliases.
+- Added regressions for canonical zero, non-finite, boolean, negative,
+  fractional, blank, numeric-string, and integral-float inputs.
+**Verify:** All 91 focused and adjacent market/no-send, snapshot-unit,
+observation-campaign, dashboard-truth, doctor-quality, and doctor-reconciliation
+tests passed. Compileall and architecture cleanliness passed with zero new
+violations. Both the market/no-send and integrated-radar offline smokes
+completed with strict doctors at zero blockers/warnings and rendered their
+fixture dashboard surfaces. Full `verify-fast` was not repeated because the
+shared source-boundary gate earlier in this prompt passed all 3,092 tests and
+this narrow aggregation follow-up is covered by the focused campaign,
+dashboard, doctor, architecture, and smoke gates.
+**Notes/risks:** Valid non-negative integral counts retain their existing
+values. Historical artifacts are not rewritten. No threshold, score, route,
+provider authorization/call, send, trade, order, paper trade, normal RSI write,
+or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Preserve canonical outcome arithmetic inputs · Codex
 **Why:** Playbook outcome metrics still selected returns, excursions, benchmark
 returns, entry prices, and OHLC fallbacks by truthiness. Explicit zero evidence
