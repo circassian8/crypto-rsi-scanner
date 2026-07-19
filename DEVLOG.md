@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Retain the cadence-eligible CoinGecko DNS failure · Codex
+**Why:** The next regular no-send observation became eligible after the KuCoin
+contract commit. The attempt had to cross the provider boundary once and then
+preserve terminal truth without risking an immediate retry or authority drift.
+**Changes:**
+- Rechecked readiness at the exact persisted boundary: authorization was
+  already present, cadence was eligible, and the contract allowed at most one
+  bounded CoinGecko request.
+- Ran one confirmed Daily Operations cycle. The sandbox failed DNS resolution
+  before an HTTP response, so the cycle terminated `provider_request_failed`
+  in namespace
+  `radar_market_no_send_20260719t014535150908z_a6733972aeef`.
+- Preserved the failed attempt and terminal journal row, advanced provider
+  failures from four to five, and refreshed the canonical campaign report.
+  Successful cycles remain 25; retained/baseline-counted/too-close observations
+  remain 750/720/30 and current ideas remain zero.
+- Re-read readiness before considering escalation. The stable reservation had
+  advanced to 2026-07-19T02:45:35.634625Z, so no second call was attempted and
+  no backoff/cadence guard was bypassed.
+- Kept the exact revision-12 pointer on
+  `radar_market_no_send_20260719t004508073690z_91fdf90a69c9`; no publication,
+  restart, invalidation, or rollback occurred.
+**Verify:** Daily Operations readiness/status reconciled the failed terminal
+state and next boundary. The campaign report rebuilt locally with 25 successful
+cycles and five provider failures. Dashboard readiness remained exact and
+green for the prior authority with revision 12 and zero writes.
+**Notes/risks:** The failure class is `ClientConnectorDNSError` from the local
+sandbox, not an HTTP/provider response. The next eligible attempt should be
+run outside the restricted network sandbox after the persisted boundary; do
+not reinterpret this failed attempt as a market observation. No sends, trades,
+orders, paper trades, normal RSI writes, or Event Alpha `TRIGGERED_FADE` were
+created.
+
 ## 2026-07-19 — Close the KuCoin announcement contract offline · Codex
 **Why:** KuCoin was selected as the next documented first-party catalyst API,
 but its exact response semantics needed to be proven before any live transport,
