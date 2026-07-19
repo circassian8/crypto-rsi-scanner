@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Make relative-return benchmark alignment causal
+**Status:** accepted
+**Decision:** Align BTC/ETH benchmark observations only from timestamps at or
+before the asset observation. Treat the configured alignment tolerance as a
+backward lookback, choose the latest eligible row deterministically, and report
+missing current context when no causal benchmark row exists. Never use a later
+benchmark observation merely because it is closer in wall-clock time.
+**Why:** A symmetric nearest-time join can incorporate a benchmark price that
+was not yet observable at the asset timestamp. Even a five-minute leak makes
+relative-return features invalid point-in-time evidence and can contaminate
+future Protocol-v2 partitions.
+**Revisit when:** A versioned data source provides a formally synchronized
+atomic cross-asset snapshot with one shared provider clock. Such a source may
+prove equality, but it still does not justify forward-time matching.
+
 ## 2026-07-19 - Keep current KuCoin UTA capture closed before live transport
 **Status:** accepted
 **Decision:** Treat the current UTA response contract and its immutable fixture

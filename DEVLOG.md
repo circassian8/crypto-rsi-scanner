@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Make benchmark alignment causal · Codex
+**Why:** The temporal baseline used a symmetric nearest-time match for BTC/ETH
+benchmarks. An observation up to the configured tolerance after the asset
+timestamp could therefore leak a future benchmark price into relative returns.
+**Changes:**
+- Changed benchmark matching to accept only observations at or before the asset
+  timestamp and choose the latest causal row deterministically.
+- Added an end-to-end regression proving that a future benchmark becomes
+  explicit missing context while an equally close prior benchmark still
+  produces the expected relative return. Documented the rule as a permanent
+  point-in-time evidence invariant.
+**Verify:** All 15 market-history tests passed; the 72-test market-history,
+market-no-send, and market-surface stack also passed. Compileall was clean, and
+host-local `make verify-fast PYTHON=.venv/bin/python` passed all 3,074 tests in
+161.43 seconds plus the alert-render, backtest-fixture, and paper-score smokes.
+**Notes/risks:** Existing synchronized CoinGecko snapshots are unaffected
+because their asset and benchmark rows share one observation clock. This does
+not tune a feature, score, route, threshold, or policy and makes no provider
+call, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` change.
+
 ## 2026-07-19 — Isolate fixture scanners from live providers · Codex
 **Why:** Artifact-heavy verification exposed that local Event Discovery tests
 inherited the operator's enabled CoinGecko-universe switch. Seven tests each

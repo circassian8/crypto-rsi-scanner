@@ -1487,15 +1487,6 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1467,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-      "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
@@ -1509,6 +1500,15 @@
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
       "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
       "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1463,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+      "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
       "source_kind": "production"
     },
     {
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T04:26:30.341994+00:00",
+  "generated_at": "2026-07-19T04:38:12.395564+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1841,12 +1841,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1467,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "source_kind": "production"
@@ -1855,6 +1849,12 @@
       "limit": 1500,
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1463,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "source_kind": "production"
     },
     {
@@ -3776,13 +3776,6 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1467,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3792,6 +3785,13 @@
     {
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
+      "line_count": 1463,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3952,12 +3952,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1467,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "source_kind": "production"
@@ -3966,6 +3960,12 @@
       "limit": 1500,
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1463,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "source_kind": "production"
     },
     {
@@ -4356,15 +4356,6 @@
         {
           "accepted": true,
           "limit": 1500,
-          "line_count": 1467,
-          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
           "line_count": 1466,
           "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
           "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
@@ -4378,6 +4369,15 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
           "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
           "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
+          "line_count": 1463,
+          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
           "source_kind": "production"
         },
         {
@@ -4613,11 +4613,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1467,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1466,
         "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
@@ -4625,6 +4620,11 @@
       {
         "line_count": 1465,
         "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1463,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
       },
       {
@@ -4808,15 +4808,6 @@
           {
             "accepted": true,
             "limit": 1500,
-            "line_count": 1467,
-            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
             "line_count": 1466,
             "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
             "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
@@ -4830,6 +4821,15 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
             "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
             "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
+            "line_count": 1463,
+            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
             "source_kind": "production"
           },
           {

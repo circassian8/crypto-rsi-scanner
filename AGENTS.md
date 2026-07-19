@@ -708,7 +708,10 @@ may be added later when a suitable environment already exists.
   feature/time-aware warmup, spread limits, artifacts, and next safe command.
   The default minimum observation spacing is 60 minutes; too-close observations
   remain explicit evidence but never enter temporal baselines or advance
-  warmup. `make radar-daily-ops-cycle` is the only public operator cycle: it
+  warmup. BTC/ETH benchmark observations for relative-return features must be
+  at or before the asset timestamp and within the configured backward
+  tolerance; a future benchmark row is missing context, never an alignment
+  candidate. `make radar-daily-ops-cycle` is the only public operator cycle: it
   rechecks authorization, cadence, and shared provider backoff before the adapter
   and may reserve/attempt at most one bounded live request in one eligible
   invocation. `make radar-market-no-send` is a compatibility alias for that same

@@ -1195,21 +1195,17 @@ def _aligned_observation(
     *,
     tolerance: timedelta,
 ) -> Mapping[str, Any] | None:
+    """Return the latest causal observation within the backward tolerance."""
+
     candidates = [
         item
         for item in observations
-        if abs(_observation_time(item) - target) <= tolerance
+        if _observation_time(item) <= target
+        and target - _observation_time(item) <= tolerance
     ]
     if not candidates:
         return None
-    return min(
-        candidates,
-        key=lambda item: (
-            abs((_observation_time(item) - target).total_seconds()),
-            _observation_time(item),
-            str(item.get("observation_id") or ""),
-        ),
-    )
+    return max(candidates, key=_observation_sort_key)
 
 
 def _zscore(

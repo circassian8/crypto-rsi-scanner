@@ -175,6 +175,63 @@ def test_market_history_enriches_temporal_features_and_preserves_lineage_and_bas
     assert json.loads(json.dumps(result.to_dict()))["summary"]["research_only"] is True
 
 
+def test_relative_returns_never_align_to_a_future_benchmark_observation():
+    cfg = _config(
+        min_baseline_observations=2,
+        benchmark_alignment_tolerance=timedelta(minutes=1),
+    )
+
+    future_benchmark_at = NOW + timedelta(seconds=30)
+    future_result = event_market_history.enrich_market_rows_with_history(
+        [
+            _row("move-token", NOW, price=110, volume=1_100),
+            _row("bitcoin", future_benchmark_at, price=220, volume=5_100, symbol="BTC"),
+        ],
+        [
+            _row("move-token", NOW - timedelta(hours=1), price=100, volume=1_000),
+            _row(
+                "bitcoin",
+                future_benchmark_at - timedelta(hours=1),
+                price=200,
+                volume=5_000,
+                symbol="BTC",
+            ),
+        ],
+        now=NOW + timedelta(minutes=1),
+        config=cfg,
+    )
+    future_enriched = future_result.enriched_rows[0]
+    assert "temporal_relative_return_vs_btc_1h" not in future_enriched
+    assert (
+        future_enriched["market_history"]["warmup"]
+        ["relative_return_vs_btc_1h_zscore"]["status"]
+        == "missing_current"
+    )
+
+    prior_benchmark_at = NOW - timedelta(seconds=30)
+    prior_result = event_market_history.enrich_market_rows_with_history(
+        [
+            _row("move-token", NOW, price=110, volume=1_100),
+            _row("bitcoin", prior_benchmark_at, price=220, volume=5_100, symbol="BTC"),
+        ],
+        [
+            _row("move-token", NOW - timedelta(hours=1), price=100, volume=1_000),
+            _row(
+                "bitcoin",
+                prior_benchmark_at - timedelta(hours=1),
+                price=200,
+                volume=5_000,
+                symbol="BTC",
+            ),
+        ],
+        now=NOW + timedelta(minutes=1),
+        config=cfg,
+    )
+    assert prior_result.enriched_rows[0][
+        "temporal_relative_return_vs_btc_1h"
+    ] == pytest.approx(0.0)
+
+
 def test_turnover_basis_distinguishes_provider_value_from_derived_ratio():
     result = event_market_history.enrich_market_rows_with_history(
         [
