@@ -457,6 +457,37 @@ def test_capture_rejects_response_outside_declared_window_before_writes(
     assert not (tmp_path / POINTER_FILENAME).exists()
 
 
+def test_capture_rejects_response_received_before_request_start(
+    tmp_path: Path,
+) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    summary, responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: NOW,
+        resolver=_resolver(observations),
+        fetch_json=_fetch,
+    )
+    changed = list(responses)
+    changed[0] = replace(
+        changed[0],
+        request_started_at="2026-07-17T12:00:00.900000Z",
+        response_received_at="2026-07-17T12:00:00.800000Z",
+    )
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="captured_response_outside_capture_window",
+    ):
+        persist_bybit_execution_quality_capture(
+            tmp_path,
+            summary=summary,
+            responses=tuple(changed),
+        )
+
+    assert not (tmp_path / POINTER_FILENAME).exists()
+
+
 def test_latest_capture_fails_closed_after_raw_response_drift(tmp_path: Path) -> None:
     observations = (_observation("bitcoin", "BTC", 3_000.0),)
     result = capture_authoritative_bybit_execution_quality(

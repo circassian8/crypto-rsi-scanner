@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Enforce causal Bybit response clocks · Codex
+**Why:** The execution-quality exact-response window rejected requests outside
+the capture and overlapping request sequences, but unlike the intraday and
+derivatives collectors it did not explicitly reject a response-read completion
+that preceded its own request start. Such a transport row is causally
+impossible and must never enter a genuine Protocol-v2 capture.
+**Changes:**
+- Added the missing `response_received_at >= request_started_at` invariant to
+  the execution-quality full-set transport validator.
+- Added a persistence regression proving a reversed request/response clock
+  fails before any namespace or pointer write.
+**Verify:** All 39 focused execution-quality capture/live/freshness tests passed,
+followed by all 167 Bybit execution-quality, intraday, derivatives, readiness,
+and Protocol-v2 progress tests. Compileall, architecture cleanliness, and the
+offline execution-quality smoke passed. Full `verify-fast` was not repeated
+because this one-condition transport hardening is covered by the complete
+Bybit test family and the broader release gate already passed earlier in the
+active goal.
+**Notes/risks:** Valid ordered capture windows are unchanged. No provider call,
+authorization, credential, score, threshold, route, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Reject non-finite Bybit freshness evidence · Codex
 **Why:** The immutable Bybit execution-quality, intraday, and derivatives
 freshness contracts required numeric age fields but did not consistently

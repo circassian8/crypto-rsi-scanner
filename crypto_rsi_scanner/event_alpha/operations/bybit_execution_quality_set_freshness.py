@@ -103,6 +103,7 @@ def require_exact_response_window(
         response_received = _aware_utc(response.response_received_at)
         if (
             request_started < started
+            or response_received < request_started
             or response_received > completed
             or (prior_received is not None and request_started < prior_received)
         ):
