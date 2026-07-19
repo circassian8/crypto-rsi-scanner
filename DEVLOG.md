@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-first no-send market cycle · Codex
+**Why:** The one-hour campaign cadence became eligible with existing CoinGecko
+authorization. One more genuine observation was needed to advance the temporal
+baseline without weakening thresholds or substituting fixture evidence.
+**Changes:**
+- Rechecked readiness after the exact boundary, then made one bounded provider
+  request with no retry. CoinGecko returned 80 rows and 30 selected observations.
+- Published receipt-backed namespace
+  `radar_market_no_send_20260719t085231044712z_5fc5bc0047e1`, restarted the
+  exact owned dashboard, and retained strict doctor status 0 blockers / 0
+  warnings at revision 12.
+- Advanced campaign truth to 31 successful cycles, 930 retained observations,
+  900 baseline-counted observations, and 30 explicitly too-close observations.
+  Twenty-six of 30 current assets are now fully warm across required temporal
+  feature families; four newer assets keep the campaign honestly warming.
+- Refreshed the canonical campaign Markdown/JSON after terminal publication.
+**Verify:** Daily Operations terminal status was `succeeded` with one successful
+provider attempt. Campaign rebuild used zero provider calls; dashboard readiness
+is READY, authority status is exact/revalidated, and an owned host HEAD request
+returned HTTP 200 with the exact namespace, run, revision, and operator digest.
+**Notes/risks:** The generation contained 30 clean snapshots and no anomaly or
+current Decision idea. Spread remains 0/930 because Bybit execution data is
+separately unauthorized and its recorded 403 is not bypassed. The next request
+boundary is 2026-07-19 09:52:31.749825 UTC. Telegram sends, trades, orders,
+paper trades, normal RSI writes, and Event Alpha `TRIGGERED_FADE` all remained
+zero; the recurring service remains uninstalled.
+
 ## 2026-07-19 — Fail closed on malformed market observation clocks · Codex
 **Why:** Market-state normalization and catalyst-queue scheduling replaced an
 explicitly malformed observation timestamp with the current wall clock. That
