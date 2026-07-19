@@ -16,10 +16,15 @@ from urllib.request import ProxyHandler, build_opener
 import pytest
 
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import DashboardReadinessError
+from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context import (
+    build_bybit_derivatives_requests,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
+    ORDERBOOK_LEVEL_LIMIT,
     REQUEST_STRATEGY,
     BybitPublicRequest,
     build_bybit_instrument_catalog_request,
+    build_bybit_orderbook_request,
     select_bybit_usdt_perpetual_instruments,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live import (
@@ -39,6 +44,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live impo
     project_authoritative_radar_assets,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_intraday import (
+    INTERVAL_SECONDS,
     KLINE_LIMIT,
     build_bybit_kline_request,
 )
@@ -561,6 +567,38 @@ def test_transport_accepts_only_the_closed_direct_kline_query_shape() -> None:
     )
     with pytest.raises(BybitExecutionQualityLiveError, match="request_contract"):
         _fetch_public_json(invalid, 10.0, opener=_FakeOpener(payload))
+
+
+def test_every_canonical_bybit_builder_crosses_the_shared_guarded_transport() -> None:
+    instruments = select_bybit_usdt_perpetual_instruments(
+        _fixture("radar_assets.json"),
+        _fixture("instruments_info.json"),
+    )
+    instrument = next(
+        row for row in instruments if row.instrument_id == "BTCUSDT"
+    )
+    as_of = datetime(2026, 7, 17, 12, 30, tzinfo=timezone.utc)
+    requests = (
+        build_bybit_instrument_catalog_request(),
+        build_bybit_orderbook_request(instrument),
+        *(
+            build_bybit_kline_request(instrument, interval=interval, as_of=as_of)
+            for interval in INTERVAL_SECONDS
+        ),
+        *build_bybit_derivatives_requests((instrument,)),
+    )
+    opener = _FakeOpener({"retCode": 0, "retMsg": "OK", "result": {}})
+
+    captured = tuple(
+        _fetch_public_json(request, 10.0, opener=opener)
+        for request in requests
+    )
+
+    assert len(captured) == len(requests) == 8
+    assert tuple(row.request for row in captured) == requests
+    assert len(opener.requests) == len(requests)
+    orderbook = next(row for row in requests if row.path.endswith("/orderbook"))
+    assert dict(orderbook.query)["limit"] == str(ORDERBOOK_LEVEL_LIMIT) == "200"
 
 
 def test_default_transport_ignores_ambient_proxy_configuration(

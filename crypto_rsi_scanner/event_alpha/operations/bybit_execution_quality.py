@@ -30,6 +30,7 @@ CONTRACT_TYPE = "LinearPerpetual"
 INSTRUMENT_STATUS = "Trading"
 MAX_RADAR_ASSETS = 30
 INSTRUMENT_CATALOG_LIMIT = 1000
+ORDERBOOK_LEVEL_LIMIT = 200
 MAX_PLANNED_REQUESTS = MAX_RADAR_ASSETS + 1
 REQUEST_STRATEGY = (
     "one_complete_trading_linear_catalog_then_one_orderbook_per_eligible_instrument"
@@ -405,7 +406,7 @@ def build_bybit_orderbook_request(
         query=(
             ("category", BYBIT_CATEGORY),
             ("symbol", instrument.instrument_id),
-            ("limit", "200"),
+            ("limit", str(ORDERBOOK_LEVEL_LIMIT)),
         ),
     )
 
@@ -603,7 +604,7 @@ def normalize_bybit_orderbook(
         best_ask=_float(best_ask),
         mid_price=_float(mid),
         spread_bps=_float(spread_bps),
-        orderbook_level_limit=200,
+        orderbook_level_limit=ORDERBOOK_LEVEL_LIMIT,
         liquidity_scope="bybit_public_rest_visible_levels_only",
         rpi_orders_included=False,
         bid_depth_usdt_by_band=_depth_by_band(
@@ -627,7 +628,7 @@ def normalize_bybit_orderbook(
         order_book_cross_sequence=sequence,
         source_url=(
             f"{PUBLIC_API_BASE}{ORDERBOOK_PATH}?category={BYBIT_CATEGORY}"
-            f"&symbol={instrument.instrument_id}&limit=200"
+            f"&symbol={instrument.instrument_id}&limit={ORDERBOOK_LEVEL_LIMIT}"
         ),
         request_lineage_id=request_lineage_id,
         research_only=True,
@@ -700,6 +701,7 @@ __all__ = (
     "MAX_RADAR_ASSETS",
     "OFFICIAL_INSTRUMENT_DOC",
     "OFFICIAL_ORDERBOOK_DOC",
+    "ORDERBOOK_LEVEL_LIMIT",
     "QUOTE_ASSET",
     "REQUEST_STRATEGY",
     "SNAPSHOT_SCHEMA_VERSION",

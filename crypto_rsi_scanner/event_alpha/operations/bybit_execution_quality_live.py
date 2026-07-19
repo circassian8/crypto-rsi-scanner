@@ -44,6 +44,8 @@ from ..dashboard.readiness import (
 from .bybit_derivatives_context import (
     ACCOUNT_RATIO_PATH,
     FUNDING_HISTORY_PATH,
+    HISTORY_LIMIT,
+    HISTORY_PERIOD,
     OPEN_INTEREST_PATH,
     TICKERS_PATH,
 )
@@ -51,9 +53,11 @@ from .bybit_execution_quality import (
     BYBIT_CATEGORY,
     CONTRACT_TYPE,
     DEFAULT_FRESHNESS_SECONDS,
+    INSTRUMENT_CATALOG_LIMIT,
     INSTRUMENTS_PATH,
     INSTRUMENT_STATUS,
     MAX_RADAR_ASSETS,
+    ORDERBOOK_LEVEL_LIMIT,
     ORDERBOOK_PATH,
     PUBLIC_API_BASE,
     QUOTE_ASSET,
@@ -70,7 +74,7 @@ from .bybit_execution_quality_universe import (
     BybitExecutionQualityUniverseError,
     partition_bybit_provider_query_assets as _partition_provider_query_assets,
 )
-from .bybit_intraday import KLINE_LIMIT, KLINE_PATH
+from .bybit_intraday import INTERVAL_SECONDS, KLINE_LIMIT, KLINE_PATH
 from .bybit_execution_quality_capture import (
     BybitCapturedJSONResponse,
     BybitExecutionQualityCaptureError,
@@ -702,29 +706,35 @@ def _fetch_public_json(
             request.path == INSTRUMENTS_PATH
             and (
                 query.get("status") != INSTRUMENT_STATUS
-                or query.get("limit") != "1000"
+                or query.get("limit") != str(INSTRUMENT_CATALOG_LIMIT)
             )
         )
-        or (request.path == ORDERBOOK_PATH and query.get("limit") != "200")
+        or (
+            request.path == ORDERBOOK_PATH
+            and query.get("limit") != str(ORDERBOOK_LEVEL_LIMIT)
+        )
         or (
             request.path == FUNDING_HISTORY_PATH
-            and query.get("limit") != "2"
+            and query.get("limit") != str(HISTORY_LIMIT)
         )
         or (
             request.path == OPEN_INTEREST_PATH
             and (
-                query.get("intervalTime") != "1h"
-                or query.get("limit") != "2"
+                query.get("intervalTime") != HISTORY_PERIOD
+                or query.get("limit") != str(HISTORY_LIMIT)
             )
         )
         or (
             request.path == ACCOUNT_RATIO_PATH
-            and (query.get("period") != "1h" or query.get("limit") != "2")
+            and (
+                query.get("period") != HISTORY_PERIOD
+                or query.get("limit") != str(HISTORY_LIMIT)
+            )
         )
         or (
             request.path == KLINE_PATH
             and (
-                query.get("interval") not in {"60", "240"}
+                query.get("interval") not in INTERVAL_SECONDS
                 or query.get("limit") != str(KLINE_LIMIT)
                 or not str(query.get("end") or "").isdigit()
             )

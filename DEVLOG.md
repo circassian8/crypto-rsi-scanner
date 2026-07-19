@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Bind every Bybit request builder to one guarded contract · Codex
+**Why:** The obsolete kline limit proved that independently copied live-guard
+literals could drift from an otherwise-correct offline request builder. The
+same duplication still existed for catalog, order-book, derivatives-history,
+and interval values even though those shapes currently matched.
+**Changes:**
+- Added one canonical 200-level order-book constant and reused it in request
+  construction, normalized snapshots, source URLs, and the guarded transport.
+- Made the live guard consume the existing catalog, derivatives period/limit,
+  and intraday interval constants rather than maintaining a second query
+  contract.
+- Added a parity regression that sends all eight request shapes for one exact
+  instrument—catalog, book, 1h/4h klines, ticker, funding, open interest, and
+  account ratio—through the real fixed-host guard with a fake local opener.
+**Verify:** 84 focused Bybit contract/live tests passed; all three offline
+Bybit smokes passed; `python3 -m compileall -q crypto_rsi_scanner tests`,
+`make architecture-cleanliness-check PYTHON=python3`, and `make
+architecture-size-gates PYTHON=python3` passed with zero new violations.
+**Notes/risks:** No provider request, authorization mutation, credential read,
+campaign attachment, send, trade, order, paper trade, normal RSI write,
+threshold/route/score change, or Event Alpha `TRIGGERED_FADE` occurred. The
+recorded Bybit 403 remains a fail-closed reachability blocker and is not
+bypassed.
+
 ## 2026-07-19 — Preserve unversioned history rows at the projection boundary · Codex
 **Why:** The full release gate exposed four shadow-surprise regressions after
 the temporal-evidence contract was versioned forward. Raw rows that carried a
