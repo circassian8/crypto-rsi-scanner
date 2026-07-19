@@ -14,6 +14,12 @@ import hashlib
 import json
 from typing import Any, Mapping, Sequence
 
+from crypto_rsi_scanner.event_alpha.operations.bybit_liquidation_stream import (
+    OFFICIAL_ALL_LIQUIDATION_DOC,
+    PUBLIC_WEBSOCKET_URL,
+    PUSH_FREQUENCY_MILLISECONDS,
+    TOPIC_PREFIX,
+)
 from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 import (
     CONTRACT_VERSION as FROZEN_CONTRACT_VERSION,
     readiness_sha256,
@@ -25,8 +31,11 @@ from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness impor
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v2"
-PROGRESS_SOURCE = "accepted_decisions_and_verified_operator_state_as_of_2026_07_19"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v3"
+PROGRESS_SOURCE = (
+    "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
+    "with_native_liquidation_contract"
+)
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
 )
@@ -36,7 +45,8 @@ _CURRENT_BLOCKERS = (
     "bybit_public_reachability_unproven_after_recorded_403",
     "genuine_execution_quality_capture_absent",
     "genuine_intraday_1h_4h_and_rsi_capture_absent",
-    "genuine_bybit_derivatives_context_capture_absent",
+    "genuine_bybit_rest_funding_open_interest_positioning_capture_absent",
+    "genuine_bybit_liquidation_stream_capture_absent",
     "authoritative_catalyst_unlock_onchain_fundamental_and_official_macro_sources_not_sealed",
     "historical_outcome_recovery_incomplete",
     "explicit_human_review_timing_and_source_independence_labels_incomplete",
@@ -51,6 +61,7 @@ _NEXT_SAFE_COMMANDS = (
     "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
     "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
     "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python",
+    "make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python",
     "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
     "make radar-outcome-price-recovery-readiness PYTHON=.venv/bin/python",
     "make radar-review-timing-queue PYTHON=.venv/bin/python",
@@ -59,6 +70,7 @@ _NEXT_SAFE_COMMANDS = (
 )
 _SAFETY_ZERO_FIELDS = (
     "provider_calls",
+    "websocket_connections",
     "credential_reads",
     "environment_reads",
     "file_reads",
@@ -113,6 +125,27 @@ def current_progress_values() -> dict[str, Any]:
             "credentials_or_private_account_data": False,
             "orders_or_execution_or_trading": False,
         },
+        "native_liquidation_contract": {
+            "venue_id": "bybit",
+            "transport": "public_websocket",
+            "websocket_url": PUBLIC_WEBSOCKET_URL,
+            "topic_template": f"{TOPIC_PREFIX}{{instrument_id}}",
+            "push_frequency_milliseconds": PUSH_FREQUENCY_MILLISECONDS,
+            "source_contract_url": OFFICIAL_ALL_LIQUIDATION_DOC,
+            "required_provider_fields": ["T", "s", "S", "v", "p"],
+            "provider_side_semantics": {
+                "Buy": "long_position_liquidated",
+                "Sell": "short_position_liquidated",
+            },
+            "offline_exact_message_normalizer_implemented": True,
+            "live_listener_implemented": False,
+            "immutable_capture_implemented": False,
+            "runtime_authorization_created": False,
+            "provider_connection_attempted": False,
+            "protocol_v2_annex_bound": False,
+            "protocol_v2_evidence_eligible": False,
+            "research_only": True,
+        },
         "current_activation_blockers": list(_CURRENT_BLOCKERS),
         "next_safe_commands": list(_NEXT_SAFE_COMMANDS),
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},
@@ -133,6 +166,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         "source",
         "frozen_readiness_contract",
         "confirmed_execution_decision",
+        "native_liquidation_contract",
         "current_activation_blockers",
         "next_safe_commands",
         "safety",
@@ -186,6 +220,31 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         if decision.get("exact_eligible_instrument_ids") != []:
             errors.append("exact_eligible_instrument_ids_must_remain_unsealed")
 
+    liquidation = value.get("native_liquidation_contract")
+    expected_liquidation = {
+        "venue_id": "bybit",
+        "transport": "public_websocket",
+        "websocket_url": PUBLIC_WEBSOCKET_URL,
+        "topic_template": f"{TOPIC_PREFIX}{{instrument_id}}",
+        "push_frequency_milliseconds": PUSH_FREQUENCY_MILLISECONDS,
+        "source_contract_url": OFFICIAL_ALL_LIQUIDATION_DOC,
+        "required_provider_fields": ["T", "s", "S", "v", "p"],
+        "provider_side_semantics": {
+            "Buy": "long_position_liquidated",
+            "Sell": "short_position_liquidated",
+        },
+        "offline_exact_message_normalizer_implemented": True,
+        "live_listener_implemented": False,
+        "immutable_capture_implemented": False,
+        "runtime_authorization_created": False,
+        "provider_connection_attempted": False,
+        "protocol_v2_annex_bound": False,
+        "protocol_v2_evidence_eligible": False,
+        "research_only": True,
+    }
+    if liquidation != expected_liquidation:
+        errors.append("native_liquidation_contract_mismatch")
+
     blockers = value.get("current_activation_blockers")
     if blockers != list(_CURRENT_BLOCKERS):
         errors.append("current_activation_blockers_mismatch")
@@ -219,6 +278,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
     payload = deepcopy(dict(value) if value is not None else current_progress_values())
     frozen = payload["frozen_readiness_contract"]
     decision = payload["confirmed_execution_decision"]
+    liquidation = payload["native_liquidation_contract"]
     lines = [
         "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS",
         f"status={payload['status']}",
@@ -236,6 +296,11 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",
         (
+            "native_liquidation_surface="
+            f"{liquidation['transport']}:{liquidation['topic_template']} "
+            "offline_normalizer=true live_listener=false immutable_capture=false"
+        ),
+        (
             "provider_calls=0 credential_reads=0 environment_reads=0 file_reads=0 "
             "file_writes=0 holdout_reads=0"
         ),
@@ -244,7 +309,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "Current unresolved activation blockers:",
         *(f"- {blocker}" for blocker in payload["current_activation_blockers"]),
         "",
-        "Next safe commands (readiness/queue only; no provider calls):",
+        "Next safe commands (offline/readiness/queue only; no provider calls):",
         *(f"- {command}" for command in payload["next_safe_commands"]),
         "",
         (

@@ -705,6 +705,19 @@ may be added later when a suitable environment already exists.
   manifest drift, unsafe paths, symlinks, races, invalid feedback, bounds
   violations, report/supplement splices, or secret findings fail closed and
   preserve any prior successful output.
+- **Bybit native liquidation evidence:**
+  `make radar-derivatives-bybit-liquidation-smoke` normalizes checked-in exact
+  public `allLiquidation.{instrument_id}` WebSocket message bytes without
+  opening a socket, reading authorization, or writing artifacts. It preserves
+  provider `Buy` = long-position-liquidated and `Sell` =
+  short-position-liquidated semantics, native base size, bankruptcy price,
+  derived USDT notional, exact source fingerprint, and causal clocks. This is
+  only an offline input contract: no live listener, immutable capture,
+  authorization, campaign attachment, direction, or Protocol-v2 eligibility
+  exists. Do not substitute the four-request REST derivatives bundle or
+  Coinalyze for required native liquidation evidence. Any live WebSocket
+  boundary requires a separate explicit authorization and must stop on the
+  recorded reachability restriction without proxy, VPN, or regional bypass.
 - **Decision Radar Observation Campaign v2:**
   `make radar-market-no-send-readiness` is read-only/no-network and reports the
   already-existing CoinGecko authorization, bounded universe, enforced cadence,

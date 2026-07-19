@@ -119,13 +119,33 @@ Coinalyze remains useful as an optional secondary Catalyst-Radar cross-check,
 but it is not the selected venue and cannot substitute for Bybit-native
 execution, funding, OI, positioning, identity, or clocks.
 
+Liquidations are not silently claimed from that REST bundle. Bybit's native
+surface is the separate public `allLiquidation.{symbol}` WebSocket topic. An
+offline exact-message v1 normalizer now preserves message fingerprints,
+instrument identity, message/event/receipt clocks, provider side, documented
+liquidated-position semantics, base-asset size, bankruptcy price, and derived
+USDT notional. It rejects duplicate JSON keys, non-finite or nonpositive values,
+identity/schema drift, and events later than their containing message. It does
+not open a socket or create authorization, persistence, aggregation, policy,
+direction, or Protocol-v2 eligibility. A genuine listener and immutable
+windowed capture remain separate future work and require an explicit boundary;
+until then, liquidation evidence is unavailable. The offline proof is:
+
+```sh
+make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python
+```
+
+Official contracts reviewed 2026-07-19:
+[All Liquidation](https://bybit-exchange.github.io/docs/v5/websocket/public/all-liquidation)
+and [WebSocket Connect](https://bybit-exchange.github.io/docs/v5/ws/connect).
+
 After a genuine current execution-quality capture exists, the exact operator
 sequence is: set the separate flag only in the local ignored environment;
 rerun the no-call readiness command; run `CONFIRM=1 make
 radar-derivatives-bybit-capture PYTHON=.venv/bin/python` once; inspect the
 immutable status; then unset the flag. Stop on any 403, 429, region restriction, malformed
 response, or prerequisite drift. Do not retry or bypass it. This diagnostic
-the diagnostic collection does not publish evidence; only the separately
+collection does not publish evidence; only the separately
 confirmed capture command may publish the exact response bundle.
 
 ## Next point-in-time intraday contract

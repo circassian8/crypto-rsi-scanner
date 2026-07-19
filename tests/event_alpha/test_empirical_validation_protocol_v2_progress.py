@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v2")
+    assert values["progress_version"].endswith("_v3")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -48,9 +48,21 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert "live_market_temporal_baseline_not_yet_warm" in values[
         "current_activation_blockers"
     ]
-    assert "genuine_bybit_derivatives_context_capture_absent" in values[
+    assert (
+        "genuine_bybit_rest_funding_open_interest_positioning_capture_absent"
+        in values["current_activation_blockers"]
+    )
+    assert "genuine_bybit_liquidation_stream_capture_absent" in values[
         "current_activation_blockers"
     ]
+    liquidation = values["native_liquidation_contract"]
+    assert liquidation["transport"] == "public_websocket"
+    assert liquidation["topic_template"] == "allLiquidation.{instrument_id}"
+    assert liquidation["offline_exact_message_normalizer_implemented"] is True
+    assert liquidation["live_listener_implemented"] is False
+    assert liquidation["immutable_capture_implemented"] is False
+    assert liquidation["provider_connection_attempted"] is False
+    assert liquidation["protocol_v2_evidence_eligible"] is False
     assert "historical_outcome_recovery_incomplete" in values[
         "current_activation_blockers"
     ]
@@ -107,6 +119,8 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     command_drift["next_safe_commands"] = ["make unsafe-live-call"]
     version_drift = progress.current_progress_values()
     version_drift["progress_version"] = "decision_radar_progress_unknown"
+    liquidation_drift = progress.current_progress_values()
+    liquidation_drift["native_liquidation_contract"]["live_listener_implemented"] = True
 
     for mutation in (
         digest_drift,
@@ -115,6 +129,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         blocker_drift,
         command_drift,
         version_drift,
+        liquidation_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -154,8 +169,15 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out
-    assert "- genuine_bybit_derivatives_context_capture_absent" in output.out
-    assert "readiness/queue only; no provider calls" in output.out
+    assert (
+        "- genuine_bybit_rest_funding_open_interest_positioning_capture_absent"
+        in output.out
+    )
+    assert "- genuine_bybit_liquidation_stream_capture_absent" in output.out
+    assert "native_liquidation_surface=public_websocket:" in output.out
+    assert "offline_normalizer=true live_listener=false" in output.out
+    assert "offline/readiness/queue only; no provider calls" in output.out
+    assert "radar-derivatives-bybit-liquidation-smoke" in output.out
     assert "radar-outcome-price-recovery-readiness" in output.out
     assert "event-alpha-source-independence-oos-readiness" in output.out
     assert "provider_calls=0" in output.out

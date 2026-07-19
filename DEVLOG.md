@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Separate native Bybit liquidation evidence from REST context · Codex
+**Why:** Protocol v2 requires liquidation context, but Bybit exposes it through
+the public `allLiquidation` WebSocket rather than any endpoint in the existing
+four-request REST funding/OI/positioning capture. Treating that bundle as
+complete would hide a real evidence gap.
+**Changes:**
+- Added an offline exact-message normalizer and checked fixture for the native
+  Bybit all-liquidation topic. It preserves source fingerprints, exact
+  instrument identity, message/event/receipt clocks, provider side and
+  documented liquidated-position semantics, base size, bankruptcy price, and
+  explicitly USDT-denominated notional.
+- Made duplicate JSON keys, non-finite/nonpositive values, schema/identity
+  drift, noncausal events, and unsafe instrument mappings fail closed. Every
+  row remains context-only, non-directional, annex-unbound, and ineligible.
+- Advanced current Protocol-v2 progress to v3 so missing REST derivatives and
+  missing live liquidation-stream capture are distinct blockers. Added an
+  offline Make smoke and documented that no live listener/capture exists.
+**Verify:** 53 focused liquidation, Protocol-v2 progress, and native REST
+derivatives tests passed; `python3 -m compileall -q crypto_rsi_scanner tests`,
+both offline Bybit derivatives smokes, the Protocol-v2 progress check,
+architecture cleanliness, and architecture size gates passed with zero new
+violations. The liquidation smoke normalized two events with zero socket,
+provider, or write activity.
+**Notes/risks:** No WebSocket connection, HTTP/provider request, authorization
+mutation, credential read, persistence, aggregation, campaign attachment,
+threshold/score/route change, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. A future live listener needs a
+separate explicit authorization and must not bypass the recorded Bybit
+restriction.
+
 ## 2026-07-19 — Bind every Bybit request builder to one guarded contract · Codex
 **Why:** The obsolete kline limit proved that independently copied live-guard
 literals could drift from an otherwise-correct offline request builder. The

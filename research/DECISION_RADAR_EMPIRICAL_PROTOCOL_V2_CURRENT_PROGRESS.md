@@ -30,6 +30,11 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - no genuine direct 1h/4h capture exists, so its 14-period point-in-time Wilder
   RSI projections are also absent; the v2 offline contract is ready and keeps
   insufficient history explicit rather than inventing a value;
+- no genuine Bybit REST funding/open-interest/positioning capture exists;
+- Bybit liquidation evidence is a separate public-WebSocket surface. The exact
+  `allLiquidation.{instrument_id}` message normalizer is implemented and
+  fixture-proven, but no live listener, runtime authorization, immutable
+  capture, or Protocol-v2 binding exists;
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
 
@@ -44,4 +49,6 @@ make radar-research-protocol-v2-progress PYTHON=.venv/bin/python
 make radar-research-protocol-v2-progress-check PYTHON=.venv/bin/python
 make radar-execution-quality-readiness PYTHON=.venv/bin/python
 make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
+make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python
+make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python
 ```

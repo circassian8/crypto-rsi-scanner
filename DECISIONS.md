@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep Bybit liquidations as a separate native stream contract
+**Status:** accepted
+**Decision:** Protocol-v2 liquidation context for the selected Bybit
+USDT-linear perpetual surface must come from exact public
+`allLiquidation.{instrument_id}` WebSocket messages. Preserve message bytes,
+instrument identity, provider event/message/receipt clocks, provider side,
+documented liquidated-position semantics, base-asset size, bankruptcy price,
+and USDT notional. The existing REST funding/open-interest/positioning bundle
+does not imply liquidation coverage, and Coinalyze cannot substitute for native
+Protocol-v2 evidence. The offline normalizer grants no live-listener,
+authorization, persistence, aggregation, directional, or evidence authority.
+**Why:** Bybit exposes all-liquidation events through a public WebSocket rather
+than the V5 REST market catalog. Collapsing the surfaces would report a required
+field as covered when no native liquidation observation was collected.
+**Revisit when:** A separately authorized, reachability-proven listener can
+seal immutable exact messages into a human-approved window/aggregation annex.
+It must remain no-send/no-trade and must not use a proxy, VPN, alternate region,
+or secondary provider to conceal a native-source failure.
+
 ## 2026-07-19 - Explicit evaluation clocks fail closed
 **Status:** accepted
 **Decision:** When a caller explicitly supplies the research/evaluation clock
