@@ -18,6 +18,8 @@ from ..radar import market_enrichment
 from .market_no_send_io import read_jsonl
 from .market_provenance import DECISION_RADAR_MEASUREMENT_PROGRAM
 
+MARKET_SNAPSHOT_UNIT_VALIDATION_CONTRACT_VERSION = 1
+
 
 def normalize_market_rows(
     rows: Iterable[Mapping[str, Any]],
@@ -283,6 +285,8 @@ def market_quality_counts_from_rows(
     warm = 0
     warming = 0
     statuses: Counter[str] = Counter()
+    unit_warning_rows = 0
+    unit_warnings: Counter[str] = Counter()
     for row in rows:
         snapshot = row.get("market_state_snapshot")
         snapshot_quality = (
@@ -298,6 +302,10 @@ def market_quality_counts_from_rows(
         if not isinstance(quality, Mapping):
             quality = row.get("market_data_quality")
         quality = quality if isinstance(quality, Mapping) else {}
+        row_unit_warnings = _snapshot_unit_warnings(snapshot)
+        if row_unit_warnings:
+            unit_warning_rows += 1
+            unit_warnings.update(row_unit_warnings)
         direct += int(
             quality.get("direct_feature_count")
             or snapshot.get("direct_market_feature_count")
@@ -322,6 +330,17 @@ def market_quality_counts_from_rows(
         else "not_evaluated"
     )
     return {
+        "market_snapshot_unit_validation_contract_version": (
+            MARKET_SNAPSHOT_UNIT_VALIDATION_CONTRACT_VERSION
+        ),
+        "market_snapshot_unit_validation_status": (
+            "clean" if rows and not unit_warning_rows
+            else "blocked" if unit_warning_rows
+            else "not_evaluated"
+        ),
+        "market_snapshot_unit_warning_row_count": unit_warning_rows,
+        "market_snapshot_unit_warning_count": sum(unit_warnings.values()),
+        "market_snapshot_unit_warning_counts": dict(sorted(unit_warnings.items())),
         "baseline_status": baseline_status,
         "baseline_status_counts": dict(sorted(statuses.items())),
         "baseline_warm_assets": warm,
@@ -329,6 +348,22 @@ def market_quality_counts_from_rows(
         "direct_feature_count": direct,
         "proxy_feature_count": proxy,
     }
+
+
+def _snapshot_unit_warnings(snapshot: Mapping[str, Any]) -> tuple[str, ...]:
+    value = snapshot.get("unit_warnings")
+    if value in (None, "", [], ()):
+        return ()
+    if not isinstance(value, (list, tuple)):
+        return ("unit_warnings_contract_invalid",)
+    warnings = tuple(
+        item.strip()
+        for item in value
+        if isinstance(item, str) and item.strip()
+    )
+    if len(warnings) != len(value):
+        return (*warnings, "unit_warnings_contract_invalid")
+    return warnings
 
 
 def decision_route_counts(path: str | Path) -> Counter[str]:

@@ -428,15 +428,7 @@ def _publication_state(
 
 
 def _empty_quality() -> dict[str, Any]:
-    return {
-        "baseline_status": "not_evaluated",
-        "baseline_status_counts": {},
-        "baseline_warm_assets": 0,
-        "baseline_warming_assets": 0,
-        "direct_feature_count": 0,
-        "proxy_feature_count": 0,
-        "spread_available_count": 0,
-    }
+    return market_quality_counts_from_rows([])
 
 
 def _operator_digest(operator: Mapping[str, Any]) -> str | None:

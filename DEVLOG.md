@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Close future publication on snapshot unit health · Codex
+**Why:** Unit warnings were visible in the anomaly report but were not a closed,
+recomputed publication contract. A future generation could therefore carry a
+unit warning without strict doctor independently proving that its manifest and
+exact snapshot rows agreed.
+**Changes:**
+- Added unit-health contract v1 to the canonical market-observation quality
+  projection: exact warning rows, total warnings, warning categories, and
+  `clean` / `blocked` / `not_evaluated` status now flow into complete manifests
+  and pilot audits from the exact snapshot rows.
+- Added a strict-doctor check that recomputes those fields, reconciles the exact
+  snapshot count, rejects malformed warning shapes or manifest drift, and blocks
+  any warning-bearing complete generation.
+- Activated the required contract for complete live observations at or after
+  2026-07-19 00:00:00 UTC. Older immutable live evidence and fixture mechanics
+  remain readable without being rewritten or silently reclassified.
+- Made empty/preflight audit quality use the same canonical projection and
+  refreshed the static architecture reports for the new source and test files.
+- Recorded the forward-only compatibility rule in `DECISIONS.md` and the
+  completed integrity slice in `ROADMAP.md`.
+**Verify:** Seven focused unit-health tests plus the controlled live/zero
+publication and existing quality-count regressions passed (9 total). Python
+compileall passed. The offline market no-send smoke strict-doctored clean, the
+architecture cleanliness gate passed with zero new size violations, and the
+current pre-cutoff revision-12 authority remained READY with its pointer bytes
+unchanged.
+**Notes/risks:** This is an integrity gate, not a threshold or score change. No
+provider authorization/call, Telegram send, trade, order, paper trade, normal
+RSI write, or `TRIGGERED_FADE` was added. The first post-cutoff live generation
+must carry a clean contract before it can become dashboard authority.
+
 ## 2026-07-18 — Record the twenty-fourth market observation cycle · Codex
 **Why:** The exact one-hour cadence boundary was eligible, and the evidence-first
 program needs regular point-in-time observations to mature temporal baselines

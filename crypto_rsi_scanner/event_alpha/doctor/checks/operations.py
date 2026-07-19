@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import check_registry
+from . import market_snapshot_units
 from ._utils import Messages, ctx_mapping, ctx_value
 from ...artifacts import paths as event_artifact_paths
 from ...artifacts import fingerprints as event_alpha_fingerprints
@@ -46,6 +47,7 @@ def apply_checks(ctx: object, blockers: Messages, warnings: Messages) -> None:
     _check_review_inbox(ctx, review_inbox, blockers, warnings)
     _check_archive_manifest(archive_manifest, blockers)
     _check_targeted_market_refresh(ctx, blockers)
+    market_snapshot_units.apply_checks(ctx, blockers)
     _check_operator_state(ctx, blockers, warnings)
     _check_source_independence_store(ctx, blockers)
     _check_daily_operations_publication(ctx, blockers)

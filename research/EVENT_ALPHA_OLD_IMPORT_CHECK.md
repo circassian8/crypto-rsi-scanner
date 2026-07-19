@@ -2,7 +2,7 @@
 
 Research artifact only. This lint-style check does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: 2026-07-18T23:14:52.081247+00:00
+- generated_at: 2026-07-18T23:58:41.853550+00:00
 - status: OK
 - registry_entry_count: 0
 - deleted_shim_entry_count: 124
@@ -15,11 +15,11 @@ Research artifact only. This lint-style check does not call providers, send Tele
 - old_path_text_references: 64
 - include_runtime_artifacts: False
 - cache_status: miss
-- scan_duration_seconds: 2.1805
-- scanned_source_files: 888
+- scan_duration_seconds: 2.4648
+- scanned_source_files: 889
 - scanned_doc_files: 72
-- scanned_test_files: 227
-- skipped_artifact_files: 3000
+- scanned_test_files: 228
+- skipped_artifact_files: 3021
 - skipped_large_files: 4
 - skipped_dirs: 67
 

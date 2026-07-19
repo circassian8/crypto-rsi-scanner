@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Require closed unit health on future live generations
+**Status:** accepted
+**Decision:** Every complete live market generation observed at or after
+2026-07-19 00:00:00 UTC must carry snapshot-unit validation contract v1. The
+manifest and audit copy exact warning-row, warning-total, warning-category, and
+status values derived from the canonical snapshot rows. Strict doctor rederives
+the values and exact snapshot cardinality; a missing/invalid contract, drift, or
+any unit warning blocks publication. Complete live generations before the
+cutoff and fixture mechanics remain readable under their original immutable
+contract and are never rewritten.
+**Why:** Operator visibility is not sufficient publication evidence. Unit
+normalization directly affects anomaly magnitude and Decision actionability, so
+future authority must prove both warning-free inputs and agreement between its
+summary and exact rows. A forward-only cutoff closes new evidence without
+silently reinterpreting or mutating historical artifacts.
+**Revisit when:** A versioned manifest migration replaces contract v1 or the
+canonical snapshot schema removes `unit_warnings`. Any replacement must retain
+exact-row recomputation, immutable historical compatibility, fail-closed strict
+publication, and no silent 100x unit conversion.
+
 ## 2026-07-18 - Preserve no-independence truth in live empirical projections
 **Status:** accepted
 **Decision:** New `decision_radar.empirical_live_campaign_projection` values use
