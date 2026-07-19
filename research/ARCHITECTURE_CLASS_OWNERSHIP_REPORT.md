@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T21:33:47.847621+00:00`
+- generated_at: `2026-07-19T22:03:09.578146+00:00`
 - public_class_count: `511`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `0`
@@ -10,8 +10,8 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_functions_over_limit: `0`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
-- v3_gate_status: `pending`
-- v3_auto_accept_ready: `False`
+- v3_gate_status: `pass`
+- v3_auto_accept_ready: `True`
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
@@ -21,18 +21,17 @@ Static source inventory only. This report does not call providers, send Telegram
 - multi_public_class_modules_count: `84`
 - accepted_model_bundles_count: `83`
 - unresolved_multi_class_modules_count: `0`
-- api_decomposition_gate_status: `pass`
+- api_decomposition_gate_status: `advisory`
 - api_classes_over_limit: `0`
 - api_functions_over_limit: `0`
 - api_modules_with_multiple_public_classes: `0`
 
 ## Policy
 
-- Every public class over 75 lines should live in its own module unless documented as an exception.
+- Class and function line counts are advisory measurements only.
 - Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.
-- Internal helper classes over 75 lines should also be split or documented.
 - Architecture policy expects public classes to live in their own modules unless the module is a documented model bundle.
-- Architecture policy treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.
+- Historical class-size exceptions remain visible for trend history but do not affect gate status.
 - `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.
 
 ## Architecture Gates
@@ -45,11 +44,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 26 | target_gap |
-| `production_files_over_1500_lines` | 0 | blocker |
+| `production_files_over_1200_lines` | 26 | advisory |
+| `production_files_over_1500_lines` | 0 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
-| `class_exceptions_remaining` | 3 | accepted_exception |
-| `functions_over_150_lines` | 0 | blocker |
+| `class_exceptions_remaining` | 3 | advisory |
+| `functions_over_150_lines` | 0 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -92,23 +91,23 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines | status | revisit condition |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1497 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1451 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/config.py` | 1450 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/project_health/architecture_report.py` | 1411 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1410 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py` | 1389 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1333 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
-| `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 | accepted_near_threshold | Revisit if the file crosses 1,500 lines or gains a new large class/function violation. |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1497 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1451 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/config.py` | 1450 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1410 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py` | 1389 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/project_health/architecture_report.py` | 1375 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1333 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 
 ## API Implementation Cores
 

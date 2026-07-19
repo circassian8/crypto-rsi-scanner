@@ -668,14 +668,14 @@ def test_architecture_final_report_generation_writes_size_and_shim_gates():
     assert payload["dead_duplicate_code_removed"] is False
     assert payload["pytest_runtime_seconds"] == 12.34
     assert payload["standalone_runner_runtime_seconds"] == 56.78
-    assert payload["line_counts"]["tests/test_indicators.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] < 2000
-    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_api.py"] < 3000
+    assert payload["line_counts"]["tests/test_indicators.py"] > 0
+    assert payload["line_counts"]["crypto_rsi_scanner/scanner.py"] > 0
+    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/scanner_api.py"] > 0
     assert "crypto_rsi_scanner/event_alpha_artifact_doctor.py" not in payload["line_counts"]
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] < 1500
-    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"] < 3000
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py"] > 0
+    assert payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"] > 0
     assert payload["api_artifact_doctor_core_lines"] == payload["line_counts"]["crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py"]
-    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] < 1500
+    assert payload["line_counts"]["crypto_rsi_scanner/cli/services/event_alpha.py"] > 0
     assert payload["active_shims"] == 0
     assert payload["partial_shims"] == 0
     assert payload["unmigrated_modules"] >= 1
@@ -693,17 +693,27 @@ def test_architecture_final_report_generation_writes_size_and_shim_gates():
         row["path"] == "crypto_rsi_scanner/scanner.py"
         for row in contract["public_compatibility_entrypoints"]
     )
+    assert contract["size_policy"]["enforcement"] == "advisory_only"
+    assert "production_file_blocker_policy" not in contract["size_policy"]
+    assert "function_blocker_policy" not in contract["size_policy"]
+    assert "class_blocker_policy" not in contract["size_policy"]
     assert payload["v3_contract_path"] == "research/ARCHITECTURE_CONTRACT.md"
-    assert payload["v3_gate_status"] == "accepted_with_documented_exceptions"
-    assert payload["v3_auto_accept_ready"] is False
+    assert payload["v3_gate_status"] == "pass"
+    assert payload["v3_auto_accept_ready"] is True
     assert payload["v3_blockers"] == []
     assert payload["v3_auto_accept_blockers"] == []
-    assert set(payload["v3_accepted_exceptions"]) == {
+    assert payload["v3_gate_snapshot"]["gate_severity"]["production_files_over_1200_lines"] == "advisory"
+    assert payload["v3_gate_snapshot"]["gate_severity"]["production_files_over_1500_lines"] == "advisory"
+    assert payload["v3_gate_snapshot"]["gate_severity"]["functions_over_150_lines"] == "advisory"
+    assert payload["v3_gate_snapshot"]["gate_severity"]["class_exceptions_remaining"] == "advisory"
+    assert set(payload["v3_accepted_exceptions"]) <= {
         "production_files_over_1200_lines",
         "class_exceptions_remaining",
     }
-    assert payload["v3_accepted_exceptions"]["production_files_over_1200_lines"]["count"] == payload["accepted_production_files_over_1200_lines"]
-    assert payload["v3_accepted_exceptions"]["class_exceptions_remaining"]["count"] == 3
+    assert all(
+        payload["v3_gate_snapshot"]["gate_severity"][name] == "advisory"
+        for name in payload["v3_accepted_exceptions"]
+    )
     for gate_name in architecture_v3_contract.V3_GATE_NAMES:
         assert gate_name in payload["v3_gates"]
     assert payload["nonessential_shims_remaining"] == payload["v3_gates"]["nonessential_shims_remaining"]
@@ -816,9 +826,13 @@ def test_architecture_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
                 "removal_candidate_counts": {"keep_public_compatibility": 0},
             },
         )
-    assert accepted["status"] == "accepted_with_documented_exceptions"
+    assert accepted["status"] == "pass"
     assert accepted["v3_blockers"] == []
-    assert accepted["v3_auto_accept_ready"] is False
+    assert accepted["v3_auto_accept_ready"] is True
+    assert accepted["gate_severity"]["production_files_over_1200_lines"] == "advisory"
+    assert accepted["gate_severity"]["production_files_over_1500_lines"] == "advisory"
+    assert accepted["gate_severity"]["functions_over_150_lines"] == "advisory"
+    assert accepted["gate_severity"]["class_exceptions_remaining"] == "advisory"
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -844,8 +858,35 @@ def test_architecture_v3_gate_snapshot_statuses_for_blockers_and_exceptions():
                 "removal_candidate_counts": {"keep_public_compatibility": 0},
             },
         )
-    assert unaccepted_class["status"] == "pending"
-    assert unaccepted_class["v3_pending_exceptions"] == ["class_exceptions_remaining"]
+    assert unaccepted_class["status"] == "pass"
+    assert unaccepted_class["v3_pending_exceptions"] == []
+    assert unaccepted_class["v3_auto_accept_ready"] is True
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        package = root / "crypto_rsi_scanner"
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        ownership_blocked = architecture_v3_contract.build_v3_gate_snapshot(
+            root=root,
+            size_gate_report={},
+            class_ownership_report={
+                "unresolved_multi_class_modules": [
+                    {"module": "crypto_rsi_scanner.mixed", "public_class_count": 2}
+                ]
+            },
+            shim_dependency_report={
+                "entries": [],
+                "old_path_internal_imports": 0,
+                "old_path_test_imports": 0,
+                "old_path_docs_references": 0,
+                "old_path_import_allowed_exceptions": 0,
+                "deleted_shims": 0,
+                "removal_candidate_counts": {"keep_public_compatibility": 0},
+            },
+        )
+    assert ownership_blocked["status"] == "blocked"
+    assert ownership_blocked["v3_blockers"] == ["public_classes_not_in_own_module"]
 
 
 def test_architecture_v3_contract_generation_lists_final_exceptions():
@@ -1243,37 +1284,74 @@ def test_architecture_size_gates_static_baseline_and_new_violation_detection():
         assert report["new_violation_count"] == 0
 
         (package / "new_large.py").write_text("\n".join(["VALUE = 1"] * 1502) + "\n", encoding="utf-8")
-        blocked = architecture_size_gates.build_gate_report(root=root)
-        assert blocked["gate_status"] == "blocked"
-        assert any(row["category"] == "file_over_1500_lines" for row in blocked["new_violations"])
-        assert blocked["production_size_gate_status"] == "blocked"
-        assert blocked["production_files_over_1200_lines"] == 1
-        assert blocked["accepted_production_files_over_1200_lines"] == 0
-        assert blocked["unresolved_production_files_over_1200_lines"] == 1
-        assert blocked["v3_gates"]["production_files_over_1200_lines"] == 1
-        assert blocked["v3_gates"]["production_files_over_1500_lines"] == 1
-        assert blocked["v3_gate_status"] == "blocked"
-        assert "production_files_over_1500_lines" in blocked["v3_blockers"]
-        assert blocked["v3_auto_accept_ready"] is False
+        advisory = architecture_size_gates.build_gate_report(root=root)
+        assert advisory["gate_status"] == "pass"
+        assert advisory["enforcement_status"] == "quantitative_limits_advisory_only"
+        assert advisory["new_blocking_violation_count"] == 0
+        assert any(row["category"] == "file_over_1500_lines" for row in advisory["new_violations"])
+        assert advisory["production_size_gate_status"] == "advisory"
+        assert advisory["production_files_over_1200_lines"] == 1
+        assert advisory["accepted_production_files_over_1200_lines"] == 0
+        assert advisory["unresolved_production_files_over_1200_lines"] == 1
+        assert advisory["v3_gates"]["production_files_over_1200_lines"] == 1
+        assert advisory["v3_gates"]["production_files_over_1500_lines"] == 1
+        assert advisory["v3_gate_status"] == "pass"
+        assert advisory["v3_gate_snapshot"]["gate_severity"]["production_files_over_1500_lines"] == "advisory"
+        assert "production_files_over_1500_lines" not in advisory["v3_blockers"]
+        assert advisory["v3_auto_accept_ready"] is True
         assert json.loads(baseline_path.read_text(encoding="utf-8"))["violation_ids"] == []
 
         (package / "giant_production.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")
-        production_blocked = architecture_size_gates.build_gate_report(root=root)
-        assert production_blocked["production_size_gate_status"] == "blocked"
-        assert production_blocked["production_files_over_2000_lines"] == 1
-        assert any(row["path"] == "crypto_rsi_scanner/giant_production.py" for row in production_blocked["largest_production_files"])
+        production_advisory = architecture_size_gates.build_gate_report(root=root)
+        assert production_advisory["production_size_gate_status"] == "advisory"
+        assert production_advisory["production_files_over_2000_lines"] == 1
+        assert any(row["path"] == "crypto_rsi_scanner/giant_production.py" for row in production_advisory["largest_production_files"])
 
         (tests_dir / "test_giant.py").write_text("\n".join(["VALUE = 1"] * 2002) + "\n", encoding="utf-8")
         test_tracked = architecture_size_gates.build_gate_report(root=root)
-        assert test_tracked["test_size_gate_status"] == "warning"
+        assert test_tracked["test_size_gate_status"] == "advisory"
         assert test_tracked["test_files_over_1500_lines"] == 1
         assert any(row["path"] == "tests/test_giant.py" for row in test_tracked["largest_test_files"])
 
         (package / "feature_legacy.py").write_text("\n".join(["VALUE = 1"] * 3001) + "\n", encoding="utf-8")
-        legacy_blocked = architecture_size_gates.build_gate_report(root=root)
-        assert legacy_blocked["api_decomposition_gate_status"] == "blocked"
-        assert legacy_blocked["api_files_over_3000_lines"] == 1
-        assert legacy_blocked["largest_api_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
+        legacy_advisory = architecture_size_gates.build_gate_report(root=root)
+        assert legacy_advisory["api_decomposition_gate_status"] == "advisory"
+        assert legacy_advisory["api_decomposition_measurement_status"] == "above_3000_reference"
+        assert legacy_advisory["api_files_over_3000_lines"] == 1
+        assert legacy_advisory["largest_api_files"][0]["path"] == "crypto_rsi_scanner/feature_legacy.py"
+
+        (package / "mixed.py").write_text(
+            "class First:\n    pass\n\nclass Second:\n    pass\n",
+            encoding="utf-8",
+        )
+        ownership_blocked = architecture_size_gates.build_gate_report(root=root)
+        assert ownership_blocked["gate_status"] == "blocked"
+        assert ownership_blocked["new_blocking_violation_count"] == 1
+        assert ownership_blocked["new_blocking_violations"][0]["category"] == "public_classes_sharing_module"
+
+
+def test_architecture_completion_never_blocks_quantitative_size_measurements():
+    from crypto_rsi_scanner.project_health import completion_map
+
+    blockers = completion_map._critical_blockers(
+        {
+            "gate_summary": {"status": "pass"},
+            "active_shim_modules_with_implementation_logic": 0,
+            "scanner_command_body_functions_remaining": 0,
+        },
+        {
+            "gate_status": "pass",
+            "production_size_gate_status": "blocked",
+            "api_decomposition_gate_status": "blocked",
+            "production_files_over_1500_lines": 99,
+            "production_files_over_3000_lines": 99,
+            "functions_over_limit_count": 99,
+            "classes_over_limit_count": 99,
+        },
+        {"status": "pass"},
+    )
+
+    assert blockers == []
 
 
 def test_architecture_size_gates_make_target_is_static_and_no_live_runtime_path():
@@ -1281,9 +1359,12 @@ def test_architecture_size_gates_make_target_is_static_and_no_live_runtime_path(
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     module_text = (root / "crypto_rsi_scanner" / "project_health" / "size_gates.py").read_text(encoding="utf-8").casefold()
     assert "architecture-size-baseline-update:" in makefile
+    assert "architecture-size-report:" in makefile
     assert "architecture-size-gates:" in makefile
     assert "$(python) -m crypto_rsi_scanner.project_health.size_gates --update-baseline" in makefile.casefold()
     assert "$(python) -m crypto_rsi_scanner.project_health.size_gates" in makefile.casefold()
+    assert "quantitative_limits_advisory_only" in module_text
+    assert "non_size_module_ownership_only" in module_text
     forbidden = (
         "urlopen",
         "requests.",
@@ -1303,19 +1384,19 @@ def test_architecture_reports_list_large_api_implementation_cores():
 
     size_report = architecture_size_gates.build_gate_report(root=REPO_ROOT)
     final_report = architecture_final_report.build_architecture_final_report(root=REPO_ROOT)
-    assert size_report["api_decomposition_gate_status"] == "pass"
-    assert final_report["api_decomposition_gate_status"] == "pass"
-    assert size_report["api_files_over_1500_lines"] == 0
-    assert final_report["api_files_over_1500_lines"] == 0
-    assert size_report["production_size_gate_status"] == "warning"
-    assert final_report["production_size_gate_status"] == "warning"
-    assert size_report["production_files_over_1200_lines"] == size_report["accepted_production_files_over_1200_lines"]
-    assert size_report["unresolved_production_files_over_1200_lines"] == 0
-    assert final_report["production_files_over_1200_lines"] == final_report["accepted_production_files_over_1200_lines"]
-    assert final_report["unresolved_production_files_over_1200_lines"] == 0
-    assert size_report["production_files_over_1500_lines"] == 0
-    assert final_report["production_files_over_1500_lines"] == 0
-    assert size_report["production_files_over_2000_lines"] == 0
+    assert size_report["api_decomposition_gate_status"] == "advisory"
+    assert final_report["api_decomposition_gate_status"] == "advisory"
+    assert size_report["production_size_gate_status"] == "advisory"
+    assert final_report["production_size_gate_status"] == "advisory"
+    assert size_report["enforcement_status"] == "quantitative_limits_advisory_only"
+    for key in (
+        "api_files_over_1500_lines",
+        "production_files_over_1200_lines",
+        "production_files_over_1500_lines",
+        "production_files_over_2000_lines",
+    ):
+        assert isinstance(size_report[key], int)
+        assert size_report[key] >= 0
     assert not any(
         blocker["path"] == "crypto_rsi_scanner/event_alpha/radar/impact_hypotheses/api.py"
         for blocker in final_report["blockers"]

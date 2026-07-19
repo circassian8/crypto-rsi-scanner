@@ -19,6 +19,8 @@ from ..event_alpha import shims as event_alpha_shims
 CONTRACT_SCHEMA_VERSION = "architecture_contract_v1"
 CONTRACT_JSON = "ARCHITECTURE_CONTRACT.json"
 CONTRACT_MD = "ARCHITECTURE_CONTRACT.md"
+# Historical names remain public for report compatibility. Their numeric values
+# are advisory reference points only and carry no blocking authority.
 PRODUCTION_TARGET_LINE_LIMIT = 1200
 PRODUCTION_BLOCKER_LINE_LIMIT = 1500
 FUNCTION_BLOCKER_LINE_LIMIT = 150
@@ -57,7 +59,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
     },
     "crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py": {
-        "reason": "Outcome maturation/report code is stable and below the blocker threshold.",
+        "reason": "Outcome maturation/report code is a cohesive behavior-critical boundary.",
         "revisit_condition": "When outcome performance views gain new sections.",
     },
     "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py": {
@@ -73,7 +75,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
         "revisit_condition": "When verdict snapshots cover each opportunity level and cap reason.",
     },
     "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py": {
-        "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+        "reason": "Provider/cache enrichment flow is a cohesive behavior-critical boundary.",
         "revisit_condition": "When adding a new enrichment source or cache policy.",
     },
     "crypto_rsi_scanner/event_alpha/shims.py": {
@@ -86,7 +88,7 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
     },
     "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py": {
         "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
-        "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
+        "revisit_condition": "Revisit when adding another source or status family and cohesion or review evidence supports a split.",
     },
     "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py": {
         "reason": "Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary.",
@@ -98,11 +100,11 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
     },
     "crypto_rsi_scanner/event_alpha/operations/daily_operations.py": {
         "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
-        "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
+        "revisit_condition": "Revisit before another scheduler shares the transaction phases or cohesion becomes unclear.",
     },
     "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py": {
         "reason": "Pure frozen shadow-policy, recommendation-seal, final-test, and chronological walk-forward evaluation with no production-policy mutation path.",
-        "revisit_condition": "Split before adding another scenario family or changing the recommendation-seal or walk-forward schemas, and before any growth crosses the 1,500-line blocker.",
+        "revisit_condition": "Revisit when another scenario family or recommendation-seal/walk-forward schema change creates a cohesive new boundary.",
     },
     "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py": {
         "reason": "Pure descriptive episode analysis keeps fixed cohort, cost, monotonicity, operator-burden, and failure classification semantics together under one frozen protocol.",
@@ -110,11 +112,11 @@ ACCEPTED_PRODUCTION_OVER_1200_LINE_FILES: dict[str, dict[str, str]] = {
     },
     "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py": {
         "reason": "Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes.",
-        "revisit_condition": "Split before adding another control or benchmark family and before any further growth reaches the 1,500-line blocker, with selection-digest parity tests in place.",
+        "revisit_condition": "Revisit when another control or benchmark family creates a cohesive boundary, with selection-digest parity tests in place.",
     },
     "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py": {
         "reason": "Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol.",
-        "revisit_condition": "Split before adding intraday outcomes, another horizon family, or a schema revision, and before any further growth reaches the 1,500-line blocker.",
+        "revisit_condition": "Revisit when intraday outcomes, another horizon family, or a schema revision creates a cohesive new boundary.",
     },
     "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py": {
         "reason": "Closed seven-file research-report projection centralizes exact run bindings, cross-report validation, anchored reads, bounded summaries, and byte-stable rendering.",
@@ -162,14 +164,13 @@ V3_INFORMATIONAL_GATES = frozenset(
         "public_compatibility_shims",
         "deleted_shims",
         "old_path_import_allowed_exceptions",
-    }
-)
-V3_ACCEPTED_EXCEPTION_GATES = frozenset(
-    {
         "production_files_over_1200_lines",
+        "production_files_over_1500_lines",
         "class_exceptions_remaining",
+        "functions_over_150_lines",
     }
 )
+V3_ACCEPTED_EXCEPTION_GATES: frozenset[str] = frozenset()
 V3_HARD_BLOCKER_GATES = frozenset(
     name
     for name in V3_GATE_NAMES
@@ -206,13 +207,15 @@ def build_architecture_contract(*, generated_at: datetime | None = None) -> dict
             ),
         },
         "size_policy": {
-            "production_module_target_lines_lt": PRODUCTION_TARGET_LINE_LIMIT,
-            "production_file_blocker_lines_gt": PRODUCTION_BLOCKER_LINE_LIMIT,
-            "production_file_blocker_policy": "Production files over 1,500 lines are blockers unless explicitly accepted.",
-            "function_blocker_lines_gt": FUNCTION_BLOCKER_LINE_LIMIT,
-            "function_blocker_policy": "Functions over 150 lines are blockers unless explicitly accepted.",
-            "class_blocker_lines_gt": CLASS_BLOCKER_LINE_LIMIT,
-            "class_blocker_policy": "Classes over 75 lines should be split or explicitly accepted.",
+            "enforcement": "advisory_only",
+            "historical_production_module_reference_lines": PRODUCTION_TARGET_LINE_LIMIT,
+            "historical_production_file_reference_lines": PRODUCTION_BLOCKER_LINE_LIMIT,
+            "historical_function_reference_lines": FUNCTION_BLOCKER_LINE_LIMIT,
+            "historical_class_reference_lines": CLASS_BLOCKER_LINE_LIMIT,
+            "policy": (
+                "File, function, and class line counts are inventory metrics only and never "
+                "block development, architecture cleanliness, or release."
+            ),
         },
         "class_ownership_policy": {
             "public_classes": "Public classes should live in their own modules.",
@@ -242,9 +245,8 @@ def build_architecture_contract(*, generated_at: datetime | None = None) -> dict
         ],
         "v3_gate_names": list(V3_GATE_NAMES),
         "auto_accept_policy": (
-            "v3 auto-accept requires all v3 gates and documented exceptions to be clear. "
-            "Accepted/documented target gaps report accepted_with_documented_exceptions; "
-            "nonessential shims or unaccepted exceptions keep v3 pending or blocked."
+            "v3 auto-accept requires non-size organization, import, shim, and safety gates to be clear. "
+            "Quantitative line counts are advisory and do not affect status."
         ),
     }
 
@@ -314,7 +316,10 @@ def build_v3_gate_snapshot(
         status = "blocked"
     elif pending_exception_names:
         status = "pending"
-    elif any(accepted_exception_rows.values()):
+    elif any(
+        name in V3_ACCEPTED_EXCEPTION_GATES
+        for name in accepted_exception_rows
+    ):
         status = "accepted_with_documented_exceptions"
     else:
         status = "pass"
@@ -336,11 +341,11 @@ def build_v3_gate_snapshot(
             "public_compatibility_shims": "informational",
             "shim_removal_blockers": "blocker",
             "deleted_shims": "informational",
-            "production_files_over_1200_lines": "accepted_exception" if accepted_exception_rows.get("production_files_over_1200_lines") else "target_gap",
-            "production_files_over_1500_lines": "blocker",
+            "production_files_over_1200_lines": "advisory",
+            "production_files_over_1500_lines": "advisory",
             "public_classes_not_in_own_module": "blocker",
-            "class_exceptions_remaining": "accepted_exception" if accepted_exception_rows.get("class_exceptions_remaining") else "pending_exception",
-            "functions_over_150_lines": "blocker",
+            "class_exceptions_remaining": "advisory",
+            "functions_over_150_lines": "advisory",
             "old_path_docs_references": "blocker_unless_policy_scoped",
             "old_path_import_allowed_exceptions": "informational",
         },
@@ -389,7 +394,7 @@ def format_architecture_contract(contract: Mapping[str, Any]) -> str:
     shim_policy = contract.get("shim_policy") if isinstance(contract.get("shim_policy"), Mapping) else {}
     for key in ("old_event_alpha_shim_paths", "new_imports", "scanner_py", "event_fade_py"):
         lines.append(f"- `{key}`: {shim_policy.get(key)}")
-    lines.extend(["", "## Size And Ownership Gates", ""])
+    lines.extend(["", "## Advisory Size Inventory And Ownership Gates", ""])
     size_policy = contract.get("size_policy") if isinstance(contract.get("size_policy"), Mapping) else {}
     for key, value in size_policy.items():
         lines.append(f"- `{key}`: {value}")
@@ -526,7 +531,7 @@ def _accepted_exception_rows(
             ]
         accepted["production_files_over_1200_lines"] = {
             "count": production_count,
-            "reason": "accepted/documented production files over the v3 1,200-line target",
+            "reason": "historical production-size reference rows retained for advisory trend reporting",
             "rows": rows,
         }
 

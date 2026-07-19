@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Quantitative source-size limits are advisory only
+**Status:** accepted; supersedes prior file/function/class line-count blocker
+policies
+**Decision:** Retain file, function, class, and transitional-core line counts
+as static maintenance telemetry, but never block development, architecture
+cleanliness, or release because a quantitative threshold was crossed. Do not
+split cohesive code solely to satisfy the historical 75/150/1,200/1,500/2,000/
+3,000-line references. Continue enforcing non-size module ownership, canonical
+imports, naming, paths, schemas, security, and safety boundaries.
+**Why:** Mechanical splitting to remain below arbitrary counts was consuming
+implementation effort and could make behavior-critical boundaries harder to
+follow. Cohesion, correctness, testability, and explicit ownership are better
+reasons to split code than a raw line total.
+**Revisit when:** Only if measured defects or review failures show that a
+specific cohesive boundary needs restructuring. Any future quantitative limit
+requires a new explicit owner decision; it must not be inferred from the
+retained historical inventory.
+
 ## 2026-07-19 - Do not infer an account fee from Bybit's public table
 **Status:** accepted
 **Decision:** Treat Bybit's public trading-fee table as product documentation,

@@ -70,8 +70,8 @@ def build_architecture_completion_map(
         "scanner_facade": {
             "path": "crypto_rsi_scanner/scanner.py",
             "line_count": line_counts.get("crypto_rsi_scanner/scanner.py"),
-            "target_lines_lt": 2000,
-            "status": "pass" if (line_counts.get("crypto_rsi_scanner/scanner.py") or 999999) < 2000 else "blocked",
+            "historical_reference_lines_lt": 2000,
+            "status": "advisory",
         },
         "transitional_compatibility_cores": [
             {
@@ -108,6 +108,8 @@ def build_architecture_completion_map(
         },
         "size_gates": {
             "gate_status": size.get("gate_status"),
+            "size_limit_enforcement": size.get("enforcement_status"),
+            "blocking_scope": size.get("blocking_scope"),
             "production_size_gate_status": size.get("production_size_gate_status"),
             "production_files_over_1200_lines": size.get("production_files_over_1200_lines"),
             "accepted_production_files_over_1200_lines": size.get(
@@ -196,7 +198,7 @@ def build_release_candidate_report(
     )
     status = "accepted" if completion["status"] == "accepted" else "pending_with_documented_architecture_blockers"
     verdict = (
-        "Event Alpha architecture accepted: critical behavior, safety, shim, size, scanner-facade, and regression checks passed."
+        "Event Alpha architecture accepted: critical behavior, safety, shim, organization, scanner-facade, and regression checks passed."
         if status == "accepted"
         else "Event Alpha architecture pending: critical blockers remain documented below."
     )
@@ -271,7 +273,7 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
     lines = [
         "# Architecture Completion Map",
         "",
-        "Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.",
+        "Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, advisory size inventory, and safety boundaries.",
         "",
         f"- generated_at: `{data['generated_at']}`",
         f"- status: `{data['status']}`",
@@ -280,8 +282,8 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- cli service bind sites: `{data['cli_architecture']['cli_service_bind_scanner_globals_call_sites']}`",
         f"- active shims: `{data['event_alpha_module_map']['active_shims']}`",
         f"- active shim logic violations: `{data['event_alpha_module_map']['active_shim_modules_with_implementation_logic']}`",
-        f"- size gate status: `{data['size_gates']['gate_status']}`",
-        f"- production size gate status: `{data['size_gates'].get('production_size_gate_status')}`",
+        f"- size inventory status: `{data['size_gates']['gate_status']}`",
+        f"- production size inventory status: `{data['size_gates'].get('production_size_gate_status')}`",
         f"- production files over 1200 lines: `{data['size_gates'].get('production_files_over_1200_lines')}`",
         f"- accepted production files over 1200 lines: `{data['size_gates'].get('accepted_production_files_over_1200_lines')}`",
         f"- unresolved production files over 1200 lines: `{data['size_gates'].get('unresolved_production_files_over_1200_lines')}`",
@@ -291,7 +293,7 @@ def format_completion_markdown(data: dict[str, Any]) -> str:
         f"- accepted class exceptions: `{data['size_gates'].get('accepted_class_exceptions_count')}`",
         f"- remaining class ownership debt: `{data['size_gates'].get('remaining_class_ownership_debt_count')}`",
         f"- multiple public class module status: `{data['size_gates'].get('modules_with_multiple_public_classes_status')}`",
-        f"- test size gate status: `{data['size_gates'].get('test_size_gate_status')}`",
+        f"- test size inventory status: `{data['size_gates'].get('test_size_gate_status')}`",
         f"- api decomposition gate status: `{data['size_gates'].get('api_decomposition_gate_status')}`",
         f"- api files over 3000 lines: `{data['size_gates'].get('api_files_over_3000_lines')}`",
         f"- transitional_named_files_remaining: `{final_gates.get('transitional_named_files_remaining')}`",
@@ -389,13 +391,9 @@ def _critical_blockers(
 ) -> list[dict[str, str]]:
     blockers: list[dict[str, str]] = []
     if final.get("gate_summary", {}).get("status") != "pass":
-        blockers.append({"id": "architecture_final_gate", "reason": "architecture final report has blocking line or organization gates"})
+        blockers.append({"id": "architecture_final_gate", "reason": "architecture final report has blocking organization or safety gates"})
     if size.get("gate_status") != "pass":
-        blockers.append({"id": "architecture_size_gate", "reason": "architecture size gate has new violations compared to baseline"})
-    if size.get("production_size_gate_status") == "blocked":
-        blockers.append({"id": "production_size_gate", "reason": "production source files over 1,500 lines remain without accepted exceptions"})
-    if size.get("api_decomposition_gate_status") == "blocked":
-        blockers.append({"id": "api_decomposition_gate", "reason": "transitional implementation files over 3,000 lines remain"})
+        blockers.append({"id": "architecture_organization_gate", "reason": "a new non-size module-ownership violation is unresolved"})
     if int(final.get("active_shim_modules_with_implementation_logic") or 0) != 0:
         blockers.append({"id": "active_shim_logic", "reason": "active shim modules contain implementation logic"})
     if int(final.get("scanner_command_body_functions_remaining") or 0) != 0:

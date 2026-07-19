@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Retire quantitative source-size blockers · Codex
+**Why:** The owner explicitly retired file-size guards. Mechanical splitting to
+stay below arbitrary line counts was consuming effort without proving better
+cohesion, correctness, or operator safety.
+**Changes:**
+- Converted file, function, class, test, and transitional-core line thresholds
+  into advisory inventory metrics; historical reference values and artifact
+  names remain compatible, but they cannot block development, architecture
+  cleanliness, completion, or release.
+- Kept non-size module ownership enforced: an unregistered multi-public-class
+  module still blocks, while a synthetic 3,001-line API core now reports only
+  an advisory measurement.
+- Updated the architecture contract, size/API/class/final/completion reports,
+  Make targets, working agreement, durable decision, roadmap, and regressions.
+  `architecture-size-gates` remains a legacy alias for
+  `architecture-size-report`.
+**Verify:** All 27 Make/architecture target tests passed; Python compileall
+passed; architecture cleanliness passed with the real over-1,500-line test file
+recorded as advisory and zero ownership blockers; final architecture report
+passed and completion status remained accepted.
+**Notes/risks:** Cohesive splits are still encouraged when supported by defects,
+review evidence, or clear ownership boundaries. Canonical imports, naming,
+paths, schemas, security, module ownership, and all provider/send/trade safety
+gates remain unchanged.
+
 ## 2026-07-19 — Record the thirty-seventh Radar market cycle · Codex
 **Why:** The authorized CoinGecko no-send campaign was cadence-eligible and
 needed another genuine point-in-time observation to continue warming the

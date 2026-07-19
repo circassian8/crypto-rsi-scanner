@@ -2,7 +2,7 @@
 
 Research-only release-candidate report. This report does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-15T04:24:38.565339+00:00`
+- generated_at: `2026-07-19T22:03:18.063431+00:00`
 - acceptance_status: `accepted`
 - critical_gate_status: `pass`
 - commands_passed: `26/26`
@@ -19,10 +19,6 @@ Research-only release-candidate report. This report does not authorize live prov
 | `old_path_internal_imports_zero` | `pass` |
 | `old_path_test_imports_zero` | `pass` |
 | `old_path_docs_references_zero` | `pass` |
-| `production_files_over_1500_zero` | `pass` |
-| `unresolved_production_files_over_1200_zero` | `pass` |
-| `functions_over_150_zero` | `pass` |
-| `oversized_classes_are_accepted` | `pass` |
 | `unresolved_multi_class_modules_zero` | `pass` |
 | `doctor_registry_api_unregistered_zero` | `pass` |
 | `namespace_inventory_complete` | `pass` |
@@ -40,9 +36,9 @@ Research-only release-candidate report. This report does not authorize live prov
 
 | item | value |
 |---|---:|
-| `production_files_over_1200_lines` | `18` |
+| `production_files_over_1200_lines` | `26` |
 | `accepted_class_exceptions_count` | `3` |
-| `architecture_v3_gate_status` | `accepted_with_documented_exceptions` |
+| `architecture_v3_gate_status` | `pass` |
 | `architecture_v3_auto_accept_blockers` | `[]` |
 | `architecture_v3_blockers` | `[]` |
 
@@ -71,8 +67,8 @@ Retained public shims:
 ## Size And Ownership
 
 - production_files_over_1500_lines: `0`
-- production_files_over_1200_lines: `18`
-- unresolved_production_files_over_1200_lines: `0`
+- production_files_over_1200_lines: `26`
+- unresolved_production_files_over_1200_lines: `1`
 - functions_over_150_lines: `0`
 - classes_over_75_lines: `None`
 - accepted_class_exceptions_count: `3`

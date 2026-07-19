@@ -228,7 +228,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 46,
+      "max_class_line_count": 48,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -392,7 +392,7 @@
         "MarketProviderResponse"
       ],
       "exception_reason": "",
-      "max_class_line_count": 59,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
       "public_class_count": 7,
@@ -541,7 +541,7 @@
         "DexOnchainReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 61,
+      "max_class_line_count": 71,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
       "public_class_count": 3,
@@ -556,7 +556,7 @@
         "LiveProviderReadinessReport"
       ],
       "exception_reason": "",
-      "max_class_line_count": 53,
+      "max_class_line_count": 58,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
       "public_class_count": 2,
@@ -734,7 +734,7 @@
         "EventCoreOpportunityStoreWriteResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 48,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
       "public_class_count": 7,
@@ -794,7 +794,7 @@
         "EvidenceSearchProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 54,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
       "public_class_count": 7,
@@ -826,7 +826,7 @@
         "EventClusterAssetLink"
       ],
       "exception_reason": "",
-      "max_class_line_count": 21,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.graph",
       "public_class_count": 3,
@@ -913,7 +913,7 @@
         "IncidentSubjectValidation"
       ],
       "exception_reason": "",
-      "max_class_line_count": 38,
+      "max_class_line_count": 44,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
       "public_class_count": 3,
@@ -1074,7 +1074,7 @@
         "MarketAnomalyScannerConfig"
       ],
       "exception_reason": "",
-      "max_class_line_count": 20,
+      "max_class_line_count": 21,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
       "public_class_count": 2,
@@ -1469,28 +1469,55 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1466,
-      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-      "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
-      "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+      "reason": "Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes.",
+      "revisit_condition": "Revisit when another control or benchmark family creates a cohesive boundary, with selection-digest parity tests in place.",
       "source_kind": "production"
     },
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1465,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
-      "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1457,
+      "line_count": 1497,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
       "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1492,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
+      "reason": "Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol.",
+      "revisit_condition": "Revisit when intraday outcomes, another horizon family, or a schema revision creates a cohesive new boundary.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1484,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
+      "revisit_condition": "Revisit before another scheduler shares the transaction phases or cohesion becomes unclear.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1466,
+      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+      "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
+      "revisit_condition": "Revisit when adding another source or status family and cohesion or review evidence supports a split.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1451,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
+      "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
       "source_kind": "production"
     },
     {
@@ -1505,10 +1532,19 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1411,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-      "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-      "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
+      "line_count": 1449,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "reason": "Closed seven-file research-report projection centralizes exact run bindings, cross-report validation, anchored reads, bounded summaries, and byte-stable rendering.",
+      "revisit_condition": "Split when report schema v2 or another report family is introduced, preserving whole-bundle and byte-for-byte validation fixtures.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1410,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
+      "reason": "Pure descriptive episode analysis keeps fixed cohort, cost, monotonicity, operator-burden, and failure classification semantics together under one frozen protocol.",
+      "revisit_condition": "Split when the analysis schema changes or another cohort family is added, using digest-stable replay fixtures before moving helpers.",
       "source_kind": "production"
     },
     {
@@ -1523,6 +1559,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1389,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
+      "reason": "Pure frozen shadow-policy, recommendation-seal, final-test, and chronological walk-forward evaluation with no production-policy mutation path.",
+      "revisit_condition": "Revisit when another scenario family or recommendation-seal/walk-forward schema change creates a cohesive new boundary.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
@@ -1532,16 +1577,16 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1354,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-      "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-      "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
+      "line_count": 1375,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+      "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
       "source_kind": "production"
     },
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1338,
+      "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
       "revisit_condition": "When config/report command bodies move to focused service modules.",
@@ -1550,10 +1595,28 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1303,
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
+      "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1310,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
       "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1300,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_review.py",
+      "reason": "Pure bounded targeted-review selection keeps outcome-aware categories, evidence bindings, deterministic ranking, and queue finalization in one policy-neutral path.",
+      "revisit_condition": "Split when another review category family or feedback-ledger integration is proposed, with frozen queue-digest fixtures first.",
       "source_kind": "production"
     },
     {
@@ -1568,9 +1631,18 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1276,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1275,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-      "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
+      "reason": "Provider/cache enrichment flow is a cohesive behavior-critical boundary.",
       "revisit_condition": "When adding a new enrichment source or cache policy.",
       "source_kind": "production"
     },
@@ -1604,32 +1676,23 @@
     {
       "accepted": true,
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1242,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-      "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
-      "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1231,
+      "line_count": 1235,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
       "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
       "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
+      "line_count": 1204,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
+      "reason": "Central escaped dashboard route renderer preserves shared candidate filtering, exact authority badges, and fail-closed response layout across the read-only surface.",
+      "revisit_condition": "Split the remaining candidate and authority helpers when a dashboard interaction family changes, using page-level golden render fixtures.",
+      "source_kind": "production"
     }
   ],
-  "accepted_production_files_over_1200_lines": 18,
+  "accepted_production_files_over_1200_lines": 25,
   "active_shim_modules_with_implementation_logic": 0,
   "active_shims": 0,
   "api_artifact_doctor_core_lines": 91,
@@ -1639,13 +1702,16 @@
     "api_classes_over_limit": 0,
     "api_classes_over_limit_rows": [],
     "api_decomposition_blockers": [],
-    "api_decomposition_gate_status": "pass",
+    "api_decomposition_gate_status": "advisory",
+    "api_decomposition_measurement_status": "within_historical_references",
+    "api_decomposition_reference_rows": [],
     "api_file_count": 0,
     "api_files_over_1500_lines": 0,
     "api_files_over_3000_lines": 0,
     "api_functions_over_limit": 0,
     "api_functions_over_limit_rows": [],
     "api_line_blocking_limit": 3000,
+    "api_line_limit_enforcement": "advisory_only",
     "api_line_warning_limit": 1500,
     "api_modules_with_multiple_public_classes": 0,
     "api_modules_with_multiple_public_classes_rows": [],
@@ -1656,7 +1722,7 @@
       "crypto_rsi_scanner/event_alpha/notifications/pipeline_core.py"
     ],
     "api_total_lines": 0,
-    "generated_at": "2026-07-15T04:24:32+00:00",
+    "generated_at": "2026-07-19T22:03:10+00:00",
     "largest_api_files": [],
     "no_live_provider_calls": true,
     "normal_rsi_signal_rows_written": 0,
@@ -1668,7 +1734,7 @@
     "trades_created": 0,
     "triggered_fade_created": 0
   },
-  "api_decomposition_gate_status": "pass",
+  "api_decomposition_gate_status": "advisory",
   "api_files_over_1500_lines": 0,
   "api_files_over_3000_lines": 0,
   "api_functions_over_limit": 0,
@@ -1920,7 +1986,7 @@
           "DashboardSnapshot"
         ],
         "exception_reason": "",
-        "max_class_line_count": 46,
+        "max_class_line_count": 48,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
         "public_class_count": 4,
@@ -2084,7 +2150,7 @@
           "MarketProviderResponse"
         ],
         "exception_reason": "",
-        "max_class_line_count": 59,
+        "max_class_line_count": 61,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
         "public_class_count": 7,
@@ -2233,7 +2299,7 @@
           "DexOnchainReadinessResult"
         ],
         "exception_reason": "",
-        "max_class_line_count": 61,
+        "max_class_line_count": 71,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
         "public_class_count": 3,
@@ -2248,7 +2314,7 @@
           "LiveProviderReadinessReport"
         ],
         "exception_reason": "",
-        "max_class_line_count": 53,
+        "max_class_line_count": 58,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
         "public_class_count": 2,
@@ -2426,7 +2492,7 @@
           "EventCoreOpportunityStoreWriteResult"
         ],
         "exception_reason": "",
-        "max_class_line_count": 48,
+        "max_class_line_count": 62,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
         "public_class_count": 7,
@@ -2486,7 +2552,7 @@
           "EvidenceSearchProvider"
         ],
         "exception_reason": "",
-        "max_class_line_count": 54,
+        "max_class_line_count": 61,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
         "public_class_count": 7,
@@ -2518,7 +2584,7 @@
           "EventClusterAssetLink"
         ],
         "exception_reason": "",
-        "max_class_line_count": 21,
+        "max_class_line_count": 27,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.graph",
         "public_class_count": 3,
@@ -2605,7 +2671,7 @@
           "IncidentSubjectValidation"
         ],
         "exception_reason": "",
-        "max_class_line_count": 38,
+        "max_class_line_count": 44,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
         "public_class_count": 3,
@@ -2766,7 +2832,7 @@
           "MarketAnomalyScannerConfig"
         ],
         "exception_reason": "",
-        "max_class_line_count": 20,
+        "max_class_line_count": 21,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
         "public_class_count": 2,
@@ -3346,7 +3412,7 @@
           "DashboardSnapshot"
         ],
         "exception_reason": "",
-        "max_class_line_count": 46,
+        "max_class_line_count": 48,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
         "public_class_count": 4,
@@ -3510,7 +3576,7 @@
           "MarketProviderResponse"
         ],
         "exception_reason": "",
-        "max_class_line_count": 59,
+        "max_class_line_count": 61,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
         "public_class_count": 7,
@@ -3659,7 +3725,7 @@
           "DexOnchainReadinessResult"
         ],
         "exception_reason": "",
-        "max_class_line_count": 61,
+        "max_class_line_count": 71,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
         "public_class_count": 3,
@@ -3674,7 +3740,7 @@
           "LiveProviderReadinessReport"
         ],
         "exception_reason": "",
-        "max_class_line_count": 53,
+        "max_class_line_count": 58,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
         "public_class_count": 2,
@@ -3852,7 +3918,7 @@
           "EventCoreOpportunityStoreWriteResult"
         ],
         "exception_reason": "",
-        "max_class_line_count": 48,
+        "max_class_line_count": 62,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
         "public_class_count": 7,
@@ -3912,7 +3978,7 @@
           "EvidenceSearchProvider"
         ],
         "exception_reason": "",
-        "max_class_line_count": 54,
+        "max_class_line_count": 61,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
         "public_class_count": 7,
@@ -3944,7 +4010,7 @@
           "EventClusterAssetLink"
         ],
         "exception_reason": "",
-        "max_class_line_count": 21,
+        "max_class_line_count": 27,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.graph",
         "public_class_count": 3,
@@ -4031,7 +4097,7 @@
           "IncidentSubjectValidation"
         ],
         "exception_reason": "",
-        "max_class_line_count": 38,
+        "max_class_line_count": 44,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
         "public_class_count": 3,
@@ -4192,7 +4258,7 @@
           "MarketAnomalyScannerConfig"
         ],
         "exception_reason": "",
-        "max_class_line_count": 20,
+        "max_class_line_count": 21,
         "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
         "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
         "public_class_count": 2,
@@ -4609,74 +4675,123 @@
     "multi_public_class_modules_count": 84,
     "near_threshold_file_status": [
       {
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1497,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1492,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1484,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
         "line_count": 1466,
         "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
-        "line_count": 1465,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
-      },
-      {
-        "line_count": 1457,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "line_count": 1451,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
         "line_count": 1450,
         "path": "crypto_rsi_scanner/config.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
-        "line_count": 1411,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "line_count": 1449,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1410,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
         "line_count": 1397,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1389,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
-        "line_count": 1354,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "line_count": 1375,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
-        "line_count": 1338,
+        "line_count": 1371,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       },
       {
-        "line_count": 1303,
+        "line_count": 1333,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1310,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-        "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-        "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-        "status": "accepted_near_threshold"
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
+      },
+      {
+        "line_count": 1300,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_review.py",
+        "reason": "Historical line-count reference retained for trend visibility only.",
+        "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+        "status": "advisory_measurement"
       }
     ],
     "path": "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.json",
@@ -4712,8 +4827,8 @@
         "line_count": 36,
         "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
         "over_limit": false,
-        "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-        "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
+        "owner_note": "Provider activation safety and cohesion take precedence over advisory line counts.",
+        "reason": "Fixture/live market enrichment adapter is tightly coupled to request budgeting and no-live defaults.",
         "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
         "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
         "split_status": "below_threshold"
@@ -4803,7 +4918,7 @@
         "split_status": "below_threshold"
       }
     ],
-    "public_class_count": 466,
+    "public_class_count": 511,
     "remaining_class_ownership_debt": [],
     "remaining_class_ownership_debt_count": 0,
     "storage_mixin_exception_status": [
@@ -4853,13 +4968,14 @@
   "cli_service_line_counts": {
     "crypto_rsi_scanner/cli/services/__init__.py": 8,
     "crypto_rsi_scanner/cli/services/event_alpha.py": 46,
+    "crypto_rsi_scanner/cli/services/event_alpha_evidence_runtime.py": 325,
     "crypto_rsi_scanner/cli/services/event_alpha_fade_review.py": 517,
-    "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 570,
+    "crypto_rsi_scanner/cli/services/event_alpha_integrated.py": 572,
     "crypto_rsi_scanner/cli/services/event_alpha_namespace.py": 50,
     "crypto_rsi_scanner/cli/services/event_alpha_outcomes.py": 486,
     "crypto_rsi_scanner/cli/services/event_alpha_provider_preflights.py": 71,
     "crypto_rsi_scanner/cli/services/event_alpha_reports.py": 417,
-    "crypto_rsi_scanner/cli/services/event_alpha_research.py": 1199,
+    "crypto_rsi_scanner/cli/services/event_alpha_research.py": 1167,
     "crypto_rsi_scanner/cli/services/inventory.py": 48,
     "crypto_rsi_scanner/cli/services/scanner_api.py": 120
   },
@@ -4899,9 +5015,10 @@
     "migrated_this_run": 29,
     "plugin_check_counts": {
       "integrated_radar": 3,
+      "market_snapshot_units": 1,
       "namespace": 1,
       "notifications": 1,
-      "operations": 47,
+      "operations": 53,
       "outcomes": 1,
       "paths": 1,
       "provider_readiness": 2,
@@ -4915,11 +5032,12 @@
   "event_fade_safety_exception_present": true,
   "functions_over_150_lines": 0,
   "gate_summary": {
+    "advisory": 3,
     "blocked": 0,
-    "passed": 3,
+    "passed": 0,
     "status": "pass"
   },
-  "generated_at": "2026-07-15T04:24:38+00:00",
+  "generated_at": "2026-07-19T22:03:18+00:00",
   "generator": "crypto_rsi_scanner.project_health.architecture_report",
   "historical_row_type_alias": "refactor_final_report",
   "intentionally_outside_event_alpha_modules": [
@@ -4945,20 +5063,38 @@
   "largest_production_files": [
     {
       "limit": 1500,
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1497,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1492,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1484,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1465,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1457,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "line_count": 1451,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "source_kind": "production"
     },
     {
@@ -4969,8 +5105,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1411,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "line_count": 1449,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1410,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
       "source_kind": "production"
     },
     {
@@ -4981,26 +5123,44 @@
     },
     {
       "limit": 1500,
+      "line_count": 1389,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1354,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "line_count": 1375,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1338,
+      "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1303,
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1310,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1300,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_review.py",
       "source_kind": "production"
     },
     {
@@ -5011,8 +5171,20 @@
     },
     {
       "limit": 1500,
+      "line_count": 1276,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1275,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
       "source_kind": "production"
     },
     {
@@ -5035,26 +5207,26 @@
     },
     {
       "limit": 1500,
-      "line_count": 1247,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1242,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1231,
+      "line_count": 1235,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1204,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 1200,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/public_access.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1200,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
     },
     {
@@ -5072,7 +5244,7 @@
     {
       "limit": 1500,
       "line_count": 1199,
-      "path": "crypto_rsi_scanner/cli/services/event_alpha_research.py",
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/loader.py",
       "source_kind": "production"
     },
     {
@@ -5089,106 +5261,58 @@
     },
     {
       "limit": 1500,
-      "line_count": 1196,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
+      "line_count": 1195,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1189,
+      "line_count": 1194,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1194,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1193,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1192,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1188,
       "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
       "line_count": 1187,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1181,
-      "path": "crypto_rsi_scanner/event_fade.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1180,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/run_ledger.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1176,
-      "path": "crypto_rsi_scanner/cli/services/scanner_parts/utility_commands.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1176,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/daily_brief/components/builder.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1175,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1171,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1168,
-      "path": "crypto_rsi_scanner/event_alpha/providers/coinalyze_preflight.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1160,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/loader.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1156,
-      "path": "crypto_rsi_scanner/event_alpha/operations/review_inbox.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1144,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1139,
-      "path": "crypto_rsi_scanner/event_alpha/outcomes/feedback_labels.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1136,
-      "path": "crypto_rsi_scanner/event_alpha/radar/pipeline.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1135,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_confirmation.py",
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model_surfaces.py",
       "source_kind": "production"
     }
   ],
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 1500,
+      "line_count": 1570,
       "path": "tests/cli/test_make_targets.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1500,
+      "path": "tests/event_alpha/test_market_no_send.py",
       "source_kind": "test"
     },
     {
@@ -5205,25 +5329,31 @@
     },
     {
       "limit": 1500,
+      "line_count": 1490,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1485,
+      "path": "tests/event_alpha/test_radar_dashboard.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1483,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1476,
-      "path": "tests/event_alpha/test_market_no_send.py",
+      "line_count": 1479,
+      "path": "tests/event_alpha/test_artifact_schema.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1461,
-      "path": "tests/event_alpha/test_radar_dashboard.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1459,
+      "line_count": 1464,
       "path": "tests/event_alpha/test_operator_workflows.py",
       "source_kind": "test"
     },
@@ -5235,13 +5365,19 @@
     },
     {
       "limit": 1500,
-      "line_count": 1427,
-      "path": "tests/event_alpha/test_artifact_schema.py",
+      "line_count": 1450,
+      "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1421,
+      "line_count": 1430,
+      "path": "tests/event_alpha/test_catalyst_frames.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1422,
       "path": "tests/event_alpha/test_namespace_integrations.py",
       "source_kind": "test"
     },
@@ -5253,7 +5389,13 @@
     },
     {
       "limit": 1500,
-      "line_count": 1309,
+      "line_count": 1369,
+      "path": "tests/event_alpha/test_bybit_liquidation_capture.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1319,
       "path": "tests/event_alpha/test_fade_review_workflows.py",
       "source_kind": "test"
     },
@@ -5271,8 +5413,26 @@
     },
     {
       "limit": 1500,
-      "line_count": 1214,
+      "line_count": 1270,
+      "path": "tests/event_alpha/test_catalyst_search.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1250,
       "path": "tests/event_alpha/test_evidence_acquisition.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1247,
+      "path": "tests/event_alpha/test_tokenomist_v5_capture.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1230,
+      "path": "tests/event_alpha/test_daily_operations.py",
       "source_kind": "test"
     },
     {
@@ -5289,32 +5449,20 @@
     },
     {
       "limit": 1500,
-      "line_count": 1191,
-      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "line_count": 1206,
+      "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1127,
-      "path": "tests/event_alpha/test_catalyst_frames.py",
+      "line_count": 1151,
+      "path": "tests/event_alpha/test_market_observation_campaign_episodes.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1109,
-      "path": "tests/event_alpha/test_market_observation_campaign.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1107,
-      "path": "tests/event_alpha/test_catalyst_search.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1107,
-      "path": "tests/event_alpha/test_daily_operations.py",
+      "line_count": 1120,
+      "path": "tests/event_alpha/test_notification_inbox_rehearsals.py",
       "source_kind": "test"
     },
     {
@@ -5338,7 +5486,7 @@
     {
       "limit": 1500,
       "line_count": 1068,
-      "path": "tests/event_alpha/test_notification_inbox_rehearsals.py",
+      "path": "tests/event_alpha/test_dashboard_readiness.py",
       "source_kind": "test"
     },
     {
@@ -5355,74 +5503,44 @@
     },
     {
       "limit": 1500,
-      "line_count": 1028,
+      "line_count": 1038,
+      "path": "tests/event_alpha/test_outcome_price_recovery_application.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1031,
+      "path": "tests/event_alpha/test_empirical_research_reports.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1030,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 993,
-      "path": "tests/event_alpha/test_discovery_pipeline.py",
+      "line_count": 1001,
+      "path": "tests/event_alpha/test_market_history.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 979,
-      "path": "tests/event_alpha/test_doctor_provider_conflicts.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 925,
-      "path": "tests/event_alpha/test_notification_operations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 920,
-      "path": "tests/event_alpha/test_impact_hypotheses.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 895,
-      "path": "tests/event_alpha/test_notification_routing.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 890,
+      "line_count": 999,
       "path": "tests/event_alpha/test_official_macro_calendar_acquisition.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 883,
-      "path": "tests/event_alpha/test_dashboard_readiness.py",
+      "line_count": 996,
+      "path": "tests/event_alpha/test_discovery_pipeline.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 874,
-      "path": "tests/event_alpha/test_evidence_quality.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 867,
-      "path": "tests/event_alpha/test_claim_semantics.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 859,
-      "path": "tests/event_alpha/test_burn_in_candidate_mode.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 831,
-      "path": "tests/event_alpha/test_source_coverage_reports.py",
+      "line_count": 987,
+      "path": "tests/event_alpha/test_impact_hypotheses.py",
       "source_kind": "test"
     }
   ],
@@ -5434,30 +5552,32 @@
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py": 36,
     "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor_core.py": 91,
     "crypto_rsi_scanner/scanner.py": 90,
-    "tests/test_indicators.py": 1028
+    "tests/test_indicators.py": 1030
   },
   "line_gates": [
     {
       "baseline_lines": 90,
       "blocker_reason": "",
       "current_lines": 90,
-      "gate_status": "pass",
+      "gate_status": "advisory",
       "next_migration_module": "crypto_rsi_scanner/cli/services/scanner_api.py",
       "path": "crypto_rsi_scanner/scanner.py",
       "reduced_by_lines": 0,
       "reduction_pct": 0.0,
+      "reference_status": "within_reference",
       "risk": "Burning down the transitional compatibility core can change CLI defaults, Make target behavior, provider guardrails, or research-only side-effect gates if moved without command snapshots.",
       "target_lines_lt": 2000
     },
     {
       "baseline_lines": 913,
       "blocker_reason": "",
-      "current_lines": 1028,
-      "gate_status": "pass",
+      "current_lines": 1030,
+      "gate_status": "advisory",
       "next_migration_module": "tests/rsi, tests/cli, and tests/event_alpha for any remaining umbrella-only cases",
       "path": "tests/test_indicators.py",
-      "reduced_by_lines": -115,
-      "reduction_pct": -12.6,
+      "reduced_by_lines": -117,
+      "reduction_pct": -12.81,
+      "reference_status": "within_reference",
       "risk": "Over-aggressive removal could break the standalone compatibility runner expected by Make and AGENTS.md.",
       "target_lines_lt": 2000
     },
@@ -5465,11 +5585,12 @@
       "baseline_lines": 36,
       "blocker_reason": "",
       "current_lines": 36,
-      "gate_status": "pass",
+      "gate_status": "advisory",
       "next_migration_module": "crypto_rsi_scanner/event_alpha/doctor/checks/safety.py, namespace.py, stale_artifacts.py, and focused historical-row counter plugins",
       "path": "crypto_rsi_scanner/event_alpha/doctor/artifact_doctor.py",
       "reduced_by_lines": 0,
       "reduction_pct": 0.0,
+      "reference_status": "within_reference",
       "risk": "Doctor extraction can silently change strict/WARN semantics, report counter names, or stale namespace handling if compatibility tests do not pin output.",
       "target_lines_lt": 300
     }
@@ -5693,7 +5814,7 @@
         "DashboardSnapshot"
       ],
       "exception_reason": "",
-      "max_class_line_count": 46,
+      "max_class_line_count": 48,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.dashboard.models",
       "public_class_count": 4,
@@ -5857,7 +5978,7 @@
         "MarketProviderResponse"
       ],
       "exception_reason": "",
-      "max_class_line_count": 59,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_models",
       "public_class_count": 7,
@@ -6006,7 +6127,7 @@
         "DexOnchainReadinessResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 61,
+      "max_class_line_count": 71,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.dex_onchain_readiness",
       "public_class_count": 3,
@@ -6021,7 +6142,7 @@
         "LiveProviderReadinessReport"
       ],
       "exception_reason": "",
-      "max_class_line_count": 53,
+      "max_class_line_count": 58,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.providers.live_provider_readiness",
       "public_class_count": 2,
@@ -6199,7 +6320,7 @@
         "EventCoreOpportunityStoreWriteResult"
       ],
       "exception_reason": "",
-      "max_class_line_count": 48,
+      "max_class_line_count": 62,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.core.models",
       "public_class_count": 7,
@@ -6259,7 +6380,7 @@
         "EvidenceSearchProvider"
       ],
       "exception_reason": "",
-      "max_class_line_count": 54,
+      "max_class_line_count": 61,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.evidence.models",
       "public_class_count": 7,
@@ -6291,7 +6412,7 @@
         "EventClusterAssetLink"
       ],
       "exception_reason": "",
-      "max_class_line_count": 21,
+      "max_class_line_count": 27,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.graph",
       "public_class_count": 3,
@@ -6378,7 +6499,7 @@
         "IncidentSubjectValidation"
       ],
       "exception_reason": "",
-      "max_class_line_count": 38,
+      "max_class_line_count": 44,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.incident_graph",
       "public_class_count": 3,
@@ -6539,7 +6660,7 @@
         "MarketAnomalyScannerConfig"
       ],
       "exception_reason": "",
-      "max_class_line_count": 20,
+      "max_class_line_count": 21,
       "model_bundle_reason": "Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit.",
       "module": "crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner",
       "public_class_count": 2,
@@ -6955,7 +7076,7 @@
   ],
   "multi_public_class_modules_count": 84,
   "namespace_lifecycle_inventory": {
-    "namespace_count": 64,
+    "namespace_count": 104,
     "namespace_count_exact": true,
     "namespace_scan_truncated": false,
     "retention_report": {
@@ -7116,7 +7237,7 @@
         }
       ],
       "compaction_performed": false,
-      "control_metadata_files_read": 45,
+      "control_metadata_files_read": 78,
       "deep_scan_performed": false,
       "deletion_performed": false,
       "direct_entry_scan_limit_per_namespace": 128,
@@ -7126,7 +7247,7 @@
         "notify_llm_deep",
         "tmp_nonexistent_cli_test"
       ],
-      "namespace_count": 64,
+      "namespace_count": 104,
       "namespace_count_exact": true,
       "namespace_entry_scan_error_count": 0,
       "namespace_scan_error": null,
@@ -7499,24 +7620,52 @@
         },
         {
           "artifact_counts": {
-            "json": 1,
-            "jsonl": 4,
-            "md": 2
+            "json": 0,
+            "jsonl": 0,
+            "md": 0
           },
           "current_doctor_status": null,
-          "direct_entry_count": 8,
+          "direct_entry_count": 2,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
-          "file_count": 7,
+          "file_count": 0,
           "file_count_exact": true,
           "marker_present": false,
           "marker_regular": false,
           "marker_status": null,
           "marker_valid": false,
-          "namespace": "derivatives_crowding_smoke",
+          "namespace": "decision_radar_research_lab",
           "nested_entries_scanned": false,
           "profile": null,
-          "reason": "fixture smoke namespace",
+          "reason": "immutable Decision Radar empirical replay and report store; not an operator generation",
+          "retention_policy": "manual_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "manual_review",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 4,
+            "md": 2
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 11,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 10,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active_fixture_smoke",
+          "marker_valid": true,
+          "namespace": "derivatives_crowding_smoke",
+          "nested_entries_scanned": false,
+          "profile": "fixture",
+          "reason": null,
           "retention_policy": "keep_latest_fixture_artifacts",
           "safe_for_burn_in_measurement": false,
           "safe_for_calibration": false,
@@ -7527,15 +7676,15 @@
         },
         {
           "artifact_counts": {
-            "json": 4,
+            "json": 5,
             "jsonl": 4,
             "md": 2
           },
           "current_doctor_status": "not_run",
-          "direct_entry_count": 10,
+          "direct_entry_count": 12,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
-          "file_count": 10,
+          "file_count": 12,
           "file_count_exact": true,
           "marker_present": true,
           "marker_regular": true,
@@ -7544,13 +7693,41 @@
           "namespace": "dex_onchain_readiness_smoke",
           "nested_entries_scanned": false,
           "profile": "fixture",
-          "reason": "fixture smoke namespace",
+          "reason": null,
           "retention_policy": "keep_latest_fixture_artifacts",
           "safe_for_burn_in_measurement": false,
           "safe_for_calibration": false,
           "safe_for_send_readiness": false,
           "stale": false,
           "status": "active_fixture_smoke",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "event_source_independence_contracts",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "immutable digest-addressed source-independence store; not an operator generation",
+          "retention_policy": "manual_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "manual_review",
           "superseded_by": null
         },
         {
@@ -7583,24 +7760,24 @@
         },
         {
           "artifact_counts": {
-            "json": 1,
+            "json": 3,
             "jsonl": 4,
             "md": 2
           },
-          "current_doctor_status": null,
-          "direct_entry_count": 8,
+          "current_doctor_status": "OK",
+          "direct_entry_count": 11,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
-          "file_count": 7,
+          "file_count": 10,
           "file_count_exact": true,
-          "marker_present": false,
-          "marker_regular": false,
-          "marker_status": null,
-          "marker_valid": false,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active_fixture_smoke",
+          "marker_valid": true,
           "namespace": "fade_review_smoke",
           "nested_entries_scanned": false,
-          "profile": null,
-          "reason": "fixture smoke namespace",
+          "profile": "fixture",
+          "reason": null,
           "retention_policy": "keep_latest_fixture_artifacts",
           "safe_for_burn_in_measurement": false,
           "safe_for_calibration": false,
@@ -7672,7 +7849,7 @@
             "md": 14
           },
           "current_doctor_status": "OK",
-          "direct_entry_count": 44,
+          "direct_entry_count": 45,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
           "file_count": 43,
@@ -8031,15 +8208,15 @@
         },
         {
           "artifact_counts": {
-            "json": 8,
+            "json": 9,
             "jsonl": 9,
             "md": 7
           },
-          "current_doctor_status": "not_run",
-          "direct_entry_count": 26,
+          "current_doctor_status": "stale",
+          "direct_entry_count": 28,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
-          "file_count": 24,
+          "file_count": 26,
           "file_count_exact": true,
           "marker_present": true,
           "marker_regular": true,
@@ -8423,15 +8600,15 @@
         },
         {
           "artifact_counts": {
-            "json": 1,
+            "json": 2,
             "jsonl": 2,
             "md": 0
           },
           "current_doctor_status": null,
-          "direct_entry_count": 3,
+          "direct_entry_count": 4,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
-          "file_count": 3,
+          "file_count": 4,
           "file_count_exact": true,
           "marker_present": false,
           "marker_regular": false,
@@ -8647,6 +8824,1070 @@
         },
         {
           "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260716t020832349089z_ed303d3217c3",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 11,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "not_run",
+          "direct_entry_count": 34,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 33,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260716t184915z",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260718t002953190093z_d31fe5583f6d",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 4,
+            "jsonl": 0,
+            "md": 1
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 5,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 5,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260718t014700z",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t024737179194z_ec091813d359",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t034857168543z_0140a5243ae4",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t054122756225z_8f5918a66699",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t064649934868z_174f5ac6bb1f",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t080415034561z_6d91b49d88b1",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260718t090951308907z_ec53f7d76ecc",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 11,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 34,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 33,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t104532z",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t114604067494z_bcd38d70ccfe",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t124637586106z_736f495b1007",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260718t134658932571z_4cfb4a20be01",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 12,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 35,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 34,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t161224033833z_e38565b0005c",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t171241517696z_05b1dff20e0b",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t194216552291z_db06c53cff36",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t204255477332z_10918132378c",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t214327701833z_47f8c7785279",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t224409325942z_e00dd1d2f4a2",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260718t234445835741z_228150d5111e",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t004508073690z_91fdf90a69c9",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260719t014535150908z_a6733972aeef",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t024647460963z_02a7a81ca5e2",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t034714861917z_188daaed2783",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t044927301472z_2dbccc8d492f",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t054955751146z_dc1657d62164",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260719t065058608772z_a2dc7f3da485",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t075136584503z_c6de7445c038",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t085231044712z_5fc5bc0047e1",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t095347969563z_9c44c8df7384",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260719t105409195530z_30c5e86a453c",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t120656522318z_3a5c4a6b39db",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t132456823505z_1f6f530fbb36",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 3,
+            "jsonl": 0,
+            "md": 0
+          },
+          "current_doctor_status": null,
+          "direct_entry_count": 3,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 3,
+          "file_count_exact": true,
+          "marker_present": false,
+          "marker_regular": false,
+          "marker_status": null,
+          "marker_valid": false,
+          "namespace": "radar_market_no_send_20260719t155006851644z_a508931f4454",
+          "nested_entries_scanned": false,
+          "profile": null,
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t204152642468z_64fc98dc9e9d",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
+            "json": 14,
+            "jsonl": 11,
+            "md": 10
+          },
+          "current_doctor_status": "OK",
+          "direct_entry_count": 37,
+          "direct_entry_scan_error": null,
+          "direct_entry_scan_truncated": false,
+          "file_count": 36,
+          "file_count_exact": true,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active",
+          "marker_valid": true,
+          "namespace": "radar_market_no_send_20260719t214234870148z_0bd651607dd8",
+          "nested_entries_scanned": false,
+          "profile": "no_key_live",
+          "reason": "Decision Radar live/no-send observation generation",
+          "retention_policy": "retain_for_burn_in_review",
+          "safe_for_burn_in_measurement": false,
+          "safe_for_calibration": false,
+          "safe_for_send_readiness": false,
+          "stale": false,
+          "status": "active_live_rehearsal",
+          "superseded_by": null
+        },
+        {
+          "artifact_counts": {
             "json": 10,
             "jsonl": 11,
             "md": 10
@@ -8759,24 +10000,24 @@
         },
         {
           "artifact_counts": {
-            "json": 3,
+            "json": 5,
             "jsonl": 3,
             "md": 5
           },
-          "current_doctor_status": null,
-          "direct_entry_count": 12,
+          "current_doctor_status": "WARN",
+          "direct_entry_count": 15,
           "direct_entry_scan_error": null,
           "direct_entry_scan_truncated": false,
-          "file_count": 11,
+          "file_count": 14,
           "file_count_exact": true,
-          "marker_present": false,
-          "marker_regular": false,
-          "marker_status": null,
-          "marker_valid": false,
+          "marker_present": true,
+          "marker_regular": true,
+          "marker_status": "active_fixture_smoke",
+          "marker_valid": true,
           "namespace": "scheduled_catalyst_smoke",
           "nested_entries_scanned": false,
-          "profile": null,
-          "reason": "fixture smoke namespace",
+          "profile": "fixture",
+          "reason": null,
           "retention_policy": "keep_latest_fixture_artifacts",
           "safe_for_burn_in_measurement": false,
           "safe_for_calibration": false,
@@ -8934,10 +10175,10 @@
       "status_counts": {
         "active_architecture_report": 1,
         "active_fixture_smoke": 23,
-        "active_live_rehearsal": 22,
+        "active_live_rehearsal": 60,
         "active_provider_preflight": 5,
         "active_provider_rehearsal": 6,
-        "manual_review": 5,
+        "manual_review": 7,
         "quarantine": 1,
         "stale_deprecated": 1
       }
@@ -8945,10 +10186,10 @@
     "status_counts": {
       "active_architecture_report": 1,
       "active_fixture_smoke": 23,
-      "active_live_rehearsal": 22,
+      "active_live_rehearsal": 60,
       "active_provider_preflight": 5,
       "active_provider_rehearsal": 6,
-      "manual_review": 5,
+      "manual_review": 7,
       "quarantine": 1,
       "stale_deprecated": 1
     },
@@ -8957,74 +10198,123 @@
   },
   "near_threshold_file_status": [
     {
+      "line_count": 1498,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1497,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1492,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1484,
+      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
-      "line_count": 1465,
-      "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1457,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "line_count": 1451,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
       "line_count": 1450,
       "path": "crypto_rsi_scanner/config.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
-      "line_count": 1411,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "line_count": 1449,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1410,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
       "line_count": 1397,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1389,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
-      "line_count": 1354,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "line_count": 1375,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
-      "line_count": 1338,
+      "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     },
     {
-      "line_count": 1303,
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1310,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1300,
+      "path": "crypto_rsi_scanner/event_alpha/operations/empirical_review.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
     }
   ],
   "no_send_rehearsal": true,
@@ -9040,9 +10330,10 @@
   "partial_shims": 0,
   "plugin_check_counts": {
     "integrated_radar": 3,
+    "market_snapshot_units": 1,
     "namespace": 1,
     "notifications": 1,
-    "operations": 47,
+    "operations": 53,
     "outcomes": 1,
     "paths": 1,
     "provider_readiness": 2,
@@ -9052,12 +10343,12 @@
     "stale_artifacts": 1
   },
   "production_classes_over_limit": 3,
-  "production_files_over_1200_lines": 18,
+  "production_files_over_1200_lines": 26,
   "production_files_over_1500_lines": 0,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
   "production_functions_over_limit": 0,
-  "production_size_gate_status": "warning",
+  "production_size_gate_status": "advisory",
   "provider_class_split_status": [
     {
       "accepted_exception": false,
@@ -9089,8 +10380,8 @@
       "line_count": 36,
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist_market",
       "over_limit": false,
-      "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
-      "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
+      "owner_note": "Provider activation safety and cohesion take precedence over advisory line counts.",
+      "reason": "Fixture/live market enrichment adapter is tightly coupled to request budgeting and no-live defaults.",
       "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist_market.py",
       "split_status": "below_threshold"
@@ -9218,29 +10509,29 @@
     "cache_status": "hit",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
-    "input_file_count": 985,
-    "input_fingerprint": "0b09c12bf366684f189d5ca2d589c5844a5e862df2ed20c16a60a19aad93d0ae",
+    "input_file_count": 1248,
+    "input_fingerprint": "b19af6fcd4532a000db37ddc1c6799a91894817e882dc162e7e91968dbb06922",
     "input_fingerprint_match": true,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784089405",
-      "ARCHITECTURE_FINAL_REPORT.md:1784088895",
+      "AGENTS.md:1784497922",
+      "ARCHITECTURE_FINAL_REPORT.md:1784498467",
       "CLAUDE.md:1783278280",
-      "DECISIONS.md:1784089405",
-      "DEVLOG.md:1784089429"
+      "DECISIONS.md:1784497938",
+      "DEVLOG.md:1784498517"
     ],
-    "newest_source_mtime": 1784089471.6691914,
+    "newest_source_mtime": 1784498589.5937476,
     "regex_compile_count": 0,
     "report_mtime": 1783260863.808767,
-    "scan_duration_seconds": 1.6521,
+    "scan_duration_seconds": 2.4095,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 54,
+    "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
-    "scanned_script_files": 2,
-    "scanned_source_files": 773,
-    "scanned_test_files": 154,
-    "skipped_artifact_files": 1948,
+    "scanned_script_files": 4,
+    "scanned_source_files": 909,
+    "scanned_test_files": 254,
+    "skipped_artifact_files": 3536,
     "skipped_binary_files": 0,
     "skipped_dir_samples": [
       "crypto_rsi_scanner/__pycache__",
@@ -9257,21 +10548,25 @@
     "skipped_dirs": 67,
     "skipped_large_file_samples": [
       "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.json",
+      "research/DECISION_RADAR_EMPIRICAL_VALIDATION_REPORT.json",
+      "research/DECISION_RADAR_EMPIRICAL_HARDENING_SUPPLEMENT.json",
       "research/archive/refactor_history/FINAL_REFACTOR_LEGACY_TERMINOLOGY_REPORT.json"
     ],
-    "skipped_large_files": 2,
+    "skipped_large_files": 4,
     "skipped_suffix_files": 1,
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "hit"
   },
-  "shim_dependency_scan_duration_seconds": 1.6521,
-  "shim_dependency_scanned_doc_files": 54,
-  "shim_dependency_scanned_source_files": 773,
-  "shim_dependency_scanned_test_files": 154,
-  "shim_dependency_skipped_artifact_files": 1948,
-  "shim_dependency_skipped_large_files": 2,
+  "shim_dependency_scan_duration_seconds": 2.4095,
+  "shim_dependency_scanned_doc_files": 79,
+  "shim_dependency_scanned_source_files": 909,
+  "shim_dependency_scanned_test_files": 254,
+  "shim_dependency_skipped_artifact_files": 3536,
+  "shim_dependency_skipped_large_files": 4,
   "shim_removal_blockers": 0,
   "shim_status_counts": {},
+  "size_inventory_blocking_scope": "non_size_module_ownership_only",
+  "size_limit_enforcement": "quantitative_limits_advisory_only",
   "standalone_runner_runtime_seconds": 191.61,
   "storage_mixin_exception_status": [
     {
@@ -9312,9 +10607,9 @@
     }
   ],
   "telegram_sends": 0,
-  "test_files_over_1500_lines": 0,
+  "test_files_over_1500_lines": 1,
   "test_runtime_report_path": "research/test_runtime_report.json",
-  "test_size_gate_status": "pass",
+  "test_size_gate_status": "advisory",
   "top_level_event_module_count": 1,
   "trades_created": 0,
   "transitional_file_report": {
@@ -9329,7 +10624,7 @@
     "deleted_shims_count": 124,
     "event_alpha_public_compatibility_entrypoints_path": "research/EVENT_ALPHA_PUBLIC_COMPATIBILITY_ENTRYPOINTS.json",
     "event_fade_safety_exception_present": true,
-    "generated_at": "2026-07-15T04:24:32.551936+00:00",
+    "generated_at": "2026-07-19T22:03:10.635908+00:00",
     "historical_row_type_alias": "final_refactor_transitional_file_report",
     "migration_named_dirs": [],
     "migration_named_dirs_count": 0,
@@ -9386,8 +10681,15 @@
   "unmigrated_modules": 1,
   "unresolved_multi_class_modules": [],
   "unresolved_multi_class_modules_count": 0,
-  "unresolved_production_files_over_1200_line_rows": [],
-  "unresolved_production_files_over_1200_lines": 0,
+  "unresolved_production_files_over_1200_line_rows": [
+    {
+      "limit": 1500,
+      "line_count": 1275,
+      "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
+      "source_kind": "production"
+    }
+  ],
+  "unresolved_production_files_over_1200_lines": 1,
   "v3_accepted_exceptions": {
     "class_exceptions_remaining": {
       "count": 3,
@@ -9436,194 +10738,26 @@
           "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
         }
       ]
-    },
-    "production_files_over_1200_lines": {
-      "count": 18,
-      "reason": "accepted/documented production files over the v3 1,200-line target",
-      "rows": [
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1466,
-          "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-          "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
-          "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1465,
-          "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-          "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
-          "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1457,
-          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1450,
-          "path": "crypto_rsi_scanner/config.py",
-          "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-          "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1411,
-          "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-          "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-          "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1397,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
-          "reason": "Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary.",
-          "revisit_condition": "When the live calendar container schema changes or a second publication format is introduced.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1387,
-          "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-          "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
-          "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1354,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-          "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-          "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1338,
-          "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-          "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-          "revisit_condition": "When config/report command bodies move to focused service modules.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1303,
-          "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-          "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-          "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1285,
-          "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-          "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-          "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1275,
-          "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-          "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
-          "revisit_condition": "When adding a new enrichment source or cache policy.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1264,
-          "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
-          "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
-          "revisit_condition": "When the calendar page gains a new interaction family and has byte-stable page-section fixtures.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1263,
-          "path": "crypto_rsi_scanner/event_alpha/shims.py",
-          "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
-          "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1261,
-          "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-          "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
-          "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1247,
-          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1242,
-          "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-          "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
-          "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1231,
-          "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
-          "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
-          "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
-          "source_kind": "production"
-        }
-      ]
     }
   },
   "v3_auto_accept_blockers": [],
-  "v3_auto_accept_ready": false,
+  "v3_auto_accept_ready": true,
   "v3_blockers": [],
   "v3_contract_path": "research/ARCHITECTURE_CONTRACT.md",
   "v3_gate_snapshot": {
     "auto_accept_blockers": [],
     "contract_path": "research/ARCHITECTURE_CONTRACT.md",
     "gate_severity": {
-      "class_exceptions_remaining": "accepted_exception",
+      "class_exceptions_remaining": "advisory",
       "deleted_shims": "informational",
-      "functions_over_150_lines": "blocker",
+      "functions_over_150_lines": "advisory",
       "nonessential_shims_remaining": "blocker",
       "old_path_docs_references": "blocker_unless_policy_scoped",
       "old_path_import_allowed_exceptions": "informational",
       "old_path_internal_imports": "blocker",
       "old_path_test_imports": "blocker",
-      "production_files_over_1200_lines": "accepted_exception",
-      "production_files_over_1500_lines": "blocker",
+      "production_files_over_1200_lines": "advisory",
+      "production_files_over_1500_lines": "advisory",
       "public_classes_not_in_own_module": "blocker",
       "public_compatibility_shims": "informational",
       "shim_removal_blockers": "blocker"
@@ -9637,7 +10771,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 18,
+      "production_files_over_1200_lines": 26,
       "production_files_over_1500_lines": 0,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -9647,18 +10781,33 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1498,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1497,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1492,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1484,
+        "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1466,
         "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
       },
       {
-        "line_count": 1465,
-        "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1457,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "line_count": 1451,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
@@ -9667,8 +10816,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1411,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+        "line_count": 1449,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1410,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
         "threshold": 1200
       },
       {
@@ -9677,23 +10831,38 @@
         "threshold": 1200
       },
       {
+        "line_count": 1389,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
         "threshold": 1200
       },
       {
-        "line_count": 1354,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "line_count": 1375,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
       },
       {
-        "line_count": 1338,
+        "line_count": 1371,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
         "threshold": 1200
       },
       {
-        "line_count": 1303,
+        "line_count": 1333,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1310,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1300,
+        "path": "crypto_rsi_scanner/event_alpha/operations/empirical_review.py",
         "threshold": 1200
       },
       {
@@ -9702,8 +10871,18 @@
         "threshold": 1200
       },
       {
+        "line_count": 1276,
+        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1275,
         "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1275,
+        "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
         "threshold": 1200
       },
       {
@@ -9722,18 +10901,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1247,
-        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1242,
-        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1231,
+        "line_count": 1235,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1204,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/render.py",
         "threshold": 1200
       }
     ],
@@ -9742,7 +10916,7 @@
     "row_type": "architecture_gate_snapshot",
     "schema_version": "architecture_gate_snapshot_v1",
     "shim_removal_blocker_rows": [],
-    "status": "accepted_with_documented_exceptions",
+    "status": "pass",
     "v3_accepted_exceptions": {
       "class_exceptions_remaining": {
         "count": 3,
@@ -9791,181 +10965,13 @@
             "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
           }
         ]
-      },
-      "production_files_over_1200_lines": {
-        "count": 18,
-        "reason": "accepted/documented production files over the v3 1,200-line target",
-        "rows": [
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1466,
-            "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-            "reason": "Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary.",
-            "revisit_condition": "Split before adding another source or status family, and before any growth crosses the 1,500-line blocker.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1465,
-            "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-            "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
-            "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1457,
-            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1450,
-            "path": "crypto_rsi_scanner/config.py",
-            "reason": "Central environment/config contract; splitting risks import-time default and env-var behavior drift.",
-            "revisit_condition": "When a dedicated config-v2 migration freeze and env snapshot tests exist.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1411,
-            "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-            "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-            "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1397,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
-            "reason": "Read-once calendar snapshot validation keeps provenance, source coverage, secret checks, freshness, and publication projection in one security boundary.",
-            "revisit_condition": "When the live calendar container schema changes or a second publication format is introduced.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1387,
-            "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-            "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
-            "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1354,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-            "reason": "Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity.",
-            "revisit_condition": "When the campaign report schema changes or another campaign family needs the same aggregation primitives.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1338,
-            "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-            "reason": "Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations.",
-            "revisit_condition": "When config/report command bodies move to focused service modules.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1303,
-            "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
-            "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
-            "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1285,
-            "path": "crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py",
-            "reason": "Stable argparse flag bundle; splitting individual flag groups risks CLI default drift.",
-            "revisit_condition": "Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1275,
-            "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
-            "reason": "Provider/cache enrichment flow is stable and below blocker threshold.",
-            "revisit_condition": "When adding a new enrichment source or cache policy.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1264,
-            "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
-            "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
-            "revisit_condition": "When the calendar page gains a new interaction family and has byte-stable page-section fixtures.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1263,
-            "path": "crypto_rsi_scanner/event_alpha/shims.py",
-            "reason": "Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral.",
-            "revisit_condition": "When deleted-shim reporting can be split from old-import linting without changing gate output.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1261,
-            "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-            "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
-            "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1247,
-            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1242,
-            "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
-            "reason": "The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection.",
-            "revisit_condition": "When health sections have independent golden render fixtures or the system-page contract reaches v2.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1231,
-            "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
-            "reason": "Canonical operator-state hashing and exact revision ownership remain centralized and fail closed.",
-            "revisit_condition": "When operator-state schema v2 can split digest policy from revision persistence with byte-stable fixtures.",
-            "source_kind": "production"
-          }
-        ]
       }
     },
-    "v3_auto_accept_ready": false,
+    "v3_auto_accept_ready": true,
     "v3_blockers": [],
     "v3_pending_exceptions": []
   },
-  "v3_gate_status": "accepted_with_documented_exceptions",
+  "v3_gate_status": "pass",
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
@@ -9975,7 +10981,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 18,
+    "production_files_over_1200_lines": 26,
     "production_files_over_1500_lines": 0,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

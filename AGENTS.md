@@ -1196,7 +1196,7 @@ may be added later when a suitable environment already exists.
 | `paper.py` | paper-trade scoreboard (virtual P&L) |
 | `backtest.py` | offline research; **reuses the pure functions** so it matches live logic |
 | `tests/test_indicators.py` | every test (pure, no network) |
-| `project_health/` | permanent static architecture/project-health checks, including baseline, size gates, class ownership, naming cleanup, completion, and final architecture reports |
+| `project_health/` | permanent static architecture/project-health checks, including advisory size inventory, class/module ownership, naming cleanup, completion, and final architecture reports |
 
 ### Event Alpha v1 package boundaries
 
@@ -1232,9 +1232,14 @@ CLI parser
 construction belongs in `cli/parser.py`, dispatch in `cli/dispatch.py`, and
 command groups in `cli/commands_*.py`. New tests belong in
 `tests/event_alpha/`, `tests/rsi/`, or `tests/cli/`; `tests/test_indicators.py`
-is the compatibility umbrella runner. When splitting a large test module, keep
-each extracted module below the 1,500-line warning when a cohesive boundary
-allows it, use package `_api_helpers` instead of importing test callables from
+is the compatibility umbrella runner. Quantitative file, function, and class
+line limits are advisory only: never split code solely to satisfy a count, and
+never treat a historical 75/150/1,200/1,500/2,000/3,000-line reference as a
+development or release blocker. `make architecture-size-report` retains trend
+visibility; `architecture-size-gates` is a compatibility alias. Non-size
+module ownership, canonical imports, naming, path, schema, and safety checks
+remain enforced. When splitting a large test module for a genuine cohesive
+boundary, use package `_api_helpers` instead of importing test callables from
 the old monolith, register the module in the standalone runner, and prove the
 test-name set has neither losses nor duplicates. New artifact fields require schema v1
 updates, and new doctor checks require check-registry schema dependencies.

@@ -2,7 +2,7 @@
 
 Research-only, behavior-preserving finalization contract. This document does not authorize live provider calls, live Telegram sends, trading, paper trading, execution/order logic, Event Alpha RSI signal writes, or Event Alpha-created TRIGGERED_FADE.
 
-- generated_at: `2026-07-15T04:24:38.533208+00:00`
+- generated_at: `2026-07-19T22:03:18.030137+00:00`
 - schema_version: `architecture_contract_v1`
 - purpose: Move from accepted refactor v2 compatibility shims to fully finished refactor v3.
 - feature_policy: Behavior-preserving refactor only; do not add product features.
@@ -14,15 +14,14 @@ Research-only, behavior-preserving finalization contract. This document does not
 - `scanner_py`: scanner.py remains a public CLI entrypoint compatibility wrapper.
 - `event_fade_py`: event_fade.py remains intentionally outside Event Alpha. TRIGGERED_FADE must only come from event_fade.py plus proxy_fade.
 
-## Size And Ownership Gates
+## Advisory Size Inventory And Ownership Gates
 
-- `production_module_target_lines_lt`: 1200
-- `production_file_blocker_lines_gt`: 1500
-- `production_file_blocker_policy`: Production files over 1,500 lines are blockers unless explicitly accepted.
-- `function_blocker_lines_gt`: 150
-- `function_blocker_policy`: Functions over 150 lines are blockers unless explicitly accepted.
-- `class_blocker_lines_gt`: 75
-- `class_blocker_policy`: Classes over 75 lines should be split or explicitly accepted.
+- `enforcement`: advisory_only
+- `historical_production_module_reference_lines`: 1200
+- `historical_production_file_reference_lines`: 1500
+- `historical_function_reference_lines`: 150
+- `historical_class_reference_lines`: 75
+- `policy`: File, function, and class line counts are inventory metrics only and never block development, architecture cleanliness, or release.
 - `public_classes`: Public classes should live in their own modules.
 - `multiple_public_classes`: Modules with multiple public classes should be reduced to model bundles only, with explicit documentation.
 
@@ -52,4 +51,4 @@ Research-only, behavior-preserving finalization contract. This document does not
 
 ## Auto-Accept
 
-- v3 auto-accept requires all v3 gates and documented exceptions to be clear. Accepted/documented target gaps report accepted_with_documented_exceptions; nonessential shims or unaccepted exceptions keep v3 pending or blocked.
+- v3 auto-accept requires non-size organization, import, shim, and safety gates to be clear. Quantitative line counts are advisory and do not affect status.

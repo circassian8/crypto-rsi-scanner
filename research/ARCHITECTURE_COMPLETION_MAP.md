@@ -1,27 +1,27 @@
 # Architecture Completion Map
 
-Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, size gates, and safety boundaries.
+Static map of the behavior-preserving Event Alpha architecture. It records package ownership, compatibility cores, advisory size inventory, and safety boundaries.
 
-- generated_at: `2026-07-10T07:34:56+00:00`
+- generated_at: `2026-07-19T22:03:26+00:00`
 - status: `accepted`
 - scanner.py lines: `90`
 - scanner command bodies remaining: `0`
 - cli service bind sites: `5`
 - active shims: `0`
 - active shim logic violations: `0`
-- size gate status: `pass`
-- production size gate status: `warning`
-- production files over 1200 lines: `9`
-- accepted production files over 1200 lines: `9`
-- unresolved production files over 1200 lines: `0`
+- size inventory status: `pass`
+- production size inventory status: `advisory`
+- production files over 1200 lines: `26`
+- accepted production files over 1200 lines: `25`
+- unresolved production files over 1200 lines: `1`
 - production files over 1500 lines: `0`
 - production files over 2000 lines: `0`
 - production files over 3000 lines: `0`
 - accepted class exceptions: `3`
 - remaining class ownership debt: `0`
 - multiple public class module status: `pass`
-- test size gate status: `pass`
-- api decomposition gate status: `pass`
+- test size inventory status: `advisory`
+- api decomposition gate status: `advisory`
 - api files over 3000 lines: `0`
 - transitional_named_files_remaining: `0`
 - transitional_named_files_with_implementation: `0`

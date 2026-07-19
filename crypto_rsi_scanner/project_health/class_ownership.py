@@ -147,8 +147,8 @@ ACCEPTED_CLASS_EXCEPTIONS: dict[str, dict[str, str]] = {
         "class_name": "CoinGeckoWatchlistMarketProvider",
         "status": "accepted_exception",
         "category": "provider_adapter",
-        "reason": "Fixture/live market enrichment adapter is below file-size gates and tightly coupled to request budgeting and no-live defaults.",
-        "owner_note": "Provider activation safety is more important than shaving this adapter below 75 lines.",
+        "reason": "Fixture/live market enrichment adapter is tightly coupled to request budgeting and no-live defaults.",
+        "owner_note": "Provider activation safety and cohesion take precedence over advisory line counts.",
         "revisit_condition": "Revisit when watchlist market enrichment gains another provider implementation.",
     },
     "crypto_rsi_scanner.event_providers.binance_announcements.api.BinanceAnnouncementProvider": {
@@ -449,11 +449,11 @@ def build_report(
         "api_decomposition_gate_status": api_inventory_data["api_decomposition_gate_status"],
         "exceptions": exception_rows,
         "policy": {
-            "public_class_over_75_lines": "should live in its own module unless documented here",
+            "public_class_over_75_lines": "advisory measurement only",
             "multiple_public_classes": (
                 "blocker unless the module is registered as an accepted model bundle or module exception"
             ),
-            "internal_helper_class_over_75_lines": "should be split or documented",
+            "internal_helper_class_over_75_lines": "advisory measurement only",
             "new_multi_public_class_module": "fails architecture gates unless registered as a model bundle",
         },
     }
@@ -483,7 +483,7 @@ def _provider_class_split_status(
                     if over_limit and exception
                     else "below_threshold"
                     if not over_limit
-                    else "needs_split_or_exception"
+                    else "advisory_over_reference"
                 ),
                 "reason": (exception or {}).get("reason") or "",
                 "owner_note": (exception or {}).get("owner_note") or "",
@@ -594,9 +594,9 @@ def _near_threshold_file_status(package_root: Path, *, repo_root: Path) -> list[
             {
                 "path": rel,
                 "line_count": line_count,
-                "status": "accepted_near_threshold",
-                "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-                "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+                "status": "advisory_measurement",
+                "reason": "Historical line-count reference retained for trend visibility only.",
+                "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
             }
         )
     return sorted(rows, key=lambda row: (-int(row["line_count"]), str(row["path"])))[:40]
@@ -653,11 +653,10 @@ def format_report(report: dict[str, Any]) -> str:
         "",
         "## Policy",
         "",
-        "- Every public class over 75 lines should live in its own module unless documented as an exception.",
+        "- Class and function line counts are advisory measurements only.",
         "- Multiple tiny value objects/enums/protocol DTOs may live together only when registered as accepted model bundles.",
-        "- Internal helper classes over 75 lines should also be split or documented.",
         "- Architecture policy expects public classes to live in their own modules unless the module is a documented model bundle.",
-        "- Architecture policy treats documented class exceptions as accepted exceptions; unaccepted class debt remains pending or blocked.",
+        "- Historical class-size exceptions remain visible for trend history but do not affect gate status.",
         "- `event_fade.py` remains outside Event Alpha; Event Alpha may produce `FADE_SHORT_REVIEW` research artifacts but must not create `TRIGGERED_FADE`.",
         "",
     ]

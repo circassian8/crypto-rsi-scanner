@@ -1,7 +1,11 @@
-"""Progressive static size gates for architecture health.
+"""Advisory static size inventory for architecture health.
 
 This module only reads source files and ASTs. It does not import scanner,
 provider, notification, storage, or backtest runtime modules.
+
+Quantitative file, function, and class line counts are retained for trend
+visibility, but they are not release or development blockers. The legacy
+``size_gates`` module and artifact names remain stable for compatibility.
 """
 
 from __future__ import annotations
@@ -25,6 +29,8 @@ BASELINE_JSON = "ARCHITECTURE_SIZE_BASELINE.json"
 REPORT_JSON = "ARCHITECTURE_SIZE_GATES.json"
 REPORT_MD = "ARCHITECTURE_SIZE_GATES.md"
 DEFAULT_FILE_LINE_LIMIT = 1500
+# Historical constant names are retained for schema and import compatibility;
+# every quantitative threshold below is advisory only.
 PRODUCTION_WARNING_LINE_LIMIT = architecture_contract.PRODUCTION_TARGET_LINE_LIMIT
 PRODUCTION_BLOCKER_LINE_LIMIT = architecture_contract.PRODUCTION_BLOCKER_LINE_LIMIT
 PRODUCTION_CONTINUITY_LINE_LIMIT = 2000
@@ -164,12 +170,8 @@ def build_inventory(
         for row in class_report.get("functions_over_limit", [])
         if isinstance(row, dict) and str(row.get("source_path") or "").startswith("crypto_rsi_scanner/")
     ]
-    production_size_gate_status = (
-        "blocked"
-        if production_files_over_1500 or production_files_over_2000 or production_files_over_3000
-        else ("warning" if production_files_over_1200 else "pass")
-    )
-    test_size_gate_status = "warning" if test_files_over_1500 else "pass"
+    production_size_gate_status = "advisory"
+    test_size_gate_status = "advisory"
     violations = _ownership_violation_rows(long_files, class_report)
     violation_ids = sorted({row["violation_id"] for row in violations})
     return {
@@ -249,7 +251,7 @@ def _ownership_violation_rows(long_files: Iterable[Mapping[str, Any]], class_rep
         {
             "violation_id": f"file:{row['path']}",
             "category": "file_over_1500_lines",
-            "severity": "warning",
+            "severity": "advisory",
             **row,
         }
         for row in long_files
@@ -258,7 +260,7 @@ def _ownership_violation_rows(long_files: Iterable[Mapping[str, Any]], class_rep
         {
             "violation_id": f"class:{row['source_path']}:{row['qualname']}",
             "category": "class_over_75_lines",
-            "severity": "warning",
+            "severity": "advisory",
             **row,
         }
         for row in class_report.get("classes_over_limit", [])
@@ -268,7 +270,7 @@ def _ownership_violation_rows(long_files: Iterable[Mapping[str, Any]], class_rep
         {
             "violation_id": f"function:{row['source_path']}:{row['qualname']}",
             "category": "function_over_150_lines",
-            "severity": "warning",
+            "severity": "advisory",
             **row,
         }
         for row in class_report.get("functions_over_limit", [])
@@ -279,7 +281,7 @@ def _ownership_violation_rows(long_files: Iterable[Mapping[str, Any]], class_rep
         {
             "violation_id": f"public_classes:{row['module']}",
             "category": "public_classes_sharing_module",
-            "severity": "warning",
+            "severity": "blocker",
             **row,
         }
         for row in unresolved
@@ -294,8 +296,8 @@ def _accepted_over_1200_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         **dict(row),
         "accepted": True,
-        "reason": str(meta.get("reason") or "Accepted v3 over-1200-line warning."),
-        "revisit_condition": str(meta.get("revisit_condition") or "Revisit on the next behavior-freeze split pass."),
+        "reason": str(meta.get("reason") or "Historical over-1,200-line advisory measurement."),
+        "revisit_condition": str(meta.get("revisit_condition") or "Revisit only when cohesion or defect evidence justifies a split."),
     }
 
 
@@ -342,7 +344,17 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         for current_id, baseline_id in sorted(MOVED_VIOLATION_ALIASES.items())
         if current_id in current_ids and baseline_id in baseline_ids
     ]
-    gate_status = "pass" if not new_rows else "blocked"
+    new_blocking_rows = [
+        row
+        for row in new_rows
+        if row.get("category") == "public_classes_sharing_module"
+    ]
+    blocking_rows = [
+        row
+        for row in inventory["violations"]
+        if row.get("category") == "public_classes_sharing_module"
+    ]
+    gate_status = "pass" if not blocking_rows else "blocked"
     return {
         **inventory,
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -353,22 +365,26 @@ def build_gate_report(*, root: str | Path | None = None) -> dict[str, Any]:
         "no_live_provider_calls": True,
         "no_sends_trades_paper_rsi_or_triggered_fade": True,
         "gate_status": gate_status,
+        "enforcement_status": "quantitative_limits_advisory_only",
+        "blocking_scope": "non_size_module_ownership_only",
         "api_decomposition_gate_status": inventory.get("api_decomposition_gate_status"),
         "baseline_path": f"research/{BASELINE_JSON}",
         "baseline_present": baseline_path.exists(),
         "policy": {
-            "existing_violations": "warning",
-            "new_violations_compared_to_baseline": "blocker",
-            "v3_production_file_under_1200_lines": "target",
-            "v3_production_file_over_1500_lines": "blocker unless explicitly accepted",
-            "production_file_over_1200_lines": "warning",
-            "production_file_over_1500_lines": "blocker unless explicitly accepted",
-            "production_file_over_2000_lines": "continuity threshold retained for architecture health",
-            "production_file_over_3000_lines": "blocker",
-            "test_file_size_debt": "tracked separately from production completion",
-            "baseline_update": "explicit make architecture-size-baseline-update only",
+            "quantitative_line_counts": "advisory inventory only; never a development or release blocker",
+            "existing_quantitative_measurements": "advisory",
+            "new_quantitative_measurements_compared_to_baseline": "advisory",
+            "historical_reference_thresholds": "retained only for comparable trend reporting",
+            "module_ownership": "new unregistered multi-public-class modules remain blockers",
+            "test_file_size_debt": "advisory inventory only",
+            "baseline_update": "optional explicit trend-snapshot refresh only",
         },
         "new_violation_count": len(new_rows),
+        "new_measurement_count": len(new_rows),
+        "new_blocking_violation_count": len(new_blocking_rows),
+        "new_blocking_violations": new_blocking_rows,
+        "blocking_violation_count": len(blocking_rows),
+        "blocking_violations": blocking_rows,
         "v3_gate_status": v3_gate_snapshot["status"],
         "v3_auto_accept_ready": v3_gate_snapshot["v3_auto_accept_ready"],
         "v3_auto_accept_blockers": v3_gate_snapshot.get("auto_accept_blockers", []),
@@ -418,12 +434,14 @@ def write_gate_report(
 
 def format_gate_report(report: dict[str, Any]) -> str:
     lines = [
-        "# Architecture Size Gates",
+        "# Architecture Size Inventory",
         "",
         "Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.",
         "",
         f"- generated_at: `{report.get('generated_at')}`",
         f"- gate_status: `{report.get('gate_status')}`",
+        f"- enforcement_status: `{report.get('enforcement_status')}`",
+        f"- blocking_scope: `{report.get('blocking_scope')}`",
         f"- baseline_present: `{str(bool(report.get('baseline_present'))).lower()}`",
         f"- files_over_limit_count: `{report.get('files_over_limit_count', 0)}`",
         f"- v3_gate_status: `{report.get('v3_gate_status')}`",
@@ -461,19 +479,12 @@ def format_gate_report(report: dict[str, Any]) -> str:
         "",
         "## Policy",
         "",
-        "- Existing violations from `research/ARCHITECTURE_SIZE_BASELINE.json` are warnings.",
-        "- New file/function/class/module ownership violations are blockers.",
-        "- Architecture health targets production files below 1,200 lines.",
-        "- Production files over 1,200 lines are warnings and must either be split or documented.",
-        "- Architecture health treats production files over 1,500 lines as blockers unless explicitly accepted.",
-        "- Production files over 1,500 lines block architecture-complete status unless explicitly accepted.",
-        "- Production files over 2,000 lines remain a continuity threshold.",
-        "- Production files over 3,000 lines are blockers.",
-        "- Test file size debt is tracked separately and does not block architecture-complete status.",
-        "- Transitional implementation files over 1,500 lines are warnings.",
-        "- Transitional implementation files over 3,000 lines block architecture-complete status.",
+        "- File, function, and class line counts are advisory measurements only.",
+        "- Historical 1,200/1,500/2,000/3,000-line references remain solely for trend comparison.",
+        "- Quantitative growth never blocks development, architecture cleanliness, or release.",
+        "- Test and transitional implementation sizes are likewise advisory.",
         "- New production modules with multiple public classes are blockers unless registered as accepted model bundles.",
-        "- Baseline updates require the explicit `make architecture-size-baseline-update` target.",
+        "- Baseline refresh is optional and exists only for an explicit trend snapshot.",
         "",
         "## New Violations",
         "",
@@ -624,7 +635,7 @@ def _violation_row(row: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write static architecture size gate reports.")
+    parser = argparse.ArgumentParser(description="Write the advisory static architecture size inventory.")
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--update-baseline", action="store_true")
     args = parser.parse_args(argv)

@@ -1,9 +1,9 @@
-"""Architecture health gate report.
+"""Architecture health report with advisory size inventory.
 
 This report is deliberately inventory-first. It measures the current file sizes
 and shim organization after the v1 migration work, records measured test
-runtimes when supplied by the caller, and documents remaining blockers without
-removing compatibility paths.
+runtimes when supplied by the caller, and documents remaining non-size blockers
+without removing compatibility paths.
 """
 
 from __future__ import annotations
@@ -374,6 +374,8 @@ def _class_ownership_final_fields(class_ownership: Mapping[str, Any]) -> dict[st
 
 def _size_gate_final_fields(size_gate_report: Mapping[str, Any]) -> dict[str, Any]:
     return {
+        "size_limit_enforcement": size_gate_report.get("enforcement_status"),
+        "size_inventory_blocking_scope": size_gate_report.get("blocking_scope"),
         "production_size_gate_status": size_gate_report.get("production_size_gate_status"),
         "production_files_over_1200_lines": size_gate_report.get("production_files_over_1200_lines"),
         "accepted_production_files_over_1200_lines": size_gate_report.get(
@@ -449,7 +451,7 @@ def _line_gate_rows(
         current = current_counts.get(path)
         baseline = baseline_counts.get(path)
         target_lines = int(target["target_lines_lt"])
-        passed = current is not None and current < target_lines
+        within_reference = current is not None and current < target_lines
         reduced_by = (baseline - current) if baseline is not None and current is not None else None
         reduction_pct = (
             round((float(reduced_by) / float(baseline)) * 100.0, 2)
@@ -464,8 +466,9 @@ def _line_gate_rows(
                 "reduced_by_lines": reduced_by,
                 "reduction_pct": reduction_pct,
                 "target_lines_lt": target_lines,
-                "gate_status": "pass" if passed else "blocked",
-                "blocker_reason": "" if passed else str(target["blocker_reason"]),
+                "gate_status": "advisory",
+                "reference_status": "within_reference" if within_reference else "above_reference",
+                "blocker_reason": "",
                 "next_migration_module": str(target["next_migration_module"]),
                 "risk": str(target["risk"]),
             }
@@ -502,15 +505,6 @@ def _architecture_extra_blockers(
                 "risk": "Moving the last imperative checks without enough fixtures can change blocker/WARN semantics.",
             }
         )
-    if cli_event_alpha_service_lines is not None and cli_event_alpha_service_lines >= 1500:
-        extra_blockers.append(
-            {
-                "path": "crypto_rsi_scanner/cli/services/event_alpha.py",
-                "blocker_reason": "event_alpha CLI service remains above the requested <1500 split target.",
-                "next_migration_module": "crypto_rsi_scanner/cli/services/event_alpha_notifications.py, event_alpha_integrated.py, provider_preflights.py, reports.py, namespace.py, and outcomes.py",
-                "risk": "Splitting service bodies before replacing scanner-bound globals can change CLI dispatch behavior or provider/send guardrails.",
-            }
-        )
     if cli_service_bind_calls > 13:
         extra_blockers.append(
             {
@@ -520,19 +514,6 @@ def _architecture_extra_blockers(
                 "risk": "Removing the runtime binding too early can break historical helper/config resolution for Makefile-backed commands.",
             }
         )
-    if api_inventory["api_decomposition_gate_status"] == "blocked":
-        for row in api_inventory["api_decomposition_blockers"]:
-            extra_blockers.append(
-                {
-                    "path": str(row.get("path")),
-                    "blocker_reason": (
-                        "Transitional implementation core remains over 3,000 lines; wrappers are not enough "
-                        "to mark the architecture cleanup complete."
-                    ),
-                    "next_migration_module": "focused transitional decomposition modules for this file",
-                    "risk": "Moving too much at once can change CLI, doctor, notification, card, brief, or radar semantics.",
-                }
-            )
     if transitional_file_report.get("status") == "BLOCKED":
         for row in transitional_file_report.get("blockers", []):
             if not isinstance(row, dict):
@@ -543,21 +524,6 @@ def _architecture_extra_blockers(
                     "blocker_reason": "Final architecture gate found a migration-era filename, directory, retained shim, or flat Event Alpha module.",
                     "next_migration_module": "Delete the old file/path or move it to a canonical package name; keep only scanner.py and event_fade.py as documented exceptions.",
                     "risk": "Leaving migration-era paths allows new code to drift back into old compatibility surfaces.",
-                }
-            )
-    if size_gate_report.get("production_size_gate_status") == "blocked":
-        for row in size_gate_report.get("largest_production_files", []):
-            if int(row.get("line_count") or 0) <= size_gates.PRODUCTION_BLOCKER_LINE_LIMIT:
-                continue
-            extra_blockers.append(
-                {
-                    "path": str(row.get("path")),
-                    "blocker_reason": (
-                        "Production module remains over 1,500 lines; architecture completion must "
-                        "document an explicit exception or split the file."
-                    ),
-                    "next_migration_module": "focused production split modules for this file",
-                    "risk": "Moving production code without fixture-backed parity can change CLI, provider, notification, or artifact behavior.",
                 }
             )
     return extra_blockers
@@ -616,10 +582,6 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "old_path_internal_imports_zero": "pass" if int(final_report.get("old_path_internal_imports") or 0) == 0 else "blocked",
         "old_path_test_imports_zero": "pass" if int(final_report.get("old_path_test_imports") or 0) == 0 else "blocked",
         "old_path_docs_references_zero": "pass" if int(final_report.get("old_path_docs_references") or 0) == 0 else "blocked",
-        "production_files_over_1500_zero": "pass" if int(final_report.get("production_files_over_1500_lines") or 0) == 0 else "blocked",
-        "unresolved_production_files_over_1200_zero": "pass" if int(final_report.get("unresolved_production_files_over_1200_lines") or 0) == 0 else "blocked",
-        "functions_over_150_zero": "pass" if int(final_report.get("functions_over_150_lines") or 0) == 0 else "blocked",
-        "oversized_classes_are_accepted": "pass" if int(final_report.get("remaining_class_ownership_debt_count") or 0) == 0 else "blocked",
         "unresolved_multi_class_modules_zero": "pass" if int(final_report.get("unresolved_multi_class_modules_count") or 0) == 0 else "blocked",
         "doctor_registry_api_unregistered_zero": "pass" if int(final_report.get("api_unregistered") or 0) == 0 else "blocked",
         "namespace_inventory_complete": (
@@ -672,6 +634,7 @@ def _build_v3_release_candidate_report(*, root: Path, final_report: Mapping[str,
         "architecture_v3_pending_exceptions": final_report.get("v3_pending_exceptions", []),
         "architecture_v3_accepted_exceptions": accepted_exceptions,
         "accepted_warning_gates": sorted(accepted_exceptions),
+        "quantitative_size_enforcement": "advisory_only",
         "production_files_over_1200_lines": final_report.get("production_files_over_1200_lines"),
         "accepted_production_files_over_1200_line_rows": final_report.get("accepted_production_files_over_1200_line_rows", []),
         "production_files_over_1500_lines": final_report.get("production_files_over_1500_lines"),
@@ -869,7 +832,7 @@ def build_architecture_report(
     }
     shim_counts["unmigrated_modules"] = max(0, len(event_modules) - shim_counts["active_shims"] - shim_counts["partial_shims"])
     line_gates = _line_gate_rows(root=root, current_counts=current_counts, baseline_counts=baseline_counts)
-    blocked = [row for row in line_gates if row["gate_status"] != "pass"]
+    blocked = [row for row in line_gates if row["gate_status"] == "blocked"]
     registry_summary = check_registry.registry_summary()
     scanner_command_bodies = _scanner_command_body_functions(root)
     namespace_inventory = _namespace_inventory(root)
@@ -933,6 +896,7 @@ def build_architecture_report(
         "line_gates": line_gates,
         "gate_summary": {
             "passed": sum(1 for row in line_gates if row["gate_status"] == "pass"),
+            "advisory": sum(1 for row in line_gates if row["gate_status"] == "advisory"),
             "blocked": len(blocked) + len(extra_blockers),
             "status": "blocked" if blocked or extra_blockers else "pass",
         },
@@ -1017,9 +981,9 @@ def format_architecture_report_markdown(data: dict[str, Any]) -> str:
         f"- pytest_runtime_seconds: `{data.get('pytest_runtime_seconds')}`",
         f"- note: {data['runtime_note']}",
         "",
-        "## Size Gates",
+        "## Advisory Size Inventory",
         "",
-        "| file | baseline lines | current lines | reduced by | reduction | target | status |",
+        "| file | baseline lines | current lines | reduced by | reduction | historical reference | status |",
         "|---|---:|---:|---:|---:|---:|---|",
     ]
     for row in data["line_gates"]:
@@ -1130,7 +1094,7 @@ def _append_api_decomposition_section(lines: list[str], data: dict[str, Any]) ->
     lines.extend(
         [
             "",
-            "## API Decomposition Gate",
+            "## Advisory API Size Inventory",
             "",
             "| path | lines |",
             "|---|---:|",
@@ -1282,7 +1246,7 @@ def _append_class_ownership_section(lines: list[str], data: dict[str, Any]) -> N
             )
 
 def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> None:
-    lines.extend(["", "## Production Size Gate", "", "| path | lines |", "|---|---:|"])
+    lines.extend(["", "## Advisory Production Size Inventory", "", "| path | lines |", "|---|---:|"])
     for row in data.get("largest_production_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
@@ -1300,7 +1264,7 @@ def _append_production_size_section(lines: list[str], data: dict[str, Any]) -> N
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")
     else:
         lines.append("| none | 0 |")
-    lines.extend(["", "## Test Size Gate", "", "| path | lines |", "|---|---:|"])
+    lines.extend(["", "## Advisory Test Size Inventory", "", "| path | lines |", "|---|---:|"])
     for row in data.get("largest_test_files", []):
         if isinstance(row, dict):
             lines.append(f"| `{row.get('path')}` | {row.get('line_count', 0)} |")

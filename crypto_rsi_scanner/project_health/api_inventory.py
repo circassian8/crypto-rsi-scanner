@@ -66,8 +66,14 @@ def build_api_inventory(
     ]
     classes_over_limit = [row for row in classes if int(row["line_count"]) > class_line_limit]
     functions_over_limit = [row for row in functions if int(row["line_count"]) > function_line_limit]
-    blocker_rows = files_over_3000
-    gate_status = "blocked" if blocker_rows else "warning" if files_over_1500 else "pass"
+    reference_rows = files_over_3000
+    measurement_status = (
+        "above_3000_reference"
+        if reference_rows
+        else "above_1500_reference"
+        if files_over_1500
+        else "within_historical_references"
+    )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "row_type": "architecture_api_inventory",
@@ -82,6 +88,7 @@ def build_api_inventory(
         "api_line_warning_limit": API_WARNING_LINE_LIMIT,
         "api_line_blocking_limit": API_BLOCKING_LINE_LIMIT,
         "api_required_decomposition_paths": list(API_REQUIRED_DECOMPOSITION_PATHS),
+        "api_line_limit_enforcement": "advisory_only",
         "api_file_count": len(line_rows),
         "api_files_over_1500_lines": len(files_over_1500),
         "api_files_over_3000_lines": len(files_over_3000),
@@ -94,8 +101,10 @@ def build_api_inventory(
         "api_functions_over_limit_rows": functions_over_limit[:160],
         "api_modules_with_multiple_public_classes_rows": modules_with_multiple_public_classes[:120],
         "api_required_decomposition_blockers": required_blockers,
-        "api_decomposition_gate_status": gate_status,
-        "api_decomposition_blockers": blocker_rows,
+        "api_decomposition_gate_status": "advisory",
+        "api_decomposition_measurement_status": measurement_status,
+        "api_decomposition_blockers": [],
+        "api_decomposition_reference_rows": reference_rows,
     }
 
 
@@ -120,6 +129,8 @@ def format_api_inventory(report: dict[str, Any]) -> str:
         f"- generated_at: `{report.get('generated_at')}`",
         f"- api_file_count: `{report.get('api_file_count')}`",
         f"- api_decomposition_gate_status: `{report.get('api_decomposition_gate_status')}`",
+        f"- api_decomposition_measurement_status: `{report.get('api_decomposition_measurement_status')}`",
+        f"- api_line_limit_enforcement: `{report.get('api_line_limit_enforcement')}`",
         f"- api_files_over_1500_lines: `{report.get('api_files_over_1500_lines')}`",
         f"- api_files_over_3000_lines: `{report.get('api_files_over_3000_lines')}`",
     ]
