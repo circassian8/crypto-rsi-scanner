@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the twenty-fifth no-send market cycle · Codex
+**Why:** The campaign reached its next cadence boundary with existing
+authorization present. A real observation was needed both to continue warming
+the temporal baseline and to prove the new forward-only snapshot-unit
+publication contract on an actual authoritative generation.
+**Changes:**
+- Ran one bounded Daily Operations cycle. CoinGecko returned HTTP 200 with 80
+  rows in one request, selected 30 current top-liquidity observations, made no
+  retry, and published/restarted the exact revision-12 namespace
+  `radar_market_no_send_20260719t004508073690z_91fdf90a69c9`.
+- Regenerated the canonical campaign Markdown/JSON report. Campaign truth is
+  now 25 real cycles, 750 retained observations, 720 baseline-counted
+  observations, 30 too-close observations, five historical and zero current
+  ideas, one matured/three pending/one missing-price outcome, and 0/750 trusted
+  spread observations.
+- Proved snapshot-unit validation contract v1 on the first post-cutoff live
+  authority: all 30 snapshots reconcile to `clean`, with zero warning rows,
+  zero warning categories, and no unit-health drift. SHIB remains the only
+  current-universe 1h/4h holdout, advancing to 6/8 and 4/8 eligible samples.
+- Updated `ROADMAP.md` with the exact authority, campaign counters, maturity
+  frontier, and next eligible boundary at 2026-07-19 01:45:08.517863 UTC.
+**Verify:** Daily Operations ended `succeeded/published_and_restarted`; the
+final publication and operations receipts bind the same namespace, run,
+revision, operator digest, artifact digest, doctor digest, and pointer digest.
+Strict artifact doctor passed with 0 blockers/0 warnings; dashboard readiness
+returned exact `READY`; Daily Operations status reported current authorization
+but `waiting_cadence`, an owned dashboard, and an uninstalled scheduler. The
+campaign report reconciles its pointer and latest generation, and the exact
+safety fields remain zero. JSON validation and `git diff --check` passed.
+**Notes/risks:** No Telegram send, trade, order, paper trade, normal RSI write,
+or Event Alpha `TRIGGERED_FADE` occurred. No authorization was created or
+changed. Bybit remains separately unauthorized/unreached in this cycle, spread
+coverage remains zero, and no score, route, threshold, outcome, or human review
+event was manufactured.
+
 ## 2026-07-19 — Bind exact Bybit acquisition to response completion · Codex
 **Why:** Exact transport evidence already preserved response-read completion,
 but normalized execution books used a second independently sampled clock. The
