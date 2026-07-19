@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Bind Bybit quantity constraints to the exact catalog capture
+**Status:** accepted
+**Decision:** Every selected Bybit USDT-linear perpetual must preserve
+`qtyStep`, `minOrderQty`, `maxOrderQty`, `maxMktOrderQty`, and
+`minNotionalValue` from the same complete instrument-catalog response. The
+quantity-reconciled visible-book model must reject a quantity below the minimum,
+above both market and limit maxima, or below the minimum visible quote value on
+either entry or exit. It must report market and marketable-limit quantity
+eligibility separately without choosing an order style. Bind the catalog
+observation clock and lineage causally before the entry book, and revalidate
+the dynamic maxima on every future capture. Keep constraint freshness, USDT-
+tier sizing/rounding, and entry/exit order style unsealed until the Protocol-v2
+annex is approved.
+**Why:** A `qtyStep`-aligned quantity can still be rejected by the venue. Bybit's
+official instrument contract exposes the other size/notional limits and warns
+that maximum quantities change over time. Preserving the exact catalog values
+closes false admissibility while avoiding a fabricated order-style or timeless
+limit assumption.
+**Revisit when:** The first genuine catalog/book capture exists and the annex is
+ready to seal its constraint-freshness window, exact size tiers/rounding, and
+market versus marketable-limit policy. No captured maximum may be treated as a
+permanent venue constant.
+
 ## 2026-07-20 - Reconcile Bybit round trips by exact underlying-token quantity
 **Status:** accepted
 **Decision:** For the selected Bybit USDT-linear perpetual surface, model a

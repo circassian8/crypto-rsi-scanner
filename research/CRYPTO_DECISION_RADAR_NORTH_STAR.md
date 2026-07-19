@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v12 records the owner-confirmed primary research
+Execution-quality readiness v13 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -944,18 +944,30 @@ token quantity. This follows Bybit's current
 which denominates USDT/USDC contract quantity in the underlying token. It
 reports long or short gross mid-mark return, net visible-book return, and their
 USDT drag, normalized to entry mid notional. It never adds `spread_bps`
-separately, and it is not realized execution. Size selection, quantity rounding
-from a USDT tier, order style, fees, funding, latency, beyond-book liquidity,
-and unavailable-cost behavior remain unsealed; therefore
+separately, and it is not realized execution.
+
+The v2 round-trip projection also binds the instrument catalog's `qtyStep`,
+`minOrderQty`, `maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue` together
+with a causal catalog clock and lineage. It rejects quantities below the
+minimum, quantities above both order-style maxima, and entry or exit visible
+quote value below the minimum notional. It reports market versus marketable-
+limit quantity eligibility without selecting either order style. Bybit's
+[instrument contract](https://bybit-exchange.github.io/docs/v5/market/instrument)
+states that the maximum order quantities change over time, so each future
+catalog capture revalidates them and the Protocol-v2 constraint-freshness
+policy remains explicitly unsealed. Size selection, quantity rounding from a
+USDT tier, order style, fees, funding, latency, beyond-book liquidity, and
+unavailable-cost behavior remain unsealed; therefore
 `protocol_v2_cost_model_sealed=false` remains correct.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
-preserves provider/snapshot clocks and book sequence, and derives spread, USDT
-second checked fixture proves the quantity-reconciled entry/exit primitive. A
+preserves provider/snapshot clocks and book sequence, and derives spread and
+USDT depth/impact. A second checked fixture proves the quantity-reconciled
+entry/exit primitive. A
 separately gated public REST adapter and immutable capture contract are
 implemented but inactive. Readiness and capture status make no provider call or
 write. A confirmed capture requires the already-present dedicated authorization
-flag. Capture v4 performs one complete
+flag. Capture v5 performs one complete
 `category=linear&status=Trading&limit=1000` instrument-catalog GET, rejects any
 missing or non-empty continuation cursor as incomplete, and then performs one 200-level order-book
 GET per exact eligible instrument. Its absolute bound is 31 and the current
@@ -979,7 +991,7 @@ one descriptor-anchored namespace for the complete read, rederives every
 projection from raw bytes, rejects pointer rollback/drift, and excludes unknown
 provider fields from the closed capture summary. The standard review archive
 selects and fully revalidates only the latest completed capture.
-For exact-response capture v4, each normalized order book uses the corresponding
+For exact-response capture v5, each normalized order book uses the corresponding
 accepted transport response's read-completion time as `acquired_at`. The
 immutable validator requires all requests and responses to remain inside the
 declared capture window, preserve sequential timing, and match each book's

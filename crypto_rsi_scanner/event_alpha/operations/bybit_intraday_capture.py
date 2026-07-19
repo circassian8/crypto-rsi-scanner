@@ -58,7 +58,7 @@ from .market_no_send_models import MarketNoSendError
 CONTRACT_VERSION = "crypto_radar_bybit_intraday_capture_v4"
 LIVE_CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v4"
 EXECUTION_CAPTURE_CONTRACT_VERSION = (
-    "crypto_radar_bybit_execution_quality_capture_v4"
+    "crypto_radar_bybit_execution_quality_capture_v5"
 )
 POINTER_FILENAME = "radar_bybit_intraday_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
@@ -208,7 +208,9 @@ def _instrument_from_values(value: object) -> BybitEligibleInstrument:
         raise BybitIntradayCaptureError("eligible_instrument_schema_invalid")
     expected = {
         "base_asset", "canonical_asset_id", "contract_type", "delivery_time_ms",
-        "instrument_id", "launch_time_ms", "liquidity_rank", "quantity_step",
+        "instrument_id", "launch_time_ms", "liquidity_rank",
+        "maximum_limit_order_quantity", "maximum_market_order_quantity",
+        "minimum_notional_value_usdt", "minimum_order_quantity", "quantity_step",
         "quote_asset", "radar_symbol", "settle_asset", "status", "tick_size",
     }
     if set(value) != expected:
@@ -226,6 +228,16 @@ def _instrument_from_values(value: object) -> BybitEligibleInstrument:
             status=str(value["status"]),
             tick_size=str(value["tick_size"]),
             quantity_step=str(value["quantity_step"]),
+            minimum_order_quantity=str(value["minimum_order_quantity"]),
+            maximum_limit_order_quantity=str(
+                value["maximum_limit_order_quantity"]
+            ),
+            maximum_market_order_quantity=str(
+                value["maximum_market_order_quantity"]
+            ),
+            minimum_notional_value_usdt=str(
+                value["minimum_notional_value_usdt"]
+            ),
             launch_time_ms=int(value["launch_time_ms"]),
             delivery_time_ms=int(value["delivery_time_ms"]),
         )

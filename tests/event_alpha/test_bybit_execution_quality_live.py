@@ -339,6 +339,10 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
         "BTCUSDT",
         "ETHUSDT",
     ]
+    assert result["eligible_instruments"][0]["minimum_order_quantity"] == "0.001"
+    assert result["eligible_instruments"][0]["maximum_limit_order_quantity"] == "1190"
+    assert result["eligible_instruments"][0]["maximum_market_order_quantity"] == "500"
+    assert result["eligible_instruments"][0]["minimum_notional_value_usdt"] == "5"
     assert result["execution_quality_snapshot_count"] == 2
     assert result["provider_request_count"] == 3
     assert result["provider_request_bound"] == 4

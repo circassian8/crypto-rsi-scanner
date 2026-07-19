@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
@@ -30,7 +31,6 @@ from .bybit_execution_quality import (
     INSTRUMENT_STATUS,
     QUOTE_ASSET,
     VENUE_ID,
-    BybitEligibleInstrument,
 )
 from .bybit_liquidation_stream import (
     PUBLIC_WEBSOCKET_URL,
@@ -67,6 +67,28 @@ _FORBIDDEN_SOURCE_PARTS = frozenset(
 )
 class BybitLiquidationCaptureError(RuntimeError):
     """Fail-closed local transcript or immutable-bundle error."""
+
+
+@dataclass(frozen=True)
+class _BybitLiquidationInstrumentIdentity:
+    """The historical transcript's minimal identity, not an order contract."""
+
+    canonical_asset_id: str
+    radar_symbol: str
+    liquidity_rank: int
+    instrument_id: str
+    base_asset: str
+    quote_asset: str
+    settle_asset: str
+    contract_type: str
+    status: str
+    tick_size: str
+    quantity_step: str
+    launch_time_ms: int
+    delivery_time_ms: int
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -167,7 +189,7 @@ def _utc_datetime(value: object, field: str) -> datetime:
     return datetime.fromisoformat(_utc_text(value, field).replace("Z", "+00:00"))
 
 
-def _instrument_from_values(value: object) -> BybitEligibleInstrument:
+def _instrument_from_values(value: object) -> _BybitLiquidationInstrumentIdentity:
     expected = {
         "base_asset",
         "canonical_asset_id",
@@ -196,7 +218,7 @@ def _instrument_from_values(value: object) -> BybitEligibleInstrument:
     ):
         raise BybitLiquidationCaptureError("instrument_schema_invalid")
     try:
-        instrument = BybitEligibleInstrument(**dict(value))
+        instrument = _BybitLiquidationInstrumentIdentity(**dict(value))
     except (TypeError, ValueError) as exc:
         raise BybitLiquidationCaptureError("instrument_schema_invalid") from exc
     if (
@@ -606,7 +628,7 @@ def _closed_truth(capture_mode: str | None) -> dict[str, object]:
 
 def _common(prepared: Mapping[str, object]) -> dict[str, object]:
     instrument = prepared["instrument"]
-    if not isinstance(instrument, BybitEligibleInstrument):
+    if not isinstance(instrument, _BybitLiquidationInstrumentIdentity):
         raise BybitLiquidationCaptureError("prepared_instrument_invalid")
     operator_supplied = prepared.get("capture_mode") == "operator_import"
     return {
@@ -996,7 +1018,7 @@ def _unavailable(reason: str) -> dict[str, object]:
 
 
 def _smoke_transcript() -> bytes:
-    instrument = BybitEligibleInstrument(
+    instrument = _BybitLiquidationInstrumentIdentity(
         canonical_asset_id="bitcoin",
         radar_symbol="BTC",
         liquidity_rank=1,

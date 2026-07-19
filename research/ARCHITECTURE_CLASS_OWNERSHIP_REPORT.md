@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T22:22:15.358147+00:00`
+- generated_at: `2026-07-19T22:42:36.041759+00:00`
 - public_class_count: `511`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `0`
+- functions_over_limit_count: `1`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `0`
+- production_functions_over_limit: `1`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `0`
+- functions_over_150_lines: `1`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `84`
@@ -44,11 +44,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 26 | advisory |
+| `production_files_over_1200_lines` | 28 | advisory |
 | `production_files_over_1500_lines` | 0 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 0 | advisory |
+| `functions_over_150_lines` | 1 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -309,3 +309,4 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | function | lines | public |
 |---|---|---:|---:|
+| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 201 | true |

@@ -551,7 +551,7 @@ may be added later when a suitable environment already exists.
   radar-execution-quality-bybit-status` validates the latest capture; neither
   makes a provider call or write. Capture requires the already-present
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the exact
-  `CONFIRM=1` target. Capture v4 first requests one complete `Trading` linear
+  `CONFIRM=1` target. Capture v5 first requests one complete `Trading` linear
   instrument catalog with `limit=1000`, requires an explicit empty continuation
   cursor (missing or non-empty fails closed), and then requests one 200-level book per
   exact eligible instrument. Its absolute bound is 31 GETs and the current
@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v12 must expose those remaining cost fields rather
+  Execution-quality readiness v13 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -593,10 +593,17 @@ may be added later when a suitable environment already exists.
   remains unsealed.
   Buy impact uses exact USDT spent and sell impact uses exact USDT proceeds.
   Equal numeric USDT lookup sizes do not prove equal base-asset quantity. The
-  offline round-trip v1 primitive instead walks two distinct fresh books with
+  offline round-trip v2 primitive instead walks two distinct fresh books with
   one exact `qtyStep`-aligned underlying-token quantity, as defined for Bybit
   USDT-linear contracts, and reports the visible-book drag against entry-mid
-  notional. It is not realized execution and must not add `spread_bps` again.
+  notional. It also binds the catalog's minimum quantity, market/limit maximum
+  quantities, minimum notional, causal clock, and lineage; rejects quantities
+  below the minimum, above both style maxima, or below minimum visible quote
+  value on either leg; and reports quantity eligibility per order style without
+  selecting one. Bybit changes maximums over time, so each catalog capture must
+  preserve and revalidate them while the annex-level constraint freshness
+  policy remains unsealed. It is not realized execution and must not add
+  `spread_bps` again.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

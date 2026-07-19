@@ -398,6 +398,32 @@ def test_capture_rejects_completion_freshness_summary_drift_before_writes(
     assert list(tmp_path.glob("radar_bybit_execution_quality_*")) == []
 
 
+def test_capture_rejects_catalog_quantity_constraint_projection_drift(
+    tmp_path: Path,
+) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    summary, responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: NOW,
+        resolver=_resolver(observations),
+        fetch_json=_fetch,
+    )
+    summary["eligible_instruments"][0]["maximum_market_order_quantity"] = "499"
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="eligible_instrument_projection_drift",
+    ):
+        persist_bybit_execution_quality_capture(
+            tmp_path,
+            summary=summary,
+            responses=responses,
+        )
+
+    assert not (tmp_path / POINTER_FILENAME).exists()
+
+
 def test_capture_rejects_snapshot_acquisition_response_clock_drift_before_writes(
     tmp_path: Path,
 ) -> None:

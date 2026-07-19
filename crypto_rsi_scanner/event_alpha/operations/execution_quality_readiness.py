@@ -15,12 +15,13 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 from .bybit_execution_quality import (
+    OFFICIAL_INSTRUMENT_DOC,
     OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
     ROUND_TRIP_SCHEMA_VERSION,
 )
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v12"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v13"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -79,6 +80,23 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
         "bybit_USDT_linear_contract_quantity_in_underlying_token"
     ),
     "round_trip_quantity_source_url": OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
+    "instrument_order_constraints_implemented": True,
+    "instrument_constraint_fields": (
+        "quantity_step",
+        "minimum_order_quantity",
+        "maximum_limit_order_quantity",
+        "maximum_market_order_quantity",
+        "minimum_notional_value_usdt",
+    ),
+    "instrument_constraint_source_url": OFFICIAL_INSTRUMENT_DOC,
+    "instrument_maximums_dynamic": True,
+    "instrument_maximums_revalidated_each_catalog_capture": True,
+    "instrument_constraints_causality_required": True,
+    "instrument_constraints_freshness_policy_sealed": False,
+    "minimum_order_quantity_enforced": True,
+    "minimum_notional_enforced_on_entry_and_exit_visible_quote_value": True,
+    "order_style_quantity_eligibility_reported": True,
+    "entry_exit_order_style_policy_sealed": False,
 }
 COMMON_METRICS = (
     "best_bid",
@@ -657,14 +675,14 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             ),
         ),
         supported_offline_adapters=(
-            "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
-            "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v1",
+            "bybit_usdt_linear_perpetual_fixture_normalizer_v3",
+            "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v2",
         ),
         supported_live_adapters=(
-            "bybit_usdt_linear_perpetual_public_REST_capture_v4",
+            "bybit_usdt_linear_perpetual_public_REST_capture_v5",
         ),
         supported_evidence_stores=(
-            "immutable_raw_response_manifest_receipt_pointer_v4",
+            "immutable_raw_response_manifest_receipt_pointer_v5",
         ),
         immutable_capture_contract_implemented=True,
         protocol_v2_annex_bound=False,
@@ -701,6 +719,9 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "adding_standalone_spread_to_the_same_side_impact_would_double_count",
             "equal_buy_and_sell_USDT_notionals_do_not_prove_equal_base_quantity",
             "round_trip_visible_book_walk_reconciles_one_exact_underlying_token_quantity_across_distinct_fresh_books",
+            "catalog_bound_minimum_quantity_minimum_notional_and_dynamic_order_style_maximums_are_preserved_and_enforced",
+            "market_and_marketable_limit_quantity_eligibility_are_reported_without_selecting_an_order_style",
+            "instrument_constraint_freshness_policy_remains_unsealed_because_Bybit_changes_maximums_over_time",
             "round_trip_size_selection_rounding_and_cost_application_policy_remain_unsealed",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
@@ -765,6 +786,26 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"quantity_semantics={value['round_trip_quantity_semantics']} "
         "realized_execution="
         f"{str(value['round_trip_visible_book_realized_execution']).casefold()}",
+        "instrument_order_constraints_implemented="
+        f"{str(value['instrument_order_constraints_implemented']).casefold()} "
+        "constraint_fields="
+        + ",".join(value["instrument_constraint_fields"]),
+        "instrument_maximums_dynamic="
+        f"{str(value['instrument_maximums_dynamic']).casefold()} "
+        "revalidated_each_catalog_capture="
+        f"{str(value['instrument_maximums_revalidated_each_catalog_capture']).casefold()} "
+        "causality_required="
+        f"{str(value['instrument_constraints_causality_required']).casefold()}",
+        "instrument_constraints_freshness_policy_sealed="
+        f"{str(value['instrument_constraints_freshness_policy_sealed']).casefold()} "
+        "entry_exit_order_style_policy_sealed="
+        f"{str(value['entry_exit_order_style_policy_sealed']).casefold()}",
+        "minimum_order_quantity_enforced="
+        f"{str(value['minimum_order_quantity_enforced']).casefold()} "
+        "minimum_notional_enforced_on_entry_and_exit_visible_quote_value="
+        f"{str(value['minimum_notional_enforced_on_entry_and_exit_visible_quote_value']).casefold()} "
+        "order_style_quantity_eligibility_reported="
+        f"{str(value['order_style_quantity_eligibility_reported']).casefold()}",
     )
 
 

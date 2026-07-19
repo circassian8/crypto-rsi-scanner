@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v11")
+    assert values["progress_version"].endswith("_v12")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -80,7 +80,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
         "same_exact_base_quantity_across_distinct_books"
     )
     assert decision["round_trip_visible_book_schema_version"] == (
-        "crypto_radar.bybit_visible_book_round_trip.v1"
+        "crypto_radar.bybit_visible_book_round_trip.v2"
     )
     assert decision["round_trip_visible_book_order_style"] == (
         "immediately_marketable_book_walk"
@@ -93,6 +93,19 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["round_trip_quantity_semantics"] == (
         "bybit_USDT_linear_contract_quantity_in_underlying_token"
     )
+    assert decision["instrument_order_constraints_implemented"] is True
+    assert decision["instrument_constraint_fields"] == [
+        "quantity_step",
+        "minimum_order_quantity",
+        "maximum_limit_order_quantity",
+        "maximum_market_order_quantity",
+        "minimum_notional_value_usdt",
+    ]
+    assert decision["instrument_maximums_dynamic"] is True
+    assert decision["instrument_maximums_revalidated_each_catalog_capture"] is True
+    assert decision["instrument_constraints_causality_required"] is True
+    assert decision["instrument_constraints_freshness_policy_sealed"] is False
+    assert decision["entry_exit_order_style_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -286,7 +299,10 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "round_trip_base_quantity_reconciliation_implemented=true" in output.out
     assert "round_trip_base_quantity_policy_sealed=false" in output.out
     assert "same_exact_base_quantity_across_distinct_books" in output.out
-    assert "crypto_radar.bybit_visible_book_round_trip.v1" in output.out
+    assert "crypto_radar.bybit_visible_book_round_trip.v2" in output.out
+    assert "instrument_order_constraints_implemented=true" in output.out
+    assert "instrument_maximums_dynamic=true" in output.out
+    assert "instrument_constraints_freshness_policy_sealed=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

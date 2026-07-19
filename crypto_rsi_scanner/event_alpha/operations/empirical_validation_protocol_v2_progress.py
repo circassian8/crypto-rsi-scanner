@@ -42,10 +42,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v11"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v12"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_quantity_reconciled_round_trip_primitive_mid_reference_impact_semantics_native_"
+    "with_catalog_bound_dynamic_instrument_constraints_quantity_reconciled_round_trip_"
+    "primitive_mid_reference_impact_semantics_native_"
     "Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_cost_unit_"
     "detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
 )
@@ -131,7 +132,7 @@ _EXPECTED_EXECUTION_DECISION = {
     "round_trip_base_quantity_policy_sealed": False,
     "round_trip_size_basis": "same_exact_base_quantity_across_distinct_books",
     "round_trip_visible_book_schema_version": (
-        "crypto_radar.bybit_visible_book_round_trip.v1"
+        "crypto_radar.bybit_visible_book_round_trip.v2"
     ),
     "round_trip_visible_book_order_style": "immediately_marketable_book_walk",
     "round_trip_visible_book_cost_basis": "entry_mid_notional_usdt",
@@ -143,6 +144,25 @@ _EXPECTED_EXECUTION_DECISION = {
     "round_trip_quantity_source_url": (
         "https://www.bybit.com/en/help-center/article/Order-Cost-USDT-Contract"
     ),
+    "instrument_order_constraints_implemented": True,
+    "instrument_constraint_fields": [
+        "quantity_step",
+        "minimum_order_quantity",
+        "maximum_limit_order_quantity",
+        "maximum_market_order_quantity",
+        "minimum_notional_value_usdt",
+    ],
+    "instrument_constraint_source_url": (
+        "https://bybit-exchange.github.io/docs/v5/market/instrument"
+    ),
+    "instrument_maximums_dynamic": True,
+    "instrument_maximums_revalidated_each_catalog_capture": True,
+    "instrument_constraints_causality_required": True,
+    "instrument_constraints_freshness_policy_sealed": False,
+    "minimum_order_quantity_enforced": True,
+    "minimum_notional_enforced_on_entry_and_exit_visible_quote_value": True,
+    "order_style_quantity_eligibility_reported": True,
+    "entry_exit_order_style_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
     "data_boundary": "public_market_data_only",
     "credentials_or_private_account_data": False,
@@ -155,6 +175,9 @@ def current_progress_values() -> dict[str, Any]:
 
     execution = build_execution_quality_readiness()
     impact = dict(execution.impact_cost_semantics)
+    impact["instrument_constraint_fields"] = list(
+        impact["instrument_constraint_fields"]
+    )
     frozen_digest = readiness_sha256()
     return {
         "schema_id": SCHEMA_ID,
@@ -479,6 +502,23 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "round_trip_quantity_unit="
             f"{decision['round_trip_quantity_unit']} semantics="
             f"{decision['round_trip_quantity_semantics']}"
+        ),
+        (
+            "instrument_order_constraints_implemented=true fields="
+            + ",".join(decision["instrument_constraint_fields"])
+        ),
+        (
+            "instrument_maximums_dynamic=true "
+            "revalidated_each_catalog_capture=true causality_required=true"
+        ),
+        (
+            "instrument_constraints_freshness_policy_sealed=false "
+            "entry_exit_order_style_policy_sealed=false"
+        ),
+        (
+            "minimum_order_quantity_enforced=true "
+            "minimum_notional_enforced_on_entry_and_exit_visible_quote_value=true "
+            "order_style_quantity_eligibility_reported=true"
         ),
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",

@@ -89,7 +89,7 @@ from .bybit_execution_quality_set_freshness import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v4"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v5"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024

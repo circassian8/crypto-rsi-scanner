@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import json
 from pathlib import Path
 import socket
@@ -49,6 +50,11 @@ def test_universe_intersection_accepts_only_exact_active_usdt_perpetuals() -> No
     assert all(row.contract_type == "LinearPerpetual" for row in selected)
     assert all(row.status == "Trading" for row in selected)
     assert all(row.quote_asset == row.settle_asset == "USDT" for row in selected)
+    assert selected[0].quantity_step == "0.001"
+    assert selected[0].minimum_order_quantity == "0.001"
+    assert selected[0].maximum_limit_order_quantity == "1190"
+    assert selected[0].maximum_market_order_quantity == "500"
+    assert selected[0].minimum_notional_value_usdt == "5"
 
 
 def test_universe_intersection_never_guesses_multiplier_or_partial_pages() -> None:
@@ -65,6 +71,40 @@ def test_universe_intersection_never_guesses_multiplier_or_partial_pages() -> No
     missing["result"].pop("nextPageCursor")
     with pytest.raises(BybitExecutionQualityError, match="page_incomplete"):
         select_bybit_usdt_perpetual_instruments(radar, missing)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    (
+        (
+            "minOrderQty",
+            "0.0015",
+            "quantity_constraints_not_aligned_to_quantity_step",
+        ),
+        (
+            "maxMktOrderQty",
+            "0",
+            "maxMktOrderQty_must_be_positive_and_finite",
+        ),
+        (
+            "minOrderQty",
+            "501",
+            "quantity_constraints_inconsistent",
+        ),
+    ),
+)
+def test_instrument_quantity_constraints_fail_closed(
+    field: str,
+    value: str,
+    error: str,
+) -> None:
+    payload = deepcopy(_json("instruments_info.json"))
+    payload["result"]["list"][0]["lotSizeFilter"][field] = value
+
+    with pytest.raises(BybitExecutionQualityError, match=error):
+        select_bybit_usdt_perpetual_instruments(
+            _json("radar_assets.json"), payload
+        )
 
 
 @pytest.mark.parametrize(
@@ -219,6 +259,8 @@ def test_round_trip_reconciles_one_exact_base_quantity_across_distinct_books(
         exit_acquired_at="2026-07-17T13:00:01Z",
         entry_request_lineage_id=f"test.{position_side}.entry",
         exit_request_lineage_id=f"test.{position_side}.exit",
+        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        instrument_constraints_lineage_id="test.linear.catalog",
     ).to_dict()
 
     assert result["schema_version"] == ROUND_TRIP_SCHEMA_VERSION
@@ -227,6 +269,27 @@ def test_round_trip_reconciles_one_exact_base_quantity_across_distinct_books(
     assert result["quote_asset"] == "USDT"
     assert result["base_quantity"] == "15"
     assert result["quantity_step"] == "0.001"
+    assert result["minimum_order_quantity"] == "0.001"
+    assert result["maximum_limit_order_quantity"] == "1190"
+    assert result["maximum_market_order_quantity"] == "500"
+    assert result["minimum_notional_value_usdt"] == "5"
+    assert result["entry_notional_meets_minimum"] is True
+    assert result["exit_notional_meets_minimum"] is True
+    assert result["limit_order_quantity_eligible"] is True
+    assert result["market_order_quantity_eligible"] is True
+    assert result["quantity_eligible_order_styles"] == [
+        "market",
+        "marketable_limit",
+    ]
+    assert result["order_style_selected"] is False
+    assert result["instrument_constraints_bound_to_catalog"] is True
+    assert result["instrument_constraints_observed_at"] == (
+        "2026-07-17T11:59:59Z"
+    )
+    assert result["instrument_constraints_lineage_id"] == "test.linear.catalog"
+    assert result["instrument_constraints_causal_to_entry"] is True
+    assert result["instrument_constraints_freshness_policy_sealed"] is False
+    assert result["instrument_maximums_dynamic"] is True
     assert result["quantity_unit"] == "base_asset"
     assert result["quantity_semantics"] == (
         "bybit_USDT_linear_contract_quantity_in_underlying_token"
@@ -289,6 +352,8 @@ def test_round_trip_invalid_quantity_identity_freshness_and_depth_fail_closed(
         "exit_acquired_at": "2026-07-17T13:00:01Z",
         "entry_request_lineage_id": "test.roundtrip.entry",
         "exit_request_lineage_id": "test.roundtrip.exit",
+        "instrument_constraints_observed_at": "2026-07-17T11:59:59Z",
+        "instrument_constraints_lineage_id": "test.linear.catalog",
     }
     arguments.update(kwargs)
     with pytest.raises(BybitExecutionQualityError, match=error):
@@ -311,6 +376,88 @@ def test_round_trip_rejects_reused_or_reversed_provider_snapshot_order() -> None
             exit_acquired_at="2026-07-17T12:00:01Z",
             entry_request_lineage_id="test.reversed.entry",
             exit_request_lineage_id="test.reversed.exit",
+            instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+            instrument_constraints_lineage_id="test.linear.catalog",
+        )
+
+
+def test_round_trip_reports_quantity_eligibility_without_selecting_order_style() -> None:
+    instrument = replace(
+        _selected()[0],
+        maximum_market_order_quantity="10",
+    )
+
+    result = model_bybit_visible_book_round_trip(
+        _json("orderbook_btcusdt.json"),
+        _json("orderbook_btcusdt_exit.json"),
+        instrument=instrument,
+        position_side="long",
+        base_quantity="15",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        exit_acquired_at="2026-07-17T13:00:01Z",
+        entry_request_lineage_id="test.limitonly.entry",
+        exit_request_lineage_id="test.limitonly.exit",
+        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        instrument_constraints_lineage_id="test.linear.catalog",
+    ).to_dict()
+
+    assert result["market_order_quantity_eligible"] is False
+    assert result["limit_order_quantity_eligible"] is True
+    assert result["quantity_eligible_order_styles"] == ["marketable_limit"]
+    assert result["order_style_selected"] is False
+
+
+@pytest.mark.parametrize(
+    ("instrument_changes", "quantity", "constraints_observed_at", "error"),
+    (
+        (
+            {"minimum_order_quantity": "0.01"},
+            "0.001",
+            "2026-07-17T11:59:59Z",
+            "below_minimum_order_quantity",
+        ),
+        (
+            {
+                "maximum_limit_order_quantity": "10",
+                "maximum_market_order_quantity": "10",
+            },
+            "15",
+            "2026-07-17T11:59:59Z",
+            "exceeds_all_order_style_maximums",
+        ),
+        (
+            {},
+            "0.001",
+            "2026-07-17T11:59:59Z",
+            "entry_notional_below_instrument_minimum",
+        ),
+        (
+            {},
+            "15",
+            "2026-07-17T12:00:00.001Z",
+            "constraints_observed_after_entry",
+        ),
+    ),
+)
+def test_round_trip_instrument_constraints_fail_closed(
+    instrument_changes: dict[str, str],
+    quantity: str,
+    constraints_observed_at: str,
+    error: str,
+) -> None:
+    with pytest.raises(BybitExecutionQualityError, match=error):
+        model_bybit_visible_book_round_trip(
+            _json("orderbook_btcusdt.json"),
+            _json("orderbook_btcusdt_exit.json"),
+            instrument=replace(_selected()[0], **instrument_changes),
+            position_side="long",
+            base_quantity=quantity,
+            entry_acquired_at="2026-07-17T12:00:01Z",
+            exit_acquired_at="2026-07-17T13:00:01Z",
+            entry_request_lineage_id="test.constraints.entry",
+            exit_request_lineage_id="test.constraints.exit",
+            instrument_constraints_observed_at=constraints_observed_at,
+            instrument_constraints_lineage_id="test.linear.catalog",
         )
 
 

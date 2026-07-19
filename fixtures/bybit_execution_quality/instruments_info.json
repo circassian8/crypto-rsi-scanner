@@ -16,7 +16,13 @@
         "deliveryTime": "0",
         "isPreListing": false,
         "priceFilter": {"tickSize": "0.10"},
-        "lotSizeFilter": {"qtyStep": "0.001"}
+        "lotSizeFilter": {
+          "qtyStep": "0.001",
+          "minOrderQty": "0.001",
+          "maxOrderQty": "1190.000",
+          "maxMktOrderQty": "500.000",
+          "minNotionalValue": "5"
+        }
       },
       {
         "symbol": "ETHUSDT",
@@ -29,7 +35,13 @@
         "deliveryTime": "0",
         "isPreListing": false,
         "priceFilter": {"tickSize": "0.01"},
-        "lotSizeFilter": {"qtyStep": "0.01"}
+        "lotSizeFilter": {
+          "qtyStep": "0.01",
+          "minOrderQty": "0.01",
+          "maxOrderQty": "10000.00",
+          "maxMktOrderQty": "5000.00",
+          "minNotionalValue": "5"
+        }
       },
       {
         "symbol": "USDCUSDT",

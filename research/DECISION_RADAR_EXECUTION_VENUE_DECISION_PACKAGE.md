@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v12`. Run
+`crypto_radar_execution_quality_readiness_v13`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -106,7 +106,7 @@ remain unsealed; this rule does not manufacture a round-trip cost.
 Equal numeric USDT lookup sizes are not a round-trip identity. The buy curve is
 defined by exact USDT spent, while the sell curve is defined by exact USDT
 proceeds; those values generally correspond to different base quantities. The
-offline v1 round-trip primitive now carries one exact `qtyStep`-aligned
+offline v2 round-trip primitive now carries one exact `qtyStep`-aligned
 underlying-token quantity across two distinct fresh books and walks the correct
 entry/exit sides for a long or short. It reports gross mid-mark return, net
 visible-book return, and native-USDT drag without adding spread twice. Bybit's
@@ -116,6 +116,15 @@ execution. Protocol v2 still must seal how USDT tiers select and round that
 quantity, along with snapshots, order style, fees, funding, latency,
 beyond-book slippage, unavailable-cost behavior, and the final cost application
 policy.
+
+The v2 projection now also binds the exact catalog values for `minOrderQty`,
+`maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue`, together with a causal
+catalog observation clock and lineage. It rejects a quantity below the minimum,
+above both order-style maxima, or with entry/exit visible quote value below the
+minimum notional. It reports market versus marketable-limit quantity eligibility
+without choosing either style. Bybit documents those maxima as dynamic, so the
+future v5 capture preserves and revalidates them on every complete catalog; the
+annex-level constraint freshness policy remains unsealed.
 
 ## Venue-native derivatives context contract
 
@@ -286,7 +295,7 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   authorization already exists. Readiness binds to one exact authoritative
   Radar generation, and status validates the latest capture; neither makes a
   provider call or write. A capture attempt may run only through the additional
-  explicit `CONFIRM=1` boundary. Capture v4 uses one complete
+  explicit `CONFIRM=1` boundary. Capture v5 uses one complete
   `category=linear&status=Trading&limit=1000` catalog request, rejects a
   missing or non-empty continuation cursor as incomplete, and then uses one 200-level
   order-book request per exact eligible instrument. The absolute bound is 31

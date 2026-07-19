@@ -66,8 +66,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v4"
-_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v4"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v5"
+_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v5"
 POINTER_FILENAME = "radar_bybit_execution_quality_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
 RECEIPT_FILENAME = "capture_completion_receipt.json"
@@ -193,6 +193,16 @@ def _eligible_from_values(value: Mapping[str, object]) -> BybitEligibleInstrumen
             status=str(value["status"]),
             tick_size=str(value["tick_size"]),
             quantity_step=str(value["quantity_step"]),
+            minimum_order_quantity=str(value["minimum_order_quantity"]),
+            maximum_limit_order_quantity=str(
+                value["maximum_limit_order_quantity"]
+            ),
+            maximum_market_order_quantity=str(
+                value["maximum_market_order_quantity"]
+            ),
+            minimum_notional_value_usdt=str(
+                value["minimum_notional_value_usdt"]
+            ),
             launch_time_ms=int(value["launch_time_ms"]),
             delivery_time_ms=int(value["delivery_time_ms"]),
         )

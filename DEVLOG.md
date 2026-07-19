@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Bind Bybit round trips to dynamic instrument constraints · Codex
+**Why:** A quantity can be aligned to `qtyStep` yet remain venue-invalid because
+it is below minimum size/notional or above the current market/limit maximum.
+Bybit documents those maxima as dynamic, so a timeless or partial constraint
+projection would overstate execution-quality evidence.
+**Changes:**
+- Extended the selected-instrument contract with exact `minOrderQty`,
+  `maxOrderQty`, `maxMktOrderQty`, and `minNotionalValue`; malformed,
+  inconsistent, or step-misaligned catalog constraints now fail closed.
+- Upgraded the visible-book round trip to v2. It requires a causal catalog
+  clock/lineage, enforces minimum quantity and both-leg visible notional, rejects
+  quantities above both order-style maxima, and reports market versus
+  marketable-limit quantity eligibility without selecting an order style.
+- Upgraded execution live/capture to v5 so immutable catalog bytes rederive the
+  exact dynamic constraints, updated downstream intraday/derivatives readers,
+  readiness v13, Protocol-v2 progress v12, the North Star, decision package,
+  working agreement, durable decision, roadmap, and regressions. Constraint
+  freshness, USDT-tier sizing/rounding, order style, fees, funding, latency,
+  beyond-book costs, unavailable-cost policy, genuine capture, and final annex
+  remain unsealed.
+  The historical detached liquidation-transcript v1 identity remains minimal
+  and unchanged rather than receiving invented execution-order constraints.
+**Verify:** 284 focused Bybit execution-quality, live/capture, intraday,
+derivatives, liquidation, readiness, and Protocol-v2 tests passed; Python
+compileall, the offline Bybit smoke, static readiness, current/frozen
+Protocol-v2 checks, JSON validation, diff check, and architecture cleanliness
+passed.
+**Notes/risks:** No provider call, authorization, credential/private-data read,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` was added. Bybit's documented dynamic maxima must be captured
+again rather than treated as permanent constants.
+
 ## 2026-07-20 — Reconcile Bybit round trips by exact quantity · Codex
 **Why:** The existing per-snapshot buy/sell impact curves used equal USDT
 lookup values, which do not preserve the same position quantity across entry
