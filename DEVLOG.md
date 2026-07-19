@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-sixth Radar market cycle · Codex
+**Why:** The persisted one-hour cadence became eligible and the already-present
+CoinGecko authorization passed the read-only readiness boundary, so the live
+research campaign could add one more genuine point-in-time observation without
+broadening any provider or execution permission.
+**Changes:**
+- Ran exactly one Daily Operations cycle. CoinGecko returned HTTP 200 with 80
+  bounded rows in 771 ms and no retry; the system selected 30 market rows and
+  published
+  `radar_market_no_send_20260719t204152642468z_64fc98dc9e9d`.
+- The generation produced zero anomalies, candidates, core ideas, cards, and
+  outcomes. Its current-row status remains honestly `warming=30`: the retained
+  history is ready for a future same-asset evaluation on 28/30 assets, but the
+  exact generation lacks a causal current 4-hour anchor after the intervening
+  observation gap. No threshold or route was changed to conceal that absence.
+- Strict doctor passed with zero blockers and warnings. Immutable publication
+  and owned-dashboard operations receipts bind the new exact revision-12
+  authority and operator-state SHA-256
+  `e74e407c2bb3ed68bf05a181fd70ad602f37fa69d5fa5caa5255c13b03f0e121`.
+- Refreshed campaign truth to 36 counted cycles, 1,080 retained observations,
+  1,050 baseline-counted observations, 30 too-close observations, five
+  historical ideas, four matured outcomes, one `due_missing_price`, and three
+  receipt-backed ideas still awaiting a first human view.
+**Verify:** `radar-daily-ops-readiness` was ready before collection and the
+cycle ended `published_and_restarted`. `make radar-dashboard-authority-status`
+and `make radar-dashboard-readiness` both passed against the exact new
+namespace; a strict `jq -e` reconciliation checked campaign counts, pointer,
+doctor 0/0, and every zero safety counter. The next provider boundary is
+reserved until `2026-07-19T21:41:53.503177+00:00`.
+**Notes/risks:** Trusted spread remains 0/1,080, so a separately authorized and
+reachable genuine Bybit execution-quality capture remains the highest-value
+missing input. `hedera-hashgraph` and `shiba-inu` remain the two non-warm assets
+for a future same-asset evaluation. The recurring service remains uninstalled.
+No Telegram send, trade, order, paper trade, normal RSI write, authorization
+mutation, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-19 — Close Bybit timeout and book-freshness numeric policy · Codex
 **Why:** The guarded Bybit execution, intraday, and derivatives collectors
 bounded ordinary timeout numbers but allowed booleans and non-finite floats;
