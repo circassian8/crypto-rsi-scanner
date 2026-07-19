@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Close the current KuCoin UTA capture doctor offline · Codex
+**Why:** The current UTA response schema was fixture-closed, but a genuine live
+path could not be reviewed safely until exact current-endpoint bytes had their
+own immutable persistence and re-derivation contract, distinct from historical
+v1 audit evidence.
+**Changes:**
+- Added a UTA-specific capture namespace, request ledger, normalized snapshot,
+  manifest, and completion receipt that bind exact endpoint/query identity,
+  transport clocks and lineage, raw UTA hashes, pagination, and requested versus
+  provider-returned page size.
+- Reused only the provider-local descriptor-held file primitives. Strict doctor
+  re-derives every artifact and fails closed on transport/page/byte/identity,
+  extra-leaf, symlink, or hardlink drift; fixture capture retains nothing and
+  cannot publish a pointer or grant source, campaign, dashboard, or Protocol-v2
+  authority.
+- Advanced readiness to v4: response and fixture capture/doctor are complete,
+  while authorization action and live transport remain unavailable. Updated the
+  KuCoin contracts, roadmap, durable decision, Make targets, and working
+  agreement to match.
+- Moved one cohesive source-with-artifacts export test out of the accumulated
+  generic Make test module after it crossed the architecture size ceiling. The
+  established parent-symlink security regression stayed at its exact path.
+**Verify:** 81 focused KuCoin/Make/export tests passed; both historical and
+current UTA disposable capture smokes passed; readiness rendered the blocked
+no-call v4 state; compileall, JSON validation, diff whitespace validation, and
+architecture cleanliness passed with zero new size violations.
+**Notes/risks:** No KuCoin call occurred and no authorization was inspected,
+created, or changed. Live transport, health/backoff, retention, genuine capture,
+policy attachment, and annex selection remain separate human-reviewed work. No
+send, trade, order, paper trade, normal RSI write, score/route/threshold change,
+or Event Alpha `TRIGGERED_FADE` was added.
+
 ## 2026-07-19 — Repair DEX/on-chain readiness profile wiring · Codex
 **Why:** A cross-layer readiness audit found that the non-smoke Make target used
 its artifact namespace as an Event Alpha runtime profile, so it failed before

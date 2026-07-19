@@ -26,10 +26,11 @@ make radar-announcements-kucoin-readiness PYTHON=.venv/bin/python
 ```
 
 It reads only whether the dedicated KuCoin authorization flag is already
-present. It reports the current UTA endpoint as not implemented, labels the
-legacy v1 plan historical and non-executable, sets the current request bound to
-zero, and recommends no provider action. It performs no call or write and
-remains blocked even when authorization is present.
+present. It reports the current UTA response and immutable fixture
+capture/doctor as separately implemented, labels the legacy v1 plan historical
+and non-executable, and keeps live transport unavailable. It recommends no
+provider action, performs no call or write, and remains blocked even when
+authorization is present.
 
 Immutable capture mechanics can be proven offline with:
 
@@ -81,11 +82,12 @@ The contract remains:
   writes, or Event Alpha `TRIGGERED_FADE` creation.
 
 The legacy no-call readiness, immutable bundle, and strict-doctor mechanics are
-implemented offline only. Before any live boundary, a new version must close
-the current UTA request/response/pagination contract and its own immutable
-doctor. Only then could separately present operator authorization, explicit
-confirmation, bounded no-redirect/no-retry transport, health/backoff, retention
-review, and Protocol-v2 annex selection be considered.
+implemented offline only. A separate current-UTA response contract and
+UTA-specific immutable fixture doctor are also closed; neither reuses the
+historical capture identity. Any live boundary still requires separately
+present operator authorization, explicit confirmation, bounded
+no-redirect/no-retry transport, health/backoff, retention review, genuine
+strict-clean evidence, and a later Protocol-v2 annex selection.
 
 Official current contract and migration evidence reviewed:
 

@@ -1,7 +1,7 @@
 # KuCoin UTA Announcement Offline Contract
 
-Status: **current endpoint contract implemented and fixture-verified; immutable
-capture and live transport not implemented** as of 2026-07-19 UTC.
+Status: **current endpoint response and immutable fixture capture contracts
+implemented and verified; live transport not implemented** as of 2026-07-19 UTC.
 
 ## Scope
 
@@ -15,7 +15,16 @@ Run the current fixture proof with:
 make radar-announcements-kucoin-uta-smoke PYTHON=.venv/bin/python
 ```
 
-The adapter has no HTTP client, environment read, persistence, pointer,
+Run the disposable immutable-capture proof with:
+
+```text
+make radar-announcements-kucoin-uta-capture-smoke PYTHON=.venv/bin/python
+```
+
+The response adapter has no HTTP client, environment read, or persistence. The
+capture module accepts supplied fixture bytes only, requires confirmation,
+writes six immutable artifacts inside a disposable root, strictly re-derives
+them, and retains nothing. Neither module has a live command, pointer,
 notification, route, score, order, or trading path. The older v1 fixture parser
 and doctor remain separately readable historical audit evidence but are barred
 from live use.
@@ -48,13 +57,14 @@ from live use.
 Readiness now distinguishes three facts:
 
 1. the current UTA response contract is fixture-verified;
-2. the current UTA immutable capture/doctor is not implemented; and
+2. the current UTA immutable fixture capture/doctor is fixture-verified; and
 3. live transport is not implemented or authorized.
 
 An ambient authorization flag cannot unlock a call. The next safe command is
-the offline UTA smoke. A later change must add a current-version immutable raw
-response bundle and strict re-deriving doctor before any separately authorized,
-explicitly confirmed transport is considered.
+the offline UTA capture smoke. A later change may consider separately authorized,
+explicitly confirmed transport only after bounded request, health/backoff, and
+retention review. Genuine bytes would still need the same strict doctor and a
+separate annex decision before any policy use.
 
 No current or historical KuCoin fixture is attached to Event Alpha discovery,
 Decision candidates, campaign/dashboard authority, or Protocol v2.

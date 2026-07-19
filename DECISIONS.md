@@ -16,21 +16,40 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep current KuCoin UTA capture closed before live transport
+**Status:** accepted
+**Decision:** Treat the current UTA response contract and its immutable fixture
+capture/strict doctor as complete offline layers. Keep live transport,
+authorization action, health/backoff, retention review, pointer publication,
+campaign attachment, dashboard authority, and Protocol-v2 admission unavailable.
+The fixture capture must use a UTA-specific namespace, ledger, manifest,
+receipt, and raw-byte identity; it may share only the provider-local hardened
+descriptor-held file primitives with the historical audit capture.
+**Why:** Closing exact persistence and re-derivation before transport removes a
+major source-contract ambiguity without turning fixtures or an ambient flag into
+genuine catalyst evidence. Separate identities prevent the replaced v1 endpoint
+from being silently treated as current UTA proof.
+**Revisit when:** The human explicitly authorizes a bounded current-UTA live
+transport after health/backoff, retention, confirmation, and exact request-ledger
+review. That later decision still cannot attach evidence to policy or Protocol v2
+without a genuine strict-clean capture and an explicit annex decision.
+
 ## 2026-07-19 - Keep KuCoin UTA parsing separate from historical v1 capture
 **Status:** accepted
 **Decision:** Implement the current `GET /api/ua/v1/market/announcement`
 request/response contract as a separately versioned offline adapter. Preserve
 the hashes of exact UTA response bytes and the renamed UTA schema; reuse only
 the already-closed common announcement semantics. Do not relabel the historical
-v1 immutable doctor as UTA-compatible. Readiness may report the current parser
-as implemented but must keep current capture/doctor and live transport false.
+v1 immutable doctor as UTA-compatible. Readiness must report the current parser,
+current capture/doctor, and live transport as separate implementation states.
 **Why:** The two endpoints express the same domain with different request and
 response identities. Converting fields for semantic validation is safe only if
 the original bytes, schema version, endpoint, query, and lineage remain the
 authority; sharing the old capture identity would hide provider-contract drift.
-**Revisit when:** A current-version UTA immutable capture and re-deriving doctor
-pass offline regressions. Live use still requires a later separate authorization
-and confirmed bounded transport decision.
+**Revisit when:** A proposed schema change would merge historical and current
+capture identity. The current-version UTA doctor now passes offline regressions;
+live use still requires a later separate authorization and confirmed bounded
+transport decision.
 
 ## 2026-07-19 - Retire KuCoin v1 from the live activation path
 **Status:** accepted

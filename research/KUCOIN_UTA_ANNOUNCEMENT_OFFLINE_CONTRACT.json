@@ -1,7 +1,7 @@
 {
   "schema_id": "decision_radar.kucoin_uta_announcement_offline_contract",
   "schema_version": 1,
-  "status": "current_fixture_verified_capture_not_implemented",
+  "status": "current_fixture_response_and_capture_doctor_verified_live_transport_missing",
   "implemented_at": "2026-07-19",
   "provider": "kucoin_announcements",
   "contract_version": "crypto_radar_kucoin_uta_announcements_v1",
@@ -44,8 +44,12 @@
   ],
   "capture": {
     "exact_uta_response_hashes_preserved": true,
-    "immutable_current_capture_implemented": false,
-    "strict_current_capture_doctor_implemented": false,
+    "capture_contract_version": "decision_radar_kucoin_uta_announcement_capture_v1",
+    "immutable_current_capture_implemented": true,
+    "strict_current_capture_doctor_implemented": true,
+    "fixture_capture_artifact_count": 6,
+    "fixture_artifacts_retained": false,
+    "pointer_publication_available": false,
     "live_transport_implemented": false,
     "historical_v1_capture_live_eligible": false
   },
@@ -67,7 +71,8 @@
     "research_only": true,
     "provider_calls": 0,
     "authorization_created": false,
-    "writes": 0,
+    "writes_to_project_artifact_store": 0,
+    "disposable_fixture_artifact_writes": 6,
     "route_or_score_effect": false,
     "telegram_sends": 0,
     "trades": 0,

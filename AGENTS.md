@@ -361,8 +361,8 @@ may be added later when a suitable environment already exists.
   `make radar-announcements-kucoin-readiness` is the non-activating operator
   boundary: it reads only the separate
   `RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` flag, reports the legacy plan
-  as non-executable, the current UTA response contract as fixture-closed, and
-  the current UTA capture/doctor plus live transport as missing. It permits no
+  as non-executable, the current UTA response and immutable capture/doctor as
+  fixture-closed, and current UTA live transport as missing. It permits no
   call and reports `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` as the
   disable action. It has no HTTP client, filesystem write, or live capture
   command. `make radar-announcements-kucoin-capture-smoke` proves exact
@@ -373,20 +373,24 @@ may be added later when a suitable environment already exists.
   single-link bounded files, and compare identity before/opened/after. The
   historical capture module explicitly rejects
   `live_public_http` mode, publishes no pointer, and cannot grant source,
-  campaign, dashboard, or Protocol-v2 authority. Authorization alone cannot
-  make readiness pass while the current UTA capture/doctor and live transport
-  remain unimplemented; never create or mutate the flag from code, and never
-  activate the superseded endpoint.
+  campaign, dashboard, or Protocol-v2 authority.
   The current UTA response contract is now independently fixture-closed by
   `make radar-announcements-kucoin-uta-smoke`: it binds exact
   `language`/`type`/`pageNumber`/`pageSize`/time queries, the renamed
   total/page/list and item schemas, exact UTA raw-response hashes, lineage,
-  publication clocks, categories, and conservative local bounds. Readiness
-  reports that parser separately from the still-missing current-version
-  immutable capture/doctor and live transport. The UTA smoke makes no call or
-  write and grants no authority. Do not reuse the historical v1 capture doctor
-  for UTA bytes; implement a version-matching immutable doctor before any
-  authorization action.
+  publication clocks, categories, and conservative local bounds. `make
+  radar-announcements-kucoin-uta-capture-smoke` then writes six artifacts only
+  inside one disposable root: exact UTA pages, a UTA-specific request ledger,
+  deterministic snapshot, manifest, and completion receipt. Its strict doctor
+  re-derives every byte through the descriptor-held bounded reader and rejects
+  transport, identity, artifact, symlink, and hardlink drift. Current UTA and
+  historical v1 namespaces/schemas remain distinct. The smoke retains nothing,
+  makes no call, publishes no pointer, and grants no authority. Authorization
+  alone cannot make readiness pass while live transport remains unimplemented;
+  never create or mutate the flag from code, and never activate the superseded
+  endpoint. A future live path still requires separate human authorization,
+  confirmation, health/backoff, retention, strict-clean genuine evidence, and
+  annex review.
 - **Bitget official-announcement offline contract:**
   `make radar-announcements-bitget-smoke` validates synthetic bytes against the
   documented public `GET /api/v2/public/annoucements` contract, preserving the

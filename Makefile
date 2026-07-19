@@ -237,8 +237,8 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: event-alpha-observed-outcome-preview event-alpha-observed-outcome-stage
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
 .PHONY: export-empirical-artifact-history export-project-artifact-history
-.PHONY: radar-announcements-kucoin-smoke radar-announcements-kucoin-readiness
-.PHONY: radar-announcements-kucoin-capture-smoke
+.PHONY: radar-announcements-kucoin-smoke radar-announcements-kucoin-uta-smoke radar-announcements-kucoin-readiness
+.PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 
 help:
@@ -369,7 +369,9 @@ help:
 	@echo "  make radar-calendar-official-acquire    Make one explicitly authorized official-calendar attempt"
 	@echo "  make radar-calendar-official-import-local FED_FOMC_HTML=... BLS_CALENDAR_ICS=... BEA_RELEASE_DATES_JSON=... OFFICIAL_MACRO_OBSERVED_AT=..."
 	@echo "  make radar-announcements-kucoin-smoke  Validate the closed KuCoin synthetic response contract; no call/write"
+	@echo "  make radar-announcements-kucoin-uta-smoke  Validate the current KuCoin UTA response contract; no call/write"
 	@echo "  make radar-announcements-kucoin-capture-smoke  Prove disposable immutable capture/doctor mechanics; no call"
+	@echo "  make radar-announcements-kucoin-uta-capture-smoke  Prove current UTA immutable capture/doctor; no call"
 	@echo "  make radar-announcements-kucoin-readiness  Inspect separate KuCoin authorization and future capture boundary; no call/write"
 	@echo "  make radar-announcements-bitget-smoke  Validate the closed Bitget synthetic response contract; no call/write"
 	@echo "  make radar-announcements-bitget-capture-smoke  Prove disposable immutable Bitget capture/doctor mechanics; no call"
@@ -1563,6 +1565,10 @@ radar-announcements-kucoin-uta-smoke:
 radar-announcements-kucoin-capture-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_announcements_capture \
 		--fixture-dir fixtures/kucoin_announcements
+
+radar-announcements-kucoin-uta-capture-smoke:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_uta_announcements_capture \
+		--fixture-dir fixtures/kucoin_uta_announcements
 
 radar-announcements-kucoin-readiness:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_announcements_readiness

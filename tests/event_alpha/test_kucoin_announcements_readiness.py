@@ -11,6 +11,7 @@ import pytest
 from crypto_rsi_scanner.event_alpha.operations.kucoin_announcements_readiness import (
     AUTHORIZATION_ACTION,
     CAPTURE_SMOKE_COMMAND,
+    CURRENT_CAPTURE_SMOKE_COMMAND,
     CURRENT_ANNOUNCEMENTS_PATH,
     CURRENT_CONTRACT_VERSION,
     CURRENT_OFFICIAL_API_DOC,
@@ -39,7 +40,6 @@ def test_absent_authorization_is_explicit_and_never_calls_or_writes() -> None:
     assert value["authorization_mutated"] is False
     assert value["reasons"] == [
         "runtime_provider_authorization_absent",
-        "current_uta_immutable_capture_not_implemented",
         "live_capture_transport_not_implemented",
     ]
     assert value["provider_call_planned"] is False
@@ -47,7 +47,8 @@ def test_absent_authorization_is_explicit_and_never_calls_or_writes() -> None:
     assert value["provider_request_count"] == 0
     assert value["writes_performed"] is False
     assert value["expected_provider_activity"] == "none_readiness_only"
-    assert value["next_safe_command"] == CURRENT_SMOKE_COMMAND
+    assert value["next_safe_command"] == CURRENT_CAPTURE_SMOKE_COMMAND
+    assert value["current_capture_smoke_command"] == CURRENT_CAPTURE_SMOKE_COMMAND
     assert value["current_response_contract_smoke_command"] == CURRENT_SMOKE_COMMAND
     assert value["legacy_capture_smoke_command"] == CAPTURE_SMOKE_COMMAND
     assert value["legacy_response_contract_smoke_command"] == SMOKE_COMMAND
@@ -64,7 +65,6 @@ def test_present_authorization_cannot_unlock_superseded_or_unimplemented_capture
     assert value["runtime_provider_authorized"] is True
     assert value["ready"] is False
     assert value["reasons"] == [
-        "current_uta_immutable_capture_not_implemented",
         "live_capture_transport_not_implemented"
     ]
     assert value["provider_contract_configured"] is True
@@ -72,7 +72,7 @@ def test_present_authorization_cannot_unlock_superseded_or_unimplemented_capture
     assert value["current_contract"]["contract_version"] == CURRENT_CONTRACT_VERSION
     assert value["current_contract"]["official_api_doc"] == CURRENT_OFFICIAL_API_DOC
     assert value["current_contract"]["status"] == (
-        "offline_fixture_verified_capture_not_implemented"
+        "offline_fixture_verified_capture_doctor_implemented_live_transport_missing"
     )
     assert value["current_contract"]["request_plan"] == value["request_plan"]
     assert value["legacy_contract"]["status"] == (
@@ -80,14 +80,14 @@ def test_present_authorization_cannot_unlock_superseded_or_unimplemented_capture
     )
     assert value["legacy_contract"]["path"] == "/api/v3/announcements"
     assert value["live_capture_configured"] is False
-    assert value["immutable_capture_boundary_implemented"] is False
+    assert value["immutable_capture_boundary_implemented"] is True
     assert value["legacy_immutable_capture_boundary_implemented"] is True
     assert value["capture_command_available"] is False
-    assert value["strict_capture_doctor_implemented"] is False
+    assert value["strict_capture_doctor_implemented"] is True
     assert value["legacy_strict_capture_doctor_implemented"] is True
     assert value["future_capture_command"] == FUTURE_CAPTURE_COMMAND
     assert value["operator_action_required"] == (
-        "unset_unreviewed_authorization_and_wait_for_current_UTA_capture_implementation"
+        "unset_unreviewed_authorization_and_wait_for_current_UTA_live_transport_review"
     )
     assert value["provider_call_planned"] is False
 
