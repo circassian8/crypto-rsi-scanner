@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Remove obsolete Protocol-v2 USD-conversion dependency · Codex
+**Why:** The active annex roadmap still listed a USDT/USD decision after the
+selected Bybit cost currency had been sealed as native USDT with no implicit
+USD equivalence. That stale wording contradicted the current fail-closed
+contract.
+**Changes:** Replaced the obsolete conversion item with the actual remaining
+cost decisions: native-USDT fees, quantity-aware execution costs, funding,
+latency, and unavailable-cost policy.
+**Verify:** `git diff --check` passed and a focused search found no remaining
+active `USDT/USD`, `USDT to USD`, or `USDT-to-USD` dependency in the current
+roadmap, working agreement, durable decisions, or Protocol-v2/North-Star
+contracts.
+**Notes/risks:** Documentation only. No protocol bytes, provider state,
+authorization, capture, route, score, threshold, holdout, or runtime behavior
+changed.
+
 ## 2026-07-19 — Keep round-trip quantity identity explicit · Codex
 **Why:** Bybit's current buy-impact curve is sized by exact USDT spent and its
 sell curve by exact USDT proceeds. Equal lookup notionals can represent
