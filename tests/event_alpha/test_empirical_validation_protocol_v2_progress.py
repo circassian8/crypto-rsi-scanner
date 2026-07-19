@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v4")
+    assert values["progress_version"].endswith("_v5")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -68,6 +68,20 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert liquidation["genuine_capture_present"] is False
     assert liquidation["provider_connection_attempted"] is False
     assert liquidation["protocol_v2_evidence_eligible"] is False
+    unlock = values["structured_unlock_contract"]
+    assert unlock["provider"] == "tokenomist"
+    assert unlock["provider_api_version"] == "v5"
+    assert unlock["legacy_provider_api_version"] == "v4"
+    assert unlock["legacy_v4_status"] == "deprecated"
+    assert unlock["legacy_v4_live_eligible"] is False
+    assert unlock["offline_response_normalizer_implemented"] is True
+    assert unlock["strict_fixture_capture_doctor_implemented"] is True
+    assert unlock["fixture_capture_retained"] is False
+    assert unlock["full_multipage_capture_contract_implemented"] is False
+    assert unlock["live_transport_implemented"] is False
+    assert unlock["genuine_capture_present"] is False
+    assert unlock["subscription_terms_approved"] is False
+    assert unlock["protocol_v2_evidence_eligible"] is False
     assert "historical_outcome_recovery_incomplete" in values[
         "current_activation_blockers"
     ]
@@ -128,6 +142,8 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     liquidation_drift["native_liquidation_contract"][
         "project_websocket_listener_implemented"
     ] = True
+    unlock_drift = progress.current_progress_values()
+    unlock_drift["structured_unlock_contract"]["genuine_capture_present"] = True
 
     for mutation in (
         digest_drift,
@@ -137,6 +153,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         command_drift,
         version_drift,
         liquidation_drift,
+        unlock_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -153,6 +170,10 @@ def test_progress_cli_reads_no_ambient_state_and_writes_nothing(
     monkeypatch.setattr(socket, "create_connection", forbidden)
     monkeypatch.setattr(builtins, "open", forbidden)
     monkeypatch.setenv("RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE", "secret")
+    monkeypatch.setenv(
+        "RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE",
+        "tokenomist-secret-must-not-be-read",
+    )
 
     before = tuple(tmp_path.iterdir())
     assert progress.main(["--json", "--check"]) == 0
@@ -164,6 +185,7 @@ def test_progress_cli_reads_no_ambient_state_and_writes_nothing(
     assert payload["confirmed_execution_decision"]["venue_id"] == "bybit"
     assert payload["safety"]["provider_calls"] == 0
     assert "secret" not in output.out
+    assert "tokenomist-secret-must-not-be-read" not in output.out
 
 
 def test_progress_human_output_and_make_targets_are_explicit(
@@ -185,9 +207,14 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "offline_normalizer=true detached_import=true" in output.out
     assert "project_listener=false project_transport_capture=false" in output.out
     assert "genuine_capture=false coverage=observed_messages_only" in output.out
+    assert "structured_unlock_surface=tokenomist:v5" in output.out
+    assert "fixture_capture_doctor=true" in output.out
+    assert "full_multipage=false live_transport=false genuine_capture=false" in output.out
     assert "offline/readiness/queue only; no provider calls" in output.out
     assert "radar-derivatives-bybit-liquidation-smoke" in output.out
     assert "radar-derivatives-bybit-liquidation-capture-smoke" in output.out
+    assert "radar-unlock-tokenomist-v5-readiness" in output.out
+    assert "radar-unlock-tokenomist-v5-capture-smoke" in output.out
     assert "radar-outcome-price-recovery-readiness" in output.out
     assert "event-alpha-source-independence-oos-readiness" in output.out
     assert "provider_calls=0" in output.out
@@ -209,6 +236,19 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "--check" not in rendered[0]
     assert rendered[1].count("--check") == 1
     assert "provider" not in "\n".join(rendered).casefold()
+
+
+def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:
+    note = (
+        REPO_ROOT / "research/DECISION_RADAR_EMPIRICAL_PROTOCOL_V2_CURRENT_PROGRESS.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Tokenomist v5 cliff-unlock response normalization" in note
+    assert "synthetic-fixture capture/doctor" in note
+    assert "retains\n  nothing" in note
+    assert "v4 remains deprecated and live-ineligible" in note
+    assert "make radar-unlock-tokenomist-v5-readiness" in note
+    assert "make radar-unlock-tokenomist-v5-capture-smoke" in note
 
 
 def test_primary_readiness_target_leads_with_current_progress() -> None:

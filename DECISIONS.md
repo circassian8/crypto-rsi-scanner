@@ -16,6 +16,35 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep Tokenomist fixture capture separate from live unlock authority
+**Status:** accepted
+**Decision:** Tokenomist v5 may have a strict immutable synthetic-fixture
+capture and doctor that prove exact response/request preservation,
+normalization, units, clocks, coverage, and artifact-chain mechanics. Run that
+proof only in a disposable root and publish no latest pointer. A separate
+readiness surface may inspect one dedicated boolean authorization flag, but it
+must remain blocked even when present until the owner approves an applicable
+subscription, retention and redistribution terms, a bounded live transport,
+health/backoff, and genuine immutable bytes. Never inspect the API credential
+from readiness. Do not place genuine Tokenomist bytes in git or the standard
+review archive, and do not treat fixture proof as source, campaign, dashboard,
+directional, policy, or Protocol-v2 authority.
+**Why:** A closed fixture capture can expose serialization, identity, unit, and
+TOCTOU defects without crossing a paid provider boundary. It cannot prove that
+the owner may acquire or redistribute genuine bytes, that a project-owned
+request succeeded, or that a partial first page covers the requested window.
+Keeping those claims separate prevents an offline contract test from
+impersonating authoritative structured-unlock coverage.
+Interrupted or raced fixture staging is retained under a unique `tmp_`
+quarantine name rather than deleted through a mutable pathname; successful
+publication uses a native atomic no-replace boundary, and any retained-write
+result reports its observed inventory instead of claiming no I/O.
+**Revisit when:** The owner explicitly selects and authorizes a suitable
+Tokenomist subscription, approves retention/export treatment, and approves a
+bounded no-send live transport with immutable request/response evidence and
+provider health controls. Full multi-page coverage requires its own closed
+request sequence and completion proof.
+
 ## 2026-07-19 - Keep operator-imported liquidation transcripts non-authoritative
 **Status:** accepted
 **Decision:** A local Bybit liquidation transcript may immutably preserve and

@@ -99,6 +99,20 @@ def _project_tree(tmp_path: Path) -> tuple[Path, str, str]:
         artifact_root / liquidation_namespace / "application_payload_003.bin",
         b'{"topic":"allLiquidation.BTCUSDT"}',
     )
+    tokenomist_namespace = (
+        "radar_tokenomist_v5_20260719t160000000000z_0123456789ab"
+    )
+    for name in (
+        "exact_fixture_capture.json",
+        "request_ledger.json",
+        "normalized_snapshot.json",
+        "capture_manifest.json",
+        "capture_completion_receipt.json",
+    ):
+        _write(
+            artifact_root / tokenomist_namespace / name,
+            _canonical_json({"synthetic_fixture": True, "name": name}),
+        )
     _write(artifact_root / ".runtime.lock", b"machine-local\n")
     return root, current, latest
 
@@ -139,9 +153,13 @@ def test_standard_export_contains_only_manifested_canonical_artifacts(
         name.startswith("event_fade_cache/radar_bybit_liquidation_transcript_")
         for name in names
     )
+    assert not any(
+        name.startswith("event_fade_cache/radar_tokenomist_v5_")
+        for name in names
+    )
     assert "event_fade_cache/.runtime.lock" not in names
     assert manifest["entry_count"] == len(expected_artifacts)
-    assert manifest["excluded_history_count"] == 4
+    assert manifest["excluded_history_count"] == 9
     assert manifest["excluded_noise"] == ["event_fade_cache/.runtime.lock"]
     assert manifest["canonical_selection_is_closed"] is True
     assert manifest["canonical_source_coverage_status"] == "partial"
@@ -252,6 +270,11 @@ def test_optional_project_history_is_exact_disjoint_checksummed_complement(
         "event_fade_cache/historical_rows.jsonl",
         "event_fade_cache/radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab/capture_manifest.json",
         "event_fade_cache/radar_bybit_liquidation_transcript_20260719t140000000000z_0123456789ab/application_payload_003.bin",
+        "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/exact_fixture_capture.json",
+        "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/request_ledger.json",
+        "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/normalized_snapshot.json",
+        "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/capture_manifest.json",
+        "event_fade_cache/radar_tokenomist_v5_20260719t160000000000z_0123456789ab/capture_completion_receipt.json",
     }
     assert names == expected_history | {_HISTORY_MANIFEST, _HISTORY_CHECKSUMS}
     assert {row["path"] for row in manifest["entries"]} == expected_history
@@ -270,6 +293,19 @@ def test_optional_project_history_is_exact_disjoint_checksummed_complement(
     assert {row["semantic_ids"]["historical_or_noncanonical"] for row in detached_rows} == {
         True
     }
+    tokenomist_rows = [
+        row
+        for row in manifest["entries"]
+        if "radar_tokenomist_v5_" in row["path"]
+    ]
+    assert len(tokenomist_rows) == 5
+    assert {row["role"] for row in tokenomist_rows} == {
+        "noncanonical_namespace_artifact"
+    }
+    assert {
+        row["semantic_ids"]["historical_or_noncanonical"]
+        for row in tokenomist_rows
+    } == {True}
     assert checksums == "".join(
         f"{hashlib.sha256((root / path).read_bytes()).hexdigest()}  {path}\n"
         for path in sorted(expected_history)

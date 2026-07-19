@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Close the Tokenomist v5 fixture capture boundary · Codex
+**Why:** Protocol v2 needs structured-unlock context, but the existing
+Tokenomist v5 fixture normalizer did not prove immutable request/source
+preservation, strict revalidation, or the human authorization and retention
+boundary for genuine subscription data.
+**Changes:**
+- Added a disposable five-artifact v5 capture that preserves the exact
+  synthetic fixture and declared request, normalized snapshot, manifest, and
+  completion receipt. Strict doctor rederives every byte and distinguishes
+  complete, healthy-empty, and partial-page coverage without claiming a
+  complete multi-page acquisition.
+- Closed duplicate-key/event, non-finite/deep/oversized JSON, decoded-secret,
+  unit, clock, source, leaf, hardlink, symlink, ancestry, identity-collision,
+  and reuse drift. Publication uses macOS/Linux atomic no-replace semantics;
+  interrupted or raced staging is retained non-destructively with exact
+  observed inventory and truthful write/idempotence fields.
+- Hardened the shared detached-capture artifact-base hold with entry and exit
+  full-ancestry validation, and pinned the checked fixture before and after its
+  read. Ancestor replacement, including a symlink back to the original tree,
+  fails closed rather than returning a misleading path.
+- Added a no-call/no-write readiness surface that reads only the dedicated
+  boolean authorization flag and still blocks on missing subscription,
+  retention/redistribution review, live transport, and genuine capture. It
+  explicitly records Tokenomist v4 as deprecated and live-ineligible.
+- Synchronized lifecycle, standalone-test authorization isolation, Make
+  targets, Protocol-v2 current progress, Crypto Decision Radar North Star,
+  project exports, collaboration policy, and durable decision records. The
+  standard review ZIP excludes noncanonical Tokenomist namespaces; optional
+  history includes their exact complement.
+**Verify:** The final focused
+Tokenomist/shared-Bybit/Protocol-v2/export/Make/architecture stack passed 163
+tests. Both Tokenomist fixture smokes, blocked readiness, the Protocol-v2
+progress check, compileall, JSON validation, diff check, architecture
+cleanliness, alert rendering, the offline backtest fixture, and the read-only
+paper scoreboard passed. The complete sandbox-runnable package suite passed
+3,291 tests with only the loopback-bind concurrency test deselected. The
+standalone compatibility runner passed 1,419/1,420; its sole failure is that
+same dashboard test because this restricted environment cannot bind
+`127.0.0.1`, not a Tokenomist or product regression. Full `verify-fast` was not
+claimed green under that host restriction.
+**Notes/risks:** This adds no Tokenomist HTTP client, subscription, genuine
+provider bytes, latest pointer, source/campaign/dashboard/directional authority,
+or Protocol-v2 evidence. No notification, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` was created. Genuine acquisition remains
+a separate human decision.
+
 ## 2026-07-19 — Record the cadence-eligible CoinGecko DNS failure · Codex
 **Why:** The observation boundary was eligible and the already-present
 CoinGecko authorization was current, so Daily Operations was permitted to make

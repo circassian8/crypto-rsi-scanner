@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-18T07:09:15+00:00`
+- generated_at: `2026-07-19T16:36:21+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -980,6 +980,28 @@ explicit transcript path, and status requires the exact returned namespace.
 This audit boundary does not replace the still-missing separately authorized,
 permitted, project-owned bounded listener capture.
 
+Structured unlock context remains a separate evidence surface. Tokenomist v5
+response normalization is closed against the current synthetic fixture, and
+`make radar-unlock-tokenomist-v5-capture-smoke PYTHON=.venv/bin/python`
+proves a five-artifact immutable fixture bundle and strict doctor entirely
+inside a disposable root. Exact synthetic source bytes, request identity,
+normalized rows, units, clocks, manifest, and completion receipt are rederived;
+complete, healthy-empty, and partial-page results remain distinct. The smoke
+retains nothing, publishes no pointer, and grants no campaign, dashboard,
+directional, source, input-quality, or Protocol-v2 authority. It does not prove
+complete multi-page acquisition or genuine provider bytes.
+
+The no-call/no-write readiness surface is
+`make radar-unlock-tokenomist-v5-readiness PYTHON=.venv/bin/python`. It reads
+only the dedicated boolean `RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE` boundary,
+never an API credential, and remains blocked even when the flag is present.
+An applicable owner-approved subscription, genuine-byte retention and
+redistribution treatment, bounded live transport, health/backoff, immutable
+multi-page completion evidence, and later Protocol-v2 annex binding are all
+still missing. Tokenomist v4 is deprecated and live-ineligible. The next safe
+action is the disposable capture smoke, not a provider call; disable the unused
+future boundary by unsetting the dedicated flag.
+
 The direct intraday offline contract likewise validates exact latest-completed
 Bybit trade-price candles independently at 1h and 4h. It cuts requests off just
 before the current bucket, preserves native instrument identity, OHLC,
@@ -1059,6 +1081,15 @@ The remaining human decisions stay explicit:
   radar-intraday-bybit-capture PYTHON=.venv/bin/python` may collect and seal
   exact 1h/4h responses. Disable the boundary by unsetting that flag. A complete
   capture remains campaign-detached and annex-ineligible until preregistration.
+- Structured unlocks: inspect `make radar-unlock-tokenomist-v5-readiness
+  PYTHON=.venv/bin/python` without a call or write. The response and immutable
+  fixture contracts can be checked with `make radar-unlock-tokenomist-v5-smoke
+  PYTHON=.venv/bin/python` and `make radar-unlock-tokenomist-v5-capture-smoke
+  PYTHON=.venv/bin/python`; both are synthetic, non-authoritative, and offline.
+  No live command exists. Genuine acquisition requires a separately approved
+  Tokenomist v5 subscription, retention/export decision, bounded transport,
+  explicit confirmation, and the already-present dedicated authorization flag.
+  Unset `RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE` to disable that future boundary.
 - Human review timing: inspect `make radar-review-timing-status
   PYTHON=.venv/bin/python` without a provider call or write, then run `make
   radar-review-timing-queue PYTHON=.venv/bin/python` to discover the exact

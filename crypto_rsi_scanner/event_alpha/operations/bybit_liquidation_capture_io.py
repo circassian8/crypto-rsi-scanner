@@ -123,30 +123,57 @@ def hold_anchored_base(
 ) -> Iterator[_AnchoredCaptureBase]:
     """Hold one fully anchored base and a cooperating-reader/writer flock."""
 
-    base = _require_canonical(artifact_base, reason="artifact_base_unavailable")
+    base = _absolute(artifact_base)
     descriptor: int | None = None
+    verification_descriptor: int | None = None
     locked = False
     try:
-        before = os.stat(base, follow_symlinks=False)
+        initial = os.stat(base, follow_symlinks=False)
         descriptor = _open_directory_chain(base)
         opened = os.fstat(descriptor)
-        if not stat.S_ISDIR(opened.st_mode) or not _same_identity(before, opened):
+        resolved = base.resolve(strict=True)
+        current = os.stat(base, follow_symlinks=False)
+        if resolved != base:
+            raise BybitLiquidationCaptureIOError("symlinked_ancestry_rejected")
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or not _same_identity(initial, opened)
+            or not _same_identity(opened, current)
+        ):
             raise BybitLiquidationCaptureIOError("artifact_base_identity_drift")
         fcntl.flock(descriptor, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
         locked = True
         yield _AnchoredCaptureBase(base, descriptor, opened, exclusive)
-        after = os.stat(base, follow_symlinks=False)
-        completed = os.fstat(descriptor)
-        if (
-            not _same_identity(opened, completed)
-            or not _same_identity(completed, after)
-        ):
-            raise BybitLiquidationCaptureIOError("artifact_base_identity_drift")
+        try:
+            completed = os.fstat(descriptor)
+            resolved_before_rewalk = base.resolve(strict=True)
+            path_before_rewalk = os.stat(base, follow_symlinks=False)
+            verification_descriptor = _open_directory_chain(base)
+            verified = os.fstat(verification_descriptor)
+            path_after_rewalk = os.stat(base, follow_symlinks=False)
+            resolved_after_rewalk = base.resolve(strict=True)
+            if (
+                resolved_before_rewalk != base
+                or resolved_after_rewalk != base
+                or not _same_identity(opened, completed)
+                or not _same_identity(completed, path_before_rewalk)
+                or not _same_identity(completed, verified)
+                or not _same_identity(completed, path_after_rewalk)
+            ):
+                raise BybitLiquidationCaptureIOError(
+                    "artifact_base_identity_drift"
+                )
+        except (BybitLiquidationCaptureIOError, OSError) as exc:
+            raise BybitLiquidationCaptureIOError(
+                "artifact_base_identity_drift"
+            ) from exc
     except BybitLiquidationCaptureIOError:
         raise
     except OSError as exc:
         raise BybitLiquidationCaptureIOError("artifact_base_unavailable") from exc
     finally:
+        if verification_descriptor is not None:
+            os.close(verification_descriptor)
         if locked and descriptor is not None:
             fcntl.flock(descriptor, fcntl.LOCK_UN)
         if descriptor is not None:

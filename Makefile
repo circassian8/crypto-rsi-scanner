@@ -242,6 +242,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-smoke radar-announcements-kucoin-uta-smoke radar-announcements-kucoin-readiness
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
+.PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
 
 help:
 	@echo "Targets:"
@@ -379,6 +380,8 @@ help:
 	@echo "  make radar-announcements-bitget-capture-smoke  Prove disposable immutable Bitget capture/doctor mechanics; no call"
 	@echo "  make radar-announcements-bitget-readiness  Inspect separate Bitget authorization and future live boundary; no call/write"
 	@echo "  make radar-unlock-tokenomist-v5-smoke  Normalize the current v5 synthetic response contract; no call/write"
+	@echo "  make radar-unlock-tokenomist-v5-capture-smoke  Prove disposable immutable Tokenomist v5 capture/doctor; no call retained"
+	@echo "  make radar-unlock-tokenomist-v5-readiness  Inspect Tokenomist subscription/auth/retention blockers; no call/write"
 	@echo "  make radar-fundamentals-defillama-smoke  Normalize four typed free-API fixture responses; no call/write"
 	@echo "  make radar-fundamentals-defillama-mapping-smoke  Validate explicit mapped/not-applicable fixture decisions; no call/write"
 	@echo "  make radar-fundamentals-defillama-mapping-review  Print current-authority operator mapping template; no call/write"
@@ -732,6 +735,7 @@ test:
 	RSI_DECISION_RADAR_OUTCOME_PRICE_RECOVERY_LIVE=0 \
 	RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE=0 \
 	RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE=0 \
+	RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE=0 \
 	RSI_EVENT_LLM_ENABLED=0 \
 	RSI_EVENT_LLM_EXTRACTOR_ENABLED=0 \
 	RSI_EVENT_LLM_CATALYST_FRAMES_ENABLED=0 \
@@ -1616,6 +1620,13 @@ radar-announcements-bitget-readiness:
 radar-unlock-tokenomist-v5-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_providers.tokenomist_v5 \
 		fixtures/event_discovery/tokenomist_unlock_events_v5_capture.json
+
+radar-unlock-tokenomist-v5-capture-smoke:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.tokenomist_v5_capture \
+		--fixture fixtures/event_discovery/tokenomist_unlock_events_v5_capture.json
+
+radar-unlock-tokenomist-v5-readiness:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.tokenomist_v5_readiness
 
 radar-fundamentals-defillama-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_providers.defillama_fundamentals \

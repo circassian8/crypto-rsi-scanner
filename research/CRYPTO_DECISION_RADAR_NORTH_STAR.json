@@ -185,7 +185,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-18T07:09:15+00:00",
+  "generated_at": "2026-07-19T16:36:21+00:00",
   "empirical_validation_lab": {
     "additional_data_needed": [
       "observed bid-ask spread and order-book execution-quality snapshots",
@@ -1238,6 +1238,41 @@
     "selected_venue": "bybit",
     "unit_boundary": "offline normalization remains USDT-denominated and never silently relabels USDT as USD"
   },
+  "structured_unlock_readiness": {
+    "provider": "tokenomist",
+    "provider_api_version": "v5",
+    "legacy_v4_status": "deprecated_and_live_ineligible",
+    "response_contract_implemented": true,
+    "fixture_capture_contract_version": "decision_radar_tokenomist_v5_capture_v1",
+    "fixture_capture_contract_implemented": true,
+    "strict_fixture_capture_doctor_implemented": true,
+    "fixture_capture_mode": "offline_synthetic_disposable_only",
+    "fixture_capture_retained": false,
+    "fixture_capture_authority_eligible": false,
+    "complete_healthy_empty_and_partial_page_states_distinct": true,
+    "full_multipage_capture_contract_implemented": false,
+    "live_transport_implemented": false,
+    "genuine_provider_capture_present": false,
+    "provider_subscription_status": "not_selected_or_authorized",
+    "genuine_bytes_retention_terms_reviewed": false,
+    "genuine_bytes_redistribution_terms_reviewed": false,
+    "runtime_authorization_env": "RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE",
+    "readiness_command": "make radar-unlock-tokenomist-v5-readiness PYTHON=.venv/bin/python",
+    "response_smoke_command": "make radar-unlock-tokenomist-v5-smoke PYTHON=.venv/bin/python",
+    "capture_smoke_command": "make radar-unlock-tokenomist-v5-capture-smoke PYTHON=.venv/bin/python",
+    "next_safe_command": "make radar-unlock-tokenomist-v5-capture-smoke PYTHON=.venv/bin/python",
+    "readiness_provider_calls": 0,
+    "latest_pointer_published": false,
+    "campaign_attached": false,
+    "dashboard_authority_eligible": false,
+    "source_authority_eligible": false,
+    "directional_authority": false,
+    "decision_policy_applied": false,
+    "protocol_v2_input_quality_eligible": false,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false,
+    "research_only": true
+  },
   "artifact_heavy_verification": {
     "artifact_retention_report": {
       "artifact_payloads_read": 0,
@@ -1315,6 +1350,14 @@
       "implication": "calendar remains not configured unless genuine local source exports are imported",
       "next_safe_command": "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
       "rollback_disable_command": "none; the program never creates authorization or installs a service"
+    },
+    "structured_unlock_subscription_and_capture": {
+      "authorization_boundary": "future genuine Tokenomist v5 capture requires an owner-approved subscription and retention treatment plus already-present RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE=1; readiness never creates authorization or reads a credential",
+      "current_status": "fixture_contract_closed_live_transport_and_subscription_unapproved",
+      "expected_provider_activity": "readiness and both fixture smokes make no provider call; no genuine capture command exists",
+      "implication": "structured unlocks remain non-authoritative context until a bounded genuine multi-page capture and exact retention policy are separately approved and Protocol-v2 annex-bound",
+      "next_safe_command": "make radar-unlock-tokenomist-v5-capture-smoke PYTHON=.venv/bin/python",
+      "rollback_disable_command": "unset RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE"
     },
     "phone_access": {
       "authorization_boundary": "private or public enable requires its exact CONFIRM=1 command",

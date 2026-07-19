@@ -27,14 +27,23 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
     build_execution_quality_readiness,
 )
+from crypto_rsi_scanner.event_alpha.operations.tokenomist_v5_capture import (
+    CONTRACT_VERSION as TOKENOMIST_CAPTURE_CONTRACT_VERSION,
+)
+from crypto_rsi_scanner.event_alpha.operations.tokenomist_v5_readiness import (
+    LIVE_AUTH_ENV as TOKENOMIST_LIVE_AUTH_ENV,
+)
+from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
+    CAPTURE_CONTRACT as TOKENOMIST_RESPONSE_CONTRACT,
+)
 
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v4"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v5"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_detached_native_liquidation_import"
+    "with_detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
 )
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
@@ -64,6 +73,8 @@ _NEXT_SAFE_COMMANDS = (
     "make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python",
     "make radar-derivatives-bybit-liquidation-capture-smoke PYTHON=.venv/bin/python",
     "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
+    "make radar-unlock-tokenomist-v5-readiness PYTHON=.venv/bin/python",
+    "make radar-unlock-tokenomist-v5-capture-smoke PYTHON=.venv/bin/python",
     "make radar-outcome-price-recovery-readiness PYTHON=.venv/bin/python",
     "make radar-review-timing-queue PYTHON=.venv/bin/python",
     "make event-alpha-source-independence-oos-readiness PYTHON=.venv/bin/python",
@@ -152,6 +163,34 @@ def current_progress_values() -> dict[str, Any]:
             "protocol_v2_evidence_eligible": False,
             "research_only": True,
         },
+        "structured_unlock_contract": {
+            "provider": "tokenomist",
+            "provider_api_version": "v5",
+            "legacy_provider_api_version": "v4",
+            "legacy_v4_status": "deprecated",
+            "legacy_v4_live_eligible": False,
+            "source_role": "cliff_unlock_context",
+            "response_fixture_contract": TOKENOMIST_RESPONSE_CONTRACT,
+            "offline_response_normalizer_implemented": True,
+            "immutable_fixture_capture_contract_version": (
+                TOKENOMIST_CAPTURE_CONTRACT_VERSION
+            ),
+            "strict_fixture_capture_doctor_implemented": True,
+            "fixture_capture_retained": False,
+            "fixture_capture_authority_eligible": False,
+            "full_multipage_capture_contract_implemented": False,
+            "live_transport_implemented": False,
+            "genuine_capture_present": False,
+            "runtime_authorization_env": TOKENOMIST_LIVE_AUTH_ENV,
+            "runtime_authorization_created": False,
+            "subscription_terms_approved": False,
+            "genuine_bytes_retention_approved": False,
+            "genuine_bytes_standard_export_approved": False,
+            "provider_call_attempted": False,
+            "protocol_v2_annex_bound": False,
+            "protocol_v2_evidence_eligible": False,
+            "research_only": True,
+        },
         "current_activation_blockers": list(_CURRENT_BLOCKERS),
         "next_safe_commands": list(_NEXT_SAFE_COMMANDS),
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},
@@ -173,6 +212,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         "frozen_readiness_contract",
         "confirmed_execution_decision",
         "native_liquidation_contract",
+        "structured_unlock_contract",
         "current_activation_blockers",
         "next_safe_commands",
         "safety",
@@ -256,6 +296,38 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
     if liquidation != expected_liquidation:
         errors.append("native_liquidation_contract_mismatch")
 
+    unlock = value.get("structured_unlock_contract")
+    expected_unlock = {
+        "provider": "tokenomist",
+        "provider_api_version": "v5",
+        "legacy_provider_api_version": "v4",
+        "legacy_v4_status": "deprecated",
+        "legacy_v4_live_eligible": False,
+        "source_role": "cliff_unlock_context",
+        "response_fixture_contract": TOKENOMIST_RESPONSE_CONTRACT,
+        "offline_response_normalizer_implemented": True,
+        "immutable_fixture_capture_contract_version": (
+            TOKENOMIST_CAPTURE_CONTRACT_VERSION
+        ),
+        "strict_fixture_capture_doctor_implemented": True,
+        "fixture_capture_retained": False,
+        "fixture_capture_authority_eligible": False,
+        "full_multipage_capture_contract_implemented": False,
+        "live_transport_implemented": False,
+        "genuine_capture_present": False,
+        "runtime_authorization_env": TOKENOMIST_LIVE_AUTH_ENV,
+        "runtime_authorization_created": False,
+        "subscription_terms_approved": False,
+        "genuine_bytes_retention_approved": False,
+        "genuine_bytes_standard_export_approved": False,
+        "provider_call_attempted": False,
+        "protocol_v2_annex_bound": False,
+        "protocol_v2_evidence_eligible": False,
+        "research_only": True,
+    }
+    if unlock != expected_unlock:
+        errors.append("structured_unlock_contract_mismatch")
+
     blockers = value.get("current_activation_blockers")
     if blockers != list(_CURRENT_BLOCKERS):
         errors.append("current_activation_blockers_mismatch")
@@ -290,6 +362,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
     frozen = payload["frozen_readiness_contract"]
     decision = payload["confirmed_execution_decision"]
     liquidation = payload["native_liquidation_contract"]
+    unlock = payload["structured_unlock_contract"]
     lines = [
         "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS",
         f"status={payload['status']}",
@@ -312,6 +385,13 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "offline_normalizer=true detached_import=true "
             "project_listener=false project_transport_capture=false "
             "genuine_capture=false coverage=observed_messages_only"
+        ),
+        (
+            "structured_unlock_surface="
+            f"{unlock['provider']}:{unlock['provider_api_version']} "
+            "offline_normalizer=true fixture_capture_doctor=true "
+            "full_multipage=false live_transport=false genuine_capture=false "
+            "protocol_v2_evidence=false"
         ),
         (
             "provider_calls=0 credential_reads=0 environment_reads=0 file_reads=0 "

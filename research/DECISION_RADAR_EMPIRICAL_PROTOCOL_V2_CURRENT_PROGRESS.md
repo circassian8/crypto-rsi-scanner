@@ -38,6 +38,13 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   application payloads, but it proves neither project-owned transport nor
   continuous stream coverage. No live listener, runtime authorization, genuine
   capture, or Protocol-v2 binding exists;
+- Tokenomist v5 cliff-unlock response normalization and a strict immutable
+  synthetic-fixture capture/doctor are implemented. The disposable capture
+  proves exact request/source bytes, units, clocks, complete versus
+  healthy-empty versus partial-page state, and artifact mechanics, then retains
+  nothing. It does not prove a subscription, live transport, multi-page
+  acquisition, genuine provider bytes, source authority, or Protocol-v2
+  eligibility; v4 remains deprecated and live-ineligible;
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
 
@@ -55,4 +62,6 @@ make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python
 make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python
 make radar-derivatives-bybit-liquidation-capture-smoke PYTHON=.venv/bin/python
+make radar-unlock-tokenomist-v5-readiness PYTHON=.venv/bin/python
+make radar-unlock-tokenomist-v5-capture-smoke PYTHON=.venv/bin/python
 ```

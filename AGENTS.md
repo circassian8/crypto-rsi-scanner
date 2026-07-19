@@ -444,6 +444,27 @@ may be added later when a suitable environment already exists.
   adapter performs no provider call, reads no key or authorization, writes
   nothing, and cannot become campaign/dashboard/Protocol-v2 authority.
   Historical flat Tokenomist-style fixtures keep their existing interpretation.
+  `make radar-unlock-tokenomist-v5-capture-smoke` separately seals the exact
+  synthetic source bytes, fixture-declared request identity, deterministic
+  normalized snapshot, manifest, and completion receipt inside one disposable
+  root, fully rederives them through a descriptor-held strict doctor, and
+  retains nothing. Duplicate keys/events, non-finite or over-deep JSON, decoded
+  secrets, path/root/leaf drift, symlinks, hardlinks, extra leaves, interrupted
+  publication, and bounded-size violations fail closed. Complete,
+  healthy-empty, and partial-page states remain distinct; the single-page
+  fixture contract never claims complete multi-page acquisition.
+  Publication uses a native atomic no-replace operation. Interrupted or raced
+  staging is never deleted by name: an exact `tmp_tokenomist_v5_stage_*` tree
+  is retained as noncanonical quarantine with its descriptor-observed bounded
+  inventory reported, and a retry uses a new stage. Do not silently remove or
+  promote that quarantine.
+  `make radar-unlock-tokenomist-v5-readiness` reads only the dedicated
+  `RSI_DECISION_RADAR_TOKENOMIST_V5_LIVE` boolean flag, never a credential, and
+  remains blocked even when that flag is present because live transport,
+  subscription approval, retention/redistribution review, health/backoff, and
+  a genuine capture do not exist. Its safe action is the disposable smoke, not
+  a provider call. Neither surface publishes a pointer or grants source,
+  campaign, dashboard, directional, policy, or Protocol-v2 authority.
   Tokenomist currently documents v5 as supported and v4 as deprecated; genuine
   acquisition needs a separately approved subscription/authorization, bounded
   request ledger, immutable capture, and retention/export review. Do not check
