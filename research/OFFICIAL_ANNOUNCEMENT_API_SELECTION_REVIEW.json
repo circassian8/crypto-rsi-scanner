@@ -34,7 +34,7 @@
       "endpoint": "GET https://api.kucoin.com/api/v3/announcements",
       "maximum_requested_page_size": 50,
       "pagination": "currentPage_totalPage_totalNum_pageSize",
-      "provider_status": "offline_contract_and_no_call_readiness_implemented_capture_unconfigured_unauthorized",
+      "provider_status": "offline_contract_readiness_and_fixture_capture_doctor_implemented_live_transport_unconfigured_unauthorized",
       "review_url": "https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements",
       "selected_first": true
     }
@@ -48,8 +48,8 @@
     "source_independence_required": true
   },
   "next_implementation": [
-    "confirmed_bounded_immutable_capture_only_after_explicit_authorization",
-    "health_backoff_strict_doctor_and_explicit_protocol_v2_annex_selection"
+    "confirmed_bounded_live_transport_only_after_explicit_authorization",
+    "health_backoff_retention_and_explicit_protocol_v2_annex_selection"
   ],
   "safety": {
     "authorization_created": false,

@@ -99,18 +99,22 @@ after the shared identity, coverage, and clock rules are proven on KuCoin.
 4. **Complete:** the no-call readiness surface reports configuration, separate
    authorization, the exact trailing-24-hour plan, maximum requests, expected
    future provider activity, disable action, and exact safe commands. It has no
-   HTTP client or write and cannot become ready until capture/doctor exist.
-5. **Next:** design immutable capture and strict doctor. Only after separate
-   operator authorization may a confirmed bounded capture be exposed
-   with no redirects, retries, alternate hosts, proxies, VPNs, or region bypass.
-6. Persist immutable accepted bytes, request ledger, coverage, fingerprints,
-   completion receipt, health/backoff, and strict-doctor truth. Keep it
-   campaign-detached and Protocol-v2-ineligible until the annex binds it.
+   HTTP client or write and cannot become ready until the live transport and
+   authorized capture command exist.
+5. **Complete offline:** descriptor-anchored fixture mechanics seal exact
+   response bytes, request ledger, normalized snapshot, fingerprints, manifest,
+   and completion receipt; strict doctor re-derives the bundle and no pointer is
+   published. `live_public_http` mode is explicitly rejected.
+6. **Next:** only after separate operator authorization, add a confirmed bounded
+   live transport with no redirects, retries, alternate hosts, proxies, VPNs,
+   or region bypass, plus health/backoff and retention review.
+7. Keep every capture campaign-detached and Protocol-v2-ineligible until an
+   explicit annex binds a genuine strict-clean namespace.
 
 ## Consequences
 
-- KuCoin's offline official-announcement contract is fixture-verified, but it
-  is not live-enabled, authoritative, or Protocol-v2-admitted.
+- KuCoin's offline response and immutable-capture contracts are fixture-
+  verified, but it is not live-enabled, authoritative, or Protocol-v2-admitted.
 - Bitget remains planned as the second documented official API candidate.
 - Bybit remains the selected execution venue and its documented announcement
   endpoint remains useful when permitted reachability exists. KuCoin/Bitget

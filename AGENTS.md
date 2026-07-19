@@ -360,9 +360,15 @@ may be added later when a suitable environment already exists.
   `RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` flag, describes one exact
   trailing-24-hour plan bounded to 20 public GETs, and reports expected future
   activity plus `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` as the
-  disable action. It has no HTTP client, filesystem write, or capture command.
-  Authorization alone cannot make it ready while immutable capture and strict
-  doctor remain unimplemented; never create or mutate the flag from code.
+  disable action. It has no HTTP client, filesystem write, or live capture
+  command. `make radar-announcements-kucoin-capture-smoke` proves exact
+  request-ledger, response-byte, normalized-snapshot, manifest, completion-
+  receipt, idempotence, and strict-doctor reconciliation inside one disposable
+  temporary root, then retains nothing. The capture module explicitly rejects
+  `live_public_http` mode, publishes no pointer, and cannot grant source,
+  campaign, dashboard, or Protocol-v2 authority. Authorization alone cannot
+  make readiness pass while the live transport remains unimplemented; never
+  create or mutate the flag from code.
 - **Tokenomist structured-unlock response contract:**
   `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
   cliff-unlock response shape entirely offline. The closed synthetic fixture

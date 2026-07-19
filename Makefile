@@ -238,6 +238,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: dependency-tools lock-dependencies dependency-lock-check dependency-audit dependency-verify
 .PHONY: export-empirical-artifact-history export-project-artifact-history
 .PHONY: radar-announcements-kucoin-smoke radar-announcements-kucoin-readiness
+.PHONY: radar-announcements-kucoin-capture-smoke
 
 help:
 	@echo "Targets:"
@@ -367,6 +368,7 @@ help:
 	@echo "  make radar-calendar-official-acquire    Make one explicitly authorized official-calendar attempt"
 	@echo "  make radar-calendar-official-import-local FED_FOMC_HTML=... BLS_CALENDAR_ICS=... BEA_RELEASE_DATES_JSON=... OFFICIAL_MACRO_OBSERVED_AT=..."
 	@echo "  make radar-announcements-kucoin-smoke  Validate the closed KuCoin synthetic response contract; no call/write"
+	@echo "  make radar-announcements-kucoin-capture-smoke  Prove disposable immutable capture/doctor mechanics; no call"
 	@echo "  make radar-announcements-kucoin-readiness  Inspect separate KuCoin authorization and future capture boundary; no call/write"
 	@echo "  make radar-unlock-tokenomist-v5-smoke  Normalize the current v5 synthetic response contract; no call/write"
 	@echo "  make radar-fundamentals-defillama-smoke  Normalize four typed free-API fixture responses; no call/write"
@@ -1548,6 +1550,10 @@ radar-calendar-official-import-local:
 
 radar-announcements-kucoin-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_announcements \
+		--fixture-dir fixtures/kucoin_announcements
+
+radar-announcements-kucoin-capture-smoke:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.kucoin_announcements_capture \
 		--fixture-dir fixtures/kucoin_announcements
 
 radar-announcements-kucoin-readiness:

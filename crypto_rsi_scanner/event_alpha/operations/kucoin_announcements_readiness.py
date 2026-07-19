@@ -26,12 +26,14 @@ READINESS_COMMAND = (
     "make radar-announcements-kucoin-readiness PYTHON=.venv/bin/python"
 )
 SMOKE_COMMAND = "make radar-announcements-kucoin-smoke PYTHON=.venv/bin/python"
+CAPTURE_SMOKE_COMMAND = (
+    "make radar-announcements-kucoin-capture-smoke PYTHON=.venv/bin/python"
+)
 FUTURE_CAPTURE_COMMAND = (
-    "unavailable_until_immutable_capture_boundary_is_implemented"
+    "unavailable_until_live_transport_and_authorized_capture_command_are_implemented"
 )
 AUTHORIZATION_ACTION = (
-    f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_only_after_reviewing_"
-    "the_future_capture_boundary_then_rerun_readiness"
+    "none_until_live_transport_and_authorized_capture_command_are_implemented"
 )
 ROLLBACK_COMMAND = f"unset {LIVE_AUTH_ENV}"
 DEFAULT_WINDOW_HOURS = 24
@@ -70,7 +72,7 @@ def build_kucoin_announcement_readiness(
     reasons = []
     if not authorized:
         reasons.append("runtime_provider_authorization_absent")
-    reasons.append("immutable_capture_boundary_not_implemented")
+    reasons.append("live_capture_transport_not_implemented")
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_kucoin_announcements_readiness",
@@ -97,9 +99,9 @@ def build_kucoin_announcement_readiness(
         "alternate_hosts_allowed": False,
         "proxy_or_vpn_bypass_allowed": False,
         "exact_response_input_contract_implemented": True,
-        "immutable_capture_boundary_implemented": False,
+        "immutable_capture_boundary_implemented": True,
         "capture_command_available": False,
-        "strict_capture_doctor_implemented": False,
+        "strict_capture_doctor_implemented": True,
         "campaign_attached": False,
         "dashboard_authority_eligible": False,
         "context_only": True,
@@ -108,13 +110,14 @@ def build_kucoin_announcement_readiness(
         "protocol_v2_annex_bound": False,
         "protocol_v2_evidence_eligible": False,
         "reasons": reasons,
-        "next_safe_command": SMOKE_COMMAND,
+        "next_safe_command": CAPTURE_SMOKE_COMMAND,
+        "response_contract_smoke_command": SMOKE_COMMAND,
         "readiness_recheck_command": READINESS_COMMAND,
         "future_capture_command": FUTURE_CAPTURE_COMMAND,
         "operator_action_required": (
             AUTHORIZATION_ACTION
             if not authorized
-            else "wait_for_immutable_capture_and_strict_doctor_implementation"
+            else "wait_for_live_capture_transport_implementation"
         ),
         "authorization_boundary": (
             f"future_capture_requires_already_present_{LIVE_AUTH_ENV}=1_and_"
@@ -157,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = (
     "AUTHORIZATION_ACTION",
+    "CAPTURE_SMOKE_COMMAND",
     "CONTRACT_VERSION",
     "FUTURE_CAPTURE_COMMAND",
     "LIVE_AUTH_ENV",

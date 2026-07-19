@@ -34,16 +34,28 @@
     "annUrl"
   ],
   "provider": "kucoin_announcements",
+  "capture_mechanics": {
+    "accepted_capture_mode": "offline_fixture",
+    "artifact_pointer_published": false,
+    "completion_receipt": true,
+    "disposable_smoke_artifacts_retained": false,
+    "exact_response_bytes": true,
+    "immutable_descriptor_anchored_writes": true,
+    "live_public_http_mode_accepted": false,
+    "manifest_fingerprints": true,
+    "nonsecret_request_ledger": true,
+    "strict_doctor": true
+  },
   "readiness": {
     "capture_command_available": false,
     "contract_version": "crypto_radar_kucoin_announcements_readiness_v1",
     "dedicated_authorization_env": "RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE",
-    "immutable_capture_boundary_implemented": false,
+    "immutable_capture_boundary_implemented": true,
     "maximum_future_requests": 20,
     "provider_calls": 0,
     "request_window_hours": 24,
     "status": "implemented_blocked",
-    "strict_capture_doctor_implemented": false,
+    "strict_capture_doctor_implemented": true,
     "writes": 0
   },
   "safety": {

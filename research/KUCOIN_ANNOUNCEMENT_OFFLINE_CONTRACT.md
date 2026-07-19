@@ -25,8 +25,21 @@ make radar-announcements-kucoin-readiness PYTHON=.venv/bin/python
 It reads only whether the dedicated KuCoin authorization flag is already
 present and reports an exact trailing-24-hour request plan, a 20-request upper
 bound, expected future activity, and the disable action. It performs no call or
-write and remains blocked even when authorization is present because immutable
-capture and strict doctor are not implemented.
+write and remains blocked even when authorization is present because the live
+transport and authorized capture command are not implemented.
+
+Immutable capture mechanics can be proven offline with:
+
+```text
+make radar-announcements-kucoin-capture-smoke PYTHON=.venv/bin/python
+```
+
+The smoke seals exact synthetic response bytes, a non-secret request ledger,
+normalized snapshot, manifest, and completion receipt in one disposable
+temporary root; strict doctor then re-derives every byte before the root is
+removed. It publishes no pointer. The capture API accepts only explicit
+`offline_fixture` mode today and rejects `live_public_http`, so synthetic bytes
+cannot be relabeled as genuine evidence.
 
 ## Closed contract
 
@@ -64,11 +77,11 @@ The contract remains:
 - research-only, with zero sends, trades, orders, paper trades, normal RSI
   writes, or Event Alpha `TRIGGERED_FADE` creation.
 
-The no-call readiness surface is now implemented. A later live boundary still
-requires separately present operator authorization, explicit confirmation,
-bounded no-redirect and no-retry acquisition, immutable accepted bytes, request
-ledger, health/backoff, completion receipt, strict doctor, retention review,
-and explicit Protocol-v2 annex selection.
+The no-call readiness, immutable bundle, and strict-doctor mechanics are now
+implemented offline. A later live boundary still requires separately present
+operator authorization, explicit confirmation, bounded no-redirect and
+no-retry transport, health/backoff, retention review, and explicit Protocol-v2
+annex selection.
 
 Official contract reviewed:
 https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements

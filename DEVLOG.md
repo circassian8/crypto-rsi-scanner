@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Prove immutable KuCoin capture mechanics offline · Codex
+**Why:** Official-announcement bytes need reproducible provenance and fail-
+closed validation before any live transport can be considered.
+**Changes:**
+- Added a provider-detached capture boundary that binds exact response pages,
+  sequential request/header/body-read clocks, URLs, status/content type,
+  redirect/retry zeroes, lineage, hashes, and sizes into a non-secret ledger.
+- Added descriptor-anchored immutable namespace writes for the raw pages,
+  normalized snapshot, manifest, and completion receipt, plus a strict doctor
+  that reconstructs and byte-compares the entire bundle.
+- Added a disposable fixture smoke, idempotence and partial-coverage behavior,
+  transport-drift/mutation/extra-leaf failures, and an explicit rejection of
+  `live_public_http` mode. No pointer or live capture command exists.
+- Updated readiness and operator/product documents to distinguish completed
+  offline mechanics from the still-unimplemented authorized transport.
+**Verify:** All KuCoin response/readiness/capture tests passed together (40
+tests); compileall, response smoke, disposable capture smoke, readiness, JSON
+validation, `git diff --check`, and architecture cleanliness passed.
+**Notes/risks:** The smoke writes only to a disposable temporary root and
+retains nothing. This adds no provider call/authorization, source authority,
+campaign/dashboard/Protocol-v2 attachment, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Add non-activating KuCoin announcement readiness · Codex
 **Why:** The closed synthetic response contract needed an operator-visible
 authorization boundary before any immutable-capture work could safely begin.
