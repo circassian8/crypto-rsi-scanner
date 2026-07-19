@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve campaign truth after a CoinGecko DNS failure · Codex
+**Why:** The cadence was eligible and authorization already existed, but the
+single bounded request failed at local DNS resolution. Recording the terminal
+attempt without an immediate retry preserves both audit truth and the provider
+request budget.
+**Changes:**
+- Daily Operations retained the attempted/failed namespace
+  `radar_market_no_send_20260719t224450016466z_42eafec40b10`, refreshed the
+  canonical campaign report, and left the prior strict-clean revision-12
+  dashboard authority unchanged.
+- Provider failures advanced to 9 while 37 successful cycles, 1,110 retained
+  observations, 1,080 baseline-counted observations, 30 too-close rows, and
+  0/1,110 trusted-spread coverage remain unchanged. The coordinator reserved
+  the next request boundary until `2026-07-19T23:44:51.024092+00:00`.
+- Updated the roadmap to expose the failed boundary and exact next safe
+  cadence. No sandbox-bypass retry was made.
+**Verify:** Daily Operations readiness reported authorized/eligible before the
+attempt; the cycle journal recorded exactly one attempted and one terminal
+failed row; status reports `waiting_cadence`; the campaign report records 9
+provider failures and keeps the prior authority exact. Dashboard readiness and
+campaign-report reconciliation passed.
+**Notes/risks:** No observation or baseline advance occurred. Telegram sends,
+trades, orders, paper trades, normal RSI writes, and Event Alpha
+`TRIGGERED_FADE` all remain zero.
+
 ## 2026-07-20 — Bind Bybit round trips to dynamic instrument constraints · Codex
 **Why:** A quantity can be aligned to `qtyStep` yet remain venue-invalid because
 it is below minimum size/notional or above the current market/limit maximum.
