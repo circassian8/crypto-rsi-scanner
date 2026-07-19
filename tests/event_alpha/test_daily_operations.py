@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
@@ -498,6 +499,74 @@ def test_eligible_cycle_publishes_then_restarts_exact_owned_dashboard(
     state = read_json_object(tmp_path / STATE_FILENAME)
     assert state["last_successful_namespace"] == result.artifact_namespace
     assert state["last_successful_publication"]
+
+
+@pytest.mark.parametrize(
+    ("scenario", "expected_status"),
+    (
+        ("authorization_blocked", "blocked"),
+        ("cadence_waiting", "skipped"),
+        ("cycle_already_running", "skipped"),
+        ("readiness_failed", "failed"),
+        ("calendar_attestation_failed", "blocked"),
+        ("current_pointer_failed", "failed"),
+        ("provider_boundary_failed", "failed"),
+        ("strict_doctor_failed", "failed"),
+        ("publication_failed", "failed"),
+        ("dashboard_restart_failed", "failed"),
+        ("operations_receipt_failed", "failed"),
+        ("dashboard_probe_failed", "failed"),
+        ("succeeded", "succeeded"),
+    ),
+)
+def test_every_terminal_cycle_refreshes_campaign_truth_exactly_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: str,
+    expected_status: str,
+) -> None:
+    fake = _Boundaries(
+        authorized=scenario != "authorization_blocked",
+        readiness_status=(
+            "blocked"
+            if scenario in {"authorization_blocked", "cadence_waiting"}
+            else "ready"
+        ),
+        cadence_status=("waiting" if scenario == "cadence_waiting" else "eligible"),
+    )
+    fake.calendar_resolver_failure = scenario == "calendar_attestation_failed"
+    fake.current_pointer_failure = scenario == "current_pointer_failed"
+    fake.run_failure = scenario == "provider_boundary_failed"
+    fake.doctor_failure = scenario == "strict_doctor_failed"
+    fake.publish_failure = scenario == "publication_failed"
+    fake.operations_receipt_failure = scenario == "operations_receipt_failed"
+    fake.dashboard_probe_result = scenario != "dashboard_probe_failed"
+    if scenario == "dashboard_restart_failed":
+        fake.restart_results = [False, True]
+    if scenario == "cycle_already_running":
+        monkeypatch.setattr(
+            daily_operations,
+            "_cycle_lock",
+            lambda _base: nullcontext(False),
+        )
+    if scenario == "readiness_failed":
+        def failed_readiness(**_kwargs: Any) -> MarketNoSendReadiness:
+            raise OSError("sanitized readiness boundary failure")
+
+        fake.readiness = failed_readiness
+
+    result = run_daily_operations_cycle(
+        artifact_base_dir=tmp_path,
+        top_n=30,
+        fetch_limit=50,
+        dependencies=fake.dependencies(),
+    )
+
+    assert result.status == expected_status
+    assert fake.events.count("refresh_campaign_report") == 1
+    assert read_jsonl(tmp_path / CYCLE_LEDGER_FILENAME)[-1]["status"] == (
+        expected_status
+    )
 
 
 def test_success_state_uses_post_attempt_next_eligible_time(tmp_path: Path) -> None:

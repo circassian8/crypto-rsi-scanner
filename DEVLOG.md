@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Enforce terminal campaign reconciliation · Codex
+**Why:** Daily Operations centralized campaign-report rebuilding in its terminal
+path, but tests proved the ordering only for successful publication. The first
+North Star item requires every terminal outcome to refresh campaign truth.
+**Changes:**
+- Added a terminal-path matrix covering concurrent-cycle skip, authorization and
+  readiness block/failure, cadence skip, calendar attestation failure, current
+  pointer failure, provider-boundary failure, strict doctor, publication,
+  restart, operations receipt, dashboard probe rollback, and success.
+- Each case must persist its exact terminal status and invoke the canonical
+  campaign-report refresh exactly once. Documented this as a Daily Operations
+  invariant and marked the evidence gap complete in the roadmap.
+**Verify:** All 45 Daily Operations tests passed, including the 14 focused
+matrix/success cases; compileall and architecture cleanliness also passed with
+zero new size violations.
+**Notes/risks:** This is regression coverage for existing centralized behavior;
+it changes no provider call, cadence, report calculation, pointer, authority,
+route, score, threshold, send, trade, order, paper trade, normal RSI write, or
+Event Alpha `TRIGGERED_FADE` behavior.
+
 ## 2026-07-19 — Close the current KuCoin UTA capture doctor offline · Codex
 **Why:** The current UTA response schema was fixture-closed, but a genuine live
 path could not be reviewed safely until exact current-endpoint bytes had their

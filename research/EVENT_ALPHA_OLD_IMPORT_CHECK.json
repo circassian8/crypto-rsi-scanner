@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 10222,
+          "line": 10273,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T04:00:41.707721+00:00",
+  "generated_at": "2026-07-19T04:07:52.125009+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1222,
-  "input_fingerprint": "0f44c91d3d83b177f291dd2c1b942989ba197f04273398d5fe4e10acdf638c10",
+  "input_fingerprint": "47f202f481d4dc006071b21e4b97279f8d2e00e7fc9a332bb9935717c2912131",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "research/ARCHITECTURE_SIZE_GATES.md:1784433557",
-    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784433639",
-    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784433639",
-    "tests/cli/test_export_source_artifacts.py:1784433632",
-    "tests/cli/test_make_targets.py:1784433632"
+    "AGENTS.md:1784434062",
+    "DEVLOG.md:1784434062",
+    "ROADMAP.md:1784434062",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784433650",
+    "research/ARCHITECTURE_SIZE_GATES.md:1784433647"
   ],
-  "newest_source_mtime": 1784433639.2034557,
+  "newest_source_mtime": 1784434069.6059148,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784433551.282266,
+  "report_mtime": 1784433641.708282,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1222,
-    "input_fingerprint": "0f44c91d3d83b177f291dd2c1b942989ba197f04273398d5fe4e10acdf638c10",
+    "input_fingerprint": "47f202f481d4dc006071b21e4b97279f8d2e00e7fc9a332bb9935717c2912131",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "research/ARCHITECTURE_SIZE_GATES.md:1784433557",
-      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784433639",
-      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784433639",
-      "tests/cli/test_export_source_artifacts.py:1784433632",
-      "tests/cli/test_make_targets.py:1784433632"
+      "AGENTS.md:1784434062",
+      "DEVLOG.md:1784434062",
+      "ROADMAP.md:1784434062",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784433650",
+      "research/ARCHITECTURE_SIZE_GATES.md:1784433647"
     ],
-    "newest_source_mtime": 1784433639.2034557,
+    "newest_source_mtime": 1784434069.6059148,
     "regex_compile_count": 124,
-    "report_mtime": 1784433551.282266,
-    "scan_duration_seconds": 2.2402,
+    "report_mtime": 1784433641.708282,
+    "scan_duration_seconds": 2.2427,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.2402,
+  "scan_duration_seconds": 2.2427,
   "scanned_doc_files": 79,
   "scanned_source_files": 900,
   "scanned_test_files": 237,

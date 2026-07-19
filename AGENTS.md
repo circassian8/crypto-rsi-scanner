@@ -250,7 +250,11 @@ may be added later when a suitable environment already exists.
   bounded, credential-free current-status receipt;
   `make radar-daily-ops-cycle` performs at most one already-authorized,
   cadence-eligible CoinGecko no-send observation. Every attempt gets a unique
-  namespace and bounded attempted/terminal journal rows. Publication requires
+  namespace and bounded attempted/terminal journal rows. Every terminal path—
+  lock skip, readiness block/failure, cadence skip, provider failure, doctor or
+  publication failure, rollback after restart/receipt/probe failure, and
+  success—must invoke the canonical campaign-report refresh exactly once after
+  terminal state is recorded. Publication requires
   complete operator state and strict doctor success. It preserves the immutable
   prepublication attempt audit, then writes an immutable final publication
   receipt after exact pointer publication and an immutable operations receipt
