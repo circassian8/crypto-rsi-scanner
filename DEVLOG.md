@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-fourth no-send market cycle · Codex
+**Why:** The hourly cadence boundary became eligible while the already-present
+CoinGecko authorization remained valid. One bounded observation was needed to
+advance the causal market baseline without bypassing cadence or manufacturing
+Decision evidence.
+**Changes:**
+- Ran one authorized Daily Operations cycle. CoinGecko returned HTTP 200 with
+  80 rows in 1,178 ms and no retry; the pipeline selected 30 exact observations
+  and published
+  `radar_market_no_send_20260719t132456823505z_1f6f530fbb36` at revision 12.
+- Preserved the immutable prepublication attempt audit and added exact final
+  publication and owned-dashboard operations receipts for cycle
+  `2534dafbe68ee301c24a0afa5b8018b6`. The live loopback surface now serves the
+  new namespace/run/operator digest with HTTP 200.
+- Refreshed canonical campaign truth to 34 successful cycles, 1,020 retained
+  observations, 990 baseline-counted observations, and 30 too-close rows. The
+  current exact generation remains honestly `warming=30` with no anomaly or
+  Decision candidate; after admitting it, retained same-asset history makes
+  29/30 current assets conditionally ready for a later point-in-time
+  observation. `hedera-hashgraph` remains the sole non-warm identity.
+- Kept the execution-quality gap explicit: trusted spread remains 0/1,020 and
+  the one historical `due_missing_price` outcome remains unresolved rather
+  than inferred.
+**Verify:** Exact strict artifact doctor passed with zero blockers and zero
+warnings. Daily Operations status reports the successful provider-backed cycle
+and cadence wait until `2026-07-19T14:24:57.648234+00:00`. Dashboard readiness
+is READY for the exact revision-12 authority; real-pointer smoke rendered 12
+pages, and loopback HEAD returned HTTP 200 with matching namespace, run,
+revision, and operator-state headers. Campaign receipt, request-ledger,
+baseline, outcome, review-queue, and safety fields were reconciled directly.
+**Notes/risks:** This cycle made exactly one cadence-eligible provider request.
+It sent no Telegram message, created no trade/order/paper trade, wrote no normal
+RSI signal, and created no Event Alpha `TRIGGERED_FADE`. The recurring service
+remains uninstalled. No threshold, score, route, provider authorization, or
+algorithm changed; the risk-appropriate live artifact/doctor/dashboard gate was
+used instead of repeating the full code suite passed by the preceding logical
+change.
+
 ## 2026-07-19 — Expose the causal baseline frontier · Codex
 **Why:** The latest authoritative generation was correctly 0/30 warm because
 each row used only strictly earlier history, while the retained cache already
