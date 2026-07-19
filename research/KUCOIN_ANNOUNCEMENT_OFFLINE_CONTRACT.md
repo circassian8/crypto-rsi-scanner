@@ -16,6 +16,18 @@ trade. Run it with:
 make radar-announcements-kucoin-smoke PYTHON=.venv/bin/python
 ```
 
+The separate observational readiness surface is:
+
+```text
+make radar-announcements-kucoin-readiness PYTHON=.venv/bin/python
+```
+
+It reads only whether the dedicated KuCoin authorization flag is already
+present and reports an exact trailing-24-hour request plan, a 20-request upper
+bound, expected future activity, and the disable action. It performs no call or
+write and remains blocked even when authorization is present because immutable
+capture and strict doctor are not implemented.
+
 ## Closed contract
 
 - The request identity binds `currentPage`, requested `pageSize`, `annType`,
@@ -52,11 +64,11 @@ The contract remains:
 - research-only, with zero sends, trades, orders, paper trades, normal RSI
   writes, or Event Alpha `TRIGGERED_FADE` creation.
 
-A later live boundary still requires a no-call readiness surface, separately
-present operator authorization, explicit confirmation, bounded no-redirect and
-no-retry acquisition, immutable accepted bytes, request ledger, health/backoff,
-completion receipt, strict doctor, retention review, and explicit Protocol-v2
-annex selection.
+The no-call readiness surface is now implemented. A later live boundary still
+requires separately present operator authorization, explicit confirmation,
+bounded no-redirect and no-retry acquisition, immutable accepted bytes, request
+ledger, health/backoff, completion receipt, strict doctor, retention review,
+and explicit Protocol-v2 annex selection.
 
 Official contract reviewed:
 https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-announcements

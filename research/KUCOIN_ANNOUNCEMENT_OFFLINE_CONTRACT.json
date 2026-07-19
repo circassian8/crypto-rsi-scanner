@@ -34,6 +34,18 @@
     "annUrl"
   ],
   "provider": "kucoin_announcements",
+  "readiness": {
+    "capture_command_available": false,
+    "contract_version": "crypto_radar_kucoin_announcements_readiness_v1",
+    "dedicated_authorization_env": "RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE",
+    "immutable_capture_boundary_implemented": false,
+    "maximum_future_requests": 20,
+    "provider_calls": 0,
+    "request_window_hours": 24,
+    "status": "implemented_blocked",
+    "strict_capture_doctor_implemented": false,
+    "writes": 0
+  },
   "safety": {
     "authorization_created": false,
     "environment_reads": 0,

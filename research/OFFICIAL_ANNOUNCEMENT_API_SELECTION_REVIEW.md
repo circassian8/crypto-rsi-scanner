@@ -96,10 +96,12 @@ after the shared identity, coverage, and clock rules are proven on KuCoin.
 3. **Complete:** reject response/code/schema extension, duplicate IDs,
    page/count drift, future or malformed clocks, unsafe URLs, unknown
    languages, oversized text, secret-like fields, and unbounded pagination.
-4. **Next:** add a no-call readiness surface that reports configuration, separate
-   authorization, maximum requests, expected provider activity, rollback, and
-   exact next command.
-5. Only after separate operator authorization, add a confirmed bounded capture
+4. **Complete:** the no-call readiness surface reports configuration, separate
+   authorization, the exact trailing-24-hour plan, maximum requests, expected
+   future provider activity, disable action, and exact safe commands. It has no
+   HTTP client or write and cannot become ready until capture/doctor exist.
+5. **Next:** design immutable capture and strict doctor. Only after separate
+   operator authorization may a confirmed bounded capture be exposed
    with no redirects, retries, alternate hosts, proxies, VPNs, or region bypass.
 6. Persist immutable accepted bytes, request ledger, coverage, fingerprints,
    completion receipt, health/backoff, and strict-doctor truth. Keep it

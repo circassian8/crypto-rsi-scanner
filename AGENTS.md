@@ -355,6 +355,14 @@ may be added later when a suitable environment already exists.
   unauthorized, inactive, and Protocol-v2-ineligible. Do not add a client or
   live path until separate authorization, confirmation, immutable capture,
   request ledger, health/backoff, doctor, retention, and annex gates exist.
+  `make radar-announcements-kucoin-readiness` is the non-activating operator
+  boundary: it reads only the separate
+  `RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` flag, describes one exact
+  trailing-24-hour plan bounded to 20 public GETs, and reports expected future
+  activity plus `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` as the
+  disable action. It has no HTTP client, filesystem write, or capture command.
+  Authorization alone cannot make it ready while immutable capture and strict
+  doctor remain unimplemented; never create or mutate the flag from code.
 - **Tokenomist structured-unlock response contract:**
   `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
   cliff-unlock response shape entirely offline. The closed synthetic fixture

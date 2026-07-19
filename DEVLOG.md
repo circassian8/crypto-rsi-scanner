@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Add non-activating KuCoin announcement readiness · Codex
+**Why:** The closed synthetic response contract needed an operator-visible
+authorization boundary before any immutable-capture work could safely begin.
+**Changes:**
+- Added a read-only readiness projection and Make target that inspect only the
+  dedicated KuCoin flag and describe an exact trailing-24-hour plan bounded to
+  20 public requests, expected future activity, and the disable action.
+- Kept the result blocked even when the flag is present because immutable
+  capture, strict doctor, and a capture command do not yet exist.
+- Added regressions for absent/present authorization, exact request bounds,
+  research-only invariants, and a network-trapped CLI; updated the contract,
+  selection review, operator agreement, and roadmap.
+**Verify:** `tests/event_alpha/test_kucoin_announcements.py` and
+`tests/event_alpha/test_kucoin_announcements_readiness.py` passed together (24
+tests); compileall, both KuCoin smoke/readiness targets, JSON validation,
+`git diff --check`, and architecture cleanliness passed.
+**Notes/risks:** This creates no authorization, provider call, client, capture,
+artifact, route/score effect, send, trade, order, paper trade, normal RSI write,
+or Event Alpha `TRIGGERED_FADE`. Genuine acquisition still requires a separate
+human authorization after immutable capture and strict doctor are implemented.
+
 ## 2026-07-19 — Retain the cadence-eligible CoinGecko DNS failure · Codex
 **Why:** The next regular no-send observation became eligible after the KuCoin
 contract commit. The attempt had to cross the provider boundary once and then
