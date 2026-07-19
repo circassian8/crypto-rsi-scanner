@@ -23,6 +23,7 @@ from typing import Any, Mapping, Sequence
 
 CONTRACT_VERSION = "crypto_radar_bybit_usdt_perpetual_execution_quality_v2"
 SNAPSHOT_SCHEMA_VERSION = "crypto_radar.bybit_execution_quality.v2"
+ROUND_TRIP_SCHEMA_VERSION = "crypto_radar.bybit_visible_book_round_trip.v1"
 VENUE_ID = "bybit"
 EXECUTION_MODE = "perpetual"
 BYBIT_CATEGORY = "linear"
@@ -44,6 +45,9 @@ INSTRUMENTS_PATH = "/v5/market/instruments-info"
 ORDERBOOK_PATH = "/v5/market/orderbook"
 OFFICIAL_INSTRUMENT_DOC = "https://bybit-exchange.github.io/docs/v5/market/instrument"
 OFFICIAL_ORDERBOOK_DOC = "https://bybit-exchange.github.io/docs/v5/market/orderbook"
+OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC = (
+    "https://www.bybit.com/en/help-center/article/Order-Cost-USDT-Contract"
+)
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _CANONICAL_ASSET_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -210,12 +214,81 @@ class _BybitExecutionQualitySnapshot:
         }
 
 
+@dataclass(frozen=True)
+class _BybitVisibleBookLeg:
+    """One quantity-complete marketable walk through one supplied public book."""
+
+    snapshot_role: str
+    action: str
+    provider_observed_at: str
+    snapshot_generated_at: str
+    acquired_at: str
+    request_lineage_id: str
+    order_book_update_id: int
+    order_book_cross_sequence: int
+    mid_price: float
+    base_quantity: str
+    quote_value_usdt: float
+    vwap: float
+    mid_reference_notional_usdt: float
+    visible_book_cost_usdt: float
+    impact_bps_from_mid: float
+    visible_depth_complete: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class _BybitVisibleBookRoundTrip:
+    """Quantity-reconciled long/short entry and exit visible-book projection."""
+
+    schema_version: str
+    venue_id: str
+    execution_mode: str
+    instrument_id: str
+    canonical_asset_id: str
+    base_asset: str
+    quote_asset: str
+    position_side: str
+    base_quantity: str
+    quantity_step: str
+    quantity_unit: str
+    quantity_semantics: str
+    entry: _BybitVisibleBookLeg
+    exit: _BybitVisibleBookLeg
+    entry_mid_notional_usdt: float
+    gross_mid_mark_return_usdt: float
+    net_visible_book_return_usdt: float
+    total_visible_book_cost_usdt: float
+    total_visible_book_cost_bps_of_entry_mid_notional: float
+    same_base_quantity_reconciled: bool
+    entry_exit_snapshots_distinct: bool
+    spread_added_separately: bool
+    realized_execution: bool
+    fees_included: bool
+    funding_included: bool
+    latency_cost_included: bool
+    beyond_visible_book_slippage_included: bool
+    liquidity_scope: str
+    quantity_source_url: str
+    research_only: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        value = asdict(self)
+        value["entry"] = self.entry.to_dict()
+        value["exit"] = self.exit.to_dict()
+        return value
+
+
 # Stable public names expose a closed model bundle without declaring multiple
 # public ownership classes in this behavior module.
 BybitEligibleInstrument = _BybitEligibleInstrument
 BybitPublicRequest = _BybitPublicRequest
 BybitPublicRequestPlan = _BybitPublicRequestPlan
 BybitExecutionQualitySnapshot = _BybitExecutionQualitySnapshot
+BybitVisibleBookLeg = _BybitVisibleBookLeg
+BybitVisibleBookRoundTrip = _BybitVisibleBookRoundTrip
 
 
 def _mapping(value: object, label: str) -> Mapping[str, Any]:
@@ -527,6 +600,224 @@ def _price_impact(
     return tuple(values)
 
 
+def _canonical_decimal_text(value: Decimal) -> str:
+    rendered = format(value.normalize(), "f")
+    return "0" if rendered == "-0" else rendered
+
+
+def _walk_base_quantity(
+    levels: Sequence[tuple[Decimal, Decimal]],
+    *,
+    quantity: Decimal,
+    mid: Decimal,
+    action: str,
+    snapshot_role: str,
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    remaining = quantity
+    quote_value = Decimal(0)
+    for price, available_quantity in levels:
+        consumed_quantity = min(remaining, available_quantity)
+        quote_value += consumed_quantity * price
+        remaining -= consumed_quantity
+        if remaining == 0:
+            break
+    if remaining > 0:
+        raise BybitExecutionQualityError(
+            f"{snapshot_role}_visible_depth_insufficient_for_base_quantity"
+        )
+    vwap = quote_value / quantity
+    mid_notional = quantity * mid
+    if action == "buy":
+        cost = quote_value - mid_notional
+        impact = (vwap - mid) / mid * Decimal(10_000)
+    elif action == "sell":
+        cost = mid_notional - quote_value
+        impact = (mid - vwap) / mid * Decimal(10_000)
+    else:  # pragma: no cover - internal caller owns the closed action set
+        raise BybitExecutionQualityError("visible_book_action_invalid")
+    if cost < 0 or impact < 0:
+        raise BybitExecutionQualityError(
+            f"{snapshot_role}_visible_book_cost_negative"
+        )
+    return quote_value, vwap, mid_notional, cost
+
+
+def _visible_book_leg(
+    *,
+    snapshot: BybitExecutionQualitySnapshot,
+    payload: Mapping[str, object],
+    quantity: Decimal,
+    action: str,
+    snapshot_role: str,
+) -> tuple[BybitVisibleBookLeg, Decimal, Decimal, Decimal]:
+    result = _mapping(payload.get("result"), f"{snapshot_role}_orderbook_result")
+    bids = _book_levels(result.get("b"), "bids")
+    asks = _book_levels(result.get("a"), "asks")
+    mid = (bids[0][0] + asks[0][0]) / Decimal(2)
+    if _float(mid) != snapshot.mid_price:
+        raise BybitExecutionQualityError(f"{snapshot_role}_mid_price_drift")
+    levels = asks if action == "buy" else bids
+    quote_value, vwap, mid_notional, cost = _walk_base_quantity(
+        levels,
+        quantity=quantity,
+        mid=mid,
+        action=action,
+        snapshot_role=snapshot_role,
+    )
+    impact = cost / mid_notional * Decimal(10_000)
+    leg = BybitVisibleBookLeg(
+        snapshot_role=snapshot_role,
+        action=action,
+        provider_observed_at=snapshot.provider_observed_at,
+        snapshot_generated_at=snapshot.snapshot_generated_at,
+        acquired_at=snapshot.acquired_at,
+        request_lineage_id=snapshot.request_lineage_id,
+        order_book_update_id=snapshot.order_book_update_id,
+        order_book_cross_sequence=snapshot.order_book_cross_sequence,
+        mid_price=snapshot.mid_price,
+        base_quantity=_canonical_decimal_text(quantity),
+        quote_value_usdt=_float(quote_value),
+        vwap=_float(vwap),
+        mid_reference_notional_usdt=_float(mid_notional),
+        visible_book_cost_usdt=_float(cost),
+        impact_bps_from_mid=_float(impact),
+    )
+    return leg, quote_value, mid, cost
+
+
+def model_bybit_visible_book_round_trip(
+    entry_payload: Mapping[str, object],
+    exit_payload: Mapping[str, object],
+    *,
+    instrument: BybitEligibleInstrument,
+    position_side: str,
+    base_quantity: object,
+    entry_acquired_at: str,
+    exit_acquired_at: str,
+    entry_request_lineage_id: str,
+    exit_request_lineage_id: str,
+    freshness_seconds: float = DEFAULT_FRESHNESS_SECONDS,
+) -> BybitVisibleBookRoundTrip:
+    """Model one quantity-identical visible-book round trip without execution.
+
+    This consumes two already-supplied Bybit public snapshots.  It models only
+    an immediately marketable walk through the visible REST levels and never
+    adds the standalone spread because each side's mid-referenced impact already
+    includes its crossing half-spread.  Fees, funding, latency, and liquidity
+    beyond the returned book remain deliberately unavailable.
+    """
+
+    if position_side not in {"long", "short"}:
+        raise BybitExecutionQualityError("position_side_invalid")
+    if entry_request_lineage_id == exit_request_lineage_id:
+        raise BybitExecutionQualityError("entry_exit_request_lineage_not_distinct")
+    quantity = _decimal(base_quantity, "base_quantity")
+    quantity_step = _decimal(instrument.quantity_step, "quantity_step")
+    if quantity % quantity_step != 0:
+        raise BybitExecutionQualityError("base_quantity_not_aligned_to_quantity_step")
+
+    entry_snapshot = normalize_bybit_orderbook(
+        entry_payload,
+        instrument=instrument,
+        acquired_at=entry_acquired_at,
+        request_lineage_id=entry_request_lineage_id,
+        freshness_seconds=freshness_seconds,
+    )
+    exit_snapshot = normalize_bybit_orderbook(
+        exit_payload,
+        instrument=instrument,
+        acquired_at=exit_acquired_at,
+        request_lineage_id=exit_request_lineage_id,
+        freshness_seconds=freshness_seconds,
+    )
+    if (
+        entry_snapshot.freshness_status != "fresh"
+        or exit_snapshot.freshness_status != "fresh"
+    ):
+        raise BybitExecutionQualityError("round_trip_snapshot_not_fresh")
+    entry_observed = _utc_datetime(
+        entry_snapshot.provider_observed_at, "entry_provider_observed_at"
+    )
+    exit_observed = _utc_datetime(
+        exit_snapshot.provider_observed_at, "exit_provider_observed_at"
+    )
+    entry_generated = _utc_datetime(
+        entry_snapshot.snapshot_generated_at, "entry_snapshot_generated_at"
+    )
+    exit_generated = _utc_datetime(
+        exit_snapshot.snapshot_generated_at, "exit_snapshot_generated_at"
+    )
+    entry_acquired = _utc_datetime(entry_snapshot.acquired_at, "entry_acquired_at")
+    exit_acquired = _utc_datetime(exit_snapshot.acquired_at, "exit_acquired_at")
+    if not (
+        exit_observed > entry_observed
+        and exit_generated > entry_generated
+        and exit_acquired > entry_acquired
+    ):
+        raise BybitExecutionQualityError("entry_exit_snapshot_order_invalid")
+
+    entry_action = "buy" if position_side == "long" else "sell"
+    exit_action = "sell" if position_side == "long" else "buy"
+    entry, entry_quote, entry_mid, entry_cost = _visible_book_leg(
+        snapshot=entry_snapshot,
+        payload=entry_payload,
+        quantity=quantity,
+        action=entry_action,
+        snapshot_role="entry",
+    )
+    exit, exit_quote, exit_mid, exit_cost = _visible_book_leg(
+        snapshot=exit_snapshot,
+        payload=exit_payload,
+        quantity=quantity,
+        action=exit_action,
+        snapshot_role="exit",
+    )
+    entry_mid_notional = quantity * entry_mid
+    if position_side == "long":
+        gross_return = quantity * (exit_mid - entry_mid)
+        net_return = exit_quote - entry_quote
+    else:
+        gross_return = quantity * (entry_mid - exit_mid)
+        net_return = entry_quote - exit_quote
+    total_cost = entry_cost + exit_cost
+    if (gross_return - net_return) != total_cost:
+        raise BybitExecutionQualityError("round_trip_cost_identity_mismatch")
+    total_cost_bps = total_cost / entry_mid_notional * Decimal(10_000)
+    return BybitVisibleBookRoundTrip(
+        schema_version=ROUND_TRIP_SCHEMA_VERSION,
+        venue_id=VENUE_ID,
+        execution_mode=EXECUTION_MODE,
+        instrument_id=instrument.instrument_id,
+        canonical_asset_id=instrument.canonical_asset_id,
+        base_asset=instrument.base_asset,
+        quote_asset=instrument.quote_asset,
+        position_side=position_side,
+        base_quantity=_canonical_decimal_text(quantity),
+        quantity_step=_canonical_decimal_text(quantity_step),
+        quantity_unit="base_asset",
+        quantity_semantics=(
+            "bybit_USDT_linear_contract_quantity_in_underlying_token"
+        ),
+        entry=entry,
+        exit=exit,
+        entry_mid_notional_usdt=_float(entry_mid_notional),
+        gross_mid_mark_return_usdt=_float(gross_return),
+        net_visible_book_return_usdt=_float(net_return),
+        total_visible_book_cost_usdt=_float(total_cost),
+        total_visible_book_cost_bps_of_entry_mid_notional=_float(total_cost_bps),
+        same_base_quantity_reconciled=True,
+        entry_exit_snapshots_distinct=True,
+        spread_added_separately=False,
+        realized_execution=False,
+        fees_included=False,
+        funding_included=False,
+        latency_cost_included=False,
+        beyond_visible_book_slippage_included=False,
+        liquidity_scope="bybit_public_REST_visible_levels_excluding_RPI",
+        quantity_source_url=OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
+    )
+
+
 def normalize_bybit_orderbook(
     payload: Mapping[str, object],
     *,
@@ -650,6 +941,11 @@ def run_fixture_smoke(fixture_directory: Path) -> dict[str, object]:
     orderbook_payload = json.loads(
         (fixture_directory / "orderbook_btcusdt.json").read_text(encoding="utf-8")
     )
+    exit_orderbook_payload = json.loads(
+        (fixture_directory / "orderbook_btcusdt_exit.json").read_text(
+            encoding="utf-8"
+        )
+    )
     selected = select_bybit_usdt_perpetual_instruments(radar_assets, instruments_payload)
     if not selected:
         raise BybitExecutionQualityError("fixture_selected_no_instruments")
@@ -662,6 +958,17 @@ def run_fixture_smoke(fixture_directory: Path) -> dict[str, object]:
         acquired_at="2026-07-17T12:00:01Z",
         request_lineage_id="fixture.bybit.btcusdt.20260717",
     )
+    round_trip = model_bybit_visible_book_round_trip(
+        orderbook_payload,
+        exit_orderbook_payload,
+        instrument=btc,
+        position_side="long",
+        base_quantity="15",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        exit_acquired_at="2026-07-17T13:00:01Z",
+        entry_request_lineage_id="fixture.bybit.btcusdt.entry.20260717",
+        exit_request_lineage_id="fixture.bybit.btcusdt.exit.20260717",
+    )
     plan = build_bybit_public_request_plan(selected)
     return {
         "contract_version": CONTRACT_VERSION,
@@ -669,6 +976,7 @@ def run_fixture_smoke(fixture_directory: Path) -> dict[str, object]:
         "selected_instrument_ids": [row.instrument_id for row in selected],
         "selected_count": len(selected),
         "snapshot": snapshot.to_dict(),
+        "quantity_reconciled_round_trip": round_trip.to_dict(),
         "request_plan": plan.to_dict(),
         "provider_calls": 0,
         "network_called": False,
@@ -706,8 +1014,10 @@ __all__ = (
     "MAX_RADAR_ASSETS",
     "OFFICIAL_INSTRUMENT_DOC",
     "OFFICIAL_ORDERBOOK_DOC",
+    "OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC",
     "ORDERBOOK_LEVEL_LIMIT",
     "QUOTE_ASSET",
+    "ROUND_TRIP_SCHEMA_VERSION",
     "REQUEST_STRATEGY",
     "SNAPSHOT_SCHEMA_VERSION",
     "VENUE_ID",
@@ -716,11 +1026,14 @@ __all__ = (
     "BybitExecutionQualitySnapshot",
     "BybitPublicRequest",
     "BybitPublicRequestPlan",
+    "BybitVisibleBookLeg",
+    "BybitVisibleBookRoundTrip",
     "bybit_base_symbol_requestable",
     "build_bybit_instrument_catalog_request",
     "build_bybit_orderbook_request",
     "build_bybit_public_request_plan",
     "main",
+    "model_bybit_visible_book_round_trip",
     "normalize_bybit_orderbook",
     "run_fixture_smoke",
     "select_bybit_usdt_perpetual_instruments",

@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v11 records the owner-confirmed primary research
+Execution-quality readiness v12 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -912,7 +912,8 @@ account- or symbol-authoritative. The official
 [account fee-rate endpoint](https://bybit-exchange.github.io/docs/v5/account/fee-rate)
 is authenticated and therefore outside the confirmed public-market-data-only
 scope; it is not authorized or called. Protocol v2 must separately seal its fee
-assumption/source, entry and exit order style, USDT notionals, spread and
+assumption/source, entry and exit order style, USDT notionals, base-quantity
+selection and venue-step rounding, spread and
 visible-book impact application, beyond-book slippage, funding treatment,
 latency cost, and unavailable-cost policy. Until then
 `protocol_v2_cost_model_sealed=false` remains operator truth.
@@ -932,17 +933,25 @@ round-trip estimate needs separate entry and exit snapshots and the selected
 side at each boundary. The eventual entry/exit snapshot policy remains
 unsealed; this closes the primitive math, not the Protocol-v2 cost decision.
 
-The side size definitions are intentionally asymmetric: buy impact means exact
-USDT spent, while sell impact means exact USDT proceeds. The same numeric USDT
-value therefore does not prove the same base-asset quantity, even within one
-book. A future round-trip calculator must reconcile the entry base quantity to
-the exit side rather than adding equal-notional lookup values. That
-reconciliation is not implemented or sealed, so no exact round-trip cost is
-claimed.
+The per-snapshot notional curves remain intentionally asymmetric: buy impact
+means exact USDT spent, while sell impact means exact USDT proceeds. The same
+numeric USDT value therefore does not prove the same base-asset quantity, even
+within one book. The offline round-trip primitive now avoids that error: for a
+specified quantity aligned to the instrument's `qtyStep`, it walks the entry
+and exit sides of two distinct fresh snapshots using the same exact underlying-
+token quantity. This follows Bybit's current
+[USDT-contract quantity definition](https://www.bybit.com/en/help-center/article/Order-Cost-USDT-Contract),
+which denominates USDT/USDC contract quantity in the underlying token. It
+reports long or short gross mid-mark return, net visible-book return, and their
+USDT drag, normalized to entry mid notional. It never adds `spread_bps`
+separately, and it is not realized execution. Size selection, quantity rounding
+from a USDT tier, order style, fees, funding, latency, beyond-book liquidity,
+and unavailable-cost behavior remain unsealed; therefore
+`protocol_v2_cost_model_sealed=false` remains correct.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread, USDT
-depth bands, and USDT-notional price impact without treating USDT as USD. A
+second checked fixture proves the quantity-reconciled entry/exit primitive. A
 separately gated public REST adapter and immutable capture contract are
 implemented but inactive. Readiness and capture status make no provider call or
 write. A confirmed capture requires the already-present dedicated authorization

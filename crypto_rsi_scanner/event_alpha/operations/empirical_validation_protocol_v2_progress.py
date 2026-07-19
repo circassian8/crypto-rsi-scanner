@@ -42,10 +42,10 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v10"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v11"
 PROGRESS_SOURCE = (
-    "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_round_trip_base_quantity_gap_mid_reference_impact_semantics_native_"
+    "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
+    "with_quantity_reconciled_round_trip_primitive_mid_reference_impact_semantics_native_"
     "Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_cost_unit_"
     "detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
 )
@@ -127,7 +127,22 @@ _EXPECTED_EXECUTION_DECISION = {
     "buy_impact_size_basis": "exact_usdt_spend",
     "sell_impact_size_basis": "exact_usdt_proceeds",
     "same_numeric_usdt_notional_proves_same_base_quantity": False,
-    "round_trip_base_quantity_reconciliation_implemented": False,
+    "round_trip_base_quantity_reconciliation_implemented": True,
+    "round_trip_base_quantity_policy_sealed": False,
+    "round_trip_size_basis": "same_exact_base_quantity_across_distinct_books",
+    "round_trip_visible_book_schema_version": (
+        "crypto_radar.bybit_visible_book_round_trip.v1"
+    ),
+    "round_trip_visible_book_order_style": "immediately_marketable_book_walk",
+    "round_trip_visible_book_cost_basis": "entry_mid_notional_usdt",
+    "round_trip_visible_book_realized_execution": False,
+    "round_trip_quantity_unit": "base_asset",
+    "round_trip_quantity_semantics": (
+        "bybit_USDT_linear_contract_quantity_in_underlying_token"
+    ),
+    "round_trip_quantity_source_url": (
+        "https://www.bybit.com/en/help-center/article/Order-Cost-USDT-Contract"
+    ),
     "exact_eligible_instrument_set_sealed": False,
     "data_boundary": "public_market_data_only",
     "credentials_or_private_account_data": False,
@@ -145,7 +160,7 @@ def current_progress_values() -> dict[str, Any]:
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
         "progress_version": PROGRESS_VERSION,
-        "as_of": "2026-07-19",
+        "as_of": "2026-07-20",
         "status": "venue_selected_evidence_collection_blocked",
         "source": PROGRESS_SOURCE,
         "frozen_readiness_contract": {
@@ -288,7 +303,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         errors.append("schema_identity_mismatch")
     if value.get("progress_version") != PROGRESS_VERSION:
         errors.append("progress_version_mismatch")
-    if value.get("as_of") != "2026-07-19":
+    if value.get("as_of") != "2026-07-20":
         errors.append("as_of_mismatch")
     if value.get("source") != PROGRESS_SOURCE:
         errors.append("source_mismatch")
@@ -450,7 +465,21 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "buy_impact_size_basis=exact_usdt_spend "
         "sell_impact_size_basis=exact_usdt_proceeds",
         "same_numeric_usdt_notional_proves_same_base_quantity=false "
-        "round_trip_base_quantity_reconciliation_implemented=false",
+        "round_trip_base_quantity_reconciliation_implemented=true",
+        "round_trip_base_quantity_policy_sealed=false "
+        "round_trip_size_basis=same_exact_base_quantity_across_distinct_books",
+        (
+            "round_trip_visible_book_model="
+            f"{decision['round_trip_visible_book_schema_version']} "
+            f"order_style={decision['round_trip_visible_book_order_style']} "
+            f"cost_basis={decision['round_trip_visible_book_cost_basis']} "
+            "realized_execution=false"
+        ),
+        (
+            "round_trip_quantity_unit="
+            f"{decision['round_trip_quantity_unit']} semantics="
+            f"{decision['round_trip_quantity_semantics']}"
+        ),
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",
         (

@@ -48,7 +48,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v11"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v12"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -89,7 +89,25 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["buy_impact_size_basis"] == "exact_usdt_spend"
     assert impact["sell_impact_size_basis"] == "exact_usdt_proceeds"
     assert impact["same_numeric_usdt_notional_proves_same_base_quantity"] is False
-    assert impact["round_trip_base_quantity_reconciliation_implemented"] is False
+    assert impact["round_trip_base_quantity_reconciliation_implemented"] is True
+    assert impact["round_trip_base_quantity_policy_sealed"] is False
+    assert impact["round_trip_size_basis"] == (
+        "same_exact_base_quantity_across_distinct_books"
+    )
+    assert impact["round_trip_visible_book_schema_version"] == (
+        "crypto_radar.bybit_visible_book_round_trip.v1"
+    )
+    assert impact["round_trip_visible_book_order_style"] == (
+        "immediately_marketable_book_walk"
+    )
+    assert impact["round_trip_visible_book_cost_basis"] == (
+        "entry_mid_notional_usdt"
+    )
+    assert impact["round_trip_visible_book_realized_execution"] is False
+    assert impact["round_trip_quantity_unit"] == "base_asset"
+    assert impact["round_trip_quantity_semantics"] == (
+        "bybit_USDT_linear_contract_quantity_in_underlying_token"
+    )
     assert result.eligible_instrument_set == ()
     assert "top_30_liquid_decision_radar_assets" in (
         result.eligible_instrument_selection_rule or ""
@@ -106,6 +124,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert result.required_human_decision_fields == REMAINING_PROTOCOL_V2_SEALING_FIELDS
     assert result.supported_offline_adapters == (
         "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
+        "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v4",
@@ -343,7 +362,12 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "buy_impact_size_basis=exact_usdt_spend" in rendered
     assert "sell_impact_size_basis=exact_usdt_proceeds" in rendered
     assert "same_numeric_usdt_notional_proves_same_base_quantity=false" in rendered
-    assert "round_trip_base_quantity_reconciliation_implemented=false" in rendered
+    assert "round_trip_base_quantity_reconciliation_implemented=true" in rendered
+    assert "round_trip_base_quantity_policy_sealed=false" in rendered
+    assert "round_trip_size_basis=same_exact_base_quantity_across_distinct_books" in rendered
+    assert "crypto_radar.bybit_visible_book_round_trip.v1" in rendered
+    assert "round_trip_quantity_unit=base_asset" in rendered
+    assert "realized_execution=false" in rendered
     assert "top_30_liquid_decision_radar_assets" in rendered
     assert "eligible_instrument_set_frozen=false" in rendered
     assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
@@ -497,7 +521,14 @@ def test_cli_json_is_structured_static_and_secret_free(
     assert payload["buy_impact_size_basis"] == "exact_usdt_spend"
     assert payload["sell_impact_size_basis"] == "exact_usdt_proceeds"
     assert payload["same_numeric_usdt_notional_proves_same_base_quantity"] is False
-    assert payload["round_trip_base_quantity_reconciliation_implemented"] is False
+    assert payload["round_trip_base_quantity_reconciliation_implemented"] is True
+    assert payload["round_trip_base_quantity_policy_sealed"] is False
+    assert payload["round_trip_size_basis"] == (
+        "same_exact_base_quantity_across_distinct_books"
+    )
+    assert payload["round_trip_visible_book_schema_version"] == (
+        "crypto_radar.bybit_visible_book_round_trip.v1"
+    )
     assert payload["required_human_decision_fields"] == list(
         REMAINING_PROTOCOL_V2_SEALING_FIELDS
     )
@@ -512,7 +543,8 @@ def test_cli_json_is_structured_static_and_secret_free(
     )
     assert payload["human_decision_confirmed_at"] == "2026-07-17"
     assert payload["supported_offline_adapters"] == [
-        "bybit_usdt_linear_perpetual_fixture_normalizer_v2"
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
+        "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v4"
@@ -640,7 +672,11 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
         is False
     )
     assert readiness["same_numeric_usdt_notional_proves_same_base_quantity"] is False
-    assert readiness["round_trip_base_quantity_reconciliation_implemented"] is False
+    assert readiness["round_trip_base_quantity_reconciliation_implemented"] is True
+    assert readiness["round_trip_base_quantity_policy_sealed"] is False
+    assert readiness["round_trip_size_basis"] == (
+        "same_exact_base_quantity_across_distinct_books"
+    )
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
     assert readiness["immutable_capture_contract_implemented"] is True

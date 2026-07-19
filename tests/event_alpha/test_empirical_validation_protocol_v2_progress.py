@@ -31,8 +31,8 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v10")
-    assert values["as_of"] == "2026-07-19"
+    assert values["progress_version"].endswith("_v11")
+    assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
     assert decision["instrument_mode"] == "usdt_linear_perpetual"
@@ -48,7 +48,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
         "fee_rate_source_and_assumption",
         "entry_exit_order_style",
         "notional_tiers_usdt",
-        "round_trip_base_quantity_reconciliation",
+        "base_quantity_selection_and_rounding_policy",
         "spread_and_visible_book_impact_application",
         "slippage_beyond_visible_book_policy",
         "funding_holding_period_and_sign_treatment",
@@ -74,7 +74,25 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["buy_impact_size_basis"] == "exact_usdt_spend"
     assert decision["sell_impact_size_basis"] == "exact_usdt_proceeds"
     assert decision["same_numeric_usdt_notional_proves_same_base_quantity"] is False
-    assert decision["round_trip_base_quantity_reconciliation_implemented"] is False
+    assert decision["round_trip_base_quantity_reconciliation_implemented"] is True
+    assert decision["round_trip_base_quantity_policy_sealed"] is False
+    assert decision["round_trip_size_basis"] == (
+        "same_exact_base_quantity_across_distinct_books"
+    )
+    assert decision["round_trip_visible_book_schema_version"] == (
+        "crypto_radar.bybit_visible_book_round_trip.v1"
+    )
+    assert decision["round_trip_visible_book_order_style"] == (
+        "immediately_marketable_book_walk"
+    )
+    assert decision["round_trip_visible_book_cost_basis"] == (
+        "entry_mid_notional_usdt"
+    )
+    assert decision["round_trip_visible_book_realized_execution"] is False
+    assert decision["round_trip_quantity_unit"] == "base_asset"
+    assert decision["round_trip_quantity_semantics"] == (
+        "bybit_USDT_linear_contract_quantity_in_underlying_token"
+    )
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -199,7 +217,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     quantity_drift = progress.current_progress_values()
     quantity_drift["confirmed_execution_decision"][
         "round_trip_base_quantity_reconciliation_implemented"
-    ] = True
+    ] = False
 
     for mutation in (
         digest_drift,
@@ -265,7 +283,10 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "selected_side_impact_reference=mid_price" in output.out
     assert "standalone_spread_addition_permitted=false" in output.out
     assert "buy_impact_size_basis=exact_usdt_spend" in output.out
-    assert "round_trip_base_quantity_reconciliation_implemented=false" in output.out
+    assert "round_trip_base_quantity_reconciliation_implemented=true" in output.out
+    assert "round_trip_base_quantity_policy_sealed=false" in output.out
+    assert "same_exact_base_quantity_across_distinct_books" in output.out
+    assert "crypto_radar.bybit_visible_book_round_trip.v1" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

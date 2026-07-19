@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v11 must expose those remaining cost fields rather
+  Execution-quality readiness v12 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -592,10 +592,15 @@ may be added later when a suitable environment already exists.
   entry and exit snapshots/sides; its snapshot, sizing, and order-style policy
   remains unsealed.
   Buy impact uses exact USDT spent and sell impact uses exact USDT proceeds.
-  Equal numeric USDT lookup sizes do not prove equal base-asset quantity. Keep
-  round-trip base-quantity reconciliation explicitly unimplemented/unsealed
-  until a future quantity-aware model is reviewed; never add equal-notional
-  side lookups and call the result an exact round-trip cost.
+  Equal numeric USDT lookup sizes do not prove equal base-asset quantity. The
+  offline round-trip v1 primitive instead walks two distinct fresh books with
+  one exact `qtyStep`-aligned underlying-token quantity, as defined for Bybit
+  USDT-linear contracts, and reports the visible-book drag against entry-mid
+  notional. It is not realized execution and must not add `spread_bps` again.
+  Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
+  funding, latency, beyond-book slippage, unavailable-cost behavior, and the
+  final cost application policy remain unsealed. Never add equal-notional side
+  lookups and call the result an exact round-trip cost.
   For exact transport captures, normalized `acquired_at` is the accepted
   response-read completion time, not a second independent clock. Immutable
   validation requires every request/response inside the declared capture window

@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v11`. Run
+`crypto_radar_execution_quality_readiness_v12`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -105,11 +105,17 @@ remain unsealed; this rule does not manufacture a round-trip cost.
 
 Equal numeric USDT lookup sizes are not a round-trip identity. The buy curve is
 defined by exact USDT spent, while the sell curve is defined by exact USDT
-proceeds; those values generally correspond to different base quantities. A
-valid round-trip model must carry the entry base quantity (and fee treatment)
-to the exit snapshot or derive an equivalent quantity-aware exit walk. That
-reconciliation is not implemented and remains an explicit Protocol-v2 cost
-field rather than being approximated silently.
+proceeds; those values generally correspond to different base quantities. The
+offline v1 round-trip primitive now carries one exact `qtyStep`-aligned
+underlying-token quantity across two distinct fresh books and walks the correct
+entry/exit sides for a long or short. It reports gross mid-mark return, net
+visible-book return, and native-USDT drag without adding spread twice. Bybit's
+current [USDT-contract quantity documentation](https://www.bybit.com/en/help-center/article/Order-Cost-USDT-Contract)
+defines contract quantity in the underlying token. This is not realized
+execution. Protocol v2 still must seal how USDT tiers select and round that
+quantity, along with snapshots, order style, fees, funding, latency,
+beyond-book slippage, unavailable-cost behavior, and the final cost application
+policy.
 
 ## Venue-native derivatives context contract
 

@@ -13,9 +13,12 @@ import pytest
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
     CONTRACT_VERSION,
     MAX_PLANNED_REQUESTS,
+    OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
+    ROUND_TRIP_SCHEMA_VERSION,
     BybitExecutionQualityError,
     build_bybit_public_request_plan,
     main,
+    model_bybit_visible_book_round_trip,
     normalize_bybit_orderbook,
     run_fixture_smoke,
     select_bybit_usdt_perpetual_instruments,
@@ -192,6 +195,125 @@ def test_insufficient_book_depth_is_explicit_not_extrapolated() -> None:
     assert snapshot.sell_price_impact_bps_by_notional_usdt == ((100_000.0, None),)
 
 
+@pytest.mark.parametrize(
+    ("position_side", "entry_action", "exit_action", "gross_return", "net_return"),
+    (
+        ("long", "buy", "sell", 150.0, 147.75),
+        ("short", "sell", "buy", -150.0, -152.25),
+    ),
+)
+def test_round_trip_reconciles_one_exact_base_quantity_across_distinct_books(
+    position_side: str,
+    entry_action: str,
+    exit_action: str,
+    gross_return: float,
+    net_return: float,
+) -> None:
+    result = model_bybit_visible_book_round_trip(
+        _json("orderbook_btcusdt.json"),
+        _json("orderbook_btcusdt_exit.json"),
+        instrument=_selected()[0],
+        position_side=position_side,
+        base_quantity="15.000",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        exit_acquired_at="2026-07-17T13:00:01Z",
+        entry_request_lineage_id=f"test.{position_side}.entry",
+        exit_request_lineage_id=f"test.{position_side}.exit",
+    ).to_dict()
+
+    assert result["schema_version"] == ROUND_TRIP_SCHEMA_VERSION
+    assert result["instrument_id"] == "BTCUSDT"
+    assert result["base_asset"] == "BTC"
+    assert result["quote_asset"] == "USDT"
+    assert result["base_quantity"] == "15"
+    assert result["quantity_step"] == "0.001"
+    assert result["quantity_unit"] == "base_asset"
+    assert result["quantity_semantics"] == (
+        "bybit_USDT_linear_contract_quantity_in_underlying_token"
+    )
+    assert result["quantity_source_url"] == OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC
+    assert result["entry"]["action"] == entry_action
+    assert result["exit"]["action"] == exit_action
+    assert result["entry"]["base_quantity"] == result["exit"]["base_quantity"] == "15"
+    assert result["entry"]["visible_depth_complete"] is True
+    assert result["exit"]["visible_depth_complete"] is True
+    assert result["gross_mid_mark_return_usdt"] == pytest.approx(gross_return)
+    assert result["net_visible_book_return_usdt"] == pytest.approx(net_return)
+    assert result["total_visible_book_cost_usdt"] == pytest.approx(2.25)
+    assert result["total_visible_book_cost_usdt"] == pytest.approx(
+        result["gross_mid_mark_return_usdt"]
+        - result["net_visible_book_return_usdt"]
+    )
+    assert result["total_visible_book_cost_bps_of_entry_mid_notional"] == (
+        pytest.approx(14.992503748126)
+    )
+    assert result["same_base_quantity_reconciled"] is True
+    assert result["entry_exit_snapshots_distinct"] is True
+    assert result["spread_added_separately"] is False
+    assert result["realized_execution"] is False
+    assert result["fees_included"] is False
+    assert result["funding_included"] is False
+    assert result["latency_cost_included"] is False
+    assert result["beyond_visible_book_slippage_included"] is False
+    assert result["research_only"] is True
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error"),
+    (
+        ({"position_side": "flat"}, "position_side_invalid"),
+        ({"base_quantity": "15.0005"}, "not_aligned_to_quantity_step"),
+        (
+            {
+                "entry_request_lineage_id": "same.lineage",
+                "exit_request_lineage_id": "same.lineage",
+            },
+            "request_lineage_not_distinct",
+        ),
+        (
+            {"exit_acquired_at": "2026-07-17T13:01:00Z"},
+            "round_trip_snapshot_not_fresh",
+        ),
+        ({"base_quantity": "1000"}, "entry_visible_depth_insufficient"),
+    ),
+)
+def test_round_trip_invalid_quantity_identity_freshness_and_depth_fail_closed(
+    kwargs: dict[str, object],
+    error: str,
+) -> None:
+    arguments: dict[str, object] = {
+        "instrument": _selected()[0],
+        "position_side": "long",
+        "base_quantity": "15",
+        "entry_acquired_at": "2026-07-17T12:00:01Z",
+        "exit_acquired_at": "2026-07-17T13:00:01Z",
+        "entry_request_lineage_id": "test.roundtrip.entry",
+        "exit_request_lineage_id": "test.roundtrip.exit",
+    }
+    arguments.update(kwargs)
+    with pytest.raises(BybitExecutionQualityError, match=error):
+        model_bybit_visible_book_round_trip(
+            _json("orderbook_btcusdt.json"),
+            _json("orderbook_btcusdt_exit.json"),
+            **arguments,
+        )
+
+
+def test_round_trip_rejects_reused_or_reversed_provider_snapshot_order() -> None:
+    with pytest.raises(BybitExecutionQualityError, match="snapshot_order_invalid"):
+        model_bybit_visible_book_round_trip(
+            _json("orderbook_btcusdt_exit.json"),
+            _json("orderbook_btcusdt.json"),
+            instrument=_selected()[0],
+            position_side="long",
+            base_quantity="15",
+            entry_acquired_at="2026-07-17T13:00:01Z",
+            exit_acquired_at="2026-07-17T12:00:01Z",
+            entry_request_lineage_id="test.reversed.entry",
+            exit_request_lineage_id="test.reversed.exit",
+        )
+
+
 def test_stale_snapshot_stays_stale_without_weakening_freshness_gate() -> None:
     instrument = _selected()[0]
     snapshot = normalize_bybit_orderbook(
@@ -268,6 +390,8 @@ def test_fixture_smoke_and_cli_are_offline_secret_free(
     assert result["credentials_read"] is False
     assert result["orders_available"] is False
     assert result["research_only"] is True
+    assert result["quantity_reconciled_round_trip"]["same_base_quantity_reconciled"] is True
+    assert result["quantity_reconciled_round_trip"]["spread_added_separately"] is False
 
     assert main(["--fixture-dir", str(FIXTURE_DIR)]) == 0
     output = capsys.readouterr()

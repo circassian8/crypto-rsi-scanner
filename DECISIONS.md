@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Reconcile Bybit round trips by exact underlying-token quantity
+**Status:** accepted
+**Decision:** For the selected Bybit USDT-linear perpetual surface, model a
+visible-book round trip only by walking two distinct fresh order-book snapshots
+with the same exact positive quantity aligned to the instrument's `qtyStep`.
+Bybit's current USDT-contract documentation defines this contract quantity in
+the underlying token. Longs buy then sell that quantity; shorts sell then buy
+it. Report each leg's mid-referenced impact, gross mid-mark return, net visible-
+book return, total USDT drag, and drag in basis points of entry-mid notional.
+Never add standalone spread to those side walks. Reject stale, reused,
+misordered, identity-mismatched, step-misaligned, or depth-insufficient inputs.
+Keep this primitive research-only and explicitly not realized execution.
+**Why:** Equal numeric USDT buy and sell lookups can represent different asset
+quantities and cannot be summed into an exact round trip. Quantity identity
+closes that mathematical defect while retaining native USDT cost accounting and
+the exact entry/exit clocks needed for later Protocol-v2 evidence.
+**Revisit when:** The Protocol-v2 annex is ready to seal size selection and
+rounding from USDT tiers, entry/exit order style, fee source, impact application,
+beyond-book slippage, funding, latency, unavailable-cost behavior, and exact
+capture IDs. The primitive alone does not seal or activate that cost model.
+
 ## 2026-07-19 - Quantitative source-size limits are advisory only
 **Status:** accepted; supersedes prior file/function/class line-count blocker
 policies

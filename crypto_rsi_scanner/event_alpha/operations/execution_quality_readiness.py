@@ -14,8 +14,13 @@ from dataclasses import asdict, dataclass
 import json
 from typing import Mapping, Protocol, Sequence
 
+from .bybit_execution_quality import (
+    OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
+    ROUND_TRIP_SCHEMA_VERSION,
+)
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v11"
+
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v12"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -27,7 +32,7 @@ REMAINING_PROTOCOL_V2_COST_FIELDS = (
     "fee_rate_source_and_assumption",
     "entry_exit_order_style",
     "notional_tiers_usdt",
-    "round_trip_base_quantity_reconciliation",
+    "base_quantity_selection_and_rounding_policy",
     "spread_and_visible_book_impact_application",
     "slippage_beyond_visible_book_policy",
     "funding_holding_period_and_sign_treatment",
@@ -62,7 +67,18 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "buy_impact_size_basis": "exact_usdt_spend",
     "sell_impact_size_basis": "exact_usdt_proceeds",
     "same_numeric_usdt_notional_proves_same_base_quantity": False,
-    "round_trip_base_quantity_reconciliation_implemented": False,
+    "round_trip_base_quantity_reconciliation_implemented": True,
+    "round_trip_base_quantity_policy_sealed": False,
+    "round_trip_size_basis": "same_exact_base_quantity_across_distinct_books",
+    "round_trip_visible_book_schema_version": ROUND_TRIP_SCHEMA_VERSION,
+    "round_trip_visible_book_order_style": "immediately_marketable_book_walk",
+    "round_trip_visible_book_cost_basis": "entry_mid_notional_usdt",
+    "round_trip_visible_book_realized_execution": False,
+    "round_trip_quantity_unit": "base_asset",
+    "round_trip_quantity_semantics": (
+        "bybit_USDT_linear_contract_quantity_in_underlying_token"
+    ),
+    "round_trip_quantity_source_url": OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
 }
 COMMON_METRICS = (
     "best_bid",
@@ -642,6 +658,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         ),
         supported_offline_adapters=(
             "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
+            "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v4",
@@ -683,7 +700,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "side_specific_visible_book_impact_from_mid_already_includes_half_spread",
             "adding_standalone_spread_to_the_same_side_impact_would_double_count",
             "equal_buy_and_sell_USDT_notionals_do_not_prove_equal_base_quantity",
-            "round_trip_base_quantity_reconciliation_remains_unimplemented_and_unsealed",
+            "round_trip_visible_book_walk_reconciles_one_exact_underlying_token_quantity_across_distinct_fresh_books",
+            "round_trip_size_selection_rounding_and_cost_application_policy_remain_unsealed",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -735,6 +753,18 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"{str(value['same_numeric_usdt_notional_proves_same_base_quantity']).casefold()} "
         "round_trip_base_quantity_reconciliation_implemented="
         f"{str(value['round_trip_base_quantity_reconciliation_implemented']).casefold()}",
+        "round_trip_base_quantity_policy_sealed="
+        f"{str(value['round_trip_base_quantity_policy_sealed']).casefold()} "
+        f"round_trip_size_basis={value['round_trip_size_basis']}",
+        "round_trip_visible_book_schema_version="
+        f"{value['round_trip_visible_book_schema_version']} "
+        f"order_style={value['round_trip_visible_book_order_style']} "
+        f"cost_basis={value['round_trip_visible_book_cost_basis']}",
+        "round_trip_quantity_unit="
+        f"{value['round_trip_quantity_unit']} "
+        f"quantity_semantics={value['round_trip_quantity_semantics']} "
+        "realized_execution="
+        f"{str(value['round_trip_visible_book_realized_execution']).casefold()}",
     )
 
 

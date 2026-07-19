@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reconcile Bybit round trips by exact quantity · Codex
+**Why:** The existing per-snapshot buy/sell impact curves used equal USDT
+lookup values, which do not preserve the same position quantity across entry
+and exit and therefore cannot support an exact round-trip cost model.
+**Changes:**
+- Added an offline Bybit visible-book round-trip v1 projection for both long and
+  short positions. It validates two distinct fresh books, walks one exact
+  `qtyStep`-aligned underlying-token quantity through the correct entry/exit
+  sides, and reports leg VWAP/impact, gross mid-mark return, net visible-book
+  return, and native-USDT drag normalized to entry-mid notional.
+- Kept the projection fail-closed for stale/reused/misordered books,
+  instrument/lineage drift, invalid quantities, insufficient visible depth, and
+  cost-identity drift. It never adds standalone spread, calls a provider, or
+  claims realized execution, fees, funding, latency, or beyond-book liquidity.
+- Added a second checked BTCUSDT book fixture and long/short regressions. Updated
+  execution-quality readiness to v12, current Protocol-v2 progress to v11, the
+  Crypto Decision Radar North Star, working agreement, durable decision, and
+  roadmap. Size selection/rounding, order style, fee source, impact application,
+  slippage, funding, latency, unavailable-cost policy, genuine captures, and
+  the final annex remain unsealed.
+**Verify:** 111 focused execution-quality/capture/live/readiness/Protocol-v2
+tests passed; Python compileall passed; the offline Bybit smoke, static
+execution-quality readiness, full Protocol-v2 readiness check, JSON validation,
+diff check, and architecture cleanliness gate passed. The architecture report
+records the new size measurement as advisory with zero blocking violations.
+**Notes/risks:** Current official Bybit documentation states that USDT/USDC
+contract quantity is denominated in the underlying token. This primitive is
+mathematical research support only; it creates no provider authorization,
+capture, route, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE`.
+
 ## 2026-07-19 — Retire quantitative source-size blockers · Codex
 **Why:** The owner explicitly retired file-size guards. Mechanical splitting to
 stay below arbitrary line counts was consuming effort without proving better
