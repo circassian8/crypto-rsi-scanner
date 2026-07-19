@@ -80,6 +80,10 @@ class MarketNoSendReadiness:
     minimum_observation_spacing_seconds: int = 3600
     next_eligible_observation_at: str | None = None
     cadence_status: str = "eligible"
+    history_next_eligible_observation_at: str | None = None
+    provider_call_reservation_next_at: str | None = None
+    provider_backoff_disabled_until: str | None = None
+    cadence_eligible_now: bool = True
     baseline_feature_readiness: dict[str, Any] = field(default_factory=dict)
     baseline_asset_readiness: dict[str, Any] = field(default_factory=dict)
     baseline_rejection_counts: dict[str, int] = field(default_factory=dict)

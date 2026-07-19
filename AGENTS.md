@@ -674,7 +674,12 @@ may be added later when a suitable environment already exists.
   transition. The application never creates authorization. A
   stable base-root cadence receipt and bounded attempt ledger survive campaign
   state-directory replacement, and the exact latest-attempt receipt prevents a
-  blocked run from reusing an older complete manifest. Campaign reports use
+  blocked run from reusing an older complete manifest. Readiness preserves the
+  history-only next-observation clock separately, but its headline cadence and
+  next eligible observation are the maximum of that clock, the durable
+  provider-call reservation, and shared provider backoff. A failed attempt
+  therefore cannot appear immediately eligible merely because the prior
+  successful observation is old enough. Campaign reports use
   root no-send `attempt_id` values as individual terminal-attempt identities;
   an ID-less namespace projection may enrich a receipt only when namespace and
   observation time identify exactly one attempt and every terminal field

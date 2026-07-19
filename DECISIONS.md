@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Make effective provider cadence the readiness headline
+**Status:** accepted
+**Decision:** Preserve the next time implied by successful observation history
+as `history_next_eligible_observation_at`, but make market/no-send readiness's
+headline next-eligible time, cadence status, and eligible-now value use the
+maximum of history cadence, the durable provider-call reservation, and shared
+provider backoff. Reuse the same pure synthesis used by campaign reporting and
+combine already-read states so the projection does not introduce a second
+state read.
+**Why:** Provider-call spacing starts when an attempt crosses the provider
+boundary, even if it fails before HTTP or publication. Showing only the older
+successful-observation clock beside a reservation blocker was technically
+explainable but operator-contradictory and could invite an unsafe retry.
+**Revisit when:** The provider campaign adopts a different explicitly reviewed
+spacing contract. Never shorten or bypass the effective clock to improve warmup.
+
 ## 2026-07-19 - Keep Bitget readiness non-activating
 **Status:** accepted
 **Decision:** Expose Bitget's future 31-day cursor request plan and the separate

@@ -47,6 +47,7 @@ from . import (
     market_no_send_history_cache,
     market_no_send_provider,
     market_no_send_publication,
+    market_observation_campaign_cadence,
     market_observation_outcomes,
     market_provenance,
 )
@@ -135,6 +136,29 @@ def build_market_no_send_readiness(
     )
     if not reservation_state["allowed"]:
         reasons.append(str(reservation_state["reason"]))
+    effective_cadence = market_observation_campaign_cadence.synthesize_next_observation(
+        baseline,
+        reservation_state,
+        provider_state,
+        evaluated=evaluated_at,
+    )
+    readiness_baseline = {
+        **baseline,
+        "next_eligible_observation_at": effective_cadence[
+            "next_eligible_observation_at"
+        ],
+        "cadence_status": effective_cadence["cadence_status"],
+        "history_next_eligible_observation_at": effective_cadence[
+            "history_next_eligible_observation_at"
+        ],
+        "provider_call_reservation_next_at": effective_cadence[
+            "provider_call_reservation_next_at"
+        ],
+        "provider_backoff_disabled_until": effective_cadence[
+            "provider_backoff_disabled_until"
+        ],
+        "cadence_eligible_now": effective_cadence["eligible_now"],
+    }
     return MarketNoSendReadiness(
         status="ready" if not reasons else "blocked",
         provider="coingecko",
@@ -150,7 +174,7 @@ def build_market_no_send_readiness(
         will_call_provider=not reasons,
         data_acquisition_mode="live_provider" if not reasons else "preflight_only",
         candidate_source_mode="live_no_send" if not reasons else "preflight_only",
-        **baseline,
+        **readiness_baseline,
         spread_data_status="unavailable_from_coingecko_market_endpoint",
         calendar_snapshot_status=calendar_snapshot.status,
         calendar_snapshot_configured=calendar_snapshot.configured,
@@ -182,7 +206,7 @@ def build_market_no_send_readiness(
         next_safe_command=(
             "make radar-daily-ops-readiness"
             if (
-                baseline.get("cadence_status") == "waiting"
+                effective_cadence["cadence_status"] != "eligible"
                 or not provider_state["allowed"]
                 or not reservation_state["allowed"]
             )

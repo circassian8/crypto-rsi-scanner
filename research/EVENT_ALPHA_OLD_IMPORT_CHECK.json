@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 3633,
+          "line": 3649,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 3633,
+          "line": 3649,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 9984,
+          "line": 10005,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T02:22:09.292855+00:00",
+  "generated_at": "2026-07-19T02:27:57.136405+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1213,
-  "input_fingerprint": "b061c12749cea40b6461d4e8b13ff948b5129e4da810ccb9df01ea6224db7c35",
+  "input_fingerprint": "d899ece0f758314fefeb4445a018ec1050c5c24fa972e1ef5dad57165886dce1",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "AGENTS.md:1784427714",
-    "DECISIONS.md:1784427714",
-    "DEVLOG.md:1784427714",
-    "Makefile:1784427671",
-    "ROADMAP.md:1784427714"
+    "AGENTS.md:1784428058",
+    "DECISIONS.md:1784428058",
+    "DEVLOG.md:1784428058",
+    "ROADMAP.md:1784428058",
+    "crypto_rsi_scanner/event_alpha/operations/market_no_send.py:1784427993"
   ],
-  "newest_source_mtime": 1784427726.5444956,
+  "newest_source_mtime": 1784428074.4250584,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784427522.8818622,
+  "report_mtime": 1784427729.2940972,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1213,
-    "input_fingerprint": "b061c12749cea40b6461d4e8b13ff948b5129e4da810ccb9df01ea6224db7c35",
+    "input_fingerprint": "d899ece0f758314fefeb4445a018ec1050c5c24fa972e1ef5dad57165886dce1",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784427714",
-      "DECISIONS.md:1784427714",
-      "DEVLOG.md:1784427714",
-      "Makefile:1784427671",
-      "ROADMAP.md:1784427714"
+      "AGENTS.md:1784428058",
+      "DECISIONS.md:1784428058",
+      "DEVLOG.md:1784428058",
+      "ROADMAP.md:1784428058",
+      "crypto_rsi_scanner/event_alpha/operations/market_no_send.py:1784427993"
     ],
-    "newest_source_mtime": 1784427726.5444956,
+    "newest_source_mtime": 1784428074.4250584,
     "regex_compile_count": 124,
-    "report_mtime": 1784427522.8818622,
-    "scan_duration_seconds": 2.3691,
+    "report_mtime": 1784427729.2940972,
+    "scan_duration_seconds": 2.3702,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 77,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.3691,
+  "scan_duration_seconds": 2.3702,
   "scanned_doc_files": 77,
   "scanned_source_files": 897,
   "scanned_test_files": 233,

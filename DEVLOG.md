@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Make market readiness cadence coherent · Codex
+**Why:** After a failed provider attempt, raw readiness exposed the old history
+eligibility time while a separate reason correctly enforced a later durable
+reservation, making the operator headline contradictory.
+**Changes:**
+- Reused the campaign report's pure cadence synthesis on the already-read
+  history, reservation, and shared-backoff states.
+- Preserved the history-only, reservation, and backoff clocks separately while
+  making the headline next time, cadence status, and eligible-now value reflect
+  their effective maximum.
+- Added a regression proving a pre-history failed attempt remains visibly
+  waiting until its exact provider reservation expires.
+- Updated operator, roadmap, decision, and generated project-health records
+  without changing any spacing, provider, publication, route, score, or
+  threshold policy.
+**Verify:** 85 focused market/campaign reservation/report/Daily Operations
+tests, compileall, and the no-provider Daily Operations dry-run passed; current
+no-call readiness rendered the exact effective reservation; `git diff --check`
+and architecture cleanliness passed.
+**Notes/risks:** No provider call, authorization mutation, send, trade, order,
+paper trade, normal RSI write, Event Alpha `TRIGGERED_FADE`, or dashboard
+publication was performed.
+
 ## 2026-07-19 — Add non-activating Bitget readiness · Codex
 **Why:** The second official announcement contract needed an explicit operator
 boundary before any future capture mechanics or authorization could be

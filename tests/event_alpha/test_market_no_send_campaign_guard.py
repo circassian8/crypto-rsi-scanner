@@ -283,6 +283,42 @@ def test_provider_cadence_survives_state_directory_replacement_after_reservation
             raise AssertionError("stable cadence must block an immediate retry")
 
 
+def test_market_readiness_headline_uses_effective_provider_reservation(
+    tmp_path,
+) -> None:
+    attempted = datetime(2026, 7, 19, 1, 45, tzinfo=timezone.utc)
+    with market_no_send_campaign_guard.acquire_campaign_reservation(
+        tmp_path,
+        artifact_namespace="failed_before_history",
+        acquired_at=attempted,
+    ) as reservation:
+        market_no_send_campaign_guard.mark_provider_call_reserved(
+            reservation,
+            attempted_at=attempted,
+            minimum_spacing=timedelta(hours=1),
+        )
+
+    readiness = market_no_send.build_market_no_send_readiness(
+        artifact_base_dir=tmp_path,
+        artifact_namespace="radar_market_no_send_effective_cadence",
+        environ={market_no_send.LIVE_AUTH_ENV: "1"},
+        fixture_dir=None,
+        now=attempted + timedelta(minutes=1),
+    )
+
+    expected = (attempted + timedelta(hours=1)).isoformat()
+    assert readiness.status == "blocked"
+    assert readiness.cadence_status == "waiting"
+    assert readiness.cadence_eligible_now is False
+    assert readiness.history_next_eligible_observation_at is None
+    assert readiness.provider_call_reservation_next_at == expected
+    assert readiness.provider_backoff_disabled_until is None
+    assert readiness.next_eligible_observation_at == expected
+    assert any("provider call is reserved until" in reason for reason in readiness.reasons)
+    assert readiness.provider_call_attempted is False
+    assert readiness.will_call_provider is False
+
+
 def test_pre_v2_state_directory_cadence_receipt_remains_readable(tmp_path):
     attempted = datetime.now(timezone.utc).replace(microsecond=0)
     with market_no_send_campaign_guard.acquire_campaign_reservation(

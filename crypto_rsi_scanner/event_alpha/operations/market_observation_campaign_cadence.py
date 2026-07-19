@@ -27,6 +27,23 @@ def next_observation(
         artifact_base_dir,
         checked_at=evaluated,
     )
+    return synthesize_next_observation(
+        baseline,
+        reservation,
+        provider_backoff,
+        evaluated=evaluated,
+    )
+
+
+def synthesize_next_observation(
+    baseline: Mapping[str, Any],
+    reservation: Mapping[str, Any],
+    provider_backoff: Mapping[str, Any],
+    *,
+    evaluated: datetime,
+) -> dict[str, Any]:
+    """Combine already-read cadence states without a second state read."""
+
     history_next = _time(baseline.get("next_eligible_observation_at"))
     reservation_next = _time(reservation.get("next_provider_call_at"))
     provider_next = _time(provider_backoff.get("disabled_until"))
@@ -111,4 +128,8 @@ def _text(value: object) -> str:
     return str(value).strip() if value is not None else ""
 
 
-__all__ = ("legacy_next_eligible", "next_observation")
+__all__ = (
+    "legacy_next_eligible",
+    "next_observation",
+    "synthesize_next_observation",
+)
