@@ -1,0 +1,27 @@
+{
+  "code": "00000",
+  "msg": "success",
+  "requestTime": 1784424900500,
+  "data": [
+    {
+      "annId": "900003",
+      "annTitle": "ALPHA/USDT Will Be Listed for Spot Trading",
+      "annDesc": "The complete official notice contains the trading schedule.",
+      "cTime": "1784424720000",
+      "language": "en_US",
+      "annUrl": "https://www.bitget.com/support/articles/900003",
+      "annType": "coin_listings",
+      "annSubType": "spot"
+    },
+    {
+      "annId": "900002",
+      "annTitle": "Scheduled Futures Maintenance Notice",
+      "annDesc": "The complete official notice contains the maintenance window.",
+      "cTime": "1784424660000",
+      "language": "en_US",
+      "annUrl": "https://www.bitget.com/en/support/articles/900002",
+      "annType": "maintenance_system_updates",
+      "annSubType": "futures_maintenance"
+    }
+  ]
+}

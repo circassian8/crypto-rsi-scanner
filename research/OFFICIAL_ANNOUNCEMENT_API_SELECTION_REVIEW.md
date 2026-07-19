@@ -9,10 +9,9 @@ They are viable first-party Catalyst Radar sources and are materially stronger
 activation candidates than guessed Help Center endpoints or flaky third-party
 RSS aggregation.
 
-KuCoin was selected as the first **offline contract implementation** and that
-strict synthetic-byte contract is now fixture-verified. Bitget remains the
-second implementation candidate. This ordering creates no provider
-authorization and permits no live call:
+KuCoin was selected as the first **offline contract implementation** and Bitget
+as the second. Both strict synthetic-byte contracts are now fixture-verified.
+This ordering creates no provider authorization and permits no live API call:
 
 - KuCoin documents a public/no-permission `GET /api/v3/announcements` endpoint,
   explicit page/count fields, up to 50 requested rows, stable announcement IDs,
@@ -22,10 +21,10 @@ authorization and permits no live call:
   time bounds, cursor pagination, stable IDs, publication clocks, language, and
   official URL, but only 10 rows per page.
 
-Neither endpoint is active in this repository. KuCoin parsing and closed
-coverage semantics now exist only offline. Any later live capture requires a separate
-already-present authorization flag, explicit confirmation, a bounded request
-plan, immutable accepted bytes, and strict doctor success.
+Neither endpoint is active in this repository. KuCoin and Bitget parsing plus
+closed coverage semantics exist only offline. Any later live capture requires a
+separate already-present authorization flag, explicit confirmation, a bounded
+request plan, immutable accepted bytes, and strict doctor success.
 
 ## Official evidence reviewed
 
@@ -60,9 +59,9 @@ plan, immutable accepted bytes, and strict doctor success.
 - Stable `annId`, `cTime`, language, description, and official URL give the
   offline contract enough identity and clock material to fail closed.
 
-Bitget remains valuable as a source-diverse second official witness. Its
-smaller cursor pages and deprecated `annDesc` make it a better second contract
-after the shared identity, coverage, and clock rules are proven on KuCoin.
+Bitget is now the fixture-verified source-diverse second official witness. Its
+smaller cursor pages and deprecated `annDesc` remain separate from KuCoin's
+total/page-count contract rather than being forced into one pagination model.
 
 ## Closed evidence semantics
 
@@ -110,12 +109,17 @@ after the shared identity, coverage, and clock rules are proven on KuCoin.
    or region bypass, plus health/backoff and retention review.
 7. Keep every capture campaign-detached and Protocol-v2-ineligible until an
    explicit annex binds a genuine strict-clean namespace.
+8. **Bitget complete offline:** preserve the exact misspelled path, optional
+   type filter, required language, maximum-10 page, last-ID cursor chain,
+   request/acquisition clocks, type/subtype pairs, deprecated description, and
+   complete/partial semantics. It has no readiness, client, or capture path.
 
 ## Consequences
 
 - KuCoin's offline response and immutable-capture contracts are fixture-
   verified, but it is not live-enabled, authoritative, or Protocol-v2-admitted.
-- Bitget remains planned as the second documented official API candidate.
+- Bitget's second offline contract is implemented, but remains unconfigured,
+  unauthorized, inactive, and Protocol-v2-ineligible.
 - Bybit remains the selected execution venue and its documented announcement
   endpoint remains useful when permitted reachability exists. KuCoin/Bitget
   catalyst evidence cannot substitute for Bybit-native spread, depth, impact,

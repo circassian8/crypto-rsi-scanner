@@ -4,6 +4,10 @@
   "protocol_v2_eligible": false,
   "research_only": true,
   "reviewed_at": "2026-07-19",
+  "offline_contracts_implemented": [
+    "kucoin_announcements",
+    "bitget_announcements"
+  ],
   "selected_next_offline_contract": "kucoin_announcements",
   "second_candidate": "bitget_announcements",
   "sources": {
@@ -13,7 +17,7 @@
       "exact_provider_path_spelling": "annoucements",
       "maximum_page_size": 10,
       "pagination": "cursor_from_last_annId",
-      "provider_status": "planned_unimplemented_unconfigured_unauthorized",
+      "provider_status": "offline_contract_implemented_fixture_verified_unconfigured_unauthorized",
       "review_url": "https://www.bitget.com/api-doc/common/notice/Get-All-Notices",
       "roles": [
         "latest_news",

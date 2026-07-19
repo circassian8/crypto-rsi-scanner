@@ -1,0 +1,17 @@
+{
+  "code": "00000",
+  "msg": "success",
+  "requestTime": 1784424901500,
+  "data": [
+    {
+      "annId": "900001",
+      "annTitle": "Bitget Research Market Update",
+      "annDesc": "This latest-news category is context and not listing evidence.",
+      "cTime": "1784424600000",
+      "language": "en_US",
+      "annUrl": "https://www.bitget.com/en_US/support/articles/900001",
+      "annType": "latest_news",
+      "annSubType": "news"
+    }
+  ]
+}

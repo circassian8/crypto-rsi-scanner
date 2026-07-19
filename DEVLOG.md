@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Add the second official announcement contract · Codex
+**Why:** Catalyst evidence needs source diversity, but Bitget's cursor contract
+must be closed offline before any authorization or live acquisition is debated.
+**Changes:**
+- Added a strict synthetic-byte Bitget normalizer and fixtures for the official
+  public `/api/v2/public/annoucements` endpoint, preserving its exact spelling.
+- Bound the 31-day window, required English language, optional type filter,
+  maximum-10 row pages, last-`annId` cursor chain, complete/partial/healthy-
+  empty states, response/acquisition clocks, hashes, lineage, string IDs,
+  type/subtype pairs, deprecated description status, and official URLs.
+- Added failures for schema/status drift, duplicate keys/IDs, broken cursors,
+  nonterminal short pages, request-limit overflow, filter mismatch, invalid
+  type/subtype/language/URL, clock drift, and publication reordering.
+- Added the no-call/no-write smoke target and updated the selection review,
+  contract reports, roadmap, decision log, and operator agreement.
+**Verify:** 20 focused Bitget tests passed; compileall, Bitget smoke, JSON
+validation, `git diff --check`, and architecture cleanliness passed.
+**Notes/risks:** This adds no client, authorization, provider call, write,
+capture, pointer, route/score effect, send, trade, order, paper trade, normal RSI
+write, Event Alpha `TRIGGERED_FADE`, campaign/dashboard authority, or Protocol-
+v2 evidence. Publication time remains distinct from event time.
+
 ## 2026-07-19 — Prove immutable KuCoin capture mechanics offline · Codex
 **Why:** Official-announcement bytes need reproducible provenance and fail-
 closed validation before any live transport can be considered.

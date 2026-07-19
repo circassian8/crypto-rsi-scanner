@@ -1,0 +1,48 @@
+{
+  "authority": {
+    "campaign_attached": false,
+    "decision_policy_applied": false,
+    "directional_authority": false,
+    "live_authorized": false,
+    "live_configured": false,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false
+  },
+  "contract_version": "crypto_radar_bitget_announcements_v1",
+  "endpoint": "GET https://api.bitget.com/api/v2/public/annoucements",
+  "exact_provider_path_spelling": "annoucements",
+  "implemented_at": "2026-07-19",
+  "maximum_page_size": 10,
+  "maximum_request_window_days": 31,
+  "maximum_requests": 20,
+  "maximum_rows": 200,
+  "mode": "offline_synthetic_fixture_only",
+  "official_documentation": "https://www.bitget.com/api-doc/common/notice/Get-All-Notices",
+  "pagination": {
+    "complete_when_final_page_short_or_empty": true,
+    "first_cursor": null,
+    "next_cursor": "last_annId_from_previous_response",
+    "provider_total_available": false
+  },
+  "provider": "bitget_announcements",
+  "safety": {
+    "authorization_created": false,
+    "environment_reads": 0,
+    "event_alpha_triggered_fade_created": 0,
+    "normal_rsi_writes": 0,
+    "orders": 0,
+    "paper_trades": 0,
+    "provider_calls": 0,
+    "route_or_score_effect": false,
+    "telegram_sends": 0,
+    "trades": 0,
+    "writes": 0
+  },
+  "semantics": {
+    "announcement_publication_time_is_event_time": false,
+    "deprecated_description_is_complete_article": false,
+    "failed_or_partial_source_means_no_events": false,
+    "official_type_subtype_pairs_preserved": true
+  },
+  "status": "implemented_fixture_verified_inactive"
+}

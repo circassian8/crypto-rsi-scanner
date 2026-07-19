@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep Bitget as an offline source-diverse announcement witness
+**Status:** accepted
+**Decision:** Implement Bitget's documented public `GET
+/api/v2/public/annoucements` response as the second strict synthetic-byte
+announcement contract, preserving the provider's exact path spelling,
+maximum-10 last-ID cursor pagination, required language, provider/acquisition
+clocks, stable string IDs, official type/subtype pairs, deprecated description,
+and safe official URLs. Keep it unconfigured, unauthorized, inactive,
+campaign-detached, and Protocol-v2-ineligible. Do not collapse its cursor
+coverage into KuCoin's total/page-count model or treat `cTime` as event time.
+**Why:** A second first-party witness improves future source diversity, while an
+offline closed contract prevents public access, deprecated fields, or a full
+last page from being mistaken for authorization, complete evidence, or a
+directional catalyst.
+**Revisit when:** KuCoin has genuine strict-clean evidence or the human
+explicitly reprioritizes Bitget and separately authorizes a bounded capture.
+Require confirmation, immutable bytes, ledger, health/backoff, doctor,
+retention, source-independence, and annex review before any policy use.
+
 ## 2026-07-19 - Keep the KuCoin announcement contract closed before activation
 **Status:** accepted
 **Decision:** Treat the v1 KuCoin announcement implementation as a strict

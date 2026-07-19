@@ -369,6 +369,20 @@ may be added later when a suitable environment already exists.
   campaign, dashboard, or Protocol-v2 authority. Authorization alone cannot
   make readiness pass while the live transport remains unimplemented; never
   create or mutate the flag from code.
+- **Bitget official-announcement offline contract:**
+  `make radar-announcements-bitget-smoke` validates synthetic bytes against the
+  documented public `GET /api/v2/public/annoucements` contract, preserving the
+  provider's exact `annoucements` spelling. It closes one-month request bounds,
+  required English language, optional type filters, maximum-10 cursor pages,
+  the exact `last annId` cursor chain, complete/partial/healthy-empty truth,
+  response/acquisition clocks and hashes, stable string IDs, official
+  type/subtype pairs, deprecated-description status, and safe official URLs.
+  `cTime` remains publication time rather than event time or directional
+  authority. The module has no client, environment read, write, pointer,
+  readiness, capture, policy, campaign, dashboard, or Protocol-v2 path. Do not
+  activate it or infer authorization from public access; a later live boundary
+  requires the same separate authorization, confirmation, immutable capture,
+  request-ledger, health/backoff, doctor, retention, and annex gates as KuCoin.
 - **Tokenomist structured-unlock response contract:**
   `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
   cliff-unlock response shape entirely offline. The closed synthetic fixture
