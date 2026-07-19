@@ -134,6 +134,16 @@ def market_snapshot(data: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(value, Mapping):
             normalized = normalize_market_snapshot(value)
             warnings.extend(_texts(normalized.get("unit_warnings")))
+            for field in _RETURN_FIELDS:
+                if (
+                    field in value
+                    and value.get(field) not in (None, "")
+                    and field not in normalized
+                ):
+                    # Normalization rejected an explicitly supplied value.
+                    # Remove any older snapshot value so malformed current
+                    # evidence cannot expose a plausible earlier return.
+                    out.pop(field, None)
             out.update(normalized)
     if warnings:
         out["unit_warnings"] = list(dict.fromkeys(warnings))

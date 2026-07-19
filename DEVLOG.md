@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve invalid return authority across snapshot merges · Codex
+**Why:** Return normalization correctly removed malformed values from a later
+canonical snapshot, but the subsequent merge left the same field from an older
+nested snapshot in place. The merged Decision context could therefore display
+or score an older return beside a warning that the current return was invalid.
+**Changes:**
+- When normalization rejects an explicitly supplied return, the Decision
+  snapshot merge now removes the lower-precedence value before applying the
+  normalized snapshot.
+- Preserved existing behavior for a genuinely absent later return: an earlier
+  observed value remains available.
+- Added focused precedence regressions for boolean, non-numeric, NaN, infinite,
+  and implausibly unitized current returns.
+**Verify:** All 75 focused snapshot-precedence, Decision Model, consistency, and
+surface tests passed. Compileall, architecture cleanliness, and the integrated-
+radar smoke passed.
+**Notes/risks:** This changes no return conversion, threshold, score weight,
+provider boundary, route policy, send, trade, order, paper trade, RSI write, or
+Event Alpha `TRIGGERED_FADE` behavior. Only an explicitly rejected later return
+can mask its older copy.
+
 ## 2026-07-19 — Require real integer catalyst evidence counts · Codex
 **Why:** Catalyst and anomaly paths treated truthy or float-coercible
 `accepted_evidence_count` values as accepted source evidence. Booleans,
