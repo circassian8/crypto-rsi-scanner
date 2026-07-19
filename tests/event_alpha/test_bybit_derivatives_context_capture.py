@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
 import importlib.util
@@ -122,8 +123,14 @@ def _resolver():
     return resolve
 
 
-def _clock():
-    ticks = iter(NOW + timedelta(milliseconds=100 * index) for index in range(50))
+def _clock(*, completed_offset_ms: int = 900):
+    ticks = iter(
+        (
+            NOW,
+            *(NOW + timedelta(milliseconds=100 * index) for index in range(1, 9)),
+            NOW + timedelta(milliseconds=completed_offset_ms),
+        )
+    )
     return lambda: next(ticks)
 
 
@@ -133,10 +140,14 @@ def _captured_fetch(
 ) -> BybitCapturedJSONResponse:
     payload = _json(DERIVATIVES_FIXTURES / PATH_FIXTURES[request.path])
     raw = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
+    request_index = list(PATH_FIXTURES).index(request.path)
+    started = NOW + timedelta(milliseconds=100 + request_index * 200)
     return BybitCapturedJSONResponse(
         request=request,
-        request_started_at="2026-07-18T07:44:00.100000Z",
-        response_received_at="2026-07-18T07:44:00.200000Z",
+        request_started_at=started.isoformat().replace("+00:00", "Z"),
+        response_received_at=(started + timedelta(milliseconds=100))
+        .isoformat()
+        .replace("+00:00", "Z"),
         duration_ms=100,
         response_url=f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}",
         http_status=200,
@@ -145,11 +156,11 @@ def _captured_fetch(
     )
 
 
-def _evidence():
+def _evidence(*, completed_offset_ms: int = 900):
     return _collect_authoritative_bybit_derivatives(
         artifact_base_dir="unused",
         environ={LIVE_AUTH_ENV: "1"},
-        now=_clock(),
+        now=_clock(completed_offset_ms=completed_offset_ms),
         capture_loader=lambda _base: _capture(),
         resolver=_resolver(),
         fetch_json=_captured_fetch,
@@ -166,6 +177,11 @@ def test_exact_bytes_rederive_one_closed_capture_without_io() -> None:
     assert prepared["request_count"] == 4
     assert prepared["context_count"] == 1
     assert prepared["all_context_fresh"] is True
+    assert prepared["all_context_fresh_at_acquisition"] is True
+    assert prepared["all_context_fresh_at_completion"] is True
+    assert prepared["derivatives_set_freshness_policy"] == (
+        "every_composite_context_fresh_at_capture_completion"
+    )
     assert prepared["protocol_v2_input_quality_eligible"] is True
     assert prepared["protocol_v2_evidence_eligible"] is False
     assert prepared["immutable_capture_persisted"] is False
@@ -222,6 +238,28 @@ def test_response_order_drift_is_rejected() -> None:
         match="derivatives_request_order_drift",
     ):
         prepare_bybit_derivatives_context_capture(summary, changed)
+
+
+def test_overlapping_exact_response_timing_is_rejected() -> None:
+    summary, responses = _evidence()
+    changed_summary = deepcopy(summary)
+    changed_summary["request_timing"][1]["request_started_at"] = (  # type: ignore[index]
+        "2026-07-18T07:44:00.150000Z"
+    )
+    changed_responses = list(responses)
+    changed_responses[1] = replace(
+        changed_responses[1],
+        request_started_at="2026-07-18T07:44:00.150000Z",
+    )
+
+    with pytest.raises(
+        BybitDerivativesContextCaptureError,
+        match="captured_response_outside_capture_window",
+    ):
+        prepare_bybit_derivatives_context_capture(
+            changed_summary,
+            changed_responses,
+        )
 
 
 def test_projected_context_drift_is_rejected() -> None:
@@ -317,6 +355,25 @@ def test_exact_capture_persists_validates_and_loads_latest(tmp_path: Path) -> No
     assert len(list((tmp_path / namespace).iterdir())) == 12
 
 
+def test_aged_capture_remains_evidence_but_not_input_quality(
+    tmp_path: Path,
+) -> None:
+    summary, responses = _evidence(completed_offset_ms=20_000)
+
+    result = persist_bybit_derivatives_context_capture(
+        tmp_path,
+        summary=summary,
+        responses=responses,
+    )
+
+    assert result["all_context_fresh_at_acquisition"] is True
+    assert result["all_context_fresh_at_completion"] is False
+    assert result["all_context_fresh"] is False
+    assert result["maximum_context_age_at_completion_seconds"] == 20.0
+    assert result["protocol_v2_input_quality_eligible"] is False
+    assert result["pointer_validated"] is True
+
+
 def test_status_is_closed_when_no_pointer_exists(tmp_path: Path) -> None:
     status = bybit_derivatives_context_capture_status(tmp_path)
 
@@ -405,10 +462,7 @@ def test_older_capture_cannot_replace_newer_latest_pointer(tmp_path: Path) -> No
         summary=summary,
         responses=responses,
     )
-    older = deepcopy(summary)
-    older["started_at"] = "2026-07-18T07:44:00Z"
-    older["completed_at"] = "2026-07-18T07:44:00.300000Z"
-    older["maximum_context_age_at_completion_seconds"] = 0.3
+    older, older_responses = _evidence(completed_offset_ms=850)
 
     with pytest.raises(
         BybitDerivativesContextCaptureError,
@@ -417,7 +471,7 @@ def test_older_capture_cannot_replace_newer_latest_pointer(tmp_path: Path) -> No
         persist_bybit_derivatives_context_capture(
             tmp_path,
             summary=older,
-            responses=responses,
+            responses=older_responses,
         )
 
 
@@ -466,6 +520,11 @@ def test_project_review_export_selects_and_revalidates_latest_capture(
     assert selected["capture_id"] == capture["capture_id"]
     assert selected["source_execution_quality_capture_id"] == "b" * 64
     assert selected["all_context_fresh"] is True
+    assert selected["all_context_fresh_at_acquisition"] is True
+    assert selected["all_context_fresh_at_completion"] is True
+    assert selected["derivatives_set_freshness_policy"] == (
+        "every_composite_context_fresh_at_capture_completion"
+    )
     assert selected["protocol_v2_input_quality_eligible"] is True
     assert selected["protocol_v2_evidence_eligible"] is False
     assert selected["protocol_v2_annex_bound"] is False

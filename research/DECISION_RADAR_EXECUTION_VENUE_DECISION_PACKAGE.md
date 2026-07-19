@@ -89,8 +89,14 @@ clock, lineage row, and deterministic identity from those exact bytes and
 rejects mapping-only diagnostic responses. Confirmed capture writes one
 descriptor-anchored immutable namespace, manifest, completion receipt, and
 rollback-protected latest pointer. Read-only status and the standard review
-export fully revalidate it from raw bytes. No genuine capture exists in the
-current store, and this boundary never creates authorization,
+export fully revalidate it from raw bytes. Guarded live/capture v3 preserves
+acquisition freshness and re-evaluates every composite context's oldest
+provider-response clock at full-set completion. The exact 15-second policy,
+maximum completion age, and acquisition/completion states survive every
+immutable surface; exact responses must form one ordered non-overlapping
+window. A complete aged capture remains evidence but is not Protocol-v2
+input-quality eligible. No genuine capture exists in the current store, and
+this boundary never creates authorization,
 credentials, notifications, orders, or trading capability. It rejects
 future/misordered rows, identity/category drift, incomplete lineage,
 implausible funding/basis/returns, and the known

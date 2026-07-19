@@ -137,8 +137,14 @@ def _resolver(source: dict[str, object] | None = None):
     return resolve
 
 
-def _clock():
-    ticks = iter(NOW + timedelta(milliseconds=100 * index) for index in range(40))
+def _clock(*, completed_offset_ms: int = 900):
+    ticks = iter(
+        (
+            NOW,
+            *(NOW + timedelta(milliseconds=100 * index) for index in range(1, 9)),
+            NOW + timedelta(milliseconds=completed_offset_ms),
+        )
+    )
     return lambda: next(ticks)
 
 
@@ -155,10 +161,14 @@ def _captured_fetch(
 ) -> BybitCapturedJSONResponse:
     payload = _fetch(request, timeout)
     raw = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
+    request_index = list(PATH_FIXTURES).index(request.path)
+    started = NOW + timedelta(milliseconds=100 + request_index * 200)
     return BybitCapturedJSONResponse(
         request=request,
-        request_started_at="2026-07-18T07:44:00.100000Z",
-        response_received_at="2026-07-18T07:44:00.200000Z",
+        request_started_at=started.isoformat().replace("+00:00", "Z"),
+        response_received_at=(started + timedelta(milliseconds=100))
+        .isoformat()
+        .replace("+00:00", "Z"),
         duration_ms=100,
         response_url=f"{PUBLIC_API_BASE}{request.path}?{urlencode(request.query)}",
         http_status=200,
@@ -334,6 +344,9 @@ def test_authorized_collection_gets_exact_context_without_writes_or_policy() -> 
     assert payload["all_context_fresh"] is True
     assert payload["all_context_fresh_at_acquisition"] is True
     assert payload["all_context_fresh_at_completion"] is True
+    assert payload["derivatives_set_freshness_policy"] == (
+        "every_composite_context_fresh_at_capture_completion"
+    )
     assert payload["maximum_context_age_at_completion_seconds"] == 0.9
     assert payload["retries"] == payload["redirects_followed"] == 0
     assert len(payload["request_timing"]) == 4
@@ -346,6 +359,22 @@ def test_authorized_collection_gets_exact_context_without_writes_or_policy() -> 
     assert payload["writes_performed"] is False
     assert payload["orders_available"] is False
     assert payload["trades_created"] == payload["telegram_sends"] == 0
+
+
+def test_collection_retains_acquisition_truth_when_set_ages_at_completion() -> None:
+    payload = collect_authoritative_bybit_derivatives(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=_clock(completed_offset_ms=20_000),
+        capture_loader=lambda _base: _capture(),
+        resolver=_resolver(),
+        fetch_json=_fetch,
+    )
+
+    assert payload["all_context_fresh_at_acquisition"] is True
+    assert payload["all_context_fresh_at_completion"] is False
+    assert payload["all_context_fresh"] is False
+    assert payload["maximum_context_age_at_completion_seconds"] == 20.0
 
 
 def test_exact_transport_responses_are_retained_in_memory_but_not_persisted() -> None:

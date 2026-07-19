@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve Bybit derivatives set freshness through publication · Codex
+**Why:** Derivatives context v2 already used the oldest of ticker, funding,
+open-interest, and positioning provider clocks, but immutable publication kept
+only one set-level freshness boolean. That lost whether a sequential collection
+was fresh at acquisition or aged before the final response completed.
+**Changes:**
+- Advanced guarded derivatives live/capture contracts to v3. One closed value
+  object now re-evaluates every composite context's oldest provider clock at
+  full-set completion and derives acquisition freshness, completion freshness,
+  maximum completion age, the exact 15-second policy, and Protocol-v2 input-
+  quality eligibility.
+- Preserved that projection through the live summary, normalized context
+  artifact, manifest, receipt, latest pointer, read-only status, full immutable
+  validation, and standard source-with-artifacts export selection. Drift or
+  missing closed fields fails validation.
+- Required exact captured responses to form one ordered non-overlapping window
+  inside the declared capture interval. A complete capture that ages during the
+  sequence remains immutable evidence while setting input-quality eligibility
+  false.
+- Kept the offline context schema at v2 and its oldest-component policy
+  unchanged. Updated the North Star, venue decision package, working agreement,
+  durable decision, roadmap, and generated architecture reports.
+- Moved the shared freshness-field contract into the focused value-object
+  module after the architecture check exposed a four-line coordinator threshold
+  crossing; the capture coordinator now remains below 1,200 lines with no new
+  exception.
+**Verify:** 124 focused derivatives, execution-quality, readiness, capture,
+export-selection, and Protocol-v2 progress tests passed; Python compileall and
+North Star JSON validation passed. The offline derivatives smoke made zero
+provider calls/writes. Live readiness/status emitted v3 and stopped before the
+provider boundary because the execution capture and separate authorization are
+absent. Protocol-v2 remained closed, dashboard readiness served the exact
+revision-12 authority, and architecture cleanliness reported zero new or
+unresolved production-size violations. `git diff --check` passed.
+**Notes/risks:** No Bybit call, authorization mutation, retry, proxy, VPN,
+alternate host, score, route, threshold, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE` occurred. A genuine derivatives
+capture still requires a fresh execution-quality capture plus the separately
+present authorization flag and explicit confirmation.
+
 ## 2026-07-19 — Require full-set freshness for Bybit intraday bars · Codex
 **Why:** Direct 1h/4h collection can issue up to 60 sequential requests. A bar
 could be fresh when received, age past the 15-second provider-response policy

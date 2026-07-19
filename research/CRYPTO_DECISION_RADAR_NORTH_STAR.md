@@ -948,8 +948,13 @@ mapping-only diagnostic results cannot enter it. The separately confirmed
 capture command publishes one descriptor-anchored immutable namespace with raw
 responses, closed projections, manifest, completion receipt, and rollback-
 protected latest pointer. Read-only status and the standard review export fully
-revalidate the capture from raw bytes. No genuine capture exists in the current
-store. Output is context-only, non-directional,
+revalidate the capture from raw bytes. Guarded live/capture v3 preserves both
+acquisition freshness and full-set-completion freshness, the exact 15-second
+maximum context age, and the oldest-component provider-clock policy through
+every immutable publication surface. Exact responses must form one ordered
+non-overlapping window. A complete capture that ages during sequential
+collection remains exact evidence but is not Protocol-v2 input-quality
+eligible. No genuine capture exists in the current store. Output is context-only, non-directional,
 policy-neutral, input-quality-ineligible, annex-unbound, and Protocol-v2-
 ineligible. Coinalyze is optional secondary Catalyst-Radar corroboration, not a
 substitute for the chosen venue-native derivatives or execution surface.

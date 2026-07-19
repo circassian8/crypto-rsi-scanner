@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Preserve derivatives freshness through full-set publication
+**Status:** accepted
+**Decision:** Bybit derivatives live/capture v3 re-evaluates every composite
+context's oldest required provider-response clock when the final sequential
+response completes. It preserves acquisition and completion freshness, the
+maximum completion age, and the exact 15-second policy through contexts,
+manifests, receipts, pointers, status, and review-export selection. Exact
+transport responses must form one ordered non-overlapping window. A complete
+aged set remains immutable exact-response evidence but sets
+`protocol_v2_input_quality_eligible=false`.
+**Why:** The offline v2 row already dated each composite context conservatively,
+but downstream publication retained only one freshness boolean. That erased
+whether the set was fresh when acquired or only became stale while its bounded
+sequential request plan was finishing, weakening audit and annex decisions.
+**Revisit when:** Bybit offers an atomic multi-instrument derivatives snapshot,
+or a preregistered streaming/synchronization annex defines a stronger common
+cutoff. Any replacement must retain every component provider clock and must not
+let individually fresh composite rows hide an aged completed set.
+
 ## 2026-07-19 - Date sequential intraday sets at full capture completion
 **Status:** accepted
 **Decision:** Bybit intraday live/capture v4 preserves whether every native 1h

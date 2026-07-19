@@ -1690,6 +1690,21 @@ def _latest_bybit_derivatives_namespace(
             "source_execution_quality_capture_id"
         ],
         "all_context_fresh": pointer["all_context_fresh"],
+        "all_context_fresh_at_acquisition": pointer[
+            "all_context_fresh_at_acquisition"
+        ],
+        "all_context_fresh_at_completion": pointer[
+            "all_context_fresh_at_completion"
+        ],
+        "derivatives_set_freshness_policy": pointer[
+            "derivatives_set_freshness_policy"
+        ],
+        "maximum_context_age_at_completion_seconds": pointer[
+            "maximum_context_age_at_completion_seconds"
+        ],
+        "maximum_context_age_policy_seconds": pointer[
+            "maximum_context_age_policy_seconds"
+        ],
         "protocol_v2_input_quality_eligible": pointer[
             "protocol_v2_input_quality_eligible"
         ],

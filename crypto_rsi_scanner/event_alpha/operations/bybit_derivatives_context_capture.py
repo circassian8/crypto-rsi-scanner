@@ -21,11 +21,21 @@ from typing import Any, Iterator, Mapping, Sequence
 from urllib.parse import urlencode
 
 from .bybit_derivatives_context import (
-    DEFAULT_FRESHNESS_SECONDS,
     MAX_PLANNED_REQUESTS,
     BybitDerivativesContextError,
     build_bybit_derivatives_requests,
     normalize_bybit_derivatives_context,
+)
+from .bybit_derivatives_context_set_freshness import (
+    COMMON_FRESHNESS_FIELDS,
+    _BybitDerivativesContextSetFreshnessError,
+    common_freshness_matches,
+    common_freshness_values,
+    freshness_contract_valid,
+    live_summary_freshness_matches,
+    live_summary_freshness_values,
+    project_derivatives_context_set_freshness,
+    require_exact_response_window,
 )
 from .bybit_execution_quality import (
     PUBLIC_API_BASE,
@@ -51,8 +61,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_capture_v2"
-LIVE_CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v2"
+CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_capture_v3"
+LIVE_CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v3"
 POINTER_FILENAME = "radar_bybit_derivatives_context_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
 RECEIPT_FILENAME = "capture_completion_receipt.json"
@@ -82,6 +92,7 @@ _LIVE_SUMMARY_KEYS = frozenset(
         "campaign_attached", "category", "completed_at",
         "composite_freshness_policy", "context_count", "context_only",
         "contexts", "contract_version", "credentials_read",
+        "derivatives_set_freshness_policy",
         "decision_policy_applied", "directional_authority",
         "eligible_instrument_count", "eligible_instruments",
         "exact_response_capture_available", "exact_response_capture_count",
@@ -460,34 +471,23 @@ def prepare_bybit_derivatives_context_capture(
         raise BybitDerivativesContextCaptureError(
             "source_execution_capture_after_derivatives_start"
         )
-    for row in request_rows:
-        if (
-            _utc(row["request_started_at"], "request_started_at") < started
-            or _utc(row["response_received_at"], "response_received_at") > completed
-        ):
-            raise BybitDerivativesContextCaptureError(
-                "captured_response_outside_capture_window"
-            )
-    ages = [
-        max(0.0, (completed - _utc(row["provider_observed_at"], "provider_observed_at")).total_seconds())
-        for row in rebuilt
-    ]
-    acquisition_fresh = all(row.get("freshness_status") == "fresh" for row in rebuilt)
-    completion_fresh = acquisition_fresh and all(
-        age <= DEFAULT_FRESHNESS_SECONDS for age in ages
-    )
-    if (
-        summary.get("all_context_fresh_at_acquisition") is not acquisition_fresh
-        or summary.get("all_context_fresh_at_completion") is not completion_fresh
-        or summary.get("all_context_fresh") is not completion_fresh
-        or summary.get("maximum_context_age_policy_seconds")
-        != DEFAULT_FRESHNESS_SECONDS
-        or summary.get("maximum_context_age_at_completion_seconds")
-        != round(max(ages, default=0.0), 6)
-    ):
+    try:
+        require_exact_response_window(
+            responses,
+            started_at=started,
+            completed_at=completed,
+        )
+        set_freshness = project_derivatives_context_set_freshness(
+            rebuilt,
+            completed_at=completed,
+        )
+    except _BybitDerivativesContextSetFreshnessError as exc:
+        raise BybitDerivativesContextCaptureError(exc.reason_code) from exc
+    if not live_summary_freshness_matches(summary, set_freshness):
         raise BybitDerivativesContextCaptureError(
             "derivatives_freshness_summary_mismatch"
         )
+    freshness_values = live_summary_freshness_values(set_freshness)
     identity_seed = {
         "completed_at": _iso(completed),
         "source_execution_quality_capture": source,
@@ -514,9 +514,9 @@ def prepare_bybit_derivatives_context_capture(
         ],
         "request_count": len(request_rows),
         "context_count": len(rebuilt),
-        "all_context_fresh": completion_fresh,
+        **freshness_values,
         "immutable_capture_persisted": False,
-        "protocol_v2_input_quality_eligible": completion_fresh,
+        "protocol_v2_input_quality_eligible": set_freshness.fresh_at_completion,
         "protocol_v2_evidence_eligible": False,
         "protocol_v2_annex_bound": False,
         "campaign_attached": False,
@@ -632,7 +632,7 @@ def _capture_payloads(
         "capture_id": capture_id,
         "context_count": len(prepared["contexts"]),
         "contexts": prepared["contexts"],
-        "all_context_fresh": prepared["all_context_fresh"],
+        **common_freshness_values(prepared),
         "research_only": True,
     }
     request_index = {
@@ -676,10 +676,7 @@ def _publication_objects(
         "source_execution_quality_pointer_sha256": source["pointer_sha256"],
         "request_count": prepared["request_count"],
         "context_count": prepared["context_count"],
-        "all_context_fresh": prepared["all_context_fresh"],
-        "protocol_v2_input_quality_eligible": prepared[
-            "protocol_v2_input_quality_eligible"
-        ],
+        **common_freshness_values(prepared),
         "protocol_v2_evidence_eligible": False,
         "protocol_v2_annex_bound": False,
         "campaign_attached": False,
@@ -881,15 +878,14 @@ def validate_bybit_derivatives_context_pointer_bytes(
 ) -> dict[str, Any]:
     pointer = _parse_json(raw)
     expected = {
-        "all_context_fresh", "artifact_namespace", "campaign_attached",
-        "capture_id", "completed_at", "context_count", "context_only",
-        "contract_version", "decision_policy_applied", "directional_authority",
+        "artifact_namespace", "campaign_attached", "capture_id", "completed_at",
+        "context_count", "context_only", "contract_version",
+        "decision_policy_applied", "directional_authority",
         "protocol_v2_annex_bound", "protocol_v2_evidence_eligible",
-        "protocol_v2_input_quality_eligible", "receipt", "request_count",
-        "research_only", "schema_id", "schema_version",
+        "receipt", "request_count", "research_only", "schema_id", "schema_version",
         "source_execution_quality_capture_id",
         "source_execution_quality_pointer_sha256", "status",
-    }
+    } | set(COMMON_FRESHNESS_FIELDS)
     receipt = pointer.get("receipt")
     if (
         set(pointer) != expected
@@ -911,9 +907,7 @@ def validate_bybit_derivatives_context_pointer_bytes(
         or type(pointer.get("context_count")) is not int
         or not 1 <= pointer["context_count"] <= 30
         or pointer["request_count"] != pointer["context_count"] * len(_PATH_LABELS)
-        or type(pointer.get("all_context_fresh")) is not bool
-        or pointer.get("protocol_v2_input_quality_eligible")
-        is not pointer.get("all_context_fresh")
+        or not freshness_contract_valid(pointer)
         or pointer.get("protocol_v2_evidence_eligible") is not False
         or pointer.get("protocol_v2_annex_bound") is not False
         or pointer.get("campaign_attached") is not False
@@ -1151,9 +1145,18 @@ def validate_bybit_derivatives_context_capture(
         source.get("source_execution_quality_capture")
         != prepared.get("source_execution_quality_capture")
         or instruments.get("instruments") != prepared.get("eligible_instruments")
+        or set(contexts) != {
+            "capture_id", "context_count", "contexts", "research_only",
+            "schema_id", "schema_version",
+        } | set(COMMON_FRESHNESS_FIELDS)
+        or contexts.get("schema_id")
+        != "decision_radar.bybit_derivatives_contexts"
+        or contexts.get("schema_version") != 1
+        or contexts.get("capture_id") != capture_id
+        or contexts.get("context_count") != prepared.get("context_count")
         or contexts.get("contexts") != prepared.get("contexts")
-        or contexts.get("all_context_fresh")
-        is not prepared.get("all_context_fresh")
+        or not common_freshness_matches(contexts, prepared)
+        or contexts.get("research_only") is not True
         or _canonical_value(projection) != _canonical_value(prepared)
     ):
         raise BybitDerivativesContextCaptureError("capture_projection_drift")

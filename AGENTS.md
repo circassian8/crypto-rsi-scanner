@@ -498,7 +498,14 @@ may be added later when a suitable environment already exists.
   capture/instrument/authority identity afterward. The closed no-I/O capture-
   input contract rederives every normalized context, request timing, lineage,
   unit, and deterministic capture identity from those exact bytes and rejects
-  mapping-only diagnostic results. `CONFIRM=1 make
+  mapping-only diagnostic results. Guarded live/capture v3 also preserves
+  acquisition freshness and re-evaluates every composite context's oldest
+  provider-response clock when the final sequential response completes. The
+  exact 15-second policy, maximum completion age, and acquisition/completion
+  states remain closed through projections, manifest, receipt, pointer, status,
+  and review export. Exact responses must form one ordered non-overlapping
+  window. A complete aged capture remains immutable evidence but is explicitly
+  Protocol-v2 input-quality-ineligible. `CONFIRM=1 make
   radar-derivatives-bybit-capture` is the separate immutable write boundary;
   `make radar-derivatives-bybit-status` revalidates the latest capture without a
   call or write. Publication holds one descriptor-anchored namespace, writes

@@ -12,6 +12,10 @@ from .bybit_derivatives_context_capture import (
     validate_bybit_derivatives_context_capture,
     validate_bybit_derivatives_context_pointer_bytes,
 )
+from .bybit_derivatives_context_set_freshness import (
+    MAXIMUM_CONTEXT_AGE_SECONDS,
+    SET_FRESHNESS_POLICY,
+)
 from .market_no_send_io import read_regular_bytes
 from .market_no_send_models import MarketNoSendError
 
@@ -63,6 +67,12 @@ def bybit_derivatives_context_capture_status(
             "contexts": [],
             "request_count": 0,
             "context_count": 0,
+            "all_context_fresh": False,
+            "all_context_fresh_at_acquisition": False,
+            "all_context_fresh_at_completion": False,
+            "derivatives_set_freshness_policy": SET_FRESHNESS_POLICY,
+            "maximum_context_age_at_completion_seconds": None,
+            "maximum_context_age_policy_seconds": MAXIMUM_CONTEXT_AGE_SECONDS,
             "protocol_v2_input_quality_eligible": False,
             "protocol_v2_evidence_eligible": False,
             "protocol_v2_annex_bound": False,

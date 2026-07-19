@@ -21,7 +21,6 @@ from ... import config
 from ..dashboard.readiness import resolve_authoritative_dashboard
 from .bybit_derivatives_context import (
     ACCOUNT_RATIO_PATH,
-    DEFAULT_FRESHNESS_SECONDS,
     FUNDING_HISTORY_PATH,
     MAX_PLANNED_REQUESTS,
     OPEN_INTEREST_PATH,
@@ -36,6 +35,13 @@ from .bybit_derivatives_context_capture import (
 )
 from .bybit_derivatives_context_capture_status import (
     bybit_derivatives_context_capture_status,
+)
+from .bybit_derivatives_context_set_freshness import (
+    MAXIMUM_CONTEXT_AGE_SECONDS,
+    SET_FRESHNESS_POLICY,
+    _BybitDerivativesContextSetFreshnessError,
+    live_summary_freshness_values,
+    project_derivatives_context_set_freshness,
 )
 from .bybit_execution_quality import (
     QUOTE_ASSET,
@@ -59,7 +65,7 @@ from .bybit_intraday_live import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v2"
+CONTRACT_VERSION = "crypto_radar_bybit_derivatives_context_live_v3"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 READINESS_COMMAND = "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python"
@@ -143,19 +149,6 @@ def _iso(value: datetime) -> str:
     return _utc(value).isoformat().replace("+00:00", "Z")
 
 
-def _context_age_seconds(context: Mapping[str, object], completed: datetime) -> float:
-    value = context.get("provider_observed_at")
-    if not isinstance(value, str):
-        raise BybitDerivativesContextLiveError("context_provider_clock_invalid")
-    try:
-        observed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise BybitDerivativesContextLiveError(
-            "context_provider_clock_invalid"
-        ) from exc
-    return max(0.0, (_utc(completed) - _utc(observed)).total_seconds())
-
-
 def _execution_prerequisites(
     artifact_base_dir: str | Path,
     *,
@@ -218,6 +211,12 @@ def build_bybit_derivatives_live_readiness(
             "long_short_account_ratio_1h",
         ],
         "composite_freshness_policy": "oldest_required_provider_response",
+        "derivatives_set_freshness_policy": SET_FRESHNESS_POLICY,
+        "maximum_context_age_policy_seconds": MAXIMUM_CONTEXT_AGE_SECONDS,
+        "protocol_v2_input_quality_rule": (
+            "every_oldest_component_context_clock_must_remain_fresh_at_"
+            "full_set_completion"
+        ),
         "runtime_authorization_env": LIVE_AUTH_ENV,
         "runtime_provider_authorized": authorized,
         "authorization_mutated": False,
@@ -395,15 +394,13 @@ def _observation_set_summary(
     request_count: int,
     captured_responses: Sequence[BybitCapturedJSONResponse],
 ) -> dict[str, object]:
-    completion_ages = [
-        _context_age_seconds(context, completed) for context in contexts
-    ]
-    fresh_at_acquisition = all(
-        row["freshness_status"] == "fresh" for row in contexts
-    )
-    fresh_at_completion = fresh_at_acquisition and all(
-        age <= DEFAULT_FRESHNESS_SECONDS for age in completion_ages
-    )
+    try:
+        set_freshness = project_derivatives_context_set_freshness(
+            contexts,
+            completed_at=completed,
+        )
+    except _BybitDerivativesContextSetFreshnessError as exc:
+        raise BybitDerivativesContextLiveError(exc.reason_code) from exc
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_derivatives_context_observation_set",
@@ -424,13 +421,7 @@ def _observation_set_summary(
         "contexts": contexts,
         "composite_freshness_policy": "oldest_required_provider_response",
         "request_timing": request_timing,
-        "all_context_fresh": fresh_at_completion,
-        "all_context_fresh_at_acquisition": fresh_at_acquisition,
-        "all_context_fresh_at_completion": fresh_at_completion,
-        "maximum_context_age_at_completion_seconds": round(
-            max(completion_ages, default=0.0), 6
-        ),
-        "maximum_context_age_policy_seconds": DEFAULT_FRESHNESS_SECONDS,
+        **live_summary_freshness_values(set_freshness),
         "provider_call_authorized": True,
         "provider_call_attempted": request_count > 0,
         "provider_request_succeeded": True,
