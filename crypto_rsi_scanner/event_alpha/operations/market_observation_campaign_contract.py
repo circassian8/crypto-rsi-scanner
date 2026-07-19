@@ -8,6 +8,12 @@ from typing import Any, Mapping, Sequence
 from . import market_observation_campaign_snapshots
 
 
+def nonnegative_int(value: object) -> int:
+    """Return canonical count evidence; malformed or non-integral values are zero."""
+
+    return value if type(value) is int and value >= 0 else 0
+
+
 def build_report_value(
     *,
     schema_id: str,
@@ -107,4 +113,4 @@ def build_report_value(
     }
 
 
-__all__ = ("build_report_value",)
+__all__ = ("build_report_value", "nonnegative_int")

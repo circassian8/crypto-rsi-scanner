@@ -7,6 +7,10 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Mapping
 
 from ..outcomes import outcome_eligibility
+from . import market_observation_campaign_contract
+
+
+_int = market_observation_campaign_contract.nonnegative_int
 
 
 OutcomeState = Callable[[Mapping[str, Any]], str]
@@ -296,15 +300,6 @@ def _mapping(value: object) -> dict[str, Any]:
 
 def _text(value: Any) -> str:
     return str(value).strip() if value not in (None, "") else ""
-
-
-def _int(value: object) -> int:
-    if isinstance(value, bool):
-        return 0
-    try:
-        return max(0, int(value or 0))
-    except (TypeError, ValueError):
-        return 0
 
 
 __all__ = ("build_due_missing_price_details", "build_outcome_metrics")

@@ -64,6 +64,7 @@ _attempt_sort_key = market_observation_campaign_attempts.attempt_sort_key
 _deduplicate_attempts = market_observation_campaign_attempts.deduplicate_attempts
 _is_live_market_attempt = market_observation_campaign_attempts.is_live_market_attempt
 _load_root_attempts = market_observation_campaign_attempts.load_root_attempts
+_int = market_observation_campaign_contract.nonnegative_int
 
 _SAFETY_COUNTER_FIELDS = (
     "telegram_sends",
@@ -1425,15 +1426,6 @@ def _mapping(value: Any) -> dict[str, Any]:
 
 def _text(value: Any) -> str:
     return str(value).strip() if value not in (None, "") else ""
-
-
-def _int(value: Any) -> int:
-    if isinstance(value, bool):
-        return 0
-    try:
-        return max(0, int(value or 0))
-    except (TypeError, ValueError):
-        return 0
 
 
 def _first_int(value: Mapping[str, Any], *fields: str) -> int | None:

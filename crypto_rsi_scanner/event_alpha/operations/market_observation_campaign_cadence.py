@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from . import market_no_send_campaign_guard
 from . import market_no_send_campaign_provider
+from . import market_observation_campaign_contract
 from ..radar import market_history
 
 
@@ -99,9 +100,9 @@ def legacy_next_eligible(readiness: Mapping[str, Any]) -> str | None:
     )
     if newest is None:
         return None
-    seconds = int(readiness.get("minimum_observation_spacing_seconds") or 0) or int(
-        market_history.MarketHistoryConfig().minimum_observation_spacing.total_seconds()
-    )
+    seconds = market_observation_campaign_contract.nonnegative_int(
+        readiness.get("minimum_observation_spacing_seconds")
+    ) or int(market_history.MarketHistoryConfig().minimum_observation_spacing.total_seconds())
     return (newest + timedelta(seconds=seconds)).isoformat()
 
 

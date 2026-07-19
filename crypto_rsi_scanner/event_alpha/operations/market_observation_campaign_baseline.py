@@ -8,7 +8,14 @@ from typing import Any, Mapping, Sequence
 
 from ... import config as project_config
 from ..radar import market_history
-from . import market_no_send_history_cache, market_observation_campaign_cadence
+from . import (
+    market_no_send_history_cache,
+    market_observation_campaign_cadence,
+    market_observation_campaign_contract,
+)
+
+
+_int = market_observation_campaign_contract.nonnegative_int
 
 
 def build_baseline_maturity(
@@ -101,15 +108,6 @@ def _asset_ids(value: object) -> Sequence[str] | None:
 
 def _mapping(value: object) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
-
-
-def _int(value: object) -> int:
-    if isinstance(value, bool):
-        return 0
-    try:
-        return max(0, int(value or 0))
-    except (TypeError, ValueError):
-        return 0
 
 
 __all__ = (

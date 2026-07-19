@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 def test_nonfinite_values_cannot_create_market_confirmation():
@@ -406,6 +406,54 @@ def test_provider_health_telemetry_is_strict_before_it_is_persisted():
     assert telemetry["retry_count"] == 0
     assert telemetry["error_class"] == "TimeoutError"
     json.dumps(telemetry, allow_nan=False)
+
+
+def test_campaign_count_projection_is_strict_and_shared_across_surfaces():
+    from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign
+    from crypto_rsi_scanner.event_alpha.operations import (
+        market_observation_campaign_baseline,
+        market_observation_campaign_contract,
+        market_observation_campaign_outcome_gaps,
+        market_observation_campaign_render,
+    )
+
+    surfaces = (
+        market_observation_campaign._int,
+        market_observation_campaign_baseline._int,
+        market_observation_campaign_contract.nonnegative_int,
+        market_observation_campaign_outcome_gaps._int,
+        market_observation_campaign_render._int,
+    )
+    for project in surfaces:
+        assert project(3) == 3
+        for invalid in (True, -1, 1.5, float("inf"), float("nan"), "3"):
+            assert project(invalid) == 0
+
+    assert market_observation_campaign_render._number(float("inf")) == "—"
+    assert market_observation_campaign_render._number(float("nan")) == "—"
+
+
+def test_campaign_legacy_cadence_rejects_nonintegral_spacing():
+    from crypto_rsi_scanner.event_alpha.operations import (
+        market_observation_campaign_cadence,
+    )
+    from crypto_rsi_scanner.event_alpha.radar import market_history
+
+    observed_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    default_spacing = market_history.MarketHistoryConfig().minimum_observation_spacing
+    for invalid in (True, -1, 1.5, float("inf"), float("nan"), "60"):
+        next_at = market_observation_campaign_cadence.legacy_next_eligible({
+            "baseline_newest_counted_observed_at": observed_at.isoformat(),
+            "minimum_observation_spacing_seconds": invalid,
+        })
+
+        assert next_at is not None
+        assert datetime.fromisoformat(next_at) - observed_at == default_spacing
+
+    assert market_observation_campaign_cadence.legacy_next_eligible({
+        "baseline_newest_counted_observed_at": observed_at.isoformat(),
+        "minimum_observation_spacing_seconds": 60,
+    }) == (observed_at + timedelta(seconds=60)).isoformat()
 
 
 def test_validation_prices_reject_nonfinite_and_shadowed_invalid_values():

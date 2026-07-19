@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
+
+from . import market_observation_campaign_contract
+
+
+_int = market_observation_campaign_contract.nonnegative_int
 
 
 EXECUTION_SURFACE_NOTICE = (
@@ -552,21 +558,14 @@ def _text(value: Any) -> str:
     return str(value).strip() if value not in (None, "") else ""
 
 
-def _int(value: Any) -> int:
-    if isinstance(value, bool):
-        return 0
-    try:
-        return max(0, int(value or 0))
-    except (TypeError, ValueError):
-        return 0
-
-
 def _number(value: Any) -> str:
     if type(value) not in (int, float):
         return "—"
     try:
         rendered = float(value)
     except (TypeError, ValueError):
+        return "—"
+    if not math.isfinite(rendered):
         return "—"
     return f"{rendered:.6f}".rstrip("0").rstrip(".")
 

@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Make campaign count reporting strict · Codex
+**Why:** Campaign report, baseline, outcome-gap, and Markdown helpers still
+converted counts with permissive `int(...)`. Fractional values could be
+truncated and infinity could raise, creating inconsistent totals or preventing
+a terminal campaign report from being rendered from malformed local evidence.
+**Changes:**
+- Added one strict non-negative integer projection to the existing campaign
+  report contract and reused it across report aggregation, baseline maturity,
+  outcome-gap details, and Markdown rendering.
+- Rejected booleans, negative values, floats, non-finite values, and numeric
+  strings as count evidence instead of truncating or reinterpreting them.
+- Made legacy cadence synthesis use the same strict spacing input and fall back
+  to the configured safe spacing when local evidence is invalid.
+- Made numeric Markdown rendering show unavailable rather than `inf`/`nan`.
+- Added cross-surface regressions proving all count consumers, cadence fallback,
+  and numeric display obey the same contract.
+**Verify:** All 87 numeric, campaign, attempt, scorecard, episode, and dashboard
+truth tests passed, followed by all 82 Daily Operations, publication,
+current-status, dashboard-operation, and operator-action tests. Compileall and
+architecture cleanliness passed with zero new violations. The offline
+market/no-send smoke completed with a strict doctor at zero blockers/warnings.
+Full `verify-fast` was not repeated because the shared source-boundary gate
+earlier in this prompt passed all 3,092 tests and this report-only numeric
+follow-up is covered by the focused campaign, Daily Operations, architecture,
+smoke, and doctor gates.
+**Notes/risks:** Canonical JSON integer counts are unchanged. Malformed local
+count evidence now contributes zero/unavailable and cannot alter cadence or
+render a plausible fractional count. No artifact history is rewritten and no
+provider call, threshold, score, route, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Harden shared provider failure telemetry · Codex
 **Why:** The campaign writes provider health and a cross-namespace failure
 receipt before the final request ledger. Those earlier layers still used
