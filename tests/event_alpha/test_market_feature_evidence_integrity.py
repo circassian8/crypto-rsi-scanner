@@ -70,6 +70,54 @@ def test_feature_evidence_survives_snapshot_and_anomaly_projection():
     ) == []
 
 
+def test_temporal_snapshot_identity_survives_canonical_decision_and_outcome(tmp_path):
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import (
+        validate_contract as validate_decision_contract,
+    )
+    from crypto_rsi_scanner.event_alpha.outcomes.integrated_radar_outcomes import (
+        write_integrated_radar_outcome_placeholders,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.integrated_radar import (
+        build_integrated_candidates,
+    )
+
+    _snapshots, anomalies = market_anomaly_scanner.scan_market_rows([_market_row()])
+    candidate = build_integrated_candidates(
+        sidecar_rows={"market_anomaly": anomalies},
+        profile="fixture",
+        artifact_namespace="temporal-evidence-chain",
+        run_mode="fixture",
+        run_id="temporal-evidence-chain-run",
+        observed_at="2026-07-19T09:00:00Z",
+    )[0]
+    projection = decision_model_values(candidate)
+
+    assert candidate["market_snapshot"]["market_feature_evidence"] == (
+        _market_row()["market_feature_evidence"]
+    )
+    assert projection["market_context_reference"]["market_snapshot_id"] == (
+        "mhobs-current"
+    )
+    assert "mhobs-current" in projection["observation_ids"]
+
+    tampered = deepcopy(projection)
+    tampered["observation_ids"].remove("mhobs-current")
+    assert "decision_projection_market_snapshot_observation_id_missing" in (
+        validate_decision_contract(tampered)
+    )
+
+    outcomes = write_integrated_radar_outcome_placeholders(
+        tmp_path,
+        [candidate],
+        observed_at="2026-07-19T09:01:00Z",
+    )
+    assert outcomes[0]["decision_projection"] == projection
+    assert "mhobs-current" in outcomes[0]["observation_ids"]
+
+
 def test_feature_evidence_projection_is_detached_from_mutable_input():
     source = _market_row()
     snapshot = market_state.snapshot_from_market_row(source)

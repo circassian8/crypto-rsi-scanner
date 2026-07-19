@@ -863,7 +863,7 @@ def _observation_ids(source: Mapping[str, Any]) -> list[str]:
     existing = _items(source.get("observation_ids"))
     if existing:
         return list(dict.fromkeys(existing))
-    return list(dict.fromkeys(
+    identifiers = list(dict.fromkeys(
         str(source.get(field) or "").strip()
         for field in (
             "candidate_id", "integrated_candidate_id", "core_opportunity_id", "market_anomaly_id",
@@ -872,6 +872,12 @@ def _observation_ids(source: Mapping[str, Any]) -> list[str]:
         )
         if str(source.get(field) or "").strip()
     ))
+    market_snapshot_id = str(
+        market_context_reference(source).get("market_snapshot_id") or ""
+    ).strip()
+    if market_snapshot_id and market_snapshot_id not in identifiers:
+        identifiers.append(market_snapshot_id)
+    return identifiers
 
 
 def _source_provider_lineage(source: Mapping[str, Any]) -> dict[str, Any]:

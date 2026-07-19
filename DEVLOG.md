@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Bind Decision ideas to their temporal observation · Codex
+**Why:** Canonical candidates and core rows retained the full temporal feature
+map, while the closed Decision projection kept the market snapshot ID only in a
+separate market-context reference. Outcome and presentation consumers therefore
+needed two fields to recover the exact measurement behind an idea.
+**Changes:**
+- Canonical Decision observation IDs now include the exact referenced market
+  snapshot/history observation ID, without duplicating an existing identity.
+- Projection-v2 validation requires any named market snapshot to appear in the
+  canonical observation-ID set, closing candidate/core/card/preview/outcome
+  joins over one self-validating value while leaving projection-v1 artifacts
+  readable.
+- Added an end-to-end temporal-evidence regression from canonical anomaly to
+  integrated candidate and pending outcome, including a fail-closed identity-
+  removal mutation.
+**Verify:** All 117 focused market-feature, Decision-v2, surface, artifact-
+schema, and outcome tests passed; compileall passed. The integrated fixture
+cycle again produced 15 candidates / 12 core rows / 15 outcomes, validated 126
+schema rows, and finished strict doctor with zero blockers and warnings;
+architecture cleanliness passed.
+**Notes/risks:** This adds provenance identity only. It does not alter any
+market value, score, threshold, route, provider boundary, authorization, send,
+trade, order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` behavior.
+
 ## 2026-07-19 — Require a closed temporal-history evidence pair · Codex
 **Why:** The canonical evidence map was validated when present, but a future
 writer could still omit the optional map entirely while retaining a history

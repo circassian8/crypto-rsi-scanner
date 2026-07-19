@@ -318,7 +318,11 @@ def test_closed_decision_projection_is_idempotent_and_preserves_calendar_rsi_and
         "freshness_status": "fresh",
         "market_snapshot_id": "calendar-rsi-market-1",
     }
-    assert projected["observation_ids"] == ["calendar-rsi-v2", "calendar-rsi-core-v2"]
+    assert projected["observation_ids"] == [
+        "calendar-rsi-v2",
+        "calendar-rsi-core-v2",
+        "calendar-rsi-market-1",
+    ]
     assert projected["source_provider_lineage"] == {
         "data_mode": "fixture",
         "providers": ["fixture-calendar"],

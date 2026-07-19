@@ -384,6 +384,15 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             observed_at = market_reference.get("observed_at")
             if observed_at is not None and _aware_timestamp(observed_at) is None:
                 errors.append("decision_projection_market_context_reference_timestamp_invalid")
+            snapshot_id = str(market_reference.get("market_snapshot_id") or "").strip()
+            if (
+                projection_version == DECISION_PROJECTION_SCHEMA_VERSION
+                and snapshot_id
+                and snapshot_id not in _items(row.get("observation_ids"))
+            ):
+                errors.append(
+                    "decision_projection_market_snapshot_observation_id_missing"
+                )
     campaign_provenance = (
         provenance
         if isinstance(provenance, Mapping)
