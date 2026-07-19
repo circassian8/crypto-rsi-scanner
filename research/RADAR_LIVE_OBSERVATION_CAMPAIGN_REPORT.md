@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-19T12:22:14.812369+00:00` from local artifacts only.
+Generated at `2026-07-19T13:14:29.795169+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -88,28 +88,33 @@ Research and decision support only. This report contains no trade recommendation
 ### Current authoritative universe
 
 - Status: `warming`
+- Latest exact-generation row readiness: `warming=30`
 - Exact authority assets: `30`
 - Assets found in retained history: `30`
 - Missing current assets: `0`
 - Fully warm retained-history baselines: `28`
 - Current-universe retained observations: `945`
 - Current-universe baseline-counted observations: `919`
-- Missing asset IDs: `none`
-- Latest exact-generation row readiness: `warming=30`
+- Missing/unassessed asset IDs: `none`
+- Observed non-warm asset IDs: `figure-heloc, hedera-hashgraph`
+- Retained history eligible for a future same-asset point-in-time evaluation: `28/30`
+- Existing history cadence boundary: `2026-07-19T13:06:57.319210+00:00`
+- Eligibility basis: `same_asset_retained_history_before_future_observation`
+- Provider-call eligibility: `not inferred`; Daily Operations readiness remains authoritative.
 
-Retained-history maturity and latest point-in-time feature availability are separate. The table below measures sample depth and elapsed coverage for the exact current asset set; it does not claim that every latest-row feature exists.
+Retained-history maturity and latest point-in-time feature availability are separate. Future-observation eligibility is conditional on the same canonical asset remaining in the next universe and does not claim unknown future membership or feature values are already observed. The table below measures only retained sample depth and elapsed coverage for the exact current asset set.
 
 #### Retained-history feature maturity for current-universe assets
 
-| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
-|---|---:|---:|---:|---:|---|---|---|
-| btc_eth_relative | 28 | 2 | 0 | 0 | 0-10 / 8 (2 below) | 0-31.1 / 31 h (1 below) | warm=28, warming=2 |
-| returns_1h | 29 | 1 | 0 | 0 | 2-15 / 8 (1 below) | 2.04-31.1 / 8 h (1 below) | warm=29, warming=1 |
-| returns_24h | 28 | 1 | 1 | 0 | 0-10 / 8 (2 below) | 0-140.83 / 31 h (1 below) | cold=1, warm=28, warming=1 |
-| returns_4h | 29 | 1 | 0 | 0 | 1-16 / 8 (1 below) | 4.26-32.3 / 11 h (1 below) | warm=29, warming=1 |
-| turnover | 29 | 1 | 0 | 0 | 6-32 / 8 (1 below) | 33.32-140.83 / 7 h (0 below) | warm=29, warming=1 |
-| volatility | 28 | 2 | 0 | 0 | 0-10 / 8 (2 below) | 0-31.1 / 31 h (1 below) | warm=28, warming=2 |
-| volume | 29 | 1 | 0 | 0 | 6-32 / 8 (1 below) | 33.32-140.83 / 7 h (0 below) | warm=29, warming=1 |
+| Feature group | Warm | Warming | Cold | Other | Future same-asset eligible | Samples min-max / required | Elapsed min-max / required | Deficit assets | Status counts |
+|---|---:|---:|---:|---:|---:|---|---|---|---|
+| btc_eth_relative | 28 | 2 | 0 | 0 | 28 | 0-10 / 8 (2 below) | 0-31.1 / 31 h (1 below) | figure-heloc [warming; samples 7/8 (gap 1); coverage 31.1/31h (gap 0h)]; hedera-hashgraph [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | warm=28, warming=2 |
+| returns_1h | 29 | 1 | 0 | 0 | 29 | 2-15 / 8 (1 below) | 2.04-31.1 / 8 h (1 below) | hedera-hashgraph [warming; samples 2/8 (gap 6); coverage 2.04/8h (gap 5.96h)] | warm=29, warming=1 |
+| returns_24h | 28 | 1 | 1 | 0 | 28 | 0-10 / 8 (2 below) | 0-140.83 / 31 h (1 below) | figure-heloc [warming; samples 7/8 (gap 1); coverage 33.32/31h (gap 0h)]; hedera-hashgraph [cold; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | cold=1, warm=28, warming=1 |
+| returns_4h | 29 | 1 | 0 | 0 | 29 | 1-16 / 8 (1 below) | 4.26-32.3 / 11 h (1 below) | hedera-hashgraph [warming; samples 1/8 (gap 7); coverage 4.26/11h (gap 6.74h)] | warm=29, warming=1 |
+| turnover | 29 | 1 | 0 | 0 | 29 | 6-32 / 8 (1 below) | 33.32-140.83 / 7 h (0 below) | hedera-hashgraph [warming; samples 6/8 (gap 2); coverage 136.99/7h (gap 0h)] | warm=29, warming=1 |
+| volatility | 28 | 2 | 0 | 0 | 28 | 0-10 / 8 (2 below) | 0-31.1 / 31 h (1 below) | figure-heloc [warming; samples 7/8 (gap 1); coverage 31.1/31h (gap 0h)]; hedera-hashgraph [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | warm=28, warming=2 |
+| volume | 29 | 1 | 0 | 0 | 29 | 6-32 / 8 (1 below) | 33.32-140.83 / 7 h (0 below) | hedera-hashgraph [warming; samples 6/8 (gap 2); coverage 136.99/7h (gap 0h)] | warm=29, warming=1 |
 
 ### Retained campaign history
 
@@ -257,8 +262,8 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 ## Next observation
 
 - Next eligible time: `2026-07-19T13:06:57.319210+00:00`
-- Eligible at report time: `false`
-- Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
+- Eligible at report time: `true`
+- Exact next safe operator command: `make radar-daily-ops-cycle PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion

@@ -6551,7 +6551,7 @@
     "baseline_warm_asset_count": 28,
     "cache_error": null,
     "cache_status": "valid",
-    "cadence_status": "waiting",
+    "cadence_status": "eligible",
     "current_universe_maturity": {
       "baseline_counted_observation_count": 919,
       "baseline_feature_readiness": {
@@ -6559,10 +6559,33 @@
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 1,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "figure-heloc",
+              "coverage_deficit_seconds": 0,
+              "coverage_seconds": 111971,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 7,
+              "sample_deficit": 1,
+              "status": "warming"
+            },
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 111600,
+              "coverage_seconds": 0,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 0,
+              "sample_deficit": 8,
+              "status": "warming"
+            }
+          ],
           "maximum_coverage_seconds": 111971,
           "maximum_sample_count": 10,
           "minimum_coverage_seconds": 0,
           "minimum_sample_count": 0,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
           "other_asset_count": 0,
           "required_coverage_seconds": 111600,
           "required_sample_count": 8,
@@ -6578,10 +6601,23 @@
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 1,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 21469,
+              "coverage_seconds": 7331,
+              "required_coverage_seconds": 28800,
+              "required_sample_count": 8,
+              "sample_count": 2,
+              "sample_deficit": 6,
+              "status": "warming"
+            }
+          ],
           "maximum_coverage_seconds": 111971,
           "maximum_sample_count": 15,
           "minimum_coverage_seconds": 7331,
           "minimum_sample_count": 2,
+          "next_cycle_point_in_time_eligible_asset_count": 29,
           "other_asset_count": 0,
           "required_coverage_seconds": 28800,
           "required_sample_count": 8,
@@ -6597,10 +6633,33 @@
           "asset_count": 30,
           "cold_asset_count": 1,
           "coverage_deficit_asset_count": 1,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "figure-heloc",
+              "coverage_deficit_seconds": 0,
+              "coverage_seconds": 119960,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 7,
+              "sample_deficit": 1,
+              "status": "warming"
+            },
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 111600,
+              "coverage_seconds": 0,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 0,
+              "sample_deficit": 8,
+              "status": "cold"
+            }
+          ],
           "maximum_coverage_seconds": 506991,
           "maximum_sample_count": 10,
           "minimum_coverage_seconds": 0,
           "minimum_sample_count": 0,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
           "other_asset_count": 0,
           "required_coverage_seconds": 111600,
           "required_sample_count": 8,
@@ -6617,10 +6676,23 @@
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 1,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 24280,
+              "coverage_seconds": 15320,
+              "required_coverage_seconds": 39600,
+              "required_sample_count": 8,
+              "sample_count": 1,
+              "sample_deficit": 7,
+              "status": "warming"
+            }
+          ],
           "maximum_coverage_seconds": 116280,
           "maximum_sample_count": 16,
           "minimum_coverage_seconds": 15320,
           "minimum_sample_count": 1,
+          "next_cycle_point_in_time_eligible_asset_count": 29,
           "other_asset_count": 0,
           "required_coverage_seconds": 39600,
           "required_sample_count": 8,
@@ -6636,10 +6708,23 @@
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 0,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 0,
+              "coverage_seconds": 493168,
+              "required_coverage_seconds": 25200,
+              "required_sample_count": 8,
+              "sample_count": 6,
+              "sample_deficit": 2,
+              "status": "warming"
+            }
+          ],
           "maximum_coverage_seconds": 506991,
           "maximum_sample_count": 32,
           "minimum_coverage_seconds": 119960,
           "minimum_sample_count": 6,
+          "next_cycle_point_in_time_eligible_asset_count": 29,
           "other_asset_count": 0,
           "required_coverage_seconds": 25200,
           "required_sample_count": 8,
@@ -6655,10 +6740,33 @@
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 1,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "figure-heloc",
+              "coverage_deficit_seconds": 0,
+              "coverage_seconds": 111971,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 7,
+              "sample_deficit": 1,
+              "status": "warming"
+            },
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 111600,
+              "coverage_seconds": 0,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 0,
+              "sample_deficit": 8,
+              "status": "warming"
+            }
+          ],
           "maximum_coverage_seconds": 111971,
           "maximum_sample_count": 10,
           "minimum_coverage_seconds": 0,
           "minimum_sample_count": 0,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
           "other_asset_count": 0,
           "required_coverage_seconds": 111600,
           "required_sample_count": 8,
@@ -6674,10 +6782,23 @@
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 0,
+          "deficit_assets": [
+            {
+              "canonical_asset_id": "hedera-hashgraph",
+              "coverage_deficit_seconds": 0,
+              "coverage_seconds": 493168,
+              "required_coverage_seconds": 25200,
+              "required_sample_count": 8,
+              "sample_count": 6,
+              "sample_deficit": 2,
+              "status": "warming"
+            }
+          ],
           "maximum_coverage_seconds": 506991,
           "maximum_sample_count": 32,
           "minimum_coverage_seconds": 119960,
           "minimum_sample_count": 6,
+          "next_cycle_point_in_time_eligible_asset_count": 29,
           "other_asset_count": 0,
           "required_coverage_seconds": 25200,
           "required_sample_count": 8,
@@ -6695,7 +6816,46 @@
       "expected_asset_count": 30,
       "missing_asset_count": 0,
       "missing_asset_ids": [],
+      "next_cycle_point_in_time_basis": "same_asset_retained_history_before_future_observation",
+      "next_cycle_point_in_time_eligible_asset_count": 28,
+      "next_cycle_point_in_time_eligible_at": "2026-07-19T13:06:57.319210+00:00",
+      "non_warm_asset_ids": [
+        "figure-heloc",
+        "hedera-hashgraph"
+      ],
       "observed_asset_count": 30,
+      "observed_asset_ids": [
+        "aave",
+        "aster-2",
+        "avalanche-2",
+        "binancecoin",
+        "bitcoin",
+        "bitcoin-cash",
+        "bittensor",
+        "cardano",
+        "chainlink",
+        "dexe",
+        "dogecoin",
+        "ethena",
+        "ethereum",
+        "figure-heloc",
+        "hedera-hashgraph",
+        "hyperliquid",
+        "litecoin",
+        "monero",
+        "near",
+        "ondo-finance",
+        "pepe",
+        "polkadot",
+        "ripple",
+        "solana",
+        "stellar",
+        "sui",
+        "tron",
+        "uniswap",
+        "worldcoin-wld",
+        "zcash"
+      ],
       "research_only": true,
       "scope": "current_authoritative_universe",
       "status": "warming"
@@ -6831,7 +6991,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "64116ac1e5d43fdd6273aa1a723f1172a9ee3b48d936cd600b2331944a46ed05",
     "candidate_rows_supplied": 5,
-    "contract_digest": "452175f4386323f36c48d5e9c1a41c03450268d18b8ab878c6d4081a995be105",
+    "contract_digest": "19e20a6c1d0f940fab3bbdcec41673b5f439c0b593f2fb00c5dbd43410e3d7e8",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "5a0b2e443d58e7f8e0f31a1eefb81a1ddbe26d7dbe95479bc21ed77ec9a2b0d6",
     "core_rows_supplied": 5,
@@ -6846,7 +7006,7 @@
       "not_evaluated": 0,
       "opposed": 1
     },
-    "evaluated_at": "2026-07-19T12:22:14.812369+00:00",
+    "evaluated_at": "2026-07-19T13:14:29.795169+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -7189,7 +7349,7 @@
         }
       ]
     },
-    "input_binding_digest": "c34b8f818152d608226ab0312229dc5bb1d0edae8c5d26d32a7604e0acc52b19",
+    "input_binding_digest": "ba4cde927e3bf806d84298e697674d5055f0315d07c5059a4fdc883a4e0fca84",
     "matched_control_available": false,
     "matured_episode_count": 2,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -7560,7 +7720,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "9da804c710ff97b2a4453b8d5a1efaa4d8c4dda47602fcecfea92c399f761205",
+    "source_episode_contract_digest": "b474add7ad795789a9975c5d194c720be8c90bc325f3a0f4aef3cd7a2d74b6da",
     "source_episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -7571,7 +7731,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-19T12:22:14.812369+00:00",
+  "generated_at": "2026-07-19T13:14:29.795169+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -7588,7 +7748,7 @@
     "eligible_idea_count": 3,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-19T12:22:14.812369+00:00",
+    "generated_at": "2026-07-19T13:14:29.795169+00:00",
     "in_review_count": 0,
     "not_viewed_count": 3,
     "operator_action_commands_available_via_queue": true,
@@ -7668,7 +7828,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-19T12:22:14.812369+00:00",
+    "generated_at": "2026-07-19T13:14:29.795169+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -7711,17 +7871,15 @@
   },
   "next_observation": {
     "authorization_rechecked_by_command": true,
-    "blocking_reasons": [
-      "Decision Radar provider call is reserved until 2026-07-19T13:06:57.319210+00:00"
-    ],
-    "cadence_status": "waiting",
-    "eligible_now": false,
+    "blocking_reasons": [],
+    "cadence_status": "eligible",
+    "eligible_now": true,
     "eligible_run_command": "make radar-daily-ops-cycle PYTHON=.venv/bin/python",
     "history_next_eligible_observation_at": "2026-07-19T13:06:57.319210+00:00",
     "next_eligible_observation_at": "2026-07-19T13:06:57.319210+00:00",
-    "next_safe_operator_command": "make radar-daily-ops-readiness PYTHON=.venv/bin/python",
+    "next_safe_operator_command": "make radar-daily-ops-cycle PYTHON=.venv/bin/python",
     "provider_backoff_disabled_until": null,
-    "provider_call_reservation_next_at": "2026-07-19T13:06:57.319210+00:00",
+    "provider_call_reservation_next_at": null,
     "rapid_cycles_do_not_advance_warmup": true
   },
   "non_authoritative_complete_generations": [
@@ -8219,7 +8377,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260719t120656522318z_3a5c4a6b39db",
-    "authority_checked_at": "2026-07-19T12:22:14.812369+00:00",
+    "authority_checked_at": "2026-07-19T13:14:29.795169+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -8580,7 +8738,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "c5d7c46cde1739d4526d8ee1dd0bfa3666099254954cda95d7b40786994e5f67",
+    "audit_digest": "82cbebdc50495306fa08c25b96ca27e8e1a3cd9e255d941b03297cf764508f0d",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -8901,7 +9059,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "9da804c710ff97b2a4453b8d5a1efaa4d8c4dda47602fcecfea92c399f761205",
+    "episode_contract_digest": "b474add7ad795789a9975c5d194c720be8c90bc325f3a0f4aef3cd7a2d74b6da",
     "episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "episode_records_supplied": 5,
     "exact_outcome_join_count": 5,
@@ -8942,7 +9100,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "9da804c710ff97b2a4453b8d5a1efaa4d8c4dda47602fcecfea92c399f761205",
+    "contract_digest": "b474add7ad795789a9975c5d194c720be8c90bc325f3a0f4aef3cd7a2d74b6da",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -9124,7 +9282,7 @@
         "window_end_exclusive_at": "2026-07-19T02:47:37.287740+00:00"
       }
     ],
-    "evaluated_at": "2026-07-19T12:22:14.812369+00:00",
+    "evaluated_at": "2026-07-19T13:14:29.795169+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T12:56:00.255064+00:00",
+  "generated_at": "2026-07-19T13:22:53.872178+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2003,7 +2003,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1198,
+      "line_count": 1199,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/loader.py",
       "source_kind": "production"
     },
@@ -2131,6 +2131,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1450,
+      "path": "tests/event_alpha/test_market_observation_campaign.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1430,
       "path": "tests/event_alpha/test_catalyst_frames.py",
       "source_kind": "test"
@@ -2139,12 +2145,6 @@
       "limit": 1500,
       "line_count": 1421,
       "path": "tests/event_alpha/test_namespace_integrations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1414,
-      "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
     {

@@ -26,6 +26,9 @@ from .market_no_send_models import MarketNoSendError
 
 
 LIVE_HISTORY_CACHE_NAMESPACE = market_no_send_campaign_guard.CAMPAIGN_STATE_NAMESPACE
+NEXT_CYCLE_POINT_IN_TIME_BASIS = (
+    "same_asset_retained_history_before_future_observation"
+)
 
 
 def cache_readiness(
@@ -75,11 +78,18 @@ def cache_readiness(
         "cache_error": "shared market history is invalid" if cache_status == "invalid" else None,
     }
     if current_asset_ids is not None:
-        result["current_universe_maturity"] = _current_universe_maturity(
-            rows,
-            current_asset_ids=current_asset_ids,
-            now=evaluated_at,
-            config=config,
+        result["current_universe_maturity"] = (
+            _unavailable_current_universe_maturity(current_asset_ids)
+            if cache_status == "invalid"
+            else _current_universe_maturity(
+                rows,
+                current_asset_ids=current_asset_ids,
+                now=evaluated_at,
+                config=config,
+                next_eligible_observation_at=assessment.get(
+                    "next_eligible_observation_at"
+                ),
+            )
         )
     return result
 
@@ -90,32 +100,13 @@ def _current_universe_maturity(
     current_asset_ids: Sequence[str],
     now: datetime | str,
     config: market_history.MarketHistoryConfig | None,
+    next_eligible_observation_at: object = None,
 ) -> dict[str, Any]:
     """Project retained history onto the exact current authoritative universe."""
 
-    expected = tuple(
-        sorted(
-            {
-                str(value).strip()
-                for value in current_asset_ids
-                if isinstance(value, str) and value.strip()
-            }
-        )
-    )
+    expected = _expected_asset_ids(current_asset_ids)
     if not expected:
-        return {
-            "status": "unavailable",
-            "scope": "current_authoritative_universe",
-            "expected_asset_count": 0,
-            "observed_asset_count": 0,
-            "missing_asset_count": 0,
-            "missing_asset_ids": [],
-            "baseline_observation_count": 0,
-            "baseline_counted_observation_count": 0,
-            "baseline_warm_asset_count": 0,
-            "baseline_feature_readiness": {},
-            "research_only": True,
-        }
+        return _unavailable_current_universe_maturity(())
     expected_set = set(expected)
     filtered = [
         dict(row)
@@ -127,8 +118,14 @@ def _current_universe_maturity(
         now=now,
         config=config,
     )
-    observed = set(_mapping_keys(assessment.get("baseline_asset_readiness")))
+    asset_readiness = _mapping(assessment.get("baseline_asset_readiness"))
+    observed = set(_mapping_keys(asset_readiness))
     missing = sorted(expected_set - observed)
+    warm = {
+        asset_id
+        for asset_id, raw in asset_readiness.items()
+        if isinstance(raw, Mapping) and raw.get("status") == "warm"
+    }
     status = (
         "incomplete"
         if missing
@@ -139,28 +136,134 @@ def _current_universe_maturity(
         "scope": "current_authoritative_universe",
         "expected_asset_count": len(expected),
         "observed_asset_count": len(observed & expected_set),
+        "observed_asset_ids": sorted(observed & expected_set),
         "missing_asset_count": len(missing),
         "missing_asset_ids": missing,
+        "non_warm_asset_ids": sorted((observed & expected_set) - warm),
         "baseline_observation_count": int(
             assessment.get("baseline_observation_count") or 0
         ),
         "baseline_counted_observation_count": int(
             assessment.get("baseline_counted_observation_count") or 0
         ),
-        "baseline_warm_asset_count": int(
-            assessment.get("baseline_warm_asset_count") or 0
-        ),
-        "baseline_feature_readiness": dict(
-            assessment.get("baseline_feature_readiness") or {}
+        "baseline_warm_asset_count": len(warm),
+        "next_cycle_point_in_time_eligible_at": next_eligible_observation_at,
+        "next_cycle_point_in_time_eligible_asset_count": len(warm),
+        "next_cycle_point_in_time_basis": NEXT_CYCLE_POINT_IN_TIME_BASIS,
+        "baseline_feature_readiness": _next_cycle_feature_readiness(
+            assessment.get("baseline_feature_readiness"),
+            asset_readiness=asset_readiness,
         ),
         "research_only": True,
     }
+
+
+def _unavailable_current_universe_maturity(
+    current_asset_ids: Sequence[str],
+) -> dict[str, Any]:
+    expected = _expected_asset_ids(current_asset_ids)
+    return {
+        "status": "unavailable",
+        "scope": "current_authoritative_universe",
+        "expected_asset_count": len(expected),
+        "observed_asset_count": 0,
+        "observed_asset_ids": [],
+        "missing_asset_count": 0,
+        "missing_asset_ids": [],
+        "non_warm_asset_ids": [],
+        "baseline_observation_count": 0,
+        "baseline_counted_observation_count": 0,
+        "baseline_warm_asset_count": 0,
+        "next_cycle_point_in_time_eligible_at": None,
+        "next_cycle_point_in_time_eligible_asset_count": 0,
+        "next_cycle_point_in_time_basis": NEXT_CYCLE_POINT_IN_TIME_BASIS,
+        "baseline_feature_readiness": {},
+        "research_only": True,
+    }
+
+
+def _expected_asset_ids(values: Sequence[str]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                str(value).strip()
+                for value in values
+                if isinstance(value, str) and value.strip()
+            }
+        )
+    )
+
+
+def _next_cycle_feature_readiness(
+    value: object,
+    *,
+    asset_readiness: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Add conditional next-observation truth from existing per-asset readiness."""
+
+    summaries = _mapping(value)
+    output: dict[str, dict[str, Any]] = {}
+    for group, raw_summary in summaries.items():
+        summary = dict(raw_summary) if isinstance(raw_summary, Mapping) else {}
+        eligible = 0
+        deficits: list[dict[str, Any]] = []
+        for asset_id, raw_asset in sorted(asset_readiness.items()):
+            asset = _mapping(raw_asset)
+            group_readiness = _mapping(
+                _mapping(asset.get("feature_readiness")).get(group)
+            )
+            status = str(group_readiness.get("status") or "")
+            if status not in {"warm", "warming", "cold", "not_configured"}:
+                raise ValueError("unexpected market-history feature readiness status")
+            if status == "warm":
+                eligible += 1
+                continue
+            sample_count = _nonnegative_int(group_readiness.get("sample_count"))
+            required_sample_count = _nonnegative_int(
+                group_readiness.get("required_sample_count")
+            )
+            coverage_seconds = _nonnegative_int(
+                group_readiness.get("coverage_seconds")
+            )
+            required_coverage_seconds = _nonnegative_int(
+                group_readiness.get("required_coverage_seconds")
+            )
+            deficits.append(
+                {
+                    "canonical_asset_id": str(asset_id),
+                    "status": status,
+                    "sample_count": sample_count,
+                    "required_sample_count": required_sample_count,
+                    "sample_deficit": max(
+                        0, required_sample_count - sample_count
+                    ),
+                    "coverage_seconds": coverage_seconds,
+                    "required_coverage_seconds": required_coverage_seconds,
+                    "coverage_deficit_seconds": max(
+                        0, required_coverage_seconds - coverage_seconds
+                    ),
+                }
+            )
+        summary["next_cycle_point_in_time_eligible_asset_count"] = eligible
+        summary["deficit_assets"] = deficits
+        output[str(group)] = summary
+    return output
 
 
 def _mapping_keys(value: object) -> tuple[str, ...]:
     if not isinstance(value, Mapping):
         return ()
     return tuple(str(key) for key in value)
+
+
+def _mapping(value: object) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _nonnegative_int(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return value
 
 
 def enrich_and_persist_history(
@@ -245,4 +348,9 @@ def _validate_live_campaign_rows(rows: Sequence[Mapping[str, Any]]) -> None:
         raise MarketNoSendError("live market history rows lack canonical campaign provenance")
 
 
-__all__ = ("LIVE_HISTORY_CACHE_NAMESPACE", "cache_readiness", "enrich_and_persist_history")
+__all__ = (
+    "LIVE_HISTORY_CACHE_NAMESPACE",
+    "NEXT_CYCLE_POINT_IN_TIME_BASIS",
+    "cache_readiness",
+    "enrich_and_persist_history",
+)

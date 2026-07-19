@@ -17,6 +17,53 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Expose the causal baseline frontier · Codex
+**Why:** The latest authoritative generation was correctly 0/30 warm because
+each row used only strictly earlier history, while the retained cache already
+made 28/30 of those same assets eligible for a later point-in-time evaluation.
+The report and dashboard did not close that distinction at asset/feature level,
+and Today would hide its baseline constraint as soon as even one row became
+warm.
+**Changes:**
+- Added one canonical conditional retained-history projection over the exact
+  current universe: sorted observed, missing/unassessed, and observed non-warm
+  IDs; the global history cadence boundary; same-asset eligibility count and
+  basis; and exact sample/coverage deficits for every non-warm feature family.
+- Kept authoritative current-generation row status as a separate pointer-bound
+  fact. The dashboard cross-checks the campaign copy against its actually loaded
+  exact market rows, binds the nested history boundary to the campaign's
+  canonical cadence timestamp, and strictly reconciles identity, counts, basis,
+  deficit arithmetic, aggregate deficits, and the required-feature union before
+  rendering campaign context.
+- Made invalid history caches unavailable rather than honest-empty, kept
+  missing assets out of fabricated feature rows, and handled partial/all-missing
+  current universes without a false 0/0-ready claim.
+- Updated campaign Markdown and Today to lead with exact current-row readiness,
+  then describe retained eligibility only as conditional on the same canonical
+  asset remaining in the next universe with valid future inputs. The history
+  cadence boundary explicitly does not grant Daily Operations provider-call
+  eligibility.
+- Kept the Today baseline constraint visible until every current row is warm,
+  and listed the actual non-warm/missing identities and compact feature gaps.
+  Current truth is exact-row `warming=30` versus retained same-asset 28/30;
+  `figure-heloc` and `hedera-hashgraph` are the two non-warm assets.
+**Verify:** The final broader market-history, cache, campaign-report, dashboard
+projection/loader, and rendering gate passed 135 tests with the one intentionally
+excluded ephemeral-loopback case then passing 1/1 under local socket permission.
+Compileall and `git diff --check` passed. Architecture cleanliness passed with
+zero new violations and zero
+function-size violations. Campaign report regeneration retained 33 real cycles
+and made zero provider calls. Fixture dashboard smoke rendered 14 pages, UX
+smoke rendered nine pages, the real pointer smoke rendered 12 pages, and exact
+revision-12 dashboard readiness remained READY with zero writes.
+**Notes/risks:** This is an additive operator-truth contract over existing
+retained bytes; no future observation was simulated and no threshold, feature,
+score, route, provider authorization, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE` path changed. The immediately prior
+logical change passed full local `make verify`; this localized slice used the
+risk-appropriate focused gate plus real campaign/dashboard checks instead of
+repeating that full suite.
+
 ## 2026-07-19 — Reconcile recovery status at exact targets · Codex
 **Why:** The recovery application status treated receipt-time whole-file
 fingerprints as a permanent freeze. A normal unrelated campaign append could

@@ -391,7 +391,7 @@ def _operator_warnings(snapshot: DashboardSnapshot) -> str:
             f"Spread is unverified for all {len(rows)} assets. Liquid ideas can remain visible as watch items, but actionable routes stay capped.",
             "/market-radar?spread=unavailable",
         ))
-    if rows and not warm:
+    if rows and warm < len(rows):
         decision_blockers.append((
             "decision:baseline",
             "Temporal baseline still warming",
@@ -450,8 +450,9 @@ def _operator_warnings(snapshot: DashboardSnapshot) -> str:
 
 def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
     fallback = (
-        "No asset has a globally warm feature baseline yet. Direct observations "
-        "and cross-sectional proxies are labeled separately."
+        "Current exact-generation readiness and retained-history maturity could not "
+        "be reconciled safely. Direct observations and cross-sectional proxies remain "
+        "labeled separately."
     )
     state = snapshot.campaign_operator_actions
     baseline = state.get("temporal_baseline")
@@ -462,7 +463,39 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
         return fallback
     observed = _non_negative_int(baseline.get("observed_asset_count"))
     fully_warm = _non_negative_int(baseline.get("fully_warm_asset_count"))
-    if observed is None or observed <= 0 or fully_warm is None:
+    next_cycle_eligible = _non_negative_int(
+        baseline.get("next_cycle_point_in_time_eligible_asset_count")
+    )
+    next_cycle_at = str(
+        baseline.get("next_cycle_point_in_time_eligible_at") or ""
+    ).strip()
+    non_warm_ids = baseline.get("non_warm_asset_ids")
+    missing_ids = baseline.get("missing_asset_ids")
+    current_counts = baseline.get("current_exact_generation_status_counts")
+    if (
+        observed is None
+        or observed <= 0
+        or fully_warm is None
+        or next_cycle_eligible != fully_warm
+        or not next_cycle_at
+        or baseline.get("next_cycle_point_in_time_basis")
+        != "same_asset_retained_history_before_future_observation"
+        or not isinstance(non_warm_ids, (list, tuple))
+        or not isinstance(missing_ids, (list, tuple))
+        or len(non_warm_ids) + fully_warm != observed
+        or not isinstance(current_counts, Mapping)
+    ):
+        return fallback
+    exact_status_parts: list[str] = []
+    exact_status_total = 0
+    for status, raw_count in sorted(current_counts.items()):
+        count = _non_negative_int(raw_count)
+        if count is None:
+            return fallback
+        exact_status_total += count
+        exact_status_parts.append(f"{humanize_enum(status)} {count}")
+    expected = _non_negative_int(baseline.get("expected_asset_count"))
+    if expected is None or exact_status_total != expected:
         return fallback
     labels = (
         ("turnover", "turnover"),
@@ -479,6 +512,9 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
         if not isinstance(details, Mapping):
             return fallback
         warm = _non_negative_int(details.get("warm_asset_count"))
+        eligible = _non_negative_int(
+            details.get("next_cycle_point_in_time_eligible_asset_count")
+        )
         asset_count = _non_negative_int(details.get("asset_count"))
         minimum_sample = _non_negative_int(details.get("minimum_sample_count"))
         maximum_sample = _non_negative_int(details.get("maximum_sample_count"))
@@ -486,8 +522,10 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
         coverage_deficit = _non_negative_int(
             details.get("coverage_deficit_asset_count")
         )
+        deficit_rows = details.get("deficit_assets")
         if (
             warm is None
+            or eligible != warm
             or asset_count != observed
             or minimum_sample is None
             or maximum_sample is None
@@ -496,6 +534,8 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
             or required_sample <= 0
             or coverage_deficit is None
             or coverage_deficit > observed
+            or not isinstance(deficit_rows, (list, tuple))
+            or len(deficit_rows) != asset_count - warm
         ):
             return fallback
         sample_range = (
@@ -503,22 +543,44 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
             if minimum_sample == maximum_sample
             else f"{minimum_sample}-{maximum_sample}"
         )
+        deficit_ids = [
+            str(row.get("canonical_asset_id") or "").strip()
+            for row in deficit_rows
+            if isinstance(row, Mapping)
+        ]
+        if len(deficit_ids) != len(deficit_rows) or any(not value for value in deficit_ids):
+            return fallback
+        deficit_summary = ", ".join(deficit_ids[:3])
+        if len(deficit_ids) > 3:
+            deficit_summary += f", +{len(deficit_ids) - 3} more"
         summaries.append(
-            f"{label} {warm}/{asset_count} ({sample_range}/{required_sample} samples"
+            f"{label} {eligible}/{asset_count} ({sample_range}/{required_sample} samples"
             + (
                 f"; {coverage_deficit} below elapsed coverage"
                 if coverage_deficit
                 else ""
             )
             + ")"
+            + (f"; deficits {deficit_summary}" if deficit_summary else "")
         )
+    top_level_deficits = ", ".join(str(value) for value in non_warm_ids[:5])
+    if len(non_warm_ids) > 5:
+        top_level_deficits += f", +{len(non_warm_ids) - 5} more"
+    missing_summary = ", ".join(str(value) for value in missing_ids[:5])
+    if len(missing_ids) > 5:
+        missing_summary += f", +{len(missing_ids) - 5} more"
     return (
-        f"{fully_warm}/{observed} assets have fully warm retained-history baselines. "
-        "Historical maturity by feature family: "
+        "Current exact-generation row readiness: "
+        + " · ".join(exact_status_parts)
+        + f". Retained history supports a future same-asset point-in-time evaluation for "
+        f"{next_cycle_eligible}/{observed} assessed assets at the existing history cadence "
+        f"boundary {next_cycle_at}, only if those canonical assets remain in the next universe. "
+        + (f"Observed non-warm assets: {top_level_deficits}. " if top_level_deficits else "")
+        + (f"Missing/unassessed current assets: {missing_summary}. " if missing_summary else "")
+        + "Conditional retained-history maturity by feature family: "
         + " · ".join(summaries)
-        + ". These counts measure retained sample depth and elapsed coverage, not whether "
-        "the latest cycle produced every point-in-time feature; current rows keep their "
-        "own readiness state."
+        + ". This does not claim unknown future membership or feature values are already "
+        "observed, and it is not provider-call eligibility."
     )
 
 

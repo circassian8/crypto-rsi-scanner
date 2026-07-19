@@ -233,6 +233,13 @@ def _baseline_maturity_section(
     current = _mapping(baseline.get("current_universe_maturity"))
     current_quality = _mapping(current_generation.get("data_quality"))
     latest_row_statuses = _mapping(current_quality.get("baseline_status_counts"))
+    observed_asset_count = _int(current.get("observed_asset_count"))
+    future_same_asset_eligibility = (
+        f"{_int(current.get('next_cycle_point_in_time_eligible_asset_count'))}"
+        f"/{observed_asset_count}"
+        if observed_asset_count
+        else "unavailable (no assessed current assets)"
+    )
     lines = [
         "",
         "## Baseline maturity",
@@ -240,19 +247,35 @@ def _baseline_maturity_section(
         "### Current authoritative universe",
         "",
         f"- Status: `{_text(current.get('status'))}`",
+        f"- Latest exact-generation row readiness: `{_counts(latest_row_statuses) if latest_row_statuses else 'unavailable'}`",
         f"- Exact authority assets: `{_int(current.get('expected_asset_count'))}`",
-        f"- Assets found in retained history: `{_int(current.get('observed_asset_count'))}`",
+        f"- Assets found in retained history: `{observed_asset_count}`",
         f"- Missing current assets: `{_int(current.get('missing_asset_count'))}`",
         f"- Fully warm retained-history baselines: `{_int(current.get('baseline_warm_asset_count'))}`",
         f"- Current-universe retained observations: `{_int(current.get('baseline_observation_count'))}`",
         f"- Current-universe baseline-counted observations: `{_int(current.get('baseline_counted_observation_count'))}`",
-        f"- Missing asset IDs: `{_joined(current.get('missing_asset_ids')) or 'none'}`",
-        f"- Latest exact-generation row readiness: `{_counts(latest_row_statuses) if latest_row_statuses else 'unavailable'}`",
+        f"- Missing/unassessed asset IDs: `{_joined(current.get('missing_asset_ids')) or 'none'}`",
+        f"- Observed non-warm asset IDs: `{_joined(current.get('non_warm_asset_ids')) or 'none'}`",
+        (
+            "- Retained history eligible for a future same-asset point-in-time "
+            f"evaluation: `{future_same_asset_eligibility}`"
+        ),
+        (
+            "- Existing history cadence boundary: "
+            f"`{_text(current.get('next_cycle_point_in_time_eligible_at')) or 'unavailable'}`"
+        ),
+        (
+            "- Eligibility basis: "
+            f"`{_text(current.get('next_cycle_point_in_time_basis')) or 'unavailable'}`"
+        ),
+        "- Provider-call eligibility: `not inferred`; Daily Operations readiness remains authoritative.",
         "",
         (
             "Retained-history maturity and latest point-in-time feature availability are "
-            "separate. The table below measures sample depth and elapsed coverage for the "
-            "exact current asset set; it does not claim that every latest-row feature exists."
+            "separate. Future-observation eligibility is conditional on the same canonical "
+            "asset remaining in the next universe and does not claim unknown future membership "
+            "or feature values are already observed. The table below measures only retained "
+            "sample depth and elapsed coverage for the exact current asset set."
         ),
         "",
         "#### Retained-history feature maturity for current-universe assets",
@@ -444,25 +467,67 @@ def _feature_maturity_lines(value: Any) -> list[str]:
     feature_readiness = _mapping(value)
     if not feature_readiness:
         return ["- Feature-level maturity is not yet available for this scope."]
-    lines = [
-        "| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |",
-        "|---|---:|---:|---:|---:|---|---|---|",
-    ]
+    has_next_cycle_projection = any(
+        isinstance(raw, Mapping)
+        and "next_cycle_point_in_time_eligible_asset_count" in raw
+        for raw in feature_readiness.values()
+    )
+    lines = (
+        [
+            "| Feature group | Warm | Warming | Cold | Other | Future same-asset eligible | Samples min-max / required | Elapsed min-max / required | Deficit assets | Status counts |",
+            "|---|---:|---:|---:|---:|---:|---|---|---|---|",
+        ]
+        if has_next_cycle_projection
+        else [
+            "| Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |",
+            "|---|---:|---:|---:|---:|---|---|---|",
+        ]
+    )
     for name, raw in sorted(feature_readiness.items()):
         feature = _mapping(raw)
         counts = ", ".join(
             f"{key}={_int(count)}"
             for key, count in sorted(_mapping(feature.get("status_counts")).items())
         ) or "none"
-        lines.append(
+        prefix = (
             f"| {_md(name)} | {_int(feature.get('warm_asset_count'))} | "
             f"{_int(feature.get('warming_asset_count'))} | "
             f"{_int(feature.get('cold_asset_count'))} | "
             f"{_int(feature.get('other_asset_count'))} | "
-            f"{_md(_sample_progress(feature))} | "
-            f"{_md(_coverage_progress(feature))} | {_md(counts)} |"
         )
+        if has_next_cycle_projection:
+            lines.append(
+                prefix
+                + f"{_int(feature.get('next_cycle_point_in_time_eligible_asset_count'))} | "
+                f"{_md(_sample_progress(feature))} | "
+                f"{_md(_coverage_progress(feature))} | "
+                f"{_md(_deficit_asset_summary(feature.get('deficit_assets')))} | "
+                f"{_md(counts)} |"
+            )
+        else:
+            lines.append(
+                prefix
+                + f"{_md(_sample_progress(feature))} | "
+                f"{_md(_coverage_progress(feature))} | {_md(counts)} |"
+            )
     return lines
+
+
+def _deficit_asset_summary(value: Any) -> str:
+    rows = [dict(row) for row in value or () if isinstance(row, Mapping)]
+    if not rows:
+        return "none"
+    rendered = []
+    for row in rows:
+        rendered.append(
+            f"{_text(row.get('canonical_asset_id'))} "
+            f"[{_text(row.get('status'))}; "
+            f"samples {_int(row.get('sample_count'))}/{_int(row.get('required_sample_count'))} "
+            f"(gap {_int(row.get('sample_deficit'))}); "
+            f"coverage {_hours(row.get('coverage_seconds'))}/{_hours(row.get('required_coverage_seconds'))}h "
+            f"(gap {_hours(row.get('coverage_deficit_seconds'))}h)]"
+        )
+    return "; ".join(rendered)
 
 
 def _sample_progress(feature: Mapping[str, Any]) -> str:

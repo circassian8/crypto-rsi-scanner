@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T12:56:00.255064+00:00`
+- generated_at: `2026-07-19T13:22:53.872178+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -121,7 +121,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1200 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1200 |
 | `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1199 |
-| `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1198 |
+| `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1199 |
 | `crypto_rsi_scanner/event_alpha/outcomes/integrated_radar_outcomes.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/report.py` | 1198 |
 | `crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py` | 1195 |
@@ -183,9 +183,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/cli/test_make_targets.py` | 1464 |
 | `tests/event_alpha/test_operator_workflows.py` | 1464 |
 | `tests/event_alpha/test_provider_activation.py` | 1452 |
+| `tests/event_alpha/test_market_observation_campaign.py` | 1450 |
 | `tests/event_alpha/test_catalyst_frames.py` | 1430 |
 | `tests/event_alpha/test_namespace_integrations.py` | 1421 |
-| `tests/event_alpha/test_market_observation_campaign.py` | 1414 |
 | `tests/event_alpha/test_core_opportunities.py` | 1407 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1319 |
 | `tests/event_alpha/test_doctor_notifications.py` | 1298 |

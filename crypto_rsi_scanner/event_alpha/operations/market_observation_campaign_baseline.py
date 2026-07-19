@@ -90,11 +90,18 @@ def unavailable_current_universe_maturity() -> dict[str, Any]:
         "scope": "current_authoritative_universe",
         "expected_asset_count": 0,
         "observed_asset_count": 0,
+        "observed_asset_ids": [],
         "missing_asset_count": 0,
         "missing_asset_ids": [],
+        "non_warm_asset_ids": [],
         "baseline_observation_count": 0,
         "baseline_counted_observation_count": 0,
         "baseline_warm_asset_count": 0,
+        "next_cycle_point_in_time_eligible_at": None,
+        "next_cycle_point_in_time_eligible_asset_count": 0,
+        "next_cycle_point_in_time_basis": (
+            market_no_send_history_cache.NEXT_CYCLE_POINT_IN_TIME_BASIS
+        ),
         "baseline_feature_readiness": {},
         "research_only": True,
     }

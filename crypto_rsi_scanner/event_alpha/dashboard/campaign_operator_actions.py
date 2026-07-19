@@ -8,6 +8,7 @@ the cumulative artifact tree or inspecting process environment variables.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 import hashlib
@@ -36,6 +37,9 @@ _OUTCOME_READINESS_COMMAND = (
 )
 _BYBIT_READINESS_COMMAND = (
     "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
+)
+_NEXT_CYCLE_POINT_IN_TIME_BASIS = (
+    "same_asset_retained_history_before_future_observation"
 )
 _BASELINE_FEATURE_GROUPS = (
     "btc_eth_relative",
@@ -74,6 +78,7 @@ def load_campaign_operator_actions(
     artifact_namespace: str,
     run_id: str,
     revision: int,
+    current_market_observations: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Load one safe campaign-action projection without calls or writes."""
 
@@ -103,6 +108,7 @@ def load_campaign_operator_actions(
             artifact_namespace=artifact_namespace,
             run_id=run_id,
             revision=revision,
+            current_market_observations=current_market_observations,
         )
     except (KeyError, TypeError, UnicodeError, ValueError):
         return _unavailable("campaign_report_contract_invalid")
@@ -125,6 +131,7 @@ def _project_campaign_actions(
     artifact_namespace: str,
     run_id: str,
     revision: int,
+    current_market_observations: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     if (
         report.get("schema_id") != _REPORT_SCHEMA
@@ -163,8 +170,15 @@ def _project_campaign_actions(
         retained_observations=metrics["retained_observation_count"],
         spread_available=metrics["spread_available_count"],
     )
+    current_exact_status_counts = _project_current_exact_baseline_counts(
+        report.get("authoritative_generations"),
+        artifact_namespace=artifact_namespace,
+        run_id=run_id,
+        loaded_rows=current_market_observations,
+    )
     temporal_baseline = _project_temporal_baseline(
-        report.get("baseline_maturity")
+        report.get("baseline_maturity"),
+        current_exact_status_counts=current_exact_status_counts,
     )
     if metrics["review_timing_action_required"] != review["action_required_count"]:
         raise ValueError("campaign_report_review_count_mismatch")
@@ -212,7 +226,64 @@ def _project_metrics(value: Any) -> dict[str, int]:
     return projected
 
 
-def _project_temporal_baseline(value: Any) -> dict[str, Any]:
+def _project_current_exact_baseline_counts(
+    value: Any,
+    *,
+    artifact_namespace: str,
+    run_id: str,
+    loaded_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, int]:
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError("campaign_authoritative_generations_invalid")
+    matches: list[Mapping[str, Any]] = []
+    for raw in value:
+        row = _mapping(raw, "authoritative_generation")
+        publication = _mapping(row.get("publication"), "generation_publication")
+        if publication.get("currently_authoritative") is True:
+            matches.append(row)
+    if len(matches) != 1:
+        raise ValueError("campaign_current_generation_count_invalid")
+    current = matches[0]
+    if (
+        current.get("artifact_namespace") != artifact_namespace
+        or current.get("run_id") != run_id
+    ):
+        raise ValueError("campaign_current_generation_identity_invalid")
+    quality = _mapping(current.get("data_quality"), "current_generation_data_quality")
+    raw_counts = _mapping(
+        quality.get("baseline_status_counts"),
+        "current_generation_baseline_status_counts",
+    )
+    if not raw_counts or len(raw_counts) > 16:
+        raise ValueError("campaign_current_generation_baseline_counts_invalid")
+    projected = {
+        _identity(status, "current_generation_baseline_status"): _count(
+            count, "current_generation_baseline_count"
+        )
+        for status, count in sorted(raw_counts.items())
+    }
+    loaded_counts: Counter[str] = Counter()
+    for row in loaded_rows:
+        status = str(
+            _mapping(row, "loaded_market_observation").get(
+                "temporal_baseline_status"
+            )
+            or "not_evaluated"
+        ).strip().casefold()
+        loaded_counts[
+            _identity(status or "not_evaluated", "loaded_generation_baseline_status")
+        ] += 1
+    loaded = dict(sorted(loaded_counts.items()))
+    if not loaded or projected != loaded:
+        raise ValueError("campaign_current_generation_baseline_counts_mismatch")
+    return projected
+
+
+def _project_temporal_baseline(
+    value: Any,
+    *,
+    current_exact_status_counts: Mapping[str, int],
+) -> dict[str, Any]:
     maturity = _mapping(value, "baseline_maturity")
     current = _mapping(
         maturity.get("current_universe_maturity"),
@@ -228,7 +299,46 @@ def _project_temporal_baseline(value: Any) -> dict[str, Any]:
         current.get("baseline_warm_asset_count"),
         "baseline_warm_asset_count",
     )
-    if observed + missing != expected or fully_warm > observed:
+    observed_ids = _identity_list(
+        current.get("observed_asset_ids"), "observed_asset_ids"
+    )
+    missing_ids = _identity_list(
+        current.get("missing_asset_ids"), "missing_asset_ids"
+    )
+    non_warm_ids = _identity_list(
+        current.get("non_warm_asset_ids"), "non_warm_asset_ids"
+    )
+    next_cycle_eligible = _count(
+        current.get("next_cycle_point_in_time_eligible_asset_count"),
+        "next_cycle_point_in_time_eligible_asset_count",
+    )
+    raw_next_cycle_at = current.get("next_cycle_point_in_time_eligible_at")
+    next_cycle_at = (
+        _timestamp(raw_next_cycle_at, "next_cycle_point_in_time_eligible_at")
+        if raw_next_cycle_at not in (None, "")
+        else None
+    )
+    raw_global_next_eligible_at = maturity.get("next_eligible_observation_at")
+    global_next_eligible_at = (
+        _timestamp(raw_global_next_eligible_at, "next_eligible_observation_at")
+        if raw_global_next_eligible_at not in (None, "")
+        else None
+    )
+    if (
+        observed + missing != expected
+        or fully_warm > observed
+        or len(observed_ids) != observed
+        or len(missing_ids) != missing
+        or set(observed_ids) & set(missing_ids)
+        or len(set(observed_ids) | set(missing_ids)) != expected
+        or not set(non_warm_ids).issubset(observed_ids)
+        or len(non_warm_ids) + fully_warm != observed
+        or next_cycle_eligible != fully_warm
+        or next_cycle_at != global_next_eligible_at
+        or sum(current_exact_status_counts.values()) != expected
+        or current.get("next_cycle_point_in_time_basis")
+        != _NEXT_CYCLE_POINT_IN_TIME_BASIS
+    ):
         raise ValueError("campaign_baseline_universe_count_mismatch")
     source_groups = _mapping(
         current.get("baseline_feature_readiness"),
@@ -236,7 +346,8 @@ def _project_temporal_baseline(value: Any) -> dict[str, Any]:
     )
     if set(source_groups) != set(_BASELINE_FEATURE_GROUPS):
         raise ValueError("campaign_baseline_feature_groups_invalid")
-    groups: dict[str, dict[str, int]] = {}
+    groups: dict[str, dict[str, Any]] = {}
+    deficit_identity_union: set[str] = set()
     for name in _BASELINE_FEATURE_GROUPS:
         details = _mapping(source_groups.get(name), f"baseline_feature_{name}")
         counts = {
@@ -262,22 +373,122 @@ def _project_temporal_baseline(value: Any) -> dict[str, Any]:
                 "coverage_deficit_asset_count",
             )
         }
+        eligible = _count(
+            details.get("next_cycle_point_in_time_eligible_asset_count"),
+            f"{name}_next_cycle_point_in_time_eligible_asset_count",
+        )
+        deficits = _project_feature_deficits(
+            details.get("deficit_assets"),
+            group=name,
+            observed_asset_ids=observed_ids,
+            required_sample_count=progress["required_sample_count"],
+            required_coverage_seconds=progress["required_coverage_seconds"],
+        )
+        deficit_identity_union.update(
+            row["canonical_asset_id"] for row in deficits
+        )
         if (
             counts["asset_count"] != observed
             or sum(counts[field] for field in counts if field != "asset_count")
             != counts["asset_count"]
+            or eligible != counts["warm_asset_count"]
+            or len(deficits)
+            != counts["asset_count"] - counts["warm_asset_count"]
+            or sum(row["sample_deficit"] > 0 for row in deficits)
+            != progress["sample_count_deficit_asset_count"]
+            or sum(row["coverage_deficit_seconds"] > 0 for row in deficits)
+            != progress["coverage_deficit_asset_count"]
         ):
             raise ValueError("campaign_baseline_feature_count_mismatch")
         _validate_feature_progress(progress, asset_count=counts["asset_count"])
-        groups[name] = counts | progress
+        groups[name] = counts | progress | {
+            "next_cycle_point_in_time_eligible_asset_count": eligible,
+            "deficit_assets": deficits,
+        }
+    if deficit_identity_union != set(non_warm_ids):
+        raise ValueError("campaign_baseline_non_warm_identity_mismatch")
     return {
         "status": status,
         "expected_asset_count": expected,
         "observed_asset_count": observed,
+        "observed_asset_ids": observed_ids,
         "missing_asset_count": missing,
+        "missing_asset_ids": missing_ids,
+        "non_warm_asset_ids": non_warm_ids,
         "fully_warm_asset_count": fully_warm,
+        "next_cycle_point_in_time_eligible_at": next_cycle_at,
+        "next_cycle_point_in_time_eligible_asset_count": next_cycle_eligible,
+        "next_cycle_point_in_time_basis": _NEXT_CYCLE_POINT_IN_TIME_BASIS,
+        "current_exact_generation_status_counts": dict(
+            current_exact_status_counts
+        ),
         "feature_groups": groups,
     }
+
+
+def _project_feature_deficits(
+    value: Any,
+    *,
+    group: str,
+    observed_asset_ids: Sequence[str],
+    required_sample_count: int,
+    required_coverage_seconds: int,
+) -> tuple[dict[str, Any], ...]:
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError("campaign_baseline_feature_deficits_invalid")
+    if len(value) > len(observed_asset_ids):
+        raise ValueError("campaign_baseline_feature_deficits_oversized")
+    rows: list[dict[str, Any]] = []
+    for index, raw in enumerate(value):
+        row = _mapping(raw, f"{group}_deficit_{index}")
+        asset_id = _identity(
+            row.get("canonical_asset_id"), f"{group}_deficit_asset_id"
+        )
+        status = _identity(row.get("status"), f"{group}_deficit_status")
+        sample_count = _count(row.get("sample_count"), f"{group}_sample_count")
+        required_samples = _count(
+            row.get("required_sample_count"), f"{group}_required_sample_count"
+        )
+        sample_deficit = _count(
+            row.get("sample_deficit"), f"{group}_sample_deficit"
+        )
+        coverage_seconds = _count(
+            row.get("coverage_seconds"), f"{group}_coverage_seconds"
+        )
+        required_coverage = _count(
+            row.get("required_coverage_seconds"),
+            f"{group}_required_coverage_seconds",
+        )
+        coverage_deficit = _count(
+            row.get("coverage_deficit_seconds"),
+            f"{group}_coverage_deficit_seconds",
+        )
+        if (
+            asset_id not in observed_asset_ids
+            or status not in {"warming", "cold", "not_configured"}
+            or required_samples != required_sample_count
+            or required_coverage != required_coverage_seconds
+            or sample_deficit != max(0, required_samples - sample_count)
+            or coverage_deficit != max(0, required_coverage - coverage_seconds)
+            or (sample_deficit == 0 and coverage_deficit == 0)
+        ):
+            raise ValueError("campaign_baseline_feature_deficit_invalid")
+        rows.append(
+            {
+                "canonical_asset_id": asset_id,
+                "status": status,
+                "sample_count": sample_count,
+                "required_sample_count": required_samples,
+                "sample_deficit": sample_deficit,
+                "coverage_seconds": coverage_seconds,
+                "required_coverage_seconds": required_coverage,
+                "coverage_deficit_seconds": coverage_deficit,
+            }
+        )
+    identities = tuple(row["canonical_asset_id"] for row in rows)
+    if identities != tuple(sorted(set(identities))):
+        raise ValueError("campaign_baseline_feature_deficit_identity_invalid")
+    return tuple(rows)
 
 
 def _validate_feature_progress(
@@ -285,6 +496,10 @@ def _validate_feature_progress(
     *,
     asset_count: int,
 ) -> None:
+    if asset_count == 0:
+        if any(progress.values()):
+            raise ValueError("campaign_baseline_empty_feature_progress_invalid")
+        return
     minimum_sample = progress["minimum_sample_count"]
     maximum_sample = progress["maximum_sample_count"]
     required_sample = progress["required_sample_count"]
@@ -536,6 +751,17 @@ def _identity(value: Any, label: str) -> str:
     if _IDENTITY_RE.fullmatch(text) is None:
         raise ValueError(f"{label}_invalid")
     return text
+
+
+def _identity_list(value: Any, label: str) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError(f"{label}_invalid")
+    if len(value) > 64:
+        raise ValueError(f"{label}_oversized")
+    identities = tuple(_identity(item, label) for item in value)
+    if identities != tuple(sorted(set(identities))):
+        raise ValueError(f"{label}_invalid")
+    return identities
 
 
 def _timestamp(value: Any, label: str) -> str:

@@ -17,6 +17,7 @@ from tests.event_alpha.test_dashboard_system_pages_v1 import _snapshot
 
 
 _GENERATED_AT = "2026-07-18T20:43:03.720770+00:00"
+_ASSET_IDS = tuple(f"asset-{index:02d}" for index in range(30))
 
 
 def _campaign_report() -> dict[str, object]:
@@ -51,13 +52,36 @@ def _campaign_report() -> dict[str, object]:
             "review_timing_action_required": 3,
             "spread_available_count": 0,
         },
+        "authoritative_generations": [
+            {
+                "artifact_namespace": "radar_market_no_send_current",
+                "run_id": "2026-07-14T10:00:00+00:00|no_key_live",
+                "data_quality": {
+                    "baseline_status_counts": {"warming": 30},
+                },
+                "publication": {"currently_authoritative": True},
+            }
+        ],
         "baseline_maturity": {
+            "next_eligible_observation_at": (
+                "2026-07-18T21:43:03.720770+00:00"
+            ),
             "current_universe_maturity": {
                 "status": "warming",
                 "expected_asset_count": 30,
                 "observed_asset_count": 30,
+                "observed_asset_ids": list(_ASSET_IDS),
                 "missing_asset_count": 0,
+                "missing_asset_ids": [],
+                "non_warm_asset_ids": list(_ASSET_IDS),
                 "baseline_warm_asset_count": 0,
+                "next_cycle_point_in_time_eligible_at": (
+                    "2026-07-18T21:43:03.720770+00:00"
+                ),
+                "next_cycle_point_in_time_eligible_asset_count": 0,
+                "next_cycle_point_in_time_basis": (
+                    "same_asset_retained_history_before_future_observation"
+                ),
                 "baseline_feature_readiness": _baseline_feature_groups(),
             }
         },
@@ -156,7 +180,7 @@ def _zero_safety() -> dict[str, int]:
     }
 
 
-def _baseline_feature_groups() -> dict[str, dict[str, int]]:
+def _baseline_feature_groups() -> dict[str, dict[str, object]]:
     specs = (
         ("btc_eth_relative", 0, 3, 3, 68_150, 111_600),
         ("returns_1h", 0, 7, 7, 455_181, 28_800),
@@ -166,8 +190,27 @@ def _baseline_feature_groups() -> dict[str, dict[str, int]]:
         ("volatility", 0, 3, 3, 68_150, 111_600),
         ("volume", 30, 21, 21, 455_181, 25_200),
     )
-    return {
-        name: {
+    groups: dict[str, dict[str, object]] = {}
+    for name, warm, minimum, maximum, minimum_coverage, required_coverage in specs:
+        deficit_rows = []
+        for index, asset_id in enumerate(_ASSET_IDS[warm:]):
+            sample_count = minimum if index == 0 else maximum
+            coverage_seconds = minimum_coverage if index == 0 else 455_181
+            deficit_rows.append(
+                {
+                    "canonical_asset_id": asset_id,
+                    "status": "warming",
+                    "sample_count": sample_count,
+                    "required_sample_count": 8,
+                    "sample_deficit": max(0, 8 - sample_count),
+                    "coverage_seconds": coverage_seconds,
+                    "required_coverage_seconds": required_coverage,
+                    "coverage_deficit_seconds": max(
+                        0, required_coverage - coverage_seconds
+                    ),
+                }
+            )
+        groups[name] = {
             "warm_asset_count": warm,
             "warming_asset_count": 30 - warm,
             "cold_asset_count": 0,
@@ -183,8 +226,52 @@ def _baseline_feature_groups() -> dict[str, dict[str, int]]:
             "coverage_deficit_asset_count": (
                 1 if minimum_coverage < required_coverage else 0
             ),
+            "next_cycle_point_in_time_eligible_asset_count": warm,
+            "deficit_assets": deficit_rows,
         }
-        for name, warm, minimum, maximum, minimum_coverage, required_coverage in specs
+    return groups
+
+
+def _partial_feature_groups() -> dict[str, dict[str, object]]:
+    required_coverage = {
+        "btc_eth_relative": 111_600,
+        "returns_1h": 28_800,
+        "returns_24h": 111_600,
+        "returns_4h": 39_600,
+        "turnover": 25_200,
+        "volatility": 111_600,
+        "volume": 25_200,
+    }
+    return {
+        name: {
+            "warm_asset_count": 1,
+            "warming_asset_count": 1,
+            "cold_asset_count": 0,
+            "other_asset_count": 0,
+            "asset_count": 2,
+            "minimum_sample_count": 7,
+            "maximum_sample_count": 8,
+            "required_sample_count": 8,
+            "sample_count_deficit_asset_count": 1,
+            "minimum_coverage_seconds": required + 3_600,
+            "maximum_coverage_seconds": required + 3_600,
+            "required_coverage_seconds": required,
+            "coverage_deficit_asset_count": 0,
+            "next_cycle_point_in_time_eligible_asset_count": 1,
+            "deficit_assets": [
+                {
+                    "canonical_asset_id": "asset-b",
+                    "status": "warming",
+                    "sample_count": 7,
+                    "required_sample_count": 8,
+                    "sample_deficit": 1,
+                    "coverage_seconds": required + 3_600,
+                    "required_coverage_seconds": required,
+                    "coverage_deficit_seconds": 0,
+                }
+            ],
+        }
+        for name, required in required_coverage.items()
     }
 
 
@@ -202,6 +289,9 @@ def _load(root: Path) -> dict[str, object]:
         artifact_namespace="radar_market_no_send_current",
         run_id="2026-07-14T10:00:00+00:00|no_key_live",
         revision=7,
+        current_market_observations=tuple(
+            {"temporal_baseline_status": "warming"} for _index in range(30)
+        ),
     )
 
 
@@ -232,6 +322,26 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert result["temporal_baseline"]["feature_groups"]["returns_24h"][
         "maximum_sample_count"
     ] == 3
+    assert result["temporal_baseline"]["current_exact_generation_status_counts"] == {
+        "warming": 30
+    }
+    assert result["temporal_baseline"][
+        "next_cycle_point_in_time_eligible_asset_count"
+    ] == 0
+    assert result["temporal_baseline"]["non_warm_asset_ids"] == _ASSET_IDS
+    first_deficit = result["temporal_baseline"]["feature_groups"][
+        "returns_24h"
+    ]["deficit_assets"][0]
+    assert first_deficit == {
+        "canonical_asset_id": "asset-00",
+        "status": "warming",
+        "sample_count": 0,
+        "required_sample_count": 8,
+        "sample_deficit": 8,
+        "coverage_seconds": 68_150,
+        "required_coverage_seconds": 111_600,
+        "coverage_deficit_seconds": 43_450,
+    }
     assert "/private/" not in repr(result)
 
 
@@ -280,6 +390,41 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, hidden_coverage_deficit)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    unknown_deficit_status = _campaign_report()
+    unknown_deficit_status["baseline_maturity"]["current_universe_maturity"][
+        "baseline_feature_readiness"
+    ]["returns_24h"]["deficit_assets"][0]["status"] = "unknown"
+    _write_report(tmp_path, unknown_deficit_status)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    missing_union_identity = _campaign_report()
+    missing_union_identity["baseline_maturity"]["current_universe_maturity"][
+        "non_warm_asset_ids"
+    ] = list(_ASSET_IDS[:-1])
+    _write_report(tmp_path, missing_union_identity)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    wrong_basis = _campaign_report()
+    wrong_basis["baseline_maturity"]["current_universe_maturity"][
+        "next_cycle_point_in_time_basis"
+    ] = "future_values_assumed"
+    _write_report(tmp_path, wrong_basis)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    timestamp_drift = _campaign_report()
+    timestamp_drift["baseline_maturity"]["current_universe_maturity"][
+        "next_cycle_point_in_time_eligible_at"
+    ] = "2026-07-18T22:43:03.720770+00:00"
+    _write_report(tmp_path, timestamp_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    exact_status_drift = _campaign_report()
+    exact_status_drift["authoritative_generations"][0]["data_quality"][
+        "baseline_status_counts"
+    ] = {"warm": 30}
+    _write_report(tmp_path, exact_status_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_operator_actions_rejects_oversized_report(tmp_path: Path) -> None:
     path = tmp_path / "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
@@ -325,8 +470,19 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
             "status": "warming",
             "expected_asset_count": 30,
             "observed_asset_count": 30,
+            "observed_asset_ids": _ASSET_IDS,
             "missing_asset_count": 0,
+            "missing_asset_ids": (),
+            "non_warm_asset_ids": _ASSET_IDS,
             "fully_warm_asset_count": 0,
+            "next_cycle_point_in_time_eligible_at": (
+                "2026-07-18T21:43:03.720770+00:00"
+            ),
+            "next_cycle_point_in_time_eligible_asset_count": 0,
+            "next_cycle_point_in_time_basis": (
+                "same_asset_retained_history_before_future_observation"
+            ),
+            "current_exact_generation_status_counts": {"warming": 30},
             "feature_groups": _baseline_feature_groups(),
         },
     }
@@ -347,8 +503,9 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
         assert "CONFIRM=1" not in page
     assert today.index("Open operator work") < today.index("Decision constraints")
     assert today.count("Execution spread unavailable") == 0
-    assert "0/30 assets have fully warm retained-history baselines" in today
-    assert "not whether the latest cycle produced every point-in-time feature" in today
+    assert "Current exact-generation row readiness: Warming 30" in today
+    assert "future same-asset point-in-time evaluation for 0/30" in today
+    assert "not provider-call eligibility" in today
     assert "turnover 30/30 (21/8 samples)" in today
     assert "1h returns 0/30 (7/8 samples)" in today
     assert (
@@ -370,3 +527,49 @@ def test_operator_work_queue_stays_hidden_without_pointer_matched_context() -> N
 
     assert render_operator_work_queue(snapshot) == ""
     assert "Open operator work" not in render_today_page(snapshot, query={})
+
+
+def test_partial_current_row_readiness_keeps_baseline_constraint_visible() -> None:
+    source = _snapshot()
+    observations = (
+        {
+            **source.current_market_observations[0],
+            "market_data_quality": {"baseline_status": "warm"},
+        },
+        {
+            **source.current_market_observations[1],
+            "market_data_quality": {"baseline_status": "warming"},
+        },
+    )
+    temporal_baseline = {
+        "status": "warming",
+        "expected_asset_count": 2,
+        "observed_asset_count": 2,
+        "observed_asset_ids": ("asset-a", "asset-b"),
+        "missing_asset_count": 0,
+        "missing_asset_ids": (),
+        "non_warm_asset_ids": ("asset-b",),
+        "fully_warm_asset_count": 1,
+        "next_cycle_point_in_time_eligible_at": "2026-07-18T21:43:03+00:00",
+        "next_cycle_point_in_time_eligible_asset_count": 1,
+        "next_cycle_point_in_time_basis": (
+            "same_asset_retained_history_before_future_observation"
+        ),
+        "current_exact_generation_status_counts": {"warm": 1, "warming": 1},
+        "feature_groups": _partial_feature_groups(),
+    }
+    snapshot = replace(
+        source,
+        current_market_observations=observations,
+        campaign_operator_actions={
+            "status": "ready",
+            "temporal_baseline": temporal_baseline,
+        },
+    )
+
+    today = render_today_page(snapshot, query={})
+
+    assert "Temporal baseline still warming" in today
+    assert "Current exact-generation row readiness: Warm 1 · Warming 1" in today
+    assert "future same-asset point-in-time evaluation for 1/2" in today
+    assert "Observed non-warm assets: asset-b" in today

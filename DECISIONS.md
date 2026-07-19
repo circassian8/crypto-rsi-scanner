@@ -1240,6 +1240,16 @@ authoritative dashboard snapshot and is evaluated against the retained campaign
 history. The retained-history projection continues to include every valid asset
 within policy retention. Missing current IDs are visible and make the current
 projection incomplete; departed historical assets never disappear silently.
+Within the current-universe projection, preserve the latest exact-generation
+row readiness separately from the retained history available before a possible
+later observation. The latter may be described as next-cycle point-in-time
+eligible only for the same observed canonical asset, at the existing global
+history cadence boundary, and only when its complete retained baseline is warm.
+It is not a forecast of the future universe, future feature availability,
+provider success, or provider-call authorization. Keep observed non-warm IDs,
+missing/unassessed IDs, and exact per-feature sample/coverage deficits disjoint
+and explicitly reconcilable; an unreadable cache is unavailable rather than
+honest-empty.
 Do not rewrite or discard historical rows, and do not treat global retained
 warmth as a substitute for the per-asset evidence used by current ideas.
 **Why:** A rolling top-liquid universe naturally changes. Counting departed

@@ -288,11 +288,20 @@ def _readiness(*_args, **_kwargs):
             "scope": "current_authoritative_universe",
             "expected_asset_count": 2,
             "observed_asset_count": 2,
+            "observed_asset_ids": ["test-a", "test-b"],
             "missing_asset_count": 0,
             "missing_asset_ids": [],
+            "non_warm_asset_ids": ["test-a", "test-b"],
             "baseline_observation_count": 8,
             "baseline_counted_observation_count": 8,
             "baseline_warm_asset_count": 0,
+            "next_cycle_point_in_time_eligible_at": (
+                "2026-07-13T18:30:00+00:00"
+            ),
+            "next_cycle_point_in_time_eligible_asset_count": 0,
+            "next_cycle_point_in_time_basis": (
+                "same_asset_retained_history_before_future_observation"
+            ),
             "baseline_feature_readiness": {
                 "volume": {
                     "status_counts": {"warming": 2},
@@ -300,6 +309,29 @@ def _readiness(*_args, **_kwargs):
                     "warming_asset_count": 2,
                     "cold_asset_count": 0,
                     "other_asset_count": 0,
+                    "asset_count": 2,
+                    "minimum_sample_count": 4,
+                    "maximum_sample_count": 4,
+                    "required_sample_count": 8,
+                    "sample_count_deficit_asset_count": 2,
+                    "minimum_coverage_seconds": 10_800,
+                    "maximum_coverage_seconds": 10_800,
+                    "required_coverage_seconds": 25_200,
+                    "coverage_deficit_asset_count": 2,
+                    "next_cycle_point_in_time_eligible_asset_count": 0,
+                    "deficit_assets": [
+                        {
+                            "canonical_asset_id": asset_id,
+                            "status": "warming",
+                            "sample_count": 4,
+                            "required_sample_count": 8,
+                            "sample_deficit": 4,
+                            "coverage_seconds": 10_800,
+                            "required_coverage_seconds": 25_200,
+                            "coverage_deficit_seconds": 14_400,
+                        }
+                        for asset_id in ("test-a", "test-b")
+                    ],
                 }
             },
             "research_only": True,
@@ -453,6 +485,10 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert "Latest exact-generation row readiness" in markdown
     assert "Retained-history maturity and latest point-in-time feature availability are separate" in markdown
     assert "Retained-history feature maturity for current-universe assets" in markdown
+    assert "Future-observation eligibility is conditional on the same canonical asset" in markdown
+    assert "Existing history cadence boundary" in markdown
+    assert "Provider-call eligibility: `not inferred`" in markdown
+    assert "test-a [warming; samples 4/8 (gap 4)" in markdown
 
 
 def test_final_receipts_reconcile_attempt_publication_operations_and_current(
