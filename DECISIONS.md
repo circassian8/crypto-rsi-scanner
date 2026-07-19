@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Verified spread requires recognized freshness
+**Status:** accepted
+**Decision:** A numeric spread can be classified as verified only when the
+highest-authority supplied spread/order-book/market freshness status is a
+recognized fresh state. Missing, unknown, unavailable, malformed, or non-string
+freshness makes spread unavailable; stale, expired, invalid, or future status
+makes it stale. An invalid higher-authority status cannot fall through to a
+lower `fresh` alias.
+**Why:** Best bid/ask without a trustworthy acquisition clock is not current
+execution-quality evidence. Treating a malformed or absent freshness status as
+verified can structurally unlock actionable/rapid routes with an old quote.
+**Revisit when:** A versioned execution-quality schema replaces string status
+fields with a validated provider-clock contract. That contract must remain
+fail-closed and prove acquisition age before spread verification.
+
 ## 2026-07-19 - Accepted evidence counts are closed integers
 **Status:** accepted
 **Decision:** Treat `accepted_evidence_count`, `rejected_evidence_count`, and

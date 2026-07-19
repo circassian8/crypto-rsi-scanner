@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 3841,
+          "line": 3856,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 3841,
+          "line": 3856,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 11044,
+          "line": 11066,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T08:27:35.657534+00:00",
+  "generated_at": "2026-07-19T08:32:27.170227+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1229,
-  "input_fingerprint": "ff4c3ada60c90ca319f17c0830bd6b89dee1a4c48b746180e7fef2d017255910",
+  "input_fingerprint": "2b166740fa8e854f8f4733095dd70f933ad22695d079c402c0e99b61a5384731",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DECISIONS.md:1784449644",
-    "DEVLOG.md:1784449644",
-    "ROADMAP.md:1784449644",
-    "crypto_rsi_scanner/event_alpha/radar/decision_policy.py:1784449615",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784449363"
+    "DECISIONS.md:1784449936",
+    "DEVLOG.md:1784449935",
+    "ROADMAP.md:1784449935",
+    "crypto_rsi_scanner/event_alpha/radar/decision_policy.py:1784449851",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784449665"
   ],
-  "newest_source_mtime": 1784449652.826888,
+  "newest_source_mtime": 1784449944.3987482,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784449353.6449373,
+  "report_mtime": 1784449655.6580737,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1229,
-    "input_fingerprint": "ff4c3ada60c90ca319f17c0830bd6b89dee1a4c48b746180e7fef2d017255910",
+    "input_fingerprint": "2b166740fa8e854f8f4733095dd70f933ad22695d079c402c0e99b61a5384731",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DECISIONS.md:1784449644",
-      "DEVLOG.md:1784449644",
-      "ROADMAP.md:1784449644",
-      "crypto_rsi_scanner/event_alpha/radar/decision_policy.py:1784449615",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784449363"
+      "DECISIONS.md:1784449936",
+      "DEVLOG.md:1784449935",
+      "ROADMAP.md:1784449935",
+      "crypto_rsi_scanner/event_alpha/radar/decision_policy.py:1784449851",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784449665"
     ],
-    "newest_source_mtime": 1784449652.826888,
+    "newest_source_mtime": 1784449944.3987482,
     "regex_compile_count": 124,
-    "report_mtime": 1784449353.6449373,
-    "scan_duration_seconds": 2.5127,
+    "report_mtime": 1784449655.6580737,
+    "scan_duration_seconds": 2.4758,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.5127,
+  "scan_duration_seconds": 2.4758,
   "scanned_doc_files": 79,
   "scanned_source_files": 901,
   "scanned_test_files": 243,

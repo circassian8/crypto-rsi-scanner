@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require recognized freshness for verified spread · Codex
+**Why:** Spread policy accepted any unrecognized explicit freshness value—and
+even no freshness at all—as long as a numeric spread existed. A malformed
+canonical status could therefore be ignored in favor of a verified-good spread,
+which is unsafe for the future Bybit execution-quality gate.
+**Changes:**
+- Resolved spread, order-book, and market freshness by ordered presence so an
+  explicit malformed higher-authority status cannot fall through to `fresh`.
+- Limited verified spread classifications to recognized `fresh` or controlled
+  fixture freshness; missing, unknown, unavailable, non-string, and malformed
+  freshness now make spread unavailable, while stale/expired/future remains
+  explicitly stale.
+- Added focused policy regressions and rechecked the offline Bybit capture/live
+  contract surfaces.
+**Verify:** All 133 focused Decision, route, surface, and Bybit execution-quality
+tests passed. Compileall, architecture cleanliness, and the integrated-radar
+smoke passed.
+**Notes/risks:** Valid fresh spread values and all configured basis-point bands
+are unchanged. No Bybit call, authorization, threshold, score weight, send,
+trade, order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` behavior
+changed.
+
 ## 2026-07-19 — Preserve invalid return authority across snapshot merges · Codex
 **Why:** Return normalization correctly removed malformed values from a later
 canonical snapshot, but the subsequent merge left the same field from an older

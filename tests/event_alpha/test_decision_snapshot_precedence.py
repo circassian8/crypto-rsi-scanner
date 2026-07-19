@@ -43,3 +43,32 @@ def test_absent_later_snapshot_return_preserves_earlier_observation():
 
     assert merged["return_4h"] == 12.0
     assert merged.get("unit_warnings") is None
+
+
+def test_spread_verification_requires_ordered_freshness_evidence():
+    classify = decision_policy.spread_status
+    limits = {"good_spread_bps": 50.0, "maximum_spread_bps": 150.0}
+
+    for invalid in (True, "unknown", "unavailable", 3, [], {}):
+        assert classify(
+            {
+                "spread_bps": 22.0,
+                "spread_freshness_status": invalid,
+                "freshness_status": "fresh",
+            },
+            **limits,
+        ) == "unavailable"
+
+    assert classify({"spread_bps": 22.0}, **limits) == "unavailable"
+    assert classify(
+        {"spread_bps": 22.0, "freshness_status": "fresh"},
+        **limits,
+    ) == "verified_good"
+    assert classify(
+        {
+            "spread_bps": 22.0,
+            "spread_freshness_status": "stale",
+            "freshness_status": "fresh",
+        },
+        **limits,
+    ) == "stale"

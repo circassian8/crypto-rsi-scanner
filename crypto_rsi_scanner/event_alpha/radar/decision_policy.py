@@ -386,14 +386,20 @@ def spread_status(
 ) -> str:
     """Classify explicit spread evidence without inferring a verified quote."""
 
-    freshness = str(
-        market.get("spread_freshness_status")
-        or market.get("order_book_freshness_status")
-        or market.get("freshness_status")
-        or ""
-    ).strip().casefold()
+    freshness_value: object = None
+    for field in (
+        "spread_freshness_status",
+        "order_book_freshness_status",
+        "freshness_status",
+    ):
+        if field in market and market.get(field) not in (None, ""):
+            freshness_value = market.get(field)
+            break
+    freshness = str(freshness_value or "").strip().casefold()
     if freshness in {"stale", "expired", "invalid", "future"}:
         return SpreadStatus.STALE.value
+    if freshness not in {"fresh", "fixture_allowed_stale"}:
+        return SpreadStatus.UNAVAILABLE.value
     explicit = str(market.get("spread_status") or "").strip().casefold()
     if explicit == SpreadStatus.STALE.value:
         return SpreadStatus.STALE.value
