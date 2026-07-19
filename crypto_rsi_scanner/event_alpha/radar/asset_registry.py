@@ -8,6 +8,7 @@ trades, normal RSI signal rows, or execution instructions.
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -404,12 +405,12 @@ def _merge_contracts(left: Any, right: Any) -> dict[str, list[str]]:
 
 
 def _liquidity_tier(row: Mapping[str, Any]) -> str | None:
-    rank = _int(row.get("market_cap_rank") or row.get("rank"))
+    rank = _int(_first_present_value(row, "market_cap_rank", "rank"))
     if rank and rank <= 50:
         return "large"
     if rank and rank <= 200:
         return "mid"
-    volume = _float(row.get("total_volume") or row.get("volume_usd") or row.get("liquidity_usd"))
+    volume = _float(_first_present_value(row, "total_volume", "volume_usd", "liquidity_usd"))
     if volume >= 50_000_000:
         return "large"
     if volume >= 5_000_000:
@@ -419,18 +420,27 @@ def _liquidity_tier(row: Mapping[str, Any]) -> str | None:
     return None
 
 
+def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
 def _int(value: Any) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return 0
 
 
 def _float(value: Any) -> float:
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return 0.0
+    return parsed if math.isfinite(parsed) else 0.0
 
 
 def _time_text(value: datetime | str | None) -> str:

@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Enforce finite evidence across downstream market layers · Codex
+**Why:** The anomaly scanner was closed, but independent downstream parsers
+still accepted infinity. One malformed input produced `strong` 100/100 market
+confirmation, five derivatives-crowding reasons, and a derivatives state that
+could not serialize as standards-compliant JSON.
+**Changes:**
+- Required finite numeric inputs in market reaction, market confirmation, and
+  derivatives normalization/crowding; invalid values remain missing evidence.
+- Made redacted derivatives diagnostics preserve an explicit `<non_finite>`
+  marker without leaking the invalid float into canonical JSON.
+- Hardened CoinGecko registry liquidity inference against non-finite values and
+  truthiness fallback, so explicit zero rank/volume cannot expose a conflicting
+  legacy alias as high liquidity.
+- Added focused regressions for confirmation, reaction, derivatives evidence,
+  strict JSON, and registry tier inference.
+**Verify:** All 78 focused evidence-quality, market-surface, namespace,
+alias-precedence, and finiteness tests passed; compileall and `git diff --check`
+were clean. Host-local `make verify-fast PYTHON=.venv/bin/python` passed all
+3,079 tests in 159.47 seconds plus alert-render, backtest-fixture, and
+paper-score smokes. Derivatives-crowding and integrated-radar smokes completed
+with strict doctors reporting zero blockers/warnings.
+**Notes/risks:** Valid finite fixture output is unchanged. No threshold, score,
+route policy, provider authorization, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE` was added or changed.
+
 ## 2026-07-19 — Reject non-finite anomaly inputs · Codex
 **Why:** The anomaly scanner rejected NaN but still accepted infinity as a real
 number. Malformed infinite liquidity or market cap could therefore manufacture

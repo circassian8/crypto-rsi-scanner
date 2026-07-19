@@ -7,6 +7,7 @@ watchlist states, alerts, paper rows, live signal rows, or event-fade triggers.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -1114,7 +1115,7 @@ def _float(value: object) -> float | None:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    return number
+    return number if math.isfinite(number) else None
 
 
 def _percent_value(value: object) -> float | None:

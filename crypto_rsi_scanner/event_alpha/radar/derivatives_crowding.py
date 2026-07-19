@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1072,8 +1073,20 @@ def _redacted_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         if "api_key" in lower or "token" in lower or "secret" in lower:
             out[str(key)] = "<redacted>"
         else:
-            out[str(key)] = value
+            out[str(key)] = _diagnostic_value(value)
     return out
+
+
+def _diagnostic_value(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        return "<non_finite>"
+    if isinstance(value, Mapping):
+        return {str(key): _diagnostic_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_diagnostic_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_diagnostic_value(item) for item in value)
+    return value
 
 
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
@@ -1145,9 +1158,10 @@ def _float(value: object) -> float | None:
     try:
         if value in (None, ""):
             return None
-        return float(value)  # type: ignore[arg-type]
+        parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _pct(value: object) -> float | None:

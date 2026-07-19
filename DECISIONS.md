@@ -19,9 +19,12 @@ decision, rationale, and revisit condition.
 ## 2026-07-19 - Keep non-finite market measurements unavailable
 **Status:** accepted
 **Decision:** Reject NaN and positive/negative infinity at every numeric input
-used by the market-anomaly scanner. Non-finite liquidity and market cap must
-remain unavailable, cannot derive a liquidity tier or increase priority, and
-must not be copied into canonical JSON artifacts.
+used by canonical market snapshots, anomaly classification, market reaction,
+market confirmation, derivatives crowding, and registry liquidity inference.
+Non-finite values remain unavailable, cannot derive a liquidity tier, score,
+reason, route input, or priority, and must not be copied into canonical JSON
+artifacts. A redacted diagnostic payload may preserve only the explicit string
+marker `<non_finite>`.
 **Why:** Python's permissive numeric and JSON handling can accept `Infinity`.
 Treating it as a very large real observation manufactures execution quality,
 overstates confidence, and emits non-standard evidence that other readers may
