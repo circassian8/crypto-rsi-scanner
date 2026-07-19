@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Repair DEX/on-chain readiness profile wiring · Codex
+**Why:** A cross-layer readiness audit found that the non-smoke Make target used
+its artifact namespace as an Event Alpha runtime profile, so it failed before
+rendering any readiness truth.
+**Changes:**
+- Preserved `dex_onchain_readiness` as the isolated artifact namespace while
+  explicitly selecting the valid `no_key_live` runtime profile.
+- Added Make dry-run assertions for both identities; the existing smoke target
+  remains fixture-profiled and unchanged.
+**Verify:** The focused Makefile regression passed. The exact target then ran in
+a disposable artifact root with fixture parsers passing, `live_call_allowed`
+false, no warnings, and no provider network call.
+**Notes/risks:** This repairs an observational fixture-only readiness surface;
+it adds no live transport, authorization, mapping decision, campaign evidence,
+route, score, threshold, send, trade, paper trade, normal RSI write, or Event
+Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Record the twenty-seventh no-send market cycle · Codex
 **Why:** The persisted one-hour cadence became eligible while the existing
 CoinGecko authorization remained present, so the next bounded observation could

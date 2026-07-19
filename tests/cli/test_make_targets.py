@@ -238,6 +238,23 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
     assert "--event-alpha-artifact-namespace coinalyze_no_send_rehearsal" in coinalyze_rehearsal_dry
     assert "--event-alpha-coinalyze-allow-live-preflight" not in coinalyze_rehearsal_dry
+    dex_onchain_readiness_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-dex-onchain-readiness", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert (
+        "--event-alpha-dex-onchain-readiness --event-alpha-profile no_key_live"
+        in dex_onchain_readiness_dry
+    )
+    assert (
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=dex_onchain_readiness"
+        in dex_onchain_readiness_dry
+    )
+    assert (
+        "--event-alpha-artifact-namespace dex_onchain_readiness"
+        in dex_onchain_readiness_dry
+    )
     dex_onchain_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-dex-onchain-readiness-smoke", "PYTHON=python3"],
         cwd=root,

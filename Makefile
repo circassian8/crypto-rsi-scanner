@@ -2322,6 +2322,7 @@ event-alpha-live-provider-readiness-smoke:
 	grep -q "no provider network calls" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(PROFILE)/event_live_provider_activation_readiness.md"
 
 event-alpha-dex-onchain-readiness: PROFILE = dex_onchain_readiness
+event-alpha-dex-onchain-readiness: EVENT_ALPHA_RUNTIME_PROFILE = no_key_live
 event-alpha-dex-onchain-readiness:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
