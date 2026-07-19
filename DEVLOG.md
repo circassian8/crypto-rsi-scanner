@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the cadence-eligible CoinGecko timeout · Codex
+**Why:** The hourly reservation elapsed with existing authorization and clear
+provider backoff, so the next genuine market observation was eligible. Provider
+failure must remain explicit evidence without an immediate retry or authority
+drift.
+**Changes:**
+- Performed exactly one confirmed Daily Operations attempt. The bounded
+  CoinGecko call timed out before returning usable rows and was recorded as
+  `TimeoutError` in namespace
+  `radar_market_no_send_20260719t065058608772z_a2dc7f3da485`.
+- Preserved the immutable attempted/failed terminal rows, refreshed campaign
+  truth, and reserved the next provider boundary at 2026-07-19
+  07:50:59.259079 UTC. No immediate retry was made.
+- Kept the prior strict-clean revision-12 dashboard authority unchanged and
+  regenerated the checked campaign report with exact temporal coverage from
+  the current readiness implementation.
+**Verify:** Daily Operations status reports the failed terminal cycle,
+`authorization_at_last_cycle=true`, provider attempted/succeeded `true/false`,
+and cadence waiting until the exact reservation. Campaign truth remains 29
+successful cycles / 870 retained / 840 baseline-counted / 30 too-close
+observations, now with 6 provider failures. Dashboard readiness is `READY`, and
+an owned loopback HEAD returned HTTP 200 with the unchanged namespace, run,
+revision, and operator-state digest headers.
+**Notes/risks:** This attempt added no observation and advanced no warmup. It
+published no pointer, restarted no process, and created no send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`. The next safe
+action is read-only readiness at or after the recorded reservation, not a retry
+before it.
+
 ## 2026-07-19 — Close market-source numeric evidence claims · Codex
 **Why:** The no-send source normalizer still used truthiness for volume aliases
 and raw field presence for evidence basis. A canonical zero could be replaced,

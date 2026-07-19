@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-19T05:50:05.927335+00:00` from local artifacts only.
+Generated at `2026-07-19T06:51:29.979906+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -20,7 +20,7 @@ Research and decision support only. This report contains no trade recommendation
 - Explicit first-view records: `0`
 - Completed human reviews: `0`
 - Ideas awaiting explicit review action: `3`
-- Provider failures: `5`
+- Provider failures: `6`
 - Preflight/blocked attempts: `1`
 - Event Alpha catalyst burn-in: `separate_not_aggregated`
 - Historical market-provenance v2 fields: `read_only_adapter`
@@ -96,12 +96,12 @@ Research and decision support only. This report contains no trade recommendation
 
 | Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
 |---|---:|---:|---:|---:|---|---|---|
-| btc_eth_relative | 0 | 30 | 0 | 0 | 3-6 / 8 (30 below) | 27.04-134.55 / 31 h (1 below) | warming=30 |
-| returns_1h | 30 | 0 | 0 | 0 | 9-13 / 8 (0 below) | 27.04-134.55 / 8 h (0 below) | warm=30 |
+| btc_eth_relative | 0 | 30 | 0 | 0 | 3-6 / 8 (30 below) | 12.62-25.01 / 31 h (30 below) | warming=30 |
+| returns_1h | 30 | 0 | 0 | 0 | 9-13 / 8 (0 below) | 13.63-27.04 / 8 h (0 below) | warm=30 |
 | returns_24h | 0 | 30 | 0 | 0 | 3-6 / 8 (30 below) | 27.04-134.55 / 31 h (1 below) | warming=30 |
-| returns_4h | 29 | 1 | 0 | 0 | 7-12 / 8 (1 below) | 27.04-134.55 / 11 h (0 below) | warm=29, warming=1 |
+| returns_4h | 29 | 1 | 0 | 0 | 7-12 / 8 (1 below) | 12.62-25.01 / 11 h (0 below) | warm=29, warming=1 |
 | turnover | 30 | 0 | 0 | 0 | 19-28 / 8 (0 below) | 27.04-134.55 / 7 h (0 below) | warm=30 |
-| volatility | 0 | 30 | 0 | 0 | 3-6 / 8 (30 below) | 27.04-134.55 / 31 h (1 below) | warming=30 |
+| volatility | 0 | 30 | 0 | 0 | 3-6 / 8 (30 below) | 12.62-25.01 / 31 h (30 below) | warming=30 |
 | volume | 30 | 0 | 0 | 0 | 19-28 / 8 (0 below) | 27.04-134.55 / 7 h (0 below) | warm=30 |
 
 ### Retained campaign history
@@ -120,12 +120,12 @@ Research and decision support only. This report contains no trade recommendation
 
 | Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
 |---|---:|---:|---:|---:|---|---|---|
-| btc_eth_relative | 0 | 31 | 3 | 0 | 0-6 / 8 (34 below) | 5.37-134.55 / 31 h (3 below) | cold=3, warming=31 |
-| returns_1h | 30 | 1 | 3 | 0 | 0-13 / 8 (4 below) | 5.37-134.55 / 8 h (1 below) | cold=3, warm=30, warming=1 |
-| returns_24h | 0 | 31 | 3 | 0 | 0-6 / 8 (34 below) | 5.37-134.55 / 31 h (3 below) | cold=3, warming=31 |
-| returns_4h | 29 | 2 | 3 | 0 | 0-12 / 8 (5 below) | 5.37-134.55 / 11 h (1 below) | cold=3, warm=29, warming=2 |
+| btc_eth_relative | 0 | 31 | 3 | 0 | 0-6 / 8 (34 below) | 0-25.01 / 31 h (34 below) | cold=3, warming=31 |
+| returns_1h | 30 | 1 | 3 | 0 | 0-13 / 8 (4 below) | 0-27.04 / 8 h (3 below) | cold=3, warm=30, warming=1 |
+| returns_24h | 0 | 31 | 3 | 0 | 0-6 / 8 (34 below) | 0-134.55 / 31 h (4 below) | cold=3, warming=31 |
+| returns_4h | 29 | 2 | 3 | 0 | 0-12 / 8 (5 below) | 0-25.01 / 11 h (4 below) | cold=3, warm=29, warming=2 |
 | turnover | 31 | 3 | 0 | 0 | 2-28 / 8 (3 below) | 5.37-134.55 / 7 h (1 below) | warm=31, warming=3 |
-| volatility | 0 | 31 | 3 | 0 | 0-6 / 8 (34 below) | 5.37-134.55 / 31 h (3 below) | cold=3, warming=31 |
+| volatility | 0 | 31 | 3 | 0 | 0-6 / 8 (34 below) | 0-25.01 / 31 h (34 below) | cold=3, warming=31 |
 | volume | 31 | 3 | 0 | 0 | 2-28 / 8 (3 below) | 5.37-134.55 / 7 h (1 below) | warm=31, warming=3 |
 
 ## Outcomes
@@ -230,6 +230,7 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 | radar_market_no_send_20260718t090951308907z_ec53f7d76ecc | 2026-07-18T09:09:51.505900+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 | radar_market_no_send_20260718t134658932571z_4cfb4a20be01 | 2026-07-18T13:46:59.198486+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 | radar_market_no_send_20260719t014535150908z_a6733972aeef | 2026-07-19T01:45:35.634625+00:00 | provider_unavailable | true | ClientConnectorDNSError |
+| radar_market_no_send_20260719t065058608772z_a2dc7f3da485 | 2026-07-19T06:50:59.259079+00:00 | provider_unavailable | true | TimeoutError |
 
 | Namespace | Observed at | Status | Provider attempted | Failure class |
 |---|---|---|---|---|
@@ -247,14 +248,14 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 
 ## Next observation
 
-- Next eligible time: `2026-07-19T06:49:56.372340+00:00`
+- Next eligible time: `2026-07-19T07:50:59.259079+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 29 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 5 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 0/34 warm retained assets; exact current-universe status is warming with 0/30 warm assets. Pointer history contains 25 bound generations and current authority is radar_market_no_send_20260719t054955751146z_dc1657d62164. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 29 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 6 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 0/34 warm retained assets; exact current-universe status is warming with 0/30 warm assets. Pointer history contains 25 bound generations and current authority is radar_market_no_send_20260719t054955751146z_dc1657d62164. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.
