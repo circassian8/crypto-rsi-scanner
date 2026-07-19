@@ -87,10 +87,18 @@ def fill_validation_outcomes(
             insufficient_history += 1
             output.append(out)
             continue
+        entry_raw = row.get("entry_reference_price")
+        entry_price = _num(entry_raw)
+        if _field_supplied(row, "entry_reference_price") and (
+            entry_price is None or entry_price <= 0
+        ):
+            insufficient_history += 1
+            output.append(out)
+            continue
         trigger_outcome = _short_outcome(
             candles,
             decision_time,
-            entry_price=_num(row.get("entry_reference_price")),
+            entry_price=entry_price,
         )
         if trigger_outcome is None:
             insufficient_history += 1
@@ -182,8 +190,8 @@ def _parse_price_candle(
     interval: str = "",
     source: str = "",
 ) -> ValidationOutcomeCandle | None:
-    ts = _dt(item.get("timestamp") or item.get("time") or item.get("date"))
-    close = _num(item.get("close") or item.get("price"))
+    ts = _dt(_first_nonblank_value(item, "timestamp", "time", "date"))
+    close = _num(_first_nonblank_value(item, "close", "price"))
     if ts is None or close is None or close <= 0:
         return None
     high = _num(item.get("high"))
@@ -237,7 +245,7 @@ def _short_outcome(
     *,
     entry_price: float | None = None,
 ) -> dict[str, float] | None:
-    entry = entry_price or _close_asof(candles, decision_time)
+    entry = entry_price if entry_price is not None else _close_asof(candles, decision_time)
     if entry is None or entry <= 0:
         return None
     future = [
@@ -294,3 +302,17 @@ def _close_asof_after(
 
 def _asset_key(value: object) -> str:
     return str(value or "").strip().casefold()
+
+
+def _field_supplied(row: Mapping[str, Any], field: str) -> bool:
+    if field not in row:
+        return False
+    value = row.get(field)
+    return value is not None and not (isinstance(value, str) and not value.strip())
+
+
+def _first_nonblank_value(row: Mapping[str, Any], *fields: str) -> object:
+    for field in fields:
+        if _field_supplied(row, field):
+            return row.get(field)
+    return None

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -316,12 +317,13 @@ def _missing_source_timing(row: Mapping[str, Any]) -> bool:
 
 
 def _num(value: object) -> float | None:
-    if value in (None, ""):
+    if value in (None, "") or isinstance(value, bool):
         return None
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _nums(values: Iterable[object]) -> list[float]:

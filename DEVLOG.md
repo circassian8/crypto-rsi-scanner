@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Fail closed on invalid validation prices · Codex
+**Why:** The Event Fade validation/outcome path still accepted NaN/infinity and
+booleans as numbers, selected candle timestamp/close aliases by truthiness, and
+could replace an explicit invalid entry reference with a cached close. That can
+manufacture a completed validation outcome from malformed local evidence.
+**Changes:**
+- Made the shared validation numeric parser reject booleans and all non-finite
+  values before review, queue, rendering, or outcome calculations use them.
+- Made price-candle timestamp and close aliases resolve by ordered presence, so
+  a supplied malformed canonical value fails closed instead of exposing a
+  lower-priority legacy alias.
+- Made explicit zero, negative, non-finite, boolean, or malformed entry prices
+  produce insufficient-history state instead of falling back to a candle; only
+  genuinely absent/blank entry evidence may use the point-in-time close.
+- Added regressions for non-finite numbers, shadowed invalid timestamps/closes,
+  invalid high/low values, and four invalid entry-price forms.
+**Verify:** All 82 numeric, fade-validation, feedback/calibration, alert-outcome,
+and fade-review workflow tests passed. Compileall and architecture cleanliness
+passed with zero new violations. The offline fade-review smoke completed with a
+strict doctor at zero blockers/warnings and no sends or trading side effects.
+Full `verify-fast` was not repeated because the shared source-boundary gate
+earlier in this prompt passed all 3,092 tests and this validation-only follow-up
+is covered by the focused validation, workflow, architecture, smoke, and doctor
+gates.
+**Notes/risks:** Valid finite prices and existing fixture outcomes are
+unchanged. Malformed historical review input may now remain unfilled, which is
+the intended evidence-preserving result; no historical artifact is rewritten.
+No threshold, score, route, provider authorization/call, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Preserve canonical market-quality counts · Codex
 **Why:** Campaign, doctor, and dashboard quality aggregation still selected
 direct/proxy feature counts by truthiness. An explicit canonical zero could be

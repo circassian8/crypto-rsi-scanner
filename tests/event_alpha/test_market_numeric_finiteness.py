@@ -307,6 +307,83 @@ def test_market_quality_counts_fall_back_only_when_canonical_count_is_blank():
     assert counts["proxy_feature_count"] == 2
 
 
+def test_validation_prices_reject_nonfinite_and_shadowed_invalid_values():
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
+
+    observed_at = "2026-07-19T06:00:00Z"
+
+    assert event_validation._num(float("inf")) is None
+    assert event_validation._num(float("nan")) is None
+    assert event_validation._num(True) is None
+    assert event_validation._parse_price_candle({
+        "timestamp": observed_at,
+        "close": 0,
+        "price": 10,
+    }) is None
+    assert event_validation._parse_price_candle({
+        "timestamp": "not-a-timestamp",
+        "time": observed_at,
+        "close": 10,
+    }) is None
+
+    candle = event_validation._parse_price_candle({
+        "timestamp": observed_at,
+        "close": 10,
+        "high": float("inf"),
+        "low": True,
+    })
+    assert candle is not None
+    assert candle.high is None
+    assert candle.low is None
+
+
+def test_validation_outcome_does_not_replace_invalid_supplied_entry_price():
+    import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
+
+    decision_time = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    candles = [
+        event_validation.ValidationOutcomeCandle(
+            decision_time,
+            close=10,
+            high=10,
+            low=10,
+        ),
+        event_validation.ValidationOutcomeCandle(
+            decision_time.replace(day=20),
+            close=9,
+            high=9,
+            low=9,
+        ),
+        event_validation.ValidationOutcomeCandle(
+            decision_time.replace(day=22),
+            close=8,
+            high=8,
+            low=8,
+        ),
+        event_validation.ValidationOutcomeCandle(
+            decision_time.replace(day=26),
+            close=7,
+            high=7,
+            low=7,
+        ),
+    ]
+
+    for invalid_entry in (0, float("inf"), True, "not-a-price"):
+        result = event_validation.fill_validation_outcomes(
+            [{
+                "signal_type": "SHORT_TRIGGERED",
+                "asset_coin_id": "invalid-entry",
+                "trigger_observed_at": decision_time.isoformat(),
+                "entry_reference_price": invalid_entry,
+            }],
+            {"invalid-entry": candles},
+        )
+
+        assert result.filled_rows == 0
+        assert result.insufficient_history_rows == 1
+        assert "post_event_return_72h" not in result.rows[0]
+
+
 def test_integrated_liquidity_checks_preserve_zero_and_reject_invalid_values():
     from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts import merge_policy
 
