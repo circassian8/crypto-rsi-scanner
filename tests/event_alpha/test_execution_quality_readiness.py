@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
+    BYBIT_NATIVE_METRICS,
     COMMON_METRICS,
     CONTRACT_VERSION,
     EXECUTION_MODES,
@@ -47,7 +48,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v8"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v9"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -74,6 +75,11 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert result.account_fee_endpoint_requires_credentials is True
     assert result.account_specific_fee_rate_access_authorized is False
     assert result.official_fee_sources_reviewed_at == "2026-07-19"
+    assert result.required_snapshot_fields_scope == (
+        "inactive_generic_cross_venue_interface_not_selected_bybit_native_contract"
+    )
+    assert result.selected_native_snapshot_fields == BYBIT_NATIVE_METRICS
+    assert result.generic_cross_venue_projection_available is False
     assert result.eligible_instrument_set == ()
     assert "top_30_liquid_decision_radar_assets" in (
         result.eligible_instrument_selection_rule or ""
@@ -199,7 +205,12 @@ def test_every_capability_reports_access_limits_metrics_and_constraints() -> Non
         )
         assert row.network_constraints
         assert row.request_limits
-        assert set(COMMON_METRICS) <= set(row.expected_metrics)
+        if row.venue_id == "bybit":
+            assert row.expected_metrics == BYBIT_NATIVE_METRICS
+            assert not any("_usd_" in field for field in row.expected_metrics)
+            assert any("_usdt_" in field for field in row.expected_metrics)
+        else:
+            assert set(COMMON_METRICS) <= set(row.expected_metrics)
         expected_review_date = "2026-07-17" if row.venue_id == "bybit" else "2026-07-15"
         assert row.official_sources_reviewed_at == expected_review_date
 
@@ -310,6 +321,10 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL in rendered
     assert "account_fee_endpoint_requires_credentials=true" in rendered
     assert "account_specific_fee_rate_access_authorized=false" in rendered
+    assert "required_snapshot_fields_scope=inactive_generic_cross_venue" in rendered
+    assert "selected_native_snapshot_fields=best_bid,best_ask,mid_price" in rendered
+    assert "bid_depth_usdt_by_band" in rendered
+    assert "generic_cross_venue_projection_available=false" in rendered
     assert "top_30_liquid_decision_radar_assets" in rendered
     assert "eligible_instrument_set_frozen=false" in rendered
     assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
@@ -392,10 +407,14 @@ def test_structured_report_keeps_mode_access_auth_and_quality_distinctions() -> 
     assert by_id["dex_operator_selected"]["credentials_required"] == (
         "provider_specific_if_required",
     )
-    for venue in by_id.values():
+    for venue_id, venue in by_id.items():
         assert venue["jurisdiction_constraints"]
         assert venue["network_constraints"]
-        assert set(COMMON_METRICS) <= set(venue["expected_metrics"])
+        if venue_id == "bybit":
+            assert tuple(venue["expected_metrics"]) == BYBIT_NATIVE_METRICS
+            assert not any("_usd_" in field for field in venue["expected_metrics"])
+        else:
+            assert set(COMMON_METRICS) <= set(venue["expected_metrics"])
     assert {
         "spread_bps",
         "bid_depth_usd_by_band",
@@ -443,6 +462,11 @@ def test_cli_json_is_structured_static_and_secret_free(
     assert payload["account_fee_endpoint_requires_credentials"] is True
     assert payload["account_specific_fee_rate_access_authorized"] is False
     assert payload["official_fee_sources_reviewed_at"] == "2026-07-19"
+    assert payload["required_snapshot_fields_scope"].startswith(
+        "inactive_generic_cross_venue_interface"
+    )
+    assert payload["selected_native_snapshot_fields"] == list(BYBIT_NATIVE_METRICS)
+    assert payload["generic_cross_venue_projection_available"] is False
     assert payload["required_human_decision_fields"] == list(
         REMAINING_PROTOCOL_V2_SEALING_FIELDS
     )
@@ -577,6 +601,8 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
         REMAINING_PROTOCOL_V2_COST_FIELDS
     )
     assert readiness["account_specific_fee_rate_access_authorized"] is False
+    assert readiness["selected_native_snapshot_fields"] == list(BYBIT_NATIVE_METRICS)
+    assert readiness["generic_cross_venue_projection_available"] is False
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
     assert readiness["immutable_capture_contract_implemented"] is True

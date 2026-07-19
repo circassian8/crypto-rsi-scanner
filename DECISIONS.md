@@ -44,7 +44,10 @@ basis points and currency-valued depth, notionals, fees, funding, and P&L in
 USDT. Do not relabel USDT as USD or assume a 1:1 conversion. Any future
 cross-venue USD projection needs a separately sealed conversion source,
 observation clock, freshness rule, and policy and cannot replace native Bybit
-evidence. This unit decision does not seal fees, order style, notional tiers,
+evidence. The selected Bybit capability and snapshot projection must therefore
+use native `*_usdt_*` depth and notional-impact fields; generic `*_usd_*` fields
+remain an inactive future interface and are not selected evidence. This unit
+decision does not seal fees, order style, notional tiers,
 slippage, funding treatment, latency cost, unavailable-cost handling, or the
 final Protocol-v2 annex.
 **Why:** The accepted venue decision and normalizer already preserve USDT and

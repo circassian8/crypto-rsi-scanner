@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v7")
+    assert values["progress_version"].endswith("_v8")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -57,6 +57,11 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert "not_account_authoritative" in decision["fee_rate_authority_status"]
     assert decision["account_specific_fee_rate_access_authorized"] is False
     assert decision["official_fee_sources_reviewed_at"] == "2026-07-19"
+    assert "bid_depth_usdt_by_band" in decision["selected_native_snapshot_fields"]
+    assert not any(
+        "_usd_" in field for field in decision["selected_native_snapshot_fields"]
+    )
+    assert decision["generic_cross_venue_projection_available"] is False
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -170,6 +175,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     cost_model_drift["confirmed_execution_decision"][
         "protocol_v2_cost_model_sealed"
     ] = True
+    native_field_drift = progress.current_progress_values()
+    native_field_drift["confirmed_execution_decision"][
+        "selected_native_snapshot_fields"
+    ] = ["bid_depth_usd_by_band"]
 
     for mutation in (
         digest_drift,
@@ -182,6 +191,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         unlock_drift,
         cost_unit_drift,
         cost_model_drift,
+        native_field_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -227,6 +237,8 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "USD_equivalence_assumed=false" in output.out
     assert "protocol_v2_cost_model_sealed=false" in output.out
     assert "fee_rate_authority_status=unsealed_public_reference" in output.out
+    assert "selected_native_snapshot_fields=best_bid,best_ask,mid_price" in output.out
+    assert "generic_cross_venue_projection_available=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

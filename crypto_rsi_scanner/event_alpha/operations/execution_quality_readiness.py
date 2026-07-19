@@ -15,7 +15,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v8"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v9"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -38,6 +38,20 @@ REMAINING_PROTOCOL_V2_SEALING_FIELDS = (
     *REMAINING_PROTOCOL_V2_COST_FIELDS,
     "protocol_v2_final_annex",
 )
+_MODE_ACCESS = {
+    "spot": (
+        "public_order_book_reads_expected_without_credentials",
+        "operator_must_confirm_venue_and_account_eligibility; no_trading_authorization_requested",
+    ),
+    "perpetual": (
+        "public_order_book_reads_expected_without_credentials",
+        "operator_must_confirm_derivatives_jurisdiction_and_account_eligibility; no_trading_authorization_requested",
+    ),
+    "dex": (
+        "RPC_or_quote_access_and_credentials_unknown_until_chain_and_provider_selection",
+        "operator_must_select_chain_tokens_pool_or_router_and_network; no_wallet_or_order_authorization_requested",
+    ),
+}
 COMMON_METRICS = (
     "best_bid",
     "best_ask",
@@ -50,6 +64,29 @@ COMMON_METRICS = (
     "provider_observed_at",
     "acquired_at",
     "freshness_status",
+)
+BYBIT_NATIVE_METRICS = (
+    "best_bid",
+    "best_ask",
+    "mid_price",
+    "spread_bps",
+    "bid_depth_usdt_by_band",
+    "ask_depth_usdt_by_band",
+    "buy_price_impact_bps_by_notional_usdt",
+    "sell_price_impact_bps_by_notional_usdt",
+    "notional_currency",
+    "provider_observed_at",
+    "snapshot_generated_at",
+    "acquired_at",
+    "age_seconds",
+    "freshness_status",
+    "order_book_update_id",
+    "order_book_cross_sequence",
+    "impact_reference",
+    "impact_method",
+    "impact_size_definition",
+    "liquidity_scope",
+    "rpi_orders_included",
 )
 REQUIRED_SNAPSHOT_FIELDS = (
     "schema_version",
@@ -236,6 +273,9 @@ class _ExecutionQualityReadiness:
     feasible_venues: tuple[ExecutionVenueCapability, ...]
     multiple_venue_research_option: Mapping[str, str]
     required_snapshot_fields: tuple[str, ...]
+    required_snapshot_fields_scope: str
+    selected_native_snapshot_fields: tuple[str, ...]
+    generic_cross_venue_projection_available: bool
     selection_blockers: tuple[str, ...]
     operator_decision: str
     implications: tuple[str, ...]
@@ -332,6 +372,11 @@ def _execution_quality_readiness_dict(
             value.multiple_venue_research_option
         ),
         "required_snapshot_fields": list(value.required_snapshot_fields),
+        "required_snapshot_fields_scope": value.required_snapshot_fields_scope,
+        "selected_native_snapshot_fields": list(value.selected_native_snapshot_fields),
+        "generic_cross_venue_projection_available": (
+            value.generic_cross_venue_projection_available
+        ),
         "selection_blockers": list(value.selection_blockers),
         "operator_decision": value.operator_decision,
         "implications": list(value.implications),
@@ -429,7 +474,7 @@ VENUE_CAPABILITIES = (
             "default_HTTP_IP_limit_600_requests_per_5_seconds",
             "use_a_much_lower_bounded_project_budget_and_honor_backoff",
         ),
-        expected_metrics=COMMON_METRICS + ("order_book_update_sequence",),
+        expected_metrics=BYBIT_NATIVE_METRICS,
         official_source_urls=(
             "https://bybit-exchange.github.io/docs/v5/market/instrument",
             "https://bybit-exchange.github.io/docs/v5/market/orderbook",
@@ -597,6 +642,11 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         feasible_venues=VENUE_CAPABILITIES,
         multiple_venue_research_option=MULTI_VENUE_RESEARCH_OPTION,
         required_snapshot_fields=REQUIRED_SNAPSHOT_FIELDS,
+        required_snapshot_fields_scope=(
+            "inactive_generic_cross_venue_interface_not_selected_bybit_native_contract"
+        ),
+        selected_native_snapshot_fields=BYBIT_NATIVE_METRICS,
+        generic_cross_venue_projection_available=False,
         selection_blockers=(
             "eligible_instrument_set_not_frozen",
             "bybit_public_endpoint_reachability_unverified_after_recorded_403",
@@ -613,6 +663,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "public_data_scope_does_not_activate_a_provider_call_or_trading_path",
             "the_recorded_403_must_fail_closed_without_proxy_VPN_or_region_bypass",
             "primary_cost_depth_and_impact_currency_is_native_USDT_without_USD_equivalence",
+            "selected_bybit_capability_uses_only_native_USDT_depth_and_notional_fields",
+            "generic_USD_projection_is_inactive_and_unavailable",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -649,20 +701,6 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
 def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str:
     """Render the confirmed selection and remaining fail-closed boundaries."""
 
-    mode_access = {
-        "spot": (
-            "public_order_book_reads_expected_without_credentials",
-            "operator_must_confirm_venue_and_account_eligibility; no_trading_authorization_requested",
-        ),
-        "perpetual": (
-            "public_order_book_reads_expected_without_credentials",
-            "operator_must_confirm_derivatives_jurisdiction_and_account_eligibility; no_trading_authorization_requested",
-        ),
-        "dex": (
-            "RPC_or_quote_access_and_credentials_unknown_until_chain_and_provider_selection",
-            "operator_must_select_chain_tokens_pool_or_router_and_network; no_wallet_or_order_authorization_requested",
-        ),
-    }
     lines = [
         "CRYPTO DECISION RADAR EXECUTION-QUALITY READINESS",
         f"status={result.status}",
@@ -689,6 +727,11 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         "account_specific_fee_rate_access_authorized="
         f"{str(result.account_specific_fee_rate_access_authorized).casefold()}",
         f"official_fee_sources_reviewed_at={result.official_fee_sources_reviewed_at}",
+        f"required_snapshot_fields_scope={result.required_snapshot_fields_scope}",
+        "selected_native_snapshot_fields="
+        + ",".join(result.selected_native_snapshot_fields),
+        "generic_cross_venue_projection_available="
+        f"{str(result.generic_cross_venue_projection_available).casefold()}",
         f"eligible_instrument_selection_rule={result.eligible_instrument_selection_rule}",
         f"eligible_instrument_set_frozen={str(result.eligible_instrument_set_frozen).casefold()}",
         "jurisdiction_and_account_eligibility_confirmed=true "
@@ -731,7 +774,7 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
             for venue in result.feasible_venues
             if mode in venue.execution_modes
         )
-        public_read, authorization = mode_access[mode]
+        public_read, authorization = _MODE_ACCESS[mode]
         lines.extend(
             (
                 f"- {mode}: venues={venue_ids}",

@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Keep selected Bybit metrics native to USDT · Codex
+**Why:** The selected adapter emits native USDT depth and notional-impact fields,
+but its feasibility row still inherited generic `*_usd_*` placeholders. That
+contradicted the sealed native-USDT boundary and could imply a conversion that
+never occurred.
+**Changes:**
+- Bumped execution-quality readiness to v9, added one exact native Bybit metric
+  set, and stopped the selected capability from inheriting generic USD fields.
+- Labeled the older generic snapshot interface as inactive cross-venue scope,
+  exposed the selected native snapshot fields, and kept generic projection
+  explicitly unavailable.
+- Advanced current Protocol-v2 progress to v8 with fail-closed native-field
+  validation and updated the North Star, decision package, progress note,
+  working agreement, durable unit decision, roadmap, and focused regressions.
+**Verify:** `24 passed` across the focused execution-quality/current-progress
+suites; Python compileall and North Star JSON parsing passed; static readiness
+and progress checks passed with zero provider/file/environment/holdout effects;
+architecture cleanliness passed with zero new size violations after moving
+static mode-access copy out of the public formatter; diff hygiene passed.
+**Notes/risks:** No field is converted or renamed in a genuine capture. No
+provider call, authorization, evidence, fee, order style, cost rule, route,
+score, threshold, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` changed.
+
 ## 2026-07-19 — Expose the complete unsealed Bybit cost model · Codex
 **Why:** Static execution readiness said the exact instrument set was the only
 remaining human sealing field even though current Protocol-v2 truth correctly

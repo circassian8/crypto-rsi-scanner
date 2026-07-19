@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v8`. Run
+`crypto_radar_execution_quality_readiness_v9`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -86,6 +86,14 @@ fixed, dated research fee assumption or a separately authorized exact fee
 source, together with entry/exit order style, USDT notional tiers, spread and
 visible-book impact application, beyond-book slippage, funding treatment,
 latency cost, and unavailable-cost behavior. No numerical fee is inferred here.
+
+The selected Bybit capability now advertises only the actual native snapshot
+fields: USDT depth bands, USDT-notional side-specific price impact, native
+notional currency, and exact provider/snapshot/acquisition clocks and book
+sequences. Generic `*_usd_*` fields remain an explicitly inactive future cross-
+venue interface. They are not required by the selected adapter, and no generic
+USD projection is available. This prevents the readiness catalog from implying
+that native USDT evidence was converted when it was not.
 
 ## Venue-native derivatives context contract
 

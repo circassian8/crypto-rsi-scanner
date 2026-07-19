@@ -25,6 +25,7 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
     readiness_sha256,
 )
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
+    BYBIT_NATIVE_METRICS,
     REMAINING_PROTOCOL_V2_COST_FIELDS,
     build_execution_quality_readiness,
 )
@@ -41,11 +42,12 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v7"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v8"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_truthful_pending_cost_model_native_USDT_cost_unit_detached_native_"
-    "liquidation_import_and_tokenomist_v5_fixture_capture_contract"
+    "with_native_Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_"
+    "cost_unit_detached_native_liquidation_import_and_tokenomist_v5_fixture_"
+    "capture_contract"
 )
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
@@ -115,6 +117,8 @@ _EXPECTED_EXECUTION_DECISION = {
     ),
     "account_specific_fee_rate_access_authorized": False,
     "official_fee_sources_reviewed_at": "2026-07-19",
+    "selected_native_snapshot_fields": list(BYBIT_NATIVE_METRICS),
+    "generic_cross_venue_projection_available": False,
     "exact_eligible_instrument_set_sealed": False,
     "data_boundary": "public_market_data_only",
     "credentials_or_private_account_data": False,
@@ -163,6 +167,12 @@ def current_progress_values() -> dict[str, Any]:
             ),
             "official_fee_sources_reviewed_at": (
                 execution.official_fee_sources_reviewed_at
+            ),
+            "selected_native_snapshot_fields": list(
+                execution.selected_native_snapshot_fields
+            ),
+            "generic_cross_venue_projection_available": (
+                execution.generic_cross_venue_projection_available
             ),
             "eligible_instrument_selection_rule": (
                 execution.eligible_instrument_selection_rule
@@ -419,6 +429,9 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "protocol_v2_cost_model_sealed=false remaining_cost_fields="
         + ",".join(decision["remaining_protocol_v2_cost_fields"]),
         f"fee_rate_authority_status={decision['fee_rate_authority_status']}",
+        "selected_native_snapshot_fields="
+        + ",".join(decision["selected_native_snapshot_fields"]),
+        "generic_cross_venue_projection_available=false",
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",
         (
