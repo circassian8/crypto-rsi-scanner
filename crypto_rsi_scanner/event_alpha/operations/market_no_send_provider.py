@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -286,6 +287,85 @@ def _request_telemetry(
     values["error_class"] = error_class
     values.setdefault("cache_behavior", "network")
     return values
+
+
+def safe_request_telemetry(
+    telemetry: Mapping[str, Any],
+    *,
+    fallback_result_count: int,
+    succeeded: bool,
+    fallback_error_class: str | None = None,
+) -> dict[str, Any]:
+    """Project final request telemetry into its bounded, strict-JSON contract."""
+
+    values = _sanitize_telemetry(telemetry)
+    endpoint = str(values.get("endpoint_path") or "/coins/markets")
+    values["endpoint_path"] = endpoint if endpoint == "/coins/markets" else "/unknown"
+    values.setdefault("request_started_at", None)
+    values.setdefault("request_ended_at", None)
+    values["duration_ms"] = _telemetry_nonnegative_int(
+        values, "duration_ms", fallback=0,
+    )
+    values["http_status"] = _telemetry_http_status(values, succeeded=succeeded)
+    values["result_count"] = _telemetry_nonnegative_int(
+        values, "result_count", fallback=fallback_result_count,
+    )
+    values["retry_count"] = _telemetry_nonnegative_int(
+        values, "retry_count", fallback=0,
+    )
+    values["error_class"] = (
+        None
+        if succeeded
+        else str(values.get("error_class") or fallback_error_class or "provider_error")[:80]
+    )
+    values.setdefault("cache_behavior", "network")
+    return values
+
+
+def _telemetry_nonnegative_int(
+    values: Mapping[str, Any],
+    field: str,
+    *,
+    fallback: int,
+) -> int:
+    if field not in values:
+        return max(0, int(fallback))
+    raw = values.get(field)
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return max(0, int(fallback))
+    if isinstance(raw, bool):
+        return 0
+    try:
+        parsed = float(raw)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(parsed) or parsed < 0 or not parsed.is_integer():
+        return 0
+    return int(parsed)
+
+
+def _telemetry_http_status(
+    values: Mapping[str, Any],
+    *,
+    succeeded: bool,
+) -> int | None:
+    if "http_status" not in values:
+        return 200 if succeeded else None
+    raw = values.get("http_status")
+    if raw is None:
+        return None
+    if isinstance(raw, str) and not raw.strip():
+        return 200 if succeeded else None
+    if isinstance(raw, bool):
+        return None
+    try:
+        parsed = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(parsed) or not parsed.is_integer():
+        return None
+    status = int(parsed)
+    return status if 100 <= status <= 599 else None
 
 
 def _sanitize_telemetry(value: Mapping[str, Any] | object) -> dict[str, Any]:

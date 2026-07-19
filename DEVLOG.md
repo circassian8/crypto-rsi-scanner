@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve exact terminal request telemetry · Codex
+**Why:** Final market request-ledger serialization still used truthiness and
+permissive integer conversion. An explicit zero result count could become the
+raw-row fallback, while booleans, fractions, NaN/infinity, or invalid HTTP
+status values could be truncated, raise, or enter non-standard JSON before the
+strict publication reconciler had a chance to reject the run.
+**Changes:**
+- Added finite, boolean-safe, non-negative integral parsing for duration,
+  result, and retry counts at the final request-ledger boundary.
+- Preserved explicit zero result count as authoritative and limited the exact
+  raw-row fallback to absent/blank count evidence.
+- Added bounded HTTP-status parsing that preserves intentional `None` for
+  fixture/local acquisition, defaults only an absent/blank successful status,
+  and closes malformed/out-of-range values to unavailable.
+- Added regressions for zero, missing, blank, `None`, boolean, NaN, and infinity
+  telemetry plus strict-JSON serialization.
+**Verify:** All 73 market/no-send, attempt, campaign-guard, campaign-attempt, and
+observation-campaign tests passed, followed by all 93 Daily Operations,
+publication, service, current-status, and dashboard-operation tests. Compileall
+and architecture cleanliness passed with zero new violations. The offline
+market/no-send smoke completed with a strict doctor at zero blockers/warnings
+and rendered its fixture dashboard surface. Full `verify-fast` was not repeated
+because the shared source-boundary gate earlier in this prompt passed all 3,092
+tests and this ledger-only follow-up is covered by the focused campaign, Daily
+Operations, architecture, smoke, and doctor gates.
+**Notes/risks:** Strict publication still requires HTTP 200, network acquisition,
+and exact result-count reconciliation for a genuine live authority. Malformed
+telemetry now remains explicit/unavailable rather than crashing or being
+reinterpreted. No provider call, threshold, score, route, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Fail closed on invalid validation prices · Codex
 **Why:** The Event Fade validation/outcome path still accepted NaN/infinity and
 booleans as numbers, selected candle timestamp/close aliases by truthiness, and

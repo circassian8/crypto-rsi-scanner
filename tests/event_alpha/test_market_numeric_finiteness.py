@@ -307,6 +307,53 @@ def test_market_quality_counts_fall_back_only_when_canonical_count_is_blank():
     assert counts["proxy_feature_count"] == 2
 
 
+def test_request_telemetry_preserves_zero_and_closes_malformed_numbers():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send
+
+    telemetry = market_no_send._safe_request_telemetry(
+        {
+            "duration_ms": float("inf"),
+            "http_status": float("nan"),
+            "result_count": 0,
+            "retry_count": True,
+        },
+        fallback_result_count=30,
+        succeeded=True,
+    )
+
+    assert telemetry["duration_ms"] == 0
+    assert telemetry["http_status"] is None
+    assert telemetry["result_count"] == 0
+    assert telemetry["retry_count"] == 0
+    json.dumps(telemetry, allow_nan=False)
+
+
+def test_request_telemetry_uses_fallback_only_for_missing_or_blank_counts():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send
+
+    missing = market_no_send._safe_request_telemetry(
+        {},
+        fallback_result_count=30,
+        succeeded=True,
+    )
+    blank = market_no_send._safe_request_telemetry(
+        {"result_count": " ", "http_status": " "},
+        fallback_result_count=30,
+        succeeded=True,
+    )
+    unavailable = market_no_send._safe_request_telemetry(
+        {"http_status": None},
+        fallback_result_count=30,
+        succeeded=True,
+    )
+
+    assert missing["result_count"] == 30
+    assert missing["http_status"] == 200
+    assert blank["result_count"] == 30
+    assert blank["http_status"] == 200
+    assert unavailable["http_status"] is None
+
+
 def test_validation_prices_reject_nonfinite_and_shadowed_invalid_values():
     import crypto_rsi_scanner.event_alpha.radar.validation as event_validation
 

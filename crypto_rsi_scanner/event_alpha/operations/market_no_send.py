@@ -69,6 +69,7 @@ LIVE_AUTH_ENV = "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE"
 _NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 MarketRowsProvider = Callable[[int], Sequence[Mapping[str, Any]]]
 _smoke_rows = market_no_send_features.smoke_rows
+_safe_request_telemetry = market_no_send_provider.safe_request_telemetry
 
 
 def build_market_no_send_readiness(
@@ -772,38 +773,6 @@ def _write_failed_market_request_ledger(
         **_SAFETY_COUNTERS,
     })
     return path
-
-
-def _safe_request_telemetry(
-    telemetry: Mapping[str, Any],
-    *,
-    fallback_result_count: int,
-    succeeded: bool,
-    fallback_error_class: str | None = None,
-) -> dict[str, Any]:
-    allowed = {
-        "endpoint_path",
-        "request_started_at",
-        "request_ended_at",
-        "duration_ms",
-        "http_status",
-        "result_count",
-        "retry_count",
-        "error_class",
-        "cache_behavior",
-    }
-    values = {key: telemetry.get(key) for key in allowed if key in telemetry}
-    endpoint = str(values.get("endpoint_path") or "/coins/markets")
-    values["endpoint_path"] = endpoint if endpoint == "/coins/markets" else "/unknown"
-    values.setdefault("request_started_at", None)
-    values.setdefault("request_ended_at", None)
-    values["duration_ms"] = max(0, int(values.get("duration_ms") or 0))
-    values.setdefault("http_status", 200 if succeeded else None)
-    values["result_count"] = max(0, int(values.get("result_count") or fallback_result_count))
-    values["retry_count"] = max(0, int(values.get("retry_count") or 0))
-    values["error_class"] = None if succeeded else str(values.get("error_class") or fallback_error_class or "provider_error")[:80]
-    values.setdefault("cache_behavior", "network")
-    return values
 
 
 def _market_request_common(

@@ -1530,12 +1530,12 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10519,
+  "function_count": 10521,
   "function_line_limit": 150,
   "functions_over_150_lines": 0,
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
-  "generated_at": "2026-07-19T07:15:25.905262+00:00",
+  "generated_at": "2026-07-19T07:22:13.066503+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3087,7 +3087,7 @@
       "status": "accepted_near_threshold"
     },
     {
-      "line_count": 1341,
+      "line_count": 1310,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
@@ -3693,7 +3693,7 @@
         },
         {
           "accepted": true,
-          "line_count": 1341,
+          "line_count": 1310,
           "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
           "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
           "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
@@ -3892,7 +3892,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1341,
+        "line_count": 1310,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
       },
@@ -4077,7 +4077,7 @@
           },
           {
             "accepted": true,
-            "line_count": 1341,
+            "line_count": 1310,
             "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
             "reason": "Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly.",
             "revisit_condition": "When adding another live-safe market provider or changing the generation transaction boundary.",
