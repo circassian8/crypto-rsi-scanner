@@ -714,6 +714,8 @@ may be added later when a suitable environment already exists.
   candidate. Canonical numeric market fields use presence-based precedence:
   an explicit finite zero is observed evidence and must never fall through to
   a legacy alias, source row, or benchmark alias merely because it is falsey.
+  NaN and positive/negative infinity remain unavailable; they must not derive
+  liquidity tiers, improve anomaly priority, or enter JSON artifacts.
   `make radar-daily-ops-cycle` is the only public operator cycle: it
   rechecks authorization, cadence, and shared provider backoff before the adapter
   and may reserve/attempt at most one bounded live request in one eligible

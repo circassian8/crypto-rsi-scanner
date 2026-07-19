@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -194,8 +195,14 @@ def scan_market_rows(
             "market_data_quality",
             "temporal_baseline_status",
         ):
-            if key in row:
-                snapshot_payload[key] = row.get(key)
+            if key not in row:
+                continue
+            if key == "market_cap":
+                market_cap = _float(row.get(key))
+                if market_cap is not None:
+                    snapshot_payload[key] = market_cap
+                continue
+            snapshot_payload[key] = row.get(key)
         snapshot_rows.append(snapshot_payload)
         if _is_sector_or_theme(snapshot_payload):
             continue
@@ -1133,7 +1140,7 @@ def _float(value: object) -> float | None:
         parsed = float(value)
     except (TypeError, ValueError):
         return None
-    return parsed if parsed == parsed else None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:

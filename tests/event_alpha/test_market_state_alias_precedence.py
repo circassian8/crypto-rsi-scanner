@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 
 def test_market_state_canonical_zero_values_override_legacy_aliases():
     from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
@@ -76,3 +78,34 @@ def test_market_state_canonical_zero_values_override_legacy_aliases():
         btc_benchmark=benchmark,
     )
     assert benchmark_snapshot.relative_return_vs_btc_4h == 2.0
+
+
+def test_nonfinite_liquidity_cannot_claim_high_liquidity_or_raise_priority():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    snapshot_rows, anomalies = market_anomaly_scanner.scan_market_rows(
+        [
+            {
+                "symbol": "INFINITE",
+                "coin_id": "infinite",
+                "return_unit": "percent_points",
+                "return_4h": 10.0,
+                "return_24h": 18.0,
+                "relative_return_vs_btc_4h": 8.0,
+                "volume_zscore_24h": 3.0,
+                "liquidity_usd": float("inf"),
+                "market_cap": float("inf"),
+                "freshness_status": "fresh",
+            }
+        ],
+        observed_at="2026-06-15T16:00:00Z",
+    )
+
+    assert snapshot_rows[0]["liquidity_usd"] is None
+    assert snapshot_rows[0]["liquidity_tier"] is None
+    assert "market_cap" not in snapshot_rows[0]
+    assert anomalies[0]["anomaly_type"] == "confirmed_breakout"
+    assert anomalies[0]["anomaly_bucket"] == "needs_catalyst_search"
+    assert anomalies[0]["priority_components"]["liquidity_tier"] == 0.0
+    assert anomalies[0]["priority_components"]["market_cap_turnover"] == 0.0
+    json.dumps({"snapshots": snapshot_rows, "anomalies": anomalies}, allow_nan=False)

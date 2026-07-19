@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Reject non-finite anomaly inputs · Codex
+**Why:** The anomaly scanner rejected NaN but still accepted infinity as a real
+number. Malformed infinite liquidity or market cap could therefore manufacture
+a high-liquidity bucket, add priority, and leak non-standard `Infinity` into a
+canonical JSON artifact.
+**Changes:**
+- Made the scanner's numeric boundary require finite values and omitted invalid
+  market cap from the canonical snapshot projection.
+- Added a regression proving infinite liquidity/market cap stay unavailable,
+  cannot improve liquidity or market-cap priority, and serialize with strict
+  JSON (`allow_nan=false`).
+**Verify:** All 38 alias-precedence, market-surface, and integrated-merge tests
+passed; compileall and `git diff --check` were clean. Architecture cleanliness
+passed with zero new violations. The market-anomaly smoke retained its expected
+8 snapshots / 5 anomalies and completed with zero doctor blockers; its two
+warnings are the expected fixture-only missing source-coverage and live-provider
+readiness artifacts. Full `verify-fast` was not repeated because the immediately
+preceding shared-core commit passed all 3,075 tests and this follow-up changes
+only the finite-number guard covered by the focused stack and smoke.
+**Notes/risks:** The immediately preceding shared-core change passed all 3,075
+release-fast tests. This localized guard does not change thresholds, scores,
+routes, provider state, sends, trades, orders, paper trades, normal RSI writes,
+or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Preserve canonical zero-valued market evidence · Codex
 **Why:** Core market normalization used truthiness-based alias fallback. An
 explicit zero could therefore be replaced by a stale nonzero legacy value and
