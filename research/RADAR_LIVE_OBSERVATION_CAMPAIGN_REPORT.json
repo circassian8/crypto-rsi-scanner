@@ -3166,7 +3166,7 @@
         "audit_status": "published",
         "authority_source": "final_publication_receipt_exact_binding",
         "contract_errors": [],
-        "currently_authoritative": true,
+        "currently_authoritative": false,
         "ever_authoritative": true,
         "final_publication_receipt_valid": true,
         "first_authoritative_at": "2026-07-19T13:25:07.300513+00:00",
@@ -3200,13 +3200,119 @@
         "triggered_fade_created": 0
       },
       "status": "complete"
+    },
+    {
+      "artifact_authority": {
+        "core_bound": true,
+        "core_row_count": 0,
+        "integrated_outcome_row_count": 0,
+        "integrated_outcomes_bound": true
+      },
+      "artifact_names": {
+        "manifest": "event_market_no_send_generation.json",
+        "operations_receipt": "event_radar_dashboard_operations_receipt.json",
+        "outcomes": "event_integrated_radar_outcomes.jsonl",
+        "pilot_audit": "event_market_no_send_pilot_audit.json",
+        "prepublication_audit": "event_market_no_send_prepublication_audit.json",
+        "publication_receipt": "event_radar_publication_receipt.json",
+        "request_ledger": "event_market_no_send_request_ledger.json"
+      },
+      "artifact_namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
+      "campaign_counted": true,
+      "campaign_counting_reason": "counted_live_no_send_exact_lineage",
+      "campaign_counting_source": "decision_radar_campaign_contract",
+      "campaign_outcome_refresh": {
+        "error_counts": {},
+        "failure_class": null
+      },
+      "candidate_count": 0,
+      "candidate_count_matches_manifest": true,
+      "data_quality": {
+        "baseline_status_counts": {
+          "warming": 30
+        },
+        "baseline_warm_assets": 0,
+        "baseline_warming_assets": 30,
+        "direct_feature_count": 148,
+        "proxy_feature_count": 32,
+        "selected_market_row_count": 30,
+        "spread_available_count": 0,
+        "spread_coverage_ratio": 0.0
+      },
+      "doctor": {
+        "authoritative": true,
+        "blocker_count": 0,
+        "revision": 12,
+        "status": "OK",
+        "warning_count": 0
+      },
+      "manifest_candidate_count": 0,
+      "observed_at": "2026-07-19T19:41:12.054658+00:00",
+      "outcomes": {
+        "automatic_threshold_changes": false,
+        "due_missing_price": 0,
+        "human_feedback_optional": true,
+        "matured": 0,
+        "missing_data": 0,
+        "not_due": 0,
+        "other": 0,
+        "pending": 0,
+        "refresh_build_error_count": 0,
+        "refresh_build_error_counts": {},
+        "source": "canonical_candidate_pending_base",
+        "status_counts": {},
+        "total": 0
+      },
+      "provider": "coingecko",
+      "provider_call_attempted": true,
+      "provider_request_succeeded": true,
+      "publication": {
+        "attempt_audit_status": "not_published",
+        "audit_authority_binding_valid": false,
+        "audit_status": "published",
+        "authority_source": "final_publication_receipt_exact_binding",
+        "contract_errors": [],
+        "currently_authoritative": true,
+        "ever_authoritative": true,
+        "final_publication_receipt_valid": true,
+        "first_authoritative_at": "2026-07-19T19:41:21.594553+00:00",
+        "operations_receipt_valid": true,
+        "operations_status": "dashboard_restarted",
+        "publication_status": "published"
+      },
+      "request_ledger": {
+        "artifact": "event_market_no_send_request_ledger.json",
+        "cache_behavior": "network",
+        "duration_ms": 1416.0,
+        "endpoint_path": "/coins/markets",
+        "error_class": null,
+        "http_status": 200,
+        "live_provider_authorized": true,
+        "no_send": true,
+        "request_ended_at": "2026-07-19T19:41:13.891348+00:00",
+        "request_started_at": "2026-07-19T19:41:12.475413+00:00",
+        "result_count": 80,
+        "retry_count": 0
+      },
+      "route_counts": {},
+      "run_id": "2026-07-19T19:41:12.054658+00:00|no_key_live",
+      "safety": {
+        "no_send": true,
+        "normal_rsi_signal_rows_written": 0,
+        "paper_trades_created": 0,
+        "research_only": true,
+        "telegram_sends": 0,
+        "trades_created": 0,
+        "triggered_fade_created": 0
+      },
+      "status": "complete"
     }
   ],
   "baseline_maturity": {
     "baseline_asset_count": 34,
     "baseline_asset_readiness": {
       "aave": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3221,7 +3327,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3236,14 +3342,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3258,14 +3364,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3281,29 +3387,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "aster-2": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3318,7 +3424,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3333,14 +3439,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3355,14 +3461,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3378,29 +3484,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "avalanche-2": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3415,7 +3521,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3430,14 +3536,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3452,14 +3558,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3475,29 +3581,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "binancecoin": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3512,7 +3618,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3527,14 +3633,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3549,14 +3655,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3572,29 +3678,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "bitcoin": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3609,7 +3715,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3624,14 +3730,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3646,14 +3752,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3669,29 +3775,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "bitcoin-cash": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3706,7 +3812,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3721,14 +3827,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3743,14 +3849,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3766,29 +3872,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "bittensor": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3803,7 +3909,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3818,14 +3924,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3840,14 +3946,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3863,29 +3969,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "cardano": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3900,7 +4006,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -3915,14 +4021,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -3937,14 +4043,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -3960,29 +4066,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "chainlink": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -3997,7 +4103,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -4012,14 +4118,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -4034,14 +4140,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -4057,24 +4163,24 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
@@ -4176,7 +4282,7 @@
         "too_close_observation_count": 1
       },
       "dogecoin": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4191,7 +4297,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -4206,14 +4312,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -4228,14 +4334,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -4251,29 +4357,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "ethena": {
-        "baseline_counted_observation_count": 30,
+        "baseline_counted_observation_count": 31,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4288,7 +4394,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 9,
+            "sample_count": 10,
             "status": "warm"
           },
           "returns_1h": {
@@ -4303,14 +4409,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 400146,
+            "coverage_seconds": 422720,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 9,
+            "sample_count": 10,
             "status": "warm"
           },
           "returns_4h": {
@@ -4325,14 +4431,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 443014,
+            "coverage_seconds": 465588,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 30,
+            "sample_count": 31,
             "status": "warm"
           },
           "volatility": {
@@ -4348,29 +4454,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 9,
+            "sample_count": 10,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 443014,
+            "coverage_seconds": 465588,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 30,
+            "sample_count": 31,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-14T10:21:23.140944+00:00",
-        "raw_observation_count": 30,
+        "raw_observation_count": 31,
         "status": "warm",
         "too_close_observation_count": 0
       },
       "ethereum": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4385,7 +4491,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -4400,14 +4506,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -4422,14 +4528,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -4445,29 +4551,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "figure-heloc": {
-        "baseline_counted_observation_count": 25,
+        "baseline_counted_observation_count": 26,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4482,7 +4588,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 8,
+            "sample_count": 9,
             "status": "warm"
           },
           "returns_1h": {
@@ -4497,14 +4603,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 124640,
+            "coverage_seconds": 147214,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 8,
+            "sample_count": 9,
             "status": "warm"
           },
           "returns_4h": {
@@ -4519,14 +4625,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 124640,
+            "coverage_seconds": 147214,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 25,
+            "sample_count": 26,
             "status": "warm"
           },
           "volatility": {
@@ -4542,29 +4648,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 8,
+            "sample_count": 9,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 124640,
+            "coverage_seconds": 147214,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 25,
+            "sample_count": 26,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-18T02:47:37.287740+00:00",
-        "raw_observation_count": 25,
+        "raw_observation_count": 26,
         "status": "warm",
         "too_close_observation_count": 0
       },
       "hedera-hashgraph": {
-        "baseline_counted_observation_count": 7,
+        "baseline_counted_observation_count": 8,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 0,
@@ -4616,15 +4722,15 @@
             "status": "warming"
           },
           "turnover": {
-            "coverage_seconds": 497848,
+            "coverage_seconds": 520422,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 7,
-            "status": "warming"
+            "sample_count": 8,
+            "status": "warm"
           },
           "volatility": {
             "coverage_seconds": 0,
@@ -4643,20 +4749,20 @@
             "status": "warming"
           },
           "volume": {
-            "coverage_seconds": 497848,
+            "coverage_seconds": 520422,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 7,
-            "status": "warming"
+            "sample_count": 8,
+            "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T19:07:29.084694+00:00",
-        "raw_observation_count": 7,
+        "raw_observation_count": 8,
         "status": "warming",
         "too_close_observation_count": 0
       },
@@ -4758,7 +4864,7 @@
         "too_close_observation_count": 1
       },
       "hyperliquid": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4773,7 +4879,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -4788,14 +4894,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -4810,14 +4916,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -4833,29 +4939,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "litecoin": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4870,7 +4976,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -4885,14 +4991,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -4907,14 +5013,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -4930,29 +5036,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "monero": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -4967,7 +5073,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -4982,14 +5088,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5004,14 +5110,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5027,29 +5133,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "near": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5064,7 +5170,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5079,14 +5185,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5101,14 +5207,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5124,29 +5230,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "ondo-finance": {
-        "baseline_counted_observation_count": 29,
+        "baseline_counted_observation_count": 30,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5161,7 +5267,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 9,
+            "sample_count": 10,
             "status": "warm"
           },
           "returns_1h": {
@@ -5176,14 +5282,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 400146,
+            "coverage_seconds": 422720,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 9,
+            "sample_count": 10,
             "status": "warm"
           },
           "returns_4h": {
@@ -5198,14 +5304,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 420717,
+            "coverage_seconds": 443291,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 29,
+            "sample_count": 30,
             "status": "warm"
           },
           "volatility": {
@@ -5221,29 +5327,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 9,
+            "sample_count": 10,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 420717,
+            "coverage_seconds": 443291,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 29,
+            "sample_count": 30,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-14T16:33:00.405079+00:00",
-        "raw_observation_count": 29,
+        "raw_observation_count": 30,
         "status": "warm",
         "too_close_observation_count": 0
       },
       "pepe": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5258,7 +5364,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5273,14 +5379,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5295,14 +5401,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5318,29 +5424,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "polkadot": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5355,7 +5461,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5370,14 +5476,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5392,14 +5498,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5415,24 +5521,24 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
@@ -5534,7 +5640,7 @@
         "too_close_observation_count": 1
       },
       "ripple": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5549,7 +5655,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5564,14 +5670,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5586,14 +5692,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5609,29 +5715,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "shiba-inu": {
-        "baseline_counted_observation_count": 19,
+        "baseline_counted_observation_count": 20,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 45423,
@@ -5646,7 +5752,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 3,
+            "sample_count": 4,
             "status": "warming"
           },
           "returns_1h": {
@@ -5661,14 +5767,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 211886,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 3,
+            "sample_count": 4,
             "status": "warming"
           },
           "returns_4h": {
@@ -5683,14 +5789,14 @@
             "status": "warming"
           },
           "turnover": {
-            "coverage_seconds": 484370,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 19,
+            "sample_count": 20,
             "status": "warm"
           },
           "volatility": {
@@ -5706,29 +5812,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 3,
+            "sample_count": 4,
             "status": "warming"
           },
           "volume": {
-            "coverage_seconds": 484370,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 19,
+            "sample_count": 20,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T05:49:56.372340+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 20,
+        "raw_observation_count": 21,
         "status": "warming",
         "too_close_observation_count": 1
       },
       "solana": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5743,7 +5849,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5758,14 +5864,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5780,14 +5886,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5803,29 +5909,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "stellar": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5840,7 +5946,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5855,14 +5961,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5877,14 +5983,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5900,29 +6006,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "sui": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -5937,7 +6043,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -5952,14 +6058,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -5974,14 +6080,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -5997,29 +6103,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "tron": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -6034,7 +6140,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -6049,14 +6155,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -6071,14 +6177,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -6094,29 +6200,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "uniswap": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -6131,7 +6237,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -6146,14 +6252,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -6168,14 +6274,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -6191,24 +6297,24 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
@@ -6310,7 +6416,7 @@
         "too_close_observation_count": 1
       },
       "worldcoin-wld": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -6325,7 +6431,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -6340,14 +6446,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -6362,14 +6468,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -6385,29 +6491,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       },
       "zcash": {
-        "baseline_counted_observation_count": 33,
+        "baseline_counted_observation_count": 34,
         "feature_readiness": {
           "btc_eth_relative": {
             "coverage_seconds": 111971,
@@ -6422,7 +6528,7 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_1h": {
@@ -6437,14 +6543,14 @@
             "status": "warm"
           },
           "returns_24h": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "return_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "returns_4h": {
@@ -6459,14 +6565,14 @@
             "status": "warm"
           },
           "turnover": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "turnover_zscore"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           },
           "volatility": {
@@ -6482,29 +6588,29 @@
             "required": true,
             "required_coverage_seconds": 111600,
             "required_sample_count": 8,
-            "sample_count": 11,
+            "sample_count": 12,
             "status": "warm"
           },
           "volume": {
-            "coverage_seconds": 511671,
+            "coverage_seconds": 534245,
             "features": [
               "volume_zscore_24h"
             ],
             "required": true,
             "required_coverage_seconds": 25200,
             "required_sample_count": 8,
-            "sample_count": 33,
+            "sample_count": 34,
             "status": "warm"
           }
         },
-        "newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
+        "newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
         "oldest_counted_observed_at": "2026-07-13T15:17:06.228233+00:00",
-        "raw_observation_count": 34,
+        "raw_observation_count": 35,
         "status": "warm",
         "too_close_observation_count": 1
       }
     },
-    "baseline_counted_observation_count": 990,
+    "baseline_counted_observation_count": 1020,
     "baseline_duplicate_conflict_count": 0,
     "baseline_duplicate_observation_count": 0,
     "baseline_feature_readiness": {
@@ -6513,7 +6619,7 @@
         "cold_asset_count": 2,
         "coverage_deficit_asset_count": 5,
         "maximum_coverage_seconds": 111971,
-        "maximum_sample_count": 11,
+        "maximum_sample_count": 12,
         "minimum_coverage_seconds": 0,
         "minimum_sample_count": 0,
         "other_asset_count": 0,
@@ -6552,8 +6658,8 @@
         "asset_count": 34,
         "cold_asset_count": 3,
         "coverage_deficit_asset_count": 3,
-        "maximum_coverage_seconds": 511671,
-        "maximum_sample_count": 11,
+        "maximum_coverage_seconds": 534245,
+        "maximum_sample_count": 12,
         "minimum_coverage_seconds": 0,
         "minimum_sample_count": 0,
         "other_asset_count": 0,
@@ -6592,27 +6698,27 @@
         "asset_count": 34,
         "cold_asset_count": 0,
         "coverage_deficit_asset_count": 0,
-        "maximum_coverage_seconds": 511671,
-        "maximum_sample_count": 33,
+        "maximum_coverage_seconds": 534245,
+        "maximum_sample_count": 34,
         "minimum_coverage_seconds": 68656,
         "minimum_sample_count": 2,
         "other_asset_count": 0,
         "required_coverage_seconds": 25200,
         "required_sample_count": 8,
-        "sample_count_deficit_asset_count": 3,
+        "sample_count_deficit_asset_count": 2,
         "status_counts": {
-          "warm": 31,
-          "warming": 3
+          "warm": 32,
+          "warming": 2
         },
-        "warm_asset_count": 31,
-        "warming_asset_count": 3
+        "warm_asset_count": 32,
+        "warming_asset_count": 2
       },
       "volatility": {
         "asset_count": 34,
         "cold_asset_count": 2,
         "coverage_deficit_asset_count": 5,
         "maximum_coverage_seconds": 111971,
-        "maximum_sample_count": 11,
+        "maximum_sample_count": 12,
         "minimum_coverage_seconds": 0,
         "minimum_sample_count": 0,
         "other_asset_count": 0,
@@ -6631,40 +6737,40 @@
         "asset_count": 34,
         "cold_asset_count": 0,
         "coverage_deficit_asset_count": 0,
-        "maximum_coverage_seconds": 511671,
-        "maximum_sample_count": 33,
+        "maximum_coverage_seconds": 534245,
+        "maximum_sample_count": 34,
         "minimum_coverage_seconds": 68656,
         "minimum_sample_count": 2,
         "other_asset_count": 0,
         "required_coverage_seconds": 25200,
         "required_sample_count": 8,
-        "sample_count_deficit_asset_count": 3,
+        "sample_count_deficit_asset_count": 2,
         "status_counts": {
-          "warm": 31,
-          "warming": 3
+          "warm": 32,
+          "warming": 2
         },
-        "warm_asset_count": 31,
-        "warming_asset_count": 3
+        "warm_asset_count": 32,
+        "warming_asset_count": 2
       }
     },
     "baseline_min_observations": 8,
-    "baseline_newest_counted_observed_at": "2026-07-19T13:24:57.648234+00:00",
-    "baseline_newest_observed_at": "2026-07-19T13:24:57.648234+00:00",
-    "baseline_observation_count": 1020,
+    "baseline_newest_counted_observed_at": "2026-07-19T19:41:12.054658+00:00",
+    "baseline_newest_observed_at": "2026-07-19T19:41:12.054658+00:00",
+    "baseline_observation_count": 1050,
     "baseline_rejection_counts": {},
     "baseline_status": "warming",
     "baseline_too_close_observation_count": 30,
     "baseline_warm_asset_count": 29,
     "cache_error": null,
     "cache_status": "valid",
-    "cadence_status": "eligible",
+    "cadence_status": "waiting",
     "current_universe_maturity": {
-      "baseline_counted_observation_count": 949,
+      "baseline_counted_observation_count": 965,
       "baseline_feature_readiness": {
         "btc_eth_relative": {
           "asset_count": 30,
           "cold_asset_count": 0,
-          "coverage_deficit_asset_count": 1,
+          "coverage_deficit_asset_count": 2,
           "deficit_assets": [
             {
               "canonical_asset_id": "hedera-hashgraph",
@@ -6675,23 +6781,33 @@
               "sample_count": 0,
               "sample_deficit": 8,
               "status": "warming"
+            },
+            {
+              "canonical_asset_id": "shiba-inu",
+              "coverage_deficit_seconds": 66177,
+              "coverage_seconds": 45423,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 4,
+              "sample_deficit": 4,
+              "status": "warming"
             }
           ],
           "maximum_coverage_seconds": 111971,
-          "maximum_sample_count": 11,
+          "maximum_sample_count": 12,
           "minimum_coverage_seconds": 0,
           "minimum_sample_count": 0,
-          "next_cycle_point_in_time_eligible_asset_count": 29,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
           "other_asset_count": 0,
           "required_coverage_seconds": 111600,
           "required_sample_count": 8,
-          "sample_count_deficit_asset_count": 1,
+          "sample_count_deficit_asset_count": 2,
           "status_counts": {
-            "warm": 29,
-            "warming": 1
+            "warm": 28,
+            "warming": 2
           },
-          "warm_asset_count": 29,
-          "warming_asset_count": 1
+          "warm_asset_count": 28,
+          "warming_asset_count": 2
         },
         "returns_1h": {
           "asset_count": 30,
@@ -6739,23 +6855,34 @@
               "sample_count": 0,
               "sample_deficit": 8,
               "status": "cold"
+            },
+            {
+              "canonical_asset_id": "shiba-inu",
+              "coverage_deficit_seconds": 0,
+              "coverage_seconds": 534245,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 4,
+              "sample_deficit": 4,
+              "status": "warming"
             }
           ],
-          "maximum_coverage_seconds": 511671,
-          "maximum_sample_count": 11,
+          "maximum_coverage_seconds": 534245,
+          "maximum_sample_count": 12,
           "minimum_coverage_seconds": 0,
           "minimum_sample_count": 0,
-          "next_cycle_point_in_time_eligible_asset_count": 29,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
           "other_asset_count": 0,
           "required_coverage_seconds": 111600,
           "required_sample_count": 8,
-          "sample_count_deficit_asset_count": 1,
+          "sample_count_deficit_asset_count": 2,
           "status_counts": {
             "cold": 1,
-            "warm": 29
+            "warm": 28,
+            "warming": 1
           },
-          "warm_asset_count": 29,
-          "warming_asset_count": 0
+          "warm_asset_count": 28,
+          "warming_asset_count": 1
         },
         "returns_4h": {
           "asset_count": 30,
@@ -6771,60 +6898,58 @@
               "sample_count": 2,
               "sample_deficit": 6,
               "status": "warming"
-            }
-          ],
-          "maximum_coverage_seconds": 120960,
-          "maximum_sample_count": 17,
-          "minimum_coverage_seconds": 20000,
-          "minimum_sample_count": 2,
-          "next_cycle_point_in_time_eligible_asset_count": 29,
-          "other_asset_count": 0,
-          "required_coverage_seconds": 39600,
-          "required_sample_count": 8,
-          "sample_count_deficit_asset_count": 1,
-          "status_counts": {
-            "warm": 29,
-            "warming": 1
-          },
-          "warm_asset_count": 29,
-          "warming_asset_count": 1
-        },
-        "turnover": {
-          "asset_count": 30,
-          "cold_asset_count": 0,
-          "coverage_deficit_asset_count": 0,
-          "deficit_assets": [
+            },
             {
-              "canonical_asset_id": "hedera-hashgraph",
+              "canonical_asset_id": "shiba-inu",
               "coverage_deficit_seconds": 0,
-              "coverage_seconds": 497848,
-              "required_coverage_seconds": 25200,
+              "coverage_seconds": 45423,
+              "required_coverage_seconds": 39600,
               "required_sample_count": 8,
               "sample_count": 7,
               "sample_deficit": 1,
               "status": "warming"
             }
           ],
-          "maximum_coverage_seconds": 511671,
-          "maximum_sample_count": 33,
-          "minimum_coverage_seconds": 124640,
-          "minimum_sample_count": 7,
-          "next_cycle_point_in_time_eligible_asset_count": 29,
+          "maximum_coverage_seconds": 120960,
+          "maximum_sample_count": 17,
+          "minimum_coverage_seconds": 20000,
+          "minimum_sample_count": 2,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
+          "other_asset_count": 0,
+          "required_coverage_seconds": 39600,
+          "required_sample_count": 8,
+          "sample_count_deficit_asset_count": 2,
+          "status_counts": {
+            "warm": 28,
+            "warming": 2
+          },
+          "warm_asset_count": 28,
+          "warming_asset_count": 2
+        },
+        "turnover": {
+          "asset_count": 30,
+          "cold_asset_count": 0,
+          "coverage_deficit_asset_count": 0,
+          "deficit_assets": [],
+          "maximum_coverage_seconds": 534245,
+          "maximum_sample_count": 34,
+          "minimum_coverage_seconds": 147214,
+          "minimum_sample_count": 8,
+          "next_cycle_point_in_time_eligible_asset_count": 30,
           "other_asset_count": 0,
           "required_coverage_seconds": 25200,
           "required_sample_count": 8,
-          "sample_count_deficit_asset_count": 1,
+          "sample_count_deficit_asset_count": 0,
           "status_counts": {
-            "warm": 29,
-            "warming": 1
+            "warm": 30
           },
-          "warm_asset_count": 29,
-          "warming_asset_count": 1
+          "warm_asset_count": 30,
+          "warming_asset_count": 0
         },
         "volatility": {
           "asset_count": 30,
           "cold_asset_count": 0,
-          "coverage_deficit_asset_count": 1,
+          "coverage_deficit_asset_count": 2,
           "deficit_assets": [
             {
               "canonical_asset_id": "hedera-hashgraph",
@@ -6835,67 +6960,66 @@
               "sample_count": 0,
               "sample_deficit": 8,
               "status": "warming"
+            },
+            {
+              "canonical_asset_id": "shiba-inu",
+              "coverage_deficit_seconds": 66177,
+              "coverage_seconds": 45423,
+              "required_coverage_seconds": 111600,
+              "required_sample_count": 8,
+              "sample_count": 4,
+              "sample_deficit": 4,
+              "status": "warming"
             }
           ],
           "maximum_coverage_seconds": 111971,
-          "maximum_sample_count": 11,
+          "maximum_sample_count": 12,
           "minimum_coverage_seconds": 0,
           "minimum_sample_count": 0,
-          "next_cycle_point_in_time_eligible_asset_count": 29,
+          "next_cycle_point_in_time_eligible_asset_count": 28,
           "other_asset_count": 0,
           "required_coverage_seconds": 111600,
           "required_sample_count": 8,
-          "sample_count_deficit_asset_count": 1,
+          "sample_count_deficit_asset_count": 2,
           "status_counts": {
-            "warm": 29,
-            "warming": 1
+            "warm": 28,
+            "warming": 2
           },
-          "warm_asset_count": 29,
-          "warming_asset_count": 1
+          "warm_asset_count": 28,
+          "warming_asset_count": 2
         },
         "volume": {
           "asset_count": 30,
           "cold_asset_count": 0,
           "coverage_deficit_asset_count": 0,
-          "deficit_assets": [
-            {
-              "canonical_asset_id": "hedera-hashgraph",
-              "coverage_deficit_seconds": 0,
-              "coverage_seconds": 497848,
-              "required_coverage_seconds": 25200,
-              "required_sample_count": 8,
-              "sample_count": 7,
-              "sample_deficit": 1,
-              "status": "warming"
-            }
-          ],
-          "maximum_coverage_seconds": 511671,
-          "maximum_sample_count": 33,
-          "minimum_coverage_seconds": 124640,
-          "minimum_sample_count": 7,
-          "next_cycle_point_in_time_eligible_asset_count": 29,
+          "deficit_assets": [],
+          "maximum_coverage_seconds": 534245,
+          "maximum_sample_count": 34,
+          "minimum_coverage_seconds": 147214,
+          "minimum_sample_count": 8,
+          "next_cycle_point_in_time_eligible_asset_count": 30,
           "other_asset_count": 0,
           "required_coverage_seconds": 25200,
           "required_sample_count": 8,
-          "sample_count_deficit_asset_count": 1,
+          "sample_count_deficit_asset_count": 0,
           "status_counts": {
-            "warm": 29,
-            "warming": 1
+            "warm": 30
           },
-          "warm_asset_count": 29,
-          "warming_asset_count": 1
+          "warm_asset_count": 30,
+          "warming_asset_count": 0
         }
       },
-      "baseline_observation_count": 975,
-      "baseline_warm_asset_count": 29,
+      "baseline_observation_count": 991,
+      "baseline_warm_asset_count": 28,
       "expected_asset_count": 30,
       "missing_asset_count": 0,
       "missing_asset_ids": [],
       "next_cycle_point_in_time_basis": "same_asset_retained_history_before_future_observation",
-      "next_cycle_point_in_time_eligible_asset_count": 29,
-      "next_cycle_point_in_time_eligible_at": "2026-07-19T14:24:57.648234+00:00",
+      "next_cycle_point_in_time_eligible_asset_count": 28,
+      "next_cycle_point_in_time_eligible_at": "2026-07-19T20:41:12.054658+00:00",
       "non_warm_asset_ids": [
-        "hedera-hashgraph"
+        "hedera-hashgraph",
+        "shiba-inu"
       ],
       "observed_asset_count": 30,
       "observed_asset_ids": [
@@ -6908,7 +7032,6 @@
         "bittensor",
         "cardano",
         "chainlink",
-        "dexe",
         "dogecoin",
         "ethena",
         "ethereum",
@@ -6922,6 +7045,7 @@
         "pepe",
         "polkadot",
         "ripple",
+        "shiba-inu",
         "solana",
         "stellar",
         "sui",
@@ -6935,7 +7059,7 @@
       "status": "warming"
     },
     "minimum_observation_spacing_seconds": 3600,
-    "next_eligible_observation_at": "2026-07-19T14:24:57.648234+00:00"
+    "next_eligible_observation_at": "2026-07-19T20:41:12.054658+00:00"
   },
   "blocked_or_preflight_attempts": [
     {
@@ -6954,7 +7078,7 @@
     }
   ],
   "campaign_metrics": {
-    "baseline_counted_observation_count": 990,
+    "baseline_counted_observation_count": 1020,
     "baseline_status": "warming",
     "baseline_warm_asset_count": 29,
     "blocked_attempts": 1,
@@ -6962,17 +7086,17 @@
     "current_universe_baseline_status": "warming",
     "current_universe_expected_asset_count": 30,
     "current_universe_observed_asset_count": 30,
-    "current_universe_warm_asset_count": 29,
-    "direct_feature_count": 5386,
+    "current_universe_warm_asset_count": 28,
+    "direct_feature_count": 5534,
     "historical_ideas": 5,
     "matured_outcomes": 4,
     "pending_outcomes": 0,
     "provider_failed_attempts": 8,
-    "proxy_feature_count": 1604,
+    "proxy_feature_count": 1636,
     "real_candidates": 5,
-    "real_cycles": 34,
-    "real_observations": 1020,
-    "retained_observation_count": 1020,
+    "real_cycles": 35,
+    "real_observations": 1050,
+    "retained_observation_count": 1050,
     "review_timing_action_required": 3,
     "review_timing_completed_reviews": 0,
     "review_timing_eligible_ideas": 3,
@@ -6988,7 +7112,7 @@
       "diagnostic": 1,
       "risk_watch": 2
     },
-    "selected_market_row_count": 1020,
+    "selected_market_row_count": 1050,
     "spread_available_count": 0,
     "spread_coverage_ratio": 0.0,
     "too_close_observation_count": 30
@@ -6997,23 +7121,23 @@
   "campaign_v2_conclusion": {
     "baseline_coverage": {
       "asset_count": 34,
-      "counted_observations": 990,
-      "retained_observations": 1020,
+      "counted_observations": 1020,
+      "retained_observations": 1050,
       "warm_asset_count": 29
     },
     "baseline_status": "warming",
     "current_authority": {
-      "artifact_namespace": "radar_market_no_send_20260719t132456823505z_1f6f530fbb36",
+      "artifact_namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
       "exact_operator_binding": true,
       "revision": 12,
-      "run_id": "2026-07-19T13:24:57.648234+00:00|no_key_live"
+      "run_id": "2026-07-19T19:41:12.054658+00:00|no_key_live"
     },
     "current_universe_baseline": {
       "expected_asset_count": 30,
       "missing_asset_count": 0,
       "observed_asset_count": 30,
       "status": "warming",
-      "warm_asset_count": 29
+      "warm_asset_count": 28
     },
     "data_quality_limitation_categories": [
       "execution_quality_spread",
@@ -7022,11 +7146,11 @@
     ],
     "highest_value_missing_input_category": "execution_quality_spread",
     "no_trade_recommendation": true,
-    "pointer_history_count": 30,
+    "pointer_history_count": 31,
     "pointer_target": {
-      "artifact_namespace": "radar_market_no_send_20260719t132456823505z_1f6f530fbb36",
+      "artifact_namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
       "revision": 12,
-      "run_id": "2026-07-19T13:24:57.648234+00:00|no_key_live",
+      "run_id": "2026-07-19T19:41:12.054658+00:00|no_key_live",
       "status": "authoritative"
     },
     "research_only": true,
@@ -7034,21 +7158,21 @@
     "spread_provider_selection": "selected_bybit_usdt_linear_perpetuals",
     "spread_readiness_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
     "status": "in_progress_baseline_warming",
-    "summary": "Decision Radar campaign v2 has 34 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 8 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 29/34 warm retained assets; exact current-universe status is warming with 29/30 warm assets. Pointer history contains 30 bound generations and current authority is radar_market_no_send_20260719t132456823505z_1f6f530fbb36. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
+    "summary": "Decision Radar campaign v2 has 35 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 8 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 29/34 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 31 bound generations and current authority is radar_market_no_send_20260719t194111199263z_5b3819b06e1e. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
   },
   "contract_version": 2,
   "data_quality_limitations": [
     {
       "authorization_boundary": "readiness_is_no_network; capture_requires_an_already_present_explicit_flag_plus_CONFIRM=1",
       "category": "execution_quality_spread",
-      "detail": "Trusted spread coverage is 0/1020. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.",
+      "detail": "Trusted spread coverage is 0/1050. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.",
       "evidence_status": "awaiting_authorized_immutable_capture",
       "next_safe_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
       "provider_selection": "selected_bybit_usdt_linear_perpetuals"
     },
     {
       "category": "proxy_market_features",
-      "detail": "The campaign retains 1604 proxy feature observations; proxy evidence remains explicitly quality-capped."
+      "detail": "The campaign retains 1636 proxy feature observations; proxy evidence remains explicitly quality-capped."
     },
     {
       "category": "temporal_baseline_maturity",
@@ -7065,7 +7189,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "64116ac1e5d43fdd6273aa1a723f1172a9ee3b48d936cd600b2331944a46ed05",
     "candidate_rows_supplied": 5,
-    "contract_digest": "e7358cd74a6e2b99a3f4e617a61be7824370e32cc37934fe7cdffd4c284950d2",
+    "contract_digest": "223ab993b45507741b0bfbb9ede7c7e30ebb5ab56a4a8c534bcb621455e787c5",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "5a0b2e443d58e7f8e0f31a1eefb81a1ddbe26d7dbe95479bc21ed77ec9a2b0d6",
     "core_rows_supplied": 5,
@@ -7080,7 +7204,7 @@
       "not_evaluated": 0,
       "opposed": 1
     },
-    "evaluated_at": "2026-07-19T15:50:08.621018+00:00",
+    "evaluated_at": "2026-07-19T19:41:21.965410+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -7423,7 +7547,7 @@
         }
       ]
     },
-    "input_binding_digest": "42db7ff4f010125b012e1f1c412e6447c47ad821a2414be1f4904f4fe7ed860f",
+    "input_binding_digest": "ceb1ee64f6a7d7018b2d0067d9e5dcd153b755baf6b794bc7ec1b265338e8f9d",
     "matched_control_available": false,
     "matured_episode_count": 2,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -7794,7 +7918,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "e38be7784f35ca2d1c22c63dbbb190d0ed05b26e3c1460b92541fa796c26d2fd",
+    "source_episode_contract_digest": "c297a8f15c4096db1e34cf3c17f1564e9d1e42fffa4450118f432b7f40bc7b88",
     "source_episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -7805,11 +7929,11 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-19T15:50:08.621018+00:00",
+  "generated_at": "2026-07-19T19:41:21.965410+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
-    "valid_generation_count": 34
+    "valid_generation_count": 35
   },
   "human_review_queue": {
     "absolute_paths_or_action_commands_embedded": false,
@@ -7822,7 +7946,7 @@
     "eligible_idea_count": 3,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-19T15:50:08.621018+00:00",
+    "generated_at": "2026-07-19T19:41:21.965410+00:00",
     "in_review_count": 0,
     "not_viewed_count": 3,
     "operator_action_commands_available_via_queue": true,
@@ -7902,7 +8026,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-19T15:50:08.621018+00:00",
+    "generated_at": "2026-07-19T19:41:21.965410+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -7946,16 +8070,16 @@
   "next_observation": {
     "authorization_rechecked_by_command": true,
     "blocking_reasons": [
-      "Decision Radar provider call is reserved until 2026-07-19T16:50:07.747704+00:00"
+      "Decision Radar provider call is reserved until 2026-07-19T20:41:12.054658+00:00"
     ],
     "cadence_status": "waiting",
     "eligible_now": false,
     "eligible_run_command": "make radar-daily-ops-cycle PYTHON=.venv/bin/python",
-    "history_next_eligible_observation_at": "2026-07-19T14:24:57.648234+00:00",
-    "next_eligible_observation_at": "2026-07-19T16:50:07.747704+00:00",
+    "history_next_eligible_observation_at": "2026-07-19T20:41:12.054658+00:00",
+    "next_eligible_observation_at": "2026-07-19T20:41:12.054658+00:00",
     "next_safe_operator_command": "make radar-daily-ops-readiness PYTHON=.venv/bin/python",
     "provider_backoff_disabled_until": null,
-    "provider_call_reservation_next_at": "2026-07-19T16:50:07.747704+00:00",
+    "provider_call_reservation_next_at": "2026-07-19T20:41:12.054658+00:00",
     "rapid_cycles_do_not_advance_warmup": true
   },
   "non_authoritative_complete_generations": [
@@ -8438,8 +8562,8 @@
     "price_history_snapshot": {
       "artifact": "event_market_history.jsonl",
       "binding_source": "campaign_market_history_exact_bytes",
-      "row_count": 1020,
-      "sha256": "81a2760de2bf3228cf83188b3369839eefc4e9c654bec4f623b8fa5917e5da6f",
+      "row_count": 1050,
+      "sha256": "b4ac27a92761e53306f58cf0d03d2c905e145636e76015fa471691e0beee6119",
       "status": "observed"
     },
     "refresh_build_error_count": 0,
@@ -8452,14 +8576,14 @@
     "total": 5
   },
   "pointer": {
-    "artifact_namespace": "radar_market_no_send_20260719t132456823505z_1f6f530fbb36",
-    "authority_checked_at": "2026-07-19T15:50:08.621018+00:00",
+    "artifact_namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
+    "authority_checked_at": "2026-07-19T19:41:21.965410+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
     "readiness_validation": "passed",
     "revision": 12,
-    "run_id": "2026-07-19T13:24:57.648234+00:00|no_key_live",
+    "run_id": "2026-07-19T19:41:12.054658+00:00|no_key_live",
     "status": "authoritative"
   },
   "pointer_history": [
@@ -8697,10 +8821,18 @@
     },
     {
       "artifact_namespace": "radar_market_no_send_20260719t132456823505z_1f6f530fbb36",
-      "currently_authoritative": true,
+      "currently_authoritative": false,
       "first_authoritative_at": "2026-07-19T13:25:07.300513+00:00",
       "observed_at": "2026-07-19T13:24:57.648234+00:00",
       "run_id": "2026-07-19T13:24:57.648234+00:00|no_key_live",
+      "source": "final_publication_receipt_exact_binding"
+    },
+    {
+      "artifact_namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
+      "currently_authoritative": true,
+      "first_authoritative_at": "2026-07-19T19:41:21.594553+00:00",
+      "observed_at": "2026-07-19T19:41:12.054658+00:00",
+      "run_id": "2026-07-19T19:41:12.054658+00:00|no_key_live",
       "source": "final_publication_receipt_exact_binding"
     }
   ],
@@ -8836,7 +8968,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "a728af2f79e6c65f0e6c2b2daa6890fcc33682c53cee1f7006cfc599e54ded9d",
+    "audit_digest": "8cdff4b46a74bf7dab8f573d19ff2881284fa4205eac9837e3abccfdeee2ec22",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -8845,7 +8977,7 @@
     "candidate_row_count": 5,
     "candidate_row_rejection_count": 0,
     "candidate_row_rejection_reason_counts": {},
-    "candidate_snapshot_binding_digest": "93d1e4eca16c9a84d9ca670c5d72178c8ed3e39e0fd1e72a4d984a286d657db1",
+    "candidate_snapshot_binding_digest": "c5821860cf6b97302412004766fc595b0682e571cbd844e11813ca6a445c4446",
     "candidate_snapshot_bindings": [
       {
         "artifact_namespace": "radar_market_no_send",
@@ -9152,12 +9284,21 @@
         "candidate_artifact_size_bytes": 0,
         "candidate_row_count": 0,
         "run_id": "2026-07-19T13:24:57.648234+00:00|no_key_live"
+      },
+      {
+        "artifact_namespace": "radar_market_no_send_20260719t194111199263z_5b3819b06e1e",
+        "binding_source": "manifest_candidate_artifact_sha256",
+        "candidate_artifact": "event_integrated_radar_candidates.jsonl",
+        "candidate_artifact_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "candidate_artifact_size_bytes": 0,
+        "candidate_row_count": 0,
+        "run_id": "2026-07-19T19:41:12.054658+00:00|no_key_live"
       }
     ],
-    "candidate_snapshot_generation_count": 34,
+    "candidate_snapshot_generation_count": 35,
     "candidate_snapshot_row_count": 5,
     "conflicting_outcome_identity_group_count": 0,
-    "counted_generation_count": 34,
+    "counted_generation_count": 35,
     "cross_candidate_outcome_collision_candidate_count": 0,
     "cross_candidate_outcome_collision_group_count": 0,
     "cross_candidate_outcome_collision_row_count": 0,
@@ -9166,7 +9307,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "e38be7784f35ca2d1c22c63dbbb190d0ed05b26e3c1460b92541fa796c26d2fd",
+    "episode_contract_digest": "c297a8f15c4096db1e34cf3c17f1564e9d1e42fffa4450118f432b7f40bc7b88",
     "episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "episode_records_supplied": 5,
     "exact_outcome_join_count": 5,
@@ -9207,7 +9348,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "e38be7784f35ca2d1c22c63dbbb190d0ed05b26e3c1460b92541fa796c26d2fd",
+    "contract_digest": "c297a8f15c4096db1e34cf3c17f1564e9d1e42fffa4450118f432b7f40bc7b88",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -9389,7 +9530,7 @@
         "window_end_exclusive_at": "2026-07-19T02:47:37.287740+00:00"
       }
     ],
-    "evaluated_at": "2026-07-19T15:50:08.621018+00:00",
+    "evaluated_at": "2026-07-19T19:41:21.965410+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

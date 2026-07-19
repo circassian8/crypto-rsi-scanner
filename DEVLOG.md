@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-fifth Radar market cycle · Codex
+**Why:** The persisted cadence was eligible and the already-present CoinGecko
+authorization passed the read-only readiness boundary, so the evidence-first
+campaign could safely collect one more no-send point-in-time observation.
+**Changes:**
+- Ran exactly one Daily Operations cycle. CoinGecko returned HTTP 200 with 80
+  bounded rows in 1,416 ms and no retry; the system selected 30 market rows and
+  published
+  `radar_market_no_send_20260719t194111199263z_5b3819b06e1e`.
+- The exact generation produced zero market anomalies, candidates, core ideas,
+  cards, and outcomes. It remains honestly point-in-time `warming=30`; no
+  thresholds were lowered and no idea was manufactured.
+- Strict doctor passed with zero blockers and warnings, final publication and
+  owned-dashboard operations receipts validate, and revision-12 authority now
+  points to the new namespace. The loopback dashboard serves HTTP 200 with the
+  exact run, revision, namespace, and operator-state digest.
+- Refreshed campaign truth to 35 counted cycles, 1,050 retained observations,
+  1,020 baseline-counted observations, 30 too-close observations, five
+  historical ideas, four matured outcomes, and one unresolved
+  `due_missing_price`. Retained current-universe maturity is 28/30 for a future
+  same-asset observation; `hedera-hashgraph` and `shiba-inu` remain non-warm.
+**Verify:** `radar-market-no-send-readiness` was ready before the request.
+Daily Operations returned `published_and_restarted`; dashboard authority and
+readiness both passed, the exact HEAD request returned HTTP 200 with matching
+identity headers, and the campaign report reconciles the pointer and new
+generation. The next provider boundary is reserved until
+`2026-07-19T20:41:12.054658+00:00`.
+**Notes/risks:** Trusted spread remains 0/1,050, so Bybit execution-quality
+evidence remains the highest-value missing input. The scheduler remains
+uninstalled. No Telegram send, trade, order, paper trade, normal RSI write,
+authorization mutation, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-19 — Fail closed on shared writer stage substitution · Codex
 **Why:** The shared immutable and replaceable artifact writers closed their
 temporary descriptor before publication. A same-user pathname substitution
