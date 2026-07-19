@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Refresh pre-cycle campaign truth · Codex
+**Why:** Before the next cadence-eligible live/no-send observation, the
+canonical campaign report needed one local-artifact-only reconciliation so its
+evaluation clock and time-bound audit digests reflected the current retained
+store rather than the prior failed-cycle timestamp.
+**Changes:**
+- Regenerated the canonical JSON and Markdown campaign reports from exact local
+  artifacts.
+- Preserved the measured state at 29 successful cycles, 870 retained
+  observations, 840 baseline-counted observations, five historical ideas, and
+  one missing-price outcome; only evaluation clocks and their bound digests
+  changed.
+**Verify:** `make radar-market-campaign-report PYTHON=.venv/bin/python`
+completed with `status=in_progress_baseline_warming`, `real_cycles=29`,
+`real_candidates=5`, and `provider_calls=0`; `git diff --check` passed.
+**Notes/risks:** This reconciliation made no provider call and changed no
+authority, observation, outcome, score, threshold, route, authorization, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Enforce causal Bybit response clocks · Codex
 **Why:** The execution-quality exact-response window rejected requests outside
 the capture and overlapping request sequences, but unlike the intraday and
