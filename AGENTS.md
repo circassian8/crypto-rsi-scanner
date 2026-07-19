@@ -378,11 +378,17 @@ may be added later when a suitable environment already exists.
   response/acquisition clocks and hashes, stable string IDs, official
   type/subtype pairs, deprecated-description status, and safe official URLs.
   `cTime` remains publication time rather than event time or directional
-  authority. The module has no client, environment read, write, pointer,
-  readiness, capture, policy, campaign, dashboard, or Protocol-v2 path. Do not
-  activate it or infer authorization from public access; a later live boundary
-  requires the same separate authorization, confirmation, immutable capture,
-  request-ledger, health/backoff, doctor, retention, and annex gates as KuCoin.
+  authority. `make radar-announcements-bitget-readiness` is a separate no-call,
+  no-write operator surface: it reads only the dedicated
+  `RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE` flag and describes the exact
+  31-day, maximum-20-request cursor plan. It remains blocked even if that flag
+  exists because immutable capture, strict doctor, and live transport are not
+  implemented; its safe action is the fixture smoke, not a provider call. The
+  contract has no client, write, pointer, capture, policy, campaign, dashboard,
+  or Protocol-v2 path. Do not activate it or infer authorization from public
+  access; a later live boundary requires the same separate authorization,
+  confirmation, immutable capture, request-ledger, health/backoff, doctor,
+  retention, and annex gates as KuCoin.
 - **Tokenomist structured-unlock response contract:**
   `make radar-unlock-tokenomist-v5-smoke` validates the current official v5
   cliff-unlock response shape entirely offline. The closed synthetic fixture

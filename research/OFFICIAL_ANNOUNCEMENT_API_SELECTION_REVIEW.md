@@ -112,7 +112,11 @@ total/page-count contract rather than being forced into one pagination model.
 8. **Bitget complete offline:** preserve the exact misspelled path, optional
    type filter, required language, maximum-10 page, last-ID cursor chain,
    request/acquisition clocks, type/subtype pairs, deprecated description, and
-   complete/partial semantics. It has no readiness, client, or capture path.
+   complete/partial semantics.
+9. **Bitget readiness complete:** expose the separate authorization flag and
+   exact 31-day, maximum-20-request future plan without a client or write. It
+   stays blocked until immutable capture, strict doctor, and live transport are
+   implemented, even when authorization is present.
 
 ## Consequences
 

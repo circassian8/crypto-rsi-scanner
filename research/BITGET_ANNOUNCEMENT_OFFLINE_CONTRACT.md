@@ -21,6 +21,21 @@ make radar-announcements-bitget-smoke PYTHON=.venv/bin/python
 It performs no provider call, environment read, artifact write, notification,
 routing, scoring, order, or trade.
 
+The observational readiness surface is:
+
+```text
+make radar-announcements-bitget-readiness PYTHON=.venv/bin/python
+```
+
+It reads only the already-present dedicated
+`RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE` flag and reports an exact 31-day
+request plan capped at 20 cursor pages / 200 rows. It never calls the provider,
+writes an artifact, or creates authorization. It remains blocked even when the
+flag exists because immutable capture, strict doctor, and live transport are
+not implemented. The only current safe next command is the offline fixture
+smoke; the disable action is `unset
+RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE`.
+
 ## Closed contract
 
 - The request binds a maximum 31-day publication-time window, required

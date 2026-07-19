@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Add non-activating Bitget readiness · Codex
+**Why:** The second official announcement contract needed an explicit operator
+boundary before any future capture mechanics or authorization could be
+considered.
+**Changes:**
+- Added a read-only Bitget readiness projection and Make target that inspect
+  only the dedicated flag and describe the exact 31-day request window,
+  maximum 20 cursor requests / 200 rows, expected future activity, and disable
+  action.
+- Kept readiness blocked even when the flag is present because immutable
+  capture, strict doctor, and live transport are not implemented; the fixture
+  smoke is the only safe next command.
+- Added no-network and safety regressions and updated the operator, contract,
+  selection, roadmap, decision, and generated project-health records.
+**Verify:** Focused readiness and response-contract tests, compileall, both
+Bitget no-call targets, JSON parsing, `git diff --check`, and architecture
+cleanliness passed.
+**Notes/risks:** No client, provider call, authorization mutation, write,
+capture, source authority, campaign/dashboard attachment, Protocol-v2 evidence,
+route/score/threshold change, send, trade, order, paper trade, normal RSI write,
+or Event Alpha `TRIGGERED_FADE` was created.
+
 ## 2026-07-19 — Preregister anomaly research without tuning · Codex
 **Why:** Stronger anomaly detection is a North Star need, but the sparse,
 overlapping campaign cannot support honest production tuning yet.
