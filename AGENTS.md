@@ -713,7 +713,8 @@ may be added later when a suitable environment already exists.
   tolerance; a future benchmark row is missing context, never an alignment
   candidate. Canonical numeric market fields use presence-based precedence:
   an explicit finite zero is observed evidence and must never fall through to
-  a legacy alias, source row, or benchmark alias merely because it is falsey.
+  a legacy alias, source row, benchmark alias, gate sentinel, or `n/a` rendering
+  merely because it is falsey.
   NaN and positive/negative infinity remain unavailable across snapshots,
   anomaly classification, market reaction/confirmation, derivatives crowding,
   and registry liquidity inference; they must not improve evidence or enter

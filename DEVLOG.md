@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve zero event age and derivatives reporting · Codex
+**Why:** A completed-move gate used `value or -1`, so exact event age zero was
+treated as missing. The derivatives report likewise rendered a neutral funding
+z-score of zero as `n/a`.
+**Changes:**
+- Made the completed-move age condition distinguish explicit zero from missing.
+- Added presence-aware numeric rendering for funding z-score and regressions for
+  both gate and report behavior.
+**Verify:** Nine focused derivatives/numeric tests passed, followed by all 66
+numeric-finiteness, market-surface, and namespace-integration tests; compileall
+and `git diff --check` were clean. The derivatives-crowding smoke completed with
+zero strict-doctor blockers/warnings. Full `verify-fast` was not repeated because
+the immediately preceding shared-layer commit passed all 3,079 tests and this
+follow-up is covered by the focused gate/report regressions and smoke.
+**Notes/risks:** No threshold, score, route policy, provider authorization,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` changed.
+
 ## 2026-07-19 — Enforce finite evidence across downstream market layers · Codex
 **Why:** The anomaly scanner was closed, but independent downstream parsers
 still accepted infinity. One malformed input produced `strong` 100/100 market

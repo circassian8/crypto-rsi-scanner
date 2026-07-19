@@ -1640,6 +1640,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1268,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1264,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
@@ -1662,15 +1671,6 @@
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
       "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
       "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1261,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-      "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-      "revisit_condition": "When adding a new derivatives metric family or crowding class.",
       "source_kind": "production"
     },
     {
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T05:23:21.609611+00:00",
+  "generated_at": "2026-07-19T05:28:23.601796+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1943,6 +1943,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1268,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1264,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "source_kind": "production"
@@ -1957,12 +1963,6 @@
       "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1261,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -4054,6 +4054,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1268,
+      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1264,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "source_kind": "production"
@@ -4068,12 +4074,6 @@
       "limit": 1500,
       "line_count": 1261,
       "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1261,
-      "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
       "source_kind": "production"
     },
     {
@@ -4509,6 +4509,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1268,
+          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1264,
           "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
           "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
@@ -4531,15 +4540,6 @@
           "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
           "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
           "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1261,
-          "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-          "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-          "revisit_condition": "When adding a new derivatives metric family or crowding class.",
           "source_kind": "production"
         },
         {
@@ -4698,6 +4698,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1268,
+        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1264,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
         "threshold": 1200
@@ -4710,11 +4715,6 @@
       {
         "line_count": 1261,
         "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1261,
-        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       },
       {
@@ -4961,6 +4961,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1268,
+            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
+            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1264,
             "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
             "reason": "The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface.",
@@ -4983,15 +4992,6 @@
             "path": "crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py",
             "reason": "Legacy notification-plan compatibility core; no-send semantics are more important than churn.",
             "revisit_condition": "When notification plan rows are covered by schema-level golden fixtures.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1261,
-            "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-            "reason": "Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage.",
-            "revisit_condition": "When adding a new derivatives metric family or crowding class.",
             "source_kind": "production"
           },
           {

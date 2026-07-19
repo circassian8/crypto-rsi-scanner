@@ -110,3 +110,28 @@ def test_nonfinite_or_shadowed_zero_universe_values_cannot_derive_liquidity(tmp_
 
     assert assets["infinite"].liquidity_tier is None
     assert assets["zero"].liquidity_tier is None
+
+
+def test_derivatives_zero_age_and_funding_zscore_remain_observed():
+    from crypto_rsi_scanner.event_alpha.radar import derivatives_crowding
+
+    assert derivatives_crowding._completed_move(
+        {"return_24h": 0.15, "event_age_hours": 0.0},
+        "no_reaction",
+    ) is True
+
+    report = derivatives_crowding.format_derivatives_crowding_report(
+        state_rows=[
+            {
+                "symbol": "ZERO",
+                "coin_id": "zero",
+                "provider": "fixture",
+                "freshness_status": "fresh",
+                "funding_zscore": 0.0,
+            }
+        ],
+        candidate_rows=[],
+    )
+
+    assert "funding_z=0 " in report
+    assert "funding_z=n/a" not in report

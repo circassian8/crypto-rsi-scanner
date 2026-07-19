@@ -685,7 +685,7 @@ def format_derivatives_crowding_report(
             f"oi_delta_24h={_fmt_pct(row.get('open_interest_delta_24h'))} "
             f"funding={_fmt_pct(row.get('funding_rate'))} "
             f"predicted_funding={_fmt_metric_pct(row, 'predicted_funding', 'predicted_funding_rate')} "
-            f"funding_z={row.get('funding_zscore') or 'n/a'} "
+            f"funding_z={_fmt_number(row.get('funding_zscore'))} "
             f"basis={_fmt_metric_pct(row, 'basis', 'basis')} "
             f"metric_status={_format_metric_status(row.get('supported_metric_status'))} "
             f"units={_format_unit_metadata(row)}"
@@ -913,11 +913,13 @@ def _crowding_class(state: Mapping[str, Any]) -> str:
 
 
 def _completed_move(market: Mapping[str, Any], market_state: str) -> bool:
+    event_age = _float(_first(market, "event_age_hours", "age_hours"))
     return any((
         str(market_state) in {"blowoff_crowded", "post_event_fade_setup", "late_momentum"},
         (_pct(_first(market, "return_24h", "price_change_24h")) or 0) >= 25,
         (_pct(_first(market, "return_4h", "price_change_4h")) or 0) >= 15,
-        (_float(_first(market, "event_age_hours", "age_hours")) or -1) >= 0
+        event_age is not None
+        and event_age >= 0
         and ((_pct(_first(market, "return_24h")) or 0) >= 15),
     ))
 
@@ -1184,6 +1186,11 @@ def _sign(value: float) -> int:
 def _fmt_pct(value: object) -> str:
     number = _pct(value)
     return "n/a" if number is None else f"{number:.1f}%"
+
+
+def _fmt_number(value: object) -> str:
+    number = _float(value)
+    return "n/a" if number is None else f"{number:g}"
 
 
 def _fmt_metric_pct(row: Mapping[str, Any], metric: str, value_key: str) -> str:
