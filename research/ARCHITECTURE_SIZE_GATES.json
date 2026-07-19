@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1147,
+  "file_count": 1149,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T09:02:26.464070+00:00",
+  "generated_at": "2026-07-19T09:28:47.980721+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2028,6 +2028,12 @@
     {
       "limit": 1500,
       "line_count": 1194,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1194,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py",
       "source_kind": "production"
     },
@@ -2053,12 +2059,6 @@
       "limit": 1500,
       "line_count": 1188,
       "path": "crypto_rsi_scanner/event_alpha/providers/bybit_announcements_preflight.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1186,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
       "source_kind": "production"
     },
     {
@@ -2114,6 +2114,12 @@
     {
       "limit": 1500,
       "line_count": 1464,
+      "path": "tests/cli/test_make_targets.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1464,
       "path": "tests/event_alpha/test_operator_workflows.py",
       "source_kind": "test"
     },
@@ -2127,12 +2133,6 @@
       "limit": 1500,
       "line_count": 1430,
       "path": "tests/event_alpha/test_catalyst_frames.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1428,
-      "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
     {
@@ -2263,7 +2263,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1028,
+      "line_count": 1029,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },

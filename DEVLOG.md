@@ -17,6 +17,47 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve temporal evidence in canonical market snapshots · Codex
+**Why:** Live market rows already bound every derived temporal feature to exact
+observation IDs and a deterministic baseline digest, but the anomaly scanner's
+canonical snapshot retained the value while dropping that audit trail. That
+made future point-in-time reconstruction weaker precisely as the campaign
+reached broad temporal maturity.
+**Changes:**
+- Added one bounded, deep-copied, JSON-safe `market_feature_evidence`
+  projection to canonical market-state snapshots, together with the matching
+  `market_history_observation_id`; anomaly rows retain the same projection in
+  their nested snapshot.
+- Closed temporal-entry validation over feature names, calculations, basis,
+  status, sample/input counts, current and baseline observation IDs, provider
+  and mode sets, SHA-256 format, benchmark references, and research-only state.
+  Generic direct-provider evidence remains compatible but must still be bounded
+  JSON data with finite numbers.
+- Extended snapshot/anomaly schema validation and added regressions for exact
+  propagation, detached copies, source mutation, current-ID drift, digest
+  drift, impossible counts, calculation drift, and non-finite nested values.
+- Registered the new regressions with the standalone compatibility runner and
+  made its discovery-provider isolation assertion self-contained, so an
+  operator's existing live authorization cannot make the no-provider test fail
+  merely because that runner does not execute pytest autouse fixtures.
+- Hardened `make test` itself to force every discovery, preflight, Decision-
+  provider, and LLM authorization off in its disposable process. An authorized
+  operator checkout can no longer turn a compatibility sweep into provider
+  activity; mocked tests still opt in explicitly.
+- Recorded the invariant in the Decision Radar North Star and durable decision.
+**Verify:** All 99 focused market-feature, history, surface, schema, and unit-
+health tests passed. Compileall and architecture cleanliness passed. The
+integrated fixture cycle validated 126 schema rows with zero errors and strict
+doctor 0 blockers / 0 warnings. An in-memory re-projection of all 30 current
+live rows produced 30 schema-clean snapshots, zero anomalies, and 30 preserved
+evidence maps; shadow-only surprise remained absent from the canonical scan
+projection. Full local `make verify` then passed 1,412/1,412 standalone checks,
+3,145/3,145 pytest checks, alert rendering, fixture backtest, and scoreboard.
+**Notes/risks:** Existing immutable namespaces are not rewritten and missing
+optional evidence remains compatible. No provider call, authorization, score,
+threshold, route, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Require valid explicit Radar evaluation clocks · Codex
 **Why:** Integrated candidate/delivery generation and market confirmation
 silently replaced a malformed explicitly supplied evaluation clock with wall

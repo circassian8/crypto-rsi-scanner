@@ -139,9 +139,12 @@ may be added later when a suitable environment already exists.
   comparable same-machine baseline before release.
   The standalone compatibility runner behind `make test` always starts one
   disposable artifact/discovery root, strips ambient per-store path overrides,
-  disables sends, and removes that root on exit. This preserves namespace-
-  relative test behavior while preventing the compatibility pass from appending
-  to cumulative operator stores. A release sequence must compare the real
+  forces every provider/preflight/LLM authorization off, disables sends, and
+  removes that root on exit. Individual tests may opt back in only through an
+  explicit mocked boundary. This preserves namespace-relative test behavior
+  while preventing the compatibility pass from appending to cumulative
+  operator stores or crossing a live provider boundary. A release sequence must
+  compare the real
   artifact tree and dashboard pointer before/after when authority neutrality is
   part of the acceptance evidence.
   Run full `make verify` for release-style handoff, risky shared

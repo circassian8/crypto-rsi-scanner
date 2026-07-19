@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping
 from . import calendar as calendar_specs, decision_model as decision_model_specs
 from . import feedback_eligibility as feedback_eligibility_specs
 from . import feedback_progress as feedback_progress_specs
+from . import market_feature_evidence as market_feature_evidence_specs
 from . import market_shadow_surprise as market_shadow_surprise_specs
 from . import measurement as measurement_specs
 from . import outcome_eligibility as outcome_eligibility_specs
@@ -531,13 +532,14 @@ SCHEMAS: dict[str, ArtifactSchema] = {
             "schema_id", "schema_version", "anomaly_id", "market_anomaly_id",
             "coin_id", "canonical_asset_id", "anomaly_type", "anomaly_bucket",
             "priority", "source_plan", "source_plan_status",
+            "market_state_snapshot",
             "shadow_temporal_surprise",
             "suggested_source_packs", "suggested_source_packs_to_search",
             "search_queries", "no_alert_until_evidence",
             "decision_model_v2_catalyst_required", "catalyst_search_role",
             *COMMON_SAFETY,
         ),
-        types={"shadow_temporal_surprise": "dict"},
+        types={"market_state_snapshot": "dict", "shadow_temporal_surprise": "dict"},
         safety=COMMON_SAFETY,
         timestamps=("observed_at", "search_deadline"),
         lineage=COMMON_LINEAGE,
@@ -816,6 +818,12 @@ def validate_row_against_schema(row: Mapping[str, Any], schema: str | ArtifactSc
     if schema_obj.schema_id == "event_alpha_feedback_progress_v1": errors.extend(feedback_progress_specs.validate_contract(row))
     if schema_obj.schema_id == "event_alpha_burn_in_measurement_dashboard_v1": errors.extend(measurement_specs.validate_contract(row))
     if schema_obj.schema_id in {"market_state_snapshot_v1", "market_anomaly_v1"}:
+        errors.extend(
+            market_feature_evidence_specs.validate_contract(
+                row,
+                nested_market_snapshot=(schema_obj.schema_id == "market_anomaly_v1"),
+            )
+        )
         errors.extend(
             market_shadow_surprise_specs.validate_contract(
                 row,

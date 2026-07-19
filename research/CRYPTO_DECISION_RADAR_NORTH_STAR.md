@@ -663,9 +663,13 @@ asset is not globally warm until all configured required groups are warm.
 Returns, volatility, turnover/volume z-scores, and BTC/ETH relative returns are
 derived in percent points without using the current observation in its own
 baseline. Current rows older than six hours or materially future-dated fail
-closed. Cold/warming status and exact observation ids remain visible, and only
-fields explicitly identified as proxy inputs may be replaced by a temporal
-calculation.
+closed. Cold/warming status and exact observation ids remain visible. The
+canonical market-state snapshot and its nested anomaly copy preserve one
+bounded `market_feature_evidence` map plus the matching current history
+observation ID, so a computed feature cannot become detached from its exact
+baseline fingerprint between collection and classification. Temporal evidence
+entries are closed, JSON-safe, deep-copied, and schema-validated. Only fields
+explicitly identified as proxy inputs may be replaced by a temporal calculation.
 
 The optional `event_alpha.shadow_temporal_surprise` v1 comparison uses only
 positive finite provider-observed `volume_24h` and provider-observed or explicit

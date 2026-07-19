@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 import crypto_rsi_scanner.event_alpha.radar.market_units as event_market_units
+from crypto_rsi_scanner.event_alpha.artifacts.schema import (
+    market_feature_evidence as event_market_feature_evidence,
+)
 
 
 _INTERNAL_TEMPORAL_RETURN_UNIT_FIELD = re.compile(
@@ -60,6 +63,8 @@ class MarketStateSnapshot:
     event_age_hours: float | None = None
     market_data_source: str = "unknown"
     freshness_status: str = "unknown"
+    market_history_observation_id: str | None = None
+    market_feature_evidence: Mapping[str, Any] = field(default_factory=dict)
     return_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
     source_return_unit: str = event_market_units.RETURN_UNIT_UNKNOWN
     threshold_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
@@ -71,6 +76,10 @@ class MarketStateSnapshot:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
+        if self.market_history_observation_id is None:
+            data.pop("market_history_observation_id")
+        if not self.market_feature_evidence:
+            data.pop("market_feature_evidence")
         data["observed_fields"] = list(self.observed_fields)
         data["return_units"] = dict(self.return_units)
         data["source_return_units"] = dict(self.source_return_units)
@@ -122,6 +131,14 @@ def snapshot_from_market_row(
         or ("fresh" if _has_valid_row_observation_time(row) else "unknown")
     )
     source = str(row.get("market_data_source") or row.get("source") or "fixture")
+    market_history_observation_id = _optional_string(
+        row.get("market_history_observation_id"),
+        field_name="market_history_observation_id",
+    )
+    market_feature_evidence = event_market_feature_evidence.canonical_projection(
+        row.get("market_feature_evidence"),
+        expected_current_observation_id=market_history_observation_id,
+    )
     normalized_return_units = {
         name: event_market_units.RETURN_UNIT_PERCENT_POINTS
         for name, value in normalized_returns.items()
@@ -185,6 +202,8 @@ def snapshot_from_market_row(
         event_age_hours=capture("event_age_hours", _float(row.get("event_age_hours"))),
         market_data_source=source,
         freshness_status=freshness,
+        market_history_observation_id=market_history_observation_id,
+        market_feature_evidence=market_feature_evidence,
         return_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
         source_return_unit=source_unit,
         threshold_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
@@ -195,6 +214,14 @@ def snapshot_from_market_row(
         warnings=tuple(dict.fromkeys(warnings)),
     )
     return snapshot
+
+
+def _optional_string(value: object, *, field_name: str) -> str | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value
 
 
 def _source_unit_warnings(row: Mapping[str, Any]) -> tuple[str, ...]:

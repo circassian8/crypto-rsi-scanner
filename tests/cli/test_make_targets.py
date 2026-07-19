@@ -444,6 +444,42 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     ) in bundle_outcomes_dry.stdout
 
 
+def test_standalone_runner_disables_every_live_provider_boundary():
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    target = makefile.split("\ntest:\n", 1)[1].split(
+        "\n# Full pytest suite as a hard gate:", 1
+    )[0]
+    disabled = (
+        "RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE",
+        "RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE",
+        "RSI_EVENT_DISCOVERY_CRYPTOPANIC_LIVE",
+        "RSI_EVENT_DISCOVERY_GDELT_LIVE",
+        "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE",
+        "RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE",
+        "RSI_EVENT_DISCOVERY_COINALYZE_LIVE",
+        "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE",
+        "RSI_EVENT_ALPHA_BYBIT_ANNOUNCEMENTS_ALLOW_LIVE_PREFLIGHT",
+        "RSI_EVENT_ALPHA_COINALYZE_ALLOW_LIVE_PREFLIGHT",
+        "RSI_EVENT_ALPHA_DEX_ONCHAIN_ALLOW_LIVE_PREFLIGHT",
+        "RSI_EVENT_ALPHA_UNLOCK_CALENDAR_ALLOW_LIVE_PREFLIGHT",
+        "RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE",
+        "RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE",
+        "RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE",
+        "RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE",
+        "RSI_DECISION_RADAR_OUTCOME_PRICE_RECOVERY_LIVE",
+        "RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE",
+        "RSI_DECISION_RADAR_BITGET_ANNOUNCEMENTS_LIVE",
+        "RSI_EVENT_LLM_ENABLED",
+        "RSI_EVENT_LLM_EXTRACTOR_ENABLED",
+        "RSI_EVENT_LLM_CATALYST_FRAMES_ENABLED",
+    )
+
+    assert all(f"{name}=0 \\" in target for name in disabled)
+    assert "RSI_EVENT_ALERTS_ENABLED=0 \\" in target
+    assert "TELEGRAM_BOT_TOKEN='' \\" in target
+    assert "OPENAI_API_KEY='' \\" in target
+
+
 def test_normalize_export_timestamps_clamps_future_mtimes():
     import os
     from scripts import normalize_export_timestamps

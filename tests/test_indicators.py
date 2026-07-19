@@ -805,6 +805,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_incident_relevance",
     "tests.event_alpha.test_llm_radar",
     "tests.event_alpha.test_market_enrichment",
+    "tests.event_alpha.test_market_feature_evidence_integrity",
     "tests.event_alpha.test_market_history",
     "tests.event_alpha.test_market_no_send_attempt",
     "tests.event_alpha.test_market_no_send_history_cache",

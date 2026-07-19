@@ -1658,6 +1658,9 @@
   },
   "temporal_market_baseline_policy": {
     "baseline_excludes_current_observation": true,
+    "canonical_snapshot_evidence_field": "market_feature_evidence",
+    "canonical_snapshot_evidence_projection": "bounded_deep_copied_json_safe_schema_validated",
+    "canonical_snapshot_observation_id_field": "market_history_observation_id",
     "cadence_policy": {
       "background_refresh_requires_explicit_operator_authorization": true,
       "default_minimum_observation_spacing_minutes": 60,

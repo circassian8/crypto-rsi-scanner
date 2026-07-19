@@ -114,7 +114,12 @@ SHA-256 of the ordered observation-ID list. Derived returns must include their
 horizon anchors and historical endpoints; relative returns must additionally
 include benchmark endpoints and anchors. Do not fall back to the last N raw
 rows. Missing observation identity or conflicting bytes under one identity fail
-closed.
+closed. The canonical market-state snapshot and any anomaly row embedding that
+snapshot must carry the same bounded `market_feature_evidence` projection and
+its `market_history_observation_id`; downstream classification may not retain a
+derived value while discarding its lineage. The projection is deep-copied,
+JSON-safe, and schema-validated, while rows that genuinely have no temporal
+evidence retain the optional-field compatibility path.
 **Why:** Sample count alone does not describe a derived statistic's lineage.
 Filtered missing values and multi-hour anchors can make the last N raw rows
 materially different from the rows used in calculation, undermining point-in-

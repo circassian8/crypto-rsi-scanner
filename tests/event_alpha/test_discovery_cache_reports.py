@@ -26,9 +26,13 @@ def _isolate_local_discovery_from_live_providers(monkeypatch):
     _force_disable_event_discovery_live(monkeypatch, config)
 
 
-def test_local_discovery_tests_force_disable_all_live_provider_flags():
+def test_local_discovery_tests_force_disable_all_live_provider_flags(monkeypatch):
     from crypto_rsi_scanner import config
 
+    # The standalone compatibility runner does not execute pytest autouse
+    # fixtures, so keep this contract self-contained under an authorized local
+    # environment as well as under pytest.
+    _force_disable_event_discovery_live(monkeypatch, config)
     assert all(
         getattr(config, name) is False
         for name in _EVENT_DISCOVERY_LIVE_FLAG_NAMES
