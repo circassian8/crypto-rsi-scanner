@@ -21,9 +21,12 @@ from .bybit_execution_quality import (
     TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION,
     TARGET_NOTIONAL_SIZING_SCHEMA_VERSION,
 )
+from .bybit_execution_quality_capture_pair import (
+    SCHEMA_VERSION as CAPTURE_PAIR_ROUND_TRIP_SCHEMA_VERSION,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v15"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v16"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -123,6 +126,20 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "target_notional_is_quote_budget": False,
     "marketable_quote_value_may_exceed_target_due_spread_and_impact": True,
     "target_notional_round_trip_identity_reconciled": True,
+    "capture_pair_round_trip_implemented": True,
+    "capture_pair_round_trip_schema_version": (
+        CAPTURE_PAIR_ROUND_TRIP_SCHEMA_VERSION
+    ),
+    "capture_pair_exact_namespaces_required": True,
+    "capture_pair_latest_pointer_used": False,
+    "capture_pair_both_strict_clean_required": True,
+    "capture_pair_both_completion_fresh_required": True,
+    "capture_pair_windows_ordered_non_overlapping": True,
+    "capture_pair_base_and_namespaces_descriptor_held_together": True,
+    "capture_pair_provider_calls": 0,
+    "capture_pair_writes_performed": False,
+    "capture_pair_protocol_v2_annex_bound": False,
+    "capture_pair_protocol_v2_evidence_eligible": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
 }
@@ -706,6 +723,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_usdt_linear_perpetual_fixture_normalizer_v5",
             "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
             "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
+            "bybit_two_exact_immutable_capture_round_trip_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -872,6 +890,28 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"{str(value['target_notional_is_quote_budget']).casefold()} "
         "marketable_quote_value_may_exceed_target_due_spread_and_impact="
         f"{str(value['marketable_quote_value_may_exceed_target_due_spread_and_impact']).casefold()}",
+        "capture_pair_round_trip_implemented="
+        f"{str(value['capture_pair_round_trip_implemented']).casefold()} "
+        f"schema={value['capture_pair_round_trip_schema_version']}",
+        "capture_pair_exact_namespaces_required="
+        f"{str(value['capture_pair_exact_namespaces_required']).casefold()} "
+        "latest_pointer_used="
+        f"{str(value['capture_pair_latest_pointer_used']).casefold()} "
+        "both_strict_clean_required="
+        f"{str(value['capture_pair_both_strict_clean_required']).casefold()} "
+        "both_completion_fresh_required="
+        f"{str(value['capture_pair_both_completion_fresh_required']).casefold()}",
+        "capture_pair_windows_ordered_non_overlapping="
+        f"{str(value['capture_pair_windows_ordered_non_overlapping']).casefold()} "
+        "base_and_namespaces_descriptor_held_together="
+        f"{str(value['capture_pair_base_and_namespaces_descriptor_held_together']).casefold()} "
+        f"provider_calls={value['capture_pair_provider_calls']} "
+        "writes_performed="
+        f"{str(value['capture_pair_writes_performed']).casefold()}",
+        "capture_pair_protocol_v2_annex_bound="
+        f"{str(value['capture_pair_protocol_v2_annex_bound']).casefold()} "
+        "protocol_v2_evidence_eligible="
+        f"{str(value['capture_pair_protocol_v2_evidence_eligible']).casefold()}",
         "target_notional_tier_set_sealed="
         f"{str(value['target_notional_tier_set_sealed']).casefold()} "
         "base_quantity_selection_policy_sealed="

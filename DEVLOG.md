@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Connect two immutable Bybit captures to round-trip evidence · Codex
+**Why:** The venue arithmetic could revalidate independent entry and exit
+constraints, but no closed read-only path joined two immutable capture bundles
+without trusting a moving latest pointer or partially projected rows.
+**Changes:**
+- Added capture-pair projection v1. It requires exact distinct entry/exit
+  namespaces, opens one verified artifact base plus both no-follow namespace
+  descriptors before either read, and retains them through full raw-bundle
+  rederivation and identity checks.
+- Require strict-clean completion-fresh capture sets, ordered non-overlapping
+  windows, one exact native instrument, and independent catalog/book hashes,
+  clocks, request lineages, source authority, and dynamic constraints before
+  invoking target composite v2 and round-trip v3.
+- Added a read-only Make/CLI surface with zero provider calls or writes, plus
+  long/short, staleness, overlap, reuse, identity, step-alignment, raw-drift,
+  root-swap, no-network, no-secret, and no-write regressions.
+- Advanced execution-quality readiness to v16 and current Protocol-v2 progress
+  to v15; updated the North Star, operator decision package, working agreement,
+  durable decision, and roadmap. Genuine capture IDs, target tiers, order
+  styles, costs, and annex authority remain explicitly absent.
+**Verify:** 314 focused Bybit execution/capture/intraday/derivatives/liquidation,
+readiness, and Protocol-v2 tests passed. Python compileall, the offline Bybit
+smoke, static execution-quality readiness, current/frozen Protocol-v2 checks,
+North Star JSON validation, diff check, and architecture cleanliness passed.
+**Notes/risks:** No provider call, authorization, credential/private-data read,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` was added. The projection is research-only and remains
+Protocol-v2-ineligible until two genuine captures and the complete human-
+approved cost annex are sealed. Quantitative source line counts remain advisory;
+bounded provider/artifact input sizes remain enforced as security controls.
+
 ## 2026-07-20 — Revalidate dynamic Bybit constraints per book leg · Codex
 **Why:** The quantity-reconciled round trip reused one entry-time catalog row
 for both legs even though Bybit documents its order maxima as dynamic. That

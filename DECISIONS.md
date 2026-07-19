@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Build round-trip evidence only from two exact immutable captures
+**Status:** accepted as a read-only capability; not Protocol-v2 evidence until annex-bound
+**Decision:** A capture-backed Bybit round trip must name exact entry and exit
+capture namespaces and must never infer either from the latest pointer. Open
+one verified artifact-base descriptor and both no-follow namespace descriptors
+before reading either bundle, retain them through the full dual read, and
+rederive both bundles from exact raw catalog and order-book responses. Require
+distinct, non-overlapping capture windows, completion-fresh input-quality sets,
+one exact shared native instrument, and independently preserved hashes, clocks,
+lineages, constraints, and source authority. The resulting projection remains
+read-only, annex-unbound, and Protocol-v2-ineligible.
+**Why:** The per-leg arithmetic was closed, but a future operator could still
+pair partially validated rows, guess a moving latest pointer, reuse one catalog,
+or mix captures across a root/namespace swap. Exact dual-descriptor evidence
+turns immutable provider bytes into reproducible round-trip inputs without
+claiming execution or empirical authority.
+**Revisit when:** Two genuine strict-clean captures exist for a human-confirmed
+instrument and the Protocol-v2 annex is ready to bind their IDs, target sizes,
+entry/exit styles, fees, funding, latency, slippage, and unavailable-cost rule.
+
 ## 2026-07-20 - Revalidate dynamic Bybit constraints at each round-trip leg
 **Status:** accepted as an offline correctness contract; Protocol-v2 policy remains unsealed
 **Decision:** A quantity-reconciled Bybit round trip must bind separate,

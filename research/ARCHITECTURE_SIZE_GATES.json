@@ -1822,7 +1822,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1163,
+  "file_count": 1165,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1848,11 +1848,27 @@
       "public": true,
       "qualname": "model_bybit_visible_book_round_trip",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py"
+    },
+    {
+      "function_name": "format_current_progress",
+      "line_count": 157,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "format_current_progress",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py"
+    },
+    {
+      "function_name": "build_execution_quality_readiness",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
+      "public": true,
+      "qualname": "build_execution_quality_readiness",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
     }
   ],
-  "functions_over_limit_count": 1,
+  "functions_over_limit_count": 3,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T23:14:00.396595+00:00",
+  "generated_at": "2026-07-19T23:36:32.027341+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2008,14 +2024,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1235,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+      "line_count": 1245,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1210,
-      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
+      "line_count": 1235,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
     {
@@ -3912,8 +3928,8 @@
   ],
   "new_blocking_violation_count": 0,
   "new_blocking_violations": [],
-  "new_measurement_count": 3,
-  "new_violation_count": 3,
+  "new_measurement_count": 5,
+  "new_violation_count": 5,
   "new_violations": [
     {
       "category": "file_over_1500_lines",
@@ -3943,6 +3959,28 @@
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "format_current_progress",
+      "line_count": 157,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "format_current_progress",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "build_execution_quality_readiness",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
+      "public": true,
+      "qualname": "build_execution_quality_readiness",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness"
     }
   ],
   "no_live_provider_calls": true,
@@ -4156,14 +4194,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1235,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+      "line_count": 1245,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1210,
-      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
+      "line_count": 1235,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
       "source_kind": "production"
     },
     {
@@ -4183,7 +4221,7 @@
   "production_files_over_1500_lines": 1,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 1,
+  "production_functions_over_limit": 3,
   "production_functions_over_limit_rows": [
     {
       "function_name": "model_bybit_visible_book_round_trip",
@@ -4192,6 +4230,22 @@
       "public": true,
       "qualname": "model_bybit_visible_book_round_trip",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py"
+    },
+    {
+      "function_name": "format_current_progress",
+      "line_count": 157,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "format_current_progress",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py"
+    },
+    {
+      "function_name": "build_execution_quality_readiness",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
+      "public": true,
+      "qualname": "build_execution_quality_readiness",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
     }
   ],
   "production_size_gate_status": "advisory",
@@ -4394,7 +4448,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1210,
+      "line_count": 1245,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
     },
@@ -4480,7 +4534,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 1,
+      "functions_over_150_lines": 3,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -4621,13 +4675,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1235,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
+        "line_count": 1245,
+        "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
         "threshold": 1200
       },
       {
-        "line_count": 1210,
-        "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
+        "line_count": 1235,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
         "threshold": 1200
       },
       {
@@ -4711,7 +4765,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 1,
+    "functions_over_150_lines": 3,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
@@ -4730,7 +4784,9 @@
     "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin",
     "file:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
     "file:tests/cli/test_make_targets.py",
-    "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip"
+    "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip",
+    "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress",
+    "function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness"
   ],
   "violations": [
     {
@@ -4812,6 +4868,28 @@
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "format_current_progress",
+      "line_count": 157,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "format_current_progress",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "build_execution_quality_readiness",
+      "line_count": 151,
+      "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
+      "public": true,
+      "qualname": "build_execution_quality_readiness",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness"
     }
   ]
 }

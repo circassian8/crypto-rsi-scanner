@@ -42,10 +42,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v14"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v15"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_target_mid_notional_floor_sizing_separate_entry_exit_catalog_bound_"
+    "with_two_exact_immutable_capture_round_trip_target_mid_notional_floor_"
+    "sizing_separate_entry_exit_catalog_bound_"
     "dynamic_instrument_constraints_quantity_reconciled_round_trip_"
     "primitive_mid_reference_impact_semantics_native_"
     "Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_cost_unit_"
@@ -74,6 +75,12 @@ _NEXT_SAFE_COMMANDS = (
     "make radar-market-no-send-readiness PYTHON=.venv/bin/python",
     "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
     "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
+    "make radar-execution-quality-bybit-round-trip "
+    "BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE=<entry> "
+    "BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE=<exit> "
+    "BYBIT_EXECUTION_INSTRUMENT_ID=<instrument> "
+    "BYBIT_EXECUTION_POSITION_SIDE=<long_or_short> "
+    "BYBIT_EXECUTION_TARGET_NOTIONAL_USDT=<usdt> PYTHON=.venv/bin/python",
     "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
     "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python",
     "make radar-derivatives-bybit-liquidation-smoke PYTHON=.venv/bin/python",
@@ -188,6 +195,20 @@ _EXPECTED_EXECUTION_DECISION = {
     "target_notional_is_quote_budget": False,
     "marketable_quote_value_may_exceed_target_due_spread_and_impact": True,
     "target_notional_round_trip_identity_reconciled": True,
+    "capture_pair_round_trip_implemented": True,
+    "capture_pair_round_trip_schema_version": (
+        "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1"
+    ),
+    "capture_pair_exact_namespaces_required": True,
+    "capture_pair_latest_pointer_used": False,
+    "capture_pair_both_strict_clean_required": True,
+    "capture_pair_both_completion_fresh_required": True,
+    "capture_pair_windows_ordered_non_overlapping": True,
+    "capture_pair_base_and_namespaces_descriptor_held_together": True,
+    "capture_pair_provider_calls": 0,
+    "capture_pair_writes_performed": False,
+    "capture_pair_protocol_v2_annex_bound": False,
+    "capture_pair_protocol_v2_evidence_eligible": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
@@ -576,6 +597,23 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         (
             "target_notional_is_quote_budget=false "
             "marketable_quote_value_may_exceed_target_due_spread_and_impact=true"
+        ),
+        (
+            "capture_pair_round_trip_implemented=true schema="
+            f"{decision['capture_pair_round_trip_schema_version']}"
+        ),
+        (
+            "capture_pair_exact_namespaces_required=true latest_pointer_used=false "
+            "both_strict_clean_required=true both_completion_fresh_required=true"
+        ),
+        (
+            "capture_pair_windows_ordered_non_overlapping=true "
+            "base_and_namespaces_descriptor_held_together=true "
+            "provider_calls=0 writes_performed=false"
+        ),
+        (
+            "capture_pair_protocol_v2_annex_bound=false "
+            "protocol_v2_evidence_eligible=false"
         ),
         (
             "target_notional_tier_set_sealed=false "

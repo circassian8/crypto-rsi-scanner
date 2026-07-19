@@ -118,6 +118,11 @@ BEA_RELEASE_DATES_JSON ?=
 OFFICIAL_MACRO_OBSERVED_AT ?=
 BYBIT_LIQUIDATION_TRANSCRIPT ?=
 BYBIT_LIQUIDATION_CAPTURE_NAMESPACE ?=
+BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE ?=
+BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE ?=
+BYBIT_EXECUTION_INSTRUMENT_ID ?=
+BYBIT_EXECUTION_POSITION_SIDE ?=
+BYBIT_EXECUTION_TARGET_NOTIONAL_USDT ?=
 RADAR_MARKET_CAMPAIGN_OUTPUT_DIR ?= research
 RADAR_MARKET_CAMPAIGN_EVALUATED_AT ?=
 RADAR_MARKET_CAMPAIGN_EVALUATED_AT_ARG = $(if $(strip $(RADAR_MARKET_CAMPAIGN_EVALUATED_AT)),--evaluated-at $(RADAR_MARKET_CAMPAIGN_EVALUATED_AT),)
@@ -410,6 +415,7 @@ help:
 	@echo "  CONFIRM=1 make radar-execution-quality-bybit-collect  Probe bounded public books only when separately authorized"
 	@echo "  CONFIRM=1 make radar-execution-quality-bybit-capture  Seal exact public responses only when separately authorized"
 	@echo "  make radar-execution-quality-bybit-status  Validate the latest immutable capture; no call/write"
+	@echo "  make radar-execution-quality-bybit-round-trip BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE=... BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE=... BYBIT_EXECUTION_INSTRUMENT_ID=... BYBIT_EXECUTION_POSITION_SIDE=long|short BYBIT_EXECUTION_TARGET_NOTIONAL_USDT=...  Revalidate two exact captures and model one read-only round trip"
 	@echo "  make event-alpha-integrated-radar-smoke  Run fixture integrated radar cycle, cards, preview, doctor; no sends"
 	@echo "  make event-alpha-integrated-radar-doctor  Strictly inspect the integrated radar smoke namespace"
 	@echo "  make event-alpha-integrated-radar-outcome-smoke  Fill/report fixture integrated radar outcomes; no sends/trades"
@@ -1776,6 +1782,21 @@ radar-execution-quality-bybit-status:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live status \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR)
+
+radar-execution-quality-bybit-round-trip:
+	@test -n "$(strip $(BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE))" || { echo "BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE is required" >&2; exit 2; }
+	@test -n "$(strip $(BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE))" || { echo "BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE is required" >&2; exit 2; }
+	@test -n "$(strip $(BYBIT_EXECUTION_INSTRUMENT_ID))" || { echo "BYBIT_EXECUTION_INSTRUMENT_ID is required" >&2; exit 2; }
+	@test -n "$(strip $(BYBIT_EXECUTION_POSITION_SIDE))" || { echo "BYBIT_EXECUTION_POSITION_SIDE is required" >&2; exit 2; }
+	@test -n "$(strip $(BYBIT_EXECUTION_TARGET_NOTIONAL_USDT))" || { echo "BYBIT_EXECUTION_TARGET_NOTIONAL_USDT is required" >&2; exit 2; }
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_capture_pair \
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--entry-namespace "$(BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE)" \
+		--exit-namespace "$(BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE)" \
+		--instrument-id "$(BYBIT_EXECUTION_INSTRUMENT_ID)" \
+		--position-side "$(BYBIT_EXECUTION_POSITION_SIDE)" \
+		--target-entry-mid-notional-usdt "$(BYBIT_EXECUTION_TARGET_NOTIONAL_USDT)"
 
 event-alpha-official-exchange-report:
 	env $(EVENT_RESEARCH_NOW_ENV) \

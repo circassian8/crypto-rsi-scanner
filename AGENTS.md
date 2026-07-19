@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v15 must expose those remaining cost fields rather
+  Execution-quality readiness v16 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -616,6 +616,15 @@ may be added later when a suitable environment already exists.
   marketable spread and depth can make a buy spend more or a sell receive less.
   Do not treat this capability as selection of the final tier set, adoption of
   the floor policy, or selection of an order style; all remain unsealed.
+  The read-only capture-pair v1 projection may connect two explicitly named
+  immutable capture namespaces to target composite v2 and round-trip v3. It
+  must never guess the latest pointer. Hold one verified artifact-base
+  descriptor and both no-follow namespace descriptors across the complete
+  read; fully rederive both raw bundles; require distinct non-overlapping
+  windows, completion freshness, exact instrument identity, and independent
+  catalog/book hashes, clocks, and lineages. It makes no provider call or write
+  and remains Protocol-v2-ineligible until genuine capture IDs and the complete
+  cost annex are human-sealed.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

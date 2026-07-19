@@ -1098,27 +1098,45 @@ def _validate_capture_semantics(
     }
 
 
-def validate_bybit_execution_quality_capture(
+def _validated_bybit_execution_quality_capture_bundle(
     artifact_base_dir: str | Path,
     *,
     namespace: str,
     pointer: Mapping[str, object] | None = None,
-) -> dict[str, object]:
-    """Validate one immutable capture and rederive projections from raw bytes."""
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Read once, validate, and retain the exact rederived in-memory bundle."""
 
     from .bybit_execution_quality_capture_validation import read_capture_bundle
 
     if not _NAMESPACE_RE.fullmatch(namespace):
         raise BybitExecutionQualityCaptureError("capture_namespace_invalid")
     base = Path(artifact_base_dir).expanduser().absolute()
-    (
-        receipt,
-        receipt_raw,
-        manifest,
-        manifest_raw,
-        artifacts,
-        roles,
-    ) = read_capture_bundle(base / namespace)
+    bundle = read_capture_bundle(base / namespace)
+    return _validated_bybit_execution_quality_loaded_bundle(
+        namespace=namespace,
+        bundle=bundle,
+        pointer=pointer,
+    )
+
+
+def _validated_bybit_execution_quality_loaded_bundle(
+    *,
+    namespace: str,
+    bundle: tuple[
+        dict[str, Any],
+        bytes,
+        dict[str, Any],
+        bytes,
+        dict[str, bytes],
+        dict[str, str],
+    ],
+    pointer: Mapping[str, object] | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Validate a bundle already read through caller-held descriptors."""
+
+    if not _NAMESPACE_RE.fullmatch(namespace):
+        raise BybitExecutionQualityCaptureError("capture_namespace_invalid")
+    receipt, receipt_raw, manifest, manifest_raw, artifacts, roles = bundle
     validated_pointer = _validate_capture_contracts(
         namespace,
         receipt=receipt,
@@ -1132,7 +1150,7 @@ def validate_bybit_execution_quality_capture(
         roles,
         capture_id=receipt.get("capture_id"),
     )
-    return _validate_capture_semantics(
+    validated = _validate_capture_semantics(
         namespace,
         receipt=receipt,
         manifest=manifest,
@@ -1140,6 +1158,23 @@ def validate_bybit_execution_quality_capture(
         artifacts=artifacts,
         projections=projections,
     )
+    return validated, projections
+
+
+def validate_bybit_execution_quality_capture(
+    artifact_base_dir: str | Path,
+    *,
+    namespace: str,
+    pointer: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Validate one immutable capture and rederive projections from raw bytes."""
+
+    validated, _projections = _validated_bybit_execution_quality_capture_bundle(
+        artifact_base_dir,
+        namespace=namespace,
+        pointer=pointer,
+    )
+    return validated
 
 
 def load_latest_bybit_execution_quality_capture(

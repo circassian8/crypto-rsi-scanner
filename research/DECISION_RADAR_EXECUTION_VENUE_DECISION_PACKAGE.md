@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v15`. Run
+`crypto_radar_execution_quality_readiness_v16`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -139,6 +139,18 @@ quantity, and notional identity. This target is not a quote-spend budget: a mark
 more and a marketable sell may receive less after spread and depth impact. The
 final target tier set, adoption of this floor rule, and order style remain
 unsealed Protocol-v2 decisions.
+
+The capture-pair v1 projection is the read-only bridge from two immutable
+capture IDs to this cost math. The operator must name exact entry and exit
+namespaces; it never guesses from the latest pointer. One held artifact-base
+descriptor and both held namespace descriptors cover the complete dual read,
+and each bundle is fully rederived from its raw catalog and order-book bytes.
+Both sets must be strict-clean and fresh at capture completion, their windows
+must be distinct and non-overlapping, and the exact native instrument must be
+present once in each. Their separate hashes, clocks, lineages, and dynamic
+constraints then feed target composite v2 and round-trip v3. This makes no
+provider call or write and cannot grant Protocol-v2 authority. Genuine pair
+evidence and the approved cost annex are still absent.
 
 ## Venue-native derivatives context contract
 

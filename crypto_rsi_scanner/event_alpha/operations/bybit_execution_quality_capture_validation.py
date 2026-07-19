@@ -33,7 +33,11 @@ from .bybit_execution_quality_set_freshness import (
     FRESHNESS_POLICY,
     MAXIMUM_AGE_SECONDS,
 )
-from .market_no_send_io import _open_verified_namespace_dir, parse_json_object_bytes
+from .market_no_send_io import (
+    _open_verified_base_dir,
+    _open_verified_namespace_dir,
+    parse_json_object_bytes,
+)
 from .market_no_send_models import MarketNoSendError
 
 
@@ -92,11 +96,12 @@ def parse_artifact_json(raw: bytes) -> dict[str, Any]:
         raise BybitExecutionQualityCaptureError("capture_artifact_invalid_json") from exc
 
 
-def read_capture_bundle(
-    namespace_dir: Path,
-) -> tuple[
+CaptureBundle = tuple[
     dict[str, Any], bytes, dict[str, Any], bytes, dict[str, bytes], dict[str, str]
-]:
+]
+
+
+def _read_capture_bundle_from_namespace_fd(namespace_fd: int) -> CaptureBundle:
     required_roles = {
         AUTHORITY_FILENAME: "source_authority",
         UNIVERSE_FILENAME: "radar_universe",
@@ -104,66 +109,160 @@ def read_capture_bundle(
         REQUEST_INDEX_FILENAME: "request_index",
         OBSERVATIONS_FILENAME: "execution_quality_observations",
     }
+    receipt_raw = _read_regular_bytes_at(namespace_fd, RECEIPT_FILENAME)
+    manifest_raw = _read_regular_bytes_at(namespace_fd, MANIFEST_FILENAME)
+    receipt = parse_artifact_json(receipt_raw)
+    manifest = parse_artifact_json(manifest_raw)
+    descriptor_values = manifest.get("artifacts")
+    if (
+        not isinstance(descriptor_values, list)
+        or not 5 < len(descriptor_values) <= MAX_RESPONSES + 5
+    ):
+        raise BybitExecutionQualityCaptureError("capture_artifact_index_invalid")
+    artifacts: dict[str, bytes] = {}
+    roles: dict[str, str] = {}
+    for descriptor in descriptor_values:
+        if (
+            not isinstance(descriptor, Mapping)
+            or set(descriptor) != {"name", "role", "sha256", "size_bytes"}
+        ):
+            raise BybitExecutionQualityCaptureError(
+                "capture_artifact_index_invalid"
+            )
+        name = str(descriptor.get("name") or "")
+        role = str(descriptor.get("role") or "")
+        expected_role = required_roles.get(name)
+        if (
+            name in artifacts
+            or name in {MANIFEST_FILENAME, RECEIPT_FILENAME}
+            or (expected_role is None and not _SAFE_RAW_NAME_RE.fullmatch(name))
+            or (expected_role is not None and role != expected_role)
+            or (
+                expected_role is None
+                and role != "accepted_raw_provider_response"
+            )
+        ):
+            raise BybitExecutionQualityCaptureError("capture_artifact_name_invalid")
+        raw = _read_regular_bytes_at(namespace_fd, name)
+        if (
+            descriptor.get("sha256") != _sha256(raw)
+            or descriptor.get("size_bytes") != len(raw)
+        ):
+            raise BybitExecutionQualityCaptureError("capture_fingerprint_mismatch")
+        artifacts[name] = raw
+        roles[name] = role
+    if set(required_roles) - set(artifacts):
+        raise BybitExecutionQualityCaptureError(
+            "capture_required_artifact_missing"
+        )
+    return receipt, receipt_raw, manifest, manifest_raw, artifacts, roles
+
+
+def read_capture_bundle(namespace_dir: Path) -> CaptureBundle:
     try:
         with _open_verified_namespace_dir(namespace_dir) as anchored:
             _base_fd, namespace_fd, _namespace, _identity = anchored
-            receipt_raw = _read_regular_bytes_at(namespace_fd, RECEIPT_FILENAME)
-            manifest_raw = _read_regular_bytes_at(namespace_fd, MANIFEST_FILENAME)
-            receipt = parse_artifact_json(receipt_raw)
-            manifest = parse_artifact_json(manifest_raw)
-            descriptor_values = manifest.get("artifacts")
-            if (
-                not isinstance(descriptor_values, list)
-                or not 5 < len(descriptor_values) <= MAX_RESPONSES + 5
-            ):
-                raise BybitExecutionQualityCaptureError(
-                    "capture_artifact_index_invalid"
-                )
-            artifacts: dict[str, bytes] = {}
-            roles: dict[str, str] = {}
-            for descriptor in descriptor_values:
-                if (
-                    not isinstance(descriptor, Mapping)
-                    or set(descriptor) != {"name", "role", "sha256", "size_bytes"}
-                ):
-                    raise BybitExecutionQualityCaptureError(
-                        "capture_artifact_index_invalid"
-                    )
-                name = str(descriptor.get("name") or "")
-                role = str(descriptor.get("role") or "")
-                expected_role = required_roles.get(name)
-                if (
-                    name in artifacts
-                    or name in {MANIFEST_FILENAME, RECEIPT_FILENAME}
-                    or (expected_role is None and not _SAFE_RAW_NAME_RE.fullmatch(name))
-                    or (expected_role is not None and role != expected_role)
-                    or (
-                        expected_role is None
-                        and role != "accepted_raw_provider_response"
-                    )
-                ):
-                    raise BybitExecutionQualityCaptureError(
-                        "capture_artifact_name_invalid"
-                    )
-                raw = _read_regular_bytes_at(namespace_fd, name)
-                if (
-                    descriptor.get("sha256") != _sha256(raw)
-                    or descriptor.get("size_bytes") != len(raw)
-                ):
-                    raise BybitExecutionQualityCaptureError(
-                        "capture_fingerprint_mismatch"
-                    )
-                artifacts[name] = raw
-                roles[name] = role
-            if set(required_roles) - set(artifacts):
-                raise BybitExecutionQualityCaptureError(
-                    "capture_required_artifact_missing"
-                )
+            return _read_capture_bundle_from_namespace_fd(namespace_fd)
     except BybitExecutionQualityCaptureError:
         raise
     except (MarketNoSendError, OSError) as exc:
         raise BybitExecutionQualityCaptureError("capture_artifact_unreadable") from exc
-    return receipt, receipt_raw, manifest, manifest_raw, artifacts, roles
+
+
+def _same_directory_identity(left: os.stat_result, right: os.stat_result) -> bool:
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
+def _open_namespace_at(base_fd: int, namespace: str) -> tuple[int, os.stat_result]:
+    if not _NAMESPACE_RE.fullmatch(namespace):
+        raise BybitExecutionQualityCaptureError("capture_namespace_invalid")
+    before = os.stat(namespace, dir_fd=base_fd, follow_symlinks=False)
+    if not stat.S_ISDIR(before.st_mode):
+        raise BybitExecutionQualityCaptureError("capture_artifact_unreadable")
+    descriptor = os.open(
+        namespace,
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0),
+        dir_fd=base_fd,
+    )
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or not _same_directory_identity(before, opened)
+        ):
+            raise BybitExecutionQualityCaptureError(
+                "capture_namespace_changed_during_pair"
+            )
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor, opened
+
+
+def _assert_named_namespace_identity(
+    base_fd: int,
+    namespace: str,
+    expected: os.stat_result,
+) -> None:
+    current = os.stat(namespace, dir_fd=base_fd, follow_symlinks=False)
+    if (
+        not stat.S_ISDIR(current.st_mode)
+        or not _same_directory_identity(current, expected)
+    ):
+        raise BybitExecutionQualityCaptureError(
+            "capture_namespace_changed_during_pair"
+        )
+
+
+def read_capture_bundle_pair(
+    artifact_base_dir: str | Path,
+    *,
+    entry_namespace: str,
+    exit_namespace: str,
+) -> tuple[CaptureBundle, CaptureBundle]:
+    """Hold one base and both namespace descriptors across the complete read."""
+
+    if entry_namespace == exit_namespace:
+        raise BybitExecutionQualityCaptureError(
+            "capture_namespaces_not_distinct"
+        )
+    base_path = Path(artifact_base_dir).expanduser().absolute()
+    base_fd: int | None = None
+    entry_fd: int | None = None
+    exit_fd: int | None = None
+    try:
+        base_fd, base_identity = _open_verified_base_dir(base_path)
+        entry_fd, entry_identity = _open_namespace_at(base_fd, entry_namespace)
+        exit_fd, exit_identity = _open_namespace_at(base_fd, exit_namespace)
+        _assert_named_namespace_identity(base_fd, entry_namespace, entry_identity)
+        _assert_named_namespace_identity(base_fd, exit_namespace, exit_identity)
+        entry = _read_capture_bundle_from_namespace_fd(entry_fd)
+        exit_bundle = _read_capture_bundle_from_namespace_fd(exit_fd)
+        _assert_named_namespace_identity(base_fd, entry_namespace, entry_identity)
+        _assert_named_namespace_identity(base_fd, exit_namespace, exit_identity)
+        named_base = os.stat(base_path, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(named_base.st_mode)
+            or not _same_directory_identity(named_base, base_identity)
+        ):
+            raise BybitExecutionQualityCaptureError(
+                "capture_artifact_base_changed_during_pair"
+            )
+        return entry, exit_bundle
+    except BybitExecutionQualityCaptureError:
+        raise
+    except (MarketNoSendError, OSError) as exc:
+        raise BybitExecutionQualityCaptureError("capture_artifact_unreadable") from exc
+    finally:
+        if exit_fd is not None:
+            os.close(exit_fd)
+        if entry_fd is not None:
+            os.close(entry_fd)
+        if base_fd is not None:
+            os.close(base_fd)
 
 
 def _validate_fingerprint(value: object, *, name: str, raw: bytes) -> None:
@@ -380,8 +479,10 @@ def validate_capture_contracts(
 
 
 __all__ = (
+    "CaptureBundle",
     "parse_artifact_json",
     "read_capture_bundle",
+    "read_capture_bundle_pair",
     "validate_capture_contracts",
     "validate_capture_pointer_bytes",
 )

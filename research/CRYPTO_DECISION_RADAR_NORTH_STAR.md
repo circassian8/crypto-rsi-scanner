@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v15 records the owner-confirmed primary research
+Execution-quality readiness v16 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -978,6 +978,31 @@ a marketable buy can spend more, and a marketable sell can receive less,
 because spread and walked depth are part of the observed leg. The system has
 not chosen the final USDT tier set, adopted the floor rule as Protocol-v2
 policy, or selected an order style; those remain annex decisions.
+
+The read-only capture-pair projection now connects that math to immutable
+evidence. It accepts two explicitly named capture namespaces—never a guessed
+latest pointer—opens the artifact base plus both namespaces together through
+held no-follow descriptors, and fully rederives both strict-clean bundles from
+their exact raw catalog and order-book responses. Both capture sets must be
+fresh at their own completion, distinct, and ordered without overlapping
+windows. The selected native instrument must exist exactly once in both, after
+which their independent catalog clocks, response hashes, request lineages, and
+dynamic constraints feed the target-notional v2 / round-trip v3 model. The
+projection is read-only and makes zero provider calls. It remains annex-unbound
+and Protocol-v2-ineligible until genuine capture IDs and the complete cost
+policy are human-sealed. No genuine Bybit capture pair exists yet.
+
+Use the exact read-only operator surface only after two genuine captures exist:
+
+```bash
+make radar-execution-quality-bybit-round-trip \
+  BYBIT_ENTRY_EXECUTION_CAPTURE_NAMESPACE=<entry> \
+  BYBIT_EXIT_EXECUTION_CAPTURE_NAMESPACE=<exit> \
+  BYBIT_EXECUTION_INSTRUMENT_ID=<instrument> \
+  BYBIT_EXECUTION_POSITION_SIDE=<long_or_short> \
+  BYBIT_EXECUTION_TARGET_NOTIONAL_USDT=<usdt> \
+  PYTHON=.venv/bin/python
+```
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread and

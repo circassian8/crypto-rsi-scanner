@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T23:14:00.396595+00:00`
+- generated_at: `2026-07-19T23:36:32.027341+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -19,11 +19,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `1`
+- production_functions_over_limit: `3`
 - test_size_gate_status: `advisory`
 - test_files_over_1500_lines: `1`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `1`
+- functions_over_limit_count: `3`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_count: `0`
@@ -31,7 +31,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - multi_public_class_modules_count: `84`
 - accepted_model_bundles_count: `83`
 - unresolved_multi_class_modules_count: `0`
-- new_violation_count: `3`
+- new_violation_count: `5`
 - moved_existing_violation_count: `0`
 - api_decomposition_gate_status: `advisory`
 - api_files_over_1500_lines: `0`
@@ -57,6 +57,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
 | `file_over_1500_lines` | `file:tests/cli/test_make_targets.py` | 1570 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip` | 226 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress` | 157 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness` | 151 |
 
 ## Architecture Gates
 
@@ -72,7 +74,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 1 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 1 | advisory |
+| `functions_over_150_lines` | 3 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -115,8 +117,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
+| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1245 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1235 |
-| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1210 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1205 |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 |
 | `crypto_rsi_scanner/event_alpha/dashboard/public_access.py` | 1200 |
@@ -167,7 +169,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
-| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1210 |
+| `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1245 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1205 |
 
 ## Largest Test Files

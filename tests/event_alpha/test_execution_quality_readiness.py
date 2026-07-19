@@ -48,7 +48,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v15"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v16"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -151,6 +151,20 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         is True
     )
     assert impact["target_notional_round_trip_identity_reconciled"] is True
+    assert impact["capture_pair_round_trip_implemented"] is True
+    assert impact["capture_pair_round_trip_schema_version"] == (
+        "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1"
+    )
+    assert impact["capture_pair_exact_namespaces_required"] is True
+    assert impact["capture_pair_latest_pointer_used"] is False
+    assert impact["capture_pair_both_strict_clean_required"] is True
+    assert impact["capture_pair_both_completion_fresh_required"] is True
+    assert impact["capture_pair_windows_ordered_non_overlapping"] is True
+    assert impact["capture_pair_base_and_namespaces_descriptor_held_together"] is True
+    assert impact["capture_pair_provider_calls"] == 0
+    assert impact["capture_pair_writes_performed"] is False
+    assert impact["capture_pair_protocol_v2_annex_bound"] is False
+    assert impact["capture_pair_protocol_v2_evidence_eligible"] is False
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
@@ -171,6 +185,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_usdt_linear_perpetual_fixture_normalizer_v5",
         "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
         "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
+        "bybit_two_exact_immutable_capture_round_trip_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -433,6 +448,15 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "rounding=floor_to_quantity_step" in rendered
     assert "target_notional_does_not_exceed_reference=true" in rendered
     assert "target_notional_is_quote_budget=false" in rendered
+    assert "capture_pair_round_trip_implemented=true" in rendered
+    assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in rendered
+    assert "capture_pair_exact_namespaces_required=true" in rendered
+    assert "latest_pointer_used=false" in rendered
+    assert "both_strict_clean_required=true" in rendered
+    assert "both_completion_fresh_required=true" in rendered
+    assert "capture_pair_windows_ordered_non_overlapping=true" in rendered
+    assert "base_and_namespaces_descriptor_held_together=true" in rendered
+    assert "capture_pair_protocol_v2_annex_bound=false" in rendered
     assert "target_notional_tier_set_sealed=false" in rendered
     assert "base_quantity_selection_policy_sealed=false" in rendered
     assert "round_trip_quantity_unit=base_asset" in rendered
@@ -622,6 +646,7 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_usdt_linear_perpetual_fixture_normalizer_v5",
         "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
         "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
+        "bybit_two_exact_immutable_capture_round_trip_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -773,6 +798,19 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     )
     assert readiness["target_notional_does_not_exceed_reference"] is True
     assert readiness["target_notional_is_quote_budget"] is False
+    assert readiness["capture_pair_round_trip_implemented"] is True
+    assert readiness["capture_pair_round_trip_schema_version"] == (
+        "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1"
+    )
+    assert readiness["capture_pair_exact_namespaces_required"] is True
+    assert readiness["capture_pair_latest_pointer_used"] is False
+    assert readiness["capture_pair_both_strict_clean_required"] is True
+    assert readiness["capture_pair_both_completion_fresh_required"] is True
+    assert readiness["capture_pair_windows_ordered_non_overlapping"] is True
+    assert readiness[
+        "capture_pair_base_and_namespaces_descriptor_held_together"
+    ] is True
+    assert readiness["capture_pair_protocol_v2_evidence_eligible"] is False
     assert readiness["target_notional_tier_set_sealed"] is False
     assert readiness["base_quantity_selection_policy_sealed"] is False
     assert readiness["final_live_adapter_implemented"] is False

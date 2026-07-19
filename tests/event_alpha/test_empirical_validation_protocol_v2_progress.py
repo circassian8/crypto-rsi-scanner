@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v14")
+    assert values["progress_version"].endswith("_v15")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -130,6 +130,22 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
         is True
     )
     assert decision["target_notional_round_trip_identity_reconciled"] is True
+    assert decision["capture_pair_round_trip_implemented"] is True
+    assert decision["capture_pair_round_trip_schema_version"] == (
+        "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1"
+    )
+    assert decision["capture_pair_exact_namespaces_required"] is True
+    assert decision["capture_pair_latest_pointer_used"] is False
+    assert decision["capture_pair_both_strict_clean_required"] is True
+    assert decision["capture_pair_both_completion_fresh_required"] is True
+    assert decision["capture_pair_windows_ordered_non_overlapping"] is True
+    assert decision[
+        "capture_pair_base_and_namespaces_descriptor_held_together"
+    ] is True
+    assert decision["capture_pair_provider_calls"] == 0
+    assert decision["capture_pair_writes_performed"] is False
+    assert decision["capture_pair_protocol_v2_annex_bound"] is False
+    assert decision["capture_pair_protocol_v2_evidence_eligible"] is False
     assert decision["target_notional_tier_set_sealed"] is False
     assert decision["base_quantity_selection_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
@@ -340,6 +356,15 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "target_notional_input_unit=USDT reference=entry_mid_price" in output.out
     assert "rounding=floor_to_quantity_step" in output.out
     assert "target_notional_is_quote_budget=false" in output.out
+    assert "capture_pair_round_trip_implemented=true" in output.out
+    assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in output.out
+    assert "capture_pair_exact_namespaces_required=true" in output.out
+    assert "latest_pointer_used=false" in output.out
+    assert "both_strict_clean_required=true" in output.out
+    assert "both_completion_fresh_required=true" in output.out
+    assert "capture_pair_windows_ordered_non_overlapping=true" in output.out
+    assert "base_and_namespaces_descriptor_held_together=true" in output.out
+    assert "capture_pair_protocol_v2_annex_bound=false" in output.out
     assert "target_notional_tier_set_sealed=false" in output.out
     assert "base_quantity_selection_policy_sealed=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
