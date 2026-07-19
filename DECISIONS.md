@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Preserve explicit zero-valued canonical market evidence
+**Status:** accepted
+**Decision:** Resolve numeric market-field aliases by ordered presence, not
+truthiness. An explicit finite `0` in the canonical field is observed evidence
+and takes precedence over legacy aliases, source-row fallbacks, and benchmark
+aliases throughout snapshot normalization, liquidity classification, anomaly
+classification, and priority construction. Missing or empty canonical values
+may still use the documented fallback order.
+**Why:** Truthiness fallback converted genuine zero returns, relative returns,
+volume surprise, liquidity, funding, and open-interest change into conflicting
+nonzero legacy values. That can manufacture a breakout or crowding state and
+corrupt point-in-time Protocol-v2 inputs without any new observation.
+**Revisit when:** A versioned schema removes all aliases and rejects duplicate
+representations at ingestion. Canonical precedence still remains the migration
+rule for historical rows.
+
 ## 2026-07-19 - Make relative-return benchmark alignment causal
 **Status:** accepted
 **Decision:** Align BTC/ETH benchmark observations only from timestamps at or

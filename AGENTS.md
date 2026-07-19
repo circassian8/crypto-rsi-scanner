@@ -711,7 +711,10 @@ may be added later when a suitable environment already exists.
   warmup. BTC/ETH benchmark observations for relative-return features must be
   at or before the asset timestamp and within the configured backward
   tolerance; a future benchmark row is missing context, never an alignment
-  candidate. `make radar-daily-ops-cycle` is the only public operator cycle: it
+  candidate. Canonical numeric market fields use presence-based precedence:
+  an explicit finite zero is observed evidence and must never fall through to
+  a legacy alias, source row, or benchmark alias merely because it is falsey.
+  `make radar-daily-ops-cycle` is the only public operator cycle: it
   rechecks authorization, cadence, and shared provider backoff before the adapter
   and may reserve/attempt at most one bounded live request in one eligible
   invocation. `make radar-market-no-send` is a compatibility alias for that same

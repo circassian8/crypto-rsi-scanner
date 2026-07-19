@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve canonical zero-valued market evidence · Codex
+**Why:** Core market normalization used truthiness-based alias fallback. An
+explicit zero could therefore be replaced by a stale nonzero legacy value and
+manufacture price momentum, volume confirmation, liquidity, or derivatives
+crowding before anomaly classification.
+**Changes:**
+- Replaced numeric alias coalescing in market snapshots and benchmark-relative
+  returns with ordered presence-based selection that preserves finite zero.
+- Kept the canonical snapshot authoritative through liquidity-tier, anomaly
+  priority, and source-row fallback construction.
+- Added an end-to-end regression covering conflicting price/return/relative,
+  benchmark, volume, liquidity, market-cap, funding, and open-interest aliases;
+  the canonical zero row remains `no_reaction` with thin liquidity.
+**Verify:** The 57 focused market-state, integrated-merge, market-surface,
+Decision-v2 fixture-route, and market-history tests passed; compileall and
+`git diff --check` were clean. Architecture cleanliness passed with zero new
+violations. Host-local `make verify-fast PYTHON=.venv/bin/python` passed all
+3,075 tests in 160.49 seconds plus alert-render, backtest-fixture, and
+paper-score smokes. The market-anomaly and integrated-radar smokes passed, the
+strict integrated doctor reported zero blockers/warnings, and the genuine
+revision-12 dashboard authority remained READY.
+**Notes/risks:** This does not change any threshold, score, route policy, unit,
+provider authorization, send, trade, order, paper trade, normal RSI write, or
+Event Alpha `TRIGGERED_FADE`. Existing nonzero and missing-value fallback order
+is unchanged.
+
 ## 2026-07-19 — Record the twenty-eighth no-send market cycle · Codex
 **Why:** The persisted one-hour cadence became eligible while the existing
 CoinGecko no-send authorization and shared provider health were current. One

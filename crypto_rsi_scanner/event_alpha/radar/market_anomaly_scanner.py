@@ -892,8 +892,12 @@ def _priority_components(
     rel_eth = abs(_float(snapshot.get("relative_return_vs_eth_4h")) or 0.0)
     volume_z = max(0.0, _float(snapshot.get("volume_zscore_24h")) or 0.0)
     volume_mcap = max(0.0, _float(snapshot.get("volume_to_market_cap")) or 0.0)
-    market_cap = _float(snapshot.get("market_cap") or source_row.get("market_cap") or source_row.get("mcap"))
-    event_age = _float(snapshot.get("event_age_hours") or source_row.get("event_age_hours"))
+    market_cap = _float(
+        _canonical_or_source_value(snapshot, source_row, "market_cap", "mcap")
+    )
+    event_age = _float(
+        _canonical_or_source_value(snapshot, source_row, "event_age_hours")
+    )
     liquidity_score = _liquidity_score(snapshot, source_row)
     derivatives_score = 8.0 if _derivatives_available(snapshot, source_row) else 0.0
     unknownness_score = 7.0 if not _has_confirming_source(source_row) else -4.0
@@ -945,7 +949,9 @@ def _high_liquidity(
     tier = str(snapshot.get("liquidity_tier") or source_row.get("liquidity_tier") or "").casefold()
     if tier in {"large", "large_cap", "high", "top", "blue_chip"}:
         return True
-    liquidity = _float(snapshot.get("liquidity_usd") or source_row.get("liquidity_usd"))
+    liquidity = _float(
+        _canonical_or_source_value(snapshot, source_row, "liquidity_usd")
+    )
     return liquidity is not None and liquidity >= cfg.high_liquidity_usd
 
 
@@ -959,7 +965,9 @@ def _liquidity_score(snapshot: Mapping[str, Any], source_row: Mapping[str, Any])
         return 2.0
     if tier in {"thin", "micro", "low"}:
         return -6.0
-    liquidity = _float(snapshot.get("liquidity_usd") or source_row.get("liquidity_usd"))
+    liquidity = _float(
+        _canonical_or_source_value(snapshot, source_row, "liquidity_usd")
+    )
     if liquidity is None:
         return 0.0
     if liquidity >= 5_000_000:
@@ -1070,9 +1078,9 @@ def _liquidity_tier_from_row(row: Mapping[str, Any]) -> str | None:
     explicit = str(row.get("liquidity_tier") or "").strip()
     if explicit:
         return explicit
-    liquidity = _float(row.get("liquidity_usd") or row.get("order_book_liquidity_usd"))
-    market_cap = _float(row.get("market_cap") or row.get("mcap"))
-    volume = _float(row.get("total_volume") or row.get("volume_24h") or row.get("spot_volume_24h"))
+    liquidity = _float(_first_present_value(row, "liquidity_usd", "order_book_liquidity_usd"))
+    market_cap = _float(_first_present_value(row, "market_cap", "mcap"))
+    volume = _float(_first_present_value(row, "total_volume", "volume_24h", "spot_volume_24h"))
     if liquidity is not None:
         if liquidity >= 20_000_000:
             return "large"
@@ -1126,3 +1134,24 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed == parsed else None
+
+
+def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:
+    """Return the first explicit non-empty value without treating zero as absent."""
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _canonical_or_source_value(
+    snapshot: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+    canonical_key: str,
+    *source_aliases: str,
+) -> object:
+    value = _first_present_value(snapshot, canonical_key)
+    if value is not None:
+        return value
+    return _first_present_value(source_row, canonical_key, *source_aliases)

@@ -106,9 +106,11 @@ def snapshot_from_market_row(
             fields.append(name)
         return value
 
-    market_cap = _float(row.get("market_cap") or row.get("mcap"))
-    volume_24h = _float(row.get("volume_24h") or row.get("total_volume") or row.get("spot_volume_24h"))
-    volume_mcap = _float(row.get("volume_to_market_cap") or row.get("volume_mcap") or row.get("volume_mcap_ratio"))
+    market_cap = _float(_first_present_value(row, "market_cap", "mcap"))
+    volume_24h = _float(_first_present_value(row, "volume_24h", "total_volume", "spot_volume_24h"))
+    volume_mcap = _float(
+        _first_present_value(row, "volume_to_market_cap", "volume_mcap", "volume_mcap_ratio")
+    )
     if volume_mcap is None and volume_24h is not None and market_cap and market_cap > 0:
         volume_mcap = volume_24h / market_cap
     if not symbol and not coin_id:
@@ -147,7 +149,7 @@ def snapshot_from_market_row(
         coin_id=coin_id,
         canonical_asset_id=canonical_asset_id,
         observed_at=observed.isoformat(),
-        price=capture("price", _float(row.get("price") or row.get("current_price"))),
+        price=capture("price", _float(_first_present_value(row, "price", "current_price"))),
         return_5m=capture("return_5m", normalized_returns["return_5m"]),
         return_15m=capture("return_15m", normalized_returns["return_15m"]),
         return_1h=capture("return_1h", normalized_returns["return_1h"]),
@@ -160,13 +162,22 @@ def snapshot_from_market_row(
         relative_return_vs_eth_4h=capture("relative_return_vs_eth_4h", normalized_returns["relative_return_vs_eth_4h"]),
         relative_return_vs_eth_24h=capture("relative_return_vs_eth_24h", normalized_returns["relative_return_vs_eth_24h"]),
         volume_24h=capture("volume_24h", volume_24h),
-        volume_zscore_24h=capture("volume_zscore_24h", _float(row.get("volume_zscore_24h") or row.get("volume_zscore"))),
+        volume_zscore_24h=capture(
+            "volume_zscore_24h",
+            _float(_first_present_value(row, "volume_zscore_24h", "volume_zscore")),
+        ),
         turnover_zscore=capture("turnover_zscore", _float(row.get("turnover_zscore"))),
         volume_to_market_cap=capture("volume_to_market_cap", volume_mcap),
-        liquidity_usd=capture("liquidity_usd", _float(row.get("liquidity_usd") or row.get("order_book_liquidity_usd"))),
+        liquidity_usd=capture(
+            "liquidity_usd",
+            _float(_first_present_value(row, "liquidity_usd", "order_book_liquidity_usd")),
+        ),
         spread_bps=capture("spread_bps", _float(row.get("spread_bps"))),
         open_interest_delta=capture("open_interest_delta", normalized_returns["open_interest_delta"]),
-        funding_level=capture("funding_level", _float(row.get("funding_level") or row.get("funding_rate"))),
+        funding_level=capture(
+            "funding_level",
+            _float(_first_present_value(row, "funding_level", "funding_rate")),
+        ),
         funding_zscore=capture("funding_zscore", _float(row.get("funding_zscore"))),
         liquidation_imbalance=capture("liquidation_imbalance", _float(row.get("liquidation_imbalance"))),
         dex_volume_change=capture("dex_volume_change", normalized_returns["dex_volume_change"]),
@@ -233,46 +244,52 @@ def _normalized_return_values(
         return event_market_units.return_unit_for_field(source, name, default=default)
 
     r1h = _percent_value(
-        row.get("return_1h") or row.get("price_change_percentage_1h_in_currency"),
+        _first_present_value(row, "return_1h", "price_change_percentage_1h_in_currency"),
         unit=field_unit("return_1h"),
     )
     r4h = _percent_value(
-        row.get("return_4h") or row.get("price_change_percentage_4h_in_currency"),
+        _first_present_value(row, "return_4h", "price_change_percentage_4h_in_currency"),
         unit=field_unit("return_4h"),
     )
     r24h = _percent_value(
-        row.get("return_24h")
-        or row.get("price_change_24h")
-        or row.get("price_change_percentage_24h_in_currency"),
+        _first_present_value(
+            row,
+            "return_24h",
+            "price_change_24h",
+            "price_change_percentage_24h_in_currency",
+        ),
         unit=field_unit("return_24h"),
     )
     btc = btc_benchmark or {}
     eth = eth_benchmark or {}
     relative_returns = {
         "relative_return_vs_btc_1h": _percent_value(
-            row.get("relative_return_vs_btc_1h") or row.get("rel_btc_1h"),
+            _first_present_value(row, "relative_return_vs_btc_1h", "rel_btc_1h"),
             unit=field_unit("relative_return_vs_btc_1h"),
         ),
         "relative_return_vs_btc_4h": _percent_value(
-            row.get("relative_return_vs_btc_4h") or row.get("rel_btc_4h"),
+            _first_present_value(row, "relative_return_vs_btc_4h", "rel_btc_4h"),
             unit=field_unit("relative_return_vs_btc_4h"),
         ),
         "relative_return_vs_btc_24h": _percent_value(
-            row.get("relative_return_vs_btc_24h")
-            or row.get("relative_strength_vs_btc")
-            or row.get("btc_relative_return"),
+            _first_present_value(
+                row,
+                "relative_return_vs_btc_24h",
+                "relative_strength_vs_btc",
+                "btc_relative_return",
+            ),
             unit=field_unit("relative_return_vs_btc_24h"),
         ),
         "relative_return_vs_eth_1h": _percent_value(
-            row.get("relative_return_vs_eth_1h") or row.get("rel_eth_1h"),
+            _first_present_value(row, "relative_return_vs_eth_1h", "rel_eth_1h"),
             unit=field_unit("relative_return_vs_eth_1h"),
         ),
         "relative_return_vs_eth_4h": _percent_value(
-            row.get("relative_return_vs_eth_4h") or row.get("rel_eth_4h"),
+            _first_present_value(row, "relative_return_vs_eth_4h", "rel_eth_4h"),
             unit=field_unit("relative_return_vs_eth_4h"),
         ),
         "relative_return_vs_eth_24h": _percent_value(
-            row.get("relative_return_vs_eth_24h") or row.get("rel_eth_24h"),
+            _first_present_value(row, "relative_return_vs_eth_24h", "rel_eth_24h"),
             unit=field_unit("relative_return_vs_eth_24h"),
         ),
     }
@@ -289,8 +306,11 @@ def _normalized_return_values(
             continue
         benchmark_unit = field_unit(benchmark_field, source=benchmark)
         benchmark_return = _percent_value(
-            benchmark.get(benchmark_field)
-            or benchmark.get(f"price_change_percentage_{benchmark_field.removeprefix('return_')}_in_currency"),
+            _first_present_value(
+                benchmark,
+                benchmark_field,
+                f"price_change_percentage_{benchmark_field.removeprefix('return_')}_in_currency",
+            ),
             unit=benchmark_unit,
         )
         if benchmark_return is not None:
@@ -304,7 +324,7 @@ def _normalized_return_values(
         "return_24h": r24h,
         **relative_returns,
         "open_interest_delta": _percent_value(
-            row.get("open_interest_delta") or row.get("open_interest_delta_24h"),
+            _first_present_value(row, "open_interest_delta", "open_interest_delta_24h"),
             unit=field_unit(
                 "open_interest_delta",
                 default=event_market_units.RETURN_UNIT_PERCENT_POINTS,
@@ -349,6 +369,15 @@ def _observed_at(row: Mapping[str, Any], observed_at: datetime | str | None) -> 
 
 def _percent_value(value: object, *, unit: str | None) -> float | None:
     return event_market_units.normalize_return_percent_points(value, unit)
+
+
+def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:
+    """Return the first explicit non-empty value without treating zero as absent."""
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+    return None
 
 
 def _float(value: object) -> float | None:
