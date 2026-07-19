@@ -186,6 +186,7 @@ def provider_market_schemas(
                 "return_72h_pct", "volume_zscore_24h", "volume_mcap",
                 "liquidity_tier", "relative_return_vs_btc", "relative_return_vs_eth",
                 "market_history_observation_id", "market_feature_evidence",
+                "market_feature_evidence_contract_version",
                 "shadow_temporal_surprise",
                 "targeted_market_refresh_id", "targeted_market_refresh_attempted",
                 "targeted_market_refresh_success", "market_refresh_provider",
@@ -194,6 +195,7 @@ def provider_market_schemas(
             ),
             types={
                 "market_feature_evidence": "dict",
+                "market_feature_evidence_contract_version": "int",
                 "shadow_temporal_surprise": "dict",
             },
             safety=operation_safety,

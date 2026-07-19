@@ -80,6 +80,10 @@ class MarketStateSnapshot:
             data.pop("market_history_observation_id")
         if not self.market_feature_evidence:
             data.pop("market_feature_evidence")
+        else:
+            data["market_feature_evidence_contract_version"] = (
+                event_market_feature_evidence.CONTRACT_VERSION
+            )
         data["observed_fields"] = list(self.observed_fields)
         data["return_units"] = dict(self.return_units)
         data["source_return_units"] = dict(self.source_return_units)

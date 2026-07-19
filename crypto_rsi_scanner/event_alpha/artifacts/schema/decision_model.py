@@ -64,7 +64,7 @@ FIELDS = (
     "independent_corroboration_count", "source_content_cluster_count",
     "source_independence_status", "source_independence_errors",
     "market_provenance",
-    "market_context_reference",
+    "market_context_reference", "market_observation_identity_bound",
     "market_provenance_schema_version", "market_provenance_contract_version",
     "data_acquisition_mode", "candidate_source_mode",
     "provider", "provider_call_attempted", "provider_call_succeeded",
@@ -106,7 +106,7 @@ TYPES = {
     "source_independence": "dict", "independent_source_count": "int",
     "independent_corroboration_count": "int", "source_content_cluster_count": "int",
     "source_independence_status": "str", "source_independence_errors": "list",
-    "market_context_reference": "dict",
+    "market_context_reference": "dict", "market_observation_identity_bound": "bool",
     "market_provenance_schema_version": "str", "market_provenance_contract_version": "int",
     "data_acquisition_mode": "str",
     "candidate_source_mode": "str", "provider": "str",
@@ -384,15 +384,9 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             observed_at = market_reference.get("observed_at")
             if observed_at is not None and _aware_timestamp(observed_at) is None:
                 errors.append("decision_projection_market_context_reference_timestamp_invalid")
-            snapshot_id = str(market_reference.get("market_snapshot_id") or "").strip()
-            if (
-                projection_version == DECISION_PROJECTION_SCHEMA_VERSION
-                and snapshot_id
-                and snapshot_id not in _items(row.get("observation_ids"))
-            ):
-                errors.append(
-                    "decision_projection_market_snapshot_observation_id_missing"
-                )
+    errors.extend(
+        _validate_projection_market_observation_binding(row, market_reference)
+    )
     campaign_provenance = (
         provenance
         if isinstance(provenance, Mapping)
@@ -436,6 +430,26 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
             elif safety.get(field) is not (row.get(attestation) is not True):
                 errors.append(f"decision_projection_safety_attestation_mismatch:{field}")
     return list(dict.fromkeys(errors))
+
+
+def _validate_projection_market_observation_binding(
+    row: Mapping[str, Any],
+    market_reference: object,
+) -> list[str]:
+    if "market_observation_identity_bound" not in row:
+        return []
+    identity_bound = row.get("market_observation_identity_bound")
+    if not isinstance(identity_bound, bool):
+        return ["decision_projection_market_observation_identity_bound_invalid"]
+    if identity_bound is not True:
+        return []
+    reference = market_reference if isinstance(market_reference, Mapping) else {}
+    snapshot_id = str(reference.get("market_snapshot_id") or "").strip()
+    if not snapshot_id:
+        return ["decision_projection_bound_market_snapshot_missing"]
+    if snapshot_id not in _items(row.get("observation_ids")):
+        return ["decision_projection_market_snapshot_observation_id_missing"]
+    return []
 
 
 def _validate_projection_source_independence(

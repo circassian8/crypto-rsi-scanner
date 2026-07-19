@@ -100,6 +100,7 @@ DECISION_PROJECTION_FIELD_NAMES = (
     "source_independence_errors",
     "market_provenance",
     "market_context_reference",
+    "market_observation_identity_bound",
     "decision_evaluated_at",
     "decision_safety_invariants",
 )
@@ -482,6 +483,7 @@ def _closed_projection_values(
     )
     rsi_references = _rsi_context_references(source, rsi_context)
     source_independence = _source_independence_projection_values(source)
+    market_reference = market_context_reference(source)
     closed = {
         "decision_projection_schema_version": (
             source.get("decision_projection_schema_version")
@@ -512,10 +514,18 @@ def _closed_projection_values(
             decision_catalyst_policy.attribution_values(source)
         ),
         **source_independence,
-        "market_context_reference": market_context_reference(source),
+        "market_context_reference": market_reference,
         "decision_evaluated_at": _evaluation_timestamp(source),
         "decision_safety_invariants": _safety_invariants(source),
     }
+    if "market_observation_identity_bound" in source:
+        closed["market_observation_identity_bound"] = source.get(
+            "market_observation_identity_bound"
+        )
+    elif "decision_projection_schema_version" not in source:
+        closed["market_observation_identity_bound"] = bool(
+            market_reference.get("market_snapshot_id")
+        )
     provenance = event_market_provenance.market_provenance_values(source)
     if provenance:
         closed["market_provenance"] = provenance

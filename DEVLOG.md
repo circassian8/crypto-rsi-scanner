@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Version temporal-evidence enforcement forward · Codex
+**Why:** The new closed history/evidence pair was initially enforced against
+every stored snapshot. Immutable pre-contract live generations already carried
+history IDs but were created before feature evidence was persisted, so current
+dashboard and campaign validation correctly failed closed but for a newly
+introduced compatibility reason.
+**Changes:**
+- New evidence-bearing snapshots now carry
+  `market_feature_evidence_contract_version=1`; only a row claiming that
+  contract must contain the closed history/evidence pair.
+- Pre-contract immutable snapshots remain schema-readable without byte
+  mutation, while dropping evidence or the version from a new snapshot remains
+  detectable.
+- The analogous Decision observation binding now uses an explicit forward-only
+  attestation; existing closed projections remain idempotent instead of being
+  silently reinterpreted.
+- Added pre-contract compatibility and current-contract regressions.
+**Verify:** All 86 focused feature-evidence, Decision-surface, review-timing,
+outcome-recovery, and artifact-schema tests passed. A real read-only campaign
+rebuild again reports `in_progress_baseline_warming`, one `due_missing_price`
+outcome, and the exact current namespace; dashboard readiness is `READY`.
+**Notes/risks:** No immutable artifact was rewritten. No provider call,
+authorization, score, threshold, route, send, trade, order, paper trade, RSI
+write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Bind Decision ideas to their temporal observation · Codex
 **Why:** Canonical candidates and core rows retained the full temporal feature
 map, while the closed Decision projection kept the market snapshot ID only in a
@@ -25,10 +50,10 @@ needed two fields to recover the exact measurement behind an idea.
 **Changes:**
 - Canonical Decision observation IDs now include the exact referenced market
   snapshot/history observation ID, without duplicating an existing identity.
-- Projection-v2 validation requires any named market snapshot to appear in the
-  canonical observation-ID set, closing candidate/core/card/preview/outcome
-  joins over one self-validating value while leaving projection-v1 artifacts
-  readable.
+- New projections explicitly attest that market-observation identity is bound;
+  validation then requires the named snapshot in the canonical observation-ID
+  set. This closes candidate/core/card/preview/outcome joins over one self-
+  validating value while older immutable projections remain readable.
 - Added an end-to-end temporal-evidence regression from canonical anomaly to
   integrated candidate and pending outcome, including a fail-closed identity-
   removal mutation.

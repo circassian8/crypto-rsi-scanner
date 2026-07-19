@@ -60,6 +60,7 @@ def test_feature_evidence_survives_snapshot_and_anomaly_projection():
     assert len(snapshots) == 1
     assert len(anomalies) == 1
     assert snapshots[0]["market_history_observation_id"] == "mhobs-current"
+    assert snapshots[0]["market_feature_evidence_contract_version"] == 1
     assert snapshots[0]["market_feature_evidence"] == expected
     assert anomalies[0]["market_state_snapshot"]["market_feature_evidence"] == expected
     assert schema_v1.validate_row_against_schema(
@@ -108,6 +109,12 @@ def test_temporal_snapshot_identity_survives_canonical_decision_and_outcome(tmp_
     assert "decision_projection_market_snapshot_observation_id_missing" in (
         validate_decision_contract(tampered)
     )
+
+    historical = deepcopy(projection)
+    historical.pop("market_observation_identity_bound")
+    historical["observation_ids"].remove("mhobs-current")
+    assert validate_decision_contract(historical) == []
+    assert decision_model_values(historical) == historical
 
     outcomes = write_integrated_radar_outcome_placeholders(
         tmp_path,
@@ -195,6 +202,21 @@ def test_schema_blocks_a_writer_that_drops_history_feature_evidence():
     ) == [
         "market_feature_evidence_invalid:value:missing_for_history_observation"
     ]
+
+
+def test_pre_contract_history_snapshot_remains_readable():
+    historical = market_state.snapshot_from_market_row({
+        **_market_row(),
+        "market_history_observation_id": None,
+        "market_feature_evidence": {},
+    }).to_dict()
+    historical["row_type"] = "event_market_state_snapshot"
+    historical["market_history_observation_id"] = "legacy-history-id"
+
+    assert "market_feature_evidence_contract_version" not in historical
+    assert schema_v1.validate_row_against_schema(
+        historical, "market_state_snapshot_v1"
+    ) == []
 
 
 @pytest.mark.parametrize(

@@ -55,6 +55,7 @@ _MAX_MAPPING_KEYS = 128
 _MAX_SEQUENCE_ITEMS = 256
 _MAX_DEPTH = 8
 _MAX_STRING_LENGTH = 4096
+CONTRACT_VERSION = 1
 
 
 def canonical_projection(
@@ -114,12 +115,22 @@ def validate_contract(
         return []
     if not isinstance(container, Mapping):
         return []
+    contract_version = container.get("market_feature_evidence_contract_version")
+    if contract_version is not None and (
+        type(contract_version) is not int or contract_version != CONTRACT_VERSION
+    ):
+        return ["market_feature_evidence_invalid:value:contract_version"]
     if "market_feature_evidence" not in container:
-        if container.get("market_history_observation_id") not in (None, ""):
+        if (
+            contract_version == CONTRACT_VERSION
+            and container.get("market_history_observation_id") not in (None, "")
+        ):
             return [
                 "market_feature_evidence_invalid:value:missing_for_history_observation"
             ]
         return []
+    if contract_version != CONTRACT_VERSION:
+        return ["market_feature_evidence_invalid:value:contract_version_missing"]
     expected = container.get("market_history_observation_id")
     expected_id = expected if isinstance(expected, str) and expected else None
     try:
