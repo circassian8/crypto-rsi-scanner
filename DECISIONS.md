@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Keep the primary Bybit cost surface native to USDT
+**Status:** accepted
+**Decision:** Seal native USDT as the currency unit for the primary Bybit
+USDT-linear-perpetual Protocol-v2 cost surface. Preserve spread and impact in
+basis points and currency-valued depth, notionals, fees, funding, and P&L in
+USDT. Do not relabel USDT as USD or assume a 1:1 conversion. Any future
+cross-venue USD projection needs a separately sealed conversion source,
+observation clock, freshness rule, and policy and cannot replace native Bybit
+evidence. This unit decision does not seal fees, order style, notional tiers,
+slippage, funding treatment, latency cost, unavailable-cost handling, or the
+final Protocol-v2 annex.
+**Why:** The accepted venue decision and normalizer already preserve USDT and
+forbid silent USD equivalence, while static readiness still reported the same
+unit policy as unresolved. Keeping that stale blocker made operator truth
+contradict its source contract. Native quote accounting is the conservative,
+reconstructible choice and removes no missing market or cost evidence.
+**Revisit when:** A future protocol deliberately adds a cross-venue reporting
+currency. It must retain the original native-USDT values and bind the exact
+conversion source and clock rather than rewriting historical evidence.
+
 ## 2026-07-19 - Generated North Star owns evidence-cycle authority truth
 **Status:** accepted
 **Decision:** The Event Alpha North Star generator must own the complete

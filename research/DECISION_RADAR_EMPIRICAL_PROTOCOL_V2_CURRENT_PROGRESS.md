@@ -14,6 +14,7 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - venue: Bybit;
 - instrument mode: USDT-linear perpetuals;
 - quote currency: USDT;
+- primary cost currency: native USDT, with no USD conversion or 1:1 equivalence;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -31,6 +32,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   RSI projections are also absent; the v2 offline contract is ready and keeps
   insufficient history explicit rather than inventing a value;
 - no genuine Bybit REST funding/open-interest/positioning capture exists;
+- the primary currency unit is sealed as native USDT, but the fee schedule,
+  order style, notional tiers, spread/impact application, slippage, funding,
+  latency-cost, and unavailable-cost rules remain unsealed;
 - Bybit liquidation evidence is a separate public-WebSocket surface. The exact
   `allLiquidation.{instrument_id}` message normalizer is implemented and
   fixture-proven. Detached immutable operator-transcript import is also

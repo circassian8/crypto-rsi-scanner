@@ -565,6 +565,12 @@ may be added later when a suitable environment already exists.
   before provider access. The order-book normalizer accepts only the declared
   15-second policy; an alternate threshold requires a future versioned schema
   that persists it end to end.
+  The primary Protocol-v2 cost currency is sealed as native USDT. Preserve
+  spread/impact in basis points and currency-valued depth, notionals, fees,
+  funding, and P&L in USDT; never relabel USDT as USD or assume 1:1 equivalence.
+  Any future cross-venue USD projection requires a separately sealed conversion
+  source, clock, and policy. The fee schedule, order style, sizes, slippage,
+  funding treatment, latency cost, and final annex remain unsealed.
   For exact transport captures, normalized `acquired_at` is the accepted
   response-read completion time, not a second independent clock. Immutable
   validation requires every request/response inside the declared capture window

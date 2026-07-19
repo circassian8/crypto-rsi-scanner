@@ -889,13 +889,21 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v6 records the owner-confirmed primary research
+Execution-quality readiness v7 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
 active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled, non-prelisting
 contracts. The exact resulting instrument IDs remain unfrozen until the
 Protocol-v2 annex is sealed.
+
+The primary Protocol-v2 spread, depth, impact, fee, funding, and P&L cost
+currency is sealed as native USDT. The system does not relabel USDT as USD or
+assume a 1:1 conversion. Any future cross-venue USD projection requires its own
+explicit conversion source, clock, and policy and is outside the selected
+Bybit Protocol-v2 cost surface. This closes only the currency-unit decision;
+fees, order style, notional sizes, slippage, latency cost, funding treatment,
+and the final annex remain unsealed.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread, USDT

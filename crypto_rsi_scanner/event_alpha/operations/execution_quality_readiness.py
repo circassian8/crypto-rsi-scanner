@@ -15,7 +15,7 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v6"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v7"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 COMMON_METRICS = (
     "best_bid",
@@ -184,6 +184,10 @@ class _ExecutionQualityReadiness:
     intended_venue: str | None
     intended_instrument_mode: str | None
     quote_currency: str | None
+    primary_cost_currency: str | None
+    primary_cost_currency_policy: str
+    primary_cost_currency_policy_sealed: bool
+    usd_equivalence_assumed: bool
     eligible_instrument_set: tuple[str, ...]
     eligible_instrument_selection_rule: str | None
     eligible_instrument_set_frozen: bool
@@ -250,6 +254,12 @@ def _execution_quality_readiness_dict(
         "intended_venue": value.intended_venue,
         "intended_instrument_mode": value.intended_instrument_mode,
         "quote_currency": value.quote_currency,
+        "primary_cost_currency": value.primary_cost_currency,
+        "primary_cost_currency_policy": value.primary_cost_currency_policy,
+        "primary_cost_currency_policy_sealed": (
+            value.primary_cost_currency_policy_sealed
+        ),
+        "usd_equivalence_assumed": value.usd_equivalence_assumed,
         "eligible_instrument_set": list(value.eligible_instrument_set),
         "eligible_instrument_selection_rule": value.eligible_instrument_selection_rule,
         "eligible_instrument_set_frozen": value.eligible_instrument_set_frozen,
@@ -476,6 +486,12 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         intended_venue="bybit",
         intended_instrument_mode="perpetual",
         quote_currency="USDT",
+        primary_cost_currency="USDT",
+        primary_cost_currency_policy=(
+            "native_USDT_only_no_USD_conversion_or_equivalence"
+        ),
+        primary_cost_currency_policy_sealed=True,
+        usd_equivalence_assumed=False,
         eligible_instrument_set=(),
         eligible_instrument_selection_rule=(
             "top_30_liquid_decision_radar_assets_intersect_active_bybit_USDT_"
@@ -531,7 +547,6 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "eligible_instrument_set_not_frozen",
             "bybit_public_endpoint_reachability_unverified_after_recorded_403",
             "runtime_provider_authorization_not_created_by_operator_selection",
-            "USDT_to_USD_cost_unit_policy_not_sealed",
             "protocol_v2_annex_not_sealed",
         ),
         operator_decision=(
@@ -542,6 +557,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "the_exact_top_30_intersection_must_be_frozen_before_holdout_access",
             "public_data_scope_does_not_activate_a_provider_call_or_trading_path",
             "the_recorded_403_must_fail_closed_without_proxy_VPN_or_region_bypass",
+            "primary_cost_depth_and_impact_currency_is_native_USDT_without_USD_equivalence",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
         ),
         next_safe_command=(
@@ -598,6 +614,11 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         f"intended_venue={result.intended_venue} "
         f"intended_instrument_mode={result.intended_instrument_mode}",
         f"quote_currency={result.quote_currency} eligible_instrument_set=not_yet_frozen",
+        f"primary_cost_currency={result.primary_cost_currency} "
+        "primary_cost_currency_policy_sealed="
+        f"{str(result.primary_cost_currency_policy_sealed).casefold()}",
+        f"primary_cost_currency_policy={result.primary_cost_currency_policy} "
+        f"usd_equivalence_assumed={str(result.usd_equivalence_assumed).casefold()}",
         f"eligible_instrument_selection_rule={result.eligible_instrument_selection_rule}",
         f"eligible_instrument_set_frozen={str(result.eligible_instrument_set_frozen).casefold()}",
         "jurisdiction_and_account_eligibility_confirmed=true "
@@ -653,8 +674,9 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
             "",
             "Execution-quality unit boundary:",
             "- selected_bybit_offline=best_bid,best_ask,mid_price,spread_bps,bid_depth_usdt_by_band,ask_depth_usdt_by_band,buy_price_impact_bps_by_notional_usdt,sell_price_impact_bps_by_notional_usdt",
-            "- future_generic_USD_projection=unavailable_until_a_trusted_USDT_to_USD_cost_unit_policy_is_sealed",
-            "- generic_target_after_conversion=bid_depth_usd_by_band,ask_depth_usd_by_band,buy_price_impact_bps_by_notional,sell_price_impact_bps_by_notional",
+            "- primary_protocol_v2_cost_unit=USDT;native_quote_only=true;USD_equivalence_assumed=false",
+            "- future_generic_USD_projection=outside_primary_protocol_v2_cost_surface_and_unavailable_without_a_separate_explicit_conversion_policy",
+            "- generic_cross_venue_fields_if_later_converted=bid_depth_usd_by_band,ask_depth_usd_by_band,buy_price_impact_bps_by_notional,sell_price_impact_bps_by_notional",
             "- freshness_and_lineage=provider_observed_at,acquired_at,freshness_status,source_url,request_lineage_id",
             "- set_freshness=every_book_fresh_at_capture_completion;maximum_provider_observation_age_seconds=15;protocol_v2_input_quality_uses_completion_freshness",
             "- dex_additions=chain_id,block_number,pool_or_router_id,gas_estimate_native,route_identity",

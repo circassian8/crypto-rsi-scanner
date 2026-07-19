@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Seal native USDT as the primary cost currency · Codex
+**Why:** The accepted Bybit venue decision and immutable order-book normalizer
+already preserve native USDT and forbid silently calling it USD, but static
+readiness still listed the USDT-to-USD unit policy as unresolved. Operator truth
+therefore contradicted an existing durable decision.
+**Changes:**
+- Bumped execution-quality readiness to v7 and added a closed structured cost
+  currency projection: native USDT, policy sealed, no USD conversion, and no
+  assumed 1:1 equivalence.
+- Removed only the stale currency-unit blocker. Exact instruments, permitted
+  reachability, runtime authorization, genuine captures, fee schedule, order
+  style, notional tiers, spread/impact application, slippage, funding treatment,
+  latency cost, unavailable-cost handling, and the final annex remain blocked.
+- Advanced current Protocol-v2 progress to v6 with the same cost-unit truth and
+  fail-closed validation, while retaining the overall `cost_model_not_sealed`
+  activation blocker.
+- Updated the Decision Radar North Star, execution decision package, current
+  progress note, collaboration contracts, and focused regressions so no surface
+  suggests native USDT is USD.
+**Verify:** `24 passed` across the focused execution-quality and Protocol-v2
+progress suites; Python compileall passed; static execution readiness and the
+Protocol-v2 progress check passed with zero provider/file/environment/holdout
+effects; North Star JSON parsed successfully; architecture cleanliness passed
+with zero new size violations after moving the closed expected-decision value
+out of the public validator.
+**Notes/risks:** This seals only the primary currency unit. It does not invent a
+fee, cost, spread, impact, conversion, or execution observation; create or read
+authorization; call a provider; access a holdout; or change any route, score,
+threshold, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE`.
+
 ## 2026-07-19 — Generate evidence-cycle operator authority from source · Codex
 **Why:** The checked Event Alpha North Star accurately recorded current
 authorization boundaries and zero-side-effect readiness, but its

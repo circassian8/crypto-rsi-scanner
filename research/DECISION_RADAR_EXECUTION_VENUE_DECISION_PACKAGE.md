@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v6`. Run
+`crypto_radar_execution_quality_readiness_v7`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -63,6 +63,15 @@ walk of those visible levels rather than realized execution. Buy size means
 exact USDT spent; sell size means exact USDT proceeds. These definitions must
 remain explicit in any Protocol-v2 cost annex. See the official
 [Bybit order-book contract](https://bybit-exchange.github.io/docs/v5/market/orderbook).
+
+The primary Protocol-v2 cost currency is now explicitly sealed as native USDT.
+Spread and impact remain basis points; depth, notionals, fees, funding, and P&L
+remain USDT where currency-valued. No field is relabeled as USD and no 1:1
+equivalence is assumed. A future cross-venue USD view would require a separate
+explicit conversion source, observation clock, and policy and would not replace
+the native Bybit cost evidence. This unit decision does not seal fee schedules,
+order style, notional tiers, slippage, funding treatment, latency cost, or the
+final Protocol-v2 annex.
 
 ## Venue-native derivatives context contract
 
@@ -271,9 +280,9 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   authorization, confirmation, exact two-GETs-per-instrument budget, and
   post-response authority recheck; do not broaden the execution-quality flag
   silently.
-- Resolve the explicit USDT cost-unit policy before any field is represented as
-  USD. The offline normalizer reports USDT depth and USDT notionals and does not
-  silently assume a 1:1 conversion.
+- Keep the sealed native-USDT cost-unit policy intact. Do not represent USDT
+  depth, notionals, fees, funding, or P&L as USD; any later cross-venue
+  conversion needs a separately sealed source, clock, and policy.
 
 The safe implementation smoke is:
 

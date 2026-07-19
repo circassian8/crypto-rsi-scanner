@@ -1149,7 +1149,7 @@
     "bybit_public_reachability": "unverified after recorded region-restricted 403; fail closed without proxy VPN or region bypass",
     "capture_command": "CONFIRM=1 make radar-execution-quality-bybit-capture PYTHON=.venv/bin/python",
     "capture_status_command": "make radar-execution-quality-bybit-status PYTHON=.venv/bin/python",
-    "contract_version": "crypto_radar_execution_quality_readiness_v6",
+    "contract_version": "crypto_radar_execution_quality_readiness_v7",
     "derivatives_context_contract_version": "crypto_radar_bybit_derivatives_context_v2",
     "derivatives_context_directional_authority": false,
     "derivatives_context_authorization_boundary": "one genuine fresh execution-quality capture for exact current authority plus already-present RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1 and CONFIRM=1; never inherited or created",
@@ -1226,6 +1226,10 @@
     "protocol_v2_evidence_eligible": false,
     "protocol_v2_input_quality_rule": "a complete capture may be input-quality eligible only when every provider observation remains within the 15-second policy at full-set completion; even then it remains ineligible as Protocol-v2 evidence until the sealed annex explicitly binds its immutable capture ID",
     "public_private_data_boundary": "public market data only; no credentials or private account data",
+    "primary_cost_currency": "USDT",
+    "primary_cost_currency_policy": "native USDT only; no USD conversion or equivalence",
+    "primary_cost_currency_policy_sealed": true,
+    "usd_equivalence_assumed": false,
     "quote_currency": "USDT",
     "reports": [
       "confirmed Bybit USDT-linear perpetual surface",
@@ -1238,7 +1242,7 @@
     "rollback_disable_command": "unset RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE; no provider process, private-data path, or order path exists",
     "selected_execution_mode": "perpetual",
     "selected_venue": "bybit",
-    "unit_boundary": "offline normalization remains USDT-denominated and never silently relabels USDT as USD"
+    "unit_boundary": "primary Protocol-v2 spread, depth, impact, fee, funding, and P&L cost currency is native USDT; no USD conversion or equivalence is assumed"
   },
   "structured_unlock_readiness": {
     "provider": "tokenomist",

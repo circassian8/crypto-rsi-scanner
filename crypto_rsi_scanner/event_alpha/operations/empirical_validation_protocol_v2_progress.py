@@ -40,10 +40,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v5"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v6"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
+    "with_native_USDT_cost_unit_detached_native_liquidation_import_and_"
+    "tokenomist_v5_fixture_capture_contract"
 )
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
@@ -95,6 +96,21 @@ _SAFETY_ZERO_FIELDS = (
     "rsi_writes",
     "event_alpha_fade_triggers",
 )
+_EXPECTED_EXECUTION_DECISION = {
+    "venue_id": "bybit",
+    "instrument_mode": "usdt_linear_perpetual",
+    "quote_currency": "USDT",
+    "primary_cost_currency": "USDT",
+    "primary_cost_currency_policy": (
+        "native_USDT_only_no_USD_conversion_or_equivalence"
+    ),
+    "primary_cost_currency_policy_sealed": True,
+    "usd_equivalence_assumed": False,
+    "exact_eligible_instrument_set_sealed": False,
+    "data_boundary": "public_market_data_only",
+    "credentials_or_private_account_data": False,
+    "orders_or_execution_or_trading": False,
+}
 
 
 def current_progress_values() -> dict[str, Any]:
@@ -122,6 +138,12 @@ def current_progress_values() -> dict[str, Any]:
             "venue_id": execution.selected_venue,
             "instrument_mode": "usdt_linear_perpetual",
             "quote_currency": execution.quote_currency,
+            "primary_cost_currency": execution.primary_cost_currency,
+            "primary_cost_currency_policy": execution.primary_cost_currency_policy,
+            "primary_cost_currency_policy_sealed": (
+                execution.primary_cost_currency_policy_sealed
+            ),
+            "usd_equivalence_assumed": execution.usd_equivalence_assumed,
             "eligible_instrument_selection_rule": (
                 execution.eligible_instrument_selection_rule
             ),
@@ -251,16 +273,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
     if not isinstance(decision, Mapping):
         errors.append("confirmed_execution_decision_invalid")
     else:
-        expected = {
-            "venue_id": "bybit",
-            "instrument_mode": "usdt_linear_perpetual",
-            "quote_currency": "USDT",
-            "exact_eligible_instrument_set_sealed": False,
-            "data_boundary": "public_market_data_only",
-            "credentials_or_private_account_data": False,
-            "orders_or_execution_or_trading": False,
-        }
-        for key, expected_value in expected.items():
+        for key, expected_value in _EXPECTED_EXECUTION_DECISION.items():
             if decision.get(key) != expected_value:
                 errors.append(f"confirmed_execution_decision_{key}_mismatch")
         if decision.get("exact_eligible_instrument_ids") != []:
@@ -376,6 +389,12 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "selected_execution_surface="
             f"{decision['venue_id']}:{decision['instrument_mode']}:"
             f"{decision['quote_currency']} data_boundary={decision['data_boundary']}"
+        ),
+        (
+            "primary_cost_currency="
+            f"{decision['primary_cost_currency']} policy="
+            f"{decision['primary_cost_currency_policy']} sealed=true "
+            "USD_equivalence_assumed=false"
         ),
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",

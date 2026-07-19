@@ -43,13 +43,19 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v6"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v7"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
     assert result.intended_venue == "bybit"
     assert result.intended_instrument_mode == "perpetual"
     assert result.quote_currency == "USDT"
+    assert result.primary_cost_currency == "USDT"
+    assert result.primary_cost_currency_policy == (
+        "native_USDT_only_no_USD_conversion_or_equivalence"
+    )
+    assert result.primary_cost_currency_policy_sealed is True
+    assert result.usd_equivalence_assumed is False
     assert result.eligible_instrument_set == ()
     assert "top_30_liquid_decision_radar_assets" in (
         result.eligible_instrument_selection_rule or ""
@@ -108,7 +114,6 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "eligible_instrument_set_not_frozen",
         "bybit_public_endpoint_reachability_unverified_after_recorded_403",
         "runtime_provider_authorization_not_created_by_operator_selection",
-        "USDT_to_USD_cost_unit_policy_not_sealed",
         "protocol_v2_annex_not_sealed",
     }
 
@@ -279,6 +284,8 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "selected_venue=bybit selected_execution_mode=perpetual" in rendered
     assert "intended_venue=bybit intended_instrument_mode=perpetual" in rendered
     assert "quote_currency=USDT eligible_instrument_set=not_yet_frozen" in rendered
+    assert "primary_cost_currency=USDT primary_cost_currency_policy_sealed=true" in rendered
+    assert "usd_equivalence_assumed=false" in rendered
     assert "top_30_liquid_decision_radar_assets" in rendered
     assert "eligible_instrument_set_frozen=false" in rendered
     assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
@@ -332,8 +339,9 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "Execution-quality unit boundary" in rendered
     assert "selected_bybit_offline=best_bid,best_ask,mid_price,spread_bps" in rendered
     assert "bid_depth_usdt_by_band" in rendered
-    assert "future_generic_USD_projection=unavailable" in rendered
-    assert "generic_target_after_conversion=bid_depth_usd_by_band" in rendered
+    assert "primary_protocol_v2_cost_unit=USDT" in rendered
+    assert "future_generic_USD_projection=outside_primary_protocol_v2_cost_surface" in rendered
+    assert "generic_cross_venue_fields_if_later_converted=bid_depth_usd_by_band" in rendered
     assert (
         "buy_price_impact_bps_by_notional,"
         "sell_price_impact_bps_by_notional"
@@ -392,6 +400,12 @@ def test_cli_json_is_structured_static_and_secret_free(
     assert payload["intended_venue"] == "bybit"
     assert payload["intended_instrument_mode"] == "perpetual"
     assert payload["quote_currency"] == "USDT"
+    assert payload["primary_cost_currency"] == "USDT"
+    assert payload["primary_cost_currency_policy"] == (
+        "native_USDT_only_no_USD_conversion_or_equivalence"
+    )
+    assert payload["primary_cost_currency_policy_sealed"] is True
+    assert payload["usd_equivalence_assumed"] is False
     assert payload["eligible_instrument_set"] == []
     assert "top_30_liquid_decision_radar_assets" in payload[
         "eligible_instrument_selection_rule"
@@ -497,6 +511,8 @@ def test_checked_operator_decision_package_records_selection_and_boundaries() ->
     for field, _value in build_execution_quality_readiness().human_decision_template:
         assert field in rendered
     assert "cannot close the primary cost model" in rendered
+    assert "primary Protocol-v2 cost currency is now explicitly sealed as native USDT" in rendered
+    assert "No field is relabeled as USD" in rendered
     assert "No Protocol-v2 holdout is defined, opened, or evaluated" in rendered
     assert (
         "No production threshold, route, score, notification, or authority changes"
@@ -510,6 +526,9 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     decision = payload["operator_decisions"]["execution_venue_and_spread_provider"]
 
     assert readiness["contract_version"] == CONTRACT_VERSION
+    assert readiness["primary_cost_currency"] == "USDT"
+    assert readiness["primary_cost_currency_policy_sealed"] is True
+    assert readiness["usd_equivalence_assumed"] is False
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
     assert readiness["immutable_capture_contract_implemented"] is True

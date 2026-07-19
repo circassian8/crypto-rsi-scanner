@@ -31,12 +31,18 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v5")
+    assert values["progress_version"].endswith("_v6")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
     assert decision["instrument_mode"] == "usdt_linear_perpetual"
     assert decision["quote_currency"] == "USDT"
+    assert decision["primary_cost_currency"] == "USDT"
+    assert decision["primary_cost_currency_policy"] == (
+        "native_USDT_only_no_USD_conversion_or_equivalence"
+    )
+    assert decision["primary_cost_currency_policy_sealed"] is True
+    assert decision["usd_equivalence_assumed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -144,6 +150,8 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     ] = True
     unlock_drift = progress.current_progress_values()
     unlock_drift["structured_unlock_contract"]["genuine_capture_present"] = True
+    cost_unit_drift = progress.current_progress_values()
+    cost_unit_drift["confirmed_execution_decision"]["usd_equivalence_assumed"] = True
 
     for mutation in (
         digest_drift,
@@ -154,6 +162,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         version_drift,
         liquidation_drift,
         unlock_drift,
+        cost_unit_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -195,6 +204,8 @@ def test_progress_human_output_and_make_targets_are_explicit(
     output = capsys.readouterr()
     assert "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS" in output.out
     assert "selected_execution_surface=bybit:usdt_linear_perpetual:USDT" in output.out
+    assert "primary_cost_currency=USDT" in output.out
+    assert "USD_equivalence_assumed=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out
@@ -244,6 +255,8 @@ def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:
     ).read_text(encoding="utf-8")
 
     assert "Tokenomist v5 cliff-unlock response normalization" in note
+    assert "primary cost currency: native USDT" in note
+    assert "fee schedule" in note
     assert "synthetic-fixture capture/doctor" in note
     assert "retains\n  nothing" in note
     assert "v4 remains deprecated and live-ineligible" in note
