@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-seventh Radar market cycle · Codex
+**Why:** The authorized CoinGecko no-send campaign was cadence-eligible and
+needed another genuine point-in-time observation to continue warming the
+temporal baseline.
+**Changes:**
+- Performed exactly one bounded request with no retry and published
+  `radar_market_no_send_20260719t214234870148z_0bd651607dd8` after strict
+  doctor, receipt, pointer, owned-dashboard restart, and HTTP identity gates.
+- Refreshed the canonical campaign reports and current roadmap truth: 37 real
+  cycles, 1,110 retained observations, 1,080 baseline-counted observations, 30
+  too-close observations, 29 retained-history warm assets, and 27/30 warm in
+  the current universe.
+**Verify:** Provider ledger reports HTTP 200, 80 rows, 30 selected rows, 1,123
+ms, and zero retries; exact live strict doctor passed with zero blockers and
+warnings; dashboard readiness returned the exact namespace/run/revision;
+publication and operations receipts bind operator-state SHA-256
+`eeaaed653dd86a47955fa1de406759890d705bc3a29ff08e4ad1cb63528fd79e`.
+**Notes/risks:** There are zero current ideas and zero trusted spread rows. All
+send, trade, order, paper-trade, normal-RSI-write, and Event Alpha
+`TRIGGERED_FADE` counters remain zero. The next provider boundary is reserved
+until `2026-07-19T22:42:35.787641+00:00`; do not retry before fresh readiness.
+
 ## 2026-07-19 — Remove obsolete Protocol-v2 USD-conversion dependency · Codex
 **Why:** The active annex roadmap still listed a USDT/USD decision after the
 selected Bybit cost currency had been sealed as native USDT with no implicit
