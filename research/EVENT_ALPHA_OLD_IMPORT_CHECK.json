@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 3665,
+          "line": 3687,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 3665,
+          "line": 3687,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 10089,
+          "line": 10117,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T03:02:03.934495+00:00",
+  "generated_at": "2026-07-19T03:09:57.390423+00:00",
   "include_runtime_artifacts": false,
-  "input_file_count": 1215,
-  "input_fingerprint": "9127a8459775c7add2cb23fc42dc5d1a03a70839994be529d312d76516203689",
+  "input_file_count": 1216,
+  "input_fingerprint": "a4abb18d681b5c80228e688e10be5b3b04b78223b418da1d850971c01be67e33",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DEVLOG.md:1784430091",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784430058",
-    "research/ARCHITECTURE_SIZE_GATES.md:1784430054",
-    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784430121",
-    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784430121"
+    "AGENTS.md:1784430589",
+    "DECISIONS.md:1784430589",
+    "DEVLOG.md:1784430589",
+    "ROADMAP.md:1784430589",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784430133"
   ],
-  "newest_source_mtime": 1784430121.409561,
+  "newest_source_mtime": 1784430594.6703067,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784430049.204677,
+  "report_mtime": 1784430123.935028,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2509,24 +2509,24 @@
     "cache_status": "miss",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
-    "input_file_count": 1215,
-    "input_fingerprint": "9127a8459775c7add2cb23fc42dc5d1a03a70839994be529d312d76516203689",
+    "input_file_count": 1216,
+    "input_fingerprint": "a4abb18d681b5c80228e688e10be5b3b04b78223b418da1d850971c01be67e33",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DEVLOG.md:1784430091",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784430058",
-      "research/ARCHITECTURE_SIZE_GATES.md:1784430054",
-      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784430121",
-      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784430121"
+      "AGENTS.md:1784430589",
+      "DECISIONS.md:1784430589",
+      "DEVLOG.md:1784430589",
+      "ROADMAP.md:1784430589",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784430133"
     ],
-    "newest_source_mtime": 1784430121.409561,
+    "newest_source_mtime": 1784430594.6703067,
     "regex_compile_count": 124,
-    "report_mtime": 1784430049.204677,
-    "scan_duration_seconds": 2.229,
+    "report_mtime": 1784430123.935028,
+    "scan_duration_seconds": 2.3792,
     "scanned_artifact_files": 0,
-    "scanned_doc_files": 77,
+    "scanned_doc_files": 78,
     "scanned_makefile_files": 1,
     "scanned_script_files": 4,
     "scanned_source_files": 898,
@@ -2557,8 +2557,8 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.229,
-  "scanned_doc_files": 77,
+  "scan_duration_seconds": 2.3792,
+  "scanned_doc_files": 78,
   "scanned_source_files": 898,
   "scanned_test_files": 234,
   "schema_version": "event_alpha_old_import_check_v1",

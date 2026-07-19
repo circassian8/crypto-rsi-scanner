@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Count episodes, dependence, and every trial before Protocol-v2 evaluation
+**Status:** accepted
+**Decision:** Make a predeclared declustered Decision episode—not an observation
+row, scan, repeated idea, notification, or asset count—the primary Protocol-v2
+analysis unit. Freeze chronological development, validation, and one untouched
+holdout with leakage-safe purge/embargo; use dependence-aware temporal blocks
+rather than IID row resampling by default; and retain an append-only ledger of
+every tried feature, parameter, threshold, subset, outcome, cost, and stopping
+choice, including failed and abandoned work. Require an annex-selected
+family-level multiple-testing method and development-derived sample planning
+before validation. Set no numerical values and do not identify or read holdout
+bytes from this design record.
+**Why:** The current evidence contains overlapping observations, common market
+moves, related assets, and many possible research choices. Treating those as
+independent or forgetting unsuccessful variants would overstate precision and
+make post-hoc selection look like measured edge.
+**Revisit when:** The genuine point-in-time inputs, complete outcomes, human
+labels, and distinct route episodes are sufficient to estimate nuisance values
+from development data and the human is ready to seal the full Protocol-v2
+annex. Revisit the exact values then, not the need for honest trial and
+dependence accounting.
+
 ## 2026-07-19 - Require an explicit empty response to close Bitget coverage
 **Status:** accepted
 **Decision:** In Bitget announcement contract v2, treat every stopped nonempty

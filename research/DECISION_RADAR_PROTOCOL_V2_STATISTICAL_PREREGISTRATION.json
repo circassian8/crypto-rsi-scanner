@@ -1,0 +1,229 @@
+{
+  "schema_id": "decision_radar.protocol_v2_statistical_preregistration",
+  "schema_version": 1,
+  "status": "research_only_design_record_not_annex",
+  "as_of_date": "2026-07-19",
+  "purpose": "Predeclare Protocol-v2 statistical evidence discipline without selecting numerical values, partitions, holdout bytes, or promotion thresholds.",
+  "protocol_relationship": {
+    "frozen_readiness_contract_modified": false,
+    "current_progress_projection_modified": false,
+    "protocol_v2_annex": false,
+    "evaluation_target_created": false,
+    "holdout_defined": false,
+    "holdout_accessed": false
+  },
+  "analysis_unit": {
+    "primary": "predeclared_declustered_decision_episode",
+    "not_primary": [
+      "observation_row",
+      "scan_cycle",
+      "notification",
+      "card",
+      "repeated_idea"
+    ],
+    "dependence_clusters": [
+      "same_thesis_episode",
+      "shared_market_risk_window",
+      "shared_catalyst",
+      "mechanically_linked_asset_family"
+    ],
+    "row_and_distinct_episode_counts_required": true,
+    "iid_claim_allowed_by_default": false
+  },
+  "partition_contract": {
+    "order": [
+      "development",
+      "validation",
+      "untouched_holdout"
+    ],
+    "chronological": true,
+    "random_row_kfold_allowed_by_default": false,
+    "time_order_and_dependence_groups_preserved": true,
+    "purge_embargo_bases": [
+      "maximum_feature_lookback",
+      "maximum_outcome_horizon",
+      "idea_lifetime_or_expiry",
+      "overlapping_episode_window"
+    ],
+    "purge_embargo_duration_selected": false,
+    "fit_on_development_only": [
+      "transformations",
+      "missingness_rules",
+      "nuisance_parameters",
+      "bootstrap_block_length",
+      "thresholds",
+      "model_choices"
+    ],
+    "validation_retuning_allowed": false,
+    "holdout_identity_defined": false,
+    "holdout_access_ledger_required": true,
+    "protocol_v1_final_test_excluded": true
+  },
+  "dependence_aware_uncertainty": {
+    "descriptive_episode_and_cluster_counts_first": true,
+    "candidate_interval_method": "time_respecting_block_or_stationary_bootstrap",
+    "iid_row_bootstrap_allowed_by_default": false,
+    "block_length_selected_from": "development_only_diagnostics",
+    "block_length_frozen_before_validation": true,
+    "same_episode_and_market_risk_clusters_preserved": true,
+    "unsupported_interval_status": "unavailable",
+    "temporal_and_cross_sectional_dependence_separate": true
+  },
+  "trial_ledger": {
+    "required": true,
+    "append_only_after_annex": true,
+    "counted_families": [
+      "feature",
+      "transformation",
+      "model",
+      "parameter_grid",
+      "threshold",
+      "route_subset",
+      "outcome_definition",
+      "cost_assumption",
+      "cohort_split",
+      "stopping_choice"
+    ],
+    "include_failed_and_abandoned": true,
+    "reset_by_rename_or_branch_prohibited": true,
+    "required_lineage": [
+      "proposal_time",
+      "hypothesis_family",
+      "author",
+      "code_digest",
+      "configuration_digest",
+      "data_digest",
+      "partitions_touched",
+      "parameters",
+      "outputs",
+      "disposition"
+    ]
+  },
+  "multiple_testing": {
+    "family_level_procedure_required_before_validation": true,
+    "candidate_procedures": [
+      "white_reality_check",
+      "hansen_superior_predictive_ability"
+    ],
+    "procedure_selected": false,
+    "deflated_sharpe_ratio": {
+      "role": "secondary_diagnostic_only",
+      "requires_predeclared_economic_return_statistic": true,
+      "requires_honest_trial_count": true,
+      "allowed_on_decision_or_route_scores": false
+    },
+    "probability_of_backtest_overfitting": {
+      "role": "development_validation_diagnostic_only",
+      "requires_leakage_safe_temporal_blocks": true,
+      "replaces_untouched_holdout": false
+    }
+  },
+  "minimum_sample_method": {
+    "exact_values_selected": false,
+    "freeze_before_validation": [
+      "primary_estimand_and_metric",
+      "smallest_worthwhile_effect_or_precision",
+      "confidence_and_error_control_policy",
+      "power_policy",
+      "observed_cost_model",
+      "missingness_and_attrition_policy",
+      "development_only_nuisance_estimates",
+      "dependence_and_attrition_inflation",
+      "minimum_distinct_episode_counts",
+      "minimum_distinct_market_window_counts"
+    ],
+    "separate_cohort_minimums": [
+      "aggregate",
+      "route",
+      "route_by_bias",
+      "regime",
+      "liquidity",
+      "execution_quality",
+      "source_quality"
+    ],
+    "below_minimum_status": "unavailable",
+    "incompatible_pooling_allowed": false,
+    "regime_diversity_separate_from_episode_count": true
+  },
+  "evaluation_sequence": [
+    "freeze_unchanged_canonical_control_and_one_candidate",
+    "evaluate_mature_episode_outcomes_and_matched_controls_under_observed_costs",
+    "report_coverage_missingness_false_positive_burden_calibration_detection_latency_and_direction_adjusted_research_outcomes",
+    "apply_sealed_dependence_and_multiple_testing_contract_on_development_and_validation",
+    "permit_one_exact_holdout_access_only_after_predeclared_validation_success",
+    "publish_negative_null_and_inconclusive_results",
+    "require_separate_human_decision_for_production_promotion"
+  ],
+  "explicitly_deferred_to_final_annex": [
+    "episode_reset_definition",
+    "dependence_cluster_definition",
+    "partition_dates_and_data_digests",
+    "untouched_holdout_identity",
+    "purge_and_embargo_duration",
+    "primary_and_secondary_metrics",
+    "smallest_worthwhile_effect",
+    "precision_target",
+    "confidence_level",
+    "power",
+    "family_wise_error_or_false_discovery_policy",
+    "block_length_selector_and_value",
+    "aggregate_and_cohort_sample_minimums",
+    "family_level_multiple_testing_procedure",
+    "success_failure_stopping_and_promotion_thresholds",
+    "route_scope_cost_sensitivity_and_rollback_rules"
+  ],
+  "current_blockers": [
+    "genuine_bybit_execution_intraday_and_derivatives_captures",
+    "exact_protocol_v2_instruments_and_observed_costs",
+    "authoritative_context_sources",
+    "complete_due_outcomes_and_human_oos_labels",
+    "sufficient_distinct_route_episodes_and_market_risk_windows",
+    "exact_chronological_partitions_and_unidentified_untouched_holdout",
+    "final_human_annex_approval"
+  ],
+  "safety": {
+    "research_only": true,
+    "auto_apply": false,
+    "production_policy_mutations": 0,
+    "provider_authorization_mutations": 0,
+    "provider_calls": 0,
+    "holdout_reads": 0,
+    "dashboard_authority_mutations": 0,
+    "telegram_sends": 0,
+    "trades": 0,
+    "orders": 0,
+    "paper_trades": 0,
+    "normal_rsi_writes": 0,
+    "event_alpha_triggered_fade": 0
+  },
+  "primary_references": [
+    {
+      "title": "The Stationary Bootstrap",
+      "url": "https://doi.org/10.1080/01621459.1994.10476870"
+    },
+    {
+      "title": "A Reality Check for Data Snooping",
+      "url": "https://doi.org/10.1111/1468-0262.00152"
+    },
+    {
+      "title": "A Test for Superior Predictive Ability",
+      "url": "https://doi.org/10.1198/073500105000000063"
+    },
+    {
+      "title": "The Deflated Sharpe Ratio",
+      "url": "https://ssrn.com/abstract=2460551"
+    },
+    {
+      "title": "The Probability of Backtest Overfitting",
+      "url": "https://ssrn.com/abstract=2326253"
+    },
+    {
+      "title": "A Note on the Validity of Cross-Validation for Evaluating Autoregressive Time Series Prediction",
+      "url": "https://doi.org/10.1016/j.csda.2017.11.003"
+    },
+    {
+      "title": "Evaluating Trading Strategies",
+      "url": "https://ssrn.com/abstract=2474755"
+    }
+  ]
+}

@@ -633,6 +633,15 @@ may be added later when a suitable environment already exists.
   catalyst, official-calendar, derivatives, on-chain, or RSI evidence remains
   unavailable and cannot be proxied. No v2 replay, selection, or final-test
   target exists; protocol-v1 final-test evidence is forbidden for tuning.
+  The checked statistical preregistration in
+  `research/DECISION_RADAR_PROTOCOL_V2_STATISTICAL_PREREGISTRATION.md` / `.json`
+  is design-only and is not the annex: it fixes episode-level counting,
+  chronological partitions, dependence-aware uncertainty, a permanent trial
+  ledger, and one untouched-holdout boundary while leaving every numerical
+  sample, partition, error-control, block-length, success, and promotion value
+  unspecified. Do not use random-row cross-validation or IID row counts by
+  default, do not read or identify holdout bytes from this record, and do not
+  treat it as an executable evaluation target.
 - **Empirical hardening supplement:**
   `make radar-research-hardening-supplement
   RADAR_RESEARCH_SELECTION_RUN=<exact-selection-run>` creates or identically

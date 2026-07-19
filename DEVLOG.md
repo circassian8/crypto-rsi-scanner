@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preregister Protocol-v2 statistical discipline · Codex
+**Why:** Protocol v2 already required independent episodes, frozen partitions,
+minimum samples, and an untouched holdout, but it did not yet state how to
+avoid IID row counting, temporal leakage, forgotten trials, or family-level
+data snooping before those exact values are sealed.
+**Changes:**
+- Added matching Markdown/JSON research-only design records that make a
+  declustered Decision episode the primary analysis unit, preserve explicit
+  market/catalyst/asset dependence clusters, and require chronological
+  development, validation, and one untouched holdout with purge/embargo.
+- Required development-only nuisance estimation, time-respecting block or
+  stationary-bootstrap uncertainty, an append-only complete trial ledger, and
+  a predeclared family-level multiple-testing procedure. Restricted Deflated
+  Sharpe and PBO/CSCV to appropriate secondary diagnostics; neither can replace
+  lineage, sufficient episodes, observed costs, or the untouched holdout.
+- Defined the method for choosing minimum samples while deliberately leaving
+  every numerical sample, effect, partition, holdout, error-control,
+  block-length, success, and promotion value to the final human-approved annex.
+- Updated the working agreement, roadmap, and durable decision record without
+  modifying the fingerprinted frozen readiness contract or current production.
+**Verify:** Parsed the new structured record, ran diff whitespace validation,
+and ran architecture cleanliness. A pytest/full verify was intentionally
+skipped because this slice changes checked research/collaboration documents only
+and creates no executable path.
+**Notes/risks:** No holdout byte was identified or read. No provider call,
+authorization, feature, score, route, threshold, publication, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-19 — Prove immutable Bitget capture offline · Codex
 **Why:** The strict Bitget response projection was closed, but exact source
 bytes and transport facts still lacked the immutable bundle and re-deriving
