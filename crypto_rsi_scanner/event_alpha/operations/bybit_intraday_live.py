@@ -50,7 +50,7 @@ from .bybit_intraday_capture import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v2"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v3"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_PROVIDER_REQUESTS = MAX_RADAR_ASSETS * len(INTERVAL_SECONDS)

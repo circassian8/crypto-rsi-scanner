@@ -948,7 +948,11 @@ The direct intraday offline contract likewise validates exact latest-completed
 Bybit trade-price candles independently at 1h and 4h. It cuts requests off just
 before the current bucket, preserves native instrument identity, OHLC,
 base-asset volume, USDT turnover, provider/request/response clocks, and
-close-to-acquisition latency, and rejects open/missing/misidentified bars. Run
+close-to-acquisition latency, and rejects open/missing/misidentified bars.
+Contract v3 marks a bar fresh only when both the completed bar remains inside
+its interval recency window and the provider response is no more than 15
+seconds old; the two component states and ages remain explicit, and a provider
+response cannot predate the completed candle it contains. Run
 `make radar-intraday-bybit-smoke PYTHON=.venv/bin/python` with zero provider
 calls or writes. Its guarded live collector is implemented but inactive: zero-
 call readiness requires a genuine fresh execution-quality capture for exact

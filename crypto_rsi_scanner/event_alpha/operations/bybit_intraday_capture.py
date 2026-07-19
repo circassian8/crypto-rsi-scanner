@@ -43,8 +43,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_capture_v2"
-LIVE_CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v2"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_capture_v3"
+LIVE_CONTRACT_VERSION = "crypto_radar_bybit_intraday_live_v3"
 EXECUTION_CAPTURE_CONTRACT_VERSION = (
     "crypto_radar_bybit_execution_quality_capture_v2"
 )

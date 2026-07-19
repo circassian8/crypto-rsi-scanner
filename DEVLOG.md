@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-18 — Require current responses for direct Bybit bars · Codex
+**Why:** The direct-bar contract proved the exact completed candle and its
+close-to-acquisition latency, but overall freshness ignored the provider's own
+response clock. A cached response could therefore look current from candle shape
+alone.
+**Changes:**
+- Advanced the intraday offline, guarded-live, and immutable-capture contracts
+  to v3. Each 1h/4h bar now exposes completed-bar recency and provider-response
+  freshness separately, with the provider response age and exact combined
+  policy preserved.
+- Overall bar freshness now requires both a completed candle inside its interval
+  recency window and a provider response no more than 15 seconds old. A provider
+  response timestamp before the completed candle it contains fails closed.
+- Kept immutable capture copy-free and exact: it rederives the new fields from
+  the accepted raw responses, so stale response evidence cannot be repaired by
+  a summary or pointer.
+- Audited the neighboring execution-quality book clock and confirmed it already
+  uses the older matching-engine clock after enforcing its relation to the book
+  snapshot; no unnecessary change was made there.
+- Updated the Crypto Decision Radar North Star, durable decision, roadmap, and
+  generated architecture reports.
+**Verify:** All 36 intraday normalizer/live/capture tests passed, including
+stale-provider and impossible-clock regressions. Another 37 execution-readiness,
+project-export, and Protocol-v2 contract tests passed. Python compileall and
+North Star JSON validation passed. The offline intraday smoke emitted v3 with
+zero provider calls/writes/side effects; architecture cleanliness passed with
+zero new violations; dashboard readiness remained exact and READY.
+**Notes/risks:** No Bybit or other provider call occurred and no authorization
+was created. The recorded 403/no-retry/no-proxy/no-VPN/no-bypass boundary,
+Decision policy, scores, routes, and all no-send/no-trade/no-order/no-paper/no-
+RSI-write/no-`TRIGGERED_FADE` protections remain unchanged.
+
 ## 2026-07-18 — Make Bybit derivatives freshness composite-safe · Codex
 **Why:** A venue-native derivatives row combines four independent provider
 responses, but v1 dated the whole row from the newest response. One fresh ticker

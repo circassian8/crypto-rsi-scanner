@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-18 - Require current provider responses for direct intraday bars
+**Status:** accepted
+**Decision:** Bybit intraday v3 keeps completed-bar recency and provider-response
+freshness as separate explicit states. Overall `freshness_status=fresh` requires
+both: the exact latest completed 1h/4h candle is still inside its interval window
+and the provider response is at most 15 seconds old at acquisition. Persist the
+provider-response age and policy, and reject a payload whose provider response
+time predates the completed candle it claims to contain. Immutable capture
+rederives the same fields from exact response bytes.
+**Why:** Exact candle identity alone does not prove a current response. A cached
+or replayed payload could satisfy the completed-bucket shape while a stale
+provider clock was ignored, overstating the point-in-time evidence available to
+Protocol-v2 research.
+**Revisit when:** The official provider contract supplies a stronger signed or
+stream-sequenced availability clock, or a preregistered annex adopts a stricter
+latency limit. Any replacement must preserve separate bar/response truth and
+must not let either component hide staleness in the other.
+
 ## 2026-07-18 - Date composite derivatives context from its oldest response
 **Status:** accepted
 **Decision:** Bybit derivatives context v2 preserves all four component provider

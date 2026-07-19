@@ -36,8 +36,8 @@ from .bybit_execution_quality import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_intraday_v2"
-BAR_SCHEMA_VERSION = "crypto_radar.bybit_intraday_bar.v2"
+CONTRACT_VERSION = "crypto_radar_bybit_intraday_v3"
+BAR_SCHEMA_VERSION = "crypto_radar.bybit_intraday_bar.v3"
 KLINE_PATH = "/v5/market/kline"
 OFFICIAL_KLINE_DOC = "https://bybit-exchange.github.io/docs/v5/market/kline"
 INTERVAL_SECONDS = {"60": 60 * 60, "240": 4 * 60 * 60}
@@ -46,6 +46,7 @@ KLINE_LIMIT = 200
 RSI_PERIOD = 14
 RSI_METHOD = "wilder_rma_sma_seed"
 MAX_PROVIDER_CLOCK_SKEW_SECONDS = 60
+MAX_PROVIDER_RESPONSE_AGE_SECONDS = 15.0
 _INSTRUMENT_RE = re.compile(r"^[A-Z0-9]{4,32}$")
 _LINEAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
@@ -77,7 +78,11 @@ class _BybitIntradayBar:
     request_started_at: str
     response_acquired_at: str
     provider_response_generated_at: str
+    provider_response_age_seconds: float
+    provider_response_freshness_status: str
     observation_latency_seconds: float
+    bar_close_recency_status: str
+    freshness_policy: str
     freshness_status: str
     open_price: float
     high_price: float
@@ -290,6 +295,7 @@ def normalize_bybit_completed_kline(
     provider_at = datetime.fromtimestamp(provider_ms / 1000, tz=timezone.utc)
     if provider_at > acquired + timedelta(seconds=MAX_PROVIDER_CLOCK_SKEW_SECONDS):
         raise BybitIntradayError("bybit_kline_provider_clock_future")
+    provider_age = max(0.0, (acquired - provider_at).total_seconds())
 
     parsed_rows: list[_ParsedKline] = []
     seen_starts: set[int] = set()
@@ -333,10 +339,20 @@ def normalize_bybit_completed_kline(
     end_at = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc)
     if end_ms != requested_end_ms + 1 or end_at > started:
         raise BybitIntradayError("kline_not_completed_before_request")
+    if provider_at < end_at:
+        raise BybitIntradayError("provider_response_precedes_completed_kline")
     latency = (acquired - end_at).total_seconds()
     if latency < 0:
         raise BybitIntradayError("kline_observation_latency_negative")
-    freshness = "fresh" if latency < INTERVAL_SECONDS[interval] else "stale"
+    bar_recency = "fresh" if latency < INTERVAL_SECONDS[interval] else "stale"
+    provider_freshness = (
+        "fresh" if provider_age <= MAX_PROVIDER_RESPONSE_AGE_SECONDS else "stale"
+    )
+    freshness = (
+        "fresh"
+        if bar_recency == "fresh" and provider_freshness == "fresh"
+        else "stale"
+    )
     start_at = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
     requested_end_at = datetime.fromtimestamp(
         (requested_end_ms + 1) / 1000, tz=timezone.utc
@@ -362,7 +378,11 @@ def normalize_bybit_completed_kline(
         request_started_at=_iso(started),
         response_acquired_at=_iso(acquired),
         provider_response_generated_at=_iso(provider_at),
+        provider_response_age_seconds=round(provider_age, 6),
+        provider_response_freshness_status=provider_freshness,
         observation_latency_seconds=latency,
+        bar_close_recency_status=bar_recency,
+        freshness_policy="completed_bar_and_current_provider_response",
         freshness_status=freshness,
         open_price=float(open_price),
         high_price=float(high_price),

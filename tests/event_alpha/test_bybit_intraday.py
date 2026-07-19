@@ -131,7 +131,11 @@ def test_normalizer_preserves_native_identity_units_and_latency(
     assert bar.bar_start_at == start
     assert bar.bar_end_at == end
     assert bar.requested_end_at == end
+    assert bar.provider_response_age_seconds == 0.025
+    assert bar.provider_response_freshness_status == "fresh"
     assert bar.observation_latency_seconds == 1800.125
+    assert bar.bar_close_recency_status == "fresh"
+    assert bar.freshness_policy == "completed_bar_and_current_provider_response"
     assert bar.freshness_status == "fresh"
     assert bar.open_price == open_price
     assert bar.close_price == 121000.0
@@ -162,6 +166,28 @@ def test_open_or_wrong_bucket_candle_cannot_replace_completed_bar() -> None:
     ]
 
     with pytest.raises(BybitIntradayError, match="latest_completed_kline_missing"):
+        _normalize("60", payload)
+
+
+def test_stale_provider_response_keeps_current_completed_bar_stale() -> None:
+    payload = _payload("60")
+    payload["time"] = int((ACQUIRED - timedelta(seconds=60)).timestamp() * 1000)
+
+    bar = _normalize("60", payload)
+
+    assert bar.bar_close_recency_status == "fresh"
+    assert bar.provider_response_age_seconds == 60.0
+    assert bar.provider_response_freshness_status == "stale"
+    assert bar.freshness_status == "stale"
+
+
+def test_provider_response_cannot_predate_completed_bar() -> None:
+    payload = _payload("60")
+    payload["time"] = int(
+        datetime(2026, 7, 17, 11, 59, 59, tzinfo=timezone.utc).timestamp() * 1000
+    )
+
+    with pytest.raises(BybitIntradayError, match="precedes_completed_kline"):
         _normalize("60", payload)
 
 
