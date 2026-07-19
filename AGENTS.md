@@ -361,18 +361,22 @@ may be added later when a suitable environment already exists.
   `make radar-announcements-kucoin-readiness` is the non-activating operator
   boundary: it reads only the separate
   `RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` flag, reports the legacy plan
-  as non-executable, the current UTA contract as unimplemented, and zero current
-  permitted requests, plus `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE`
-  as the disable action. It has no HTTP client, filesystem write, or live
-  capture command. `make radar-announcements-kucoin-capture-smoke` proves exact
+  as non-executable, the current UTA response contract as fixture-closed, and
+  the current UTA capture/doctor plus live transport as missing. It permits no
+  call and reports `unset RSI_DECISION_RADAR_KUCOIN_ANNOUNCEMENTS_LIVE` as the
+  disable action. It has no HTTP client, filesystem write, or live capture
+  command. `make radar-announcements-kucoin-capture-smoke` proves exact
   request-ledger, response-byte, normalized-snapshot, manifest, completion-
   receipt, idempotence, and strict-doctor reconciliation inside one disposable
-  temporary root, then retains nothing. The capture module explicitly rejects
+  temporary root, then retains nothing. Strict reads hold one verified namespace
+  descriptor across inventory and every no-follow leaf read, require regular
+  single-link bounded files, and compare identity before/opened/after. The
+  historical capture module explicitly rejects
   `live_public_http` mode, publishes no pointer, and cannot grant source,
   campaign, dashboard, or Protocol-v2 authority. Authorization alone cannot
-  make readiness pass while the current UTA contract and live transport remain
-  unimplemented; never create or mutate the flag from code, and never activate
-  the superseded endpoint.
+  make readiness pass while the current UTA capture/doctor and live transport
+  remain unimplemented; never create or mutate the flag from code, and never
+  activate the superseded endpoint.
   The current UTA response contract is now independently fixture-closed by
   `make radar-announcements-kucoin-uta-smoke`: it binds exact
   `language`/`type`/`pageNumber`/`pageSize`/time queries, the renamed

@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Anchor KuCoin capture-doctor leaf reads · Codex
+**Why:** A cross-layer audit found that the historical KuCoin doctor anchored
+its directory inventory but reopened each artifact by pathname afterward. A
+parent replacement between those steps could redirect reads even though later
+hash checks would usually fail.
+**Changes:**
+- Kept one verified namespace descriptor open across inventory and every leaf
+  read, opening each relative name with no-follow semantics.
+- Required bounded regular single-link files and exact device, inode, mode,
+  link-count, size, and modification-time identity before/opened/after reads.
+- Added symlink and hardlink leaf regressions; the historical contract remains
+  fixture/audit-only and cannot gain current UTA or live authority.
+**Verify:** Focused historical KuCoin capture tests, capture smoke, compileall,
+diff whitespace validation, and architecture cleanliness passed.
+**Notes/risks:** No provider call, authorization, artifact publication, route,
+score, threshold, send, trade, order, paper trade, normal RSI write, or Event
+Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-19 — Close the current KuCoin UTA response contract offline · Codex
 **Why:** After retiring KuCoin's replaced v1 endpoint from live consideration,
 the current UTA schema needed its own exact offline contract before any capture

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -212,6 +214,36 @@ def test_extra_leaf_fails_strict_doctor(tmp_path: Path) -> None:
 
     with pytest.raises(
         KuCoinAnnouncementCaptureError, match="capture_artifact_set_invalid"
+    ):
+        validate_capture(tmp_path, result["artifact_namespace"])
+
+
+def test_symlinked_capture_leaf_fails_closed(tmp_path: Path) -> None:
+    result = _persist(tmp_path)
+    directory = tmp_path / result["artifact_namespace"]
+    target = directory / "response_page_001.json"
+    outside = tmp_path / "outside.json"
+    outside.write_bytes(target.read_bytes())
+    target.unlink()
+    target.symlink_to(outside)
+
+    with pytest.raises(
+        KuCoinAnnouncementCaptureError, match="capture_artifact_leaf_invalid"
+    ):
+        validate_capture(tmp_path, result["artifact_namespace"])
+
+
+def test_hardlinked_capture_leaf_fails_closed(tmp_path: Path) -> None:
+    result = _persist(tmp_path)
+    directory = tmp_path / result["artifact_namespace"]
+    target = directory / "response_page_001.json"
+    outside = tmp_path / "outside.json"
+    shutil.copyfile(target, outside)
+    target.unlink()
+    os.link(outside, target)
+
+    with pytest.raises(
+        KuCoinAnnouncementCaptureError, match="capture_artifact_leaf_invalid"
     ):
         validate_capture(tmp_path, result["artifact_namespace"])
 

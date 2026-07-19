@@ -39,7 +39,6 @@ from .market_no_send_io import (
     _open_verified_namespace_dir,
     ensure_safe_namespace_dir,
     parse_json_object_bytes,
-    read_regular_bytes,
     write_bytes_immutable,
 )
 from .market_no_send_models import MarketNoSendError
@@ -59,6 +58,7 @@ _NAMESPACE_RE = re.compile(
 )
 _RAW_PAGE_RE = re.compile(r"^response_page_([0-9]{3})\.json$")
 _LINEAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+_MAX_CAPTURE_ARTIFACT_BYTES = 8_000_000
 
 
 class KuCoinAnnouncementCaptureError(ValueError):
@@ -486,27 +486,91 @@ def _read_exact_capture_files(namespace_dir: Path) -> dict[str, bytes]:
         with _open_verified_namespace_dir(namespace_dir) as anchored:
             _base_fd, namespace_fd, _namespace, _identity = anchored
             names = set(os.listdir(namespace_fd))
-        fixed = {LEDGER_FILENAME, SNAPSHOT_FILENAME, MANIFEST_FILENAME, RECEIPT_FILENAME}
-        page_names = sorted(name for name in names if _RAW_PAGE_RE.fullmatch(name))
-        if (
-            not page_names
-            or len(page_names) > MAX_RESPONSE_PAGES
-            or names != fixed | set(page_names)
-            or page_names
-            != [_page_filename(index) for index in range(1, len(page_names) + 1)]
-        ):
-            raise KuCoinAnnouncementCaptureError("capture_artifact_set_invalid")
-        files: dict[str, bytes] = {}
-        for name in sorted(names):
-            raw = read_regular_bytes(namespace_dir / name)
-            if raw is None:
-                raise KuCoinAnnouncementCaptureError("capture_artifact_missing")
-            files[name] = raw
-        return files
+            fixed = {
+                LEDGER_FILENAME,
+                SNAPSHOT_FILENAME,
+                MANIFEST_FILENAME,
+                RECEIPT_FILENAME,
+            }
+            page_names = sorted(name for name in names if _RAW_PAGE_RE.fullmatch(name))
+            if (
+                not page_names
+                or len(page_names) > MAX_RESPONSE_PAGES
+                or names != fixed | set(page_names)
+                or page_names
+                != [_page_filename(index) for index in range(1, len(page_names) + 1)]
+            ):
+                raise KuCoinAnnouncementCaptureError("capture_artifact_set_invalid")
+            files: dict[str, bytes] = {}
+            for name in sorted(names):
+                before = os.stat(name, dir_fd=namespace_fd, follow_symlinks=False)
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or before.st_nlink != 1
+                    or before.st_size < 0
+                    or before.st_size > _MAX_CAPTURE_ARTIFACT_BYTES
+                ):
+                    raise KuCoinAnnouncementCaptureError("capture_artifact_leaf_invalid")
+                descriptor = os.open(
+                    name,
+                    os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=namespace_fd,
+                )
+                try:
+                    opened = os.fstat(descriptor)
+                    if not _same_file_snapshot(before, opened):
+                        raise KuCoinAnnouncementCaptureError(
+                            "capture_artifact_identity_invalid"
+                        )
+                    chunks = []
+                    remaining = before.st_size
+                    while remaining:
+                        chunk = os.read(descriptor, min(65_536, remaining))
+                        if not chunk:
+                            break
+                        chunks.append(chunk)
+                        remaining -= len(chunk)
+                    raw = b"".join(chunks)
+                    current = os.stat(
+                        name,
+                        dir_fd=namespace_fd,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        remaining != 0
+                        or len(raw) != before.st_size
+                        or not _same_file_snapshot(before, os.fstat(descriptor))
+                        or not _same_file_snapshot(before, current)
+                    ):
+                        raise KuCoinAnnouncementCaptureError(
+                            "capture_artifact_changed_during_read"
+                        )
+                    files[name] = raw
+                finally:
+                    os.close(descriptor)
+            return files
     except KuCoinAnnouncementCaptureError:
         raise
     except (MarketNoSendError, OSError) as exc:
         raise KuCoinAnnouncementCaptureError("capture_artifact_unreadable") from exc
+
+
+def _same_file_snapshot(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        left.st_dev,
+        left.st_ino,
+        left.st_mode,
+        left.st_nlink,
+        left.st_size,
+        left.st_mtime_ns,
+    ) == (
+        right.st_dev,
+        right.st_ino,
+        right.st_mode,
+        right.st_nlink,
+        right.st_size,
+        right.st_mtime_ns,
+    )
 
 
 def _parse_object(raw: bytes, reason: str) -> dict[str, Any]:

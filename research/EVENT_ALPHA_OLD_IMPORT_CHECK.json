@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 10165,
+          "line": 10183,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,20 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T03:25:55.821517+00:00",
+  "generated_at": "2026-07-19T03:31:09.684913+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1219,
-  "input_fingerprint": "f22ef47a03a186f9138eba4acd82ab646902f73e708b7878c2659aed3ecb8533",
+  "input_fingerprint": "8c6b2a3fc4b876efbcd08972d038bea04c646e91b8525050db80287e1d2ed301",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "AGENTS.md:1784431537",
-    "DECISIONS.md:1784431537",
-    "DEVLOG.md:1784431537",
-    "Makefile:1784431430",
-    "ROADMAP.md:1784431537"
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784431814",
+    "research/ARCHITECTURE_SIZE_GATES.md:1784431810",
+    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784431866",
+    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784431867"
   ],
-  "newest_source_mtime": 1784431553.0859683,
+  "newest_source_mtime": 1784431866.9460146,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2500,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784431079.0656757,
+  "report_mtime": 1784431804.8479626,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2509,20 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1219,
-    "input_fingerprint": "f22ef47a03a186f9138eba4acd82ab646902f73e708b7878c2659aed3ecb8533",
+    "input_fingerprint": "8c6b2a3fc4b876efbcd08972d038bea04c646e91b8525050db80287e1d2ed301",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784431537",
-      "DECISIONS.md:1784431537",
-      "DEVLOG.md:1784431537",
-      "Makefile:1784431430",
-      "ROADMAP.md:1784431537"
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784431814",
+      "research/ARCHITECTURE_SIZE_GATES.md:1784431810",
+      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784431866",
+      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784431867"
     ],
-    "newest_source_mtime": 1784431553.0859683,
+    "newest_source_mtime": 1784431866.9460146,
     "regex_compile_count": 124,
-    "report_mtime": 1784431079.0656757,
-    "scan_duration_seconds": 2.3744,
+    "report_mtime": 1784431804.8479626,
+    "scan_duration_seconds": 2.392,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2557,7 +2555,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.3744,
+  "scan_duration_seconds": 2.392,
   "scanned_doc_files": 79,
   "scanned_source_files": 899,
   "scanned_test_files": 235,
