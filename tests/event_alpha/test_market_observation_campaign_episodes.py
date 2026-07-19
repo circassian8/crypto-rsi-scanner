@@ -118,6 +118,21 @@ def _resign_input_audit(audit: dict[str, object]) -> None:
     )
 
 
+def _historically_recovered(outcome: dict[str, object]) -> dict[str, object]:
+    recovered = deepcopy(outcome)
+    recovered.update({
+        "historical_price_recovery": True,
+        "historical_price_recovery_point_in_time": False,
+        "calibration_eligible": False,
+        "include_in_performance": False,
+    })
+    recovered["calibration_ineligible_reasons"] = list(
+        outcome_eligibility.calibration_ineligibility_reasons(recovered)
+    )
+    assert outcome_eligibility.validate_contract(recovered) == []
+    return recovered
+
+
 def test_campaign_report_adds_episode_shadow_without_changing_headline_counts(
     tmp_path: Path,
 ):
@@ -255,6 +270,74 @@ def test_campaign_report_scores_one_exact_primary_representative(tmp_path: Path)
     markdown = market_observation_campaign.format_campaign_report(report)
     assert "| episode-token |" in markdown
     assert "| matured | aligned | 0.10000000 |" in markdown
+
+
+def test_campaign_report_keeps_recovery_mature_but_excludes_episode_evidence(
+    tmp_path: Path,
+):
+    namespace = "episode_historical_recovery"
+    candidate = _candidate(
+        namespace,
+        _START,
+        anomaly_id=f"mkt:episode:{namespace}",
+    )
+    core = market_observation_outcomes._candidate_projection_core(  # noqa: SLF001
+        candidate,
+        projection=decision_model_values(candidate),
+    )
+    assert core is not None
+    core["integrated_candidate_id"] = candidate["candidate_id"]
+    evaluated = _START + timedelta(days=2)
+    outcome = _historically_recovered(
+        _scorecard_outcome(
+            candidate,
+            core,
+            persisted_evaluated_at=evaluated,
+            primary_price=110.0,
+        )
+    )
+    write_countable_generation(
+        tmp_path,
+        namespace,
+        _START.isoformat(),
+        candidates=[candidate],
+        core_rows=[core],
+    )
+    history_dir = tmp_path / LIVE_HISTORY_CACHE_NAMESPACE
+    history_dir.mkdir()
+    ledger_path = history_dir / market_observation_outcomes.CAMPAIGN_OUTCOMES_FILENAME
+    market_no_send_io.write_jsonl(ledger_path, [outcome])
+    ledger_before = ledger_path.read_bytes()
+
+    report = market_observation_campaign.build_campaign_report(
+        tmp_path,
+        evaluated_at=evaluated,
+    )
+
+    episode_record = report["shadow_anomaly_episodes"]["episodes"][0][
+        "representative"
+    ]
+    audit = report["shadow_anomaly_episode_input_audit"]
+    scorecard = report["decision_v2_episode_outcome_scorecard"]
+    representative = scorecard["representatives"][0]
+    assert report["outcomes"]["matured"] == 1
+    assert outcome["maturation_state"] == "matured"
+    assert outcome["primary_horizon_return"] == pytest.approx(0.10)
+    assert episode_record["outcome_evidence_status"] == "unavailable"
+    assert episode_record["outcome_evidence_reasons"] == [
+        "historical_price_recovery_not_point_in_time"
+    ]
+    assert episode_record["primary_horizon_return"] is None
+    assert audit["exact_outcome_join_count"] == 1
+    assert audit["outcome_evidence_status_counts"] == {"unavailable": 1}
+    assert representative["outcome_state"] == "contract_excluded"
+    assert representative["contract_exclusion_reasons"] == [
+        "historical_price_recovery_not_point_in_time"
+    ]
+    assert representative["primary_horizon_return"] is None
+    assert scorecard["matured_episode_count"] == 0
+    assert scorecard["scoreable_directional_episode_count"] == 0
+    assert ledger_path.read_bytes() == ledger_before
 
 
 def test_raw_duplicate_outcome_identity_is_explicit_before_legacy_dedup(

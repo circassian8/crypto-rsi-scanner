@@ -1056,6 +1056,10 @@ rows, proves market-history bytes unchanged, and writes one immutable receipt.
 Any pre-receipt failure restores the exact prior ledger; receipt/current-state
 drift fails closed. Recovered rows retain explicit post-hoc lineage and remain
 permanently excluded from calibration, performance, and Protocol-v2 evidence.
+Campaign episode inputs must therefore mark their returns unavailable with
+`historical_price_recovery_not_point_in_time`, and Decision episode scorecards
+must contract-exclude those representatives rather than count them as matured
+or scoreable evidence.
 **Why:** A genuine historical series can close an operational outcome gap, but
 post-hoc acquisition is not point-in-time campaign evidence. A distinct
 authorization, exact window, immutable provenance, and ledger-only boundary

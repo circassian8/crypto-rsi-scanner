@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Keep post-hoc recovery outside episode evidence · Codex
+**Why:** Historical outcome-price recovery was already marked permanently
+ineligible for calibration and performance, but the campaign episode and
+Decision scorecard layers used its finite return anyway. That could turn a
+post-hoc operational repair into apparently scoreable empirical evidence.
+**Changes:**
+- Made the campaign episode projection recognize canonical historical-recovery
+  lineage, retain the exact outcome join, and emit
+  `historical_price_recovery_not_point_in_time` with unavailable episode
+  evidence and no projected return.
+- Made the Decision episode scorecard apply the same reason before maturity
+  classification. A recovered representative is now `contract_excluded`,
+  never direction-aligned, matured, or scoreable.
+- Added end-to-end campaign and focused scorecard regressions proving the
+  mutable outcome remains operationally matured while its source ledger bytes,
+  lineage, and all research-only safety fields remain unchanged.
+- Clarified the existing durable recovery decision and recovery runbook so the
+  downstream empirical firewall is explicit.
+**Verify:** 76 focused campaign-episode, Decision scorecard, recovery-
+application, and campaign-report tests passed. `python3 -m compileall -q
+crypto_rsi_scanner tests` and `git diff --check` passed. `make
+radar-market-campaign-report PYTHON=python3` reconciled the real campaign with
+zero provider calls, and `make architecture-cleanliness-check PYTHON=python3`
+passed with zero new violations. The full local `make verify PYTHON=python3`
+release gate then passed, including 3,173 package tests in 165.88 seconds,
+alert-render smoke, fixture backtest smoke, and the paper scoreboard. Its first
+restricted-sandbox attempt stopped only because the dashboard concurrency test
+could not bind an ephemeral loopback socket; the exact gate passed when rerun
+with local-loopback permission while the harness still forced provider
+authorization and sends off.
+**Notes/risks:** This changes only empirical eligibility projection. It does
+not collect or apply the currently absent DEXE recovery, mutate a live outcome,
+change a threshold/route/score, or create provider authorization. No send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+path changed.
+
 ## 2026-07-19 — Record the thirty-third no-send market cycle · Codex
 **Why:** The one-hour cadence was eligible and the already-present CoinGecko
 authorization allowed the next bounded research-only observation. Continuing

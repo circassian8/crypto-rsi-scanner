@@ -694,11 +694,20 @@ def _episode_records(
                 evidence_reasons.append("outcome_contract_invalid")
             else:
                 exact += 1
-                primary_return = _finite_number(row.get("primary_horizon_return"))
-                if primary_return is None:
-                    evidence_reasons.append("primary_outcome_unavailable")
+                if "historical_price_recovery" in (
+                    outcome_eligibility.calibration_ineligibility_reasons(row)
+                ):
+                    evidence_reasons.append(
+                        "historical_price_recovery_not_point_in_time"
+                    )
                 else:
-                    evidence_status = "available"
+                    primary_return = _finite_number(
+                        row.get("primary_horizon_return")
+                    )
+                    if primary_return is None:
+                        evidence_reasons.append("primary_outcome_unavailable")
+                    else:
+                        evidence_status = "available"
         evidence_counts[evidence_status] += 1
         records.append({
             "artifact_namespace": namespace,

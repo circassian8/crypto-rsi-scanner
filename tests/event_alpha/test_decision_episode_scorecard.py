@@ -209,6 +209,21 @@ def _episode(candidates: list[dict[str, object]], *, evaluated_at: datetime):
     )
 
 
+def _historically_recovered(outcome: dict[str, object]) -> dict[str, object]:
+    recovered = deepcopy(outcome)
+    recovered.update({
+        "historical_price_recovery": True,
+        "historical_price_recovery_point_in_time": False,
+        "calibration_eligible": False,
+        "include_in_performance": False,
+    })
+    recovered["calibration_ineligible_reasons"] = list(
+        outcome_eligibility.calibration_ineligibility_reasons(recovered)
+    )
+    assert outcome_eligibility.validate_contract(recovered) == []
+    return recovered
+
+
 def _score(
     episode: dict[str, object],
     candidates: list[dict[str, object]],
@@ -390,6 +405,49 @@ def test_due_primary_without_price_is_explicitly_due_missing():
     assert scorecard["representatives"][0]["direction_alignment"] == (
         "not_evaluated"
     )
+
+
+def test_historical_recovery_is_never_matured_or_scoreable_episode_evidence():
+    candidate = _candidate("historical-recovery", _START)
+    core = _core(candidate)
+    evaluated = _START + timedelta(days=2)
+    outcome = _historically_recovered(
+        _outcome(
+            candidate,
+            core,
+            persisted_evaluated_at=evaluated,
+            primary_price=110.0,
+        )
+    )
+    episode = _episode([candidate], evaluated_at=evaluated)
+
+    scorecard = _score(
+        episode,
+        [candidate],
+        [core],
+        [outcome],
+        evaluated_at=evaluated,
+    )
+    representative = scorecard["representatives"][0]
+
+    assert outcome["maturation_state"] == "matured"
+    assert outcome["primary_horizon_return"] == pytest.approx(0.10)
+    assert outcome["historical_price_recovery"] is True
+    assert outcome["historical_price_recovery_point_in_time"] is False
+    assert outcome["calibration_eligible"] is False
+    assert outcome["include_in_performance"] is False
+    assert representative["outcome_state"] == "contract_excluded"
+    assert representative["contract_exclusion_reasons"] == [
+        "historical_price_recovery_not_point_in_time"
+    ]
+    assert representative["primary_horizon_return"] is None
+    assert representative["direction_alignment"] == "not_evaluated"
+    assert scorecard["matured_episode_count"] == 0
+    assert scorecard["scoreable_directional_episode_count"] == 0
+    assert decision_episode_scorecard.validate_contract(
+        scorecard,
+        episode_value=episode,
+    ) == []
 
 
 def test_repeat_with_mature_outcome_cannot_replace_fixed_representative():

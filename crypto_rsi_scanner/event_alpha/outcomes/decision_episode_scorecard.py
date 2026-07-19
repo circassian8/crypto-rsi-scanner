@@ -572,6 +572,10 @@ def _outcome_contract_reasons(
         reasons.add("outcome_decision_projection_mismatch")
     if outcome_eligibility.validate_contract(outcome):
         reasons.add("outcome_contract_invalid")
+    if "historical_price_recovery" in (
+        outcome_eligibility.calibration_ineligibility_reasons(outcome)
+    ):
+        reasons.add("historical_price_recovery_not_point_in_time")
     persisted_evaluated = outcome_eligibility.parse_aware_time(
         outcome.get("outcome_evaluated_at")
     )

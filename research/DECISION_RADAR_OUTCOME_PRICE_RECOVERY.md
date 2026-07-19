@@ -76,6 +76,10 @@ the existing root-scoped campaign lock. It then:
   response IDs, and the explicit historical-recovery price source;
 - marks the completed row permanently ineligible for calibration, performance,
   and Protocol-v2 evidence;
+- projects its return as unavailable episode evidence with
+  `historical_price_recovery_not_point_in_time`, so the Decision episode
+  scorecard contract-excludes it rather than counting it as matured or
+  scoreable evidence;
 - leaves the market-history baseline byte-identical;
 - writes the ledger atomically and creates one immutable application receipt
   binding before/after ledger fingerprints and the unchanged baseline;
