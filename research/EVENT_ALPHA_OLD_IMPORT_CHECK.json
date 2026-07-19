@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 10527,
+          "line": 10586,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T06:23:42.374821+00:00",
+  "generated_at": "2026-07-19T06:42:24.744953+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1226,
-  "input_fingerprint": "0c79ad23af207e08d1094259bfaa9b669ae180c4ae99c40631d0eab683994277",
+  "input_fingerprint": "4d2ead9870068e9c43cc10dc663ce2cecbd0b17273bccfe53f2bb20b0bb4ec62",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DECISIONS.md:1784441831",
-    "DEVLOG.md:1784441888",
-    "ROADMAP.md:1784441831",
-    "crypto_rsi_scanner/event_alpha/radar/market_history_readiness.py:1784442098",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784441595"
+    "DEVLOG.md:1784443309",
+    "ROADMAP.md:1784443310",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784442999",
+    "research/ARCHITECTURE_SIZE_GATES.md:1784442996",
+    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784443342"
   ],
-  "newest_source_mtime": 1784442219.7900677,
+  "newest_source_mtime": 1784443342.112937,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784441585.501424,
+  "report_mtime": 1784442990.5290864,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1226,
-    "input_fingerprint": "0c79ad23af207e08d1094259bfaa9b669ae180c4ae99c40631d0eab683994277",
+    "input_fingerprint": "4d2ead9870068e9c43cc10dc663ce2cecbd0b17273bccfe53f2bb20b0bb4ec62",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DECISIONS.md:1784441831",
-      "DEVLOG.md:1784441888",
-      "ROADMAP.md:1784441831",
-      "crypto_rsi_scanner/event_alpha/radar/market_history_readiness.py:1784442098",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784441595"
+      "DEVLOG.md:1784443309",
+      "ROADMAP.md:1784443310",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784442999",
+      "research/ARCHITECTURE_SIZE_GATES.md:1784442996",
+      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784443342"
     ],
-    "newest_source_mtime": 1784442219.7900677,
+    "newest_source_mtime": 1784443342.112937,
     "regex_compile_count": 124,
-    "report_mtime": 1784441585.501424,
-    "scan_duration_seconds": 2.3088,
+    "report_mtime": 1784442990.5290864,
+    "scan_duration_seconds": 2.364,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.3088,
+  "scan_duration_seconds": 2.364,
   "scanned_doc_files": 79,
   "scanned_source_files": 901,
   "scanned_test_files": 240,

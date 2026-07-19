@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -19,6 +20,21 @@ from .market_no_send_io import read_jsonl
 from .market_provenance import DECISION_RADAR_MEASUREMENT_PROGRAM
 
 MARKET_SNAPSHOT_UNIT_VALIDATION_CONTRACT_VERSION = 1
+
+
+@dataclass(frozen=True)
+class _MarketQualityInputs:
+    market_cap: float | None
+    total_volume: float | None
+    volume_mcap: float | None
+    volume_zscore: float | None
+    volume_zscore_basis: str
+    liquidity: float | None
+    liquidity_basis: str
+    spread_bps: float | None
+    feature_basis: Mapping[str, str]
+    direct_features: int
+    proxy_features: int
 
 
 def normalize_market_rows(
@@ -100,43 +116,12 @@ def _normalize_market_row(
     )
     coin_id = str(snapshot.get("coin_id") or row.get("id") or row.get("coin_id") or "").strip()
     symbol = str(snapshot.get("symbol") or row.get("symbol") or "").upper().strip()
-    market_cap = finite_float(row.get("market_cap"))
-    total_volume = finite_float(row.get("total_volume") or row.get("volume_24h"))
-    explicit_liquidity = finite_float(row.get("liquidity_usd"))
-    liquidity = explicit_liquidity if explicit_liquidity is not None else total_volume
-    volume_mcap = (
-        total_volume / market_cap
-        if total_volume is not None and market_cap is not None and market_cap > 0
-        else None
+    quality = _market_quality_inputs(
+        row,
+        snapshot,
+        explicit_returns=explicit_returns,
+        proxy_zscore=proxy_zscore,
     )
-    volume_zscore = finite_float(row.get("volume_zscore_24h"))
-    if volume_zscore is None:
-        volume_zscore = proxy_zscore
-    liquidity_basis = (
-        "provider_observed" if explicit_liquidity is not None
-        else "coingecko_total_volume_24h_proxy"
-    )
-    volume_zscore_basis = (
-        "provider_observed" if row.get("volume_zscore_24h") is not None
-        else "cross_sectional_log_turnover_proxy"
-    )
-    spread_available = row.get("spread_bps") is not None
-    feature_basis = {
-        "returns": "provider_observed_explicit" if explicit_returns else "provider_derived_sparkline",
-        "relative_strength": "benchmark_derived_same_observation",
-        "volume_turnover": "provider_observed",
-        "volume_zscore": volume_zscore_basis,
-        "liquidity": liquidity_basis,
-        "spread": "provider_observed" if spread_available else "unavailable",
-    }
-    direct_features = sum(
-        1
-        for value in feature_basis.values()
-        if "provider_observed" in value
-        or "provider_derived" in value
-        or "benchmark_derived" in value
-    )
-    proxy_features = sum(1 for value in feature_basis.values() if "proxy" in value)
     snapshot.update({
         "coin_id": coin_id,
         "symbol": symbol,
@@ -184,39 +169,123 @@ def _normalize_market_row(
         "no_send_status": "enforced",
         "no_send": True,
         "research_only": True,
-        "market_cap": market_cap,
-        "volume_24h": total_volume,
-        "total_volume": total_volume,
-        "volume_to_market_cap": volume_mcap,
+        "market_cap": quality.market_cap,
+        "volume_24h": quality.total_volume,
+        "total_volume": quality.total_volume,
+        "volume_to_market_cap": quality.volume_mcap,
         "feature_basis": {
-            "volume_24h": "provider_observed",
-            "market_cap": "provider_observed",
+            "volume_24h": (
+                "provider_observed" if quality.total_volume is not None else "unavailable"
+            ),
+            "market_cap": (
+                "provider_observed" if quality.market_cap is not None else "unavailable"
+            ),
             "turnover_24h": (
-                "derived_provider_ratio" if volume_mcap is not None else "unavailable"
+                "derived_provider_ratio" if quality.volume_mcap is not None else "unavailable"
             ),
         },
-        "volume_zscore_24h": volume_zscore,
-        "volume_zscore_basis": volume_zscore_basis,
-        "liquidity_usd": liquidity,
-        "liquidity_basis": liquidity_basis,
-        "spread_bps": finite_float(row.get("spread_bps")),
-        "spread_status": "verified" if spread_available else "unavailable",
-        "market_feature_basis": feature_basis,
+        "volume_zscore_24h": quality.volume_zscore,
+        "volume_zscore_basis": quality.volume_zscore_basis,
+        "liquidity_usd": quality.liquidity,
+        "liquidity_basis": quality.liquidity_basis,
+        "spread_bps": quality.spread_bps,
+        "spread_status": "verified" if quality.spread_bps is not None else "unavailable",
+        "market_feature_basis": quality.feature_basis,
         "market_data_quality": _initial_market_quality(
-            feature_basis,
-            direct_features=direct_features,
-            proxy_features=proxy_features,
-            spread_available=spread_available,
-            liquidity_basis=liquidity_basis,
-            volume_zscore_basis=volume_zscore_basis,
+            quality.feature_basis,
+            direct_features=quality.direct_features,
+            proxy_features=quality.proxy_features,
+            spread_available=quality.spread_bps is not None,
+            liquidity_basis=quality.liquidity_basis,
+            volume_zscore_basis=quality.volume_zscore_basis,
         ),
-        "direct_market_feature_count": direct_features,
-        "proxy_market_feature_count": proxy_features,
+        "direct_market_feature_count": quality.direct_features,
+        "proxy_market_feature_count": quality.proxy_features,
         "is_tradable_asset": True,
         "venues": [provider],
         **dict(safety_counters),
     })
     return {key: value for key, value in snapshot.items() if value is not None}
+
+
+def _market_quality_inputs(
+    row: Mapping[str, Any],
+    snapshot: Mapping[str, Any],
+    *,
+    explicit_returns: bool,
+    proxy_zscore: float | None,
+) -> _MarketQualityInputs:
+    market_cap = _finite_alias_value(row, "market_cap", minimum=0.0, exclusive=True)
+    total_volume = _finite_alias_value(
+        row, "total_volume", "volume_24h", minimum=0.0,
+    )
+    explicit_liquidity = _finite_alias_value(row, "liquidity_usd", minimum=0.0)
+    liquidity = explicit_liquidity if explicit_liquidity is not None else total_volume
+    volume_mcap = (
+        total_volume / market_cap
+        if total_volume is not None and market_cap is not None else None
+    )
+    provider_volume_zscore = finite_float(row.get("volume_zscore_24h"))
+    proxy_volume_zscore = finite_float(proxy_zscore)
+    volume_zscore = (
+        provider_volume_zscore
+        if provider_volume_zscore is not None else proxy_volume_zscore
+    )
+    liquidity_basis = (
+        "provider_observed" if explicit_liquidity is not None
+        else "coingecko_total_volume_24h_proxy" if total_volume is not None
+        else "unavailable"
+    )
+    volume_zscore_basis = (
+        "provider_observed" if provider_volume_zscore is not None
+        else "cross_sectional_log_turnover_proxy" if proxy_volume_zscore is not None
+        else "unavailable"
+    )
+    spread_bps = _finite_alias_value(row, "spread_bps", minimum=0.0)
+    returns_available = _any_finite(
+        snapshot, "return_1h", "return_4h", "return_24h", "return_72h", "return_7d",
+    )
+    relative_strength_available = _any_finite(
+        snapshot,
+        "relative_return_vs_btc_1h", "relative_return_vs_btc_4h",
+        "relative_return_vs_btc_24h", "relative_return_vs_eth_1h",
+        "relative_return_vs_eth_4h", "relative_return_vs_eth_24h",
+    )
+    feature_basis = {
+        "returns": (
+            "provider_observed_explicit" if explicit_returns
+            else "provider_derived_sparkline" if returns_available
+            else "unavailable"
+        ),
+        "relative_strength": (
+            "benchmark_derived_same_observation"
+            if relative_strength_available else "unavailable"
+        ),
+        "volume_turnover": (
+            "derived_provider_ratio" if volume_mcap is not None else "unavailable"
+        ),
+        "volume_zscore": volume_zscore_basis,
+        "liquidity": liquidity_basis,
+        "spread": "provider_observed" if spread_bps is not None else "unavailable",
+    }
+    return _MarketQualityInputs(
+        market_cap=market_cap,
+        total_volume=total_volume,
+        volume_mcap=volume_mcap,
+        volume_zscore=volume_zscore,
+        volume_zscore_basis=volume_zscore_basis,
+        liquidity=liquidity,
+        liquidity_basis=liquidity_basis,
+        spread_bps=spread_bps,
+        feature_basis=feature_basis,
+        direct_features=sum(
+            1 for value in feature_basis.values()
+            if any(token in value for token in (
+                "provider_observed", "provider_derived", "benchmark_derived",
+            ))
+        ),
+        proxy_features=sum(1 for value in feature_basis.values() if "proxy" in value),
+    )
 
 
 def _initial_market_quality(
@@ -472,6 +541,8 @@ def generation_data_quality(
 
 
 def finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         parsed = float(value)
     except (TypeError, ValueError):
@@ -479,20 +550,25 @@ def finite_float(value: Any) -> float | None:
     return parsed if math.isfinite(parsed) else None
 
 
+def _any_finite(row: Mapping[str, Any], *fields: str) -> bool:
+    return any(finite_float(row.get(field)) is not None for field in fields)
+
+
 def _normalized_explicit_market_row(row: Mapping[str, Any]) -> dict[str, Any]:
     output = {
-        key: row.get(key)
+        key: value
         for key in (
-            "price", "current_price", "return_1h", "return_4h", "return_24h",
-            "return_72h", "return_7d", "relative_return_vs_btc_1h",
-            "relative_return_vs_btc_4h", "relative_return_vs_btc_24h",
-            "relative_return_vs_eth_1h", "relative_return_vs_eth_4h",
-            "relative_return_vs_eth_24h", "return_unit",
+            "return_1h", "return_4h", "return_24h", "return_72h", "return_7d",
+            "relative_return_vs_btc_1h", "relative_return_vs_btc_4h",
+            "relative_return_vs_btc_24h", "relative_return_vs_eth_1h",
+            "relative_return_vs_eth_4h", "relative_return_vs_eth_24h",
         )
-        if row.get(key) is not None
+        if (value := finite_float(row.get(key))) is not None
     }
-    output["price"] = output.pop("current_price", output.get("price", None))
-    output.setdefault("return_unit", "fraction")
+    price = _finite_alias_value(row, "current_price", "price", minimum=0.0, exclusive=True)
+    if price is not None:
+        output["price"] = price
+    output["return_unit"] = str(row.get("return_unit") or "fraction")
     output["coin_id"] = str(row.get("coin_id") or row.get("id") or "")
     output["symbol"] = str(row.get("symbol") or "").upper()
     return output
@@ -501,9 +577,19 @@ def _normalized_explicit_market_row(row: Mapping[str, Any]) -> dict[str, Any]:
 def _cross_sectional_turnover_zscores(rows: Sequence[Mapping[str, Any]]) -> dict[int, float]:
     values: dict[int, float] = {}
     for index, row in enumerate(rows):
-        volume = finite_float(row.get("total_volume") or row.get("volume_24h"))
-        market_cap = finite_float(row.get("market_cap"))
-        if volume is None or market_cap is None or volume < 0 or market_cap <= 0:
+        volume = _finite_alias_value(
+            row,
+            "total_volume",
+            "volume_24h",
+            minimum=0.0,
+        )
+        market_cap = _finite_alias_value(
+            row,
+            "market_cap",
+            minimum=0.0,
+            exclusive=True,
+        )
+        if volume is None or market_cap is None:
             continue
         values[index] = math.log1p(volume / market_cap)
     if len(values) < 3:
@@ -518,14 +604,57 @@ def _cross_sectional_turnover_zscores(rows: Sequence[Mapping[str, Any]]) -> dict
 
 def _liquid_rank(row: Mapping[str, Any]) -> tuple[float, float, float]:
     return (
-        finite_float(row.get("total_volume") or row.get("volume_24h")) or 0.0,
-        finite_float(row.get("liquidity_usd")) or 0.0,
-        finite_float(row.get("market_cap")) or 0.0,
+        _finite_alias_value(
+            row,
+            "total_volume",
+            "volume_24h",
+            minimum=0.0,
+        ) or 0.0,
+        _finite_alias_value(row, "liquidity_usd", minimum=0.0) or 0.0,
+        _finite_alias_value(
+            row,
+            "market_cap",
+            minimum=0.0,
+            exclusive=True,
+        ) or 0.0,
     )
 
 
 def _has_explicit_return_fields(row: Mapping[str, Any]) -> bool:
-    return any(row.get(key) is not None for key in ("return_1h", "return_4h", "return_24h"))
+    return any(
+        finite_float(row.get(key)) is not None
+        for key in ("return_1h", "return_4h", "return_24h")
+    )
+
+
+def _finite_alias_value(
+    row: Mapping[str, Any],
+    *keys: str,
+    minimum: float | None = None,
+    exclusive: bool = False,
+) -> float | None:
+    """Return the first supplied alias without shadowing canonical zeroes.
+
+    A supplied but invalid higher-priority value fails closed instead of being
+    silently replaced by a lower-priority alias. Missing and blank values may
+    fall through to the next documented alias.
+    """
+
+    for key in keys:
+        if key not in row:
+            continue
+        raw = row.get(key)
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            continue
+        value = finite_float(raw)
+        if value is None:
+            return None
+        if minimum is not None and (
+            value < minimum or (exclusive and value == minimum)
+        ):
+            return None
+        return value
+    return None
 
 
 def smoke_rows() -> tuple[dict[str, Any], ...]:

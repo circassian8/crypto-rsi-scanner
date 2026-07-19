@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 
 def test_nonfinite_values_cannot_create_market_confirmation():
@@ -135,3 +136,104 @@ def test_derivatives_zero_age_and_funding_zscore_remain_observed():
 
     assert "funding_z=0 " in report
     assert "funding_z=n/a" not in report
+
+
+def test_market_no_send_normalization_closes_invalid_numeric_basis_claims():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+
+    observed_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    rows, audit = market_no_send_features.normalize_market_rows(
+        [
+            {
+                "id": "invalid-evidence",
+                "coin_id": "invalid-evidence",
+                "symbol": "BAD",
+                "name": "Invalid Evidence",
+                "price": 10,
+                "return_unit": "fraction",
+                "return_1h": 0.01,
+                "return_4h": 0.02,
+                "return_24h": 0.03,
+                "market_cap": 100_000_000,
+                "total_volume": 1_000_000,
+                "volume_zscore_24h": float("inf"),
+                "liquidity_usd": -1,
+                "spread_bps": float("inf"),
+            },
+            {
+                "id": "nonfinite-universe-audit",
+                "symbol": "INFAUDIT",
+                "name": "Nonfinite Universe Audit",
+                "market_cap_rank": float("inf"),
+                "market_cap": float("inf"),
+                "total_volume": 1_000_000,
+            },
+        ],
+        top_n=1,
+        observed_at=observed_at,
+        provider="coingecko",
+        data_mode="live",
+        request_cache_artifact="market.json",
+        request_ledger_artifact="ledger.json",
+        candidate_source_mode="live_no_send",
+        decision_radar_campaign_counted=True,
+        burn_in_counted=False,
+        safety_counters={},
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["volume_zscore_24h"] == 0.0
+    assert row["volume_zscore_basis"] == "cross_sectional_log_turnover_proxy"
+    assert row["liquidity_usd"] == 1_000_000
+    assert row["liquidity_basis"] == "coingecko_total_volume_24h_proxy"
+    assert row["spread_status"] == "unavailable"
+    assert row["market_feature_basis"]["spread"] == "unavailable"
+    assert "spread_bps" not in row
+    assert audit["spread_available_count"] == 0
+    json.dumps({"rows": rows, "audit": audit}, allow_nan=False)
+
+
+def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+
+    observed_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    row = market_no_send_features._normalize_market_row(
+        {
+            "id": "zero-evidence",
+            "coin_id": "zero-evidence",
+            "symbol": "ZERO",
+            "price": 10,
+            "return_unit": "fraction",
+            "return_1h": 0.0,
+            "return_4h": 0.0,
+            "return_24h": 0.0,
+            "market_cap": 100,
+            "total_volume": 0,
+            "volume_24h": 999,
+            "volume_zscore_24h": 0,
+            "liquidity_usd": 0,
+            "spread_bps": 0,
+        },
+        observed_at=observed_at,
+        provider="fixture",
+        data_mode="mock",
+        source_mode="mocked_fixture",
+        request_cache_artifact="market.json",
+        request_ledger_artifact="ledger.json",
+        decision_radar_campaign_counted=False,
+        burn_in_counted=False,
+        proxy_zscore=9.0,
+        safety_counters={},
+    )
+
+    assert row["total_volume"] == 0
+    assert row["volume_24h"] == 0
+    assert row["volume_to_market_cap"] == 0
+    assert row["volume_zscore_24h"] == 0
+    assert row["volume_zscore_basis"] == "provider_observed"
+    assert row["liquidity_usd"] == 0
+    assert row["liquidity_basis"] == "provider_observed"
+    assert row["spread_bps"] == 0
+    assert row["spread_status"] == "verified"
+    assert market_no_send_features.finite_float(True) is None

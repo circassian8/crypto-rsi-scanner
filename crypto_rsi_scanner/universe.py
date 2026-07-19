@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import math
 import re
 import unicodedata
 from pathlib import Path
@@ -52,11 +53,12 @@ def _clean_text(value: object) -> str:
 
 def _as_float(value: object) -> float | None:
     try:
-        if value is None:
+        if value is None or isinstance(value, bool):
             return None
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def candidate_count(target: int) -> int:
@@ -130,7 +132,7 @@ def _market_summary(market: dict, reason: str | None = None) -> dict:
     market_cap = _as_float(market.get("market_cap"))
     volume = _as_float(market.get("total_volume"))
     summary = {
-        "rank": market.get("market_cap_rank"),
+        "rank": _as_float(market.get("market_cap_rank")),
         "id": market.get("id"),
         "symbol": market.get("symbol"),
         "name": market.get("name"),

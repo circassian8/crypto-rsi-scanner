@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Close market-source numeric evidence claims · Codex
+**Why:** The no-send source normalizer still used truthiness for volume aliases
+and raw field presence for evidence basis. A canonical zero could be replaced,
+while NaN/infinity, a negative liquidity value, or an invalid spread could be
+described as provider-observed or verified before downstream guards rejected it.
+**Changes:**
+- Made finite ordered alias resolution preserve canonical zero, reject booleans
+  and non-finite values, and fail closed on an invalid higher-priority alias.
+- Made market cap, volume, liquidity, volume surprise, spread, returns, relative
+  strength, and turnover bases describe only values actually present after
+  normalization. Invalid liquidity may use the already-declared volume proxy;
+  invalid spread remains unavailable and cannot become execution evidence.
+- Removed non-finite numerics from explicit market snapshots and universe-audit
+  summaries so the normalized source cache is strict-JSON safe.
+- Added source-boundary regressions for invalid basis claims, strict JSON, and
+  exact zero preservation, and extracted the quality resolution into a closed
+  internal value object to keep architecture size gates clean.
+**Verify:** All 91 source-normalization/no-send/universe tests and 157 adjacent
+market-history, provenance, campaign, Decision-v2, and dashboard tests passed.
+Compileall and architecture cleanliness passed with zero new violations. The
+offline no-send and integrated-radar smokes completed with strict doctors at
+zero blockers/warnings. `make verify-fast PYTHON=.venv/bin/python` passed all
+3,092 tests in 170.36 seconds plus alert, backtest-fixture, and paper-score
+smokes.
+**Notes/risks:** Valid finite inputs retain their values and route behavior.
+Malformed inputs may now report less feature coverage, lower data quality, or
+unavailable spread, which is the intended fail-closed result. No threshold,
+score, provider authorization/call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Reconcile readiness with exact temporal inputs · Codex
 **Why:** Feature enrichment measured return-family coverage from exact usable
 endpoints and anchors, while the separate readiness report still measured the
