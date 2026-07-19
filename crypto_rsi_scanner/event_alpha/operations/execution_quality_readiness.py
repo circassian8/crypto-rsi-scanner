@@ -515,10 +515,10 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
         ),
         supported_live_adapters=(
-            "bybit_usdt_linear_perpetual_public_REST_capture_v2",
+            "bybit_usdt_linear_perpetual_public_REST_capture_v3",
         ),
         supported_evidence_stores=(
-            "immutable_raw_response_manifest_receipt_pointer_v2",
+            "immutable_raw_response_manifest_receipt_pointer_v3",
         ),
         immutable_capture_contract_implemented=True,
         protocol_v2_annex_bound=False,
@@ -656,6 +656,7 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
             "- future_generic_USD_projection=unavailable_until_a_trusted_USDT_to_USD_cost_unit_policy_is_sealed",
             "- generic_target_after_conversion=bid_depth_usd_by_band,ask_depth_usd_by_band,buy_price_impact_bps_by_notional,sell_price_impact_bps_by_notional",
             "- freshness_and_lineage=provider_observed_at,acquired_at,freshness_status,source_url,request_lineage_id",
+            "- set_freshness=every_book_fresh_at_capture_completion;maximum_provider_observation_age_seconds=15;protocol_v2_input_quality_uses_completion_freshness",
             "- dex_additions=chain_id,block_number,pool_or_router_id,gas_estimate_native,route_identity",
             "",
             "Multiple-venue research alternative (not an execution venue):",

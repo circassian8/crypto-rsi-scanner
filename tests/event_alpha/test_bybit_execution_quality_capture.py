@@ -150,6 +150,13 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     assert result["observation_count"] == 2
     assert result["evidence_authority_eligible"] is True
     assert result["protocol_v2_input_quality_eligible"] is True
+    assert result["all_execution_quality_fresh_at_acquisition"] is True
+    assert result["all_execution_quality_fresh_at_completion"] is True
+    assert result["execution_quality_set_freshness_policy"] == (
+        "every_book_fresh_at_capture_completion"
+    )
+    assert result["maximum_execution_quality_age_at_completion_seconds"] == 1.0
+    assert result["maximum_execution_quality_age_policy_seconds"] == 15.0
     assert result["protocol_v2_evidence_eligible"] is False
     assert result["protocol_v2_annex_bound"] is False
     assert result["campaign_attached"] is False
@@ -187,11 +194,63 @@ def test_capture_seals_exact_raw_responses_and_validates_latest_pointer(
     )
 
     manifest = json.loads((namespace / "capture_manifest.json").read_text())
+    assert manifest["schema_version"] == 2
     descriptors = {row["name"]: row for row in manifest["artifacts"]}
     for path in raw_paths:
         assert descriptors[path.name]["sha256"] == hashlib.sha256(
             path.read_bytes()
         ).hexdigest()
+
+
+def test_capture_keeps_stale_complete_set_but_denies_protocol_input_quality(
+    tmp_path: Path,
+) -> None:
+    observations = (
+        _observation("bitcoin", "BTC", 3_000.0),
+        _observation("ethereum", "ETH", 2_000.0),
+    )
+    started = datetime(2026, 7, 17, 12, 0, 0, 500_000, tzinfo=timezone.utc)
+    rechecked = datetime(2026, 7, 17, 12, 0, 16, 100_000, tzinfo=timezone.utc)
+    clock_values = iter(
+        (
+            started,
+            datetime(2026, 7, 17, 12, 0, 1, tzinfo=timezone.utc),
+            datetime(2026, 7, 17, 12, 0, 14, tzinfo=timezone.utc),
+            datetime(2026, 7, 17, 12, 0, 16, tzinfo=timezone.utc),
+            rechecked,
+        )
+    )
+    snapshot = _resolver(observations, expected_now=started)(
+        tmp_path, now=started
+    ).snapshot
+
+    def resolver(_base: object, *, now: object) -> object:
+        assert now in {started, rechecked}
+        return SimpleNamespace(snapshot=snapshot)
+
+    result = capture_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: next(clock_values),
+        resolver=resolver,
+        fetch_json=_fetch,
+    )
+
+    assert result["status"] == "complete"
+    assert result["evidence_authority_eligible"] is True
+    assert result["all_execution_quality_fresh_at_acquisition"] is True
+    assert result["all_execution_quality_fresh_at_completion"] is False
+    assert result["maximum_execution_quality_age_at_completion_seconds"] == 16.0
+    assert result["protocol_v2_input_quality_eligible"] is False
+    namespace = tmp_path / result["artifact_namespace"]
+    observations_projection = json.loads(
+        (namespace / "execution_quality_observations.json").read_text()
+    )
+    assert observations_projection["schema_version"] == 2
+    assert observations_projection["all_fresh_at_acquisition"] is True
+    assert observations_projection["all_fresh_at_completion"] is False
+    assert observations_projection["all_fresh"] is False
+    assert observations_projection["maximum_age_at_completion_seconds"] == 16.0
 
 
 def test_capture_rejects_mapping_only_test_transport_before_writes(
@@ -274,6 +333,33 @@ def test_capture_rejects_unallowlisted_summary_fields_before_writes(
     with pytest.raises(
         BybitExecutionQualityCaptureError,
         match="capture_summary_contract_invalid",
+    ):
+        persist_bybit_execution_quality_capture(
+            tmp_path,
+            summary=summary,
+            responses=responses,
+        )
+
+    assert not (tmp_path / POINTER_FILENAME).exists()
+    assert list(tmp_path.glob("radar_bybit_execution_quality_*")) == []
+
+
+def test_capture_rejects_completion_freshness_summary_drift_before_writes(
+    tmp_path: Path,
+) -> None:
+    observations = (_observation("bitcoin", "BTC", 3_000.0),)
+    summary, responses = _collect_authoritative_bybit_execution_quality(
+        artifact_base_dir=tmp_path,
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: NOW,
+        resolver=_resolver(observations),
+        fetch_json=_fetch,
+    )
+    summary["maximum_execution_quality_age_at_completion_seconds"] = 0.0
+
+    with pytest.raises(
+        BybitExecutionQualityCaptureError,
+        match="execution_quality_freshness_summary_mismatch",
     ):
         persist_bybit_execution_quality_capture(
             tmp_path,

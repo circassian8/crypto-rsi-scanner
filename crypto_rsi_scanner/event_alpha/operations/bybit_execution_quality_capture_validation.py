@@ -28,6 +28,10 @@ from .bybit_execution_quality_capture import (
 from .bybit_execution_quality_capture_errors import (
     BybitExecutionQualityCaptureError,
 )
+from .bybit_execution_quality_set_freshness import (
+    FRESHNESS_POLICY,
+    MAXIMUM_AGE_SECONDS,
+)
 from .market_no_send_io import _open_verified_namespace_dir, parse_json_object_bytes
 from .market_no_send_models import MarketNoSendError
 
@@ -177,8 +181,13 @@ def validate_capture_pointer_bytes(raw: bytes) -> dict[str, Any]:
     except MarketNoSendError as exc:
         raise BybitExecutionQualityCaptureError("capture_pointer_invalid_json") from exc
     expected_keys = {
+        "all_execution_quality_fresh_at_acquisition",
+        "all_execution_quality_fresh_at_completion",
         "artifact_namespace", "campaign_attached", "capture_id", "completed_at",
         "contract_version", "evidence_authority_eligible", "observation_count",
+        "execution_quality_set_freshness_policy",
+        "maximum_execution_quality_age_at_completion_seconds",
+        "maximum_execution_quality_age_policy_seconds",
         "protocol_v2_annex_bound", "protocol_v2_evidence_eligible",
         "protocol_v2_input_quality_eligible", "receipt", "request_count",
         "research_only", "schema_id", "schema_version", "source_authority", "status",
@@ -188,7 +197,7 @@ def validate_capture_pointer_bytes(raw: bytes) -> dict[str, Any]:
         set(pointer) != expected_keys
         or pointer.get("schema_id")
         != "decision_radar.bybit_execution_quality_latest_pointer"
-        or pointer.get("schema_version") != 1
+        or pointer.get("schema_version") != 2
         or pointer.get("contract_version") != CONTRACT_VERSION
         or pointer.get("status") != "complete"
         or not _NAMESPACE_RE.fullmatch(str(pointer.get("artifact_namespace") or ""))
@@ -196,6 +205,19 @@ def validate_capture_pointer_bytes(raw: bytes) -> dict[str, Any]:
         or pointer.get("evidence_authority_eligible") is not True
         or pointer.get("protocol_v2_evidence_eligible") is not False
         or type(pointer.get("protocol_v2_input_quality_eligible")) is not bool
+        or type(pointer.get("all_execution_quality_fresh_at_acquisition"))
+        is not bool
+        or type(pointer.get("all_execution_quality_fresh_at_completion"))
+        is not bool
+        or pointer.get("execution_quality_set_freshness_policy")
+        != FRESHNESS_POLICY
+        or type(pointer.get("maximum_execution_quality_age_at_completion_seconds"))
+        not in {int, float}
+        or pointer.get("maximum_execution_quality_age_at_completion_seconds") < 0
+        or pointer.get("maximum_execution_quality_age_policy_seconds")
+        != MAXIMUM_AGE_SECONDS
+        or pointer.get("protocol_v2_input_quality_eligible")
+        is not pointer.get("all_execution_quality_fresh_at_completion")
         or pointer.get("protocol_v2_annex_bound") is not False
         or pointer.get("campaign_attached") is not False
         or pointer.get("research_only") is not True
@@ -242,17 +264,27 @@ def validate_capture_contracts(
     pointer: Mapping[str, object] | None = None,
 ) -> Mapping[str, object] | None:
     receipt_keys = {
+        "all_execution_quality_fresh_at_acquisition",
+        "all_execution_quality_fresh_at_completion",
         "artifact_namespace", "campaign_attached", "capture_id", "completed_at",
         "contract_version", "evidence_authority_eligible", "manifest",
+        "execution_quality_set_freshness_policy",
+        "maximum_execution_quality_age_at_completion_seconds",
+        "maximum_execution_quality_age_policy_seconds",
         "observation_count", "protocol_v2_annex_bound",
         "protocol_v2_evidence_eligible", "protocol_v2_input_quality_eligible",
         "request_count", "research_only", "schema_id", "schema_version",
         "source_authority", "status",
     }
     manifest_keys = {
+        "all_execution_quality_fresh_at_acquisition",
+        "all_execution_quality_fresh_at_completion",
         "artifact_namespace", "artifacts", "campaign_attached", "capture_id",
         "completed_at", "contract_version", "event_alpha_triggered_fade",
         "evidence_authority_eligible", "execution_mode", "no_send",
+        "execution_quality_set_freshness_policy",
+        "maximum_execution_quality_age_at_completion_seconds",
+        "maximum_execution_quality_age_policy_seconds",
         "normal_rsi_writes", "observation_count", "orders", "paper_trades",
         "protocol_v2_annex_bound", "protocol_v2_evidence_eligible",
         "protocol_v2_input_quality_eligible", "quote_asset", "request_count",
@@ -264,25 +296,48 @@ def validate_capture_contracts(
         or set(manifest) != manifest_keys
         or receipt.get("schema_id")
         != "decision_radar.bybit_execution_quality_completion_receipt"
-        or receipt.get("schema_version") != 1
+        or receipt.get("schema_version") != 2
         or receipt.get("contract_version") != CONTRACT_VERSION
         or receipt.get("status") != "complete"
         or receipt.get("artifact_namespace") != namespace
         or receipt.get("evidence_authority_eligible") is not True
         or receipt.get("protocol_v2_evidence_eligible") is not False
         or type(receipt.get("protocol_v2_input_quality_eligible")) is not bool
+        or type(receipt.get("all_execution_quality_fresh_at_acquisition"))
+        is not bool
+        or type(receipt.get("all_execution_quality_fresh_at_completion"))
+        is not bool
+        or receipt.get("execution_quality_set_freshness_policy")
+        != FRESHNESS_POLICY
+        or type(receipt.get("maximum_execution_quality_age_at_completion_seconds"))
+        not in {int, float}
+        or receipt.get("maximum_execution_quality_age_at_completion_seconds") < 0
+        or receipt.get("maximum_execution_quality_age_policy_seconds")
+        != MAXIMUM_AGE_SECONDS
+        or receipt.get("protocol_v2_input_quality_eligible")
+        is not receipt.get("all_execution_quality_fresh_at_completion")
         or receipt.get("protocol_v2_annex_bound") is not False
         or receipt.get("campaign_attached") is not False
         or receipt.get("research_only") is not True
         or manifest.get("schema_id")
         != "decision_radar.bybit_execution_quality_capture_manifest"
-        or manifest.get("schema_version") != 1
+        or manifest.get("schema_version") != 2
         or manifest.get("contract_version") != CONTRACT_VERSION
         or manifest.get("artifact_namespace") != namespace
         or manifest.get("capture_id") != receipt.get("capture_id")
         or manifest.get("evidence_authority_eligible") is not True
         or manifest.get("protocol_v2_evidence_eligible") is not False
         or type(manifest.get("protocol_v2_input_quality_eligible")) is not bool
+        or manifest.get("all_execution_quality_fresh_at_acquisition")
+        is not receipt.get("all_execution_quality_fresh_at_acquisition")
+        or manifest.get("all_execution_quality_fresh_at_completion")
+        is not receipt.get("all_execution_quality_fresh_at_completion")
+        or manifest.get("execution_quality_set_freshness_policy")
+        != receipt.get("execution_quality_set_freshness_policy")
+        or manifest.get("maximum_execution_quality_age_at_completion_seconds")
+        != receipt.get("maximum_execution_quality_age_at_completion_seconds")
+        or manifest.get("maximum_execution_quality_age_policy_seconds")
+        != receipt.get("maximum_execution_quality_age_policy_seconds")
         or manifest.get("protocol_v2_annex_bound") is not False
         or manifest.get("campaign_attached") is not False
         or manifest.get("research_only") is not True

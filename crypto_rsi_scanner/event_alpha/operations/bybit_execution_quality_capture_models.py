@@ -15,10 +15,14 @@ from .market_no_send_models import MarketNoSendError
 TRANSPORT_CONTRACT = "bybit_public_direct_http_v1"
 LIVE_SUMMARY_KEYS = frozenset(
     {
+        "all_execution_quality_fresh",
+        "all_execution_quality_fresh_at_acquisition",
+        "all_execution_quality_fresh_at_completion",
         "artifact_persisted", "campaign_attached", "category", "completed_at",
         "contract_version", "credentials_read", "eligible_instrument_count",
         "eligible_instruments", "evidence_authority_eligible", "execution_mode",
         "execution_quality_snapshot_count", "execution_quality_snapshots",
+        "execution_quality_set_freshness_policy",
         "instrument_contract", "instrument_status", "no_send",
         "normal_rsi_signal_rows_written", "orders_available", "paper_trades_created",
         "private_data_read", "protocol_v2_evidence_eligible",
@@ -27,6 +31,8 @@ LIVE_SUMMARY_KEYS = frozenset(
         "provider_query_asset_count", "provider_query_assets",
         "provider_request_bound", "provider_request_count",
         "provider_request_strategy", "instrument_catalog_request_count",
+        "maximum_execution_quality_age_at_completion_seconds",
+        "maximum_execution_quality_age_policy_seconds",
         "orderbook_request_count",
         "provider_request_succeeded", "quote_asset", "radar_assets",
         "recorded_403_policy", "redirects_followed", "requested_radar_asset_count",

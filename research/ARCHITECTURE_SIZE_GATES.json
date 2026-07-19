@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1117,
+  "file_count": 1118,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,7 +1823,7 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T00:13:13.839868+00:00",
+  "generated_at": "2026-07-19T00:29:40.625188+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -1997,6 +1997,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1199,
+      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1198,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/loader.py",
       "source_kind": "production"
@@ -2023,12 +2029,6 @@
       "limit": 1500,
       "line_count": 1191,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_derivatives_context_capture.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1191,
-      "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
     },
     {

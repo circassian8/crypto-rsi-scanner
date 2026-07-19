@@ -1144,7 +1144,7 @@
     "service_credentials_or_authorization_embedded": false,
     "unique_immutable_namespace_per_attempt": true
   },
-  "execution_quality_readiness": {
+    "execution_quality_readiness": {
     "authorization_boundary": "confirmed public-market-data research scope does not create runtime provider authorization or allow credentials, private data, orders, or trading",
     "bybit_public_reachability": "unverified after recorded region-restricted 403; fail closed without proxy VPN or region bypass",
     "capture_command": "CONFIRM=1 make radar-execution-quality-bybit-capture PYTHON=.venv/bin/python",
@@ -1192,8 +1192,11 @@
     "intraday_smoke_command": "make radar-intraday-bybit-smoke PYTHON=.venv/bin/python",
     "intraday_status_command": "make radar-intraday-bybit-status PYTHON=.venv/bin/python",
     "intraday_review_export_selection": "latest complete pointer-selected capture only; fully revalidated from exact raw responses",
+    "execution_quality_live_contract_version": "crypto_radar_bybit_execution_quality_live_v3",
+    "execution_quality_capture_contract_version": "crypto_radar_bybit_execution_quality_capture_v3",
+    "execution_quality_set_freshness_policy": "each provider observation must remain no more than 15 seconds old when the final sequential order book completes; acquisition and completion freshness remain separate and Protocol-v2 input-quality eligibility uses completion freshness",
     "live_adapter_active": false,
-    "live_adapter_contract": "exact authoritative Radar generation; separate runtime authorization plus CONFIRM=1; one complete category=linear status=Trading limit=1000 catalog GET that requires an explicit empty continuation cursor and fails closed when it is missing or non-empty, then one 200-level order-book GET per eligible instrument; absolute bound 31 and current 29-candidate bound 30; no retries, redirects, ambient proxies, credentials, private data, orders, trading, or sends; capture mode preserves exact accepted response bytes, request timing, normalized observations, manifest, completion receipt, and latest pointer",
+    "live_adapter_contract": "exact authoritative Radar generation; separate runtime authorization plus CONFIRM=1; one complete category=linear status=Trading limit=1000 catalog GET that requires an explicit empty continuation cursor and fails closed when it is missing or non-empty, then one 200-level order-book GET per eligible instrument; absolute bound 31 and current 29-candidate bound 30; no retries, redirects, ambient proxies, credentials, private data, orders, trading, or sends; capture mode preserves exact accepted response bytes, request timing, acquisition and full-set completion freshness, normalized observations, manifest, completion receipt, and latest pointer",
     "public_rest_adapter_implemented": true,
     "jurisdiction_and_account_eligibility": "owner confirmed 2026-07-17 for the selected research scope",
     "next_safe_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
@@ -1202,7 +1205,7 @@
     "provider_calls": 0,
     "protocol_v2_annex_bound": false,
     "protocol_v2_evidence_eligible": false,
-    "protocol_v2_input_quality_rule": "a complete fresh capture may be input-quality eligible but remains ineligible as Protocol-v2 evidence until the sealed annex explicitly binds its immutable capture ID",
+    "protocol_v2_input_quality_rule": "a complete capture may be input-quality eligible only when every provider observation remains within the 15-second policy at full-set completion; even then it remains ineligible as Protocol-v2 evidence until the sealed annex explicitly binds its immutable capture ID",
     "public_private_data_boundary": "public market data only; no credentials or private account data",
     "quote_currency": "USDT",
     "reports": [

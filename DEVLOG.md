@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require full-set freshness for sequential Bybit books · Codex
+**Why:** The existing execution-quality capture classified each order book at
+its own acquisition time. In a sequential top-universe collection, early books
+could age past the policy before the final request completed while the whole set
+still appeared fresh.
+**Changes:**
+- Advanced guarded execution-quality live/capture contracts to v3. The live set
+  now records acquisition freshness, final-set completion freshness, the exact
+  maximum provider-observation age at completion, and the 15-second policy.
+- Added one focused closed freshness projection shared by live collection and
+  immutable revalidation. Capture summaries, observation projections,
+  manifests, receipts, pointers, and status results all bind the same derived
+  truth; tampered summaries fail before writes.
+- Kept complete aged captures as immutable exact-response evidence while making
+  them Protocol-v2 input-quality-ineligible. Updated the exact downstream
+  intraday and derivatives prerequisite contract from execution capture v2 to
+  v3 without changing their separate authorization boundaries.
+- Added regressions proving two individually fresh sequential books can be stale
+  at full-set completion, remain a valid capture, and fail input-quality
+  eligibility. Updated the North Star, decision package, working agreement,
+  durable decision, roadmap, and generated architecture reports.
+**Verify:** 117 focused execution-quality readiness, normalizer, live/capture,
+intraday, and derivatives tests passed. Python compileall passed. The offline
+execution-quality smoke remained provider-free. Live readiness emitted v3,
+reported the completion-freshness policy, and made no call because authorization
+is absent. Architecture cleanliness passed with zero new violations. Dashboard
+readiness and the project-export regression were included in the final targeted
+gate below.
+**Notes/risks:** No Bybit or other provider call occurred and no authorization
+was created. The recorded 403/no-retry/no-proxy/no-VPN/no-bypass boundary and
+all no-send/no-trade/no-order/no-paper/no-RSI-write/no-`TRIGGERED_FADE`
+protections remain unchanged. Existing immutable history was not rewritten.
+
 ## 2026-07-18 — Require current responses for direct Bybit bars · Codex
 **Why:** The direct-bar contract proved the exact completed candle and its
 close-to-acquisition latency, but overall freshness ignored the provider's own

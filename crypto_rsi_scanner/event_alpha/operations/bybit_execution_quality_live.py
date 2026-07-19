@@ -50,6 +50,7 @@ from .bybit_derivatives_context import (
 from .bybit_execution_quality import (
     BYBIT_CATEGORY,
     CONTRACT_TYPE,
+    DEFAULT_FRESHNESS_SECONDS,
     INSTRUMENTS_PATH,
     INSTRUMENT_STATUS,
     MAX_RADAR_ASSETS,
@@ -76,9 +77,14 @@ from .bybit_execution_quality_capture import (
     bybit_execution_quality_capture_status,
     persist_bybit_execution_quality_capture,
 )
+from .bybit_execution_quality_set_freshness import (
+    _BybitExecutionQualitySetFreshnessError,
+    live_summary_freshness_values,
+    project_execution_quality_set_freshness,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v2"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v3"
 LIVE_AUTH_ENV = "RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE"
 DEFAULT_TIMEOUT_SECONDS = 10.0
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -348,6 +354,12 @@ def build_bybit_execution_quality_live_readiness(
         "provider_request_strategy": REQUEST_STRATEGY,
         "instrument_catalog_request_bound": 1 if query_assets else 0,
         "orderbook_request_bound": len(query_assets),
+        "execution_quality_set_freshness_policy": (
+            "every_book_fresh_at_capture_completion"
+        ),
+        "maximum_execution_quality_age_policy_seconds": (
+            DEFAULT_FRESHNESS_SECONDS
+        ),
         "provider_call_planned": False,
         "provider_call_attempted": False,
         "evidence_authority_eligible": False,
@@ -514,6 +526,12 @@ def _collect_authoritative_bybit_execution_quality(
         ) from exc
 
     completed = _utc(clock())
+    try:
+        set_freshness = project_execution_quality_set_freshness(
+            snapshots, completed_at=completed
+        )
+    except _BybitExecutionQualitySetFreshnessError as exc:
+        raise BybitExecutionQualityLiveError(exc.reason_code) from exc
     summary = {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_bybit_execution_quality_observation_set",
@@ -535,6 +553,7 @@ def _collect_authoritative_bybit_execution_quality(
         "eligible_instruments": [row.to_dict() for row in eligible],
         "execution_quality_snapshot_count": len(snapshots),
         "execution_quality_snapshots": snapshots,
+        **live_summary_freshness_values(set_freshness),
         "provider_call_authorized": True,
         "provider_call_attempted": requests_attempted > 0,
         "provider_request_succeeded": True,

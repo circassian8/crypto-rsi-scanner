@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Date execution-quality sets at full capture completion
+**Status:** accepted
+**Decision:** Bybit execution-quality live/capture v3 preserves whether every
+order book was fresh when acquired, then re-evaluates every provider-observation
+clock when the final sequential book completes. The 15-second age policy applies
+at that full-set completion boundary. Manifests, receipts, pointers, summaries,
+and observation projections bind both freshness states, the maximum completion
+age, the policy, and the derived Protocol-v2 input-quality decision. A complete
+but aged capture remains immutable and evidence-authority-eligible, but must set
+`protocol_v2_input_quality_eligible=false`.
+**Why:** With up to 29 sequential order-book requests, an early book can be
+fresh on arrival but stale by the time the set is complete. Treating only
+per-request acquisition freshness as the set result would overstate the
+point-in-time execution evidence available to Protocol v2.
+**Revisit when:** A preregistered annex adopts a stricter age limit, the official
+provider offers one atomic multi-instrument snapshot, or a bounded streaming
+capture defines a stronger synchronization contract. Any replacement must keep
+per-book clocks and must not let individually fresh arrivals hide an aged set.
+
 ## 2026-07-18 - Require current provider responses for direct intraday bars
 **Status:** accepted
 **Decision:** Bybit intraday v3 keeps completed-bar recency and provider-response

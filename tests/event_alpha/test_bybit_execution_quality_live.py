@@ -67,7 +67,11 @@ def _observation(
     }
 
 
-def _resolver(observations: tuple[dict[str, object], ...]):
+def _resolver(
+    observations: tuple[dict[str, object], ...],
+    *,
+    expected_now: datetime = NOW,
+):
     snapshot = SimpleNamespace(
         artifact_namespace="radar_market_no_send_live_exact",
         run_id="2026-07-17T12:00:00Z|no_key_live",
@@ -78,7 +82,7 @@ def _resolver(observations: tuple[dict[str, object], ...]):
     )
 
     def resolve(_base: object, *, now: object) -> object:
-        assert now == NOW
+        assert now == expected_now
         return SimpleNamespace(snapshot=snapshot)
 
     return resolve
@@ -148,6 +152,10 @@ def test_readiness_is_no_call_and_requires_exact_authority_plus_explicit_auth() 
     assert payload["provider_request_strategy"] == REQUEST_STRATEGY
     assert payload["instrument_catalog_request_bound"] == 1
     assert payload["orderbook_request_bound"] == 1
+    assert payload["execution_quality_set_freshness_policy"] == (
+        "every_book_fresh_at_capture_completion"
+    )
+    assert payload["maximum_execution_quality_age_policy_seconds"] == 15.0
     assert payload["reasons"] == ["runtime_provider_authorization_absent"]
     assert payload["operator_action_required"] == AUTHORIZATION_ACTION
     assert payload["authorization_action_required"] == AUTHORIZATION_ACTION
@@ -333,6 +341,14 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
     assert result["campaign_attached"] is False
     assert result["evidence_authority_eligible"] is False
     assert result["protocol_v2_evidence_eligible"] is False
+    assert result["execution_quality_set_freshness_policy"] == (
+        "every_book_fresh_at_capture_completion"
+    )
+    assert result["all_execution_quality_fresh_at_acquisition"] is True
+    assert result["all_execution_quality_fresh_at_completion"] is True
+    assert result["all_execution_quality_fresh"] is True
+    assert result["maximum_execution_quality_age_at_completion_seconds"] == 1.0
+    assert result["maximum_execution_quality_age_policy_seconds"] == 15.0
     assert all(row["freshness_status"] == "fresh" for row in result["execution_quality_snapshots"])
     assert all(row["notional_currency"] == "USDT" for row in result["execution_quality_snapshots"])
     assert all(row["research_only"] is True for row in result["execution_quality_snapshots"])
@@ -343,6 +359,46 @@ def test_authorized_mock_collection_selects_exact_active_perps_and_normalizes_bo
     assert [request.path for request in requests].count("/v5/market/instruments-info") == 1
     assert [request.path for request in requests].count("/v5/market/orderbook") == 2
     assert all("FIGR_HELOC" not in str(request.query) for request in requests)
+
+
+def test_sequential_books_can_be_fresh_when_acquired_but_stale_at_set_completion() -> None:
+    observations = (
+        _observation("bitcoin", "BTC", 3_000.0),
+        _observation("ethereum", "ETH", 2_000.0),
+    )
+    started = datetime(2026, 7, 17, 12, 0, 0, 500_000, tzinfo=timezone.utc)
+    clock_values = iter(
+        (
+            started,
+            datetime(2026, 7, 17, 12, 0, 1, tzinfo=timezone.utc),
+            datetime(2026, 7, 17, 12, 0, 14, tzinfo=timezone.utc),
+            datetime(2026, 7, 17, 12, 0, 16, tzinfo=timezone.utc),
+        )
+    )
+
+    def fetch(request: BybitPublicRequest, _timeout: float) -> Mapping[str, object]:
+        query = dict(request.query)
+        if request.path.endswith("instruments-info"):
+            return deepcopy(_fixture("instruments_info.json"))
+        prices = {"BTCUSDT": 100.0, "ETHUSDT": 50.0}
+        return _orderbook_payload(query["symbol"], prices[query["symbol"]])
+
+    result = collect_authoritative_bybit_execution_quality(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=lambda: next(clock_values),
+        resolver=_resolver(observations, expected_now=started),
+        fetch_json=fetch,
+    )
+
+    assert [
+        row["freshness_status"] for row in result["execution_quality_snapshots"]
+    ] == ["fresh", "fresh"]
+    assert result["all_execution_quality_fresh_at_acquisition"] is True
+    assert result["all_execution_quality_fresh_at_completion"] is False
+    assert result["all_execution_quality_fresh"] is False
+    assert result["maximum_execution_quality_age_at_completion_seconds"] == 16.0
+    assert result["maximum_execution_quality_age_policy_seconds"] == 15.0
 
 
 def test_provider_metadata_with_no_eligible_contract_fails_before_orderbook() -> None:

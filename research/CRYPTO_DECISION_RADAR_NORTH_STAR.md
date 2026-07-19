@@ -899,13 +899,17 @@ depth bands, and USDT-notional price impact without treating USDT as USD. A
 separately gated public REST adapter and immutable capture contract are
 implemented but inactive. Readiness and capture status make no provider call or
 write. A confirmed capture requires the already-present dedicated authorization
-flag. Capture v2 performs one complete
+flag. Capture v3 performs one complete
 `category=linear&status=Trading&limit=1000` instrument-catalog GET, rejects any
 missing or non-empty continuation cursor as incomplete, and then performs one 200-level order-book
 GET per exact eligible instrument. Its absolute bound is 31 and the current
 29-candidate authority bound is 30; actual calls are one plus the eligible
 count. It never retries and has no credential, private-data, order, trading, or
-send surface. Only a complete run is published: exact accepted response bytes,
+send surface. Every individual book retains acquisition freshness, while the
+closed set is fresh only when every provider observation is still at most 15
+seconds old at full-set completion. A complete but aged set remains immutable
+evidence and is explicitly Protocol-v2 input-quality-ineligible. Only a complete
+run is published: exact accepted response bytes,
 request timing, the exact Radar authority and universe, normalized observations,
 fingerprints, a completion receipt, and a stable latest pointer are retained.
 Validation holds

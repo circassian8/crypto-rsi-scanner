@@ -31,15 +31,20 @@ from .bybit_execution_quality import (
     normalize_bybit_orderbook,
     select_bybit_usdt_perpetual_instruments,
 )
-from .bybit_execution_quality_capture_errors import (
-    BybitExecutionQualityCaptureError,
-)
+from .bybit_execution_quality_capture_errors import BybitExecutionQualityCaptureError
 from .bybit_execution_quality_capture_models import (
     LIVE_SUMMARY_KEYS as _LIVE_SUMMARY_KEYS,
     PERSISTED_SUMMARY_EXTRA_KEYS as _PERSISTED_SUMMARY_EXTRA_KEYS,
     REQUEST_ROW_KEYS as _REQUEST_ROW_KEYS,
     TRANSPORT_CONTRACT,
     BybitCapturedJSONResponse,
+)
+from .bybit_execution_quality_set_freshness import (
+    _BybitExecutionQualitySetFreshnessError, common_freshness_matches,
+    common_freshness_values, live_summary_freshness_matches,
+    observation_freshness_contract_valid, observation_freshness_matches,
+    observation_freshness_values, prepared_freshness_values,
+    prepared_summary_freshness_matches, project_execution_quality_set_freshness,
 )
 from .bybit_execution_quality_universe import (
     BybitExecutionQualityUniverseError,
@@ -59,8 +64,8 @@ from .market_no_send_io import (
 from .market_no_send_models import MarketNoSendError
 
 
-CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v2"
-_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v2"
+CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_capture_v3"
+_LIVE_CONTRACT_VERSION = "crypto_radar_bybit_execution_quality_live_v3"
 POINTER_FILENAME = "radar_bybit_execution_quality_latest.json"
 MANIFEST_FILENAME = "capture_manifest.json"
 RECEIPT_FILENAME = "capture_completion_receipt.json"
@@ -477,10 +482,17 @@ def _validate_capture_inputs(
             "execution_quality_snapshot_projection_drift"
         )
 
-    all_fresh = all(
-        isinstance(row, Mapping) and row.get("freshness_status") == "fresh"
-        for row in snapshot_values
-    )
+    try:
+        freshness = project_execution_quality_set_freshness(
+            snapshot_values,  # type: ignore[arg-type]
+            completed_at=_utc_datetime(completed_at, "capture_completed_at"),
+        )
+    except _BybitExecutionQualitySetFreshnessError as exc:
+        raise BybitExecutionQualityCaptureError(exc.reason_code) from exc
+    if not live_summary_freshness_matches(summary, freshness):
+        raise BybitExecutionQualityCaptureError(
+            "execution_quality_freshness_summary_mismatch"
+        )
     return {
         "started_at": started_at,
         "completed_at": completed_at,
@@ -492,8 +504,8 @@ def _validate_capture_inputs(
         "execution_quality_snapshots": snapshot_values,
         "request_rows": request_rows,
         "raw_rows": raw_rows,
+        **prepared_freshness_values(freshness),
         "evidence_authority_eligible": True,
-        "protocol_v2_input_quality_eligible": all_fresh,
         "protocol_v2_evidence_eligible": False,
         "protocol_v2_annex_bound": False,
     }
@@ -597,14 +609,14 @@ def _capture_file_payloads(
     )
     observation_values = {
         "schema_id": "decision_radar.bybit_execution_quality_observations",
-        "schema_version": 1,
+        "schema_version": 2,
         "capture_id": capture_id,
         "venue_id": "bybit",
         "execution_mode": "perpetual",
         "notional_currency": QUOTE_ASSET,
         "observation_count": len(prepared["execution_quality_snapshots"]),
         "observations": prepared["execution_quality_snapshots"],
-        "all_fresh": prepared["protocol_v2_input_quality_eligible"],
+        **observation_freshness_values(prepared),
         "research_only": True,
     }
     request_values = {
@@ -671,16 +683,14 @@ def _capture_publication_values(
         "observation_count": len(prepared["execution_quality_snapshots"]),
         "evidence_authority_eligible": True,
         "protocol_v2_evidence_eligible": False,
-        "protocol_v2_input_quality_eligible": prepared[
-            "protocol_v2_input_quality_eligible"
-        ],
+        **common_freshness_values(prepared),
         "protocol_v2_annex_bound": False,
         "campaign_attached": False,
         "research_only": True,
     }
     manifest = {
         "schema_id": "decision_radar.bybit_execution_quality_capture_manifest",
-        "schema_version": 1,
+        "schema_version": 2,
         **common,
         "started_at": prepared["started_at"],
         "venue_id": "bybit",
@@ -697,7 +707,7 @@ def _capture_publication_values(
     manifest_raw = _pretty_bytes(manifest)
     receipt = {
         "schema_id": "decision_radar.bybit_execution_quality_completion_receipt",
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "complete",
         **common,
         "manifest": {"name": MANIFEST_FILENAME, **_fingerprint(manifest_raw)},
@@ -705,7 +715,7 @@ def _capture_publication_values(
     receipt_raw = _pretty_bytes(receipt)
     pointer = {
         "schema_id": "decision_radar.bybit_execution_quality_latest_pointer",
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "complete",
         **common,
         "receipt": {"name": RECEIPT_FILENAME, **_fingerprint(receipt_raw)},
@@ -847,8 +857,13 @@ def _capture_projections(
         or set(observations)
         != {
             "all_fresh",
+            "all_fresh_at_acquisition",
+            "all_fresh_at_completion",
             "capture_id",
             "execution_mode",
+            "freshness_policy",
+            "maximum_age_at_completion_seconds",
+            "maximum_age_policy_seconds",
             "notional_currency",
             "observation_count",
             "observations",
@@ -859,12 +874,12 @@ def _capture_projections(
         }
         or observations.get("schema_id")
         != "decision_radar.bybit_execution_quality_observations"
-        or observations.get("schema_version") != 1
+        or observations.get("schema_version") != 2
         or observations.get("capture_id") != capture_id
         or observations.get("venue_id") != "bybit"
         or observations.get("execution_mode") != "perpetual"
         or observations.get("notional_currency") != QUOTE_ASSET
-        or type(observations.get("all_fresh")) is not bool
+        or not observation_freshness_contract_valid(observations)
         or observations.get("research_only") is not True
         or set(request_index)
         != {
@@ -978,8 +993,7 @@ def _validate_capture_semantics(
         or prepared["request_rows"] != request_rows
         or summary.get("capture_id") != capture_id
         or summary.get("artifact_namespace") != namespace
-        or summary.get("protocol_v2_input_quality_eligible")
-        is not prepared["protocol_v2_input_quality_eligible"]
+        or not prepared_summary_freshness_matches(summary, prepared)
         or universe.get("asset_count") != len(prepared["radar_assets"])
         or universe.get("assets") != prepared["radar_assets"]
         or universe.get("provider_query_asset_count")
@@ -994,8 +1008,7 @@ def _validate_capture_semantics(
         != len(prepared["execution_quality_snapshots"])
         or observations.get("observations")
         != prepared["execution_quality_snapshots"]
-        or observations.get("all_fresh")
-        is not prepared["protocol_v2_input_quality_eligible"]
+        or not observation_freshness_matches(observations, prepared)
         or authority.get("capture_id") != receipt.get("capture_id")
         or {
             key: authority.get(key)
@@ -1020,8 +1033,7 @@ def _validate_capture_semantics(
         != len(prepared["execution_quality_snapshots"])
         or manifest.get("protocol_v2_evidence_eligible")
         is not prepared["protocol_v2_evidence_eligible"]
-        or manifest.get("protocol_v2_input_quality_eligible")
-        is not prepared["protocol_v2_input_quality_eligible"]
+        or not common_freshness_matches(manifest, prepared)
         or manifest.get("protocol_v2_annex_bound") is not False
         or receipt.get("capture_id") != derived_capture_id
         or receipt.get("completed_at") != prepared["completed_at"]
@@ -1031,8 +1043,7 @@ def _validate_capture_semantics(
         or receipt.get("source_authority") != prepared["source_authority"]
         or receipt.get("protocol_v2_evidence_eligible")
         is not prepared["protocol_v2_evidence_eligible"]
-        or receipt.get("protocol_v2_input_quality_eligible")
-        is not prepared["protocol_v2_input_quality_eligible"]
+        or not common_freshness_matches(receipt, prepared)
         or (
             pointer is not None
             and (
@@ -1043,8 +1054,7 @@ def _validate_capture_semantics(
                 or pointer.get("source_authority") != prepared["source_authority"]
                 or pointer.get("protocol_v2_evidence_eligible")
                 is not prepared["protocol_v2_evidence_eligible"]
-                or pointer.get("protocol_v2_input_quality_eligible")
-                is not prepared["protocol_v2_input_quality_eligible"]
+                or not common_freshness_matches(pointer, prepared)
             )
         )
     ):
@@ -1063,9 +1073,7 @@ def _validate_capture_semantics(
         "protocol_v2_evidence_eligible": prepared[
             "protocol_v2_evidence_eligible"
         ],
-        "protocol_v2_input_quality_eligible": prepared[
-            "protocol_v2_input_quality_eligible"
-        ],
+        **common_freshness_values(prepared),
         "protocol_v2_annex_bound": False,
         "campaign_attached": False,
         "pointer_validated": pointer is not None,

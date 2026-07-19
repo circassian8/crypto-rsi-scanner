@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 3433,
+          "line": 3452,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 3433,
+          "line": 3452,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 9532,
+          "line": 9565,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T00:13:08.624306+00:00",
+  "generated_at": "2026-07-19T00:29:35.416876+00:00",
   "include_runtime_artifacts": false,
-  "input_file_count": 1195,
-  "input_fingerprint": "8f5c230935b751d2f10d4081d69bf6059490ab8a142de66b577303894858c31b",
+  "input_file_count": 1196,
+  "input_fingerprint": "43789f8a1b3f8b7c87c5832cc2df360aadae2c454b1365a7606f3e51b43c9316",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "DEVLOG.md:1784419979",
-    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784419953",
-    "research/ARCHITECTURE_SIZE_GATES.md:1784419950",
-    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784419986",
-    "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784419986"
+    "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture_validation.py:1784420963",
+    "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_set_freshness.py:1784420963",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784420947",
+    "research/ARCHITECTURE_SIZE_GATES.md:1784420943",
+    "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784420972"
   ],
-  "newest_source_mtime": 1784419986.122245,
+  "newest_source_mtime": 1784420972.9104362,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784419944.4054356,
+  "report_mtime": 1784420937.9817154,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2509,27 +2509,27 @@
     "cache_status": "miss",
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
-    "input_file_count": 1195,
-    "input_fingerprint": "8f5c230935b751d2f10d4081d69bf6059490ab8a142de66b577303894858c31b",
+    "input_file_count": 1196,
+    "input_fingerprint": "43789f8a1b3f8b7c87c5832cc2df360aadae2c454b1365a7606f3e51b43c9316",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "DEVLOG.md:1784419979",
-      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784419953",
-      "research/ARCHITECTURE_SIZE_GATES.md:1784419950",
-      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784419986",
-      "research/PROJECT_HEALTH_NAMING_CLEANUP_REPORT.md:1784419986"
+      "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture_validation.py:1784420963",
+      "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_set_freshness.py:1784420963",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784420947",
+      "research/ARCHITECTURE_SIZE_GATES.md:1784420943",
+      "research/ARCHITECTURE_TRANSITIONAL_FILE_REPORT.md:1784420972"
     ],
-    "newest_source_mtime": 1784419986.122245,
+    "newest_source_mtime": 1784420972.9104362,
     "regex_compile_count": 124,
-    "report_mtime": 1784419944.4054356,
-    "scan_duration_seconds": 2.2373,
+    "report_mtime": 1784420937.9817154,
+    "scan_duration_seconds": 2.2362,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 72,
     "scanned_makefile_files": 1,
     "scanned_script_files": 4,
-    "scanned_source_files": 889,
+    "scanned_source_files": 890,
     "scanned_test_files": 228,
     "skipped_artifact_files": 3037,
     "skipped_binary_files": 0,
@@ -2557,9 +2557,9 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.2373,
+  "scan_duration_seconds": 2.2362,
   "scanned_doc_files": 72,
-  "scanned_source_files": 889,
+  "scanned_source_files": 890,
   "scanned_test_files": 228,
   "schema_version": "event_alpha_old_import_check_v1",
   "skipped_artifact_files": 3037,
