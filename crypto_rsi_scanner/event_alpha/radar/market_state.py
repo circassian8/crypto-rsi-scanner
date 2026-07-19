@@ -139,6 +139,17 @@ def snapshot_from_market_row(
         row.get("market_feature_evidence"),
         expected_current_observation_id=market_history_observation_id,
     )
+    has_temporal_evidence = event_market_feature_evidence.contains_temporal_evidence(
+        market_feature_evidence
+    )
+    if market_history_observation_id is not None and not has_temporal_evidence:
+        raise ValueError(
+            "market_feature_evidence_invalid:value:missing_for_history_observation"
+        )
+    if market_history_observation_id is None and has_temporal_evidence:
+        raise ValueError(
+            "market_feature_evidence_invalid:value:market_history_observation_id_missing"
+        )
     normalized_return_units = {
         name: event_market_units.RETURN_UNIT_PERCENT_POINTS
         for name, value in normalized_returns.items()

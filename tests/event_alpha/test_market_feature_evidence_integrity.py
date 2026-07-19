@@ -115,6 +115,41 @@ def test_schema_rejects_temporal_evidence_digest_drift_after_projection():
 
 
 @pytest.mark.parametrize(
+    "missing_field,error",
+    (
+        (
+            "market_feature_evidence",
+            "missing_for_history_observation",
+        ),
+        (
+            "market_history_observation_id",
+            "market_history_observation_id_missing",
+        ),
+    ),
+)
+def test_history_observation_and_temporal_evidence_are_one_closed_pair(
+    missing_field,
+    error,
+):
+    source = _market_row()
+    source.pop(missing_field)
+
+    with pytest.raises(ValueError, match=error):
+        market_state.snapshot_from_market_row(source)
+
+
+def test_schema_blocks_a_writer_that_drops_history_feature_evidence():
+    snapshots, _ = market_anomaly_scanner.scan_market_rows([_market_row()])
+    snapshots[0].pop("market_feature_evidence")
+
+    assert schema_v1.validate_row_against_schema(
+        snapshots[0], "market_state_snapshot_v1"
+    ) == [
+        "market_feature_evidence_invalid:value:missing_for_history_observation"
+    ]
+
+
+@pytest.mark.parametrize(
     "mutation,error",
     (
         (

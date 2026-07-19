@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 11202,
+          "line": 11224,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-19T09:28:42.050429+00:00",
+  "generated_at": "2026-07-19T09:32:39.086207+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1234,
-  "input_fingerprint": "0340648b294c96b71a317f3c51b9c87d0569cca258f2e0a5dd415f0a51c82519",
+  "input_fingerprint": "40bdcd290ea08b8c4d40b3319c7f18847f5f0006d02dbeef436741b7a5b4f9ee",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "AGENTS.md:1784452915",
-    "DEVLOG.md:1784453273",
-    "Makefile:1784453304",
-    "crypto_rsi_scanner/event_alpha/artifacts/schema/provider_lineage_specs.py:1784453304",
-    "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py:1784453304"
+    "DEVLOG.md:1784453549",
+    "ROADMAP.md:1784453549",
+    "crypto_rsi_scanner/event_alpha/artifacts/schema/market_feature_evidence.py:1784453492",
+    "crypto_rsi_scanner/event_alpha/radar/market_state.py:1784453492",
+    "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784453332"
   ],
-  "newest_source_mtime": 1784453319.0207849,
+  "newest_source_mtime": 1784453556.257451,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784452497.313323,
+  "report_mtime": 1784453322.0516784,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1234,
-    "input_fingerprint": "0340648b294c96b71a317f3c51b9c87d0569cca258f2e0a5dd415f0a51c82519",
+    "input_fingerprint": "40bdcd290ea08b8c4d40b3319c7f18847f5f0006d02dbeef436741b7a5b4f9ee",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784452915",
-      "DEVLOG.md:1784453273",
-      "Makefile:1784453304",
-      "crypto_rsi_scanner/event_alpha/artifacts/schema/provider_lineage_specs.py:1784453304",
-      "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py:1784453304"
+      "DEVLOG.md:1784453549",
+      "ROADMAP.md:1784453549",
+      "crypto_rsi_scanner/event_alpha/artifacts/schema/market_feature_evidence.py:1784453492",
+      "crypto_rsi_scanner/event_alpha/radar/market_state.py:1784453492",
+      "research/ARCHITECTURE_CLASS_OWNERSHIP_REPORT.md:1784453332"
     ],
-    "newest_source_mtime": 1784453319.0207849,
+    "newest_source_mtime": 1784453556.257451,
     "regex_compile_count": 124,
-    "report_mtime": 1784452497.313323,
-    "scan_duration_seconds": 2.6546,
+    "report_mtime": 1784453322.0516784,
+    "scan_duration_seconds": 2.4784,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2557,7 +2557,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.6546,
+  "scan_duration_seconds": 2.4784,
   "scanned_doc_files": 79,
   "scanned_source_files": 902,
   "scanned_test_files": 247,

@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require a closed temporal-history evidence pair · Codex
+**Why:** The canonical evidence map was validated when present, but a future
+writer could still omit the optional map entirely while retaining a history
+observation marker. That would recreate lineage loss without malformed evidence
+for the schema to inspect.
+**Changes:**
+- Snapshot construction now requires `market_history_observation_id` and at
+  least one temporal evidence entry together; neither side can exist alone.
+- Snapshot and nested-anomaly schema validation enforces the same pairing, so a
+  later writer that drops the map is a strict-doctor schema error.
+- Added focused construction and post-projection drop regressions while keeping
+  legacy/fixture snapshots that carry neither optional field byte-compatible.
+**Verify:** All 97 focused feature-evidence, market-history, market-surface,
+schema, and integrated-merge tests passed; compileall passed. All 30 current
+live input rows re-projected to 30 closed pairs with zero schema errors and the
+same zero-anomaly result. The integrated fixture smoke again validated 126
+schema rows and strict doctor reported zero blockers and warnings.
+**Notes/risks:** This is a future-artifact integrity gate only. Existing
+immutable namespaces remain unchanged. No provider call, authorization, score,
+threshold, route, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-19 — Preserve temporal evidence in canonical market snapshots · Codex
 **Why:** Live market rows already bound every derived temporal feature to exact
 observation IDs and a deterministic baseline digest, but the anomaly scanner's

@@ -96,6 +96,12 @@ def canonical_projection(
     return projected
 
 
+def contains_temporal_evidence(value: Mapping[str, Any]) -> bool:
+    """Return whether a canonical projection carries temporal lineage."""
+
+    return any(feature.startswith("temporal_") for feature in value)
+
+
 def validate_contract(
     row: Mapping[str, Any],
     *,
@@ -109,16 +115,28 @@ def validate_contract(
     if not isinstance(container, Mapping):
         return []
     if "market_feature_evidence" not in container:
+        if container.get("market_history_observation_id") not in (None, ""):
+            return [
+                "market_feature_evidence_invalid:value:missing_for_history_observation"
+            ]
         return []
     expected = container.get("market_history_observation_id")
     expected_id = expected if isinstance(expected, str) and expected else None
     try:
-        canonical_projection(
+        projection = canonical_projection(
             container.get("market_feature_evidence"),
             expected_current_observation_id=expected_id,
         )
     except ValueError as exc:
         return [str(exc)]
+    if contains_temporal_evidence(projection) and expected_id is None:
+        return [
+            "market_feature_evidence_invalid:value:market_history_observation_id_missing"
+        ]
+    if expected_id is not None and not contains_temporal_evidence(projection):
+        return [
+            "market_feature_evidence_invalid:value:missing_for_history_observation"
+        ]
     return []
 
 
