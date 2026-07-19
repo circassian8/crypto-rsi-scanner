@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Select the next documented official announcement API · Codex
+**Why:** The selected-venue Bybit announcement path is documented but currently
+blocked by honest regional reachability. The project needs an authoritative
+first-party catalyst source with a supported machine contract, not another
+guessed page, hidden endpoint, or flaky aggregator.
+**Changes:**
+- Reviewed current official KuCoin and Bitget API documentation and recorded a
+  structured source-selection contract plus a human-readable implementation
+  boundary.
+- Confirmed that KuCoin documents public/no-permission `GET
+  /api/v3/announcements` with request weight 20, up to 50 requested rows,
+  explicit page totals, stable IDs, multi-type categories, publication clocks,
+  language, descriptions, and official URLs.
+- Confirmed that Bitget documents public `GET
+  /api/v2/public/annoucements`—preserving its exact official spelling—with
+  one-month time bounds, explicit categories/subtypes, stable IDs/clocks/URLs,
+  cursor pagination, and a 10-row maximum page.
+- Selected KuCoin as the next offline-only normalizer because its larger page
+  and explicit total/current-page fields make bounded coverage easier to prove.
+  Kept Bitget second as a later source-diverse official witness.
+- Closed publication-time versus event-time, truncated-description, category,
+  healthy-empty, pagination, source-independence, directionality, immutable-byte,
+  authorization, health, doctor, and annex semantics before implementation.
+- Updated the durable decision and roadmap. No provider adapter or broad source
+  layer was added; the next item is a strict synthetic-fixture KuCoin contract.
+**Verify:** The structured review passed JSON and whitespace validation.
+Thirteen focused source-registry and source-coverage tests passed. Architecture
+cleanliness remained green with zero new size violations.
+**Notes/risks:** Official web research occurred outside the project provider
+runtime. The repository made no KuCoin/Bitget call and created no authorization,
+transport, parser, score, route, threshold, evidence authority, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Separate Kraken roadmap context from launch evidence · Codex
 **Why:** Kraken is already recognized as an official-exchange source identity,
 but the project had no closed decision about what its listing roadmap, launch

@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Implement KuCoin's documented announcement contract before Bitget
+**Status:** accepted
+**Decision:** Select KuCoin's documented public/no-permission `GET
+/api/v3/announcements` as the next offline official-announcement contract.
+Keep Bitget's documented public `GET /api/v2/public/annoucements` as the second
+candidate, preserving the provider's exact path spelling. This chooses
+implementation order only: both providers remain unconfigured, unauthorized,
+inactive, campaign-detached, and Protocol-v2-ineligible. No live call is
+permitted until a separate already-present authorization and confirmed bounded
+capture exist.
+**Why:** Both official APIs expose stable IDs, categories, publication clocks,
+language, source URLs, and bounded pagination. KuCoin's up-to-50-row page plus
+explicit total/current-page fields makes coverage easier to close with fewer
+requests; Bitget's 10-row cursor contract is valuable as a later source-diverse
+official witness.
+**Revisit when:** KuCoin's official contract, terms, or reachability no longer
+supports a bounded public capture, or the offline normalizer reveals a contract
+gap that Bitget closes more safely. Reordering must not create authorization or
+weaken immutable-byte, clock, coverage, health, doctor, or annex gates.
+
 ## 2026-07-19 - Keep Kraken roadmap context separate from launch evidence
 **Status:** accepted
 **Decision:** Treat Kraken's official listing roadmap as planned-listing or
