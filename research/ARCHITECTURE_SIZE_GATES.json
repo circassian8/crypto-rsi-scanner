@@ -1469,6 +1469,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+      "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
       "reason": "Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes.",
@@ -1500,15 +1509,6 @@
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
       "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
       "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1463,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-      "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-      "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
       "source_kind": "production"
     },
     {
@@ -1815,7 +1815,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1140,
+  "file_count": 1141,
   "file_line_limit": 1500,
   "files_over_limit": [],
   "files_over_limit_count": 0,
@@ -1823,10 +1823,16 @@
   "functions_over_limit": [],
   "functions_over_limit_count": 0,
   "gate_status": "pass",
-  "generated_at": "2026-07-19T05:37:13.837506+00:00",
+  "generated_at": "2026-07-19T06:13:10.905386+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
+    {
+      "limit": 1500,
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "source_kind": "production"
+    },
     {
       "limit": 1500,
       "line_count": 1498,
@@ -1849,12 +1855,6 @@
       "limit": 1500,
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1463,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "source_kind": "production"
     },
     {
@@ -3762,6 +3762,13 @@
   "multi_public_class_modules_count": 84,
   "near_threshold_file_status": [
     {
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
+      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
+      "status": "accepted_near_threshold"
+    },
+    {
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
@@ -3785,13 +3792,6 @@
     {
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
-      "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
-      "status": "accepted_near_threshold"
-    },
-    {
-      "line_count": 1463,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "reason": "Below the production warning threshold; split only when making related behavior-preserving changes.",
       "revisit_condition": "Revisit if the file crosses 1,500 lines or gains a new large class/function violation.",
       "status": "accepted_near_threshold"
@@ -3940,6 +3940,12 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
+      "line_count": 1499,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1498,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
       "source_kind": "production"
@@ -3960,12 +3966,6 @@
       "limit": 1500,
       "line_count": 1465,
       "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1463,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
       "source_kind": "production"
     },
     {
@@ -4338,6 +4338,15 @@
         {
           "accepted": true,
           "limit": 1500,
+          "line_count": 1499,
+          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+          "source_kind": "production"
+        },
+        {
+          "accepted": true,
+          "limit": 1500,
           "line_count": 1498,
           "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
           "reason": "Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes.",
@@ -4369,15 +4378,6 @@
           "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
           "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
           "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-          "source_kind": "production"
-        },
-        {
-          "accepted": true,
-          "limit": 1500,
-          "line_count": 1463,
-          "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-          "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-          "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
           "source_kind": "production"
         },
         {
@@ -4603,6 +4603,11 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1499,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1498,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
         "threshold": 1200
@@ -4620,11 +4625,6 @@
       {
         "line_count": 1465,
         "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1463,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
       },
       {
@@ -4790,6 +4790,15 @@
           {
             "accepted": true,
             "limit": 1500,
+            "line_count": 1499,
+            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
+            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
+            "source_kind": "production"
+          },
+          {
+            "accepted": true,
+            "limit": 1500,
             "line_count": 1498,
             "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py",
             "reason": "Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes.",
@@ -4821,15 +4830,6 @@
             "path": "crypto_rsi_scanner/event_alpha/operations/daily_operations.py",
             "reason": "Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts.",
             "revisit_condition": "Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases.",
-            "source_kind": "production"
-          },
-          {
-            "accepted": true,
-            "limit": 1500,
-            "line_count": 1463,
-            "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
-            "reason": "Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path.",
-            "revisit_condition": "When adding another baseline family or changing the observation-spacing contract.",
             "source_kind": "production"
           },
           {

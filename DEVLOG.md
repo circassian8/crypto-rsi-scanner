@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Bind temporal features to exact observation inputs · Codex
+**Why:** Temporal feature values were calculated from filtered scalar rows or
+specific horizon endpoints and anchors, but their evidence metadata named only
+the last N raw observations. A 4-hour return could therefore cite the 1-hour
+row, and missing-value rows could appear as baseline inputs that never entered
+the statistic.
+**Changes:**
+- Made volume and turnover evidence use only the rows with valid measurements.
+- Made direct and historical return evidence preserve the exact endpoint/anchor
+  pairs, and made BTC/ETH-relative evidence preserve both asset and benchmark
+  endpoints/anchors.
+- Added a deterministic count and SHA-256 binding for the exact deduplicated
+  input observation IDs while retaining first/last IDs, providers, modes,
+  sample counts, and the current observation ID. Missing IDs or conflicting
+  bytes under one ID now fail closed.
+- Required every temporal feature call site to supply exact evidence rows; the
+  old approximate fallback no longer exists.
+- Kept the architecture gate clean by moving the unchanged history contracts
+  and internal data models to `market_history_models.py` and extracting the
+  return-family loop from the main enrichment function.
+**Verify:** The five new exact-lineage regressions and all 20 market-history
+tests pass. All 331 adjacent market/no-send, surprise, Decision-v2, surface,
+namespace, and dashboard tests pass (plus the host-side loopback regression).
+Both no-send and integrated-radar smokes completed with strict doctors at zero
+blockers/warnings. Compileall, diff checks, and architecture cleanliness pass
+with zero new size/function/class violations. Host-local `make verify-fast
+PYTHON=.venv/bin/python` passed all 3,088 tests in 160.89 seconds plus alert,
+backtest-fixture, and paper-score smokes.
+**Notes/risks:** Valid complete history produces the same feature values and
+routes. Sparse or malformed history may now remain warming when its exact
+usable inputs lack the required coverage; that is an evidence correction, not
+threshold or score tuning. No provider authorization, provider call, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+behavior changed.
+
 ## 2026-07-19 — Record the twenty-ninth no-send market cycle · Codex
 **Why:** The exact hourly campaign cadence elapsed with existing CoinGecko
 authorization, clear provider backoff, and an owned healthy dashboard. Another

@@ -1,9 +1,8 @@
-"""Pure rolling market history and temporal baseline calculations.
-Callers own persistence and provide prior observations plus normalized current rows;
+"""Pure rolling market history and temporal baseline calculations. Callers own
+persistence and provide prior observations plus normalized current rows;
 derived returns use percentage points.
 Provider fields and bases are preserved, and only fields explicitly marked as proxy are replaced.
 """
-
 from __future__ import annotations
 
 import copy
@@ -12,33 +11,33 @@ import json
 import math
 import statistics
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
+from crypto_rsi_scanner.event_alpha.radar.market_history_models import (
+    BASELINE_COUNTED,
+    BASELINE_DUPLICATE,
+    BASELINE_TOO_CLOSE,
+    FEATURE_READINESS_GROUPS,
+    MARKET_HISTORY_ENRICHMENT_SCHEMA,
+    MARKET_HISTORY_OBSERVATION_SCHEMA,
+    MARKET_HISTORY_SCHEMA_VERSION,
+    MARKET_HISTORY_SUMMARY_SCHEMA,
+    RETURN_UNIT_PERCENT_POINTS,
+    TEMPORAL_BASELINE_BASIS,
+    MarketHistoryConfig,
+    _MarketHistoryResult,
+    _PreparedObservation,
+    _RelativeReturnSample,
+    _ReturnSample,
+    _Telemetry,
+    _config_values,
+)
 from crypto_rsi_scanner.event_alpha.radar.market_history_summary import (
     build_market_history_summary,
 )
 
 
-MARKET_HISTORY_OBSERVATION_SCHEMA = "event_alpha.market_history_observation"
-MARKET_HISTORY_ENRICHMENT_SCHEMA = "event_alpha.market_history_enrichment"
-MARKET_HISTORY_SUMMARY_SCHEMA = "event_alpha.market_history_summary"
-MARKET_HISTORY_SCHEMA_VERSION = 1
-TEMPORAL_BASELINE_BASIS = "temporal_baseline"
-RETURN_UNIT_PERCENT_POINTS = "percent_points"
-BASELINE_COUNTED = "counted"
-BASELINE_TOO_CLOSE = "too_close"
-BASELINE_DUPLICATE = "duplicate"
-FEATURE_READINESS_GROUPS = (
-    "volume",
-    "turnover",
-    "volatility",
-    "returns_1h",
-    "returns_4h",
-    "returns_24h",
-    "btc_eth_relative",
-)
 _WARM_FEATURE_STATUSES = {"ready", "constant_baseline", "warm"}
 
 _LINEAGE_FIELDS = (
@@ -51,112 +50,6 @@ _LINEAGE_FIELDS = (
     "contract_counted_status", "no_send_status", "research_only",
 )
 _PROXY_BASIS_MARKERS = ("proxy", "cross_sectional", "24h_volume")
-
-
-@dataclass(frozen=True)
-class MarketHistoryConfig:
-    """Deterministic retention and warm-up policy for market observations."""
-
-    max_history_age: timedelta = timedelta(days=45)
-    max_current_age: timedelta = timedelta(hours=6)
-    future_tolerance: timedelta = timedelta(minutes=5)
-    max_observations_per_asset: int = 256
-    min_baseline_observations: int = 8
-    minimum_observation_spacing: timedelta = timedelta(hours=1)
-    return_horizons_hours: tuple[int, ...] = (1, 4, 24)
-    required_feature_groups: tuple[str, ...] = FEATURE_READINESS_GROUPS
-    anchor_tolerance_ratio: float = 0.25
-    min_anchor_tolerance: timedelta = timedelta(minutes=5)
-    benchmark_alignment_tolerance: timedelta = timedelta(minutes=5)
-    btc_asset_ids: tuple[str, ...] = ("bitcoin", "btc")
-    eth_asset_ids: tuple[str, ...] = ("ethereum", "eth")
-    rejection_example_limit: int = 25
-
-    def __post_init__(self) -> None:
-        checks = (
-            (self.max_history_age > timedelta(0), "max_history_age must be positive"),
-            (self.max_current_age > timedelta(0), "max_current_age must be positive"),
-            (self.future_tolerance >= timedelta(0), "future_tolerance cannot be negative"),
-            (self.max_observations_per_asset >= 2, "max_observations_per_asset must be at least 2"),
-            (self.min_baseline_observations >= 2, "min_baseline_observations must be at least 2"),
-            (self.minimum_observation_spacing > timedelta(0),
-             "minimum_observation_spacing must be positive"),
-            (self.return_horizons_hours and all(value > 0 for value in self.return_horizons_hours),
-             "return_horizons_hours must contain positive values"),
-            (len(set(self.return_horizons_hours)) == len(self.return_horizons_hours),
-             "return_horizons_hours must be unique"),
-            (self.anchor_tolerance_ratio >= 0, "anchor_tolerance_ratio cannot be negative"),
-            (self.min_anchor_tolerance >= timedelta(0), "min_anchor_tolerance cannot be negative"),
-            (self.benchmark_alignment_tolerance >= timedelta(0),
-             "benchmark_alignment_tolerance cannot be negative"),
-            (self.rejection_example_limit >= 0, "rejection_example_limit cannot be negative"),
-            (bool(self.required_feature_groups), "required_feature_groups cannot be empty"),
-            (len(set(self.required_feature_groups)) == len(self.required_feature_groups),
-             "required_feature_groups must be unique"),
-            (set(self.required_feature_groups).issubset(FEATURE_READINESS_GROUPS),
-             "required_feature_groups contains an unknown group"),
-        )
-        for valid, message in checks:
-            if not valid:
-                raise ValueError(message)
-        if self.max_observations_per_asset <= self.min_baseline_observations:
-            raise ValueError("max_observations_per_asset must leave room after min_baseline_observations")
-
-
-@dataclass(frozen=True)
-class _MarketHistoryResult:
-    enriched_rows: tuple[dict[str, Any], ...]
-    retained_history: tuple[dict[str, Any], ...]
-    summary: dict[str, Any]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "enriched_rows": copy.deepcopy(list(self.enriched_rows)),
-            "retained_history": copy.deepcopy(list(self.retained_history)),
-            "summary": copy.deepcopy(self.summary),
-        }
-
-
-@dataclass(frozen=True)
-class _PreparedObservation:
-    index: int
-    observation: dict[str, Any]
-    asset_id: str
-    observed_at: datetime
-    @property
-    def key(self) -> tuple[str, datetime]:
-        return self.asset_id, self.observed_at
-
-
-@dataclass
-class _Telemetry:
-    counts: Counter[str] = field(default_factory=Counter)
-    role_counts: Counter[tuple[str, str]] = field(default_factory=Counter)
-    examples: list[dict[str, Any]] = field(default_factory=list)
-    example_limit: int = 25
-    def record(
-        self,
-        reason: str,
-        *,
-        role: str,
-        index: int,
-        asset_id: str = "",
-        observed_at: datetime | None = None,
-    ) -> None:
-        self.counts[reason] += 1
-        self.role_counts[(role, reason)] += 1
-        if len(self.examples) >= self.example_limit:
-            return
-        item: dict[str, Any] = {
-            "reason": reason,
-            "role": role,
-            "input_index": index,
-        }
-        if asset_id:
-            item["canonical_asset_id"] = asset_id
-        if observed_at is not None:
-            item["observed_at"] = _iso(observed_at)
-        self.examples.append(item)
 
 
 def enrich_market_rows_with_history(
@@ -612,7 +505,7 @@ def _enrich_current_row(
         _record_baseline_feature(
             row, evidence, warmup, baseline_values,
             feature=feature, temporal_field=temporal_field, value=value, stats=stats,
-            current=current, prior=prior,
+            current=current, evidence_rows=baseline_rows,
         )
         if value is not None and _canonical_field_accepts_temporal(
             row, feature, basis_fields=basis_fields,
@@ -620,11 +513,63 @@ def _enrich_current_row(
             _preserve_proxy_value(row, feature, basis_field)
             row[feature] = value
             row[basis_field] = TEMPORAL_BASELINE_BASIS
+    current_returns, current_return_samples = _enrich_return_baselines(
+        row,
+        evidence,
+        warmup,
+        baseline_values,
+        current=current,
+        observations=observations,
+        prior=prior,
+        cfg=cfg,
+    )
+    _enrich_relative_baselines(
+        row,
+        evidence,
+        warmup,
+        baseline_values,
+        current,
+        prior,
+        current_returns,
+        current_return_samples,
+        history_by_asset=history_by_asset, cfg=cfg,
+    )
+    return _finish_current_enrichment(
+        row, current, observations, prior, warmup, baseline_values, evidence,
+        cfg=cfg,
+    )
+
+
+def _enrich_return_baselines(
+    row: dict[str, Any],
+    evidence: dict[str, Any],
+    warmup: dict[str, dict[str, Any]],
+    baseline_values: dict[str, Any],
+    *,
+    current: _PreparedObservation,
+    observations: Sequence[Mapping[str, Any]],
+    prior: Sequence[Mapping[str, Any]],
+    cfg: MarketHistoryConfig,
+) -> tuple[dict[int, float | None], dict[int, _ReturnSample | None]]:
     current_returns: dict[int, float | None] = {}
+    current_samples: dict[int, _ReturnSample | None] = {}
     for hours in sorted(cfg.return_horizons_hours):
-        current_return = _return_for_endpoint(current.observation, observations, hours=hours, cfg=cfg)
-        historical_returns = _historical_returns(prior, hours=hours, cfg=cfg)
+        current_sample = _return_sample_for_endpoint(
+            current.observation,
+            observations,
+            hours=hours,
+            cfg=cfg,
+        )
+        historical_samples = _historical_return_samples(prior, hours=hours, cfg=cfg)
+        current_return = current_sample.value if current_sample is not None else None
+        historical_returns = [sample.value for sample in historical_samples]
+        historical_evidence_rows = [
+            evidence_row
+            for sample in historical_samples
+            for evidence_row in sample.evidence_rows
+        ]
         current_returns[hours] = current_return
+        current_samples[hours] = current_sample
         return_z, return_stats = _zscore(
             current_return,
             historical_returns,
@@ -632,7 +577,7 @@ def _enrich_current_row(
         )
         return_stats = _with_feature_coverage(
             return_stats,
-            prior,
+            historical_evidence_rows,
             required=_required_coverage(cfg, horizon_hours=hours),
         )
         return_field = f"return_{hours}h"
@@ -645,10 +590,10 @@ def _enrich_current_row(
                 _declare_return_unit(row, return_field)
             evidence[temporal_return_field] = _feature_evidence(
                 current=current,
-                prior=prior,
                 sample_count=1,
                 status="ready",
                 calculation="price_horizon_return",
+                evidence_rows=(current_sample.anchor,),
             )
         _record_baseline_feature(
             row,
@@ -660,9 +605,13 @@ def _enrich_current_row(
             value=return_z,
             stats=return_stats,
             current=current,
-            prior=prior,
+            evidence_rows=historical_evidence_rows,
         )
-        volatility = _rounded(statistics.pstdev(historical_returns)) if len(historical_returns) >= 2 else None
+        volatility = (
+            _rounded(statistics.pstdev(historical_returns))
+            if len(historical_returns) >= 2
+            else None
+        )
         volatility_status = _baseline_status(
             current_return,
             len(historical_returns),
@@ -673,12 +622,16 @@ def _enrich_current_row(
             "status": volatility_status,
             "sample_count": len(historical_returns),
             "required_sample_count": cfg.min_baseline_observations,
-            "mean": _rounded(statistics.fmean(historical_returns)) if historical_returns else None,
+            "mean": (
+                _rounded(statistics.fmean(historical_returns))
+                if historical_returns
+                else None
+            ),
             "standard_deviation": volatility,
         }
         volatility_stats = _with_feature_coverage(
             volatility_stats,
-            prior,
+            historical_evidence_rows,
             required=_required_coverage(cfg, horizon_hours=hours),
         )
         _record_baseline_feature(
@@ -691,7 +644,7 @@ def _enrich_current_row(
             value=volatility if volatility_status == "ready" else None,
             stats=volatility_stats,
             current=current,
-            prior=prior,
+            evidence_rows=historical_evidence_rows,
         )
         if volatility is not None and volatility_status == "ready":
             _declare_return_unit(row, f"temporal_return_volatility_{hours}h")
@@ -703,7 +656,7 @@ def _enrich_current_row(
         )
         volatility_z_stats = _with_feature_coverage(
             volatility_z_stats,
-            prior,
+            historical_evidence_rows,
             required=_required_coverage(cfg, horizon_hours=hours),
         )
         _record_baseline_feature(
@@ -716,16 +669,9 @@ def _enrich_current_row(
             value=volatility_z,
             stats=volatility_z_stats,
             current=current,
-            prior=prior,
+            evidence_rows=historical_evidence_rows,
         )
-    _enrich_relative_baselines(
-        row, evidence, warmup, baseline_values, current, prior, current_returns,
-        history_by_asset=history_by_asset, cfg=cfg,
-    )
-    return _finish_current_enrichment(
-        row, current, observations, prior, warmup, baseline_values, evidence,
-        cfg=cfg,
-    )
+    return current_returns, current_samples
 
 
 def _enrich_relative_baselines(
@@ -736,6 +682,7 @@ def _enrich_relative_baselines(
     current: _PreparedObservation,
     prior: Sequence[Mapping[str, Any]],
     current_returns: Mapping[int, float | None],
+    current_return_samples: Mapping[int, _ReturnSample | None],
     *,
     history_by_asset: Mapping[str, Sequence[Mapping[str, Any]]],
     cfg: MarketHistoryConfig,
@@ -753,7 +700,9 @@ def _enrich_relative_baselines(
                     row, evidence, warmup, baseline_values,
                     feature=feature, temporal_field=f"temporal_{feature}", value=None,
                     stats={"status": "not_applicable", "sample_count": 0, "required_sample_count": 0},
-                    current=current, prior=prior, benchmark_asset_id=asset_id,
+                    current=current,
+                    benchmark_asset_id=asset_id,
+                    evidence_rows=(),
                 )
             continue
         endpoint = _aligned_observation(
@@ -761,22 +710,36 @@ def _enrich_relative_baselines(
         )
         for hours in sorted(cfg.return_horizons_hours):
             feature = f"relative_return_vs_{name}_{hours}h"
-            benchmark_return = (
-                _return_for_endpoint(endpoint, observations, hours=hours, cfg=cfg)
-                if endpoint is not None else None
+            benchmark_sample = (
+                _return_sample_for_endpoint(endpoint, observations, hours=hours, cfg=cfg)
+                if endpoint is not None
+                else None
             )
+            asset_sample = current_return_samples.get(hours)
+            benchmark_return = benchmark_sample.value if benchmark_sample is not None else None
             asset_return = current_returns.get(hours)
             relative = (
                 _rounded(asset_return - benchmark_return)
                 if asset_return is not None and benchmark_return is not None else None
             )
-            history = _historical_relative_returns(prior, observations, hours=hours, cfg=cfg)
+            historical_samples = _historical_relative_return_samples(
+                prior,
+                observations,
+                hours=hours,
+                cfg=cfg,
+            )
+            history = [sample.value for sample in historical_samples]
+            historical_evidence_rows = [
+                evidence_row
+                for sample in historical_samples
+                for evidence_row in sample.evidence_rows
+            ]
             relative_z, stats = _zscore(
                 relative, history, minimum=cfg.min_baseline_observations,
             )
             stats = _with_feature_coverage(
                 stats,
-                prior,
+                historical_evidence_rows,
                 required=_required_coverage(cfg, horizon_hours=hours),
             )
             if relative is not None:
@@ -787,14 +750,20 @@ def _enrich_relative_baselines(
                     row[feature] = relative
                     _declare_return_unit(row, feature)
                 evidence[temporal_field] = _feature_evidence(
-                    current=current, prior=prior, sample_count=1, status="ready",
+                    current=current, sample_count=1, status="ready",
                     calculation=f"asset_return_minus_{name}_return", benchmark_asset_id=asset_id,
+                    evidence_rows=(
+                        asset_sample.anchor,
+                        benchmark_sample.endpoint,
+                        benchmark_sample.anchor,
+                    ),
                 )
             _record_baseline_feature(
                 row, evidence, warmup, baseline_values,
                 feature=f"{feature}_zscore", temporal_field=f"temporal_{feature}_zscore",
-                value=relative_z, stats=stats, current=current, prior=prior,
+                value=relative_z, stats=stats, current=current,
                 benchmark_asset_id=asset_id,
+                evidence_rows=historical_evidence_rows,
             )
 
 
@@ -866,7 +835,7 @@ def _record_baseline_feature(
     value: float | None,
     stats: Mapping[str, Any],
     current: _PreparedObservation,
-    prior: Sequence[Mapping[str, Any]],
+    evidence_rows: Sequence[Mapping[str, Any]],
     benchmark_asset_id: str | None = None,
 ) -> None:
     status = str(stats.get("status") or "unknown")
@@ -894,11 +863,11 @@ def _record_baseline_feature(
         row[temporal_field] = value
     evidence[temporal_field] = _feature_evidence(
         current=current,
-        prior=prior,
         sample_count=int(stats.get("sample_count") or 0),
         status=status,
         calculation=feature,
         benchmark_asset_id=benchmark_asset_id,
+        evidence_rows=evidence_rows,
     )
 
 
@@ -994,13 +963,14 @@ def _group_feature_readiness(
 def _feature_evidence(
     *,
     current: _PreparedObservation,
-    prior: Sequence[Mapping[str, Any]],
+    evidence_rows: Sequence[Mapping[str, Any]],
     sample_count: int,
     status: str,
     calculation: str,
     benchmark_asset_id: str | None = None,
 ) -> dict[str, Any]:
-    relevant = list(prior[-sample_count:]) if sample_count > 0 else []
+    relevant = _canonical_evidence_rows(evidence_rows)
+    observation_ids = [str(item["observation_id"]) for item in relevant]
     providers = sorted({str(item.get("provider") or "") for item in relevant if item.get("provider")})
     modes = sorted({str(item.get("data_mode") or "") for item in relevant if item.get("data_mode")})
     evidence = {
@@ -1011,6 +981,14 @@ def _feature_evidence(
         "current_observation_id": current.observation["observation_id"],
         "baseline_first_observation_id": relevant[0].get("observation_id") if relevant else None,
         "baseline_last_observation_id": relevant[-1].get("observation_id") if relevant else None,
+        "baseline_input_observation_count": len(relevant),
+        "baseline_observation_ids_sha256": (
+            hashlib.sha256(
+                json.dumps(observation_ids, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            if observation_ids
+            else None
+        ),
         "providers": providers,
         "data_modes": modes,
         "research_only": True,
@@ -1018,6 +996,25 @@ def _feature_evidence(
     if benchmark_asset_id:
         evidence["benchmark_asset_id"] = benchmark_asset_id
     return evidence
+
+
+def _canonical_evidence_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    """Return exact input observations once, in deterministic temporal order."""
+
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        observation_id = str(row.get("observation_id") or "").strip()
+        if not observation_id:
+            raise ValueError("temporal feature evidence row is missing observation_id")
+        existing = by_id.get(observation_id)
+        if existing is not None and _canonical_json(existing) != _canonical_json(row):
+            raise ValueError(
+                f"temporal feature evidence observation conflict: {observation_id}"
+            )
+        by_id[observation_id] = row
+    return sorted(by_id.values(), key=_observation_sort_key)
 
 
 def _observation_values(
@@ -1115,13 +1112,26 @@ def _historical_returns(
     hours: int,
     cfg: MarketHistoryConfig,
 ) -> list[float]:
-    values: list[float] = []
+    return [sample.value for sample in _historical_return_samples(
+        observations,
+        hours=hours,
+        cfg=cfg,
+    )]
+
+
+def _historical_return_samples(
+    observations: Sequence[Mapping[str, Any]],
+    *,
+    hours: int,
+    cfg: MarketHistoryConfig,
+) -> list[_ReturnSample]:
+    samples: list[_ReturnSample] = []
     ordered = sorted(observations, key=_observation_sort_key)
     for endpoint in ordered:
-        value = _return_for_endpoint(endpoint, ordered, hours=hours, cfg=cfg)
-        if value is not None:
-            values.append(value)
-    return values
+        sample = _return_sample_for_endpoint(endpoint, ordered, hours=hours, cfg=cfg)
+        if sample is not None:
+            samples.append(sample)
+    return samples
 
 
 def _historical_relative_returns(
@@ -1131,7 +1141,22 @@ def _historical_relative_returns(
     hours: int,
     cfg: MarketHistoryConfig,
 ) -> list[float]:
-    values: list[float] = []
+    return [sample.value for sample in _historical_relative_return_samples(
+        asset_observations,
+        benchmark_observations,
+        hours=hours,
+        cfg=cfg,
+    )]
+
+
+def _historical_relative_return_samples(
+    asset_observations: Sequence[Mapping[str, Any]],
+    benchmark_observations: Sequence[Mapping[str, Any]],
+    *,
+    hours: int,
+    cfg: MarketHistoryConfig,
+) -> list[_RelativeReturnSample]:
+    samples: list[_RelativeReturnSample] = []
     asset_ordered = sorted(asset_observations, key=_observation_sort_key)
     benchmark_ordered = sorted(benchmark_observations, key=_observation_sort_key)
     for endpoint in asset_ordered:
@@ -1143,16 +1168,27 @@ def _historical_relative_returns(
         )
         if benchmark_endpoint is None:
             continue
-        asset_return = _return_for_endpoint(endpoint, asset_ordered, hours=hours, cfg=cfg)
-        benchmark_return = _return_for_endpoint(
+        asset_sample = _return_sample_for_endpoint(
+            endpoint,
+            asset_ordered,
+            hours=hours,
+            cfg=cfg,
+        )
+        benchmark_sample = _return_sample_for_endpoint(
             benchmark_endpoint,
             benchmark_ordered,
             hours=hours,
             cfg=cfg,
         )
-        if asset_return is not None and benchmark_return is not None:
-            values.append(_rounded(asset_return - benchmark_return))
-    return values
+        if asset_sample is not None and benchmark_sample is not None:
+            samples.append(_RelativeReturnSample(
+                value=_rounded(asset_sample.value - benchmark_sample.value),
+                asset_endpoint=asset_sample.endpoint,
+                asset_anchor=asset_sample.anchor,
+                benchmark_endpoint=benchmark_sample.endpoint,
+                benchmark_anchor=benchmark_sample.anchor,
+            ))
+    return samples
 
 
 def _return_for_endpoint(
@@ -1162,6 +1198,22 @@ def _return_for_endpoint(
     hours: int,
     cfg: MarketHistoryConfig,
 ) -> float | None:
+    sample = _return_sample_for_endpoint(
+        endpoint,
+        observations,
+        hours=hours,
+        cfg=cfg,
+    )
+    return sample.value if sample is not None else None
+
+
+def _return_sample_for_endpoint(
+    endpoint: Mapping[str, Any] | None,
+    observations: Sequence[Mapping[str, Any]],
+    *,
+    hours: int,
+    cfg: MarketHistoryConfig,
+) -> _ReturnSample | None:
     if endpoint is None:
         return None
     endpoint_time = _observation_time(endpoint)
@@ -1186,7 +1238,11 @@ def _return_for_endpoint(
     anchor_price = _number(anchor.get("price"))
     if anchor_price is None or anchor_price <= 0:
         return None
-    return _rounded((endpoint_price / anchor_price - 1.0) * 100.0)
+    return _ReturnSample(
+        value=_rounded((endpoint_price / anchor_price - 1.0) * 100.0),
+        endpoint=endpoint,
+        anchor=anchor,
+    )
 
 
 def _aligned_observation(
@@ -1441,23 +1497,3 @@ def _require_aware_utc(value: datetime | str, *, field_name: str) -> datetime:
 
 def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat()
-
-
-def _config_values(cfg: MarketHistoryConfig) -> dict[str, Any]:
-    return {
-        "max_history_age_seconds": int(cfg.max_history_age.total_seconds()),
-        "max_current_age_seconds": int(cfg.max_current_age.total_seconds()),
-        "future_tolerance_seconds": int(cfg.future_tolerance.total_seconds()),
-        "max_observations_per_asset": cfg.max_observations_per_asset,
-        "min_baseline_observations": cfg.min_baseline_observations,
-        "minimum_observation_spacing_seconds": int(
-            cfg.minimum_observation_spacing.total_seconds()
-        ),
-        "return_horizons_hours": list(sorted(cfg.return_horizons_hours)),
-        "required_feature_groups": list(cfg.required_feature_groups),
-        "anchor_tolerance_ratio": cfg.anchor_tolerance_ratio,
-        "min_anchor_tolerance_seconds": int(cfg.min_anchor_tolerance.total_seconds()),
-        "benchmark_alignment_tolerance_seconds": int(cfg.benchmark_alignment_tolerance.total_seconds()),
-        "btc_asset_ids": list(cfg.btc_asset_ids),
-        "eth_asset_ids": list(cfg.eth_asset_ids),
-    }

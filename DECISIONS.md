@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Bind temporal statistics to their exact input observations
+**Status:** accepted
+**Decision:** Every temporal scalar, return, volatility, and benchmark-relative
+feature must identify the exact usable observations that produced it. Preserve
+the current observation separately; bind deduplicated baseline inputs by count,
+chronological first/last observation IDs, provider/mode sets, and a deterministic
+SHA-256 of the ordered observation-ID list. Derived returns must include their
+horizon anchors and historical endpoints; relative returns must additionally
+include benchmark endpoints and anchors. Do not fall back to the last N raw
+rows. Missing observation identity or conflicting bytes under one identity fail
+closed.
+**Why:** Sample count alone does not describe a derived statistic's lineage.
+Filtered missing values and multi-hour anchors can make the last N raw rows
+materially different from the rows used in calculation, undermining point-in-
+time review and future Protocol-v2 reproducibility.
+**Revisit when:** A versioned feature store records an equally exact,
+independently verifiable input graph. Any replacement must preserve causal
+anchors and deterministic reconstruction; it cannot restore approximate range
+metadata.
+
 ## 2026-07-19 - Keep non-finite market measurements unavailable
 **Status:** accepted
 **Decision:** Reject NaN and positive/negative infinity at every numeric input

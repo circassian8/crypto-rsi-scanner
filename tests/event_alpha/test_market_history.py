@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -296,6 +297,238 @@ def test_provider_observed_zscore_is_not_replaced_by_temporal_baseline():
     assert enriched["volume_zscore_basis"] == "provider_observed"
     assert enriched["temporal_volume_zscore_24h"] is not None
     assert enriched["market_feature_evidence"]["volume_zscore_24h"]["provider"] == "vendor"
+
+
+def test_scalar_feature_evidence_names_only_rows_used_by_the_baseline():
+    history = [
+        _row(
+            "move-token",
+            NOW - timedelta(hours=4),
+            price=100,
+            volume=1_000,
+            provider="provider-a",
+        ),
+        _row(
+            "move-token",
+            NOW - timedelta(hours=3),
+            price=101,
+            volume=None,
+            provider="unused-provider-a",
+        ),
+        _row(
+            "move-token",
+            NOW - timedelta(hours=2),
+            price=102,
+            volume=1_200,
+            provider="provider-b",
+        ),
+        _row(
+            "move-token",
+            NOW - timedelta(hours=1),
+            price=103,
+            volume=None,
+            provider="unused-provider-b",
+        ),
+    ]
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [_row("move-token", NOW, price=104, volume=1_400)],
+        history,
+        now=NOW,
+        config=_config(min_baseline_observations=2),
+    )
+
+    retained_by_time = {
+        row["observed_at"]: row for row in result.retained_history
+    }
+    evidence = result.enriched_rows[0]["market_feature_evidence"][
+        "temporal_volume_zscore_24h"
+    ]
+    exact_ids = [
+        retained_by_time[(NOW - timedelta(hours=4)).isoformat()]["observation_id"],
+        retained_by_time[(NOW - timedelta(hours=2)).isoformat()]["observation_id"],
+    ]
+
+    assert evidence["sample_count"] == 2
+    assert evidence["baseline_input_observation_count"] == 2
+    assert evidence["baseline_first_observation_id"] == exact_ids[0]
+    assert evidence["baseline_last_observation_id"] == exact_ids[-1]
+    assert evidence["providers"] == ["provider-a", "provider-b"]
+    assert evidence["baseline_observation_ids_sha256"] == hashlib.sha256(
+        json.dumps(exact_ids, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def test_horizon_return_evidence_names_its_exact_anchor_not_the_latest_row():
+    history = [
+        _row("move-token", NOW - timedelta(hours=4), price=100, volume=1_000),
+        _row("move-token", NOW - timedelta(hours=1), price=109, volume=1_100),
+    ]
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [_row("move-token", NOW, price=110, volume=1_200)],
+        history,
+        now=NOW,
+        config=_config(
+            min_baseline_observations=2,
+            return_horizons_hours=(4,),
+        ),
+    )
+
+    retained_by_time = {
+        row["observed_at"]: row for row in result.retained_history
+    }
+    anchor_id = retained_by_time[
+        (NOW - timedelta(hours=4)).isoformat()
+    ]["observation_id"]
+    latest_id = retained_by_time[
+        (NOW - timedelta(hours=1)).isoformat()
+    ]["observation_id"]
+    evidence = result.enriched_rows[0]["market_feature_evidence"][
+        "temporal_return_4h"
+    ]
+
+    assert evidence["sample_count"] == 1
+    assert evidence["baseline_input_observation_count"] == 1
+    assert evidence["baseline_first_observation_id"] == anchor_id
+    assert evidence["baseline_last_observation_id"] == anchor_id
+    assert evidence["baseline_last_observation_id"] != latest_id
+
+
+def test_derived_return_baseline_binds_endpoints_and_horizon_anchors():
+    history = [
+        _row(
+            "move-token",
+            NOW - timedelta(hours=offset),
+            price=112 - offset * 2,
+            volume=1_000 + offset,
+        )
+        for offset in range(6, 0, -1)
+    ]
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [_row("move-token", NOW, price=114, volume=1_200)],
+        history,
+        now=NOW,
+        config=_config(
+            min_baseline_observations=2,
+            return_horizons_hours=(4,),
+        ),
+    )
+
+    retained_by_time = {
+        row["observed_at"]: row for row in result.retained_history
+    }
+    exact_times = (
+        NOW - timedelta(hours=6),
+        NOW - timedelta(hours=5),
+        NOW - timedelta(hours=2),
+        NOW - timedelta(hours=1),
+    )
+    exact_ids = [
+        retained_by_time[observed_at.isoformat()]["observation_id"]
+        for observed_at in exact_times
+    ]
+    evidence = result.enriched_rows[0]["market_feature_evidence"][
+        "temporal_return_zscore_4h"
+    ]
+
+    assert evidence["sample_count"] == 2
+    assert evidence["baseline_input_observation_count"] == 4
+    assert evidence["baseline_first_observation_id"] == exact_ids[0]
+    assert evidence["baseline_last_observation_id"] == exact_ids[-1]
+    assert evidence["baseline_observation_ids_sha256"] == hashlib.sha256(
+        json.dumps(exact_ids, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def test_relative_return_evidence_binds_asset_and_benchmark_inputs():
+    history: list[dict] = []
+    for offset in range(6, 0, -1):
+        history.extend((
+            _row(
+                "move-token",
+                NOW - timedelta(hours=offset),
+                price=112 - offset * 2,
+                volume=1_000 + offset,
+            ),
+            _row(
+                "bitcoin",
+                NOW - timedelta(hours=offset),
+                price=218 - offset * 3,
+                volume=5_000 + offset,
+                symbol="BTC",
+            ),
+        ))
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [
+            _row("move-token", NOW, price=114, volume=1_200),
+            _row("bitcoin", NOW, price=220, volume=5_200, symbol="BTC"),
+        ],
+        history,
+        now=NOW,
+        config=_config(
+            min_baseline_observations=2,
+            return_horizons_hours=(4,),
+        ),
+    )
+
+    retained = {
+        (row["canonical_asset_id"], row["observed_at"]): row
+        for row in result.retained_history
+    }
+
+    def evidence_digest(keys: list[tuple[str, datetime]]) -> str:
+        rows = [retained[(asset_id, observed_at.isoformat())] for asset_id, observed_at in keys]
+        rows.sort(key=lambda row: (row["observed_at"], row["observation_id"]))
+        ids = [row["observation_id"] for row in rows]
+        return hashlib.sha256(
+            json.dumps(ids, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+    direct = result.enriched_rows[0]["market_feature_evidence"][
+        "temporal_relative_return_vs_btc_4h"
+    ]
+    assert direct["sample_count"] == 1
+    assert direct["baseline_input_observation_count"] == 3
+    assert direct["baseline_observation_ids_sha256"] == evidence_digest([
+        ("move-token", NOW - timedelta(hours=4)),
+        ("bitcoin", NOW - timedelta(hours=4)),
+        ("bitcoin", NOW),
+    ])
+
+    baseline = result.enriched_rows[0]["market_feature_evidence"][
+        "temporal_relative_return_vs_btc_4h_zscore"
+    ]
+    assert baseline["sample_count"] == 2
+    assert baseline["baseline_input_observation_count"] == 8
+    assert baseline["baseline_observation_ids_sha256"] == evidence_digest([
+        (asset_id, NOW - timedelta(hours=offset))
+        for offset in (6, 5, 2, 1)
+        for asset_id in ("move-token", "bitcoin")
+    ])
+
+
+def test_temporal_evidence_identity_failures_are_closed():
+    with pytest.raises(ValueError, match="missing observation_id"):
+        event_market_history._canonical_evidence_rows([{
+            "observed_at": NOW.isoformat(),
+        }])
+
+    with pytest.raises(ValueError, match="observation conflict"):
+        event_market_history._canonical_evidence_rows([
+            {
+                "observation_id": "same-id",
+                "observed_at": (NOW - timedelta(hours=1)).isoformat(),
+                "price": 100,
+            },
+            {
+                "observation_id": "same-id",
+                "observed_at": (NOW - timedelta(hours=1)).isoformat(),
+                "price": 101,
+            },
+        ])
 
 
 def test_warmup_is_explicit_and_does_not_replace_proxy_before_ready():
