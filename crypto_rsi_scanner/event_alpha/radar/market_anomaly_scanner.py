@@ -1014,7 +1014,8 @@ def _has_confirming_source(source_row: Mapping[str, Any]) -> bool:
     for key in ("source_url", "official_source_url", "published_at", "event_time", "catalyst_confirmed"):
         if source_row.get(key):
             return True
-    return bool(source_row.get("accepted_evidence_count") or source_row.get("source_urls"))
+    accepted = _count(source_row.get("accepted_evidence_count"))
+    return bool((accepted is not None and accepted > 0) or source_row.get("source_urls"))
 
 
 def _search_queries_for_anomaly(
@@ -1141,6 +1142,17 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _count(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        parsed = int(value)
+        return parsed if parsed >= 0 else None
+    return None
 
 
 def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:

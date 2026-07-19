@@ -7,6 +7,7 @@ retrospective, and context-only evidence fails closed for causal confidence.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 from . import catalyst_attribution as event_catalyst_attribution
@@ -60,7 +61,7 @@ def catalyst_status(
         for row in evidence_rows
     )
     accepted = sum(
-        _number(row.get("accepted_evidence_count")) or 0.0
+        _count(row.get("accepted_evidence_count")) or 0
         for row in evidence_rows
     )
     source_lane_text = " ".join(
@@ -236,11 +237,15 @@ def _row_text(
     return " ".join(values).casefold()
 
 
-def _number(value: object) -> float | None:
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+def _count(value: object) -> int | None:
+    if isinstance(value, bool):
         return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        parsed = int(value)
+        return parsed if parsed >= 0 else None
+    return None
 
 
 def _truthy(value: object) -> bool:

@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Require real integer catalyst evidence counts · Codex
+**Why:** Catalyst and anomaly paths treated truthy or float-coercible
+`accepted_evidence_count` values as accepted source evidence. Booleans,
+fractions, numeric strings, and infinity could therefore improve catalyst
+status, anomaly priority, or integrated source eligibility without one accepted
+evidence row.
+**Changes:**
+- Added a closed non-negative integer contract for accepted/rejected and related
+  counts in Decision catalyst evaluation, market anomaly source confirmation,
+  market reaction, and the integrated merge path.
+- Invalid count values now remain unavailable/zero and cannot promote source
+  specificity, remove the unknown-catalyst priority penalty, add the integrated
+  evidence score bonus, or satisfy a source gate.
+- Added public-behavior regressions across Decision status, anomaly priority,
+  market-reaction evidence summaries, and integrated source requirements.
+**Verify:** All 129 focused Decision, catalyst-attribution, market-state,
+market-surface, and integrated-merge tests passed. Compileall, architecture
+cleanliness, and the integrated-radar smoke passed.
+**Notes/risks:** Exact non-negative JSON integers and integer-valued finite
+floats remain compatible. Historical valid rows are unchanged; malformed
+claims become unavailable. No provider, score weight, threshold, route policy,
+send, trade, order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE`
+boundary changed.
+
 ## 2026-07-19 — Fail closed on malformed canonical Decision evidence · Codex
 **Why:** Decision Model numeric alias helpers preserved canonical zeroes but
 still skipped an explicitly supplied malformed canonical value and accepted a

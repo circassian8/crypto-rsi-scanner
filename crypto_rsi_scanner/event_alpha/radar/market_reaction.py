@@ -661,10 +661,14 @@ def _float(value: object) -> float | None:
 
 
 def _int(value: object) -> int | None:
-    try:
-        return int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
         return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        parsed = int(value)
+        return parsed if parsed >= 0 else None
+    return None
 
 
 def _pct(value: object, *, unit_hint: str | None = None) -> float | None:

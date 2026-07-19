@@ -564,7 +564,7 @@ def _evidence_components(
     source_url, source_title = _catalyst_source_fields(data)
     if not source_url:
         authority = min(authority, 62.0)
-    accepted = _number(data.get("accepted_evidence_count")) or 0.0
+    accepted = _count(data.get("accepted_evidence_count")) or 0
     specificity = 92.0 if catalyst == CatalystStatus.CONFIRMED.value else 72.0 if accepted > 0 else 42.0
     if not source_title:
         specificity = min(specificity, 58.0)
@@ -1027,6 +1027,17 @@ def _number(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _count(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        parsed = int(value)
+        return parsed if parsed >= 0 else None
+    return None
 
 
 def _truthy(value: object) -> bool:

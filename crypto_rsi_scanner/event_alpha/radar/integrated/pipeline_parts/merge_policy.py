@@ -461,7 +461,7 @@ def _score_for(
         base += 4.0
     if reaction.market_requirements_met:
         base += 4.0
-    if any(row.get("accepted_evidence_count") for row in rows):
+    if any(_int(row.get("accepted_evidence_count")) > 0 for row in rows):
         base += 2.0
     return min(95.0, base)
 
@@ -473,7 +473,9 @@ def _source_requirements_met(opportunity: str, rows: list[dict[str, Any]], sourc
         event_market_reaction.EventOpportunityType.RISK_ONLY.value,
         event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value,
     }:
-        if source_strength == "official_structured" or any(row.get("accepted_evidence_count") for row in rows):
+        if source_strength == "official_structured" or any(
+            _int(row.get("accepted_evidence_count")) > 0 for row in rows
+        ):
             return True
         if opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value:
             return any(str(row.get("_source_origin") or "") == "market_anomaly" for row in rows) and _dex_liquidity_sane(_best_dex_row(rows))

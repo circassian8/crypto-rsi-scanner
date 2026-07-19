@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from .runtime import *
 
 def _merged_list(rows: list[Mapping[str, Any]], key: str) -> tuple[str, ...]:
@@ -70,10 +72,14 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 def _int(value: Any) -> int:
-    try:
-        return int(float(value or 0))
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
         return 0
+    if isinstance(value, int):
+        return value if value >= 0 else 0
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        parsed = int(value)
+        return parsed if parsed >= 0 else 0
+    return 0
 
 def _rate_text(value: Any) -> str:
     try:

@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Accepted evidence counts are closed integers
+**Status:** accepted
+**Decision:** Treat `accepted_evidence_count`, `rejected_evidence_count`, and
+equivalent scalar count fields as non-negative finite integers. Reject
+booleans, fractional values, numeric strings, negative values, NaN, and
+infinity. An invalid count contributes no evidence and cannot improve catalyst
+status, source specificity, anomaly priority, integrated scoring, or source
+eligibility.
+**Why:** Truthiness and permissive float/int conversion let values such as
+`true`, `0.5`, `"1"`, and infinity stand in for an accepted evidence row. That
+manufactures catalyst confidence without a corresponding immutable source.
+**Revisit when:** Never for canonical count fields. A legacy importer may
+convert a documented historical representation before canonical evaluation,
+but must preserve its original bytes and emit an explicit conversion audit.
+
 ## 2026-07-19 - Invalid canonical Decision numerics cannot borrow aliases
 **Status:** accepted
 **Decision:** For ordered numeric fields used by Decision scoring, timing,
