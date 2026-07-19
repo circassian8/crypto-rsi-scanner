@@ -1,20 +1,20 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-19T11:29:24.396123+00:00` from local artifacts only.
+Generated at `2026-07-19T12:11:06.315042+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
 
 - Status: `in_progress_baseline_warming`
-- Counted real/no-send cycles: `32`
-- Real market observations: `960`
-- Baseline-counting observations: `930`
+- Counted real/no-send cycles: `33`
+- Real market observations: `990`
+- Baseline-counting observations: `960`
 - Too-close observations: `30`
 - Real Decision candidates: `5`
 - Current ideas: `0`
 - Historical ideas: `5`
-- Direct feature evidence: `5090`
-- Proxy feature evidence: `1540`
+- Direct feature evidence: `5238`
+- Proxy feature evidence: `1572`
 - Pending outcomes: `0`
 - Matured outcomes: `4`
 - Explicit first-view records: `0`
@@ -34,9 +34,9 @@ Research and decision support only. This report contains no trade recommendation
 ## Authority and pointer
 
 - Pointer status: `authoritative`
-- Current authority namespace: `radar_market_no_send_20260719t095347969563z_9c44c8df7384`
-- Pointer target namespace: `radar_market_no_send_20260719t095347969563z_9c44c8df7384`
-- Exact run: `2026-07-19T09:53:48.732731+00:00|no_key_live`
+- Current authority namespace: `radar_market_no_send_20260719t120656522318z_3a5c4a6b39db`
+- Pointer target namespace: `radar_market_no_send_20260719t120656522318z_3a5c4a6b39db`
+- Exact run: `2026-07-19T12:06:57.319210+00:00|no_key_live`
 - Revision: `12`
 - Exact operator binding: `true`
 
@@ -71,7 +71,8 @@ Research and decision support only. This report contains no trade recommendation
 | radar_market_no_send_20260719t054955751146z_dc1657d62164 | 2026-07-19T05:49:56.372340+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
 | radar_market_no_send_20260719t075136584503z_c6de7445c038 | 2026-07-19T07:51:37.241940+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
 | radar_market_no_send_20260719t085231044712z_5fc5bc0047e1 | 2026-07-19T08:52:31.749825+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
-| radar_market_no_send_20260719t095347969563z_9c44c8df7384 | 2026-07-19T09:53:48.732731+00:00 | 0 | none | not_published | published | dashboard_restarted | true |
+| radar_market_no_send_20260719t095347969563z_9c44c8df7384 | 2026-07-19T09:53:48.732731+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
+| radar_market_no_send_20260719t120656522318z_3a5c4a6b39db | 2026-07-19T12:06:57.319210+00:00 | 0 | none | not_published | published | dashboard_restarted | true |
 
 ### Complete but non-authoritative generations
 
@@ -90,11 +91,11 @@ Research and decision support only. This report contains no trade recommendation
 - Exact authority assets: `30`
 - Assets found in retained history: `30`
 - Missing current assets: `0`
-- Fully warm retained-history baselines: `26`
-- Current-universe retained observations: `915`
-- Current-universe baseline-counted observations: `889`
+- Fully warm retained-history baselines: `28`
+- Current-universe retained observations: `945`
+- Current-universe baseline-counted observations: `919`
 - Missing asset IDs: `none`
-- Latest exact-generation row readiness: `warm=26, warming=4`
+- Latest exact-generation row readiness: `warming=30`
 
 Retained-history maturity and latest point-in-time feature availability are separate. The table below measures sample depth and elapsed coverage for the exact current asset set; it does not claim that every latest-row feature exists.
 
@@ -102,37 +103,37 @@ Retained-history maturity and latest point-in-time feature availability are sepa
 
 | Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
 |---|---:|---:|---:|---:|---|---|---|
-| btc_eth_relative | 26 | 4 | 0 | 0 | 0-9 / 8 (4 below) | 0-30.08 / 31 h (30 below) | warm=26, warming=4 |
+| btc_eth_relative | 28 | 2 | 0 | 0 | 0-10 / 8 (2 below) | 0-31.1 / 31 h (1 below) | warm=28, warming=2 |
 | returns_1h | 29 | 1 | 0 | 0 | 2-15 / 8 (1 below) | 2.04-31.1 / 8 h (1 below) | warm=29, warming=1 |
-| returns_24h | 26 | 3 | 1 | 0 | 0-9 / 8 (4 below) | 0-138.61 / 31 h (1 below) | cold=1, warm=26, warming=3 |
-| returns_4h | 29 | 0 | 1 | 0 | 0-15 / 8 (1 below) | 0-30.08 / 11 h (1 below) | cold=1, warm=29 |
-| turnover | 29 | 1 | 0 | 0 | 5-31 / 8 (1 below) | 31.1-138.61 / 7 h (0 below) | warm=29, warming=1 |
-| volatility | 26 | 4 | 0 | 0 | 0-9 / 8 (4 below) | 0-30.08 / 31 h (30 below) | warm=26, warming=4 |
-| volume | 29 | 1 | 0 | 0 | 5-31 / 8 (1 below) | 31.1-138.61 / 7 h (0 below) | warm=29, warming=1 |
+| returns_24h | 28 | 1 | 1 | 0 | 0-10 / 8 (2 below) | 0-140.83 / 31 h (1 below) | cold=1, warm=28, warming=1 |
+| returns_4h | 29 | 1 | 0 | 0 | 1-16 / 8 (1 below) | 4.26-32.3 / 11 h (1 below) | warm=29, warming=1 |
+| turnover | 29 | 1 | 0 | 0 | 6-32 / 8 (1 below) | 33.32-140.83 / 7 h (0 below) | warm=29, warming=1 |
+| volatility | 28 | 2 | 0 | 0 | 0-10 / 8 (2 below) | 0-31.1 / 31 h (1 below) | warm=28, warming=2 |
+| volume | 29 | 1 | 0 | 0 | 6-32 / 8 (1 below) | 33.32-140.83 / 7 h (0 below) | warm=29, warming=1 |
 
 ### Retained campaign history
 
 - Status: `warming`
-- Retained observations: `960`
-- Baseline-counted observations: `930`
+- Retained observations: `990`
+- Baseline-counted observations: `960`
 - Too-close observations: `30`
 - Duplicate observations: `0`
 - Conflicting duplicate observations: `0`
 - Assets: `34`
-- Warm assets: `26`
+- Warm assets: `28`
 - Minimum spacing seconds: `3600`
 
 #### Retained-history feature maturity
 
 | Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
 |---|---:|---:|---:|---:|---|---|---|
-| btc_eth_relative | 26 | 6 | 2 | 0 | 0-9 / 8 (8 below) | 0-30.08 / 31 h (34 below) | cold=2, warm=26, warming=6 |
+| btc_eth_relative | 28 | 4 | 2 | 0 | 0-10 / 8 (6 below) | 0-31.1 / 31 h (5 below) | cold=2, warm=28, warming=4 |
 | returns_1h | 30 | 2 | 2 | 0 | 0-15 / 8 (4 below) | 0-31.1 / 8 h (3 below) | cold=2, warm=30, warming=2 |
-| returns_24h | 26 | 5 | 3 | 0 | 0-9 / 8 (8 below) | 0-138.61 / 31 h (3 below) | cold=3, warm=26, warming=5 |
-| returns_4h | 29 | 2 | 3 | 0 | 0-15 / 8 (5 below) | 0-30.08 / 11 h (4 below) | cold=3, warm=29, warming=2 |
-| turnover | 31 | 3 | 0 | 0 | 2-31 / 8 (3 below) | 19.07-138.61 / 7 h (0 below) | warm=31, warming=3 |
-| volatility | 26 | 6 | 2 | 0 | 0-9 / 8 (8 below) | 0-30.08 / 31 h (34 below) | cold=2, warm=26, warming=6 |
-| volume | 31 | 3 | 0 | 0 | 2-31 / 8 (3 below) | 19.07-138.61 / 7 h (0 below) | warm=31, warming=3 |
+| returns_24h | 28 | 3 | 3 | 0 | 0-10 / 8 (6 below) | 0-140.83 / 31 h (3 below) | cold=3, warm=28, warming=3 |
+| returns_4h | 29 | 3 | 2 | 0 | 0-16 / 8 (5 below) | 0-32.3 / 11 h (4 below) | cold=2, warm=29, warming=3 |
+| turnover | 31 | 3 | 0 | 0 | 2-32 / 8 (3 below) | 19.07-140.83 / 7 h (0 below) | warm=31, warming=3 |
+| volatility | 28 | 4 | 2 | 0 | 0-10 / 8 (6 below) | 0-31.1 / 31 h (5 below) | cold=2, warm=28, warming=4 |
+| volume | 31 | 3 | 0 | 0 | 2-32 / 8 (3 below) | 19.07-140.83 / 7 h (0 below) | warm=31, warming=3 |
 
 ## Outcomes
 
@@ -148,8 +149,8 @@ Retained-history maturity and latest point-in-time feature availability are sepa
 These rows remain unresolved because the exact retained price history does not currently prove a price inside the closed outcome window. No interpolation or automatic threshold change is permitted.
 
 - Price-history snapshot status: `observed`
-- Price-history rows: `960`
-- Price-history SHA-256: `7c9702ad18f4582b9a9ae816fab2231106b1b514f651bddd730e5a2805c5f781`
+- Price-history rows: `990`
+- Price-history SHA-256: `006b364c6dbe5bba963bf657599172a24e2b3562754a3a94ffb9202f8990a8dc`
 
 | Asset | Candidate observed | Outcome due | Price allowed through | First retained after due | Outside window | Evidence status |
 |---|---|---|---|---|---:|---|
@@ -185,7 +186,7 @@ Repeated observations are grouped into fixed-start descriptive episodes; they ar
 - Outcome input status: `partial`
 - Structural membership status: `ready`
 - Outcome ledger status: `observed`
-- Candidate snapshots: `32`/`32` generations
+- Candidate snapshots: `33`/`33` generations
 - Eligible anomaly observations: `5`
 - Excluded observations: `0`
 - Primary 24h episodes: `2`
@@ -249,20 +250,20 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 
 ## Data-quality limitations
 
-- **execution_quality_spread:** Trusted spread coverage is 0/960. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.
-- **proxy_market_features:** The campaign retains 1540 proxy feature observations; proxy evidence remains explicitly quality-capped.
+- **execution_quality_spread:** Trusted spread coverage is 0/990. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.
+- **proxy_market_features:** The campaign retains 1572 proxy feature observations; proxy evidence remains explicitly quality-capped.
 - **temporal_baseline_maturity:** The exact current authoritative universe is not feature/time-aware warm.
 
 ## Next observation
 
-- Next eligible time: `2026-07-19T11:54:09.995373+00:00`
+- Next eligible time: `2026-07-19T13:06:57.319210+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 32 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 7 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 26/34 warm retained assets; exact current-universe status is warming with 26/30 warm assets. Pointer history contains 28 bound generations and current authority is radar_market_no_send_20260719t095347969563z_9c44c8df7384. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 33 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 7 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 28/34 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 29 bound generations and current authority is radar_market_no_send_20260719t120656522318z_3a5c4a6b39db. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.

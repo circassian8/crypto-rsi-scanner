@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the thirty-third no-send market cycle · Codex
+**Why:** The one-hour cadence was eligible and the already-present CoinGecko
+authorization allowed the next bounded research-only observation. Continuing
+the real campaign is required to warm causal temporal baselines without
+lowering anomaly thresholds or inventing execution-quality evidence.
+**Changes:**
+- Performed exactly one authorized CoinGecko `/coins/markets` request. It
+  returned HTTP 200 with 80 bounded rows, selected 30 observations, used no
+  retry, and published the strict-clean revision-12 namespace
+  `radar_market_no_send_20260719t120656522318z_3a5c4a6b39db`.
+- Refreshed canonical campaign truth to 33 successful cycles, 990 retained
+  observations, 960 baseline-counted observations, 30 too-close observations,
+  7 provider failures, 5 historical ideas, 4 matured outcomes, one unresolved
+  `due_missing_price`, and 0/990 trusted spread observations.
+- Retained current-universe maturity advanced to 28/30 fully warm assets for
+  the next evaluation. The exact generation correctly remained point-in-time
+  warming with zero anomalies and zero current Decision ideas because its own
+  observations were not used to evaluate themselves.
+- Updated the roadmap with the exact authority, campaign counts, maturity, and
+  next provider boundary.
+**Verify:** `make radar-market-campaign-report PYTHON=python3` reconciled the
+33-generation history locally with no provider call. `make
+radar-dashboard-authority-status PYTHON=python3` and `make
+radar-dashboard-readiness PYTHON=python3` accepted the new exact pointer;
+strict doctor reports 0 blockers / 0 warnings. `curl -I
+http://127.0.0.1:8765/health` returned HTTP 200 with the exact namespace, run,
+revision 12, and operator digest
+`90bd6ae58261bc140c9951d9aef1e5c234c0ba14e5cf920043a60f6cc4168230`.
+`python3 -m json.tool research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json`,
+`git diff --check`, and `make architecture-cleanliness-check PYTHON=python3`
+passed with zero new architecture violations.
+**Notes/risks:** The next safe CoinGecko boundary is
+`2026-07-19T13:06:57.319210+00:00`; it must not be bypassed. No Bybit,
+calendar, context-source, or outcome-recovery authorization was created or
+changed. The cycle produced no send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE`.
+This operational report/artifact-only change used those focused gates instead
+of repeating the full 3,171-test package gate that passed for the immediately
+preceding logical code change.
+
 ## 2026-07-19 — Clarify recorded review actions versus queued ideas · Codex
 **Why:** The dashboard and review queue correctly showed three receipt-backed
 ideas awaiting explicit review, while `radar-review-timing-status` showed
