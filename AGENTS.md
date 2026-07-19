@@ -567,7 +567,13 @@ may be added later when a suitable environment already exists.
   for the separate static current-decision projection. That surface records the
   confirmed Bybit USDT-linear perpetual, USDT quote, public-only data boundary,
   and owner research eligibility while keeping exact eligible instrument IDs
-  unsealed and permitted reachability unproven after the recorded 403. The
+  unsealed and permitted reachability unproven after the recorded 403. Current
+  progress v2 must also enumerate baseline warmup, genuine execution/intraday/
+  derivatives captures, authoritative context sources, historical outcome
+  recovery, explicit review/OOS labels, holdout, cost, independent-episode/
+  sample, and final annex blockers instead of collapsing them into generic
+  source or outcome rows. Its next commands are observational readiness/queue
+  surfaces only and make no provider call. The
   executable protocol is intentionally not frozen or active until the exact
   instrument set, source, partition/untouched-holdout, outcome, cost, universe,
   route, episode, minimum-sample, and final human annex approval are sealed.

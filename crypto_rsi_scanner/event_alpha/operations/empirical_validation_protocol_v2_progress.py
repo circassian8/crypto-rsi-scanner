@@ -1,9 +1,9 @@
-"""Current Protocol-v2 decision progress beside the immutable readiness contract.
+"""Current Protocol-v2 evidence progress beside the immutable readiness contract.
 
 The 2026-07-16 readiness implementation is canonical empirical evidence and is
 fingerprinted by the export policy.  This module projects later accepted human
-decisions from the static execution-quality readiness contract without changing
-that evidence, reading ambient state, or opening the holdout.
+decisions plus a dated, manually reconciled operator evidence frontier without
+changing that evidence, reading ambient state, or opening the holdout.
 """
 
 from __future__ import annotations
@@ -25,20 +25,37 @@ from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness impor
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v1"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v2"
+PROGRESS_SOURCE = "accepted_decisions_and_verified_operator_state_as_of_2026_07_19"
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
 )
 _CURRENT_BLOCKERS = (
+    "live_market_temporal_baseline_not_yet_warm",
     "exact_eligible_instrument_set_not_sealed",
     "bybit_public_reachability_unproven_after_recorded_403",
     "genuine_execution_quality_capture_absent",
     "genuine_intraday_1h_4h_and_rsi_capture_absent",
-    "data_sources_not_sealed",
+    "genuine_bybit_derivatives_context_capture_absent",
+    "authoritative_catalyst_unlock_onchain_fundamental_and_official_macro_sources_not_sealed",
+    "historical_outcome_recovery_incomplete",
+    "explicit_human_review_timing_and_source_independence_labels_incomplete",
     "partitions_and_untouched_holdout_not_sealed",
-    "outcomes_and_costs_not_sealed",
-    "universe_routes_episodes_and_minimum_samples_not_sealed",
+    "cost_model_not_sealed",
+    "universe_routes_independent_episodes_and_minimum_samples_not_sealed",
     "human_protocol_v2_annex_approval_absent",
+)
+_NEXT_SAFE_COMMANDS = (
+    "make radar-market-no-send-readiness PYTHON=.venv/bin/python",
+    "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
+    "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
+    "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
+    "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python",
+    "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
+    "make radar-outcome-price-recovery-readiness PYTHON=.venv/bin/python",
+    "make radar-review-timing-queue PYTHON=.venv/bin/python",
+    "make event-alpha-source-independence-oos-readiness PYTHON=.venv/bin/python",
+    "make radar-research-protocol-v2-progress-check PYTHON=.venv/bin/python",
 )
 _SAFETY_ZERO_FIELDS = (
     "provider_calls",
@@ -65,9 +82,9 @@ def current_progress_values() -> dict[str, Any]:
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
         "progress_version": PROGRESS_VERSION,
-        "as_of": "2026-07-18",
+        "as_of": "2026-07-19",
         "status": "venue_selected_evidence_collection_blocked",
-        "source": "accepted_human_decisions_after_frozen_readiness_contract",
+        "source": PROGRESS_SOURCE,
         "frozen_readiness_contract": {
             "contract_version": FROZEN_CONTRACT_VERSION,
             "sha256": frozen_digest,
@@ -97,12 +114,7 @@ def current_progress_values() -> dict[str, Any]:
             "orders_or_execution_or_trading": False,
         },
         "current_activation_blockers": list(_CURRENT_BLOCKERS),
-        "next_safe_commands": [
-            "make radar-execution-quality-readiness PYTHON=.venv/bin/python",
-            "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
-            "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
-            "make radar-research-protocol-v2-progress-check PYTHON=.venv/bin/python",
-        ],
+        "next_safe_commands": list(_NEXT_SAFE_COMMANDS),
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},
         "research_only": True,
     }
@@ -131,6 +143,12 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         return errors
     if value.get("schema_id") != SCHEMA_ID or value.get("schema_version") != 1:
         errors.append("schema_identity_mismatch")
+    if value.get("progress_version") != PROGRESS_VERSION:
+        errors.append("progress_version_mismatch")
+    if value.get("as_of") != "2026-07-19":
+        errors.append("as_of_mismatch")
+    if value.get("source") != PROGRESS_SOURCE:
+        errors.append("source_mismatch")
     if value.get("status") != "venue_selected_evidence_collection_blocked":
         errors.append("status_mismatch")
 
@@ -173,6 +191,8 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         errors.append("current_activation_blockers_mismatch")
     elif "execution_venue_not_selected" in blockers:
         errors.append("superseded_venue_blocker_present")
+    if value.get("next_safe_commands") != list(_NEXT_SAFE_COMMANDS):
+        errors.append("next_safe_commands_mismatch")
 
     safety = value.get("safety")
     if not isinstance(safety, Mapping) or set(safety) != set(_SAFETY_ZERO_FIELDS):
@@ -224,7 +244,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "Current unresolved activation blockers:",
         *(f"- {blocker}" for blocker in payload["current_activation_blockers"]),
         "",
-        "Next safe commands (all static/read-only):",
+        "Next safe commands (readiness/queue only; no provider calls):",
         *(f"- {command}" for command in payload["next_safe_commands"]),
         "",
         (
@@ -262,6 +282,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = (
     "FROZEN_READINESS_SHA256",
+    "PROGRESS_SOURCE",
     "PROGRESS_VERSION",
     "SCHEMA_ID",
     "SCHEMA_VERSION",

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Enumerate the real Protocol-v2 evidence frontier · Codex
+**Why:** The separate current-progress surface correctly superseded the frozen
+contract's old venue placeholders, but still collapsed most remaining work into
+generic source and outcome blockers. It omitted active baseline, derivatives,
+historical-recovery, human-review, and blind-OOS gaps that the operator must
+resolve before Protocol v2 can be sealed.
+**Changes:**
+- Advanced the static current-progress contract to v2 and dated it 2026-07-19.
+  It now names live temporal-baseline warmup; exact instrument selection and
+  permitted Bybit reachability; genuine execution, direct intraday/RSI, and
+  derivatives captures; authoritative catalyst/unlock/on-chain/fundamental/
+  official-macro sources; historical outcome recovery; explicit human timing
+  and source-independence labels; holdout, cost, independent episode/sample,
+  and final annex requirements separately.
+- Replaced the partial command list with the existing market, execution,
+  intraday, derivatives, official-calendar, outcome-recovery, human-review,
+  blind-OOS, and Protocol-v2 observational readiness/queue commands. None of
+  those listed surfaces crosses a provider boundary.
+- Closed validation over the exact v2 version, date, source, blocker ordering,
+  and command ordering so a drifted or unsafe command list can no longer pass.
+  The fingerprinted 2026-07-16 frozen readiness implementation and document
+  remain byte-identical and continue to render second for historical audit.
+- Updated the working agreement, durable decision, roadmap, and focused tests.
+**Verify:** Seven focused current-progress tests passed, including frozen-file
+fingerprints, deterministic digest, zero-I/O CLI, drift rejection, primary
+render order, and Make wiring. Python compileall passed. Both the focused
+current-progress check and combined current-plus-frozen Protocol-v2 check passed
+with provider/file/environment/credential/holdout reads and writes all zero.
+`git diff --check` passed.
+**Notes/risks:** This is operator truth, not evidence acquisition. It created no
+authorization, provider call, holdout identity/access, replay, selection,
+evaluation, score, route, threshold, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Preserve Bybit derivatives set freshness through publication · Codex
 **Why:** Derivatives context v2 already used the oldest of ticker, funding,
 open-interest, and positioning provider clocks, but immutable publication kept

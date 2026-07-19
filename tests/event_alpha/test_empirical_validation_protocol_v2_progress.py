@@ -31,6 +31,8 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
+    assert values["progress_version"].endswith("_v2")
+    assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
     assert decision["instrument_mode"] == "usdt_linear_perpetual"
@@ -43,6 +45,19 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert "exact_eligible_instrument_set_not_sealed" in values[
         "current_activation_blockers"
     ]
+    assert "live_market_temporal_baseline_not_yet_warm" in values[
+        "current_activation_blockers"
+    ]
+    assert "genuine_bybit_derivatives_context_capture_absent" in values[
+        "current_activation_blockers"
+    ]
+    assert "historical_outcome_recovery_incomplete" in values[
+        "current_activation_blockers"
+    ]
+    assert (
+        "explicit_human_review_timing_and_source_independence_labels_incomplete"
+        in values["current_activation_blockers"]
+    )
     assert "execution_venue_not_selected" not in values[
         "current_activation_blockers"
     ]
@@ -88,8 +103,19 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     venue_drift["confirmed_execution_decision"]["venue_id"] = "other"
     blocker_drift = progress.current_progress_values()
     blocker_drift["current_activation_blockers"] = ["execution_venue_not_selected"]
+    command_drift = progress.current_progress_values()
+    command_drift["next_safe_commands"] = ["make unsafe-live-call"]
+    version_drift = progress.current_progress_values()
+    version_drift["progress_version"] = "decision_radar_progress_unknown"
 
-    for mutation in (digest_drift, safety_drift, venue_drift, blocker_drift):
+    for mutation in (
+        digest_drift,
+        safety_drift,
+        venue_drift,
+        blocker_drift,
+        command_drift,
+        version_drift,
+    ):
         assert progress.validate_current_progress(mutation)
 
 
@@ -128,6 +154,10 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out
+    assert "- genuine_bybit_derivatives_context_capture_absent" in output.out
+    assert "readiness/queue only; no provider calls" in output.out
+    assert "radar-outcome-price-recovery-readiness" in output.out
+    assert "event-alpha-source-independence-oos-readiness" in output.out
     assert "provider_calls=0" in output.out
 
     rendered = []

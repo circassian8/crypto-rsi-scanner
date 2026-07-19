@@ -272,9 +272,13 @@ data only, and owner-confirmed research eligibility are selected. Do not
 present the frozen object's freeze-time “venue/instrument/quote not selected”
 placeholders as current blockers. Current blockers begin with the exact
 unsealed instrument set, unproven permitted reachability after the recorded
-403, and absent genuine execution-quality capture, followed by the remaining
-sources, holdout, outcome/cost, universe/route/episode/sample, and final annex
-decisions. The progress projection reads no environment, files, credentials,
+403, and absent genuine execution-quality capture. Current-progress v2 must
+then enumerate live baseline warmup, genuine intraday/RSI and derivatives
+captures, authoritative catalyst/unlock/on-chain/fundamental/official-macro
+sources, historical outcome recovery, explicit human timing and blind OOS
+labels, holdout, cost, independent episode/sample, and final annex decisions.
+Do not collapse those operationally distinct gaps into generic source or
+outcome rows. The progress projection reads no environment, files, credentials,
 providers, or holdout data and creates no authorization or evaluation target.
 **Why:** Rewriting the preregistered requirements would destroy its audit hash,
 while continuing to show superseded placeholders as current truth contradicts
