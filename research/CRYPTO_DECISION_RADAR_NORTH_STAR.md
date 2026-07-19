@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v7 records the owner-confirmed primary research
+Execution-quality readiness v8 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -904,6 +904,18 @@ explicit conversion source, clock, and policy and is outside the selected
 Bybit Protocol-v2 cost surface. This closes only the currency-unit decision;
 fees, order style, notional sizes, slippage, latency cost, funding treatment,
 and the final annex remain unsealed.
+
+The cost-model status is deliberately explicit. Bybit's current public
+[fee reference](https://www.bybit.com/en/help-center/article/Trading-Fee-Structure)
+states that actual rates vary by region and account tier, so it is not
+account- or symbol-authoritative. The official
+[account fee-rate endpoint](https://bybit-exchange.github.io/docs/v5/account/fee-rate)
+is authenticated and therefore outside the confirmed public-market-data-only
+scope; it is not authorized or called. Protocol v2 must separately seal its fee
+assumption/source, entry and exit order style, USDT notionals, spread and
+visible-book impact application, beyond-book slippage, funding treatment,
+latency cost, and unavailable-cost policy. Until then
+`protocol_v2_cost_model_sealed=false` remains operator truth.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread, USDT

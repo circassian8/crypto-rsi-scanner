@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v6")
+    assert values["progress_version"].endswith("_v7")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -43,6 +43,20 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     )
     assert decision["primary_cost_currency_policy_sealed"] is True
     assert decision["usd_equivalence_assumed"] is False
+    assert decision["protocol_v2_cost_model_sealed"] is False
+    assert decision["remaining_protocol_v2_cost_fields"] == [
+        "fee_rate_source_and_assumption",
+        "entry_exit_order_style",
+        "notional_tiers_usdt",
+        "spread_and_visible_book_impact_application",
+        "slippage_beyond_visible_book_policy",
+        "funding_holding_period_and_sign_treatment",
+        "latency_cost_policy",
+        "unavailable_cost_policy",
+    ]
+    assert "not_account_authoritative" in decision["fee_rate_authority_status"]
+    assert decision["account_specific_fee_rate_access_authorized"] is False
+    assert decision["official_fee_sources_reviewed_at"] == "2026-07-19"
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -152,6 +166,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     unlock_drift["structured_unlock_contract"]["genuine_capture_present"] = True
     cost_unit_drift = progress.current_progress_values()
     cost_unit_drift["confirmed_execution_decision"]["usd_equivalence_assumed"] = True
+    cost_model_drift = progress.current_progress_values()
+    cost_model_drift["confirmed_execution_decision"][
+        "protocol_v2_cost_model_sealed"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -163,6 +181,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         liquidation_drift,
         unlock_drift,
         cost_unit_drift,
+        cost_model_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -206,6 +225,8 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "selected_execution_surface=bybit:usdt_linear_perpetual:USDT" in output.out
     assert "primary_cost_currency=USDT" in output.out
     assert "USD_equivalence_assumed=false" in output.out
+    assert "protocol_v2_cost_model_sealed=false" in output.out
+    assert "fee_rate_authority_status=unsealed_public_reference" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

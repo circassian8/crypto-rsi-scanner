@@ -16,6 +16,10 @@ from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness impor
     CONTRACT_VERSION,
     EXECUTION_MODES,
     MULTI_VENUE_RESEARCH_OPTION,
+    OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL,
+    OFFICIAL_PUBLIC_FEE_REFERENCE_URL,
+    REMAINING_PROTOCOL_V2_COST_FIELDS,
+    REMAINING_PROTOCOL_V2_SEALING_FIELDS,
     REQUIRED_SNAPSHOT_FIELDS,
     ExecutionQualityReader,
     ExecutionQualitySnapshot,
@@ -43,7 +47,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v7"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v8"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -56,6 +60,20 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     )
     assert result.primary_cost_currency_policy_sealed is True
     assert result.usd_equivalence_assumed is False
+    assert result.protocol_v2_cost_model_sealed is False
+    assert result.remaining_protocol_v2_cost_fields == REMAINING_PROTOCOL_V2_COST_FIELDS
+    assert result.fee_rate_authority_status == (
+        "unsealed_public_reference_not_account_authoritative_authenticated_"
+        "account_endpoint_outside_public_only_scope"
+    )
+    assert result.public_fee_reference_url == OFFICIAL_PUBLIC_FEE_REFERENCE_URL
+    assert (
+        result.account_fee_rate_endpoint_doc_url
+        == OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL
+    )
+    assert result.account_fee_endpoint_requires_credentials is True
+    assert result.account_specific_fee_rate_access_authorized is False
+    assert result.official_fee_sources_reviewed_at == "2026-07-19"
     assert result.eligible_instrument_set == ()
     assert "top_30_liquid_decision_radar_assets" in (
         result.eligible_instrument_selection_rule or ""
@@ -69,9 +87,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "public_market_data_only_no_credentials_no_private_data"
     )
     assert result.human_decision_confirmed_at == "2026-07-17"
-    assert result.required_human_decision_fields == (
-        "exact_frozen_eligible_instrument_set",
-    )
+    assert result.required_human_decision_fields == REMAINING_PROTOCOL_V2_SEALING_FIELDS
     assert result.supported_offline_adapters == (
         "bybit_usdt_linear_perpetual_fixture_normalizer_v2",
     )
@@ -114,6 +130,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "eligible_instrument_set_not_frozen",
         "bybit_public_endpoint_reachability_unverified_after_recorded_403",
         "runtime_provider_authorization_not_created_by_operator_selection",
+        "protocol_v2_cost_model_not_sealed",
         "protocol_v2_annex_not_sealed",
     }
 
@@ -286,6 +303,13 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "quote_currency=USDT eligible_instrument_set=not_yet_frozen" in rendered
     assert "primary_cost_currency=USDT primary_cost_currency_policy_sealed=true" in rendered
     assert "usd_equivalence_assumed=false" in rendered
+    assert "protocol_v2_cost_model_sealed=false" in rendered
+    assert "remaining_protocol_v2_cost_fields=fee_rate_source_and_assumption" in rendered
+    assert "public_reference_not_account_authoritative" in rendered
+    assert OFFICIAL_PUBLIC_FEE_REFERENCE_URL in rendered
+    assert OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL in rendered
+    assert "account_fee_endpoint_requires_credentials=true" in rendered
+    assert "account_specific_fee_rate_access_authorized=false" in rendered
     assert "top_30_liquid_decision_radar_assets" in rendered
     assert "eligible_instrument_set_frozen=false" in rendered
     assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
@@ -406,6 +430,22 @@ def test_cli_json_is_structured_static_and_secret_free(
     )
     assert payload["primary_cost_currency_policy_sealed"] is True
     assert payload["usd_equivalence_assumed"] is False
+    assert payload["protocol_v2_cost_model_sealed"] is False
+    assert payload["remaining_protocol_v2_cost_fields"] == list(
+        REMAINING_PROTOCOL_V2_COST_FIELDS
+    )
+    assert "not_account_authoritative" in payload["fee_rate_authority_status"]
+    assert payload["public_fee_reference_url"] == OFFICIAL_PUBLIC_FEE_REFERENCE_URL
+    assert (
+        payload["account_fee_rate_endpoint_doc_url"]
+        == OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL
+    )
+    assert payload["account_fee_endpoint_requires_credentials"] is True
+    assert payload["account_specific_fee_rate_access_authorized"] is False
+    assert payload["official_fee_sources_reviewed_at"] == "2026-07-19"
+    assert payload["required_human_decision_fields"] == list(
+        REMAINING_PROTOCOL_V2_SEALING_FIELDS
+    )
     assert payload["eligible_instrument_set"] == []
     assert "top_30_liquid_decision_radar_assets" in payload[
         "eligible_instrument_selection_rule"
@@ -513,6 +553,9 @@ def test_checked_operator_decision_package_records_selection_and_boundaries() ->
     assert "cannot close the primary cost model" in rendered
     assert "primary Protocol-v2 cost currency is now explicitly sealed as native USDT" in rendered
     assert "No field is relabeled as USD" in rendered
+    assert "public reference table is not account- or\nsymbol-authoritative" in rendered
+    assert "/v5/account/fee-rate" in rendered
+    assert "requires credentials and private account" in rendered
     assert "No Protocol-v2 holdout is defined, opened, or evaluated" in rendered
     assert (
         "No production threshold, route, score, notification, or authority changes"
@@ -529,6 +572,11 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     assert readiness["primary_cost_currency"] == "USDT"
     assert readiness["primary_cost_currency_policy_sealed"] is True
     assert readiness["usd_equivalence_assumed"] is False
+    assert readiness["protocol_v2_cost_model_sealed"] is False
+    assert readiness["remaining_protocol_v2_cost_fields"] == list(
+        REMAINING_PROTOCOL_V2_COST_FIELDS
+    )
+    assert readiness["account_specific_fee_rate_access_authorized"] is False
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
     assert readiness["immutable_capture_contract_implemented"] is True

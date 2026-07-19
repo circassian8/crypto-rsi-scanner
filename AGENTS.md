@@ -571,6 +571,16 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
+  Execution-quality readiness v8 must expose those remaining cost fields rather
+  than claiming only the exact instrument set is pending. Bybit's public fee
+  reference is not account- or symbol-authoritative because rates vary by
+  region and account tier. The official account fee-rate endpoint requires
+  credentials and remains outside the confirmed public-market-data-only scope;
+  never call it or infer an account rate without a separate explicit private-
+  data authorization. A later annex must seal either a dated fixed research
+  assumption or a separately authorized exact source, plus entry/exit style,
+  USDT notionals, spread/impact application, beyond-book slippage, funding,
+  latency, and unavailable-cost rules.
   For exact transport captures, normalized `acquired_at` is the accepted
   response-read completion time, not a second independent clock. Immutable
   validation requires every request/response inside the declared capture window

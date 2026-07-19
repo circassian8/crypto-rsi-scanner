@@ -15,8 +15,29 @@ import json
 from typing import Mapping, Protocol, Sequence
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v7"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v8"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
+OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
+    "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
+)
+OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL = (
+    "https://bybit-exchange.github.io/docs/v5/account/fee-rate"
+)
+REMAINING_PROTOCOL_V2_COST_FIELDS = (
+    "fee_rate_source_and_assumption",
+    "entry_exit_order_style",
+    "notional_tiers_usdt",
+    "spread_and_visible_book_impact_application",
+    "slippage_beyond_visible_book_policy",
+    "funding_holding_period_and_sign_treatment",
+    "latency_cost_policy",
+    "unavailable_cost_policy",
+)
+REMAINING_PROTOCOL_V2_SEALING_FIELDS = (
+    "exact_frozen_eligible_instrument_set",
+    *REMAINING_PROTOCOL_V2_COST_FIELDS,
+    "protocol_v2_final_annex",
+)
 COMMON_METRICS = (
     "best_bid",
     "best_ask",
@@ -188,6 +209,14 @@ class _ExecutionQualityReadiness:
     primary_cost_currency_policy: str
     primary_cost_currency_policy_sealed: bool
     usd_equivalence_assumed: bool
+    protocol_v2_cost_model_sealed: bool
+    remaining_protocol_v2_cost_fields: tuple[str, ...]
+    fee_rate_authority_status: str
+    public_fee_reference_url: str
+    account_fee_rate_endpoint_doc_url: str
+    account_fee_endpoint_requires_credentials: bool
+    account_specific_fee_rate_access_authorized: bool
+    official_fee_sources_reviewed_at: str
     eligible_instrument_set: tuple[str, ...]
     eligible_instrument_selection_rule: str | None
     eligible_instrument_set_frozen: bool
@@ -260,6 +289,20 @@ def _execution_quality_readiness_dict(
             value.primary_cost_currency_policy_sealed
         ),
         "usd_equivalence_assumed": value.usd_equivalence_assumed,
+        "protocol_v2_cost_model_sealed": value.protocol_v2_cost_model_sealed,
+        "remaining_protocol_v2_cost_fields": list(
+            value.remaining_protocol_v2_cost_fields
+        ),
+        "fee_rate_authority_status": value.fee_rate_authority_status,
+        "public_fee_reference_url": value.public_fee_reference_url,
+        "account_fee_rate_endpoint_doc_url": value.account_fee_rate_endpoint_doc_url,
+        "account_fee_endpoint_requires_credentials": (
+            value.account_fee_endpoint_requires_credentials
+        ),
+        "account_specific_fee_rate_access_authorized": (
+            value.account_specific_fee_rate_access_authorized
+        ),
+        "official_fee_sources_reviewed_at": value.official_fee_sources_reviewed_at,
         "eligible_instrument_set": list(value.eligible_instrument_set),
         "eligible_instrument_selection_rule": value.eligible_instrument_selection_rule,
         "eligible_instrument_set_frozen": value.eligible_instrument_set_frozen,
@@ -492,6 +535,19 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         ),
         primary_cost_currency_policy_sealed=True,
         usd_equivalence_assumed=False,
+        protocol_v2_cost_model_sealed=False,
+        remaining_protocol_v2_cost_fields=REMAINING_PROTOCOL_V2_COST_FIELDS,
+        fee_rate_authority_status=(
+            "unsealed_public_reference_not_account_authoritative_authenticated_"
+            "account_endpoint_outside_public_only_scope"
+        ),
+        public_fee_reference_url=OFFICIAL_PUBLIC_FEE_REFERENCE_URL,
+        account_fee_rate_endpoint_doc_url=(
+            OFFICIAL_ACCOUNT_FEE_RATE_ENDPOINT_DOC_URL
+        ),
+        account_fee_endpoint_requires_credentials=True,
+        account_specific_fee_rate_access_authorized=False,
+        official_fee_sources_reviewed_at="2026-07-19",
         eligible_instrument_set=(),
         eligible_instrument_selection_rule=(
             "top_30_liquid_decision_radar_assets_intersect_active_bybit_USDT_"
@@ -507,9 +563,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "public_market_data_only_no_credentials_no_private_data"
         ),
         human_decision_confirmed_at="2026-07-17",
-        required_human_decision_fields=(
-            "exact_frozen_eligible_instrument_set",
-        ),
+        required_human_decision_fields=REMAINING_PROTOCOL_V2_SEALING_FIELDS,
         human_decision_template=(
             ("intended_venue", "bybit"),
             ("instrument_mode", "perpetual"),
@@ -547,6 +601,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "eligible_instrument_set_not_frozen",
             "bybit_public_endpoint_reachability_unverified_after_recorded_403",
             "runtime_provider_authorization_not_created_by_operator_selection",
+            "protocol_v2_cost_model_not_sealed",
             "protocol_v2_annex_not_sealed",
         ),
         operator_decision=(
@@ -558,6 +613,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "public_data_scope_does_not_activate_a_provider_call_or_trading_path",
             "the_recorded_403_must_fail_closed_without_proxy_VPN_or_region_bypass",
             "primary_cost_depth_and_impact_currency_is_native_USDT_without_USD_equivalence",
+            "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
+            "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
         ),
         next_safe_command=(
@@ -619,6 +676,19 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
         f"{str(result.primary_cost_currency_policy_sealed).casefold()}",
         f"primary_cost_currency_policy={result.primary_cost_currency_policy} "
         f"usd_equivalence_assumed={str(result.usd_equivalence_assumed).casefold()}",
+        "protocol_v2_cost_model_sealed="
+        f"{str(result.protocol_v2_cost_model_sealed).casefold()}",
+        "remaining_protocol_v2_cost_fields="
+        + ",".join(result.remaining_protocol_v2_cost_fields),
+        f"fee_rate_authority_status={result.fee_rate_authority_status}",
+        f"public_fee_reference_url={result.public_fee_reference_url}",
+        "account_fee_rate_endpoint_doc_url="
+        f"{result.account_fee_rate_endpoint_doc_url}",
+        "account_fee_endpoint_requires_credentials="
+        f"{str(result.account_fee_endpoint_requires_credentials).casefold()} "
+        "account_specific_fee_rate_access_authorized="
+        f"{str(result.account_specific_fee_rate_access_authorized).casefold()}",
+        f"official_fee_sources_reviewed_at={result.official_fee_sources_reviewed_at}",
         f"eligible_instrument_selection_rule={result.eligible_instrument_selection_rule}",
         f"eligible_instrument_set_frozen={str(result.eligible_instrument_set_frozen).casefold()}",
         "jurisdiction_and_account_eligibility_confirmed=true "

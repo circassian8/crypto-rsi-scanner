@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v7`. Run
+`crypto_radar_execution_quality_readiness_v8`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -72,6 +72,20 @@ explicit conversion source, observation clock, and policy and would not replace
 the native Bybit cost evidence. This unit decision does not seal fee schedules,
 order style, notional tiers, slippage, funding treatment, latency cost, or the
 final Protocol-v2 annex.
+
+The fee source is not sealed. Bybit's current public
+[fee reference](https://www.bybit.com/en/help-center/article/Trading-Fee-Structure)
+is useful product documentation, but it explicitly makes actual rates dependent
+on region and account tier; the public reference table is not account- or
+symbol-authoritative. Bybit's official authenticated
+[`/v5/account/fee-rate` endpoint](https://bybit-exchange.github.io/docs/v5/account/fee-rate)
+could report an account rate, but it requires credentials and private account
+access outside the confirmed public-market-data-only boundary. The project does
+not authorize or call it. The operator must later choose and seal either a
+fixed, dated research fee assumption or a separately authorized exact fee
+source, together with entry/exit order style, USDT notional tiers, spread and
+visible-book impact application, beyond-book slippage, funding treatment,
+latency cost, and unavailable-cost behavior. No numerical fee is inferred here.
 
 ## Venue-native derivatives context contract
 

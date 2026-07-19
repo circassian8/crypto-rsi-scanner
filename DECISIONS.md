@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-19 - Do not infer an account fee from Bybit's public table
+**Status:** accepted
+**Decision:** Treat Bybit's public trading-fee table as product documentation,
+not as an account- or symbol-authoritative Protocol-v2 cost input. The
+authenticated account fee-rate endpoint is outside the confirmed public-market-
+data-only boundary and must not be called without a separate explicit private-
+data authorization. Before Protocol v2 is sealed, the owner must choose either
+a dated fixed research fee assumption or a separately authorized exact fee
+source, then also seal entry/exit order style, USDT notional tiers, spread and
+visible-book impact application, beyond-book slippage, funding treatment,
+latency cost, and unavailable-cost behavior. Do not invent a numerical fee.
+**Why:** Official Bybit documentation says actual rates can depend on region and
+account tier, while the exact fee endpoint requires authenticated account
+access. Copying a generic table value into the empirical cost model would look
+more precise than the evidence and would silently cross the accepted public-
+only scope if replaced with account data.
+**Revisit when:** The owner explicitly approves the complete Protocol-v2 cost
+policy or separately authorizes credentialed fee-rate acquisition. Preserve the
+native-USDT values and the exact source/effective clock either way.
+
 ## 2026-07-19 - Keep the primary Bybit cost surface native to USDT
 **Status:** accepted
 **Decision:** Seal native USDT as the currency unit for the primary Bybit

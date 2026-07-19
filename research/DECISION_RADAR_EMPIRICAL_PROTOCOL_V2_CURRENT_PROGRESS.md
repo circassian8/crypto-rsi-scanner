@@ -35,6 +35,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - the primary currency unit is sealed as native USDT, but the fee schedule,
   order style, notional tiers, spread/impact application, slippage, funding,
   latency-cost, and unavailable-cost rules remain unsealed;
+- Bybit's public fee table is not treated as account- or symbol-authoritative,
+  while its authenticated account fee-rate endpoint remains outside the
+  confirmed public-only boundary and is neither authorized nor called;
 - Bybit liquidation evidence is a separate public-WebSocket surface. The exact
   `allLiquidation.{instrument_id}` message normalizer is implemented and
   fixture-proven. Detached immutable operator-transcript import is also

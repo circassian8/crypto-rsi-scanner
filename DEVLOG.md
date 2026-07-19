@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Expose the complete unsealed Bybit cost model · Codex
+**Why:** Static execution readiness said the exact instrument set was the only
+remaining human sealing field even though current Protocol-v2 truth correctly
+blocked on eight fee and cost-application decisions. The generic public fee
+table also cannot establish an exact account or symbol rate.
+**Changes:**
+- Bumped execution-quality readiness to v8 and made
+  `protocol_v2_cost_model_sealed=false`, the eight remaining cost fields, the
+  complete human sealing list, and the cost-model blocker explicit in JSON and
+  human output.
+- Recorded the credential boundary between Bybit's public fee reference and its
+  authenticated account fee-rate endpoint. No numerical fee is inferred; the
+  private endpoint remains unauthorized and uncalled.
+- Advanced the mutable Protocol-v2 progress projection to v7 with the same
+  fail-closed cost truth and drift validation while preserving the immutable
+  readiness contract and unopened holdout.
+- Updated the North Star, execution decision package, current progress note,
+  working agreement, durable decision, roadmap, and focused regressions.
+**Verify:** `24 passed` across the focused execution-quality and current-
+progress suites; Python compileall and North Star JSON parsing passed; static
+readiness and the current-progress check passed with zero provider, credential,
+environment, file, or holdout effects; architecture cleanliness passed with
+zero new size violations; diff hygiene passed.
+**Notes/risks:** The public fee reference and authenticated endpoint were checked
+against official Bybit documentation on 2026-07-19. This change does not choose
+a fee, order style, size, spread/impact rule, slippage, funding, latency, or
+unavailable-cost policy; access private data; create authorization; call a
+provider; open a holdout; or change any route, score, threshold, send, trade,
+order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-19 — Seal native USDT as the primary cost currency · Codex
 **Why:** The accepted Bybit venue decision and immutable order-book normalizer
 already preserve native USDT and forbid silently calling it USD, but static

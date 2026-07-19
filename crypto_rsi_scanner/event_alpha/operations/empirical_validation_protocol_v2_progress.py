@@ -25,6 +25,7 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
     readiness_sha256,
 )
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
+    REMAINING_PROTOCOL_V2_COST_FIELDS,
     build_execution_quality_readiness,
 )
 from crypto_rsi_scanner.event_alpha.operations.tokenomist_v5_capture import (
@@ -40,11 +41,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v6"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v7"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_native_USDT_cost_unit_detached_native_liquidation_import_and_"
-    "tokenomist_v5_fixture_capture_contract"
+    "with_truthful_pending_cost_model_native_USDT_cost_unit_detached_native_"
+    "liquidation_import_and_tokenomist_v5_fixture_capture_contract"
 )
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
@@ -106,6 +107,14 @@ _EXPECTED_EXECUTION_DECISION = {
     ),
     "primary_cost_currency_policy_sealed": True,
     "usd_equivalence_assumed": False,
+    "protocol_v2_cost_model_sealed": False,
+    "remaining_protocol_v2_cost_fields": list(REMAINING_PROTOCOL_V2_COST_FIELDS),
+    "fee_rate_authority_status": (
+        "unsealed_public_reference_not_account_authoritative_authenticated_"
+        "account_endpoint_outside_public_only_scope"
+    ),
+    "account_specific_fee_rate_access_authorized": False,
+    "official_fee_sources_reviewed_at": "2026-07-19",
     "exact_eligible_instrument_set_sealed": False,
     "data_boundary": "public_market_data_only",
     "credentials_or_private_account_data": False,
@@ -144,6 +153,17 @@ def current_progress_values() -> dict[str, Any]:
                 execution.primary_cost_currency_policy_sealed
             ),
             "usd_equivalence_assumed": execution.usd_equivalence_assumed,
+            "protocol_v2_cost_model_sealed": execution.protocol_v2_cost_model_sealed,
+            "remaining_protocol_v2_cost_fields": list(
+                execution.remaining_protocol_v2_cost_fields
+            ),
+            "fee_rate_authority_status": execution.fee_rate_authority_status,
+            "account_specific_fee_rate_access_authorized": (
+                execution.account_specific_fee_rate_access_authorized
+            ),
+            "official_fee_sources_reviewed_at": (
+                execution.official_fee_sources_reviewed_at
+            ),
             "eligible_instrument_selection_rule": (
                 execution.eligible_instrument_selection_rule
             ),
@@ -396,6 +416,9 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             f"{decision['primary_cost_currency_policy']} sealed=true "
             "USD_equivalence_assumed=false"
         ),
+        "protocol_v2_cost_model_sealed=false remaining_cost_fields="
+        + ",".join(decision["remaining_protocol_v2_cost_fields"]),
+        f"fee_rate_authority_status={decision['fee_rate_authority_status']}",
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",
         (
