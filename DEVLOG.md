@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Record the twenty-seventh no-send market cycle · Codex
+**Why:** The persisted one-hour cadence became eligible while the existing
+CoinGecko authorization remained present, so the next bounded observation could
+advance genuine temporal evidence without lowering any gate.
+**Changes:**
+- Made exactly one confirmed provider attempt: HTTP 200, 80 bounded rows, 30
+  selected observations, no retry, and no second attempt.
+- Published `radar_market_no_send_20260719t034714861917z_188daaed2783` only
+  after strict doctor 0 blockers / 0 warnings, exact pointer publication, owned
+  dashboard restart, operations receipt, and matching host-loopback HTTP 200.
+- Refreshed the canonical campaign reports to 27 successful cycles, 810
+  retained observations, 780 baseline-counted, 30 too-close, 2 matured
+  outcomes, 2 pending, 1 `due_missing_price`, 0 current ideas, and 0/810 trusted
+  spread. The next eligible observation is 2026-07-19 04:47:15.373068 UTC.
+**Verify:** Fresh Daily Operations readiness was authorized and eligible; the
+single cycle succeeded; status, dashboard readiness, exact authority, final
+publication/operations receipts, strict doctor, campaign reconciliation, and a
+host-level HTTP HEAD identity probe all passed.
+**Notes/risks:** The current generation is healthy-empty with zero Decision
+ideas. No authorization was created or changed, and sends, trades, orders,
+paper trades, normal RSI writes, and Event Alpha `TRIGGERED_FADE` remained zero.
+
 ## 2026-07-19 — Anchor KuCoin capture-doctor leaf reads · Codex
 **Why:** A cross-layer audit found that the historical KuCoin doctor anchored
 its directory inventory but reopened each artifact by pathname afterward. A
