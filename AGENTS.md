@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v13 must expose those remaining cost fields rather
+  Execution-quality readiness v14 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -604,6 +604,15 @@ may be added later when a suitable environment already exists.
   preserve and revalidate them while the annex-level constraint freshness
   policy remains unsealed. It is not realized execution and must not add
   `spread_bps` again.
+  The offline target-notional v1 projection accepts a caller-supplied native-
+  USDT entry-mid reference, derives the exact entry-book mid, floors the
+  underlying-token quantity to `qtyStep`, never exceeds the target mid-
+  notional, and bounds the shortfall below one step notional. It joins that
+  exact quantity to the v2 round trip and fails on catalog, book, identity,
+  minimum, maximum, or notional drift. The target is not a quote-spend budget:
+  marketable spread and depth can make a buy spend more or a sell receive less.
+  Do not treat this capability as selection of the final tier set, adoption of
+  the floor policy, or selection of an order style; all remain unsealed.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

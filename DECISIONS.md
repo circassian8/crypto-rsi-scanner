@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Size a supplied Bybit target by conservative venue-step floor
+**Status:** accepted as an offline capability; not yet sealed as Protocol-v2 policy
+**Decision:** A caller-supplied native-USDT target may be interpreted only as an
+entry-mid reference. Derive the exact mid from the causal entry book, floor the
+implied underlying-token quantity to the instrument's current `qtyStep`, never
+exceed the supplied mid-notional, and require the shortfall to remain below one
+step notional. Enforce the same catalog-bound minimum quantity, minimum
+notional, dynamic market/limit maxima, clocks, lineage, and identity before
+joining the derived quantity to the exact entry/exit book walk. Explicitly
+state that the target is not a quote-spend budget because marketable spread and
+depth can make an entry buy spend more or an entry sell receive less. Do not
+select the final USDT tier set, adopt this floor rule as Protocol-v2 policy, or
+choose an order style without the sealed annex.
+**Why:** The quantity-reconciled primitive still required a manually supplied
+base quantity. A deterministic, conservative target projection closes that
+arithmetic gap without inventing final research sizes or confusing mid-
+notional normalization with executable quote value.
+**Revisit when:** The exact instrument set and genuine books exist and the
+operator is ready to approve the final tier set, rounding/admissibility policy,
+order style, and complete cost annex.
+
 ## 2026-07-20 - Bind Bybit quantity constraints to the exact catalog capture
 **Status:** accepted
 **Decision:** Every selected Bybit USDT-linear perpetual must preserve

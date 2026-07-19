@@ -48,7 +48,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v13"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v14"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -127,6 +127,25 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     )
     assert impact["order_style_quantity_eligibility_reported"] is True
     assert impact["entry_exit_order_style_policy_sealed"] is False
+    assert impact["target_notional_sizing_implemented"] is True
+    assert impact["target_notional_sizing_schema_version"] == (
+        "crypto_radar.bybit_target_entry_mid_notional_sizing.v1"
+    )
+    assert impact["target_notional_round_trip_schema_version"] == (
+        "crypto_radar.bybit_target_notional_visible_book_round_trip.v1"
+    )
+    assert impact["target_notional_input_unit"] == "USDT"
+    assert impact["target_notional_reference"] == "entry_mid_price"
+    assert impact["target_notional_rounding_mode"] == "floor_to_quantity_step"
+    assert impact["target_notional_does_not_exceed_reference"] is True
+    assert impact["target_notional_is_quote_budget"] is False
+    assert (
+        impact["marketable_quote_value_may_exceed_target_due_spread_and_impact"]
+        is True
+    )
+    assert impact["target_notional_round_trip_identity_reconciled"] is True
+    assert impact["target_notional_tier_set_sealed"] is False
+    assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
     assert "top_30_liquid_decision_radar_assets" in (
         result.eligible_instrument_selection_rule or ""
@@ -142,8 +161,9 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert result.human_decision_confirmed_at == "2026-07-17"
     assert result.required_human_decision_fields == REMAINING_PROTOCOL_V2_SEALING_FIELDS
     assert result.supported_offline_adapters == (
-        "bybit_usdt_linear_perpetual_fixture_normalizer_v3",
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v4",
         "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v2",
+        "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -392,6 +412,15 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "instrument_constraints_freshness_policy_sealed=false" in rendered
     assert "entry_exit_order_style_policy_sealed=false" in rendered
     assert "minimum_notional_enforced_on_entry_and_exit_visible_quote_value=true" in rendered
+    assert "target_notional_sizing_implemented=true" in rendered
+    assert "crypto_radar.bybit_target_entry_mid_notional_sizing.v1" in rendered
+    assert "crypto_radar.bybit_target_notional_visible_book_round_trip.v1" in rendered
+    assert "target_notional_input_unit=USDT reference=entry_mid_price" in rendered
+    assert "rounding=floor_to_quantity_step" in rendered
+    assert "target_notional_does_not_exceed_reference=true" in rendered
+    assert "target_notional_is_quote_budget=false" in rendered
+    assert "target_notional_tier_set_sealed=false" in rendered
+    assert "base_quantity_selection_policy_sealed=false" in rendered
     assert "round_trip_quantity_unit=base_asset" in rendered
     assert "realized_execution=false" in rendered
     assert "top_30_liquid_decision_radar_assets" in rendered
@@ -569,8 +598,9 @@ def test_cli_json_is_structured_static_and_secret_free(
     )
     assert payload["human_decision_confirmed_at"] == "2026-07-17"
     assert payload["supported_offline_adapters"] == [
-        "bybit_usdt_linear_perpetual_fixture_normalizer_v3",
+        "bybit_usdt_linear_perpetual_fixture_normalizer_v4",
         "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v2",
+        "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -703,6 +733,14 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     assert readiness["round_trip_size_basis"] == (
         "same_exact_base_quantity_across_distinct_books"
     )
+    assert readiness["target_notional_sizing_implemented"] is True
+    assert readiness["target_notional_rounding_mode"] == (
+        "floor_to_quantity_step"
+    )
+    assert readiness["target_notional_does_not_exceed_reference"] is True
+    assert readiness["target_notional_is_quote_budget"] is False
+    assert readiness["target_notional_tier_set_sealed"] is False
+    assert readiness["base_quantity_selection_policy_sealed"] is False
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
     assert readiness["immutable_capture_contract_implemented"] is True

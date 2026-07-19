@@ -42,10 +42,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v12"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v13"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_catalog_bound_dynamic_instrument_constraints_quantity_reconciled_round_trip_"
+    "with_target_mid_notional_floor_sizing_catalog_bound_dynamic_instrument_"
+    "constraints_quantity_reconciled_round_trip_"
     "primitive_mid_reference_impact_semantics_native_"
     "Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_cost_unit_"
     "detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
@@ -163,6 +164,25 @@ _EXPECTED_EXECUTION_DECISION = {
     "minimum_notional_enforced_on_entry_and_exit_visible_quote_value": True,
     "order_style_quantity_eligibility_reported": True,
     "entry_exit_order_style_policy_sealed": False,
+    "target_notional_sizing_implemented": True,
+    "target_notional_sizing_schema_version": (
+        "crypto_radar.bybit_target_entry_mid_notional_sizing.v1"
+    ),
+    "target_notional_round_trip_schema_version": (
+        "crypto_radar.bybit_target_notional_visible_book_round_trip.v1"
+    ),
+    "target_notional_input_unit": "USDT",
+    "target_notional_reference": "entry_mid_price",
+    "target_notional_rounding_mode": "floor_to_quantity_step",
+    "target_notional_does_not_exceed_reference": True,
+    "target_notional_shortfall_bound": (
+        "strictly_less_than_one_quantity_step_at_entry_mid"
+    ),
+    "target_notional_is_quote_budget": False,
+    "marketable_quote_value_may_exceed_target_due_spread_and_impact": True,
+    "target_notional_round_trip_identity_reconciled": True,
+    "target_notional_tier_set_sealed": False,
+    "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
     "data_boundary": "public_market_data_only",
     "credentials_or_private_account_data": False,
@@ -519,6 +539,29 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "minimum_order_quantity_enforced=true "
             "minimum_notional_enforced_on_entry_and_exit_visible_quote_value=true "
             "order_style_quantity_eligibility_reported=true"
+        ),
+        (
+            "target_notional_sizing_implemented=true sizing_schema="
+            f"{decision['target_notional_sizing_schema_version']} "
+            "round_trip_schema="
+            f"{decision['target_notional_round_trip_schema_version']}"
+        ),
+        (
+            "target_notional_input_unit=USDT reference=entry_mid_price "
+            "rounding=floor_to_quantity_step does_not_exceed_reference=true"
+        ),
+        (
+            "target_notional_shortfall_bound="
+            f"{decision['target_notional_shortfall_bound']} "
+            "round_trip_identity_reconciled=true"
+        ),
+        (
+            "target_notional_is_quote_budget=false "
+            "marketable_quote_value_may_exceed_target_due_spread_and_impact=true"
+        ),
+        (
+            "target_notional_tier_set_sealed=false "
+            "base_quantity_selection_policy_sealed=false"
         ),
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",

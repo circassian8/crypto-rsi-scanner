@@ -16,13 +16,17 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
     MAX_PLANNED_REQUESTS,
     OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
     ROUND_TRIP_SCHEMA_VERSION,
+    TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION,
+    TARGET_NOTIONAL_SIZING_SCHEMA_VERSION,
     BybitExecutionQualityError,
     build_bybit_public_request_plan,
     main,
+    model_bybit_target_notional_visible_book_round_trip,
     model_bybit_visible_book_round_trip,
     normalize_bybit_orderbook,
     run_fixture_smoke,
     select_bybit_usdt_perpetual_instruments,
+    size_bybit_target_entry_mid_notional,
 )
 
 
@@ -321,6 +325,139 @@ def test_round_trip_reconciles_one_exact_base_quantity_across_distinct_books(
     assert result["research_only"] is True
 
 
+def test_target_mid_notional_floors_to_exact_venue_quantity_without_policy_claim() -> None:
+    result = size_bybit_target_entry_mid_notional(
+        _json("orderbook_btcusdt.json"),
+        instrument=_selected()[0],
+        target_entry_mid_notional_usdt="1500.74",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        entry_request_lineage_id="test.sizing.entry",
+        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        instrument_constraints_lineage_id="test.sizing.catalog",
+    ).to_dict()
+
+    assert result["schema_version"] == TARGET_NOTIONAL_SIZING_SCHEMA_VERSION
+    assert result["target_entry_mid_notional_usdt"] == "1500.74"
+    assert result["entry_mid_price"] == 100.05
+    assert result["sized_base_quantity"] == "14.999"
+    assert result["sized_entry_mid_notional_usdt"] == "1500.64995"
+    assert result["notional_shortfall_usdt"] == "0.09005"
+    assert result["one_quantity_step_mid_notional_usdt"] == "0.10005"
+    assert result["rounding_mode"] == "floor_to_quantity_step"
+    assert result["does_not_exceed_target"] is True
+    assert result["shortfall_less_than_one_quantity_step_notional"] is True
+    assert result["sized_mid_notional_meets_minimum"] is True
+    assert result["quantity_eligible_order_styles"] == [
+        "market",
+        "marketable_limit",
+    ]
+    assert result["order_style_selected"] is False
+    assert result["target_notional_tier_set_sealed"] is False
+    assert result["base_quantity_selection_policy_sealed"] is False
+    assert result["target_is_reference_mid_notional_not_quote_budget"] is True
+    assert (
+        result["marketable_quote_value_may_exceed_target_due_spread_and_impact"]
+        is True
+    )
+    assert result["realized_execution"] is False
+    assert result["research_only"] is True
+
+
+@pytest.mark.parametrize("position_side", ("long", "short"))
+def test_target_notional_sizing_reconciles_into_exact_round_trip(
+    position_side: str,
+) -> None:
+    result = model_bybit_target_notional_visible_book_round_trip(
+        _json("orderbook_btcusdt.json"),
+        _json("orderbook_btcusdt_exit.json"),
+        instrument=_selected()[0],
+        position_side=position_side,
+        target_entry_mid_notional_usdt="1500.75",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        exit_acquired_at="2026-07-17T13:00:01Z",
+        entry_request_lineage_id=f"test.target.{position_side}.entry",
+        exit_request_lineage_id=f"test.target.{position_side}.exit",
+        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        instrument_constraints_lineage_id="test.target.catalog",
+    ).to_dict()
+
+    assert result["schema_version"] == TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION
+    assert result["sizing"]["sized_base_quantity"] == "15"
+    assert result["sizing"]["sized_entry_mid_notional_usdt"] == "1500.75"
+    assert result["sizing"]["notional_shortfall_usdt"] == "0"
+    assert result["round_trip"]["base_quantity"] == "15"
+    assert result["round_trip"]["entry_mid_notional_usdt"] == 1500.75
+    assert result["sizing_and_round_trip_identity_reconciled"] is True
+    assert result["same_entry_book_reconciled"] is True
+    assert result["same_base_quantity_reconciled"] is True
+    assert result["target_notional_tier_set_sealed"] is False
+    assert result["base_quantity_selection_policy_sealed"] is False
+    assert result["order_style_selected"] is False
+    assert result["realized_execution"] is False
+    if position_side == "long":
+        assert result["round_trip"]["entry"]["quote_value_usdt"] > 1500.75
+    else:
+        assert result["round_trip"]["entry"]["quote_value_usdt"] < 1500.75
+
+
+def test_target_notional_sizing_reports_order_style_eligibility_without_choice() -> None:
+    result = size_bybit_target_entry_mid_notional(
+        _json("orderbook_btcusdt.json"),
+        instrument=replace(
+            _selected()[0],
+            maximum_market_order_quantity="10",
+        ),
+        target_entry_mid_notional_usdt="1500.75",
+        entry_acquired_at="2026-07-17T12:00:01Z",
+        entry_request_lineage_id="test.sizing.limitonly.entry",
+        instrument_constraints_observed_at="2026-07-17T11:59:59Z",
+        instrument_constraints_lineage_id="test.sizing.limitonly.catalog",
+    ).to_dict()
+
+    assert result["market_order_quantity_eligible"] is False
+    assert result["limit_order_quantity_eligible"] is True
+    assert result["quantity_eligible_order_styles"] == ["marketable_limit"]
+    assert result["order_style_selected"] is False
+
+
+@pytest.mark.parametrize(
+    ("target", "instrument_changes", "acquired_at", "constraints_at", "error"),
+    (
+        (True, {}, "2026-07-17T12:00:01Z", "2026-07-17T11:59:59Z", "must_be_decimal_text"),
+        ("0", {}, "2026-07-17T12:00:01Z", "2026-07-17T11:59:59Z", "positive_and_finite"),
+        ("NaN", {}, "2026-07-17T12:00:01Z", "2026-07-17T11:59:59Z", "positive_and_finite"),
+        ("0.05", {}, "2026-07-17T12:00:01Z", "2026-07-17T11:59:59Z", "below_minimum_order_quantity"),
+        ("0.20", {}, "2026-07-17T12:00:01Z", "2026-07-17T11:59:59Z", "below_instrument_minimum_notional"),
+        (
+            "1500.75",
+            {"maximum_limit_order_quantity": "10", "maximum_market_order_quantity": "10"},
+            "2026-07-17T12:00:01Z",
+            "2026-07-17T11:59:59Z",
+            "exceeds_all_order_style_maximums",
+        ),
+        ("1500.75", {}, "2026-07-17T12:01:00Z", "2026-07-17T11:59:59Z", "snapshot_not_fresh"),
+        ("1500.75", {}, "2026-07-17T12:00:01Z", "2026-07-17T12:00:00.001Z", "constraints_observed_after_entry"),
+    ),
+)
+def test_target_notional_sizing_fails_closed(
+    target: object,
+    instrument_changes: dict[str, str],
+    acquired_at: str,
+    constraints_at: str,
+    error: str,
+) -> None:
+    with pytest.raises(BybitExecutionQualityError, match=error):
+        size_bybit_target_entry_mid_notional(
+            _json("orderbook_btcusdt.json"),
+            instrument=replace(_selected()[0], **instrument_changes),
+            target_entry_mid_notional_usdt=target,
+            entry_acquired_at=acquired_at,
+            entry_request_lineage_id="test.sizing.invalid.entry",
+            instrument_constraints_observed_at=constraints_at,
+            instrument_constraints_lineage_id="test.sizing.invalid.catalog",
+        )
+
+
 @pytest.mark.parametrize(
     ("kwargs", "error"),
     (
@@ -539,6 +676,8 @@ def test_fixture_smoke_and_cli_are_offline_secret_free(
     assert result["research_only"] is True
     assert result["quantity_reconciled_round_trip"]["same_base_quantity_reconciled"] is True
     assert result["quantity_reconciled_round_trip"]["spread_added_separately"] is False
+    assert result["target_notional_round_trip"]["same_base_quantity_reconciled"] is True
+    assert result["target_notional_round_trip"]["target_notional_tier_set_sealed"] is False
 
     assert main(["--fixture-dir", str(FIXTURE_DIR)]) == 0
     output = capsys.readouterr()

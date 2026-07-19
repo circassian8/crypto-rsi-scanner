@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v13 records the owner-confirmed primary research
+Execution-quality readiness v14 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -959,6 +959,19 @@ policy remains explicitly unsealed. Size selection, quantity rounding from a
 USDT tier, order style, fees, funding, latency, beyond-book liquidity, and
 unavailable-cost behavior remain unsealed; therefore
 `protocol_v2_cost_model_sealed=false` remains correct.
+
+The offline v1 target-notional projection now closes the arithmetic between a
+caller-supplied native-USDT entry-mid reference and the quantity primitive. It
+uses the exact entry-book mid, floors the implied underlying-token quantity to
+`qtyStep`, never exceeds the supplied mid-notional, and proves that the
+shortfall is strictly less than one quantity-step notional. Minimum quantity,
+minimum notional, dynamic market/limit maxima, catalog causality, and book
+identity remain enforced before the derived quantity is joined to the v2
+entry/exit walk. The target is deliberately not labeled a quote-spend budget:
+a marketable buy can spend more, and a marketable sell can receive less,
+because spread and walked depth are part of the observed leg. The system has
+not chosen the final USDT tier set, adopted the floor rule as Protocol-v2
+policy, or selected an order style; those remain annex decisions.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread and

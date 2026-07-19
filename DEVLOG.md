@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Connect Bybit target notional to exact venue quantity · Codex
+**Why:** The quantity-reconciled book walk still required a manually supplied
+base quantity. A deterministic bridge from a native-USDT research reference is
+needed before the final Protocol-v2 tier and order-style decisions can be
+sealed.
+**Changes:**
+- Added target-notional sizing v1. It derives the exact causal entry-book mid,
+  floors the implied underlying-token quantity to the current `qtyStep`, never
+  exceeds the supplied mid-notional, bounds the shortfall below one step
+  notional, and enforces catalog-bound minimum quantity/notional plus dynamic
+  market/limit maxima.
+- Added a closed composite that identity-reconciles the sizing projection with
+  the v2 long/short entry/exit book walk. It explicitly distinguishes an entry-
+  mid reference from quote spend/proceeds and remains non-executable.
+- Advanced execution-quality readiness to v14 and current Protocol-v2 progress
+  to v13; updated the North Star, decision package, working agreement, durable
+  decision, roadmap, offline smoke, and regressions. The final target tier set,
+  adoption of the floor rule, constraint freshness, order style, fees, funding,
+  latency, beyond-book slippage, unavailable-cost behavior, genuine captures,
+  and annex remain unsealed.
+**Verify:** 296 focused Bybit execution, capture, intraday, derivatives,
+liquidation, readiness, and Protocol-v2 tests passed; Python compileall, the
+offline Bybit smoke, static readiness, current/frozen Protocol-v2 checks, JSON
+validation, diff check, and architecture cleanliness passed.
+**Notes/risks:** No provider call, authorization, credential/private-data read,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` was added. A target mid-notional is not a quote-spend budget;
+marketable spread and depth may move actual quote value beyond it.
+
 ## 2026-07-20 — Preserve campaign truth after a CoinGecko DNS failure · Codex
 **Why:** The cadence was eligible and authorization already existed, but the
 single bounded request failed at local DNS resolution. Recording the terminal

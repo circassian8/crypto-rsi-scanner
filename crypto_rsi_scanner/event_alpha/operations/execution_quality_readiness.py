@@ -18,10 +18,12 @@ from .bybit_execution_quality import (
     OFFICIAL_INSTRUMENT_DOC,
     OFFICIAL_USDT_CONTRACT_ORDER_COST_DOC,
     ROUND_TRIP_SCHEMA_VERSION,
+    TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION,
+    TARGET_NOTIONAL_SIZING_SCHEMA_VERSION,
 )
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v13"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v14"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -97,6 +99,25 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "minimum_notional_enforced_on_entry_and_exit_visible_quote_value": True,
     "order_style_quantity_eligibility_reported": True,
     "entry_exit_order_style_policy_sealed": False,
+    "target_notional_sizing_implemented": True,
+    "target_notional_sizing_schema_version": (
+        TARGET_NOTIONAL_SIZING_SCHEMA_VERSION
+    ),
+    "target_notional_round_trip_schema_version": (
+        TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION
+    ),
+    "target_notional_input_unit": "USDT",
+    "target_notional_reference": "entry_mid_price",
+    "target_notional_rounding_mode": "floor_to_quantity_step",
+    "target_notional_does_not_exceed_reference": True,
+    "target_notional_shortfall_bound": (
+        "strictly_less_than_one_quantity_step_at_entry_mid"
+    ),
+    "target_notional_is_quote_budget": False,
+    "marketable_quote_value_may_exceed_target_due_spread_and_impact": True,
+    "target_notional_round_trip_identity_reconciled": True,
+    "target_notional_tier_set_sealed": False,
+    "base_quantity_selection_policy_sealed": False,
 }
 COMMON_METRICS = (
     "best_bid",
@@ -675,8 +696,9 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             ),
         ),
         supported_offline_adapters=(
-            "bybit_usdt_linear_perpetual_fixture_normalizer_v3",
+            "bybit_usdt_linear_perpetual_fixture_normalizer_v4",
             "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v2",
+            "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -722,6 +744,10 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "catalog_bound_minimum_quantity_minimum_notional_and_dynamic_order_style_maximums_are_preserved_and_enforced",
             "market_and_marketable_limit_quantity_eligibility_are_reported_without_selecting_an_order_style",
             "instrument_constraint_freshness_policy_remains_unsealed_because_Bybit_changes_maximums_over_time",
+            "caller_supplied_USDT_target_mid_notional_can_be_floored_to_qtyStep_and_reconciled_through_both_books",
+            "the_sized_mid_notional_never_exceeds_the_reference_target_and_its_shortfall_is_less_than_one_step_notional",
+            "the_target_is_not_a_quote_spend_budget_because_marketable_spread_and_impact_can_move_actual_quote_value",
+            "the_final_target_tier_set_and_adoption_of_this_base_quantity_policy_remain_unsealed",
             "round_trip_size_selection_rounding_and_cost_application_policy_remain_unsealed",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
@@ -806,6 +832,27 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"{str(value['minimum_notional_enforced_on_entry_and_exit_visible_quote_value']).casefold()} "
         "order_style_quantity_eligibility_reported="
         f"{str(value['order_style_quantity_eligibility_reported']).casefold()}",
+        "target_notional_sizing_implemented="
+        f"{str(value['target_notional_sizing_implemented']).casefold()} "
+        f"sizing_schema={value['target_notional_sizing_schema_version']} "
+        f"round_trip_schema={value['target_notional_round_trip_schema_version']}",
+        "target_notional_input_unit="
+        f"{value['target_notional_input_unit']} reference="
+        f"{value['target_notional_reference']} rounding="
+        f"{value['target_notional_rounding_mode']}",
+        "target_notional_does_not_exceed_reference="
+        f"{str(value['target_notional_does_not_exceed_reference']).casefold()} "
+        f"shortfall_bound={value['target_notional_shortfall_bound']} "
+        "round_trip_identity_reconciled="
+        f"{str(value['target_notional_round_trip_identity_reconciled']).casefold()}",
+        "target_notional_is_quote_budget="
+        f"{str(value['target_notional_is_quote_budget']).casefold()} "
+        "marketable_quote_value_may_exceed_target_due_spread_and_impact="
+        f"{str(value['marketable_quote_value_may_exceed_target_due_spread_and_impact']).casefold()}",
+        "target_notional_tier_set_sealed="
+        f"{str(value['target_notional_tier_set_sealed']).casefold()} "
+        "base_quantity_selection_policy_sealed="
+        f"{str(value['base_quantity_selection_policy_sealed']).casefold()}",
     )
 
 

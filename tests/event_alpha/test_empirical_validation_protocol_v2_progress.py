@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v12")
+    assert values["progress_version"].endswith("_v13")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -106,6 +106,25 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["instrument_constraints_causality_required"] is True
     assert decision["instrument_constraints_freshness_policy_sealed"] is False
     assert decision["entry_exit_order_style_policy_sealed"] is False
+    assert decision["target_notional_sizing_implemented"] is True
+    assert decision["target_notional_sizing_schema_version"] == (
+        "crypto_radar.bybit_target_entry_mid_notional_sizing.v1"
+    )
+    assert decision["target_notional_round_trip_schema_version"] == (
+        "crypto_radar.bybit_target_notional_visible_book_round_trip.v1"
+    )
+    assert decision["target_notional_input_unit"] == "USDT"
+    assert decision["target_notional_reference"] == "entry_mid_price"
+    assert decision["target_notional_rounding_mode"] == "floor_to_quantity_step"
+    assert decision["target_notional_does_not_exceed_reference"] is True
+    assert decision["target_notional_is_quote_budget"] is False
+    assert (
+        decision["marketable_quote_value_may_exceed_target_due_spread_and_impact"]
+        is True
+    )
+    assert decision["target_notional_round_trip_identity_reconciled"] is True
+    assert decision["target_notional_tier_set_sealed"] is False
+    assert decision["base_quantity_selection_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -303,6 +322,12 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "instrument_order_constraints_implemented=true" in output.out
     assert "instrument_maximums_dynamic=true" in output.out
     assert "instrument_constraints_freshness_policy_sealed=false" in output.out
+    assert "target_notional_sizing_implemented=true" in output.out
+    assert "target_notional_input_unit=USDT reference=entry_mid_price" in output.out
+    assert "rounding=floor_to_quantity_step" in output.out
+    assert "target_notional_is_quote_budget=false" in output.out
+    assert "target_notional_tier_set_sealed=false" in output.out
+    assert "base_quantity_selection_policy_sealed=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

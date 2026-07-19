@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v13`. Run
+`crypto_radar_execution_quality_readiness_v14`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -125,6 +125,17 @@ minimum notional. It reports market versus marketable-limit quantity eligibility
 without choosing either style. Bybit documents those maxima as dynamic, so the
 future v5 capture preserves and revalidates them on every complete catalog; the
 annex-level constraint freshness policy remains unsealed.
+
+A separate offline v1 projection can now turn a caller-supplied native-USDT
+entry-mid reference into a venue-valid candidate quantity. It derives the exact
+entry mid from the same book, floors the implied underlying-token quantity to
+`qtyStep`, never exceeds the target mid-notional, and bounds the shortfall to
+less than one step notional. It then joins that exact quantity to the v2
+entry/exit walk and proves instrument, catalog, book, quantity, and notional
+identity. This target is not a quote-spend budget: a marketable buy may spend
+more and a marketable sell may receive less after spread and depth impact. The
+final target tier set, adoption of this floor rule, and order style remain
+unsealed Protocol-v2 decisions.
 
 ## Venue-native derivatives context contract
 
