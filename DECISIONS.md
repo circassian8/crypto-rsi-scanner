@@ -50,7 +50,10 @@ remain an inactive future interface and are not selected evidence. This unit
 boundary also preserves the normalizer's mid-price reference: each side impact
 already includes its crossing half-spread, so standalone spread must not be
 added to the same side impact. A round trip still requires separate entry and
-exit snapshots and a later sealed application policy. This unit decision does
+exit snapshots and a later sealed application policy. Buy size is exact USDT
+spent and sell size is exact USDT proceeds, so equal numeric lookups are not
+the same base position; quantity reconciliation must remain explicit and
+unsealed until implemented. This unit decision does
 not seal fees, order style, notional tiers,
 slippage, funding treatment, latency cost, unavailable-cost handling, or the
 final Protocol-v2 annex.

@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v10 must expose those remaining cost fields rather
+  Execution-quality readiness v11 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -591,6 +591,11 @@ may be added later when a suitable environment already exists.
   `spread_bps` to the same side impact. A round-trip model requires distinct
   entry and exit snapshots/sides; its snapshot, sizing, and order-style policy
   remains unsealed.
+  Buy impact uses exact USDT spent and sell impact uses exact USDT proceeds.
+  Equal numeric USDT lookup sizes do not prove equal base-asset quantity. Keep
+  round-trip base-quantity reconciliation explicitly unimplemented/unsealed
+  until a future quantity-aware model is reviewed; never add equal-notional
+  side lookups and call the result an exact round-trip cost.
   For exact transport captures, normalized `acquired_at` is the accepted
   response-read completion time, not a second independent clock. Immutable
   validation requires every request/response inside the declared capture window

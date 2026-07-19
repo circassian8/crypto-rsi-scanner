@@ -48,7 +48,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v10"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v11"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -80,11 +80,16 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     )
     assert result.selected_native_snapshot_fields == BYBIT_NATIVE_METRICS
     assert result.generic_cross_venue_projection_available is False
-    assert result.selected_impact_reference == "mid_price"
-    assert result.selected_side_impact_includes_crossing_half_spread is True
-    assert result.standalone_spread_addition_to_selected_side_impact_permitted is False
-    assert result.round_trip_impact_requires_entry_and_exit_snapshots is True
-    assert result.impact_cost_application_policy_sealed is False
+    impact = result.impact_cost_semantics
+    assert impact["selected_impact_reference"] == "mid_price"
+    assert impact["selected_side_impact_includes_crossing_half_spread"] is True
+    assert impact["standalone_spread_addition_to_selected_side_impact_permitted"] is False
+    assert impact["round_trip_impact_requires_entry_and_exit_snapshots"] is True
+    assert impact["impact_cost_application_policy_sealed"] is False
+    assert impact["buy_impact_size_basis"] == "exact_usdt_spend"
+    assert impact["sell_impact_size_basis"] == "exact_usdt_proceeds"
+    assert impact["same_numeric_usdt_notional_proves_same_base_quantity"] is False
+    assert impact["round_trip_base_quantity_reconciliation_implemented"] is False
     assert result.eligible_instrument_set == ()
     assert "top_30_liquid_decision_radar_assets" in (
         result.eligible_instrument_selection_rule or ""
@@ -335,6 +340,10 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "standalone_spread_addition_to_selected_side_impact_permitted=false" in rendered
     assert "round_trip_impact_requires_entry_and_exit_snapshots=true" in rendered
     assert "impact_cost_application_policy_sealed=false" in rendered
+    assert "buy_impact_size_basis=exact_usdt_spend" in rendered
+    assert "sell_impact_size_basis=exact_usdt_proceeds" in rendered
+    assert "same_numeric_usdt_notional_proves_same_base_quantity=false" in rendered
+    assert "round_trip_base_quantity_reconciliation_implemented=false" in rendered
     assert "top_30_liquid_decision_radar_assets" in rendered
     assert "eligible_instrument_set_frozen=false" in rendered
     assert "jurisdiction_and_account_eligibility_confirmed=true" in rendered
@@ -485,6 +494,10 @@ def test_cli_json_is_structured_static_and_secret_free(
     )
     assert payload["round_trip_impact_requires_entry_and_exit_snapshots"] is True
     assert payload["impact_cost_application_policy_sealed"] is False
+    assert payload["buy_impact_size_basis"] == "exact_usdt_spend"
+    assert payload["sell_impact_size_basis"] == "exact_usdt_proceeds"
+    assert payload["same_numeric_usdt_notional_proves_same_base_quantity"] is False
+    assert payload["round_trip_base_quantity_reconciliation_implemented"] is False
     assert payload["required_human_decision_fields"] == list(
         REMAINING_PROTOCOL_V2_SEALING_FIELDS
     )
@@ -626,6 +639,8 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
         readiness["standalone_spread_addition_to_selected_side_impact_permitted"]
         is False
     )
+    assert readiness["same_numeric_usdt_notional_proves_same_base_quantity"] is False
+    assert readiness["round_trip_base_quantity_reconciliation_implemented"] is False
     assert readiness["final_live_adapter_implemented"] is False
     assert readiness["public_rest_adapter_implemented"] is True
     assert readiness["immutable_capture_contract_implemented"] is True

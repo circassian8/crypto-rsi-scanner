@@ -42,12 +42,12 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v9"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v10"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_19_"
-    "with_mid_reference_impact_semantics_native_Bybit_snapshot_fields_truthful_"
-    "pending_cost_model_native_USDT_cost_unit_detached_native_liquidation_import_"
-    "and_tokenomist_v5_fixture_capture_contract"
+    "with_round_trip_base_quantity_gap_mid_reference_impact_semantics_native_"
+    "Bybit_snapshot_fields_truthful_pending_cost_model_native_USDT_cost_unit_"
+    "detached_native_liquidation_import_and_tokenomist_v5_fixture_capture_contract"
 )
 FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
@@ -124,6 +124,10 @@ _EXPECTED_EXECUTION_DECISION = {
     "standalone_spread_addition_to_selected_side_impact_permitted": False,
     "round_trip_impact_requires_entry_and_exit_snapshots": True,
     "impact_cost_application_policy_sealed": False,
+    "buy_impact_size_basis": "exact_usdt_spend",
+    "sell_impact_size_basis": "exact_usdt_proceeds",
+    "same_numeric_usdt_notional_proves_same_base_quantity": False,
+    "round_trip_base_quantity_reconciliation_implemented": False,
     "exact_eligible_instrument_set_sealed": False,
     "data_boundary": "public_market_data_only",
     "credentials_or_private_account_data": False,
@@ -135,6 +139,7 @@ def current_progress_values() -> dict[str, Any]:
     """Return accepted progress derived only from deterministic static contracts."""
 
     execution = build_execution_quality_readiness()
+    impact = dict(execution.impact_cost_semantics)
     frozen_digest = readiness_sha256()
     return {
         "schema_id": SCHEMA_ID,
@@ -179,19 +184,7 @@ def current_progress_values() -> dict[str, Any]:
             "generic_cross_venue_projection_available": (
                 execution.generic_cross_venue_projection_available
             ),
-            "selected_impact_reference": execution.selected_impact_reference,
-            "selected_side_impact_includes_crossing_half_spread": (
-                execution.selected_side_impact_includes_crossing_half_spread
-            ),
-            "standalone_spread_addition_to_selected_side_impact_permitted": (
-                execution.standalone_spread_addition_to_selected_side_impact_permitted
-            ),
-            "round_trip_impact_requires_entry_and_exit_snapshots": (
-                execution.round_trip_impact_requires_entry_and_exit_snapshots
-            ),
-            "impact_cost_application_policy_sealed": (
-                execution.impact_cost_application_policy_sealed
-            ),
+            **impact,
             "eligible_instrument_selection_rule": (
                 execution.eligible_instrument_selection_rule
             ),
@@ -454,6 +447,10 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "standalone_spread_addition_permitted=false "
         "round_trip_requires_entry_and_exit_snapshots=true "
         "impact_cost_application_policy_sealed=false",
+        "buy_impact_size_basis=exact_usdt_spend "
+        "sell_impact_size_basis=exact_usdt_proceeds",
+        "same_numeric_usdt_notional_proves_same_base_quantity=false "
+        "round_trip_base_quantity_reconciliation_implemented=false",
         "eligible_instrument_set=not_yet_sealed",
         f"eligible_instrument_selection_rule={decision['eligible_instrument_selection_rule']}",
         (

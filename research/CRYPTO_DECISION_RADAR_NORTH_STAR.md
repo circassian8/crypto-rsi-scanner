@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v10 records the owner-confirmed primary research
+Execution-quality readiness v11 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -931,6 +931,14 @@ Consumers must not add `spread_bps` again to the same side impact. A complete
 round-trip estimate needs separate entry and exit snapshots and the selected
 side at each boundary. The eventual entry/exit snapshot policy remains
 unsealed; this closes the primitive math, not the Protocol-v2 cost decision.
+
+The side size definitions are intentionally asymmetric: buy impact means exact
+USDT spent, while sell impact means exact USDT proceeds. The same numeric USDT
+value therefore does not prove the same base-asset quantity, even within one
+book. A future round-trip calculator must reconcile the entry base quantity to
+the exit side rather than adding equal-notional lookup values. That
+reconciliation is not implemented or sealed, so no exact round-trip cost is
+claimed.
 
 The offline slice validates supplied V5 instrument and order-book payloads,
 preserves provider/snapshot clocks and book sequence, and derives spread, USDT

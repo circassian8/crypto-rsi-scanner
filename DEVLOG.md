@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Keep round-trip quantity identity explicit · Codex
+**Why:** Bybit's current buy-impact curve is sized by exact USDT spent and its
+sell curve by exact USDT proceeds. Equal lookup notionals can represent
+different base quantities, so adding them would create a false round-trip cost.
+**Changes:**
+- Bumped execution-quality readiness to v11 and exposed both side size bases,
+  the false same-notional identity, and the missing base-quantity
+  reconciliation explicitly.
+- Added `round_trip_base_quantity_reconciliation` to the remaining Protocol-v2
+  cost fields and advanced current progress to v10 with fail-closed validation.
+- Updated the North Star, execution decision package, current progress note,
+  working agreement, durable unit decision, roadmap, and focused regressions.
+**Verify:** `48 passed` across the focused order-book, readiness, and current-
+progress suites; Python compileall and North Star JSON parsing passed; static
+readiness/progress checks passed with zero provider/file/environment/holdout
+effects; architecture cleanliness passed with zero new size violations after
+grouping the closed impact semantics; diff hygiene passed.
+**Notes/risks:** No quantity-aware round-trip calculator was invented. Entry/
+exit snapshots, order style, sizes, fees, slippage, funding, latency, and the
+final cost model remain unsealed. No provider call, authorization, capture,
+route, score, threshold, send, trade, order, paper trade, RSI write, or Event
+Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-19 — Prevent Bybit spread and impact double counting · Codex
 **Why:** The order-book normalizer measures each side's visible-book impact from
 mid price. That already includes the crossing half-spread, but operator truth

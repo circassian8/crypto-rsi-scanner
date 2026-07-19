@@ -20,6 +20,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - each side impact is mid-referenced and already includes its crossing
   half-spread, so standalone spread cannot be added to that same side; the
   round-trip entry/exit snapshot policy remains unsealed;
+- buy size is exact USDT spent and sell size is exact USDT proceeds, so equal
+  numeric notionals do not prove equal base quantity; round-trip base-quantity
+  reconciliation remains unimplemented and unsealed;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;

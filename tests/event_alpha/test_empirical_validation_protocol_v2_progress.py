@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v9")
+    assert values["progress_version"].endswith("_v10")
     assert values["as_of"] == "2026-07-19"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -48,6 +48,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
         "fee_rate_source_and_assumption",
         "entry_exit_order_style",
         "notional_tiers_usdt",
+        "round_trip_base_quantity_reconciliation",
         "spread_and_visible_book_impact_application",
         "slippage_beyond_visible_book_policy",
         "funding_holding_period_and_sign_treatment",
@@ -70,6 +71,10 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     )
     assert decision["round_trip_impact_requires_entry_and_exit_snapshots"] is True
     assert decision["impact_cost_application_policy_sealed"] is False
+    assert decision["buy_impact_size_basis"] == "exact_usdt_spend"
+    assert decision["sell_impact_size_basis"] == "exact_usdt_proceeds"
+    assert decision["same_numeric_usdt_notional_proves_same_base_quantity"] is False
+    assert decision["round_trip_base_quantity_reconciliation_implemented"] is False
     assert decision["data_boundary"] == "public_market_data_only"
     assert decision["exact_eligible_instrument_ids"] == []
     assert decision["exact_eligible_instrument_set_sealed"] is False
@@ -191,6 +196,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     impact_drift["confirmed_execution_decision"][
         "standalone_spread_addition_to_selected_side_impact_permitted"
     ] = True
+    quantity_drift = progress.current_progress_values()
+    quantity_drift["confirmed_execution_decision"][
+        "round_trip_base_quantity_reconciliation_implemented"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -205,6 +214,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         cost_model_drift,
         native_field_drift,
         impact_drift,
+        quantity_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -254,6 +264,8 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "generic_cross_venue_projection_available=false" in output.out
     assert "selected_side_impact_reference=mid_price" in output.out
     assert "standalone_spread_addition_permitted=false" in output.out
+    assert "buy_impact_size_basis=exact_usdt_spend" in output.out
+    assert "round_trip_base_quantity_reconciliation_implemented=false" in output.out
     assert "eligible_instrument_set=not_yet_sealed" in output.out
     assert "Current unresolved activation blockers:" in output.out
     assert "- exact_eligible_instrument_set_not_sealed" in output.out

@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v10`. Run
+`crypto_radar_execution_quality_readiness_v11`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -102,6 +102,14 @@ Do not add standalone `spread_bps` to the same side impact. A round trip needs
 an entry-side impact from the entry snapshot and an exit-side impact from the
 exit snapshot. Which snapshots, sizes, and order style Protocol v2 will use
 remain unsealed; this rule does not manufacture a round-trip cost.
+
+Equal numeric USDT lookup sizes are not a round-trip identity. The buy curve is
+defined by exact USDT spent, while the sell curve is defined by exact USDT
+proceeds; those values generally correspond to different base quantities. A
+valid round-trip model must carry the entry base quantity (and fee treatment)
+to the exit snapshot or derive an equivalent quantity-aware exit walk. That
+reconciliation is not implemented and remains an explicit Protocol-v2 cost
+field rather than being approximated silently.
 
 ## Venue-native derivatives context contract
 
