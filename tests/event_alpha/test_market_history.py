@@ -272,6 +272,57 @@ def test_turnover_basis_distinguishes_provider_value_from_derived_ratio():
     )
 
 
+def test_market_history_does_not_replace_invalid_canonical_measurements():
+    invalid = event_market_history._observation_values(
+        {
+            "canonical_asset_id": "invalid-canonical",
+            "price": float("inf"),
+            "current_price": 10,
+            "volume_24h": float("nan"),
+            "total_volume": 100,
+            "market_cap": True,
+            "mcap": 1_000,
+            "turnover_24h": float("inf"),
+            "volume_to_market_cap": 0.1,
+        },
+        asset_id="invalid-canonical",
+        observed_at=NOW,
+    )
+
+    assert "price" not in invalid
+    assert "volume_24h" not in invalid
+    assert "market_cap" not in invalid
+    assert "turnover_24h" not in invalid
+    assert invalid["feature_basis"] == {
+        "price": "unavailable",
+        "volume_24h": "unavailable",
+        "market_cap": "unavailable",
+        "turnover_24h": "unavailable",
+    }
+    json.dumps(invalid, allow_nan=False)
+
+    blank = event_market_history._observation_values(
+        {
+            "canonical_asset_id": "blank-canonical",
+            "price": None,
+            "current_price": 10,
+            "volume_24h": "",
+            "total_volume": 100,
+            "market_cap": None,
+            "mcap": 1_000,
+            "turnover_24h": "",
+            "volume_to_market_cap": 0.1,
+        },
+        asset_id="blank-canonical",
+        observed_at=NOW,
+    )
+
+    assert blank["price"] == 10
+    assert blank["volume_24h"] == 100
+    assert blank["market_cap"] == 1_000
+    assert blank["turnover_24h"] == 0.1
+
+
 def test_provider_observed_zscore_is_not_replaced_by_temporal_baseline():
     current = _row(
         "move-token",

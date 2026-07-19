@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T07:31:15.894987+00:00`
+- generated_at: `2026-07-19T07:37:03.161675+00:00`
 - gate_status: `pass`
 - baseline_present: `true`
 - files_over_limit_count: `0`
@@ -92,8 +92,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
-| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1499 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 |
+| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1497 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1465 |
@@ -137,8 +137,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
-| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1499 | Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path. | When adding another baseline family or changing the observation-spacing contract. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes. | Split before adding another control or benchmark family and before any further growth reaches the 1,500-line blocker, with selection-digest parity tests in place. |
+| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1497 | Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path. | When adding another baseline family or changing the observation-spacing contract. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol. | Split before adding intraday outcomes, another horizon family, or a schema revision, and before any further growth reaches the 1,500-line blocker. |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | Closed official-calendar acquisition keeps per-source authorization, immutable bytes, partial-coverage receipts, and validation in one fail-closed boundary. | Split before adding another source or status family, and before any growth crosses the 1,500-line blocker. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1465 | Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts. | Split before any further lifecycle phase or growth approaches the 1,500-line blocker, and before another scheduler shares the transaction phases. |
@@ -206,11 +206,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_quality_feedback.py` | 1040 |
 | `tests/event_alpha/test_empirical_research_reports.py` | 1031 |
 | `tests/test_indicators.py` | 1028 |
+| `tests/event_alpha/test_market_history.py` | 1001 |
 | `tests/event_alpha/test_official_macro_calendar_acquisition.py` | 999 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 996 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 987 |
 | `tests/event_alpha/test_empirical_hardening_supplement.py` | 953 |
-| `tests/event_alpha/test_market_history.py` | 950 |
 | `tests/event_alpha/test_notification_operations.py` | 925 |
 | `tests/event_alpha/test_evidence_quality.py` | 918 |
 

@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-19 — Preserve canonical temporal-history measurements · Codex
+**Why:** Temporal-history normalization still continued through numeric aliases
+after a supplied canonical value failed parsing. A malformed canonical price,
+volume, market cap, or turnover could therefore expose a legacy value and warm
+Protocol-v2 baselines with evidence the source row did not actually validate.
+**Changes:**
+- Made market-history numeric alias resolution stop at the first supplied
+  nonblank field, preserving canonical precedence for price, volume, market cap,
+  and turnover.
+- Kept fallback compatibility for genuinely absent/blank canonical fields and
+  retained the transparent volume/market-cap turnover derivation when its
+  independent inputs are valid.
+- Added regressions proving NaN/infinity/boolean canonical measurements cannot
+  expose lower-priority aliases or enter strict JSON, while blank fields still
+  use their documented compatibility aliases.
+**Verify:** All 48 market-history, history-cache, and numeric-integrity tests
+passed, followed by all 90 market/no-send, campaign, episode, scorecard, and
+Decision-episode tests. Compileall and architecture cleanliness passed with zero
+new violations. The offline market/no-send smoke completed with a strict doctor
+at zero blockers/warnings. Full `verify-fast` was not repeated because the
+shared source-boundary gate earlier in this prompt passed all 3,092 tests and
+this temporal-input follow-up is covered by the focused history, campaign,
+scorecard, architecture, smoke, and doctor gates.
+**Notes/risks:** Valid finite measurements and blank-field compatibility are
+unchanged. Malformed canonical observations may now retain less history data
+and remain cold/warming, which is the intended fail-closed result. Historical
+artifacts are not rewritten. No provider call, threshold, score, route, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+behavior changed.
+
 ## 2026-07-19 — Make campaign count reporting strict · Codex
 **Why:** Campaign report, baseline, outcome-gap, and Markdown helpers still
 converted counts with permissive `int(...)`. Fractional values could be

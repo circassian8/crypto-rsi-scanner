@@ -1447,9 +1447,7 @@ def _canonical_asset_id(row: Mapping[str, Any]) -> str:
 def _first_number(row: Mapping[str, Any], *keys: str) -> float | None:
     for key in keys:
         if key in row and row.get(key) not in (None, ""):
-            value = _number(row.get(key))
-            if value is not None:
-                return value
+            return _number(row.get(key))
     return None
 
 
