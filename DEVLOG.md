@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the fifty-second no-send market cycle · Codex
+**Why:** The hourly cadence became eligible, so the evidence-first campaign
+needed one bounded authorized observation and a reconciled terminal report
+rather than a retry or synthetic warm-up row.
+**Changes:** One already-authorized CoinGecko `/coins/markets` request returned
+HTTP 200 with 80 bounded provider rows in 3,555 ms and no retry, then published
+`radar_market_no_send_20260720t194139879375z_8e89674a5a2a`. The immutable
+publication and dashboard-operations receipts bind revision 12, exact run
+`2026-07-20T19:41:41.729110+00:00|no_key_live`, pointer SHA-256
+`eb6e4a8352e62782e0fb09250c38c23e7b031d8999392531ab22daa91bb16227`, and
+operator-state SHA-256
+`3a74dfb11ef6e8faf5c56c6398b8a974f72e20168596dc791c15e1a93f4be6d6`.
+Campaign truth advanced to 52 cycles / 1,560 retained / 1,530
+baseline-counted / 30 too-close observations. The generation contains 30 exact
+market rows and one genuine PUMP `dashboard_watch` idea; spread remains
+unavailable, so it is non-actionable. Exact current-row readiness improved to
+28/30, while PUMP and WBT still prevent a complete causal 24-hour control
+regime; no regime or partition was fabricated. The campaign report now counts
+8 ideas, 4 matured outcomes, 3 pending outcomes, and 300 prospectively
+contextualized rows.
+**Verify:** The terminal Daily Operations cycle reported `succeeded` /
+`published_and_restarted` with every safety counter zero. Follow-up Daily
+Operations status made zero provider calls and preserved the next eligible time
+`2026-07-20T20:41:41.729110+00:00`. Dashboard authority revalidation reported
+the exact namespace and pointer digest; loopback HEAD returned HTTP 200 with
+the exact namespace, run, revision, and operator-state headers. The campaign's
+exact authoritative row reports strict doctor 0 blockers / 0 warnings, valid
+publication and operations receipts, and matching candidate/manifest counts.
+`git diff --check` passed.
+**Notes/risks:** The recurring service remains disabled. No send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred. PUMP is
+operator-visible research only, not an actionable instruction; Bybit execution
+quality remains separately unauthorized and region-blocked.
+
 ## 2026-07-20 — Type Decision catalyst-state claims · Codex
 **Why:** Malformed explicit catalyst state was ignored by the compatibility
 heuristic. An object-valued `catalyst_status`, malformed disproof/not-required
