@@ -344,6 +344,19 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert result.operator_decision == (
         "confirmed_bybit_USDT_linear_perpetual_public_market_data_only"
     )
+    assert (
+        "the_base_composite_excludes_latency_beyond_book_slippage_and_"
+        "unavailable_cost_policy"
+    ) in result.implications
+    assert (
+        "the_decision_reference_composite_includes_supplied_latency_visible_"
+        "book_fee_and_funding_but_still_excludes_beyond_book_slippage_and_"
+        "unavailable_cost_policy_and_is_not_a_complete_protocol_v2_cost_model"
+    ) in result.implications
+    assert not any(
+        value.startswith("the_composite_still_excludes_latency")
+        for value in result.implications
+    )
     assert result.next_safe_command == (
         "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python"
     )

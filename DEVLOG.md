@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reconcile Bybit composite readiness wording · Codex
+**Why:** The execution-quality readiness implications still used the generic
+phrase “the composite” for the older base composite and said latency was
+excluded, contradicting the newly exposed decision-reference composite.
+**Changes:** Readiness now distinguishes the base composite, which excludes
+latency, from the decision-reference composite, which includes supplied
+latency, visible-book, fee, and funding components while remaining incomplete
+without beyond-book slippage and unavailable-cost policy. Added a regression
+that rejects the stale contradictory wording.
+**Verify:** 24 execution-readiness and Protocol-v2 progress tests passed. Static
+readiness rendering, compileall, and `git diff --check` passed.
+**Notes/risks:** This changes static operator truth only. It adds no provider
+call, authorization, trade, order, send, paper trade, RSI write, route, score,
+or Protocol-v2 authority.
+
 ## 2026-07-20 — Decompose Bybit decision-price latency exactly · Codex
 **Why:** The modeled round trip measured visible-book impact from each later
 execution-book midpoint, leaving price drift between the research decision and
