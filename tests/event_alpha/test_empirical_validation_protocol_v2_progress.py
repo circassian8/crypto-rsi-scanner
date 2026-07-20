@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v15")
+    assert values["progress_version"].endswith("_v16")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -57,7 +57,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     ]
     assert "not_account_authoritative" in decision["fee_rate_authority_status"]
     assert decision["account_specific_fee_rate_access_authorized"] is False
-    assert decision["official_fee_sources_reviewed_at"] == "2026-07-19"
+    assert decision["official_fee_sources_reviewed_at"] == "2026-07-20"
     assert "bid_depth_usdt_by_band" in decision["selected_native_snapshot_fields"]
     assert not any(
         "_usd_" in field for field in decision["selected_native_snapshot_fields"]
@@ -146,6 +146,23 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["capture_pair_writes_performed"] is False
     assert decision["capture_pair_protocol_v2_annex_bound"] is False
     assert decision["capture_pair_protocol_v2_evidence_eligible"] is False
+    assert decision["immediately_marketable_liquidity_role"] == "taker"
+    assert (
+        decision["marketable_limit_immediate_fill_liquidity_role"] == "taker"
+    )
+    assert decision["maker_liquidity_scenario_modeled"] is False
+    assert decision["taker_fee_application_implemented"] is True
+    assert decision["taker_fee_scenario_schema_version"] == (
+        "crypto_radar.bybit_visible_book_taker_fee_scenario.v1"
+    )
+    assert decision["taker_fee_rate_unit"] == "fraction"
+    assert decision["taker_fee_applied_to_each_executed_leg_quote_value"] is True
+    assert decision["taker_fee_effective_window_must_cover_both_legs"] is True
+    assert decision["taker_fee_source_reference_required"] is True
+    assert decision["taker_fee_source_sealed"] is False
+    assert decision["taker_fee_protocol_v2_annex_bound"] is False
+    assert decision["taker_fee_provider_calls"] == 0
+    assert decision["taker_fee_writes_performed"] is False
     assert decision["target_notional_tier_set_sealed"] is False
     assert decision["base_quantity_selection_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
@@ -356,6 +373,14 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "target_notional_input_unit=USDT reference=entry_mid_price" in output.out
     assert "rounding=floor_to_quantity_step" in output.out
     assert "target_notional_is_quote_budget=false" in output.out
+    assert "immediately_marketable_liquidity_role=taker" in output.out
+    assert "marketable_limit_immediate_fill_liquidity_role=taker" in output.out
+    assert "maker_liquidity_scenario_modeled=false" in output.out
+    assert "taker_fee_application_implemented=true" in output.out
+    assert "crypto_radar.bybit_visible_book_taker_fee_scenario.v1" in output.out
+    assert "taker_fee_applied_to_each_executed_leg_quote_value=true" in output.out
+    assert "effective_window_must_cover_both_legs=true" in output.out
+    assert "taker_fee_source_sealed=false" in output.out
     assert "capture_pair_round_trip_implemented=true" in output.out
     assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in output.out
     assert "capture_pair_exact_namespaces_required=true" in output.out

@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Apply exact taker fees to modeled Bybit round trips · Codex
+**Why:** The two-book round-trip model preserved exact executed quote values,
+but it did not yet apply trading fees. An immediately marketable limit order
+also must not be mislabeled as maker liquidity merely because it uses a limit
+price.
+**Changes:**
+- Added a pure v1 taker-fee projection over one exact Bybit visible-book round
+  trip. It applies separate caller-supplied fractional rates to the entry and
+  exit legs' executed USDT values and preserves fee-only, visible-book, and
+  combined-cost identities.
+- Bound immediate market and immediately marketable limit book walks to taker
+  semantics. Added strict decimal-unit, plausible-bound, effective-window,
+  source-reference, lineage, source-round-trip, and no-I/O checks.
+- Advanced execution-quality readiness to v17 and current Protocol-v2 progress
+  to v16, and reconciled the North Star, venue decision package, working
+  agreement, durable decision, and roadmap with the new unsealed capability.
+**Verify:** 160 focused Bybit execution/capture, fee, readiness, and current
+Protocol-v2 tests passed. Python compileall, North Star JSON validation, the
+offline Bybit smoke, static execution-quality readiness, current Protocol-v2
+progress check, architecture cleanliness, and diff check passed.
+**Notes/risks:** No fee rate, order style, target tier, private endpoint, or
+account-specific authority was selected. Fee-source authority, genuine capture
+evidence, funding, latency, beyond-book slippage, unavailable-cost behavior,
+and the final Protocol-v2 annex remain unsealed. No provider call, credential
+read, write, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` was added.
+
 ## 2026-07-20 — Record the thirty-eighth no-send market cycle · Codex
 **Why:** The persisted provider reservation expired with existing CoinGecko
 authorization still present, making one new point-in-time observation eligible

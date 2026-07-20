@@ -1185,7 +1185,12 @@ The remaining human decisions stay explicit:
   radar-execution-quality-bybit-capture PYTHON=.venv/bin/python` may collect and
   seal exact responses. Bybit perpetual is selected and the capture contract
   exists, but live spread remains unavailable while it is inactive and no valid
-  capture exists. Collection is disabled by unsetting
+  capture exists. The offline cost primitive now classifies every immediately
+  executing book walk—including an immediately marketable limit—as taker
+  liquidity and can apply caller-supplied fractional fee assumptions to each
+  leg's exact executed USDT value. It does not select a rate, model maker fills,
+  use account data, or seal the fee source/effective window or Protocol-v2
+  annex. Collection is disabled by unsetting
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE`; no provider process or order
   path exists.
 - Direct intraday: after one genuine current execution-quality capture exists,

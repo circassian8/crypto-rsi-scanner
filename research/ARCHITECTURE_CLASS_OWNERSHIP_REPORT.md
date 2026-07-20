@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-19T23:36:35.289553+00:00`
-- public_class_count: `512`
+- generated_at: `2026-07-20T00:07:08.322132+00:00`
+- public_class_count: `513`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `3`
+- functions_over_limit_count: `4`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `3`
+- production_functions_over_limit: `4`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `3`
+- functions_over_150_lines: `4`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `84`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 1 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 3 | advisory |
+| `functions_over_150_lines` | 4 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -309,6 +309,7 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | function | lines | public |
 |---|---|---:|---:|
+| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee` | `model_bybit_visible_book_taker_fee_scenario` | 166 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 226 | true |
-| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 157 | true |
-| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 151 | true |
+| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 176 | true |
+| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 155 | true |

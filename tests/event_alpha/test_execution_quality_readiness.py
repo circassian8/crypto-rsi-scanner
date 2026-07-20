@@ -28,6 +28,10 @@ from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness impor
     format_execution_quality_readiness,
     main,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
+    OFFICIAL_MAKER_TAKER_URL,
+    SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
+)
 
 
 EXPECTED_VENUES = {
@@ -48,7 +52,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v16"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v17"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -74,7 +78,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     )
     assert result.account_fee_endpoint_requires_credentials is True
     assert result.account_specific_fee_rate_access_authorized is False
-    assert result.official_fee_sources_reviewed_at == "2026-07-19"
+    assert result.official_fee_sources_reviewed_at == "2026-07-20"
     assert result.required_snapshot_fields_scope == (
         "inactive_generic_cross_venue_interface_not_selected_bybit_native_contract"
     )
@@ -165,6 +169,23 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["capture_pair_writes_performed"] is False
     assert impact["capture_pair_protocol_v2_annex_bound"] is False
     assert impact["capture_pair_protocol_v2_evidence_eligible"] is False
+    assert impact["immediately_marketable_liquidity_role"] == "taker"
+    assert impact["marketable_limit_immediate_fill_liquidity_role"] == "taker"
+    assert impact["maker_liquidity_scenario_modeled"] is False
+    assert impact["taker_fee_application_implemented"] is True
+    assert (
+        impact["taker_fee_scenario_schema_version"]
+        == TAKER_FEE_SCENARIO_SCHEMA_VERSION
+    )
+    assert impact["taker_fee_rate_unit"] == "fraction"
+    assert impact["taker_fee_applied_to_each_executed_leg_quote_value"] is True
+    assert impact["taker_fee_effective_window_must_cover_both_legs"] is True
+    assert impact["taker_fee_source_reference_required"] is True
+    assert impact["taker_fee_source_sealed"] is False
+    assert impact["taker_fee_protocol_v2_annex_bound"] is False
+    assert impact["taker_fee_provider_calls"] == 0
+    assert impact["taker_fee_writes_performed"] is False
+    assert impact["official_maker_taker_url"] == OFFICIAL_MAKER_TAKER_URL
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
@@ -186,6 +207,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
         "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
         "bybit_two_exact_immutable_capture_round_trip_v1",
+        "bybit_visible_book_taker_fee_scenario_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -448,6 +470,14 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "rounding=floor_to_quantity_step" in rendered
     assert "target_notional_does_not_exceed_reference=true" in rendered
     assert "target_notional_is_quote_budget=false" in rendered
+    assert "immediately_marketable_liquidity_role=taker" in rendered
+    assert "marketable_limit_immediate_fill_liquidity_role=taker" in rendered
+    assert "maker_liquidity_scenario_modeled=false" in rendered
+    assert "taker_fee_application_implemented=true" in rendered
+    assert TAKER_FEE_SCENARIO_SCHEMA_VERSION in rendered
+    assert "taker_fee_applied_to_each_executed_leg_quote_value=true" in rendered
+    assert "effective_window_must_cover_both_legs=true" in rendered
+    assert "taker_fee_source_sealed=false" in rendered
     assert "capture_pair_round_trip_implemented=true" in rendered
     assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in rendered
     assert "capture_pair_exact_namespaces_required=true" in rendered
@@ -597,7 +627,7 @@ def test_cli_json_is_structured_static_and_secret_free(
     )
     assert payload["account_fee_endpoint_requires_credentials"] is True
     assert payload["account_specific_fee_rate_access_authorized"] is False
-    assert payload["official_fee_sources_reviewed_at"] == "2026-07-19"
+    assert payload["official_fee_sources_reviewed_at"] == "2026-07-20"
     assert payload["required_snapshot_fields_scope"].startswith(
         "inactive_generic_cross_venue_interface"
     )
@@ -647,6 +677,7 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
         "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
         "bybit_two_exact_immutable_capture_round_trip_v1",
+        "bybit_visible_book_taker_fee_scenario_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -811,6 +842,16 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
         "capture_pair_base_and_namespaces_descriptor_held_together"
     ] is True
     assert readiness["capture_pair_protocol_v2_evidence_eligible"] is False
+    assert readiness["immediately_marketable_liquidity_role"] == "taker"
+    assert readiness["marketable_limit_immediate_fill_liquidity_role"] == "taker"
+    assert readiness["maker_liquidity_scenario_modeled"] is False
+    assert readiness["taker_fee_application_implemented"] is True
+    assert (
+        readiness["taker_fee_scenario_schema_version"]
+        == TAKER_FEE_SCENARIO_SCHEMA_VERSION
+    )
+    assert readiness["taker_fee_source_sealed"] is False
+    assert readiness["taker_fee_protocol_v2_annex_bound"] is False
     assert readiness["target_notional_tier_set_sealed"] is False
     assert readiness["base_quantity_selection_policy_sealed"] is False
     assert readiness["final_live_adapter_implemented"] is False

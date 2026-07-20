@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v16`. Run
+`crypto_radar_execution_quality_readiness_v17`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -86,6 +86,18 @@ fixed, dated research fee assumption or a separately authorized exact fee
 source, together with entry/exit order style, USDT notional tiers, spread and
 visible-book impact application, beyond-book slippage, funding treatment,
 latency cost, and unavailable-cost behavior. No numerical fee is inferred here.
+
+The fee arithmetic itself is now closed for the existing immediate book-walk
+scenario without choosing those values. Bybit's official
+[maker/taker explanation](https://www.bybit.com/en/help-center/article/Comparison-Between-Maker-Orders-and-Taker-Orders)
+classifies an order that executes immediately as a taker, whether the placement
+type is market or an immediately marketable limit. The pure fee-scenario v1
+therefore accepts separate decimal-text fractional taker rates, applies each to
+that leg's exact executed USDT value, and preserves fee-only plus combined
+visible-book cost identities. It requires a bounded public/reference-assumption
+source and one declared effective window covering both observed book legs. It
+does not model maker fills, read the account fee endpoint, select a rate, or
+make the result annex/evidence eligible.
 
 The selected Bybit capability now advertises only the actual native snapshot
 fields: USDT depth bands, USDT-notional side-specific price impact, native

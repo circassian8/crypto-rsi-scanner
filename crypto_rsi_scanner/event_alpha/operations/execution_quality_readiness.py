@@ -24,9 +24,13 @@ from .bybit_execution_quality import (
 from .bybit_execution_quality_capture_pair import (
     SCHEMA_VERSION as CAPTURE_PAIR_ROUND_TRIP_SCHEMA_VERSION,
 )
+from .bybit_execution_fee import (
+    OFFICIAL_MAKER_TAKER_URL,
+    SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v16"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v17"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -140,6 +144,20 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "capture_pair_writes_performed": False,
     "capture_pair_protocol_v2_annex_bound": False,
     "capture_pair_protocol_v2_evidence_eligible": False,
+    "immediately_marketable_liquidity_role": "taker",
+    "marketable_limit_immediate_fill_liquidity_role": "taker",
+    "maker_liquidity_scenario_modeled": False,
+    "taker_fee_application_implemented": True,
+    "taker_fee_scenario_schema_version": TAKER_FEE_SCENARIO_SCHEMA_VERSION,
+    "taker_fee_rate_unit": "fraction",
+    "taker_fee_applied_to_each_executed_leg_quote_value": True,
+    "taker_fee_effective_window_must_cover_both_legs": True,
+    "taker_fee_source_reference_required": True,
+    "taker_fee_source_sealed": False,
+    "taker_fee_protocol_v2_annex_bound": False,
+    "taker_fee_provider_calls": 0,
+    "taker_fee_writes_performed": False,
+    "official_maker_taker_url": OFFICIAL_MAKER_TAKER_URL,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
 }
@@ -685,7 +703,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
         ),
         account_fee_endpoint_requires_credentials=True,
         account_specific_fee_rate_access_authorized=False,
-        official_fee_sources_reviewed_at="2026-07-19",
+        official_fee_sources_reviewed_at="2026-07-20",
         eligible_instrument_set=(),
         eligible_instrument_selection_rule=(
             "top_30_liquid_decision_radar_assets_intersect_active_bybit_USDT_"
@@ -724,6 +742,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_usdt_linear_quantity_reconciled_visible_book_round_trip_v3",
             "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
             "bybit_two_exact_immutable_capture_round_trip_v1",
+            "bybit_visible_book_taker_fee_scenario_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -776,6 +795,9 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "the_target_is_not_a_quote_spend_budget_because_marketable_spread_and_impact_can_move_actual_quote_value",
             "the_final_target_tier_set_and_adoption_of_this_base_quantity_policy_remain_unsealed",
             "round_trip_size_selection_rounding_and_cost_application_policy_remain_unsealed",
+            "an_immediately_executing_market_or_marketable_limit_book_walk_is_taker_liquidity",
+            "the_pure_fee_projection_applies_supplied_fractional_taker_rates_to_each_exact_executed_leg_value",
+            "fee_rates_sources_effective_windows_and_final_policy_remain_unsealed",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -890,6 +912,29 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"{str(value['target_notional_is_quote_budget']).casefold()} "
         "marketable_quote_value_may_exceed_target_due_spread_and_impact="
         f"{str(value['marketable_quote_value_may_exceed_target_due_spread_and_impact']).casefold()}",
+        "immediately_marketable_liquidity_role="
+        f"{value['immediately_marketable_liquidity_role']} "
+        "marketable_limit_immediate_fill_liquidity_role="
+        f"{value['marketable_limit_immediate_fill_liquidity_role']} "
+        "maker_liquidity_scenario_modeled="
+        f"{str(value['maker_liquidity_scenario_modeled']).casefold()}",
+        "taker_fee_application_implemented="
+        f"{str(value['taker_fee_application_implemented']).casefold()} "
+        f"schema={value['taker_fee_scenario_schema_version']} "
+        f"rate_unit={value['taker_fee_rate_unit']}",
+        "taker_fee_applied_to_each_executed_leg_quote_value="
+        f"{str(value['taker_fee_applied_to_each_executed_leg_quote_value']).casefold()} "
+        "effective_window_must_cover_both_legs="
+        f"{str(value['taker_fee_effective_window_must_cover_both_legs']).casefold()} "
+        "source_reference_required="
+        f"{str(value['taker_fee_source_reference_required']).casefold()}",
+        "taker_fee_source_sealed="
+        f"{str(value['taker_fee_source_sealed']).casefold()} "
+        "protocol_v2_annex_bound="
+        f"{str(value['taker_fee_protocol_v2_annex_bound']).casefold()} "
+        f"provider_calls={value['taker_fee_provider_calls']} "
+        "writes_performed="
+        f"{str(value['taker_fee_writes_performed']).casefold()}",
         "capture_pair_round_trip_implemented="
         f"{str(value['capture_pair_round_trip_implemented']).casefold()} "
         f"schema={value['capture_pair_round_trip_schema_version']}",

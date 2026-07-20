@@ -20,6 +20,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_liquidation_stream import (
     PUSH_FREQUENCY_MILLISECONDS,
     TOPIC_PREFIX,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
+    OFFICIAL_MAKER_TAKER_URL,
+    SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 import (
     CONTRACT_VERSION as FROZEN_CONTRACT_VERSION,
     readiness_sha256,
@@ -42,10 +46,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v15"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v16"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_two_exact_immutable_capture_round_trip_target_mid_notional_floor_"
+    "with_unsealed_exact_leg_taker_fee_application_two_exact_immutable_"
+    "capture_round_trip_target_mid_notional_floor_"
     "sizing_separate_entry_exit_catalog_bound_"
     "dynamic_instrument_constraints_quantity_reconciled_round_trip_"
     "primitive_mid_reference_impact_semantics_native_"
@@ -125,7 +130,7 @@ _EXPECTED_EXECUTION_DECISION = {
         "account_endpoint_outside_public_only_scope"
     ),
     "account_specific_fee_rate_access_authorized": False,
-    "official_fee_sources_reviewed_at": "2026-07-19",
+    "official_fee_sources_reviewed_at": "2026-07-20",
     "selected_native_snapshot_fields": list(BYBIT_NATIVE_METRICS),
     "generic_cross_venue_projection_available": False,
     "selected_impact_reference": "mid_price",
@@ -209,6 +214,20 @@ _EXPECTED_EXECUTION_DECISION = {
     "capture_pair_writes_performed": False,
     "capture_pair_protocol_v2_annex_bound": False,
     "capture_pair_protocol_v2_evidence_eligible": False,
+    "immediately_marketable_liquidity_role": "taker",
+    "marketable_limit_immediate_fill_liquidity_role": "taker",
+    "maker_liquidity_scenario_modeled": False,
+    "taker_fee_application_implemented": True,
+    "taker_fee_scenario_schema_version": TAKER_FEE_SCENARIO_SCHEMA_VERSION,
+    "taker_fee_rate_unit": "fraction",
+    "taker_fee_applied_to_each_executed_leg_quote_value": True,
+    "taker_fee_effective_window_must_cover_both_legs": True,
+    "taker_fee_source_reference_required": True,
+    "taker_fee_source_sealed": False,
+    "taker_fee_protocol_v2_annex_bound": False,
+    "taker_fee_provider_calls": 0,
+    "taker_fee_writes_performed": False,
+    "official_maker_taker_url": OFFICIAL_MAKER_TAKER_URL,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
@@ -597,6 +616,25 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         (
             "target_notional_is_quote_budget=false "
             "marketable_quote_value_may_exceed_target_due_spread_and_impact=true"
+        ),
+        (
+            "immediately_marketable_liquidity_role=taker "
+            "marketable_limit_immediate_fill_liquidity_role=taker "
+            "maker_liquidity_scenario_modeled=false"
+        ),
+        (
+            "taker_fee_application_implemented=true schema="
+            f"{decision['taker_fee_scenario_schema_version']} "
+            "rate_unit=fraction"
+        ),
+        (
+            "taker_fee_applied_to_each_executed_leg_quote_value=true "
+            "effective_window_must_cover_both_legs=true "
+            "source_reference_required=true"
+        ),
+        (
+            "taker_fee_source_sealed=false protocol_v2_annex_bound=false "
+            "provider_calls=0 writes_performed=false"
         ),
         (
             "capture_pair_round_trip_implemented=true schema="

@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Apply immediate-book fees as explicit taker scenarios
+**Status:** accepted as offline arithmetic; fee source and Protocol-v2 policy remain unsealed
+**Decision:** Treat every complete immediately marketable visible-book walk as
+taker liquidity, including a limit order that executes immediately. A research
+fee scenario may apply separate caller-supplied decimal-text fractional rates
+to the exact executed USDT value of the entry and exit legs. Require a bounded
+public-documentation or named research-assumption reference, explicit lineage,
+and one effective window covering both provider-observed leg times. Preserve
+fee-only, visible-book-only, and combined cost identities; never add spread
+again, model a maker fill from an immediate walk, infer an account rate, or
+claim realized execution. The projection stays source-unsealed, annex-unbound,
+and Protocol-v2-ineligible.
+**Why:** Order placement type does not determine maker/taker status: an
+immediately executing market or marketable-limit order removes liquidity. The
+two-book model already had exact executed quote values but exposed no safe way
+to apply fees, inviting either maker/taker confusion or fees calculated from a
+target notional instead of the actual modeled legs.
+**Revisit when:** The operator seals the final fee source/rates, effective
+window, entry/exit execution style, target tiers, and complete Protocol-v2 cost
+annex. A maker scenario requires a separate fill-probability and queue-position
+contract rather than reuse of the immediate book walk.
+
 ## 2026-07-20 - Build round-trip evidence only from two exact immutable captures
 **Status:** accepted as a read-only capability; not Protocol-v2 evidence until annex-bound
 **Decision:** A capture-backed Bybit round trip must name exact entry and exit

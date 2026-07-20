@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v16 must expose those remaining cost fields rather
+  Execution-quality readiness v17 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -625,6 +625,18 @@ may be added later when a suitable environment already exists.
   catalog/book hashes, clocks, and lineages. It makes no provider call or write
   and remains Protocol-v2-ineligible until genuine capture IDs and the complete
   cost annex are human-sealed.
+  The pure taker-fee scenario v1 may then apply explicit fractional entry and
+  exit fee assumptions to each leg's exact executed USDT value. An immediate
+  book walk consumes liquidity, so both market orders and immediately
+  marketable limit orders use the taker role in this scenario; it never models
+  a maker fill. Rates must be decimal-text fractions within plausible bounds,
+  name a bounded public or research-assumption reference, and have one declared
+  effective window covering both provider-observed leg times. The projection
+  rejects fee/spread double counting and preserves the gross, visible-book,
+  fee-only, and combined cost identities. It reads no account data, provider,
+  credential, or file; performs no write; chooses no rate; and remains
+  `fee_rate_source_sealed=false` and Protocol-v2-ineligible until the annex
+  binds a reviewed source and policy.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side
