@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on missing residual execution cost · Codex
+**Why:** The Bybit cost stack could exactly compose decision-price latency,
+visible-book drag, taker fees, and supplied-schedule funding, but it had no
+closed representation for the remaining residual execution cost. Treating that
+missing value as zero would make empirical P&L optimistically wrong, while a
+hard-coded penalty would manufacture unsupported evidence.
+**Changes:**
+- Added a pure residual-cost sensitivity projection that fully rederives the
+  decision-reference composite. With no explicit residual assumption it
+  returns no numeric all-in cost or net; with one, it applies separate
+  decimal-text entry/exit basis points to each leg's exact executed USDT value.
+- Bound assumptions to an explicit unit, causal effective window, bounded
+  research-assumption reference, and lineage distinct from execution, catalog,
+  decision-reference, fee, funding-schedule, rate, and mark sources. Even a
+  supplied zero remains unobserved, source/policy-unsealed, annex-unbound, and
+  Protocol-v2-ineligible.
+- Advanced execution-quality readiness to v22 and mutable Protocol-v2 progress
+  to v21, then synchronized the North Star, execution decision package, working
+  agreement, durable decision, roadmap, and checked operator surfaces. The
+  frozen 2026-07-16 readiness contract remains byte-identical.
+**Verify:** 57 focused Bybit cost/readiness/progress tests and 25 North Star/
+operator-surface tests passed; compileall, JSON validation, progress check,
+execution-quality readiness, North Star generation, exact dashboard readiness,
+and `git diff --check` passed. The broad local pytest run completed with 3,531
+passes and one sandbox-only denial of an ephemeral loopback bind; that exact
+dashboard concurrency test then passed with loopback permission. The remaining
+`verify-fast` alert-render, fixture-backtest, and scoreboard stages passed.
+Architecture cleanliness passed with no non-size blocker; the new long-function
+measurement and all other quantitative size observations are advisory only.
+**Notes/risks:** This is sensitivity and missing-data mechanics, not a selected
+slippage estimate or final unavailable-cost rule. No provider call,
+authorization, threshold, route, score, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE` path changed.
+
 ## 2026-07-20 — Fail closed on catalyst context truthiness · Codex
 **Why:** Source-enrichment cache/LLM rows, incident context rows, and persisted
 watchlist rows still accepted Python truthiness. Literal false-like values

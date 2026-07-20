@@ -34,6 +34,10 @@ from .bybit_execution_cost import (
 from .bybit_execution_cost_latency import (
     SCHEMA_VERSION as DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION,
 )
+from .bybit_execution_cost_residual import (
+    SCHEMA_VERSION as RESIDUAL_EXECUTION_COST_SCHEMA_VERSION,
+    SLIPPAGE_UNIT as RESIDUAL_SLIPPAGE_UNIT,
+)
 from .bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -48,7 +52,7 @@ from .bybit_execution_latency import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v21"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v22"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -263,6 +267,25 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "decision_reference_composite_unavailable_cost_policy_sealed": False,
     "decision_reference_composite_provider_calls": 0,
     "decision_reference_composite_writes_performed": False,
+    "residual_cost_sensitivity_implemented": True,
+    "residual_cost_sensitivity_schema_version": (
+        RESIDUAL_EXECUTION_COST_SCHEMA_VERSION
+    ),
+    "residual_cost_sensitivity_unit": RESIDUAL_SLIPPAGE_UNIT,
+    "residual_cost_reference_basis": (
+        "each_leg_exact_executed_quote_value_usdt"
+    ),
+    "residual_cost_missing_assumption_fails_closed": True,
+    "residual_cost_missing_assumption_numeric_all_in_available": False,
+    "residual_cost_explicit_zero_is_observed_evidence": False,
+    "residual_cost_slippage_observed": False,
+    "residual_cost_source_sealed": False,
+    "residual_cost_unavailable_policy_sealed": False,
+    "residual_cost_complete_protocol_v2_cost_model": False,
+    "residual_cost_protocol_v2_annex_bound": False,
+    "residual_cost_protocol_v2_evidence_eligible": False,
+    "residual_cost_provider_calls": 0,
+    "residual_cost_writes_performed": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
 }
@@ -853,6 +876,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_composite_execution_cost_scenario_v1",
             "bybit_decision_price_latency_scenario_v1",
             "bybit_decision_reference_composite_execution_cost_scenario_v1",
+            "bybit_residual_execution_cost_sensitivity_scenario_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -914,6 +938,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "the_composite_cost_projection_fully_rederives_and_identity_reconciles_visible_book_taker_fee_and_supplied_schedule_funding_components",
             "the_base_composite_excludes_latency_beyond_book_slippage_and_unavailable_cost_policy",
             "the_decision_reference_composite_includes_supplied_latency_visible_book_fee_and_funding_but_still_excludes_beyond_book_slippage_and_unavailable_cost_policy_and_is_not_a_complete_protocol_v2_cost_model",
+            "the_residual_cost_projection_returns_no_numeric_all_in_result_when_the_required_residual_assumption_is_missing_and_can_apply_only_an_explicit_unsealed_per_leg_sensitivity_without_claiming_observation_source_authority_policy_sealing_or_protocol_v2_completeness",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -1139,6 +1164,33 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"{str(value['decision_reference_composite_beyond_visible_book_slippage_included']).casefold()} "
         "unavailable_cost_policy_sealed="
         f"{str(value['decision_reference_composite_unavailable_cost_policy_sealed']).casefold()}",
+        "residual_cost_sensitivity_implemented="
+        f"{str(value['residual_cost_sensitivity_implemented']).casefold()} "
+        f"schema={value['residual_cost_sensitivity_schema_version']} "
+        f"unit={value['residual_cost_sensitivity_unit']}",
+        "residual_cost_reference_basis="
+        f"{value['residual_cost_reference_basis']} "
+        "missing_assumption_fails_closed="
+        f"{str(value['residual_cost_missing_assumption_fails_closed']).casefold()} "
+        "numeric_all_in_available_without_assumption="
+        f"{str(value['residual_cost_missing_assumption_numeric_all_in_available']).casefold()}",
+        "residual_cost_explicit_zero_is_observed_evidence="
+        f"{str(value['residual_cost_explicit_zero_is_observed_evidence']).casefold()} "
+        "slippage_observed="
+        f"{str(value['residual_cost_slippage_observed']).casefold()} "
+        "source_sealed="
+        f"{str(value['residual_cost_source_sealed']).casefold()}",
+        "residual_cost_unavailable_policy_sealed="
+        f"{str(value['residual_cost_unavailable_policy_sealed']).casefold()} "
+        "complete_protocol_v2_cost_model="
+        f"{str(value['residual_cost_complete_protocol_v2_cost_model']).casefold()} "
+        "protocol_v2_annex_bound="
+        f"{str(value['residual_cost_protocol_v2_annex_bound']).casefold()} "
+        "protocol_v2_evidence_eligible="
+        f"{str(value['residual_cost_protocol_v2_evidence_eligible']).casefold()}",
+        f"residual_cost_provider_calls={value['residual_cost_provider_calls']} "
+        "writes_performed="
+        f"{str(value['residual_cost_writes_performed']).casefold()}",
         "capture_pair_round_trip_implemented="
         f"{str(value['capture_pair_round_trip_implemented']).casefold()} "
         f"schema={value['capture_pair_round_trip_schema_version']}",

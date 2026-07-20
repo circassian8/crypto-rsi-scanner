@@ -894,7 +894,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v21 records the owner-confirmed primary research
+Execution-quality readiness v22 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -974,6 +974,16 @@ and latency policy are unsealed, and beyond-visible-book slippage and
 unavailable-cost behavior remain absent. Therefore the new composite keeps
 `complete_protocol_v2_cost_model=false`, `protocol_v2_annex_bound=false`, and
 `protocol_v2_evidence_eligible=false`.
+
+Residual-cost sensitivity v1 closes the missing-data behavior without claiming
+that the missing evidence has been measured. It fully rederives the exact
+decision-reference composite, then either applies explicit non-negative
+per-leg basis-point assumptions to each leg's actual executed USDT value or
+returns no numeric all-in result when the assumption is absent. Missing
+residual cost is never silently treated as zero. Even an explicit zero
+sensitivity remains an unobserved research assumption: source authority,
+slippage policy, unavailable-cost policy, complete cost-model status, annex
+binding, and Protocol-v2 evidence eligibility all remain false.
 
 The selected capability and snapshot projection use the real native fields:
 `bid_depth_usdt_by_band`, `ask_depth_usdt_by_band`, and side-specific

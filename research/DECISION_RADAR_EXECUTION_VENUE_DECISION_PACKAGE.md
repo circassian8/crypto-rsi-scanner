@@ -152,6 +152,14 @@ sources or latency policy, modeled beyond-visible-book slippage, selected an
 unavailable-cost rule, or bound the annex. Neither composite is a complete
 Protocol-v2 cost model or evidence row.
 
+The residual-cost sensitivity contract now makes that last numeric gap
+fail-closed. Without an explicit residual assumption it exposes the known
+component result but returns no numeric all-in cost or net. With an explicit
+unsealed per-leg basis-point sensitivity, it applies the adverse amount to each
+leg's exact executed USDT value and reconciles the resulting net. This is
+sensitivity arithmetic, not observed slippage: even zero remains unobserved,
+source-unsealed, policy-unsealed, annex-unbound, and Protocol-v2-ineligible.
+
 The selected Bybit capability now advertises only the actual native snapshot
 fields: USDT depth bands, USDT-notional side-specific price impact, native
 notional currency, and exact provider/snapshot/acquisition clocks and book

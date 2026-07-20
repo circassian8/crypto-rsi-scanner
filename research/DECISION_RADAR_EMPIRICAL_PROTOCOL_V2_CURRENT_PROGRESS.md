@@ -48,6 +48,11 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   actual submission or fill is observed, so the result remains incomplete
   without sealed references and policy, beyond-book slippage, unavailable-cost
   behavior, authoritative fee/funding sources, and annex binding;
+- residual-cost sensitivity now fully rederives that decision-reference
+  composite and applies an explicit unsealed per-leg basis-point penalty to
+  each exact executed USDT value. If the penalty is absent, the all-in cost and
+  net remain unavailable rather than silently using zero. Even a supplied zero
+  is unobserved sensitivity, not empirical evidence or a sealed policy;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -67,8 +72,10 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - no genuine Bybit REST funding/open-interest/positioning capture exists;
 - the primary currency unit is sealed as native USDT, but the fee schedule,
   order style, notional tiers, final quantity policy, spread/impact application,
-  slippage, funding policy and sources, decision-reference source/clock rules,
-  latency-cost policy, and unavailable-cost rules remain unsealed;
+  slippage source and final policy, funding policy and sources,
+  decision-reference source/clock rules, latency-cost policy, and the final
+  unavailable-cost rule remain unsealed; the implemented fail-closed
+  sensitivity mechanics do not choose those annex values;
 - Bybit's public fee table is not treated as account- or symbol-authoritative,
   while its authenticated account fee-rate endpoint remains outside the
   confirmed public-only boundary and is neither authorized nor called;

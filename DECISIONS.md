@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Missing residual execution cost cannot become zero
+**Status:** accepted as fail-closed offline mechanics; final policy remains unsealed
+**Decision:** Fully rederive the exact Bybit decision-reference composite before
+projecting any residual execution cost. Without an explicit residual-slippage
+assumption, retain the known components but return no numeric all-in cost or net.
+An optional sensitivity may supply separate non-negative decimal-text basis
+points for entry and exit, applied to each leg's exact executed USDT value under
+one causal effective window and distinct research-assumption lineage. Treat even
+an explicit zero as unobserved sensitivity. Keep source authority,
+beyond-visible-book policy, unavailable-cost policy, complete Protocol-v2 cost
+status, annex binding, realized execution, and evidence eligibility false.
+**Why:** Silently interpreting an unavailable cost as zero creates optimistic
+backtest P&L, while inventing a generic penalty creates unsupported evidence.
+The two-state contract lets the project test exact arithmetic and sensitivity
+without confusing a research assumption with measured execution quality or
+prematurely choosing the final annex rule.
+**Revisit when:** Genuine immutable decision/submission/fill evidence supports a
+residual-slippage model and the operator is ready to seal its source, estimation
+window, missing-data rule, permitted bounds, target tiers, and Protocol-v2 annex.
+
 ## 2026-07-20 - Parse Decision Radar policy booleans semantically
 **Status:** accepted
 **Decision:** Market-anomaly classification, Decision catalyst policy,

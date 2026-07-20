@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 764,
+  "class_count": 767,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,10 +1530,18 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10789,
+  "function_count": 10802,
   "function_line_limit": 150,
-  "functions_over_150_lines": 9,
+  "functions_over_150_lines": 10,
   "functions_over_limit": [
+    {
+      "function_name": "model_bybit_residual_execution_cost_sensitivity_scenario",
+      "line_count": 195,
+      "module": "crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual",
+      "public": true,
+      "qualname": "model_bybit_residual_execution_cost_sensitivity_scenario",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_cost_residual.py"
+    },
     {
       "function_name": "model_bybit_visible_book_taker_fee_scenario",
       "line_count": 166,
@@ -1576,7 +1584,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 256,
+      "line_count": 278,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1584,7 +1592,7 @@
     },
     {
       "function_name": "build_execution_quality_readiness",
-      "line_count": 166,
+      "line_count": 168,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": true,
       "qualname": "build_execution_quality_readiness",
@@ -1592,7 +1600,7 @@
     },
     {
       "function_name": "_impact_cost_lines",
-      "line_count": 219,
+      "line_count": 246,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": false,
       "qualname": "_impact_cost_lines",
@@ -1607,8 +1615,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 9,
-  "generated_at": "2026-07-20T04:46:44.060973+00:00",
+  "functions_over_limit_count": 10,
+  "generated_at": "2026-07-20T05:12:39.638688+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3118,6 +3126,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1402,
+      "path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1397,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3148,13 +3163,6 @@
     {
       "line_count": 1371,
       "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1350,
-      "path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -3242,8 +3250,16 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 9,
+  "production_functions_over_limit": 10,
   "production_functions_over_limit_rows": [
+    {
+      "function_name": "model_bybit_residual_execution_cost_sensitivity_scenario",
+      "line_count": 195,
+      "module": "crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual",
+      "public": true,
+      "qualname": "model_bybit_residual_execution_cost_sensitivity_scenario",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_cost_residual.py"
+    },
     {
       "function_name": "model_bybit_visible_book_taker_fee_scenario",
       "line_count": 166,
@@ -3286,7 +3302,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 256,
+      "line_count": 278,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -3294,7 +3310,7 @@
     },
     {
       "function_name": "build_execution_quality_readiness",
-      "line_count": 166,
+      "line_count": 168,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": true,
       "qualname": "build_execution_quality_readiness",
@@ -3302,7 +3318,7 @@
     },
     {
       "function_name": "_impact_cost_lines",
-      "line_count": 219,
+      "line_count": 246,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": false,
       "qualname": "_impact_cost_lines",
@@ -3439,7 +3455,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 517,
+  "public_class_count": 518,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3515,6 +3531,7 @@
     "crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_set_freshness": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_latency": 1,
+    "crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_latency": 1,
@@ -3770,7 +3787,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 9,
+      "functions_over_150_lines": 10,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -3836,6 +3853,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1402,
+        "path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1397,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
         "threshold": 1200
@@ -3858,11 +3880,6 @@
       {
         "line_count": 1371,
         "path": "crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1350,
-        "path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
         "threshold": 1200
       },
       {
@@ -3978,7 +3995,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 9,
+    "functions_over_150_lines": 10,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

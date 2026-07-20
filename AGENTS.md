@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v21 must expose those remaining cost fields rather
+  Execution-quality readiness v22 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -680,6 +680,16 @@ may be added later when a suitable environment already exists.
   latency. Keep decision sources and latency policy unsealed, actual submission
   and fill observation false, beyond-book and unavailable-cost behavior absent,
   and Protocol-v2 authority false.
+  The pure residual execution-cost sensitivity v1 must fully rederive that
+  decision-reference composite. With no explicit residual-slippage assumption,
+  it retains known components but returns no numeric all-in cost or net; missing
+  cost must never become zero. An optional sensitivity uses separate
+  non-negative decimal-text entry/exit basis points against each leg's exact
+  executed USDT value, one causal effective window, a bounded research-
+  assumption reference, and a lineage distinct from every component source.
+  Even an explicit zero remains unobserved and source/policy-unsealed. Never
+  treat sensitivity arithmetic as realized slippage, a sealed unavailable-cost
+  rule, a complete Protocol-v2 cost model, annex authority, or evidence.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

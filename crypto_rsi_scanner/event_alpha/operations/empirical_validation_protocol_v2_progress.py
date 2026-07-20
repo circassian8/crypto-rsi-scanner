@@ -30,6 +30,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost import (
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_latency import (
     SCHEMA_VERSION as DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual import (
+    SCHEMA_VERSION as RESIDUAL_EXECUTION_COST_SCHEMA_VERSION,
+    SLIPPAGE_UNIT as RESIDUAL_SLIPPAGE_UNIT,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -64,9 +68,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v20"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v21"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
+    "with_fail_closed_residual_cost_availability_and_unsealed_per_leg_"
+    "slippage_sensitivity_"
     "with_unsealed_decision_price_latency_and_identity_rederived_"
     "decision_reference_composite_cost_"
     "with_unsealed_identity_rederived_composite_execution_cost_"
@@ -338,6 +344,25 @@ _EXPECTED_EXECUTION_DECISION = {
     "decision_reference_composite_unavailable_cost_policy_sealed": False,
     "decision_reference_composite_provider_calls": 0,
     "decision_reference_composite_writes_performed": False,
+    "residual_cost_sensitivity_implemented": True,
+    "residual_cost_sensitivity_schema_version": (
+        RESIDUAL_EXECUTION_COST_SCHEMA_VERSION
+    ),
+    "residual_cost_sensitivity_unit": RESIDUAL_SLIPPAGE_UNIT,
+    "residual_cost_reference_basis": (
+        "each_leg_exact_executed_quote_value_usdt"
+    ),
+    "residual_cost_missing_assumption_fails_closed": True,
+    "residual_cost_missing_assumption_numeric_all_in_available": False,
+    "residual_cost_explicit_zero_is_observed_evidence": False,
+    "residual_cost_slippage_observed": False,
+    "residual_cost_source_sealed": False,
+    "residual_cost_unavailable_policy_sealed": False,
+    "residual_cost_complete_protocol_v2_cost_model": False,
+    "residual_cost_protocol_v2_annex_bound": False,
+    "residual_cost_protocol_v2_evidence_eligible": False,
+    "residual_cost_provider_calls": 0,
+    "residual_cost_writes_performed": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
@@ -824,6 +849,28 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "complete_protocol_v2_cost_model=false "
             "beyond_visible_book_slippage_included=false "
             "unavailable_cost_policy_sealed=false provider_calls=0 "
+            "writes_performed=false"
+        ),
+        (
+            "residual_cost_sensitivity_implemented=true schema="
+            f"{decision['residual_cost_sensitivity_schema_version']} "
+            f"unit={decision['residual_cost_sensitivity_unit']}"
+        ),
+        (
+            "residual_cost_reference_basis="
+            f"{decision['residual_cost_reference_basis']} "
+            "missing_assumption_fails_closed=true "
+            "numeric_all_in_available_without_assumption=false"
+        ),
+        (
+            "residual_cost_explicit_zero_is_observed_evidence=false "
+            "slippage_observed=false source_sealed=false"
+        ),
+        (
+            "residual_cost_unavailable_policy_sealed=false "
+            "complete_protocol_v2_cost_model=false "
+            "protocol_v2_annex_bound=false "
+            "protocol_v2_evidence_eligible=false provider_calls=0 "
             "writes_performed=false"
         ),
         (

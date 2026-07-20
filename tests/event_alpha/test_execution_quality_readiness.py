@@ -38,6 +38,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost import (
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_latency import (
     SCHEMA_VERSION as DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual import (
+    SCHEMA_VERSION as RESIDUAL_EXECUTION_COST_SCHEMA_VERSION,
+    SLIPPAGE_UNIT as RESIDUAL_SLIPPAGE_UNIT,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -70,7 +74,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v21"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v22"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -297,6 +301,28 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     ] is False
     assert impact["decision_reference_composite_provider_calls"] == 0
     assert impact["decision_reference_composite_writes_performed"] is False
+    assert impact["residual_cost_sensitivity_implemented"] is True
+    assert impact["residual_cost_sensitivity_schema_version"] == (
+        RESIDUAL_EXECUTION_COST_SCHEMA_VERSION
+    )
+    assert impact["residual_cost_sensitivity_unit"] == RESIDUAL_SLIPPAGE_UNIT
+    assert impact["residual_cost_reference_basis"] == (
+        "each_leg_exact_executed_quote_value_usdt"
+    )
+    assert impact["residual_cost_missing_assumption_fails_closed"] is True
+    assert (
+        impact["residual_cost_missing_assumption_numeric_all_in_available"]
+        is False
+    )
+    assert impact["residual_cost_explicit_zero_is_observed_evidence"] is False
+    assert impact["residual_cost_slippage_observed"] is False
+    assert impact["residual_cost_source_sealed"] is False
+    assert impact["residual_cost_unavailable_policy_sealed"] is False
+    assert impact["residual_cost_complete_protocol_v2_cost_model"] is False
+    assert impact["residual_cost_protocol_v2_annex_bound"] is False
+    assert impact["residual_cost_protocol_v2_evidence_eligible"] is False
+    assert impact["residual_cost_provider_calls"] == 0
+    assert impact["residual_cost_writes_performed"] is False
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
@@ -324,6 +350,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_composite_execution_cost_scenario_v1",
         "bybit_decision_price_latency_scenario_v1",
         "bybit_decision_reference_composite_execution_cost_scenario_v1",
+        "bybit_residual_execution_cost_sensitivity_scenario_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -352,6 +379,12 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "the_decision_reference_composite_includes_supplied_latency_visible_"
         "book_fee_and_funding_but_still_excludes_beyond_book_slippage_and_"
         "unavailable_cost_policy_and_is_not_a_complete_protocol_v2_cost_model"
+    ) in result.implications
+    assert (
+        "the_residual_cost_projection_returns_no_numeric_all_in_result_when_"
+        "the_required_residual_assumption_is_missing_and_can_apply_only_an_"
+        "explicit_unsealed_per_leg_sensitivity_without_claiming_observation_"
+        "source_authority_policy_sealing_or_protocol_v2_completeness"
     ) in result.implications
     assert not any(
         value.startswith("the_composite_still_excludes_latency")
@@ -644,6 +677,14 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "decision_reference_composite_cost_implemented=true" in rendered
     assert DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION in rendered
     assert "decision_reference_composite_latency_cost_included=true" in rendered
+    assert "residual_cost_sensitivity_implemented=true" in rendered
+    assert RESIDUAL_EXECUTION_COST_SCHEMA_VERSION in rendered
+    assert f"unit={RESIDUAL_SLIPPAGE_UNIT}" in rendered
+    assert "missing_assumption_fails_closed=true" in rendered
+    assert "numeric_all_in_available_without_assumption=false" in rendered
+    assert "residual_cost_explicit_zero_is_observed_evidence=false" in rendered
+    assert "residual_cost_unavailable_policy_sealed=false" in rendered
+    assert "residual_cost_provider_calls=0 writes_performed=false" in rendered
     assert "funding_rate_source_sealed=false" in rendered
     assert "settlement_mark_source_sealed=false" in rendered
     assert "capture_pair_round_trip_implemented=true" in rendered
@@ -851,6 +892,7 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_composite_execution_cost_scenario_v1",
         "bybit_decision_price_latency_scenario_v1",
         "bybit_decision_reference_composite_execution_cost_scenario_v1",
+        "bybit_residual_execution_cost_sensitivity_scenario_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -1076,6 +1118,22 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     assert readiness[
         "decision_reference_composite_complete_protocol_v2_cost_model"
     ] is False
+    assert readiness["residual_cost_sensitivity_implemented"] is True
+    assert readiness["residual_cost_sensitivity_schema_version"] == (
+        RESIDUAL_EXECUTION_COST_SCHEMA_VERSION
+    )
+    assert readiness["residual_cost_sensitivity_unit"] == RESIDUAL_SLIPPAGE_UNIT
+    assert readiness["residual_cost_missing_assumption_fails_closed"] is True
+    assert (
+        readiness["residual_cost_missing_assumption_numeric_all_in_available"]
+        is False
+    )
+    assert readiness["residual_cost_explicit_zero_is_observed_evidence"] is False
+    assert readiness["residual_cost_slippage_observed"] is False
+    assert readiness["residual_cost_source_sealed"] is False
+    assert readiness["residual_cost_unavailable_policy_sealed"] is False
+    assert readiness["residual_cost_complete_protocol_v2_cost_model"] is False
+    assert readiness["residual_cost_protocol_v2_evidence_eligible"] is False
     assert readiness["funding_rate_source_sealed"] is False
     assert readiness["settlement_mark_source_sealed"] is False
     assert readiness["funding_settlement_protocol_v2_annex_bound"] is False

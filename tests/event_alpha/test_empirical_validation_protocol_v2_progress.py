@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v20")
+    assert values["progress_version"].endswith("_v21")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -243,6 +243,30 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision[
         "decision_reference_composite_complete_protocol_v2_cost_model"
     ] is False
+    assert decision["residual_cost_sensitivity_implemented"] is True
+    assert decision["residual_cost_sensitivity_schema_version"] == (
+        "crypto_radar.bybit_residual_execution_cost_sensitivity_scenario.v1"
+    )
+    assert decision["residual_cost_sensitivity_unit"] == (
+        "basis_points_of_executed_quote_value"
+    )
+    assert decision["residual_cost_reference_basis"] == (
+        "each_leg_exact_executed_quote_value_usdt"
+    )
+    assert decision["residual_cost_missing_assumption_fails_closed"] is True
+    assert (
+        decision["residual_cost_missing_assumption_numeric_all_in_available"]
+        is False
+    )
+    assert decision["residual_cost_explicit_zero_is_observed_evidence"] is False
+    assert decision["residual_cost_slippage_observed"] is False
+    assert decision["residual_cost_source_sealed"] is False
+    assert decision["residual_cost_unavailable_policy_sealed"] is False
+    assert decision["residual_cost_complete_protocol_v2_cost_model"] is False
+    assert decision["residual_cost_protocol_v2_annex_bound"] is False
+    assert decision["residual_cost_protocol_v2_evidence_eligible"] is False
+    assert decision["residual_cost_provider_calls"] == 0
+    assert decision["residual_cost_writes_performed"] is False
     assert decision["target_notional_tier_set_sealed"] is False
     assert decision["base_quantity_selection_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
@@ -501,6 +525,16 @@ def test_progress_human_output_and_make_targets_are_explicit(
         in output.out
     )
     assert "decision_reference_composite_latency_cost_included=true" in output.out
+    assert "residual_cost_sensitivity_implemented=true" in output.out
+    assert (
+        "crypto_radar.bybit_residual_execution_cost_sensitivity_scenario.v1"
+        in output.out
+    )
+    assert "unit=basis_points_of_executed_quote_value" in output.out
+    assert "missing_assumption_fails_closed=true" in output.out
+    assert "numeric_all_in_available_without_assumption=false" in output.out
+    assert "residual_cost_explicit_zero_is_observed_evidence=false" in output.out
+    assert "residual_cost_unavailable_policy_sealed=false" in output.out
     assert "capture_pair_round_trip_implemented=true" in output.out
     assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in output.out
     assert "capture_pair_exact_namespaces_required=true" in output.out
