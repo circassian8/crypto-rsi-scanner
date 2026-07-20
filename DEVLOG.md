@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-fifth no-send market cycle · Codex
+**Why:** The next hourly cadence boundary was eligible and the existing
+CoinGecko authorization was present, so one bounded no-send observation could
+advance temporal and prospective-control evidence without changing policy.
+**Changes:** Ran exactly one provider request and published
+`radar_market_no_send_20260720t123454737235z_79d90e9ba9f3`. The campaign now
+contains 45 real cycles, 1,350 retained observations, 1,320 baseline-counted
+observations, and 90 rows with prospective point-in-time universe/liquidity
+context. The current generation is healthy-empty with 30 observations and zero
+ideas. Current-universe volume and turnover baselines are warm for all 30
+assets; PUMP and WBT still prevent a complete causal 24-hour regime set, so no
+market regime, partition, or matched control was fabricated.
+**Verify:** Daily Operations returned terminal `succeeded`, provider attempted
+and succeeded once, pointer published, and owned dashboard restarted. Strict
+doctor reported 0 blockers / 0 warnings; publication and operations receipts
+bind revision 12 and operator-state SHA-256
+`a9ff55d9e54dd9195d9a332ea740ee8ee33ebdd3bcf0933c12c5f214293d3f85`.
+Dashboard readiness passed, and a host-level loopback HEAD returned HTTP 200
+with the exact namespace, run, revision, and operator digest. Every Telegram,
+trade, order, paper-trade, normal-RSI-write, and Event Alpha `TRIGGERED_FADE`
+counter remained zero.
+**Notes/risks:** The next provider boundary is
+`2026-07-20T13:34:56.205337+00:00`. A restricted command sandbox cannot reach
+the host loopback listener, so dashboard availability was verified at the host
+boundary; the owned process itself remained listening and healthy.
+
 ## 2026-07-20 — Record the post-cluster local verification checkpoint · Codex
 **Why:** Five low-risk logical changes had accumulated since the prior broad
 local gate. The repository policy calls for a wider checkpoint after such a

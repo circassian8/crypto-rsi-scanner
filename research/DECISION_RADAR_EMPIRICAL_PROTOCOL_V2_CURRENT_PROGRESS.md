@@ -64,8 +64,10 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   digest, and writes `risk_on`, `risk_off`, or `mixed` only to those retained
   history rows. It does not expose the field to Decision evaluation. The 09:27
   UTC DNS failure and 10:27 UTC timeout were followed by a strict-clean 11:34
-  UTC success. Prospective universe/liquidity context now covers 60 counted
-  rows, but PUMP and WBT still lack closed causal 24-hour inputs in the latest
+  UTC success and a second strict-clean 12:34 UTC success. Prospective
+  universe/liquidity context now covers 90 of 1,320 baseline-counted rows.
+  Current-universe volume and turnover baselines are warm for all 30 assets,
+  but PUMP and WBT still lack closed causal 24-hour inputs in the latest
   complete universe, so market-regime coverage remains honestly zero;
 - the canonical campaign report now derives a digest-bound all-category
   episode coverage frontier from the frozen Decision-v2 episode scorecard and
@@ -133,7 +135,7 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   Protocol-v2 partition, so no complete match row or matched control is
   available. The campaign's exact-authority, manifest-digest-bound diagnostic
   proves the latest top-liquid generation has causal 24-hour regime inputs for
-  28 of 30 rows. It identifies PUMP at rank 14 and WBT at rank 28 as missing the
+  28 of 30 rows. It identifies PUMP at rank 15 and WBT at rank 27 as missing the
   value, percent-point unit, and closed evidence reference; the collector
   correctly refuses to infer or backfill a regime from that incomplete set.
 
