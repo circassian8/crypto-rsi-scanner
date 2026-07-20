@@ -31,6 +31,43 @@ from .decision_models import (
 )
 
 
+_DERIVATIVES_SNAPSHOT_FIELDS = (
+    "derivatives_state_snapshot",
+    "derivatives_snapshot",
+)
+_DERIVATIVES_FRESHNESS_FIELDS = (
+    "derivatives_snapshot_freshness_status",
+    "freshness_status",
+)
+_DERIVATIVES_NUMERIC_FIELDS = (
+    "open_interest_delta_4h",
+    "open_interest_delta_24h",
+    "open_interest_delta",
+    "funding_zscore",
+    "funding_rate_zscore",
+)
+_ALLOWED_DERIVATIVES_FRESHNESS = {
+    "fresh",
+    "stale",
+    "expired",
+    "unknown",
+    "missing",
+    "invalid",
+    "future",
+    "fixture_allowed_stale",
+}
+_ALLOWED_CROWDING_CLASSES = {
+    "none",
+    "low",
+    "moderate",
+    "high",
+    "extreme",
+    "unknown",
+    "missing",
+    "unavailable",
+}
+
+
 @dataclass(frozen=True)
 class _DecisionIdentityEvidence:
     symbol: str
@@ -377,6 +414,8 @@ def _hard_blockers(
         blockers.append("market_snapshot_contract_invalid")
     if decision_policy.calendar_context_invalid(data):
         blockers.append("calendar_context_invalid")
+    if _derivatives_context_invalid(data):
+        blockers.append("derivatives_context_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(
@@ -892,7 +931,7 @@ def _missing_data(data: Mapping[str, Any], market: Mapping[str, Any]) -> tuple[s
         "liquidity_usd": _first_number(market, "liquidity_usd", "order_book_depth_2pct", "depth_2pct_usd"),
         "spread_bps": _first_number(market, "spread_bps", "bid_ask_spread_bps"),
         "market_freshness": _freshness(data, market) or None,
-        "derivatives_confirmation": data.get("derivatives_state_snapshot") or data.get("derivatives_snapshot"),
+        "derivatives_confirmation": _derivatives_snapshot(data),
     }
     for name, value in checks.items():
         if value in (None, "", [], {}, ()):
@@ -978,9 +1017,10 @@ def _has_crowding(data: Mapping[str, Any]) -> bool:
         "fixture_allowed_stale",
     }:
         return False
-    if str(data.get("crowding_class") or "").casefold() in {"moderate", "high", "extreme"}:
+    crowding_class = _typed_text(data.get("crowding_class")).casefold()
+    if crowding_class in {"moderate", "high", "extreme"}:
         return True
-    if _texts(data.get("crowding_exhaustion_evidence")):
+    if _typed_text_list(data.get("crowding_exhaustion_evidence")):
         return True
     oi = _first_number(snapshot, "open_interest_delta_4h", "open_interest_delta_24h", "open_interest_delta")
     funding_z = _first_number(snapshot, "funding_zscore", "funding_rate_zscore")
@@ -988,12 +1028,66 @@ def _has_crowding(data: Mapping[str, Any]) -> bool:
 
 
 def _derivatives_snapshot(data: Mapping[str, Any]) -> Mapping[str, Any] | None:
-    for field in ("derivatives_state_snapshot", "derivatives_snapshot"):
+    for field in _DERIVATIVES_SNAPSHOT_FIELDS:
         if field not in data or data.get(field) in (None, ""):
             continue
         value = data.get(field)
         return value if isinstance(value, Mapping) else None
     return None
+
+
+def _derivatives_context_invalid(data: Mapping[str, Any]) -> bool:
+    """Reject malformed explicit evidence before it can influence derivatives policy."""
+
+    for field in _DERIVATIVES_SNAPSHOT_FIELDS:
+        if field not in data or data.get(field) in (None, ""):
+            continue
+        snapshot = data.get(field)
+        if not isinstance(snapshot, Mapping):
+            return True
+        for freshness_field in _DERIVATIVES_FRESHNESS_FIELDS:
+            if _typed_enum_claim_invalid(
+                snapshot,
+                freshness_field,
+                allowed=_ALLOWED_DERIVATIVES_FRESHNESS,
+            ):
+                return True
+        if any(
+            metric in snapshot
+            and snapshot.get(metric) not in (None, "")
+            and _strict_finite_number(snapshot.get(metric)) is None
+            for metric in _DERIVATIVES_NUMERIC_FIELDS
+        ):
+            return True
+    if _typed_enum_claim_invalid(
+        data,
+        "coinalyze_freshness_status",
+        allowed=_ALLOWED_DERIVATIVES_FRESHNESS,
+    ):
+        return True
+    if _typed_enum_claim_invalid(
+        data,
+        "crowding_class",
+        allowed=_ALLOWED_CROWDING_CLASSES,
+    ):
+        return True
+    if "crowding_exhaustion_evidence" in data and data.get(
+        "crowding_exhaustion_evidence"
+    ) not in (None, "", [], ()):
+        return not bool(_typed_text_list(data.get("crowding_exhaustion_evidence")))
+    return False
+
+
+def _typed_enum_claim_invalid(
+    owner: Mapping[str, Any],
+    field: str,
+    *,
+    allowed: set[str],
+) -> bool:
+    if field not in owner or owner.get(field) in (None, ""):
+        return False
+    value = _typed_text(owner.get(field)).casefold()
+    return not value or value not in allowed
 
 
 def _derivatives_freshness(
@@ -1006,7 +1100,7 @@ def _derivatives_freshness(
         (snapshot, "freshness_status"),
     ):
         if field in owner and owner.get(field) not in (None, ""):
-            return str(owner.get(field)).strip().casefold()
+            return _typed_text(owner.get(field)).casefold()
     return ""
 
 
@@ -1195,6 +1289,24 @@ def _texts(value: object) -> list[str]:
         return [str(item) for item in value if str(item or "")]  # type: ignore[union-attr]
     except TypeError:
         return [str(value)]
+
+
+def _typed_text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _typed_text_list(value: object) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    values = tuple(_typed_text(item) for item in value)
+    return values if values and all(values) else ()
+
+
+def _strict_finite_number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    parsed = float(value)
+    return parsed if math.isfinite(parsed) else None
 
 
 def _rounded_map(values: Mapping[str, float]) -> dict[str, float]:

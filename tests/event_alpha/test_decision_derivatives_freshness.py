@@ -85,3 +85,66 @@ def test_invalid_canonical_derivatives_snapshot_cannot_expose_alias():
 
     assert decision_model._has_crowding(row) is False
     assert decision_model._derivatives_score(row) == 30.0
+
+    result = decision_model.evaluate_radar_decision(row)
+    assert result.radar_actionable is False
+    assert result.radar_route == "diagnostic"
+    assert "derivatives_context_invalid" in result.decision_hard_blockers
+
+
+def test_malformed_derivatives_context_cannot_create_or_hide_crowding_evidence():
+    malformed_rows: list[dict[str, object]] = []
+
+    for field, value in (
+        ("derivatives_state_snapshot", []),
+        ("derivatives_snapshot", True),
+    ):
+        row = _candidate("fresh")
+        if field == "derivatives_snapshot":
+            row.pop("derivatives_state_snapshot")
+        row[field] = value
+        malformed_rows.append(row)
+
+    for snapshot_override in (
+        {"freshness_status": True},
+        {"freshness_status": "banana"},
+        {"freshness_status": "fresh", "funding_zscore": {"value": 3.0}},
+        {"freshness_status": "fresh", "open_interest_delta_4h": "30.0"},
+    ):
+        row = _candidate("fresh")
+        row["derivatives_state_snapshot"] = snapshot_override
+        malformed_rows.append(row)
+
+    for field, value in (
+        ("coinalyze_freshness_status", []),
+        ("crowding_class", {"high": True}),
+        ("crowding_exhaustion_evidence", {"funding_zscore_elevated": True}),
+        ("crowding_exhaustion_evidence", ["funding_zscore_elevated", {"oi": True}]),
+    ):
+        row = _candidate("fresh")
+        row["crowding_class"] = "none"
+        row["crowding_exhaustion_evidence"] = []
+        row[field] = value
+        malformed_rows.append(row)
+
+    for row in malformed_rows:
+        result = decision_model.evaluate_radar_decision(row)
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "derivatives_context_invalid" in result.decision_hard_blockers
+
+
+def test_typed_derivatives_context_keeps_valid_crowding_route():
+    row = _candidate("fresh")
+    row["coinalyze_freshness_status"] = "fresh"
+    row["crowding_class"] = "high"
+    row["crowding_exhaustion_evidence"] = [
+        "open_interest_delta_4h_high",
+        "funding_zscore_elevated",
+    ]
+
+    result = decision_model.evaluate_radar_decision(row)
+
+    assert result.radar_route == "fade_exhaustion_review"
+    assert "derivatives_context_invalid" not in result.decision_hard_blockers

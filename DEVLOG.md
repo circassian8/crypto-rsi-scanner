@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Type Decision derivatives evidence · Codex
+**Why:** Decision v2 treated malformed derivatives context as merely absent and
+stringified arbitrary crowding-evidence objects. A reproduced non-mapping
+canonical snapshot could leave a normal breakout actionable, while a boolean or
+object evidence value plus fresh status could supply crowding to the
+fade/exhaustion route.
+**Changes:** The Decision model now validates both derivatives snapshot aliases,
+their freshness claims, the route-relevant open-interest/funding metrics,
+top-level Coinalyze freshness, crowding class, and exhaustion-evidence list.
+Snapshots must be mappings; route metrics must be finite non-boolean numbers;
+freshness and crowding use closed text vocabularies; exhaustion evidence must be
+a list/tuple of non-empty strings. Malformed explicit context adds
+`derivatives_context_invalid` and routes diagnostic. Canonical snapshot
+precedence now also controls missing-data reporting, and crowding checks no
+longer stringify objects. Valid fresh normalized evidence retains the existing
+`fade_exhaustion_review` route. No derivatives formula, threshold, provider,
+authorization, request, or historical artifact changed.
+**Verify:** All `5` focused derivatives freshness/typing tests passed. `180`
+Decision, consistency, surface, derivatives, fixture-route, snapshot-
+precedence, RSI, schema, merge, pipeline, catalyst-attribution, and unified-
+calendar tests passed. `make event-alpha-integrated-radar-smoke PYTHON=python3`
+passed with 15 candidates, 12 canonical cores/cards, strict doctor 0 blockers /
+0 warnings, and 14 dashboard pages. `python3 -m compileall -q
+crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; evidence-payload and artifact/
+security bounds remain enforced.
+
 ## 2026-07-20 — Require typed Decision calendar context · Codex
 **Why:** Decision routing ignored malformed explicit calendar evidence. A
 non-mapping event, mixed-type event list, or invalid schedule timestamp could
