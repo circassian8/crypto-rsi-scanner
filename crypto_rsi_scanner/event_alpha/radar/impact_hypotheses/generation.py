@@ -247,7 +247,10 @@ def validate_hypotheses_with_raw_events(
                 )
                 components.update(_quality_score_components(quality_kwargs))
             if best_stage == ValidationStage.MARKET_CONFIRMED.value:
-                components["market_confirmation"] = max(float(components.get("market_confirmation") or 0.0), 70.0)
+                components["market_confirmation"] = max(
+                    _coerce_score(components.get("market_confirmation")),
+                    70.0,
+                )
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
             out.append(replace(
                 hypothesis,
@@ -269,7 +272,10 @@ def validate_hypotheses_with_raw_events(
         elif reasons:
             components = dict(hypothesis.score_components or {})
             quality_kwargs = {}
-            components["validation_strength"] = max(float(components.get("validation_strength") or 0.0), 45.0)
+            components["validation_strength"] = max(
+                _coerce_score(components.get("validation_strength")),
+                45.0,
+            )
             if impact_path_reason:
                 components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
             if impact_validation is not None:

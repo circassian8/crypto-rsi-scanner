@@ -814,6 +814,57 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
     assert rejected.status != "validated"
 
 
+def test_partial_hypothesis_validation_normalizes_stored_strength():
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    source = RawDiscoveredEvent(
+        raw_id="velvet-identity-only",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/velvet-identity-only",
+        title="VELVET platform update",
+        body="Velvet Capital published a routine product update.",
+        raw_json={},
+        source_confidence=0.8,
+        content_hash="velvet-identity-only",
+    )
+
+    def validate(value):
+        hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+            hypothesis_id="hyp:velvet-identity-only",
+            event_cluster_id="cluster:velvet-identity-only",
+            event_type="ipo_proxy",
+            external_asset="SpaceX",
+            impact_category="rwa_preipo_proxy",
+            candidate_sectors=("tokenized_stock_venues",),
+            candidate_symbols=("VELVET",),
+            candidate_coin_ids=("velvet",),
+            confidence=0.5,
+            hypothesis_score=50.0,
+            score_components={"validation_strength": value},
+            validation_stage="validation_search_pending",
+            status="validation_search_pending",
+        )
+        return event_impact_hypotheses.validate_hypotheses_with_raw_events(
+            (hypothesis,),
+            (source,),
+        )[0]
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = validate(malformed)
+        assert row.status == "validation_evidence_found"
+        assert row.validation_stage == "identity_validated"
+        assert row.score_components["validation_strength"] == 45.0
+
+    valid = validate(80.0)
+    assert valid.score_components["validation_strength"] == 80.0
+
+
 def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrence():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import config

@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reconcile partial-validation strength components · Codex
+**Why:** Partial validation's weighted score already ignored malformed prior
+strength, but the stored component could remain NaN/infinite, making the audit
+row disagree with its finite result.
+**Changes:** Applied the canonical finite score boundary before merging the
+deterministic 45-point partial-validation floor and the existing 70-point
+market-confirmation floor. Added an end-to-end identity-only validation
+regression with malformed and valid stronger controls. Weights, floors, and
+route policy are unchanged.
+**Verify:** The new regression passed, followed by `63` focused impact-
+hypothesis, catalyst-frame, discovery-pipeline, and watchlist-router tests.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Preserve final-score truth through catalyst-frame caps · Codex
 **Why:** The catalyst-frame safety cap treated final score zero as absent and
 fell back to a high legacy hypothesis score; a present NaN final score could
