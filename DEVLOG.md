@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require typed Decision identity and tradability · Codex
+**Why:** Decision v2 independently trusted already-enriched candidate fields and
+still coerced identity with `str()`. A reproduced boolean or mapping canonical
+identity combined with caller-supplied resolved/trusted flags reached
+`actionable_watch`; string, numeric, missing, or object tradability did too.
+Malformed resolver confidence also retained a high identity component.
+**Changes:** Decision evaluation now creates one private closed identity view for
+symbol, canonical asset, resolver status/confidence, exact trust, and exact
+tradability. Explicit invalid higher-authority text cannot borrow a lower alias;
+resolver confidence must be a finite non-boolean number in the documented
+fraction-or-percent range; trust and tradability require semantic booleans.
+Invalid identity is hard-blocked and scores zero in both actionability and
+evidence confidence. False tradability remains `asset_not_tradable`; absent or
+malformed tradability is separately `asset_tradability_unverified`. Blank
+canonical identity still falls back to a typed coin ID for legacy compatibility.
+No formula weight, threshold, route definition, provider, or historical row
+changed.
+**Verify:** The original forged candidates now route `diagnostic`, are not
+actionable, and carry zero identity components. All `59` focused Decision-model
+tests passed, followed by `97` Decision-v2 consistency, fixture-route, surface,
+derivatives, and RSI-context tests. `make event-alpha-integrated-radar-smoke
+PYTHON=python3` passed with 15 candidates, 12 canonical cores/cards, strict
+doctor 0 blockers / 0 warnings, and 14 dashboard pages. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Close canonical asset identity coercion · Codex
 **Why:** The shared asset registry and resolver still stringified malformed
 identity. A reproduced boolean canonical ID plus mapping symbol became asset ID

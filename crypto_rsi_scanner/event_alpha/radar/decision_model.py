@@ -8,6 +8,7 @@ lower-case ``radar_route`` is an operator-facing research grouping only.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 from typing import Any, Iterable, Mapping
 
@@ -28,6 +29,18 @@ from .decision_models import (
     RadarDecisionConfig, RadarResearchRoute, SpreadStatus, ThesisOrigin, TimingState,
     TradabilityStatus,
 )
+
+
+@dataclass(frozen=True)
+class _DecisionIdentityEvidence:
+    symbol: str
+    canonical_asset_id: str
+    resolver_status: str
+    resolver_confidence: float | None
+    resolver_confidence_claimed: bool
+    identity_trusted: bool
+    is_tradable_asset: bool | None
+    invalid_claims: tuple[str, ...]
 
 
 def evaluate_radar_decision(
@@ -336,17 +349,22 @@ def _hard_blockers(
     cfg: RadarDecisionConfig,
 ) -> tuple[str, ...]:
     blockers = list(decision_safety_blockers(data, sources))
-    symbol = str(data.get("symbol") or data.get("validated_symbol") or "").strip().upper()
-    canonical = str(data.get("canonical_asset_id") or data.get("coin_id") or "").strip().casefold()
-    resolver = str(data.get("instrument_resolver_status") or "").strip().casefold()
+    identity = _decision_identity_evidence(data)
+    symbol = identity.symbol
+    canonical = identity.canonical_asset_id
+    resolver = identity.resolver_status
     if not symbol or symbol == "UNKNOWN" or not canonical or canonical == "unknown":
         blockers.append("canonical_asset_identity_missing")
+    if identity.invalid_claims:
+        blockers.append("canonical_asset_identity_invalid")
     if resolver.startswith("unresolved"):
         blockers.append("canonical_asset_identity_unresolved")
-    if resolver != "resolved" or data.get("instrument_identity_trusted") is not True:
+    if resolver != "resolved" or not identity.identity_trusted:
         blockers.append("canonical_asset_identity_untrusted")
-    if data.get("is_tradable_asset") is False:
+    if identity.is_tradable_asset is False:
         blockers.append("asset_not_tradable")
+    elif identity.is_tradable_asset is not True:
+        blockers.append("asset_tradability_unverified")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(
@@ -525,9 +543,7 @@ def _actionability_components(
         TimingState.SCHEDULED.value: 82.0,
         TimingState.STALE.value: 0.0,
     }[timing]
-    canonical = str(data.get("canonical_asset_id") or data.get("coin_id") or "").strip()
-    resolver = _number(data.get("instrument_resolver_confidence"))
-    identity_score = _clamp((resolver * 100.0) if resolver is not None and resolver <= 1 else (resolver or (88.0 if canonical else 0.0)))
+    identity_score = _decision_identity_score(_decision_identity_evidence(data))
     catalyst_score = {
         CatalystStatus.CONFIRMED.value: 96.0,
         CatalystStatus.PLAUSIBLE.value: 70.0,
@@ -577,9 +593,7 @@ def _evidence_components(
         CatalystStatus.NOT_REQUIRED.value: 62.0,
         CatalystStatus.DISPROVEN.value: 0.0,
     }[catalyst]
-    canonical = str(data.get("canonical_asset_id") or data.get("coin_id") or "").strip()
-    resolver = _number(data.get("instrument_resolver_confidence"))
-    identity = _clamp((resolver * 100.0) if resolver is not None and resolver <= 1 else (resolver or (88.0 if canonical else 0.0)))
+    identity = _decision_identity_score(_decision_identity_evidence(data))
     observed = sum(
         _first_number(market, *keys) is not None
         for keys in (
@@ -1044,6 +1058,100 @@ def _first_number(row: Mapping[str, Any], *keys: str) -> float | None:
         # representation that may describe different or older evidence.
         return _number(row.get(key))
     return None
+
+
+def _decision_identity_evidence(data: Mapping[str, Any]) -> _DecisionIdentityEvidence:
+    symbol, symbol_claimed = _typed_text_claim(data, "symbol", "validated_symbol")
+    canonical, canonical_claimed = _typed_text_claim(
+        data,
+        "canonical_asset_id",
+        "coin_id",
+    )
+    resolver_status, resolver_status_claimed = _typed_text_claim(
+        data,
+        "instrument_resolver_status",
+    )
+    invalid: list[str] = []
+    if symbol_claimed and not symbol:
+        invalid.append("symbol")
+    if canonical_claimed and not canonical:
+        invalid.append("canonical_asset_id")
+    if resolver_status_claimed and not resolver_status:
+        invalid.append("instrument_resolver_status")
+
+    confidence_raw = data.get("instrument_resolver_confidence")
+    confidence_claimed = (
+        "instrument_resolver_confidence" in data
+        and confidence_raw is not None
+        and confidence_raw != ""
+    )
+    confidence: float | None = None
+    if confidence_claimed:
+        if (
+            isinstance(confidence_raw, bool)
+            or not isinstance(confidence_raw, (int, float))
+            or not math.isfinite(float(confidence_raw))
+        ):
+            invalid.append("instrument_resolver_confidence")
+        else:
+            parsed_confidence = float(confidence_raw)
+            if 0.0 <= parsed_confidence <= 100.0:
+                confidence = parsed_confidence
+            else:
+                invalid.append("instrument_resolver_confidence")
+
+    trusted_raw = data.get("instrument_identity_trusted")
+    trusted_claimed = (
+        "instrument_identity_trusted" in data
+        and trusted_raw is not None
+        and trusted_raw != ""
+    )
+    if trusted_claimed and not isinstance(trusted_raw, bool):
+        invalid.append("instrument_identity_trusted")
+
+    tradable_raw = data.get("is_tradable_asset")
+    invalid_claims = tuple(dict.fromkeys(invalid))
+    return _DecisionIdentityEvidence(
+        symbol=symbol.upper(),
+        canonical_asset_id=canonical.casefold(),
+        resolver_status=resolver_status.casefold(),
+        resolver_confidence=confidence,
+        resolver_confidence_claimed=confidence_claimed,
+        identity_trusted=trusted_raw is True and not invalid_claims,
+        is_tradable_asset=tradable_raw if isinstance(tradable_raw, bool) else None,
+        invalid_claims=invalid_claims,
+    )
+
+
+def _decision_identity_score(identity: _DecisionIdentityEvidence) -> float:
+    if (
+        identity.invalid_claims
+        or not identity.symbol
+        or identity.symbol == "UNKNOWN"
+        or not identity.canonical_asset_id
+        or identity.canonical_asset_id == "unknown"
+        or identity.resolver_status != "resolved"
+        or not identity.identity_trusted
+        or identity.is_tradable_asset is not True
+    ):
+        return 0.0
+    resolver = identity.resolver_confidence
+    if resolver is None:
+        return 88.0 if not identity.resolver_confidence_claimed else 0.0
+    return _clamp(resolver * 100.0 if resolver <= 1.0 else resolver)
+
+
+def _typed_text_claim(row: Mapping[str, Any], *keys: str) -> tuple[str, bool]:
+    """Resolve identity aliases without coercion or invalid-claim fallback."""
+
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return (value.strip() if isinstance(value, str) else ""), True
+    return "", False
 
 
 def _number(value: object) -> float | None:

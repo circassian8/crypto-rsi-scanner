@@ -290,6 +290,61 @@ def test_symbol_fallback_cannot_satisfy_strict_canonical_identity():
     assert "canonical_asset_identity_untrusted" in result.decision_hard_blockers
 
 
+def test_decision_identity_rejects_non_text_and_invalid_confidence_claims():
+    malformed_rows = (
+        _market_led_candidate(canonical_asset_id=True),
+        _market_led_candidate(canonical_asset_id={"forged": "identity"}),
+        _market_led_candidate(symbol=["MOVE"]),
+        _market_led_candidate(instrument_resolver_status=["resolved"]),
+        _market_led_candidate(instrument_resolver_confidence=True),
+        _market_led_candidate(instrument_resolver_confidence="0.95"),
+        _market_led_candidate(instrument_resolver_confidence=101.0),
+        _market_led_candidate(instrument_identity_trusted="true"),
+    )
+
+    for row in malformed_rows:
+        result = decision_model.evaluate_radar_decision(row)
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "canonical_asset_identity_invalid" in result.decision_hard_blockers
+        assert "canonical_asset_identity_untrusted" in result.decision_hard_blockers
+        assert result.actionability_score_components["asset_identity"] == 0.0
+        assert result.evidence_confidence_components["asset_identity"] == 0.0
+
+
+def test_decision_requires_exact_boolean_tradability() -> None:
+    for value in ("false", 0, None, {"forged": "tradability"}):
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(is_tradable_asset=value)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "asset_tradability_unverified" in result.decision_hard_blockers
+        assert "canonical_asset_identity_invalid" not in result.decision_hard_blockers
+        assert result.actionability_score_components["asset_identity"] == 0.0
+        assert result.evidence_confidence_components["asset_identity"] == 0.0
+
+    blocked = decision_model.evaluate_radar_decision(
+        _market_led_candidate(is_tradable_asset=False)
+    )
+    assert "asset_not_tradable" in blocked.decision_hard_blockers
+    assert "asset_tradability_unverified" not in blocked.decision_hard_blockers
+
+
+def test_blank_canonical_identity_retains_typed_coin_id_compatibility() -> None:
+    result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(canonical_asset_id="")
+    )
+
+    assert result.radar_actionable is True
+    assert result.radar_route == "actionable_watch"
+    assert result.decision_hard_blockers == ()
+    assert result.actionability_score_components["asset_identity"] == 95.0
+    assert result.evidence_confidence_components["asset_identity"] == 95.0
+
+
 def test_late_momentum_route_depends_on_derivatives_crowding():
     late = _market_led_candidate(
         market_state_class="late_momentum",
