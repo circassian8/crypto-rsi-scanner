@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve explicit Decision spread authority · Codex
+**Why:** Decision spread classification re-derived from the numeric value after
+recognizing only explicit stale/unavailable states. An explicit
+`verified_wide`, unknown string, or object-valued status could therefore be
+ignored and replaced by `verified_good`, creating an optimistic execution-
+quality contradiction.
+**Changes:** Market/spread freshness now uses a closed typed status contract,
+and explicit spread status accepts only the canonical Decision values plus the
+established legacy `verified` input. Malformed claims add
+`market_execution_claim_invalid` and route diagnostic. Explicit stale,
+unavailable, and wide status is authoritative; explicit acceptable status caps
+a numerically good derivation at acceptable; numeric evidence may only
+downgrade an explicit good/acceptable claim, never upgrade it. Missing spread
+still remains unavailable, and legacy verified + fresh numeric evidence keeps
+the existing deterministic classification. No spread threshold, score,
+provider, authorization, or route definition changed.
+**Verify:** `3` focused execution-quality/spread-tier regressions passed. `202`
+Decision, consistency, surface, fixture-route, snapshot-precedence,
+derivatives, RSI, schema, merge, catalyst-attribution, propagation, and
+unified-calendar tests passed. `make event-alpha-integrated-radar-smoke
+PYTHON=python3` passed with 15 candidates, 12 canonical cores/cards, strict
+doctor 0 blockers / 0 warnings, and 14 dashboard pages. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Verification was fixture-only and does not claim observed
+Bybit spread. No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source size
+remains advisory; artifact/security/provider bounds remain enforced.
+
 ## 2026-07-20 — Fail closed on malformed Decision timing and route text · Codex
 **Why:** Route/source-noise fields were stringified during control detection,
 while malformed values could otherwise be ignored. An invalid high-authority

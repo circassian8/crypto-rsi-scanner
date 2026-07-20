@@ -297,6 +297,60 @@ def test_invalid_canonical_market_numbers_do_not_borrow_legacy_aliases():
     assert "liquidity_usd" in liquidity_result.decision_missing_data
 
 
+def test_explicit_spread_claims_cannot_be_ignored_or_optimistically_upgraded():
+    wide = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "spread_status": "verified_wide",
+                "spread_bps": 22.0,
+            }
+        )
+    )
+    acceptable = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "spread_status": "verified_acceptable",
+                "spread_bps": 22.0,
+            }
+        )
+    )
+    legacy_verified = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "spread_status": "verified",
+                "spread_bps": 22.0,
+            }
+        )
+    )
+
+    assert wide.spread_status == "verified_wide"
+    assert "spread_above_maximum" in wide.decision_hard_blockers
+    assert acceptable.spread_status == "verified_acceptable"
+    assert acceptable.radar_actionable is True
+    assert legacy_verified.spread_status == "verified_good"
+    assert legacy_verified.radar_actionable is True
+
+
+def test_malformed_execution_quality_claims_fail_closed():
+    malformed_claims = (
+        {"spread_status": {"status": "verified_good"}},
+        {"spread_status": "banana"},
+        {"spread_freshness_status": {"status": "fresh"}},
+        {"order_book_freshness_status": ["fresh"]},
+        {"market_context_freshness_status": True},
+        {"freshness_status": "banana"},
+    )
+
+    for malformed in malformed_claims:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(market_state_snapshot=malformed)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "market_execution_claim_invalid" in result.decision_hard_blockers
+
+
 def test_proxy_only_market_evidence_is_score_and_route_capped():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(

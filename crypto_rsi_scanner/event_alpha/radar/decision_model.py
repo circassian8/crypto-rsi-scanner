@@ -426,6 +426,8 @@ def _hard_blockers(
         blockers.append("catalyst_state_claim_invalid")
     if decision_policy.market_snapshot_invalid(data):
         blockers.append("market_snapshot_contract_invalid")
+    if decision_policy.market_execution_claims_invalid(market):
+        blockers.append("market_execution_claim_invalid")
     if decision_policy.calendar_context_invalid(data):
         blockers.append("calendar_context_invalid")
     if decision_policy.origin_context_invalid(data):

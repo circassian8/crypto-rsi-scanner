@@ -91,6 +91,27 @@ _TIMING_ANCHOR_FIELDS = (
     "captured_at",
     "as_of",
 )
+_MARKET_FRESHNESS_FIELDS = (
+    "spread_freshness_status",
+    "order_book_freshness_status",
+    "market_context_freshness_status",
+    "freshness_status",
+)
+_ALLOWED_MARKET_FRESHNESS = {
+    "fresh",
+    "stale",
+    "expired",
+    "unknown",
+    "missing",
+    "unavailable",
+    "invalid",
+    "future",
+    "fixture_allowed_stale",
+}
+_ALLOWED_INPUT_SPREAD_STATUSES = {
+    *(item.value for item in SpreadStatus),
+    "verified",
+}
 
 
 @dataclass(frozen=True)
@@ -460,24 +481,36 @@ def spread_status(
         if field in market and market.get(field) not in (None, ""):
             freshness_value = market.get(field)
             break
-    freshness = str(freshness_value or "").strip().casefold()
+    freshness = _typed_text(freshness_value).casefold()
     if freshness in {"stale", "expired", "invalid", "future"}:
         return SpreadStatus.STALE.value
     if freshness not in {"fresh", "fixture_allowed_stale"}:
         return SpreadStatus.UNAVAILABLE.value
-    explicit = str(market.get("spread_status") or "").strip().casefold()
+    explicit_claimed = (
+        "spread_status" in market and market.get("spread_status") not in (None, "")
+    )
+    explicit = _typed_text(market.get("spread_status")).casefold()
+    if explicit_claimed and explicit not in _ALLOWED_INPUT_SPREAD_STATUSES:
+        return SpreadStatus.UNAVAILABLE.value
     if explicit == SpreadStatus.STALE.value:
         return SpreadStatus.STALE.value
     if explicit == SpreadStatus.UNAVAILABLE.value:
         return SpreadStatus.UNAVAILABLE.value
+    if explicit == SpreadStatus.VERIFIED_WIDE.value:
+        return SpreadStatus.VERIFIED_WIDE.value
     spread = _first_finite_number(market, "spread_bps", "bid_ask_spread_bps")
     if spread is None:
         return SpreadStatus.UNAVAILABLE.value
     if spread < 0 or spread > maximum_spread_bps:
         return SpreadStatus.VERIFIED_WIDE.value
-    if spread <= good_spread_bps:
-        return SpreadStatus.VERIFIED_GOOD.value
-    return SpreadStatus.VERIFIED_ACCEPTABLE.value
+    derived = (
+        SpreadStatus.VERIFIED_GOOD.value
+        if spread <= good_spread_bps
+        else SpreadStatus.VERIFIED_ACCEPTABLE.value
+    )
+    if explicit == SpreadStatus.VERIFIED_ACCEPTABLE.value:
+        return SpreadStatus.VERIFIED_ACCEPTABLE.value
+    return derived
 
 
 def timing_profile(data: Mapping[str, Any], market: Mapping[str, Any]) -> TimingProfile:
@@ -676,6 +709,22 @@ def timing_context_invalid(
         for row in (data, market)
         for field in _TIMING_ANCHOR_FIELDS
     )
+
+
+def market_execution_claims_invalid(market: Mapping[str, Any]) -> bool:
+    """Reject malformed freshness/spread classifications before promotion."""
+
+    for field in _MARKET_FRESHNESS_FIELDS:
+        if field not in market or market.get(field) in (None, ""):
+            continue
+        value = _typed_text(market.get(field)).casefold()
+        if not value or value not in _ALLOWED_MARKET_FRESHNESS:
+            return True
+    if "spread_status" in market and market.get("spread_status") not in (None, ""):
+        value = _typed_text(market.get("spread_status")).casefold()
+        if not value or value not in _ALLOWED_INPUT_SPREAD_STATUSES:
+            return True
+    return False
 
 
 def _calendar_event_timestamps_invalid(event: Mapping[str, Any]) -> bool:
@@ -1073,6 +1122,7 @@ __all__ = (
     "market_snapshot",
     "market_snapshot_invalid",
     "market_classification_invalid",
+    "market_execution_claims_invalid",
     "market_label",
     "origin_context_invalid",
     "source_classification_invalid",
