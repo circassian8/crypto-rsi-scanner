@@ -1,8 +1,8 @@
 {
   "schema_id": "decision_radar.anomaly_methods_preregistration",
-  "schema_version": 1,
-  "status": "research_only_not_implemented",
-  "as_of_date": "2026-07-19",
+  "schema_version": 2,
+  "status": "research_only_rank_1_shadow_implemented_not_calibrated",
+  "as_of_date": "2026-07-20",
   "purpose": "Predeclare the order and evidence gates for future anomaly-method experiments without changing production policy.",
   "current_engine": {
     "canonical_temporal_baseline": "strictly_earlier_cadence_counted_same_asset",
@@ -12,6 +12,22 @@
       "turnover_24h"
     ],
     "existing_shadow_method": "natural_log_median_mad_and_descriptive_upper_tail_rank",
+    "shadow_schema_version": 2,
+    "legacy_shadow_schema_versions_readable": [
+      1
+    ],
+    "signed_return_shadow_features": [
+      "return_1h",
+      "return_4h",
+      "return_24h",
+      "relative_return_vs_btc_1h",
+      "relative_return_vs_btc_4h",
+      "relative_return_vs_btc_24h",
+      "relative_return_vs_eth_1h",
+      "relative_return_vs_eth_4h",
+      "relative_return_vs_eth_24h"
+    ],
+    "signed_return_shadow_method": "identity_signed_median_mad_and_descriptive_lower_upper_two_sided_tail_ranks",
     "existing_shadow_policy_eligible": false,
     "independent_live_samples_established": false
   },
@@ -19,13 +35,17 @@
     {
       "rank": 1,
       "method": "robust_signed_return_and_relative_return_tails",
-      "state": "candidate_not_implemented",
+      "state": "implemented_shadow_only_unvalidated",
       "requirements": [
         "separate_exact_horizon_and_basis_families",
         "strictly_earlier_point_in_time_inputs",
         "median_mad_scale",
         "two_sided_descriptive_ranks_with_sign",
-        "no_p_value_claim"
+        "no_p_value_claim",
+        "provider_observed_prices_only",
+        "causal_horizon_anchors",
+        "canonical_btc_eth_identity",
+        "no_routing_scoring_or_threshold_authority"
       ]
     },
     {

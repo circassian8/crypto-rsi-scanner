@@ -275,14 +275,52 @@ def _shadow_surprise_by_observation_id(
             and (observed_at := _market_history_time(row.get("observed_at"))) is not None
             and observed_at < current_at
         )
+        benchmark_observations = {
+            benchmark: _benchmark_history_rows(
+                history,
+                asset_ids=asset_ids,
+                current_at=current_at,
+            )
+            for benchmark, asset_ids in market_shadow_surprise.BENCHMARK_ASSET_IDS.items()
+        }
         result[observation_id] = market_shadow_surprise.evaluate_shadow_temporal_surprise(
             current,
             prior,
             minimum_sample_count=minimum_sample_count,
             history_artifact=history_artifact,
             history_sha256=history_sha256,
+            benchmark_observations=benchmark_observations,
         )
     return result
+
+
+def _benchmark_history_rows(
+    history: tuple[dict[str, Any], ...],
+    *,
+    asset_ids: tuple[str, ...],
+    current_at: datetime,
+) -> tuple[dict[str, Any], ...]:
+    selected_asset_id = next(
+        (
+            asset_id
+            for asset_id in asset_ids
+            if any(
+                str(row.get("canonical_asset_id") or "") == asset_id
+                for row in history
+            )
+        ),
+        None,
+    )
+    if selected_asset_id is None:
+        return ()
+    return tuple(
+        row
+        for row in history
+        if str(row.get("canonical_asset_id") or "") == selected_asset_id
+        and row.get("baseline_counted") is True
+        and (observed_at := _market_history_time(row.get("observed_at"))) is not None
+        and observed_at <= current_at
+    )
 
 
 def _copy_shadow_temporal_surprise(

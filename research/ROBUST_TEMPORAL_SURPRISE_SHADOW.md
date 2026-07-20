@@ -16,7 +16,7 @@ The shadow metric is a comparison feature, not a replacement. It lets the
 outcome loop measure whether a robust view separates useful anomalies from
 noise before any threshold or routing proposal is considered.
 
-## Fixed v1 method
+## Fixed v1 activity method
 
 The eligible feature set is deliberately narrow:
 
@@ -64,6 +64,51 @@ Calculation of Empirical P Values from Monte Carlo
 Procedures*](https://doi.org/10.1086/341527), while this implementation avoids
 calling its non-exchangeable rolling rank a significance test.
 
+## Fixed v2 signed-return extension
+
+Schema v2 keeps the v1 activity fields unchanged and adds nine independent
+return families:
+
+- direct `return_1h`, `return_4h`, and `return_24h`;
+- `relative_return_vs_btc_{1h,4h,24h}`;
+- `relative_return_vs_eth_{1h,4h,24h}`.
+
+Each family is calculated separately. A value cannot cross a horizon,
+benchmark, unit, or feature-basis boundary. Historical schema-v1 activity
+values remain readable; they are not silently reinterpreted as v2 return
+evidence.
+
+The return contract is fixed as follows:
+
+1. Use positive finite prices whose explicit basis is `provider_observed`.
+   Proxy, cross-sectional, interpolated, bar-derived, or unknown price bases are
+   ineligible.
+2. Express each return in percentage points as
+   `(endpoint_price / anchor_price - 1) * 100`. Keep the identity transform so
+   downside remains negative.
+3. For each endpoint, choose the latest observation at or before the exact
+   horizon target. It must be within the larger of five minutes or 25% of that
+   horizon. Never choose a future anchor.
+4. For a relative return, require the canonical BTC identity (`bitcoin` or
+   `btc`) or ETH identity (`ethereum` or `eth`). Choose the benchmark endpoint
+   at or before the asset endpoint and within five minutes, build its own causal
+   horizon return, then subtract benchmark return from asset return. A BTC/ETH
+   asset compared with itself is explicitly `not_applicable`.
+5. Build the baseline only from strictly earlier, cadence-counted asset
+   endpoints. Every baseline return retains its exact endpoint/anchor prices in
+   the sample digest; the current sample projects all endpoint/anchor
+   observation references.
+6. Use the baseline median and median absolute deviation multiplied by
+   `1.482602218505602`. MAD at or below `1e-12` produces no robust z-score and
+   no fallback.
+7. Record add-one lower and upper descriptive ranks and
+   `min(1, 2 * min(lower_rank, upper_rank))` as the two-sided descriptive rank.
+
+All three ranks preserve the direction through the signed return and separate
+lower/upper fields. They are not p-values. Rolling horizon samples overlap and
+are explicitly not claimed to be statistically independent. V2 sets no anomaly
+threshold and does not promote any route or score.
+
 ## Isolation and integrity contract
 
 - Compute from the exact fingerprinted generation history snapshot only after
@@ -93,15 +138,16 @@ calling its non-exchangeable rolling rank a significance test.
 
 ## Known limitations
 
-- Consecutive `volume_24h` observations overlap heavily and are autocorrelated.
+- Consecutive `volume_24h` observations and rolling return horizons overlap
+  heavily and are autocorrelated.
 - Crypto activity has intraday/weekly seasonality and provider-regime changes.
 - MAD can be zero in short or quantized histories.
 - A robust z-score is not calibrated probability and does not establish a
   catalyst or direction.
-- An extreme small upper-tail rank can be a data-quality event, wash activity,
-  or venue migration.
+- An extreme activity upper-tail or return two-sided rank can be a data-quality
+  event, wash activity, broad market move, or venue migration.
 
-These limitations are why v1 remains shadow-only.
+These limitations are why v2 remains shadow-only.
 
 ## Evidence required before promotion is even proposed
 

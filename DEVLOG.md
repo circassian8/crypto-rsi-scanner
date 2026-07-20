@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Add causal signed-return shadow tails · Codex
+**Why:** The market anomaly engine's first shadow surprise contract preserved
+robust magnitude diagnostics but could not distinguish upside from downside or
+measure an asset's move relative to contemporaneous BTC and ETH. The
+preregistered next step was to add those diagnostics without changing any
+Decision Radar score, threshold, route, or operator policy.
+**Changes:**
+- Advanced the shadow projection to schema v2 with direct signed 1h/4h/24h
+returns and BTC/ETH-relative signed returns, calculated from exact provider-
+observed prices and causal at-or-before anchors. The original v1 magnitude
+features remain unchanged and historical v1 artifacts remain readable.
+- Added median/MAD robust location-scale diagnostics plus explicit add-one
+lower, upper, and two-sided descriptive tail ranks. Degenerate histories,
+missing or misaligned benchmarks, noncanonical identities, and invalid price
+bases fail closed; the ranks are explicitly not p-values and overlapping
+observations are explicitly not independent samples.
+- Bound every sample digest to the feature, value, source prices, reference
+observations, price bases, and canonical asset identity. The no-send authority
+path now supplies exact cadence-counted BTC/ETH histories without introducing
+another provider call.
+- Closed the v2 artifact schema and adversarial validation, added raw-to-
+artifact integration and no-policy-leakage coverage, and synchronized the
+preregistration, North Star, shadow-method note, working agreement, durable
+decision, roadmap, burn-in contract, and current architecture reports.
+- Recorded the owner's instruction that quantitative file/function/class size
+measurements are advisory only; ownership, import, security, reproducibility,
+and safety boundaries remain enforced.
+**Verify:** 133 focused shadow, integration, no-send, schema, and North Star
+tests passed; compileall, JSON validation, and `git diff --check` passed.
+Market-anomaly, integrated-radar, and market-no-send smokes passed with strict
+fixture doctors clean; the current genuine authoritative v1 namespace passed
+strict doctor with zero blockers/warnings and exact dashboard readiness passed.
+Architecture cleanliness passed with quantitative size observations advisory.
+The full outside-sandbox `make verify PYTHON=.venv/bin/python` gate passed:
+1,445/1,445 standalone checks, 3,547 pytest tests, alert-render smoke, offline
+fixture backtest, and paper scoreboard. An earlier sandboxed run's only failure
+was the expected denied loopback-bind test; that exact test and the complete
+outside-sandbox rerun passed.
+**Notes/risks:** This is shadow-only diagnostic evidence. It does not calibrate
+or change thresholds, scores, routes, notifications, authorization, or
+provider policy, and it made no provider call, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-20 — Record the forty-first no-send market cycle · Codex
 **Why:** The explicitly authorized CoinGecko observation cadence was eligible,
 so the temporal baseline could advance without weakening the one-request,

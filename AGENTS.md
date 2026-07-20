@@ -973,6 +973,21 @@ may be added later when a suitable environment already exists.
   the live target also refreshes it after every success or failure. Decision
   campaign generations, candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
+  Post-scan raw market evidence may carry the optional closed
+  `event_alpha.shadow_temporal_surprise` v2 diagnostic. It preserves the v1
+  log-median/MAD volume/turnover fields and adds separate signed direct and
+  BTC/ETH-relative 1h/4h/24h percent-point return families, rederived only from
+  canonical provider-observed prices with causal at-or-before horizon anchors.
+  BTC/ETH endpoints must be canonical, at or before the asset clock, and within
+  300 seconds; horizon anchors use the larger of 300 seconds or 25% of the
+  horizon as backward tolerance. Lower, upper, and two-sided add-one ranks are
+  descriptive, not p-values, and overlapping samples are not independent.
+  Historical v1 values remain readable. The shadow attaches only after routing
+  to top-level raw snapshot/anomaly artifacts; it must never enter nested market
+  snapshots, candidates, Decision projections, CoreOpportunity, outcomes,
+  cards, routes, priorities, scores, thresholds, alerts, or execution. Every
+  policy-authority flag remains false until a separate sealed, episode-level,
+  out-of-sample promotion decision.
   Human review timing uses the separate append-only shared campaign ledger
   `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
   `make radar-review-timing-status` is read-only/no-network and reports only

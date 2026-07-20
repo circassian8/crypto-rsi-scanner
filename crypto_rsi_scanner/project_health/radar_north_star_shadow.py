@@ -7,8 +7,20 @@ from typing import Any, Mapping
 
 SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "schema_id": "event_alpha.shadow_temporal_surprise",
-    "schema_version": 1,
+    "schema_version": 2,
+    "legacy_schema_versions_readable": [1],
     "features": ["volume_24h", "turnover_24h"],
+    "signed_return_features": [
+        "return_1h",
+        "return_4h",
+        "return_24h",
+        "relative_return_vs_btc_1h",
+        "relative_return_vs_btc_4h",
+        "relative_return_vs_btc_24h",
+        "relative_return_vs_eth_1h",
+        "relative_return_vs_eth_4h",
+        "relative_return_vs_eth_24h",
+    ],
     "eligible_feature_basis": ["provider_observed", "derived_provider_ratio"],
     "derived_ratio_validation": "volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12",
     "proxy_or_cross_sectional_basis_eligible": False,
@@ -25,6 +37,30 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "degenerate_mad_policy": "mad_le_1e-12_returns_null_without_epsilon_or_std_fallback",
     "descriptive_upper_tail": "(count_baseline_log_ge_current_log+1)/(n+1)",
     "descriptive_tail_is_p_value": False,
+    "signed_return_unit": "percent_points",
+    "signed_return_transform": "identity_preserves_sign",
+    "signed_return_feature_basis": "provider_observed_price_ratio_only",
+    "relative_return_feature_basis": (
+        "provider_observed_asset_return_minus_provider_observed_benchmark_return"
+    ),
+    "return_horizons_hours": [1, 4, 24],
+    "return_families_kept_separate": True,
+    "return_anchor": "latest_at_or_before_exact_horizon_target",
+    "return_anchor_tolerance": "max_300_seconds_or_25_percent_of_horizon",
+    "benchmark_identities": ["btc:bitcoin_or_btc", "eth:ethereum_or_eth"],
+    "benchmark_endpoint_alignment": "at_or_before_asset_within_300_seconds",
+    "descriptive_lower_return_tail": (
+        "(count_baseline_return_le_current_return+1)/(n+1)"
+    ),
+    "descriptive_upper_return_tail": (
+        "(count_baseline_return_ge_current_return+1)/(n+1)"
+    ),
+    "descriptive_two_sided_return_tail": (
+        "min(1,2*min(lower_tail_rank,upper_tail_rank))"
+    ),
+    "return_tail_ranks_are_p_values": False,
+    "overlapping_return_samples_are_independent": False,
+    "same_asset_relative_return_status": "not_applicable",
     "attachment": "top_level_post_scan_snapshot_and_anomaly_metadata_only",
     "canonical_history_or_provider_source_mutated": False,
     "copied_to_decision_projection": False,

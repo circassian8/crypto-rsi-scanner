@@ -1,18 +1,33 @@
-"""Closed nested schema checks for shadow temporal market surprise v1."""
+"""Closed nested schema checks for shadow temporal market surprise v1/v2."""
 
 from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
 from numbers import Real
 from typing import Any
 
 
 SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+LEGACY_SCHEMA_VERSION = 1
 FEATURES = ("volume_24h", "turnover_24h")
+RETURN_HORIZONS_HOURS = (1, 4, 24)
+RETURN_BENCHMARKS = ("btc", "eth")
+RETURN_FEATURES = (
+    *(f"return_{hours}h" for hours in RETURN_HORIZONS_HOURS),
+    *(
+        f"relative_return_vs_{benchmark}_{hours}h"
+        for benchmark in RETURN_BENCHMARKS
+        for hours in RETURN_HORIZONS_HOURS
+    ),
+)
+RETURN_ANCHOR_TOLERANCE_RATIO = 0.25
+RETURN_MIN_ANCHOR_TOLERANCE_SECONDS = 300
+BENCHMARK_ALIGNMENT_TOLERANCE_SECONDS = 300
 
-_TOP_LEVEL_KEYS = frozenset(
+_TOP_LEVEL_KEYS_V1 = frozenset(
     (
         "schema_id",
         "schema_version",
@@ -32,6 +47,14 @@ _TOP_LEVEL_KEYS = frozenset(
         "decision_score_eligible",
         "auto_apply",
         "research_only",
+    )
+)
+_TOP_LEVEL_KEYS = frozenset(
+    (
+        *_TOP_LEVEL_KEYS_V1,
+        "return_status",
+        "return_method",
+        "return_features",
     )
 )
 _METHOD_KEYS = frozenset(
@@ -106,6 +129,113 @@ _METHOD_VALUES = {
     ),
     "upper_tail_rank_is_p_value": False,
 }
+_RETURN_METHOD_KEYS = frozenset(
+    (
+        "transform",
+        "return_unit",
+        "location_estimator",
+        "scale_estimator",
+        "normal_consistency_factor",
+        "degenerate_mad_threshold",
+        "derived_float_decimal_places",
+        "anchor_tolerance_ratio",
+        "minimum_anchor_tolerance_seconds",
+        "benchmark_alignment_tolerance_seconds",
+        "lower_tail_rank_definition",
+        "upper_tail_rank_definition",
+        "two_sided_tail_rank_definition",
+        "tail_ranks_are_p_values",
+        "overlapping_samples_are_independent",
+    )
+)
+_RETURN_METHOD_VALUES = {
+    "transform": "identity_signed",
+    "return_unit": "percent_points",
+    "location_estimator": "median",
+    "scale_estimator": "median_absolute_deviation",
+    "normal_consistency_factor": 1.482602218505602,
+    "degenerate_mad_threshold": 1e-12,
+    "derived_float_decimal_places": 12,
+    "anchor_tolerance_ratio": 0.25,
+    "minimum_anchor_tolerance_seconds": 300,
+    "benchmark_alignment_tolerance_seconds": 300,
+    "lower_tail_rank_definition": (
+        "(count(baseline_return <= current_return)+1)/(sample_count+1)"
+    ),
+    "upper_tail_rank_definition": (
+        "(count(baseline_return >= current_return)+1)/(sample_count+1)"
+    ),
+    "two_sided_tail_rank_definition": (
+        "min(1,2*min(lower_tail_rank,upper_tail_rank))"
+    ),
+    "tail_ranks_are_p_values": False,
+    "overlapping_samples_are_independent": False,
+}
+_RETURN_FEATURE_KEYS = frozenset(
+    (
+        "feature",
+        "family",
+        "horizon_hours",
+        "benchmark",
+        "status",
+        "reason",
+        "return_unit",
+        "current_value",
+        "current_sample",
+        "feature_basis",
+        "sample_count",
+        "minimum_sample_count",
+        "basis_ineligible_baseline_count",
+        "invalid_baseline_count",
+        "eligible_baseline_first_observation",
+        "eligible_baseline_last_observation",
+        "eligible_sample_sha256",
+        "median",
+        "mad",
+        "normal_consistent_mad",
+        "robust_z",
+        "lower_tail_rank",
+        "upper_tail_rank",
+        "two_sided_tail_rank",
+        "tail_ranks_are_p_values",
+    )
+)
+_RETURN_SAMPLE_KEYS = frozenset(
+    ("asset_endpoint", "asset_anchor", "benchmark_endpoint", "benchmark_anchor")
+)
+_RETURN_FEATURE_STATUSES = frozenset(
+    (
+        "ready",
+        "not_applicable",
+        "benchmark_unavailable",
+        "basis_ineligible",
+        "current_unavailable",
+        "insufficient_history",
+        "degenerate_scale",
+        "unavailable",
+    )
+)
+_RETURN_FEATURE_REASONS = frozenset(
+    (
+        "same_asset_benchmark_not_applicable",
+        "benchmark_history_unavailable",
+        "current_price_basis_not_eligible",
+        "current_return_sample_unavailable",
+        "minimum_sample_count_not_met",
+        "mad_at_or_below_degenerate_threshold",
+        "non_finite_robust_z",
+    )
+)
+_RETURN_REASON_BY_STATUS = {
+    "ready": None,
+    "not_applicable": "same_asset_benchmark_not_applicable",
+    "benchmark_unavailable": "benchmark_history_unavailable",
+    "basis_ineligible": "current_price_basis_not_eligible",
+    "current_unavailable": "current_return_sample_unavailable",
+    "insufficient_history": "minimum_sample_count_not_met",
+    "degenerate_scale": "mad_at_or_below_degenerate_threshold",
+    "unavailable": "non_finite_robust_z",
+}
 _FALSE_ISOLATION_FLAGS = (
     "routing_eligible",
     "priority_eligible",
@@ -178,6 +308,16 @@ def validate_contract(
         errors.append("shadow_temporal_surprise_invalid_type:value:dict")
         return errors
     errors.extend(_validate_value(value))
+    current_reference = value.get("current_observation")
+    outer_observation_id = row.get("market_history_observation_id")
+    if (
+        outer_observation_id not in (None, "")
+        and isinstance(current_reference, Mapping)
+        and current_reference.get("observation_id") != outer_observation_id
+    ):
+        errors.append(
+            "shadow_temporal_surprise_reference_inconsistent:outer_market_history_observation_id"
+        )
     return errors
 
 
@@ -210,12 +350,25 @@ def _contains_shadow_key(value: object) -> bool:
 
 
 def _validate_value(value: Mapping[str, Any]) -> list[str]:
-    errors = _closed_keys(value, _TOP_LEVEL_KEYS, "value")
+    schema_version = value.get("schema_version")
+    if (
+        isinstance(schema_version, bool)
+        or not isinstance(schema_version, int)
+        or schema_version not in {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}
+    ):
+        return [
+            "shadow_temporal_surprise_fixed_value_mismatch:value.schema_version"
+        ]
+    expected_keys = (
+        _TOP_LEVEL_KEYS_V1
+        if schema_version == LEGACY_SCHEMA_VERSION
+        else _TOP_LEVEL_KEYS
+    )
+    errors = _closed_keys(value, expected_keys, "value")
     if errors:
         return errors
 
     _expect_exact(value, "schema_id", SCHEMA_ID, "value", errors)
-    _expect_exact(value, "schema_version", SCHEMA_VERSION, "value", errors)
     _expect_enum(value, "status", _TOP_LEVEL_STATUSES, "value", errors)
     history_artifact = value.get("history_artifact")
     if (
@@ -253,7 +406,15 @@ def _validate_value(value: Mapping[str, Any]) -> list[str]:
     )
     _validate_method(value.get("method"), errors)
     _validate_features(value.get("features"), errors)
-    _validate_cross_field_consistency(value, errors)
+    if schema_version == SCHEMA_VERSION:
+        _expect_enum(value, "return_status", _TOP_LEVEL_STATUSES, "value", errors)
+        _validate_return_method(value.get("return_method"), errors)
+        _validate_return_features(value.get("return_features"), errors)
+    _validate_cross_field_consistency(
+        value,
+        schema_version=schema_version,
+        errors=errors,
+    )
     return errors
 
 
@@ -267,6 +428,18 @@ def _validate_method(value: object, errors: list[str]) -> None:
         return
     for field, expected in _METHOD_VALUES.items():
         _expect_exact(value, field, expected, "method", errors)
+
+
+def _validate_return_method(value: object, errors: list[str]) -> None:
+    if not isinstance(value, Mapping):
+        errors.append("shadow_temporal_surprise_invalid_type:return_method:dict")
+        return
+    key_errors = _closed_keys(value, _RETURN_METHOD_KEYS, "return_method")
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    for field, expected in _RETURN_METHOD_VALUES.items():
+        _expect_exact(value, field, expected, "return_method", errors)
 
 
 def _validate_features(value: object, errors: list[str]) -> None:
@@ -327,8 +500,143 @@ def _validate_feature(value: object, feature: str, errors: list[str]) -> None:
     _expect_exact(value, "upper_tail_rank_is_p_value", False, path, errors)
 
 
+def _validate_return_features(value: object, errors: list[str]) -> None:
+    if not isinstance(value, Mapping):
+        errors.append("shadow_temporal_surprise_invalid_type:return_features:dict")
+        return
+    key_errors = _closed_keys(
+        value,
+        frozenset(RETURN_FEATURES),
+        "return_features",
+    )
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    for feature in RETURN_FEATURES:
+        _validate_return_feature(value.get(feature), feature, errors)
+
+
+def _validate_return_feature(
+    value: object,
+    feature: str,
+    errors: list[str],
+) -> None:
+    path = f"return_features.{feature}"
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(value, _RETURN_FEATURE_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    family, horizon, benchmark = _return_feature_spec(feature)
+    _expect_exact(value, "feature", feature, path, errors)
+    _expect_exact(value, "family", family, path, errors)
+    _expect_exact(value, "horizon_hours", horizon, path, errors)
+    if benchmark is None:
+        if value.get("benchmark") is not None:
+            errors.append(
+                f"shadow_temporal_surprise_fixed_value_mismatch:{path}.benchmark"
+            )
+    else:
+        _expect_exact(value, "benchmark", benchmark, path, errors)
+    _expect_enum(value, "status", _RETURN_FEATURE_STATUSES, path, errors)
+    reason = value.get("reason")
+    if reason is not None and (
+        not isinstance(reason, str) or reason not in _RETURN_FEATURE_REASONS
+    ):
+        errors.append(f"shadow_temporal_surprise_invalid_enum:{path}.reason")
+    _expect_exact(value, "return_unit", "percent_points", path, errors)
+    basis = value.get("feature_basis")
+    if basis is not None and (not isinstance(basis, str) or not basis.strip()):
+        errors.append(
+            f"shadow_temporal_surprise_invalid_type:{path}.feature_basis:str_or_null"
+        )
+    for field in (
+        "current_value",
+        "median",
+        "mad",
+        "normal_consistent_mad",
+        "robust_z",
+        "lower_tail_rank",
+        "upper_tail_rank",
+        "two_sided_tail_rank",
+    ):
+        if not _is_finite_number_or_none(value.get(field)):
+            errors.append(
+                f"shadow_temporal_surprise_invalid_type:{path}.{field}:finite_number_or_null"
+            )
+    for field in _NONNEGATIVE_COUNTS:
+        _expect_nonnegative_int(value, field, path, errors)
+    _expect_positive_int(value, "minimum_sample_count", path, errors)
+    _validate_nullable_reference(
+        value.get("eligible_baseline_first_observation"),
+        f"{path}.eligible_baseline_first_observation",
+        errors,
+    )
+    _validate_nullable_reference(
+        value.get("eligible_baseline_last_observation"),
+        f"{path}.eligible_baseline_last_observation",
+        errors,
+    )
+    if not _is_sha256(value.get("eligible_sample_sha256")):
+        errors.append(
+            f"shadow_temporal_surprise_invalid_type:{path}.eligible_sample_sha256:sha256"
+        )
+    _validate_return_sample(
+        value.get("current_sample"),
+        path=f"{path}.current_sample",
+        benchmark=benchmark,
+        errors=errors,
+    )
+    _expect_exact(value, "tail_ranks_are_p_values", False, path, errors)
+
+
+def _validate_return_sample(
+    value: object,
+    *,
+    path: str,
+    benchmark: str | None,
+    errors: list[str],
+) -> None:
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict_or_null")
+        return
+    key_errors = _closed_keys(value, _RETURN_SAMPLE_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    _validate_reference(value.get("asset_endpoint"), f"{path}.asset_endpoint", errors)
+    _validate_reference(value.get("asset_anchor"), f"{path}.asset_anchor", errors)
+    for field in ("benchmark_endpoint", "benchmark_anchor"):
+        item = value.get(field)
+        if benchmark is None:
+            if item is not None:
+                errors.append(
+                    f"shadow_temporal_surprise_reference_inconsistent:{path}.{field}"
+                )
+        else:
+            _validate_reference(item, f"{path}.{field}", errors)
+
+
+def _return_feature_spec(feature: str) -> tuple[str, int, str | None]:
+    if feature.startswith("return_"):
+        hours = int(feature.removeprefix("return_").removesuffix("h"))
+        return "direct_return", hours, None
+    for benchmark in RETURN_BENCHMARKS:
+        prefix = f"relative_return_vs_{benchmark}_"
+        if feature.startswith(prefix):
+            hours = int(feature.removeprefix(prefix).removesuffix("h"))
+            return f"relative_return_{benchmark}", hours, benchmark
+    raise AssertionError(f"unknown shadow return feature: {feature}")
+
+
 def _validate_cross_field_consistency(
     value: Mapping[str, Any],
+    *,
+    schema_version: int,
     errors: list[str],
 ) -> None:
     features = value.get("features")
@@ -336,14 +644,49 @@ def _validate_cross_field_consistency(
         return
     supplied = value.get("supplied_prior_observation_count")
     minimum = value.get("minimum_sample_count")
-    ready_count = sum(
-        isinstance(features.get(feature), Mapping)
-        and features[feature].get("status") == "ready"
+    magnitude_values = [
+        features[feature]
         for feature in FEATURES
-    )
-    expected_status = "ready" if ready_count == len(FEATURES) else (
-        "partial" if ready_count else "unavailable"
-    )
+        if isinstance(features.get(feature), Mapping)
+    ]
+    status_values = list(magnitude_values)
+    if schema_version == SCHEMA_VERSION:
+        return_features = value.get("return_features")
+        if (
+            isinstance(return_features, Mapping)
+            and frozenset(return_features) == frozenset(RETURN_FEATURES)
+        ):
+            return_values = [
+                return_features[feature]
+                for feature in RETURN_FEATURES
+                if isinstance(return_features.get(feature), Mapping)
+            ]
+            applicable_return_values = [
+                item
+                for item in return_values
+                if item.get("status") != "not_applicable"
+            ]
+            expected_return_status = _collection_status(applicable_return_values)
+            if value.get("return_status") != expected_return_status:
+                errors.append(
+                    "shadow_temporal_surprise_status_inconsistent:value.return_status"
+                )
+            status_values.extend(applicable_return_values)
+            for feature in RETURN_FEATURES:
+                feature_value = return_features.get(feature)
+                if (
+                    isinstance(feature_value, Mapping)
+                    and frozenset(feature_value) == _RETURN_FEATURE_KEYS
+                ):
+                    _validate_return_feature_consistency(
+                        feature_value,
+                        feature=feature,
+                        supplied=supplied,
+                        top_level_minimum=minimum,
+                        current_reference=value.get("current_observation"),
+                        errors=errors,
+                    )
+    expected_status = _collection_status(status_values)
     if value.get("status") != expected_status:
         errors.append("shadow_temporal_surprise_status_inconsistent:value.status")
     _validate_reference_presence(
@@ -364,6 +707,15 @@ def _validate_cross_field_consistency(
             top_level_minimum=minimum,
             errors=errors,
         )
+
+
+def _collection_status(values: list[Mapping[str, Any]]) -> str:
+    ready_count = sum(value.get("status") == "ready" for value in values)
+    if values and ready_count == len(values):
+        return "ready"
+    if ready_count:
+        return "partial"
+    return "unavailable"
 
 
 def _validate_feature_consistency(
@@ -452,6 +804,268 @@ def _validate_feature_consistency(
         errors.append(f"shadow_temporal_surprise_tail_out_of_range:{path}")
 
 
+def _validate_return_feature_consistency(
+    value: Mapping[str, Any],
+    *,
+    feature: str,
+    supplied: object,
+    top_level_minimum: object,
+    current_reference: object,
+    errors: list[str],
+) -> None:
+    path = f"return_features.{feature}"
+    status = value.get("status")
+    if (
+        status in _RETURN_REASON_BY_STATUS
+        and value.get("reason") != _RETURN_REASON_BY_STATUS[status]
+    ):
+        errors.append(f"shadow_temporal_surprise_reason_inconsistent:{path}")
+    if value.get("minimum_sample_count") != top_level_minimum:
+        errors.append(f"shadow_temporal_surprise_minimum_inconsistent:{path}")
+    sample_count = value.get("sample_count")
+    minimum = value.get("minimum_sample_count")
+    if (
+        isinstance(sample_count, int)
+        and not isinstance(sample_count, bool)
+        and isinstance(minimum, int)
+        and not isinstance(minimum, bool)
+    ):
+        if status in {"ready", "degenerate_scale", "unavailable"} and (
+            sample_count < minimum
+        ):
+            errors.append(f"shadow_temporal_surprise_sample_status_mismatch:{path}")
+        if status == "insufficient_history" and sample_count >= minimum:
+            errors.append(f"shadow_temporal_surprise_sample_status_mismatch:{path}")
+    counts = (
+        value.get("sample_count"),
+        value.get("basis_ineligible_baseline_count"),
+        value.get("invalid_baseline_count"),
+    )
+    if (
+        status != "not_applicable"
+        and isinstance(supplied, int)
+        and not isinstance(supplied, bool)
+        and all(isinstance(item, int) and not isinstance(item, bool) for item in counts)
+        and sum(counts) != supplied
+    ):
+        errors.append(f"shadow_temporal_surprise_sample_accounting_mismatch:{path}")
+    _validate_reference_presence(
+        count=value.get("sample_count"),
+        first=value.get("eligible_baseline_first_observation"),
+        last=value.get("eligible_baseline_last_observation"),
+        path=f"{path}.eligible_baseline",
+        errors=errors,
+    )
+    family, hours, benchmark = _return_feature_spec(feature)
+    expected_basis = (
+        "provider_observed_price_ratio"
+        if family == "direct_return"
+        else (
+            "provider_observed_asset_return_minus_provider_observed_"
+            "benchmark_return"
+        )
+    )
+    derived_statuses = {
+        "ready", "insufficient_history", "degenerate_scale", "unavailable"
+    }
+    if status in derived_statuses and value.get("feature_basis") != expected_basis:
+        errors.append(f"shadow_temporal_surprise_basis_inconsistent:{path}")
+    required_statistics = {
+        "ready": {
+            "current_value", "current_sample", "feature_basis", "median", "mad",
+            "normal_consistent_mad", "robust_z", "lower_tail_rank",
+            "upper_tail_rank", "two_sided_tail_rank",
+        },
+        "degenerate_scale": {
+            "current_value", "current_sample", "feature_basis", "median", "mad",
+            "normal_consistent_mad", "lower_tail_rank", "upper_tail_rank",
+            "two_sided_tail_rank",
+        },
+        "unavailable": {
+            "current_value", "current_sample", "feature_basis", "median", "mad",
+            "normal_consistent_mad", "lower_tail_rank", "upper_tail_rank",
+            "two_sided_tail_rank",
+        },
+        "insufficient_history": {
+            "current_value", "current_sample", "feature_basis",
+        },
+    }.get(status, set())
+    nullable_fields = (
+        "current_value", "current_sample", "feature_basis", "median", "mad",
+        "normal_consistent_mad", "robust_z", "lower_tail_rank",
+        "upper_tail_rank", "two_sided_tail_rank",
+    )
+    for field in nullable_fields:
+        should_exist = field in required_statistics
+        if should_exist != (value.get(field) is not None):
+            errors.append(
+                f"shadow_temporal_surprise_statistic_inconsistent:{path}.{field}"
+            )
+    for field in ("lower_tail_rank", "upper_tail_rank", "two_sided_tail_rank"):
+        tail = value.get(field)
+        if (
+            _is_finite_number_or_none(tail)
+            and tail is not None
+            and not 0 <= float(tail) <= 1
+        ):
+            errors.append(
+                f"shadow_temporal_surprise_tail_out_of_range:{path}.{field}"
+            )
+    mad = value.get("mad")
+    consistent_mad = value.get("normal_consistent_mad")
+    if _is_finite_number_or_none(mad) and mad is not None and float(mad) < 0:
+        errors.append(f"shadow_temporal_surprise_scale_inconsistent:{path}.mad")
+    if (
+        _is_finite_number_or_none(consistent_mad)
+        and consistent_mad is not None
+        and float(consistent_mad) < 0
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_scale_inconsistent:{path}.normal_consistent_mad"
+        )
+    if (
+        _is_finite_number_or_none(mad)
+        and mad is not None
+        and _is_finite_number_or_none(consistent_mad)
+        and consistent_mad is not None
+        and not math.isclose(
+            float(consistent_mad),
+            float(mad) * _RETURN_METHOD_VALUES["normal_consistency_factor"],
+            rel_tol=1e-10,
+            abs_tol=2e-12,
+        )
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_scale_inconsistent:{path}.normal_consistent_mad"
+        )
+    lower_tail = value.get("lower_tail_rank")
+    upper_tail = value.get("upper_tail_rank")
+    two_sided_tail = value.get("two_sided_tail_rank")
+    if all(
+        _is_finite_number_or_none(item) and item is not None
+        for item in (lower_tail, upper_tail, two_sided_tail)
+    ):
+        expected_two_sided = min(
+            1.0,
+            2.0 * min(float(lower_tail), float(upper_tail)),
+        )
+        if not math.isclose(
+            float(two_sided_tail),
+            expected_two_sided,
+            rel_tol=1e-10,
+            abs_tol=2e-12,
+        ):
+            errors.append(
+                f"shadow_temporal_surprise_tail_inconsistent:{path}.two_sided_tail_rank"
+            )
+    current_value = value.get("current_value")
+    median = value.get("median")
+    robust_z = value.get("robust_z")
+    if all(
+        _is_finite_number_or_none(item) and item is not None
+        for item in (current_value, median, consistent_mad, robust_z)
+    ) and float(consistent_mad) > 0:
+        expected_robust_z = (
+            float(current_value) - float(median)
+        ) / float(consistent_mad)
+        if not math.isclose(
+            float(robust_z),
+            expected_robust_z,
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            errors.append(
+                f"shadow_temporal_surprise_statistic_inconsistent:{path}.robust_z"
+            )
+    sample = value.get("current_sample")
+    if isinstance(sample, Mapping) and frozenset(sample) == _RETURN_SAMPLE_KEYS:
+        _validate_return_sample_clocks(
+            sample,
+            path=path,
+            benchmark=benchmark,
+            horizon_hours=hours,
+            current_reference=current_reference,
+            errors=errors,
+        )
+
+
+def _validate_return_sample_clocks(
+    sample: Mapping[str, Any],
+    *,
+    path: str,
+    benchmark: str | None,
+    horizon_hours: int,
+    current_reference: object,
+    errors: list[str],
+) -> None:
+    asset_endpoint = sample.get("asset_endpoint")
+    asset_anchor = sample.get("asset_anchor")
+    if (
+        isinstance(current_reference, Mapping)
+        and isinstance(asset_endpoint, Mapping)
+        and dict(asset_endpoint) != dict(current_reference)
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_reference_inconsistent:{path}.asset_endpoint"
+        )
+    endpoint_at = _reference_time(asset_endpoint)
+    anchor_at = _reference_time(asset_anchor)
+    if (
+        isinstance(asset_endpoint, Mapping)
+        and isinstance(asset_anchor, Mapping)
+        and asset_endpoint.get("observation_id") == asset_anchor.get("observation_id")
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_reference_inconsistent:{path}.asset_anchor"
+        )
+    if endpoint_at is None or anchor_at is None:
+        return
+    target_at = endpoint_at - timedelta(hours=horizon_hours)
+    tolerance = max(
+        timedelta(seconds=RETURN_MIN_ANCHOR_TOLERANCE_SECONDS),
+        timedelta(hours=horizon_hours * RETURN_ANCHOR_TOLERANCE_RATIO),
+    )
+    if anchor_at > target_at or target_at - anchor_at > tolerance:
+        errors.append(
+            f"shadow_temporal_surprise_return_clock_inconsistent:{path}.asset"
+        )
+    if benchmark is None:
+        return
+    benchmark_endpoint_at = _reference_time(sample.get("benchmark_endpoint"))
+    benchmark_anchor_at = _reference_time(sample.get("benchmark_anchor"))
+    benchmark_endpoint = sample.get("benchmark_endpoint")
+    benchmark_anchor = sample.get("benchmark_anchor")
+    if (
+        isinstance(benchmark_endpoint, Mapping)
+        and isinstance(benchmark_anchor, Mapping)
+        and benchmark_endpoint.get("observation_id")
+        == benchmark_anchor.get("observation_id")
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_reference_inconsistent:{path}.benchmark_anchor"
+        )
+    if benchmark_endpoint_at is None or benchmark_anchor_at is None:
+        return
+    alignment_tolerance = timedelta(
+        seconds=BENCHMARK_ALIGNMENT_TOLERANCE_SECONDS
+    )
+    if (
+        benchmark_endpoint_at > endpoint_at
+        or endpoint_at - benchmark_endpoint_at > alignment_tolerance
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_return_clock_inconsistent:{path}.benchmark_alignment"
+        )
+    benchmark_target_at = benchmark_endpoint_at - timedelta(hours=horizon_hours)
+    if (
+        benchmark_anchor_at > benchmark_target_at
+        or benchmark_target_at - benchmark_anchor_at > tolerance
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_return_clock_inconsistent:{path}.benchmark"
+        )
+
+
 def _validate_reference_presence(
     *,
     count: object,
@@ -481,12 +1095,31 @@ def _validate_reference(value: object, path: str, errors: list[str]) -> None:
             errors.append(
                 f"shadow_temporal_surprise_invalid_type:{path}.{field}:str"
             )
+    if _reference_time(value) is None:
+        errors.append(
+            f"shadow_temporal_surprise_invalid_type:{path}.observed_at:aware_timestamp"
+        )
 
 
 def _validate_nullable_reference(value: object, path: str, errors: list[str]) -> None:
     if value is None:
         return
     _validate_reference(value, path, errors)
+
+
+def _reference_time(value: object) -> datetime | None:
+    if not isinstance(value, Mapping):
+        return None
+    raw = value.get("observed_at")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 def _closed_keys(

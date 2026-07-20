@@ -676,28 +676,34 @@ observed relative value cannot remain labeled unavailable. An independently
 supplied canonical value and stronger basis remain authoritative, with the
 temporal calculation retained only under its explicit diagnostic field.
 
-The optional `event_alpha.shadow_temporal_surprise` v1 comparison uses only
-positive finite provider-observed `volume_24h` and provider-observed or explicit
-provider-ratio `turnover_24h`. It applies a natural log, baseline median, and
-normal-consistent MAD scale (`MAD * 1.482602218505602`) over the same strictly
-earlier cadence-counted history. A derived-ratio turnover must match provider
-volume divided by provider market cap within fixed `1e-9` relative and `1e-12`
-absolute tolerances; independently supplied turnover remains
-provider-observed. Degenerate MAD returns a null robust z-score;
-there is no epsilon or standard-deviation fallback. Its add-one upper-tail rank
-is labeled descriptive and never a p-value. The value is computed from the
-exact fingerprinted generation-history snapshot only after anomaly
-classification, bucketing, priority, sorting, and truncation, then attached as
-top-level snapshot/anomaly diagnostic metadata. The exact history artifact
-basename and verified SHA-256 remain inside the closed value, while bundle
-enrichment stays bound to the original scan namespace device/inode and unchanged
-artifact hashes. It never enters provider source
-rows, canonical history, nested market snapshots, integrated candidates, the
-Decision projection, routes, priorities, scores, thresholds, cards, or sends.
-Its explicit policy remains routing/priority/Decision-score ineligible,
-`auto_apply=false`, and research-only until matured outcome and control evidence
-supports a separate reviewed decision. The detailed method and limitations are
-recorded in `research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
+The optional `event_alpha.shadow_temporal_surprise` v2 comparison preserves its
+v1 activity contract and keeps historical v1 values readable. Positive finite
+provider-observed `volume_24h` and provider-observed or exact provider-ratio
+`turnover_24h` use natural log, baseline median, normal-consistent MAD
+(`MAD * 1.482602218505602`), and a descriptive add-one upper-tail rank. V2 adds
+separate direct, BTC-relative, and ETH-relative 1h/4h/24h signed-return families
+in percentage points. Returns are rederived only from provider-observed prices;
+each endpoint uses an at-or-before causal horizon anchor within the larger of
+300 seconds or 25% of the horizon. A canonical benchmark endpoint must be at or
+before the asset clock and within 300 seconds. The identity transform preserves
+downside sign, while median/MAD robust z-scores and add-one lower, upper, and
+two-sided ranks remain descriptive rather than p-values. Overlapping samples
+are explicitly not independent. Proxy basis, identity drift, future/misaligned
+clocks, insufficient history, and degenerate MAD fail closed without a fallback.
+
+The value is computed from the exact fingerprinted generation-history snapshot
+only after anomaly classification, bucketing, priority, sorting, and truncation,
+then attached as top-level snapshot/anomaly diagnostic metadata. The exact
+history artifact basename and verified SHA-256 remain inside the closed value,
+while bundle enrichment stays bound to the original scan namespace device/inode
+and unchanged artifact hashes. It never enters provider source rows, canonical
+history, nested market snapshots, integrated candidates, the Decision
+projection, routes, priorities, scores, thresholds, cards, or sends. Its
+explicit policy remains routing/priority/Decision-score ineligible,
+`auto_apply=false`, and research-only until matured episode-level outcome and
+matched-control evidence supports a separate sealed out-of-sample decision. The
+detailed method and limitations are recorded in
+`research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
 
 Repeated campaign observations of one persistent market move are measured with
 the closed `event_alpha.shadow_anomaly_episodes` v1 contract. It partitions

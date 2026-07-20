@@ -16,6 +16,31 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Extend robust temporal surprise with causal signed-return tails
+**Status:** accepted as shadow-only research instrumentation
+**Decision:** Advance `event_alpha.shadow_temporal_surprise` to schema v2 while
+keeping historical v1 values readable. Preserve the existing log-median/MAD
+volume and turnover comparison, and add separate direct and BTC/ETH-relative
+1h, 4h, and 24h return families. Rederive percent-point returns only from
+provider-observed prices with canonical benchmark identity, at-or-before causal
+horizon anchors, and a bounded backward tolerance. Preserve sign with the
+identity transform; report median/MAD robust z-scores plus add-one lower, upper,
+and two-sided descriptive ranks. Treat overlapping observations as dependent,
+call no rank a p-value, and fail closed on proxy bases, future or misaligned
+clocks, insufficient history, identity drift, or degenerate MAD. Attach v2 only
+to top-level post-scan market evidence with every routing, score, threshold,
+publication, and automatic-application flag false.
+**Why:** Signed crypto returns are heavy-tailed, so the canonical mean/standard-
+deviation comparison needs an explainable robust challenger that preserves
+direction and exact point-in-time lineage. Implementing the preregistered first
+candidate as isolated instrumentation lets the campaign collect comparable
+evidence without tuning sparse overlapping observations or changing trader-
+facing truth.
+**Revisit when:** Matured episode-level Decision outcomes and matched non-idea
+controls support a frozen development/validation/untouched-holdout comparison
+with dependence-aware uncertainty, coverage and degeneracy reporting, a sealed
+Protocol-v2 annex, and a separate reviewed promotion decision.
+
 ## 2026-07-20 - Missing residual execution cost cannot become zero
 **Status:** accepted as fail-closed offline mechanics; final policy remains unsealed
 **Decision:** Fully rederive the exact Bybit decision-reference composite before

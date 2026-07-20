@@ -1,7 +1,8 @@
 # Decision Radar anomaly-method preregistration
 
-Status: **research-only design record; not implemented, not calibrated, and not
-eligible for routing, scoring, publication, alerts, or Protocol-v2 evidence**.
+Status: **research-only design record; rank 1 is implemented as an isolated
+shadow diagnostic but is not calibrated and is not eligible for routing,
+scoring, publication authority, alerts, or Protocol-v2 evidence**.
 
 ## Purpose
 
@@ -18,9 +19,10 @@ holdout.
   observations and keep the current value out of its own baseline.
 - Production return, relative-return, volatility, volume, and turnover features
   currently use transparent mean/population-standard-deviation z-scores.
-- The existing shadow metric applies a natural log, median, normal-consistent
-  median absolute deviation, and a descriptive add-one upper-tail rank only to
-  eligible `volume_24h` and `turnover_24h` evidence.
+- Shadow schema v2 preserves the v1 natural-log median/MAD activity comparison
+  for eligible `volume_24h` and `turnover_24h`, and implements the preregistered
+  rank-1 signed-return comparison for direct and BTC/ETH-relative 1h/4h/24h
+  families. Historical v1 values remain readable.
 - That shadow value is explicitly barred from routes, priorities, Decision
   scores, thresholds, and automatic application.
 - The present campaign has overlapping observations and sparse matured ideas;
@@ -30,16 +32,20 @@ holdout.
 
 ### 1. Robust signed-return and relative-return tails
 
-Study a shadow-only extension for direct 1h, 4h, and 24h signed returns and
-BTC/ETH-relative returns. Each horizon and basis must remain a separate family.
-Use strictly earlier point-in-time observations, a median/MAD scale, and
-two-sided empirical ranks that preserve sign. Do not mix direct bars with proxy
-or differently timed return evidence, and do not call the dependent rolling
-ranks p-values.
+Implemented as shadow schema v2 for direct 1h, 4h, and 24h signed returns and
+BTC/ETH-relative returns. Each horizon and basis remains a separate family.
+The implementation rederives percent-point returns only from provider-observed
+prices, uses causal at-or-before horizon anchors, keeps BTC/ETH endpoints at or
+before the asset clock, and applies median/MAD plus sign-preserving lower,
+upper, and two-sided descriptive ranks. Proxy prices, mismatched canonical
+benchmark identities, future clocks, and insufficient or degenerate samples
+fail closed. The dependent rolling ranks are explicitly not p-values.
 
-This is first because it is a small, explainable extension of an already closed
-shadow contract and directly addresses the heavy tails that make mean/std
-zscores fragile. It must remain unavailable when the scale degenerates.
+This remains rank 1 because it is a small, explainable extension of an already
+closed shadow contract and directly addresses the heavy tails that make
+mean/std z-scores fragile. Implementation does not imply empirical acceptance:
+it remains unavailable when the scale degenerates and cannot affect production
+until the evaluation contract below is completed.
 
 ### 2. Point-in-time crypto market-factor residuals
 

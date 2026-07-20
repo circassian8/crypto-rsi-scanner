@@ -2,7 +2,7 @@
 
 Research-only 30-day burn-in operating contract. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-20T05:06:32.792099+00:00`
+- generated_at: `2026-07-20T05:53:40.607746+00:00`
 - schema_version: `event_alpha_burn_in_contract_v1`
 - duration_days: `30`
 - min_live_no_send_cycles: `20`

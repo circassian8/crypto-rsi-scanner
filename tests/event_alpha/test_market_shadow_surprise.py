@@ -6,13 +6,16 @@ import copy
 import json
 import math
 import statistics
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from crypto_rsi_scanner.event_alpha.radar.market_shadow_surprise import (
     ELIGIBLE_FEATURE_BASES,
     MAD_NORMAL_CONSISTENCY_FACTOR,
+    RETURN_HORIZONS_HOURS,
     SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID,
+    SUPPORTED_RETURN_FEATURES,
     build_shadow_temporal_surprise as _build_shadow_temporal_surprise,
     evaluate_shadow_temporal_surprise as _evaluate_shadow_temporal_surprise,
 )
@@ -21,23 +24,37 @@ _HISTORY_ARTIFACT = "event_market_history.jsonl"
 _HISTORY_SHA256 = "a" * 64
 
 
-def evaluate_shadow_temporal_surprise(current, priors, *, minimum_sample_count):
+def evaluate_shadow_temporal_surprise(
+    current,
+    priors,
+    *,
+    minimum_sample_count,
+    benchmark_observations=None,
+):
     return _evaluate_shadow_temporal_surprise(
         current,
         priors,
         minimum_sample_count=minimum_sample_count,
         history_artifact=_HISTORY_ARTIFACT,
         history_sha256=_HISTORY_SHA256,
+        benchmark_observations=benchmark_observations,
     )
 
 
-def build_shadow_temporal_surprise(current, priors, *, minimum_sample_count):
+def build_shadow_temporal_surprise(
+    current,
+    priors,
+    *,
+    minimum_sample_count,
+    benchmark_observations=None,
+):
     return _build_shadow_temporal_surprise(
         current,
         priors,
         minimum_sample_count=minimum_sample_count,
         history_artifact=_HISTORY_ARTIFACT,
         history_sha256=_HISTORY_SHA256,
+        benchmark_observations=benchmark_observations,
     )
 
 
@@ -68,6 +85,273 @@ def _observation(
     }
 
 
+_RETURN_BASE = datetime(2026, 7, 10, tzinfo=timezone.utc)
+
+
+def _return_observation(
+    index: int,
+    *,
+    asset_id: str,
+    price: float,
+    price_basis: str = "provider_observed",
+) -> dict:
+    volume = float(1_000_000 + index * 11_000 + (index % 3) * 2_000)
+    market_cap = float(10_000_000 + index * 7_000)
+    return {
+        "observation_id": f"{asset_id}-obs-{index}",
+        "observed_at": (_RETURN_BASE + timedelta(hours=index)).isoformat(),
+        "canonical_asset_id": asset_id,
+        "baseline_counted": True,
+        "price": price,
+        "volume_24h": volume,
+        "turnover_24h": volume / market_cap,
+        "market_cap": market_cap,
+        "feature_basis": {
+            "price": price_basis,
+            "volume_24h": "provider_observed",
+            "turnover_24h": "derived_provider_ratio",
+            "market_cap": "provider_observed",
+        },
+    }
+
+
+def _complete_return_history(*, current_price: float = 138.0):
+    asset_priors = [
+        _return_observation(
+            index,
+            asset_id="asset-a",
+            price=100.0 + index * 0.31 + (index % 4) * 0.07,
+        )
+        for index in range(30)
+    ]
+    current = _return_observation(
+        30,
+        asset_id="asset-a",
+        price=current_price,
+    )
+    benchmarks = {
+        "btc": [
+            _return_observation(
+                index,
+                asset_id="bitcoin",
+                price=1_000.0 + index * 1.7 + (index % 5) * 0.11,
+            )
+            for index in range(31)
+        ],
+        "eth": [
+            _return_observation(
+                index,
+                asset_id="ethereum",
+                price=500.0 + index * 0.83 + (index % 4) * 0.09,
+            )
+            for index in range(31)
+        ],
+    }
+    return current, asset_priors, benchmarks
+
+
+def test_v2_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank():
+    current, priors, benchmarks = _complete_return_history()
+
+    result = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+
+    assert result["schema_version"] == 2
+    assert result["status"] == "ready"
+    assert result["return_status"] == "ready"
+    assert tuple(RETURN_HORIZONS_HOURS) == (1, 4, 24)
+    assert result["return_method"] == {
+        "transform": "identity_signed",
+        "return_unit": "percent_points",
+        "location_estimator": "median",
+        "scale_estimator": "median_absolute_deviation",
+        "normal_consistency_factor": MAD_NORMAL_CONSISTENCY_FACTOR,
+        "degenerate_mad_threshold": 1e-12,
+        "derived_float_decimal_places": 12,
+        "anchor_tolerance_ratio": 0.25,
+        "minimum_anchor_tolerance_seconds": 300,
+        "benchmark_alignment_tolerance_seconds": 300,
+        "lower_tail_rank_definition": (
+            "(count(baseline_return <= current_return)+1)/(sample_count+1)"
+        ),
+        "upper_tail_rank_definition": (
+            "(count(baseline_return >= current_return)+1)/(sample_count+1)"
+        ),
+        "two_sided_tail_rank_definition": (
+            "min(1,2*min(lower_tail_rank,upper_tail_rank))"
+        ),
+        "tail_ranks_are_p_values": False,
+        "overlapping_samples_are_independent": False,
+    }
+    direct = result["return_features"]["return_1h"]
+    expected_direct = (current["price"] / priors[-1]["price"] - 1.0) * 100.0
+    assert direct["status"] == "ready"
+    assert direct["return_unit"] == "percent_points"
+    assert direct["feature_basis"] == "provider_observed_price_ratio"
+    assert direct["current_value"] == round(expected_direct, 12)
+    assert direct["robust_z"] > 0
+    assert direct["upper_tail_rank"] < direct["lower_tail_rank"]
+    assert direct["two_sided_tail_rank"] == pytest.approx(min(
+        1.0,
+        2 * min(direct["lower_tail_rank"], direct["upper_tail_rank"]),
+    ), abs=2e-12)
+    assert direct["tail_ranks_are_p_values"] is False
+    assert direct["current_sample"]["asset_anchor"]["observation_id"] == (
+        "asset-a-obs-29"
+    )
+    assert direct["current_sample"]["benchmark_endpoint"] is None
+    relative = result["return_features"]["relative_return_vs_btc_24h"]
+    expected_asset_24h = (current["price"] / priors[6]["price"] - 1.0) * 100.0
+    expected_btc_24h = (
+        benchmarks["btc"][30]["price"] / benchmarks["btc"][6]["price"] - 1.0
+    ) * 100.0
+    assert relative["status"] == "ready"
+    assert relative["family"] == "relative_return_btc"
+    assert relative["benchmark"] == "btc"
+    assert relative["feature_basis"] == (
+        "provider_observed_asset_return_minus_provider_observed_benchmark_return"
+    )
+    assert relative["current_value"] == pytest.approx(
+        round(expected_asset_24h - expected_btc_24h, 12),
+        abs=1e-10,
+    )
+    assert relative["current_sample"]["benchmark_endpoint"]["observation_id"] == (
+        "bitcoin-obs-30"
+    )
+    assert relative["sample_count"] == 6
+    json.dumps(result, sort_keys=True, allow_nan=False)
+
+
+def test_v2_signed_return_tail_preserves_negative_direction():
+    current, priors, benchmarks = _complete_return_history(current_price=80.0)
+
+    result = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+
+    for feature in ("return_1h", "return_4h", "return_24h"):
+        value = result["return_features"][feature]
+        assert value["status"] == "ready"
+        assert value["current_value"] < 0
+        assert value["robust_z"] < 0
+        assert value["lower_tail_rank"] < value["upper_tail_rank"]
+
+
+def test_v2_return_features_fail_closed_on_price_basis_and_missing_benchmark():
+    current, priors, benchmarks = _complete_return_history()
+    current["feature_basis"]["price"] = "cross_sectional_price_proxy"
+
+    result = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+        benchmark_observations={"btc": benchmarks["btc"]},
+    )
+
+    for feature in ("return_1h", "return_4h", "return_24h"):
+        value = result["return_features"][feature]
+        assert value["status"] == "basis_ineligible"
+        assert value["current_value"] is None
+        assert value["robust_z"] is None
+    for hours in RETURN_HORIZONS_HOURS:
+        missing = result["return_features"][f"relative_return_vs_eth_{hours}h"]
+        assert missing["status"] == "benchmark_unavailable"
+        assert missing["reason"] == "benchmark_history_unavailable"
+        assert missing["invalid_baseline_count"] == len(priors)
+    assert result["return_status"] == "unavailable"
+
+
+def test_v2_return_output_is_order_independent_and_sample_digest_binds_prices():
+    current, priors, benchmarks = _complete_return_history()
+    forward = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+    reverse = evaluate_shadow_temporal_surprise(
+        current,
+        reversed(priors),
+        minimum_sample_count=5,
+        benchmark_observations={
+            name: reversed(rows) for name, rows in benchmarks.items()
+        },
+    )
+    changed_priors = copy.deepcopy(priors)
+    changed_priors[12]["price"] += 0.01
+    changed = evaluate_shadow_temporal_surprise(
+        current,
+        changed_priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+    renamed_current = copy.deepcopy(current)
+    renamed_current["canonical_asset_id"] = "asset-renamed"
+    renamed_priors = copy.deepcopy(priors)
+    for row in renamed_priors:
+        row["canonical_asset_id"] = "asset-renamed"
+    renamed = evaluate_shadow_temporal_surprise(
+        renamed_current,
+        renamed_priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+
+    assert forward == reverse
+    assert (
+        forward["return_features"]["return_4h"]["eligible_sample_sha256"]
+        != changed["return_features"]["return_4h"]["eligible_sample_sha256"]
+    )
+    assert (
+        forward["return_features"]["return_4h"]["eligible_sample_sha256"]
+        != renamed["return_features"]["return_4h"]["eligible_sample_sha256"]
+    )
+
+
+def test_v2_rejects_wrong_canonical_benchmark_identity():
+    current, priors, benchmarks = _complete_return_history()
+    for row in benchmarks["btc"]:
+        row["canonical_asset_id"] = "not-bitcoin"
+
+    with pytest.raises(
+        ValueError,
+        match="btc benchmark canonical asset identity is invalid",
+    ):
+        evaluate_shadow_temporal_surprise(
+            current,
+            priors,
+            minimum_sample_count=5,
+            benchmark_observations=benchmarks,
+        )
+
+
+def test_v2_treats_canonical_benchmark_alias_as_self_relative_not_applicable():
+    current, priors, _benchmarks = _complete_return_history()
+    current["canonical_asset_id"] = "btc"
+    for row in priors:
+        row["canonical_asset_id"] = "btc"
+
+    result = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+    )
+
+    for hours in RETURN_HORIZONS_HOURS:
+        feature = result["return_features"][
+            f"relative_return_vs_btc_{hours}h"
+        ]
+        assert feature["status"] == "not_applicable"
+        assert feature["reason"] == "same_asset_benchmark_not_applicable"
+
+
 def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
     priors = [
         _observation(index, volume=volume, turnover=turnover)
@@ -90,8 +374,9 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
 
     assert SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID == "event_alpha.shadow_temporal_surprise"
     assert result["schema_id"] == SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
-    assert result["schema_version"] == 1
-    assert result["status"] == "ready"
+    assert result["schema_version"] == 2
+    assert result["status"] == "partial"
+    assert result["return_status"] == "unavailable"
     assert volume["status"] == "ready"
     assert volume["current_log"] == round(math.log(160), 12)
     assert volume["median_log"] == round(expected_median, 12)
@@ -132,6 +417,9 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
         "minimum_sample_count",
         "method",
         "features",
+        "return_status",
+        "return_method",
+        "return_features",
         "routing_eligible",
         "priority_eligible",
         "score_adjustment_eligible",
@@ -140,6 +428,7 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
         "research_only",
     }
     assert set(result["features"]) == {"volume_24h", "turnover_24h"}
+    assert set(result["return_features"]) == set(SUPPORTED_RETURN_FEATURES)
     assert "price" not in result["features"]
     assert result["routing_eligible"] is False
     assert result["priority_eligible"] is False
@@ -512,7 +801,15 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     policy = payload["shadow_temporal_surprise_policy"]
 
     assert policy["schema_id"] == "event_alpha.shadow_temporal_surprise"
+    assert policy["schema_version"] == 2
+    assert policy["legacy_schema_versions_readable"] == [1]
     assert policy["features"] == ["volume_24h", "turnover_24h"]
+    assert policy["signed_return_features"] == list(SUPPORTED_RETURN_FEATURES)
+    assert policy["signed_return_unit"] == "percent_points"
+    assert policy["signed_return_transform"] == "identity_preserves_sign"
+    assert policy["return_families_kept_separate"] is True
+    assert policy["return_tail_ranks_are_p_values"] is False
+    assert policy["overlapping_return_samples_are_independent"] is False
     assert policy["derived_ratio_validation"] == (
         "volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12"
     )
@@ -570,6 +867,24 @@ def test_artifact_schema_accepts_closed_shadow_temporal_surprise(schema_id):
     assert schema_v1.validate_row_against_schema(row, schema_id) == []
 
 
+def test_artifact_schema_binds_shadow_to_outer_market_history_observation():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    shadow = _valid_schema_shadow()
+    row = _shadow_artifact_row("market_state_snapshot_v1", shadow)
+    row["market_history_observation_id"] = "different-observation"
+
+    errors = schema_v1.validate_row_against_schema(
+        row,
+        "market_state_snapshot_v1",
+    )
+
+    assert (
+        "shadow_temporal_surprise_reference_inconsistent:outer_market_history_observation_id"
+        in errors
+    )
+
+
 def test_artifact_schema_accepts_unavailable_shadow_with_null_references_and_statistics():
     from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
 
@@ -585,6 +900,99 @@ def test_artifact_schema_accepts_unavailable_shadow_with_null_references_and_sta
     assert schema_v1.validate_row_against_schema(
         row, "market_state_snapshot_v1"
     ) == []
+
+
+def test_artifact_schema_keeps_historical_v1_shadow_values_readable():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    legacy = _valid_schema_shadow()
+    legacy["schema_version"] = 1
+    legacy["status"] = "ready"
+    legacy.pop("return_status")
+    legacy.pop("return_method")
+    legacy.pop("return_features")
+
+    errors = schema_v1.validate_row_against_schema(
+        _shadow_artifact_row("market_state_snapshot_v1", legacy),
+        "market_state_snapshot_v1",
+    )
+
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_error"),
+    (
+        (
+            lambda value: value["return_method"].__setitem__(
+                "tail_ranks_are_p_values", True
+            ),
+            "shadow_temporal_surprise_fixed_value_mismatch:return_method.tail_ranks_are_p_values",
+        ),
+        (
+            lambda value: value["return_features"].pop("return_24h"),
+            "shadow_temporal_surprise_closed_keys:return_features",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"].__setitem__(
+                "robust_z", {}
+            ),
+            "shadow_temporal_surprise_invalid_type:return_features.return_1h.robust_z:finite_number_or_null",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"].__setitem__(
+                "two_sided_tail_rank", 0.9
+            ),
+            "shadow_temporal_surprise_tail_inconsistent:return_features.return_1h.two_sided_tail_rank",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
+                "current_sample"
+            ]["asset_endpoint"].__setitem__("observation_id", "wrong-current"),
+            "shadow_temporal_surprise_reference_inconsistent:return_features.return_1h.asset_endpoint",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
+                "current_sample"
+            ]["asset_anchor"].__setitem__(
+                "observed_at",
+                value["return_features"]["return_1h"]["current_sample"][
+                    "asset_endpoint"
+                ]["observed_at"],
+            ),
+            "shadow_temporal_surprise_return_clock_inconsistent:return_features.return_1h.asset",
+        ),
+        (
+            lambda value: value["return_features"][
+                "relative_return_vs_btc_1h"
+            ]["current_sample"]["benchmark_endpoint"].__setitem__(
+                "observed_at", "2026-07-11T06:01:00+00:00"
+            ),
+            "shadow_temporal_surprise_return_clock_inconsistent:return_features.relative_return_vs_btc_1h.benchmark_alignment",
+        ),
+    ),
+)
+def test_artifact_schema_rejects_malformed_v2_return_contract(
+    mutation,
+    expected_error,
+):
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    current, priors, benchmarks = _complete_return_history()
+    shadow = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+    mutation(shadow)
+
+    errors = schema_v1.validate_row_against_schema(
+        _shadow_artifact_row("market_state_snapshot_v1", shadow),
+        "market_state_snapshot_v1",
+    )
+
+    assert any(error.startswith(expected_error) for error in errors), errors
 
 
 @pytest.mark.parametrize(
@@ -673,7 +1081,7 @@ def test_artifact_schema_accepts_unavailable_shadow_with_null_references_and_sta
             "shadow_temporal_surprise_invalid_type:value.history_artifact_sha256:sha256",
         ),
         (
-            lambda value: value.__setitem__("status", "partial"),
+            lambda value: value.__setitem__("status", "ready"),
             "shadow_temporal_surprise_status_inconsistent:value.status",
         ),
         (

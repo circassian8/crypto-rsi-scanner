@@ -28,10 +28,12 @@ def _current_market_row() -> dict:
     row.update({
         "coin_id": "token-b",
         "canonical_asset_id": "token-b",
+        "price": row["current_price"],
         "volume_24h": 125_000_000.0,
         "turnover_24h": 125_000_000.0 / 420_000_000.0,
         "market_history_observation_id": "obs-current",
         "feature_basis": {
+            "price": "provider_observed",
             "volume_24h": "provider_observed",
             "market_cap": "provider_observed",
             "turnover_24h": "derived_provider_ratio",
@@ -42,17 +44,19 @@ def _current_market_row() -> dict:
 
 def _history_rows(current: dict) -> list[dict]:
     history: list[dict] = []
-    for offset in range(8, 0, -1):
-        volume = float(45_000_000 + (8 - offset) * 5_000_000)
+    for offset in range(9, 0, -1):
+        volume = float(45_000_000 + (9 - offset) * 5_000_000)
         history.append({
             "observation_id": f"obs-prior-{offset}",
             "canonical_asset_id": "token-b",
             "coin_id": "token-b",
             "observed_at": (NOW - timedelta(hours=offset)).isoformat(),
+            "price": 1.70 + (9 - offset) * 0.01,
             "volume_24h": volume,
             "market_cap": 420_000_000.0,
             "turnover_24h": volume / 420_000_000.0,
             "feature_basis": {
+                "price": "provider_observed",
                 "volume_24h": "provider_observed",
                 "market_cap": "provider_observed",
                 "turnover_24h": "derived_provider_ratio",
@@ -61,6 +65,30 @@ def _history_rows(current: dict) -> list[dict]:
             "baseline_counting_status": "counted",
             "research_only": True,
         })
+    for asset_id, start_price, hourly_change in (
+        ("bitcoin", 65_000.0, 17.0),
+        ("ethereum", 3_400.0, 2.0),
+    ):
+        for offset in range(9, -1, -1):
+            history.append({
+                "observation_id": f"{asset_id}-obs-{offset}",
+                "canonical_asset_id": asset_id,
+                "coin_id": asset_id,
+                "observed_at": (NOW - timedelta(hours=offset)).isoformat(),
+                "price": start_price + (9 - offset) * hourly_change,
+                "volume_24h": 1_000_000_000.0,
+                "market_cap": 10_000_000_000.0,
+                "turnover_24h": 0.1,
+                "feature_basis": {
+                    "price": "provider_observed",
+                    "volume_24h": "provider_observed",
+                    "market_cap": "provider_observed",
+                    "turnover_24h": "derived_provider_ratio",
+                },
+                "baseline_counted": True,
+                "baseline_counting_status": "counted",
+                "research_only": True,
+            })
     history.append({
         "observation_id": "obs-too-close",
         "canonical_asset_id": "token-b",
@@ -79,6 +107,7 @@ def _history_rows(current: dict) -> list[dict]:
         "canonical_asset_id": "token-b",
         "coin_id": "token-b",
         "observed_at": NOW.isoformat(),
+        "price": current["price"],
         "volume_24h": current["volume_24h"],
         "market_cap": current["market_cap"],
         "turnover_24h": current["turnover_24h"],
@@ -180,6 +209,7 @@ def test_shadow_surprise_attaches_only_after_route_and_preserves_authority_bytes
     anomaly = next(row for row in anomalies if row.get("coin_id") == "token-b")
     snapshot = next(row for row in snapshots if row.get("coin_id") == "token-b")
     shadow = anomaly["shadow_temporal_surprise"]
+    assert shadow["schema_version"] == 2
     assert shadow["history_artifact"] == market_no_send.HISTORY_FILENAME
     assert shadow["history_artifact_sha256"] == hashlib.sha256(
         history_before
@@ -193,8 +223,13 @@ def test_shadow_surprise_attaches_only_after_route_and_preserves_authority_bytes
     assert shadow["priority_eligible"] is False
     assert shadow["decision_score_eligible"] is False
     assert shadow["auto_apply"] is False
-    assert shadow["features"]["volume_24h"]["sample_count"] == 8
+    assert shadow["features"]["volume_24h"]["sample_count"] == 9
     assert shadow["features"]["volume_24h"]["robust_z"] is not None
+    assert shadow["return_features"]["return_1h"]["status"] == "ready"
+    assert shadow["return_features"]["return_1h"]["current_value"] > 0
+    assert shadow["return_features"]["relative_return_vs_btc_1h"][
+        "status"
+    ] == "ready"
     assert all("shadow_temporal_surprise" not in row for row in queue)
     assert current == current_before
     assert history_path.read_bytes() == history_before
