@@ -12,6 +12,98 @@ globals().update({
 })
 
 
+def test_market_anomaly_incident_identity_requires_text_evidence():
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
+    from crypto_rsi_scanner.event_core.models import NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 7, 20, 15, 0, tzinfo=timezone.utc)
+    malformed_values = (True, False, 123, {"symbol": "SOL"}, ["SOL"])
+    for index, malformed in enumerate(malformed_values):
+        raw_id = f"malformed_market_identity_{index}"
+        raw = RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="market_anomaly",
+            fetched_at=now,
+            published_at=now,
+            source_url=None,
+            title="Market anomaly",
+            body="No validated catalyst is known for this market anomaly.",
+            raw_json={
+                "market": {
+                    "symbol": malformed,
+                    "coin_id": malformed,
+                    "name": malformed,
+                    "anomaly_score": 80,
+                },
+                "anomaly": {"score": 80},
+            },
+            source_confidence=0.5,
+            content_hash=raw_id,
+        )
+        event = NormalizedEvent(
+            event_id=f"event_{raw_id}",
+            raw_ids=(raw_id,),
+            event_name="Market anomaly",
+            event_type="market_anomaly",
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source="market_anomaly",
+            source_urls=(),
+            external_asset=None,
+            description=raw.body,
+            confidence=0.5,
+        )
+
+        asset = event_incident_graph._market_anomaly_asset(event, (raw,))  # noqa: SLF001
+        assert asset["identity_source"] == "missing"
+        assert not asset["symbol"]
+        assert not asset["coin_id"]
+        assert not asset["name"]
+
+        incident = event_incident_graph.build_incidents((event,), {raw_id: raw})[0]
+        assert incident.linked_assets == ()
+        assert "market_anomaly_missing_validated_asset" in incident.warnings
+        assert incident.primary_subject not in {"True", "False", "123", "{'symbol': 'SOL'}", "['SOL']"}
+
+    name_only_raw = RawDiscoveredEvent(
+        raw_id="name_only_market_identity",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="Solana market anomaly",
+        body="Solana moved sharply without a validated catalyst.",
+        raw_json={
+            "market": {"name": "Solana", "anomaly_score": 80},
+            "anomaly": {"score": 80},
+        },
+        source_confidence=0.5,
+        content_hash="name_only_market_identity",
+    )
+    name_only_event = NormalizedEvent(
+        event_id="event_name_only_market_identity",
+        raw_ids=(name_only_raw.raw_id,),
+        event_name="Solana market anomaly",
+        event_type="market_anomaly",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source="market_anomaly",
+        source_urls=(),
+        external_asset="Solana",
+        description=name_only_raw.body,
+        confidence=0.5,
+    )
+    name_only_incident = event_incident_graph.build_incidents(
+        (name_only_event,), {name_only_raw.raw_id: name_only_raw}
+    )[0]
+    assert name_only_incident.primary_subject == "Solana"
+    assert name_only_incident.linked_assets == ()
+
+
 def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     import tempfile
     from datetime import datetime, timezone

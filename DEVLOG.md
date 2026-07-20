@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require typed market-anomaly incident identity · Codex
+**Why:** Canonical incident construction stringified malformed market identity
+values. A reproduced snapshot with `symbol=true`, `coin_id=false`, and an
+object-valued name became a valid `TRUE` subject and a 0.90 direct asset link.
+**Changes:** Market-anomaly symbol, coin ID, name, event type, event fallback,
+and subject-fallback evidence now require real non-empty text. Explicit market
+anomalies derive their canonical subject only from that typed asset projection,
+so catalyst-frame stringification cannot reintroduce malformed identity.
+Name-only context may still label the incident, but a canonical direct asset
+role now requires a venue/provider symbol or coin ID. Added malformed boolean,
+numeric, mapping, and sequence regressions plus a valid name-only control. No
+anomaly formula, score, threshold, route, or provider policy changed.
+**Verify:** The new regression passed, followed by `78` focused claim,
+incident-relevance, catalyst-frame, impact-hypothesis, core-opportunity, and
+source-independence tests. `python3 -m compileall -q crypto_rsi_scanner tests`
+and `git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Type canonical incident asset linkage · Codex
 **Why:** Incident linkage converted boolean identity/role values to text and
 qualified them as a crypto asset. It also treated explicit role confidence zero

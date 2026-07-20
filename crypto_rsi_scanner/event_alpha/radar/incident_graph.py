@@ -454,16 +454,22 @@ def _incident_from_group(
     first_event = events[0]
     frames = event_catalyst_frames.build_catalyst_frames(raws, event=first_event)
     main_frame, supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames, first_event)
-    primary_subject = (
-        main_frame.subject
-        if main_frame
-        and main_frame.subject
-        and main_frame.frame_role in {
-            event_catalyst_frames.ROLE_MAIN,
-            event_catalyst_frames.ROLE_MARKET_REACTION,
-        }
-        else infer_primary_subject(first_event, raws, claims=claims)
-    )
+    if _is_market_anomaly_event(first_event, raws):
+        asset = _market_anomaly_asset(first_event, raws)
+        primary_subject = _normalized_subject(
+            asset.get("symbol") or asset.get("name") or asset.get("coin_id")
+        )
+    else:
+        primary_subject = (
+            main_frame.subject
+            if main_frame
+            and main_frame.subject
+            and main_frame.frame_role in {
+                event_catalyst_frames.ROLE_MAIN,
+                event_catalyst_frames.ROLE_MARKET_REACTION,
+            }
+            else infer_primary_subject(first_event, raws, claims=claims)
+        )
     validation = validate_incident_primary_subject(primary_subject, {
         "event": first_event,
         "raws": raws,
@@ -777,12 +783,21 @@ def _slug(value: str | None) -> str:
     return cleaned or "unknown"
 
 
-def _valid_subject(value: str | None) -> bool:
+def _identity_text(value: object, *, uppercase: bool = False) -> str:
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    return text.upper() if uppercase else text
+
+
+def _valid_subject(value: object | None) -> bool:
     return _normalized_subject(value) is not None
 
 
-def _normalized_subject(value: str | None) -> str | None:
-    text = re.sub(r"\s+", " ", str(value or "").strip(" -:.,;|"))
+def _normalized_subject(value: object | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = re.sub(r"\s+", " ", value.strip(" -:.,;|"))
     if not text:
         return None
     text = re.sub(r"^(The|A|An)\s+", "", text).strip()
@@ -884,7 +899,7 @@ def _subject_fallback_from_context(context: object | None) -> tuple[str | None, 
             if isinstance(value, dict):
                 values.extend(_subject_values_from_asset(value, f"context:{key}"))
             else:
-                values.append((str(value) if value is not None else None, f"context:{key}"))
+                values.append((_identity_text(value), f"context:{key}"))
     else:
         values.extend(_subject_values_from_event(context))
     for value, source in values:
@@ -898,11 +913,11 @@ def _subject_values_from_event(event: object | None) -> list[tuple[str | None, s
     if event is None:
         return []
     values: list[tuple[str | None, str]] = []
-    values.append((getattr(event, "external_asset", None), "event_external_asset"))
+    values.append((_identity_text(getattr(event, "external_asset", None)), "event_external_asset"))
     payload = getattr(event, "raw_json", None)
     if isinstance(payload, dict):
         for key in ("external_asset", "validated_external_entity", "symbol", "coin_id", "name"):
-            values.append((str(payload.get(key)) if payload.get(key) is not None else None, f"raw_json:{key}"))
+            values.append((_identity_text(payload.get(key)), f"raw_json:{key}"))
         market = payload.get("market")
         if isinstance(market, dict):
             values.extend(_subject_values_from_asset(market, "market_payload"))
@@ -914,15 +929,18 @@ def _subject_values_from_event(event: object | None) -> list[tuple[str | None, s
 
 def _subject_values_from_asset(asset: dict[str, object], source: str) -> list[tuple[str | None, str]]:
     return [
-        (str(asset.get("name")) if asset.get("name") is not None else None, source + ":name"),
-        (str(asset.get("symbol")) if asset.get("symbol") is not None else None, source + ":symbol"),
-        (str(asset.get("coin_id")) if asset.get("coin_id") is not None else None, source + ":coin_id"),
-        (str(asset.get("id")) if asset.get("id") is not None else None, source + ":id"),
+        (_identity_text(asset.get("name")), source + ":name"),
+        (_identity_text(asset.get("symbol")), source + ":symbol"),
+        (_identity_text(asset.get("coin_id")), source + ":coin_id"),
+        (_identity_text(asset.get("id")), source + ":id"),
     ]
 
 
-def _event_name_can_be_subject(value: str | None) -> bool:
-    cleaned = clean_text(value or "")
+def _event_name_can_be_subject(value: object | None) -> bool:
+    text = _identity_text(value)
+    if not text:
+        return False
+    cleaned = clean_text(text)
     if not cleaned:
         return False
     tokens = cleaned.split()
@@ -954,12 +972,23 @@ def _market_anomaly_asset(
         payload = raw.raw_json if isinstance(raw.raw_json, dict) else {}
         market = payload.get("market") if isinstance(payload.get("market"), dict) else {}
         event_payload = payload.get("event") if isinstance(payload.get("event"), dict) else {}
-        symbol = str(market.get("symbol") or payload.get("symbol") or "").strip().upper()
-        coin_id = str(market.get("coin_id") or market.get("id") or payload.get("coin_id") or payload.get("id") or "").strip()
-        name = str(market.get("name") or payload.get("name") or "").strip()
+        symbol = _identity_text(
+            market.get("symbol"), uppercase=True
+        ) or _identity_text(payload.get("symbol"), uppercase=True)
+        coin_id = (
+            _identity_text(market.get("coin_id"))
+            or _identity_text(market.get("id"))
+            or _identity_text(payload.get("coin_id"))
+            or _identity_text(payload.get("id"))
+        )
+        name = _identity_text(market.get("name")) or _identity_text(payload.get("name"))
         if not name and coin_id:
             name = coin_id.replace("-", " ").title()
-        anomaly_type = str(event_payload.get("event_type") or payload.get("event_type") or "market_anomaly")
+        anomaly_type = (
+            _identity_text(event_payload.get("event_type"))
+            or _identity_text(payload.get("event_type"))
+            or "market_anomaly"
+        )
         if symbol or coin_id or name:
             return {
                 "symbol": symbol,
@@ -969,8 +998,9 @@ def _market_anomaly_asset(
                 "identity_source": "market_payload",
             }
     if event is not None:
-        name = str(event.external_asset or "").strip()
-        symbol_match = re.match(r"\s*([A-Z0-9]{2,12})\s+market\s+anomaly\b", str(event.event_name or ""))
+        name = _identity_text(event.external_asset)
+        event_name = _identity_text(event.event_name)
+        symbol_match = re.match(r"\s*([A-Z0-9]{2,12})\s+market\s+anomaly\b", event_name)
         symbol = symbol_match.group(1) if symbol_match else ""
         if symbol or name:
             return {
@@ -996,8 +1026,7 @@ def _incident_linked_assets(
         return ()
     symbol = str(asset.get("symbol") or "").strip().upper() or None
     coin_id = str(asset.get("coin_id") or "").strip() or None
-    name = str(asset.get("name") or "").strip()
-    if not (symbol or coin_id or name):
+    if not (symbol or coin_id):
         return ()
     return (
         IncidentAssetRole(
