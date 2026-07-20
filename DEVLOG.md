@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record a bounded no-send provider failure · Codex
+**Why:** The authorized CoinGecko observation cadence became eligible, so Daily
+Operations needed one honest terminal attempt while preserving the one-request
+reservation and existing dashboard authority.
+**Changes:**
+- Attempted one authorized no-send cycle at the eligible boundary. The request
+failed with `ClientConnectorDNSError` and the immutable failed namespace is
+`radar_market_no_send_20260720t061616599628z_a701f3ac24d3`.
+- Re-ran outside the network sandbox as required for an honest local check. The
+cycle correctly stopped before the provider boundary because the first attempt
+had advanced the reservation; it made no second request.
+- Refreshed campaign truth to 11 provider failures while preserving 41
+successful cycles, 1,230 retained observations, 1,200 baseline-counted rows,
+the exact prior authority, and the next eligible time of
+`2026-07-20T07:16:17.806575+00:00`.
+**Verify:** Daily Operations status distinguishes the latest skipped invocation
+from the latest provider-boundary failure and preserves the exact next
+reservation. Dashboard authority status revalidated the prior namespace, and
+exact dashboard readiness passed for its run/revision/operator binding. The
+campaign report reconciles the terminal failure and `git diff --check` passed.
+**Notes/risks:** No new observation was collected, and the failure must not be
+reinterpreted as provider data. The attempt made no Telegram send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-20 — Add causal signed-return shadow tails · Codex
 **Why:** The market anomaly engine's first shadow surprise contract preserved
 robust magnitude diagnostics but could not distinguish upside from downside or
