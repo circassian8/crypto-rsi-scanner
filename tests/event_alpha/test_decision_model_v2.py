@@ -79,9 +79,9 @@ def test_decision_sector_and_quote_blockers_require_explicit_semantic_truth():
         _market_led_candidate(
             is_theme_or_sector="false",
             is_quote_asset="0",
-            quote_asset_excluded=2,
+            quote_asset_excluded=0,
             duplicate_suppressed="false",
-            is_duplicate=2,
+            is_duplicate=0,
             suppressed_duplicate="off",
         )
     )
@@ -107,6 +107,28 @@ def test_decision_sector_and_quote_blockers_require_explicit_semantic_truth():
     assert theme.radar_actionable is False
     assert quote.radar_actionable is False
     assert duplicate.radar_actionable is False
+
+
+def test_malformed_decision_control_claims_fail_closed():
+    malformed_claims = (
+        {"is_theme_or_sector": 2},
+        {"is_quote_asset": {"value": False}},
+        {"quote_asset_excluded": []},
+        {"duplicate_suppressed": "maybe"},
+        {"is_duplicate": {"value": False}},
+        {"suppressed_duplicate": [False]},
+        {"final_route_after_quality_gate": {"route": "STORE_ONLY"}},
+        {"route": ["STORE_ONLY"]},
+    )
+
+    for malformed in malformed_claims:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**malformed)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "decision_control_claim_invalid" in result.decision_hard_blockers
 
 
 def test_unknown_catalyst_lowers_evidence_confidence_without_hard_block():

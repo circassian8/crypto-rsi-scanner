@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on malformed Decision controls · Codex
+**Why:** Theme, quote-asset, and duplicate-suppression claims accepted a small
+set of semantic true values but treated every other object or number as false.
+An explicit malformed control such as `is_quote_asset=2` or a non-text
+suppression route could therefore leave an otherwise actionable row promoted.
+**Changes:** Decision v2 now validates all six theme/quote/duplicate boolean
+claims through one closed semantic-boolean contract. Native booleans, numeric
+zero/one, and the existing true/false text spellings remain compatible; other
+numbers, strings, mappings, and sequences add
+`decision_control_claim_invalid` and route diagnostic. Duplicate route aliases
+must be text when supplied, and suppression matching no longer stringifies
+objects. Valid explicit true controls retain their existing specific blocker;
+valid false controls remain actionable. No identity rule, route definition,
+score, threshold, provider, or historical artifact changed.
+**Verify:** `2` focused control regressions passed. `183` Decision, consistency,
+surface, derivatives, fixture-route, snapshot-precedence, RSI, schema, merge,
+pipeline, catalyst-attribution, and unified-calendar tests passed. `make
+event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15 candidates,
+12 canonical cores/cards, strict doctor 0 blockers / 0 warnings, and 14
+dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and `git
+diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; evidence-payload and artifact/
+security bounds remain enforced.
+
 ## 2026-07-20 — Type Decision origin-selecting context · Codex
 **Why:** Thesis-origin inference treated any non-empty technical value as
 technical evidence and silently ignored malformed on-chain/fundamental

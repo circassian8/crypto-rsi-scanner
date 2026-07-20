@@ -66,6 +66,18 @@ _ALLOWED_CROWDING_CLASSES = {
     "missing",
     "unavailable",
 }
+_BOOLEAN_CONTROL_FIELDS = (
+    "is_theme_or_sector",
+    "is_quote_asset",
+    "quote_asset_excluded",
+    "duplicate_suppressed",
+    "is_duplicate",
+    "suppressed_duplicate",
+)
+_DUPLICATE_ROUTE_FIELDS = (
+    "final_route_after_quality_gate",
+    "route",
+)
 
 
 @dataclass(frozen=True)
@@ -418,6 +430,8 @@ def _hard_blockers(
         blockers.append("origin_context_invalid")
     if _derivatives_context_invalid(data):
         blockers.append("derivatives_context_invalid")
+    if _control_claims_invalid(data):
+        blockers.append("decision_control_claim_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(
@@ -1129,8 +1143,25 @@ def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
     )
 
 
+def _control_claims_invalid(data: Mapping[str, Any]) -> bool:
+    for field in _BOOLEAN_CONTROL_FIELDS:
+        if field not in data or data.get(field) in (None, ""):
+            continue
+        if _semantic_boolean(data.get(field)) is None:
+            return True
+    return any(
+        field in data
+        and data.get(field) not in (None, "")
+        and not _typed_text(data.get(field))
+        for field in _DUPLICATE_ROUTE_FIELDS
+    )
+
+
 def _is_duplicate(data: Mapping[str, Any]) -> bool:
-    route = str(data.get("final_route_after_quality_gate") or data.get("route") or "").upper()
+    route = (
+        _typed_text(data.get("final_route_after_quality_gate"))
+        or _typed_text(data.get("route"))
+    ).upper()
     return (
         _truthy(data.get("duplicate_suppressed"))
         or _truthy(data.get("is_duplicate"))
@@ -1273,11 +1304,25 @@ def _count(value: object) -> int | None:
 
 
 def _truthy(value: object) -> bool:
+    return _semantic_boolean(value) is True
+
+
+def _semantic_boolean(value: object) -> bool | None:
     if isinstance(value, bool):
         return value
-    if value is None:
-        return False
-    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        if float(value) == 1.0:
+            return True
+        if float(value) == 0.0:
+            return False
+        return None
+    if isinstance(value, str):
+        text = value.strip().casefold()
+        if text in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "no", "n", "off"}:
+            return False
+    return None
 
 
 def _texts(value: object) -> list[str]:
