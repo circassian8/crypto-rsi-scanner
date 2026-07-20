@@ -107,22 +107,22 @@ def _link_row_quality(
         components = row.get("score_components")
     merged = {**dict(components or {}), **dict(row)}
     validated_asset = merged.get("validated_asset") if isinstance(merged.get("validated_asset"), Mapping) else {}
-    symbol = _first_text(
+    symbol = _evidence_text(
         merged.get("validated_symbol"),
         validated_asset.get("symbol"),
         merged.get("symbol"),
     ).upper()
-    coin_id = _first_text(
+    coin_id = _evidence_text(
         merged.get("validated_coin_id"),
         validated_asset.get("coin_id"),
         merged.get("coin_id"),
     ).casefold()
-    role = _first_text(merged.get("candidate_role"), merged.get("asset_role"), merged.get("relationship_type")).casefold()
-    impact = _first_text(merged.get("impact_path_type"), merged.get("impact_category")).casefold()
-    evidence = _first_text(merged.get("evidence_specificity")).casefold()
-    level = _first_text(merged.get("opportunity_level")).casefold()
-    final_state = _first_text(merged.get("final_state_after_quality_gate"), merged.get("state")).upper()
-    route = _first_text(merged.get("final_route_after_quality_gate"), merged.get("route")).upper()
+    role = _evidence_text(merged.get("candidate_role"), merged.get("asset_role"), merged.get("relationship_type")).casefold()
+    impact = _evidence_text(merged.get("impact_path_type"), merged.get("impact_category")).casefold()
+    evidence = _evidence_text(merged.get("evidence_specificity")).casefold()
+    level = _evidence_text(merged.get("opportunity_level")).casefold()
+    final_state = _evidence_text(merged.get("final_state_after_quality_gate"), merged.get("state")).upper()
+    route = _evidence_text(merged.get("final_route_after_quality_gate"), merged.get("route")).upper()
     score = _bounded_score(merged.get("opportunity_score_final"))
     has_quality = any(
         key in merged and merged.get(key) not in (None, "", [], {})
@@ -182,6 +182,15 @@ def _first_text(*values: Any) -> str:
     for value in values:
         if value not in (None, "", [], {}):
             return str(value).strip()
+    return ""
+
+
+def _evidence_text(*values: Any) -> str:
+    """Return the first real text value for identity and policy evidence."""
+
+    for value in values:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
     return ""
 def _has_crypto_asset_link(assets: Iterable[Mapping[str, Any]]) -> bool:
     for asset in assets:
@@ -479,8 +488,18 @@ def _bounded_score(value: Any) -> float:
 
 
 def _bounded_confidence(value: Any) -> float:
-    parsed = _float(value)
-    return parsed if 0.0 <= parsed <= 1.0 else 0.0
+    parsed = _optional_bounded_confidence(value)
+    return parsed if parsed is not None else 0.0
+
+
+def _optional_bounded_confidence(value: Any) -> float | None:
+    if isinstance(value, bool) or value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) and 0.0 <= parsed <= 1.0 else None
 def _iso(value: object) -> str | None:
     if isinstance(value, datetime):
         dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)

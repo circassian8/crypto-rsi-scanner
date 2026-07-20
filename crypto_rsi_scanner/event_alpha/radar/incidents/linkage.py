@@ -13,6 +13,7 @@ import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_gra
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
 from .relevance import _incident_flag_true
+from .subject_quality import _evidence_text, _optional_bounded_confidence
 
 def _unqualified_persistence_reason(link_quality: IncidentLinkQuality) -> str | None:
     if link_quality.qualified_watchlist_count > 0:
@@ -48,15 +49,15 @@ def _has_active_watchlist_row(rows: Iterable[Mapping[str, Any]]) -> bool:
             return True
     return False
 def _strong_sector_hypothesis(row: Mapping[str, Any], *, incident: event_incident_graph.CanonicalIncident) -> bool:
-    level = _first_text(row.get("opportunity_level")).casefold()
-    impact = _first_text(row.get("impact_path_type"), row.get("impact_category")).casefold()
-    role = _first_text(row.get("candidate_role")).casefold()
-    evidence = _first_text(row.get("evidence_specificity")).casefold()
+    level = _evidence_text(row.get("opportunity_level")).casefold()
+    impact = _evidence_text(row.get("impact_path_type"), row.get("impact_category")).casefold()
+    role = _evidence_text(row.get("candidate_role")).casefold()
+    evidence = _evidence_text(row.get("evidence_specificity")).casefold()
     if level not in {"validated_digest", "watchlist", "high_priority"}:
         return False
     if impact in _BAD_IMPACT_PATHS or evidence == "insufficient_data":
         return False
-    if role in _BAD_LINK_ROLES:
+    if not role or role in _BAD_LINK_ROLES:
         return False
     return incident.event_archetype in _EXTERNAL_CATALYST_ARCHETYPES | _DIRECT_CRYPTO_ARCHETYPES
 def _has_explicit_material_update(
@@ -93,29 +94,32 @@ def _linked_assets(
     assets: list[dict[str, Any]] = []
     if incident is not None:
         for asset in incident.linked_assets:
-            if asset.symbol or asset.coin_id:
+            symbol = _evidence_text(asset.symbol)
+            coin_id = _evidence_text(asset.coin_id)
+            role = _evidence_text(asset.role) or "unknown"
+            if symbol or coin_id:
                 assets.append({
-                    "symbol": asset.symbol,
-                    "coin_id": asset.coin_id,
-                    "role": asset.role,
-                    "role_confidence": asset.confidence,
+                    "symbol": symbol,
+                    "coin_id": coin_id,
+                    "role": role,
+                    "role_confidence": _optional_bounded_confidence(
+                        asset.confidence
+                    ),
                     "source": "incident",
                     "evidence": tuple(asset.evidence),
                 })
     for row in h_rows:
-        role = _value(row, "candidate_role")
+        role = _evidence_text(row.get("candidate_role"))
         validated_asset = row.get("validated_asset") if isinstance(row.get("validated_asset"), Mapping) else {}
-        symbol = _value(row, "validated_symbol") or _value(validated_asset, "symbol")
-        coin_id = _value(row, "validated_coin_id") or _value(validated_asset, "coin_id")
-        validated_identity = bool(symbol or coin_id) or _incident_flag_true(
-            validated_asset.get("validated")
-        )
+        symbol = _evidence_text(row.get("validated_symbol"), validated_asset.get("symbol"))
+        coin_id = _evidence_text(row.get("validated_coin_id"), validated_asset.get("coin_id"))
+        validated_identity = bool(symbol or coin_id)
         if not symbol:
             symbols = row.get("candidate_symbols") or ()
-            symbol = str(symbols[0]).upper() if symbols else ""
+            symbol = _first_sequence_text(symbols).upper()
         if not coin_id:
             coin_ids = row.get("candidate_coin_ids") or ()
-            coin_id = str(coin_ids[0]) if coin_ids else ""
+            coin_id = _first_sequence_text(coin_ids)
         if symbol or coin_id:
             if not validated_identity:
                 role = _safe_unvalidated_incident_asset_role(row, role)
@@ -129,14 +133,14 @@ def _linked_assets(
                 "symbol": symbol,
                 "coin_id": coin_id,
                 "role": role or "unknown",
-                "role_confidence": row.get("role_confidence"),
+                "role_confidence": _role_confidence(row),
                 "source": "hypothesis" if validated_identity else "hypothesis_candidate_suggestion",
             })
     for row in w_rows:
         components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
-        symbol = _value(row, "symbol") or _value(components, "validated_symbol")
-        coin_id = _value(row, "coin_id") or _value(components, "validated_coin_id")
-        role = _value(row, "candidate_role") or _value(components, "candidate_role")
+        symbol = _evidence_text(row.get("symbol"), components.get("validated_symbol"))
+        coin_id = _evidence_text(row.get("coin_id"), components.get("validated_coin_id"))
+        role = _evidence_text(row.get("candidate_role"), components.get("candidate_role"))
         if symbol or coin_id:
             role = _incident_asset_role(
                 symbol=symbol,
@@ -148,10 +152,27 @@ def _linked_assets(
                 "symbol": symbol,
                 "coin_id": coin_id,
                 "role": role or "unknown",
-                "role_confidence": row.get("role_confidence") or components.get("role_confidence"),
+                "role_confidence": _role_confidence(row, components),
                 "source": "watchlist",
             })
     return tuple(_unique_dicts(assets, keys=("symbol", "coin_id", "role")))
+
+
+def _first_sequence_text(values: object) -> str:
+    if isinstance(values, IterableABC) and not isinstance(values, (str, bytes, Mapping)):
+        return _evidence_text(*tuple(values))
+    return ""
+
+
+def _role_confidence(*sources: Mapping[str, Any]) -> float | None:
+    for source in sources:
+        if "role_confidence" not in source:
+            continue
+        value = source.get("role_confidence")
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        return _optional_bounded_confidence(value)
+    return None
 def _safe_unvalidated_incident_asset_role(row: Mapping[str, Any], role: str) -> str:
     strong_roles = {
         "direct_subject",

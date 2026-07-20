@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Type canonical incident asset linkage · Codex
+**Why:** Incident linkage converted boolean identity/role values to text and
+qualified them as a crypto asset. It also treated explicit role confidence zero
+as absent, borrowing stale 0.9 evidence, and allowed a validation flag without
+its own identity to bless the first candidate suggestion.
+**Changes:** Identity, role, impact, state, and route evidence now require real
+non-empty text at link qualification. Role confidence uses presence-aware
+finite `[0,1]` projection across incident, hypothesis, and watchlist sources;
+explicit zero remains zero and explicit invalid evidence cannot fall through.
+Candidate-list fallback skips non-text values and remains explicitly a
+suggestion unless a validated identity is actually present. Canonical incident
+assets with malformed identity are omitted, and strong sector qualification now
+requires an explicit valid role. Added end-to-end link and projection controls.
+No link taxonomy, score, threshold, route, or provider policy changed.
+**Verify:** The new regression passed, followed by `45` focused incident-
+relevance, claim-semantics, impact-hypothesis, watchlist, and doctor-quality
+tests. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Harden incident relevance evidence contracts · Codex
 **Why:** Incident link qualification accepted an out-of-range 101-point
 opportunity, interpreted `state_quality_capped="false"` as true, and allowed

@@ -229,6 +229,112 @@ def test_incident_relevance_numeric_evidence_fails_closed():
         assert projected["incident_relevance_status"] == "incident_candidate"
 
 
+def test_incident_link_identity_and_role_confidence_are_typed_and_canonical():
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.incidents as incidents
+
+    incident = SimpleNamespace(
+        event_archetype="rwa_preipo_proxy",
+        linked_assets=(),
+    )
+    malformed_identity = incidents._link_row_quality(  # noqa: SLF001
+        {
+            "validated_symbol": True,
+            "validated_coin_id": False,
+            "candidate_role": True,
+            "impact_path_type": "venue_value_capture",
+            "evidence_specificity": "direct_token_mechanism",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 80,
+        },
+        incident=incident,
+        source="hypothesis",
+    )
+    assert malformed_identity["qualified"] is False
+    assert malformed_identity["unknown_role"] is True
+
+    watchlist_assets = incidents._linked_assets(  # noqa: SLF001
+        [],
+        [
+            {
+                "symbol": "ZERO",
+                "coin_id": "zero",
+                "candidate_role": "direct_subject",
+                "role_confidence": 0,
+                "latest_score_components": {"role_confidence": 0.9},
+            },
+            {
+                "symbol": "INVALID",
+                "coin_id": "invalid",
+                "candidate_role": "direct_subject",
+                "role_confidence": 1.1,
+                "latest_score_components": {"role_confidence": 0.8},
+            },
+        ],
+        incident=incident,
+    )
+    by_symbol = {row["symbol"]: row for row in watchlist_assets}
+    assert by_symbol["ZERO"]["role_confidence"] == 0.0
+    assert by_symbol["INVALID"]["role_confidence"] is None
+
+    hypothesis_assets = incidents._linked_assets(  # noqa: SLF001
+        [
+            {
+                "candidate_symbols": (True, "FALLBACK"),
+                "candidate_coin_ids": (False, "fallback"),
+                "candidate_role": "direct_subject",
+                "role_confidence": float("nan"),
+            },
+            {
+                "validated_asset": {"validated": True},
+                "candidate_symbols": ("UNVERIFIED",),
+                "candidate_coin_ids": ("unverified",),
+                "candidate_role": "direct_subject",
+                "role_confidence": 0.7,
+            },
+        ],
+        [],
+        incident=incident,
+    )
+    assert hypothesis_assets[0]["symbol"] == "FALLBACK"
+    assert hypothesis_assets[0]["coin_id"] == "fallback"
+    assert hypothesis_assets[0]["role"] == "candidate_suggestion"
+    assert hypothesis_assets[0]["role_confidence"] is None
+    unverified = next(
+        row for row in hypothesis_assets if row["symbol"] == "UNVERIFIED"
+    )
+    assert unverified["role"] == "candidate_suggestion"
+    assert unverified["source"] == "hypothesis_candidate_suggestion"
+
+    incident_with_bad_confidence = SimpleNamespace(
+        event_archetype="rwa_preipo_proxy",
+        linked_assets=(
+            SimpleNamespace(
+                symbol="INC",
+                coin_id="incident",
+                role="direct_subject",
+                confidence=float("inf"),
+                evidence=(),
+            ),
+            SimpleNamespace(
+                symbol=True,
+                coin_id=False,
+                role=True,
+                confidence=0.9,
+                evidence=(),
+            ),
+        ),
+    )
+    incident_assets = incidents._linked_assets(  # noqa: SLF001
+        [],
+        [],
+        incident=incident_with_bad_confidence,
+    )
+    assert len(incident_assets) == 1
+    assert incident_assets[0]["role_confidence"] is None
+
+
 def test_event_incident_relevance_gates_raw_external_observations():
     import tempfile
     from datetime import datetime, timezone
