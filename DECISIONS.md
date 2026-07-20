@@ -16,21 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
-## 2026-07-20 - Parse anomaly boolean claims semantically
+## 2026-07-20 - Parse Decision Radar policy booleans semantically
 **Status:** accepted
-**Decision:** Core market-anomaly classification must parse boolean-like control
-fields through the existing explicit true vocabulary instead of Python object
-truthiness. Text values such as `false`, `0`, `no`, and `off` cannot create a
-negative catalyst, post-event state/failure, derivatives-availability claim,
-confirmed catalyst, or catalyst-search request. Booleans are not numeric market
-features and cannot become `1.0` funding, positioning, liquidation, return, or
-volume evidence.
+**Decision:** Market-anomaly classification, Decision catalyst policy, and
+integrated route policy must parse boolean-like control fields through an
+explicit true vocabulary instead of Python object truthiness. Text values such
+as `false`, `0`, `no`, and `off`, arbitrary nonzero numbers, and unrecognized
+text cannot create a negative/disproven/not-required catalyst, post-event
+state/failure, derivatives-availability claim, major-pair cap, completed move,
+fade eligibility, confirmed catalyst, or catalyst-search request. A derivatives
+representative must carry a real non-empty mapping snapshot. Booleans are not
+numeric market features and cannot become `1.0` funding, positioning,
+liquidation, return, or volume evidence.
 **Why:** Python considers every non-empty string truthy and considers booleans
 numeric. Untyped external or compatibility rows could therefore manufacture a
 risk/fade classification, crowding state, priority bonus, or source-knownness
-claim even when their literal value said false.
+claim—or incorrectly cap a valid idea—even when their literal value said false.
 **Revisit when:** A versioned upstream schema rejects these malformed types
-before the classifier and every compatibility path is proven to enforce it.
+before every classifier and downstream merge, and every compatibility path is
+proven to enforce it.
 
 ## 2026-07-20 - Treat latency as signed decision-mid implementation shortfall
 **Status:** accepted as offline arithmetic; reference sources and policy remain unsealed

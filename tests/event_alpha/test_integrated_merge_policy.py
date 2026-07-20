@@ -3,6 +3,7 @@ import json
 from tempfile import TemporaryDirectory
 
 from crypto_rsi_scanner.event_alpha.artifacts.context import context_from_profile
+from crypto_rsi_scanner.event_alpha.radar import market_reaction
 from crypto_rsi_scanner.event_alpha.radar.integrated import api as integrated_api
 from crypto_rsi_scanner.event_alpha.radar.integrated.pipeline_parts import merge, merge_policy
 from crypto_rsi_scanner.event_alpha.radar.integrated_radar import run_integrated_radar_cycle
@@ -80,6 +81,91 @@ def test_integrated_merge_policy_preserves_compatibility_exports():
         api_function = getattr(integrated_api, name)
         assert getattr(merge, name) is api_function
         assert api_function.__wrapped__ is policy_function
+
+
+def test_integrated_policy_flags_require_explicit_semantic_truth():
+    reaction = market_reaction.MarketReactionResult(
+        market_state_snapshot=market_reaction.MarketStateSnapshot(
+            freshness_status="fresh"
+        ),
+        market_state=market_reaction.EventMarketState.NO_REACTION.value,
+        opportunity_type=market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value,
+        why_now="no material market reaction",
+    )
+    false_official = {
+        "source_class": "official_exchange",
+        "major_pair_simple_announcement": "false",
+    }
+    true_official = {
+        "source_class": "official_exchange",
+        "major_pair_simple_announcement": "true",
+    }
+
+    assert merge_policy._policy_opportunity_type(
+        reaction,
+        [false_official],
+        ["official_exchange"],
+        official_row=false_official,
+    ) == market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value
+    assert merge_policy._policy_opportunity_type(
+        reaction,
+        [true_official],
+        ["official_exchange"],
+        official_row=true_official,
+    ) == market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
+    assert "major_pair_simple_announcement_capped" not in merge_policy._policy_warnings(
+        market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value,
+        [false_official],
+        reaction,
+    )
+    assert "major_pair_simple_announcement_capped" in merge_policy._policy_warnings(
+        market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value,
+        [true_official],
+        reaction,
+    )
+    assert "major_pair_simple_announcement_not_alpha" not in merge_policy._lane_why_not(
+        market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value,
+        [false_official],
+    )
+    assert "major_pair_simple_announcement_not_alpha" in merge_policy._lane_why_not(
+        market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value,
+        [true_official],
+    )
+
+    fade_context = {
+        "derivatives_snapshot_freshness_status": "fresh",
+        "crowding_exhaustion_evidence": ["funding_elevated"],
+        "completed_move": True,
+    }
+    assert merge_policy._fade_requirements_met(
+        market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value,
+        [{**fade_context, "fade_requirements_met": "false"}],
+    ) is False
+    assert merge_policy._fade_requirements_met(
+        market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value,
+        [{**fade_context, "fade_requirements_met": "true"}],
+    ) is True
+    assert merge_policy._row_completed_move({"completed_move": "false"}) is False
+    assert merge_policy._row_completed_move({"completed_move": "true"}) is True
+    assert merge_policy._negative_candidate(
+        [{"negative_catalyst": "false"}],
+        "market_anomaly_unknown",
+        "market_anomaly_pack",
+    ) is False
+    assert merge_policy._negative_candidate(
+        [{"negative_catalyst": "true"}],
+        "market_anomaly_unknown",
+        "market_anomaly_pack",
+    ) is True
+
+
+def test_integrated_derivatives_representative_requires_a_mapping_snapshot():
+    assert merge_policy._best_derivatives_row(
+        [{"derivatives_state_snapshot": "false"}]
+    ) is None
+
+    row = {"derivatives_state_snapshot": {"funding_rate": 0.001}}
+    assert merge_policy._best_derivatives_row([row]) is row
 
 
 def test_integrated_merge_identity_source_market_and_derivatives_golden_snapshot():

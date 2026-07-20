@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from .runtime import *
+from .utilities import _int, _text
 
 
 def _coinalyze_match_index(sidecar_rows: Mapping[str, Iterable[Mapping[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
@@ -111,6 +112,16 @@ def _float_value(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _semantic_true(value: Any) -> bool:
+    """Accept only explicit boolean truth for policy-changing flags."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _numeric_alias_resolution(
@@ -304,15 +315,15 @@ def _policy_opportunity_type(
     protocol_row: Mapping[str, Any] | None = None,
     market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None = None,
 ) -> str:
-    if any(_truthy(row.get("is_theme_or_sector")) or str(row.get("symbol") or "").upper() == "SECTOR" for row in rows):
+    if any(_semantic_true(row.get("is_theme_or_sector")) or str(row.get("symbol") or "").upper() == "SECTOR" for row in rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
-    if any(_truthy(row.get("quote_asset_excluded")) or _truthy(row.get("is_quote_asset")) for row in rows):
+    if any(_semantic_true(row.get("quote_asset_excluded")) or _semantic_true(row.get("is_quote_asset")) for row in rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if _has_low_liquidity_suspicious_anomaly(rows):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
     if _dex_row_is_suspicious_low_liquidity(dex_row):
         return event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
-    if official_row and bool(official_row.get("major_pair_simple_announcement")):
+    if official_row and _semantic_true(official_row.get("major_pair_simple_announcement")):
         return event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
     if _fade_requirements_met(event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value, rows):
         return event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value
@@ -509,7 +520,7 @@ def _fade_requirements_met(opportunity: str, rows: list[dict[str, Any]]) -> bool
     del opportunity
     return any(
         (
-            bool(row.get("fade_requirements_met"))
+            _semantic_true(row.get("fade_requirements_met"))
             or str(row.get("opportunity_type")) == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value
         )
         and _row_derivatives_fresh_for_integration(row)
@@ -558,7 +569,7 @@ def _row_has_crowding_evidence(row: Mapping[str, Any]) -> bool:
 
 
 def _row_completed_move(row: Mapping[str, Any]) -> bool:
-    if bool(row.get("completed_move")):
+    if _semantic_true(row.get("completed_move")):
         return True
     market = row.get("market_snapshot")
     if not isinstance(market, Mapping):
@@ -627,7 +638,11 @@ def _best_derivatives_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
             key=lambda row: _opportunity_rank(str(row.get("opportunity_type") or "")),
             reverse=True,
         )[0]
-    return _best_row(rows, lambda row: bool(row.get("derivatives_state_snapshot")))
+    return _best_row(
+        rows,
+        lambda row: isinstance(row.get("derivatives_state_snapshot"), Mapping)
+        and bool(row.get("derivatives_state_snapshot")),
+    )
 
 
 def _best_dex_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -864,7 +879,9 @@ def _evidence_score(source_strength: str, accepted: int) -> float:
 
 def _negative_candidate(rows: list[dict[str, Any]], impact_path: str, source_pack: str) -> bool:
     text = f"{impact_path} {source_pack}".casefold()
-    return "unlock" in text or "delist" in text or any(bool(row.get("negative_catalyst")) for row in rows)
+    return "unlock" in text or "delist" in text or any(
+        _semantic_true(row.get("negative_catalyst")) for row in rows
+    )
 
 
 def _policy_warnings(
@@ -877,7 +894,7 @@ def _policy_warnings(
     market_confirmation: event_market_confirmation.EventMarketConfirmationResult | None = None,
 ) -> tuple[str, ...]:
     warnings: list[str] = []
-    if any(row.get("major_pair_simple_announcement") for row in rows):
+    if any(_semantic_true(row.get("major_pair_simple_announcement")) for row in rows):
         warnings.append("major_pair_simple_announcement_capped")
     if (
         opportunity == event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
@@ -902,7 +919,7 @@ def _policy_warnings(
 
 def _lane_why_not(opportunity: str, rows: list[dict[str, Any]]) -> tuple[str, ...]:
     out: list[str] = []
-    if any(row.get("major_pair_simple_announcement") for row in rows):
+    if any(_semantic_true(row.get("major_pair_simple_announcement")) for row in rows):
         out.append("major_pair_simple_announcement_not_alpha")
     if opportunity == event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value:
         out.append("strict_lane_requirements_not_met")
@@ -926,7 +943,7 @@ def _why_now_for(
         return "completed move with derivatives crowding/exhaustion evidence"
     if opportunity == event_market_reaction.EventOpportunityType.RISK_ONLY.value:
         return "credible downside/risk catalyst for research monitoring"
-    if any(row.get("major_pair_simple_announcement") for row in rows):
+    if any(_semantic_true(row.get("major_pair_simple_announcement")) for row in rows):
         return "simple major-pair announcement capped as unconfirmed research"
     return reaction.why_now
 
@@ -938,8 +955,17 @@ def _candidate_role_for(opportunity: str) -> str:
 
 
 def _canonical_incident_name(rows: list[dict[str, Any]], symbol: str, opportunity: str) -> str:
-    title = _best_text(rows, "event_name", "title")
+    title = _policy_best_text(rows, "event_name", "title")
     return title or f"{symbol} {opportunity}"
+
+
+def _policy_best_text(rows: list[dict[str, Any]], *keys: str) -> str | None:
+    for row in rows:
+        for key in keys:
+            text = _text(row.get(key))
+            if text:
+                return text
+    return None
 
 
 def _compact_event(row: Mapping[str, Any] | None) -> dict[str, Any] | None:

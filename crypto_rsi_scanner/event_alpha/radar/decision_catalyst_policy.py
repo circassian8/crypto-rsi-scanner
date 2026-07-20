@@ -106,7 +106,7 @@ def catalyst_status(
         data.get("latest_source_url") and catalyst_specific_source
     ):
         return CatalystStatus.PLAUSIBLE.value
-    if bool(data.get("catalyst_not_required")):
+    if _truthy(data.get("catalyst_not_required")):
         return CatalystStatus.NOT_REQUIRED.value
     return CatalystStatus.UNKNOWN.value
 
@@ -251,9 +251,9 @@ def _count(value: object) -> int | None:
 def _truthy(value: object) -> bool:
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _texts(value: object) -> list[str]:

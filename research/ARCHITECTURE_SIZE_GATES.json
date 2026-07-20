@@ -1920,7 +1920,7 @@
   ],
   "functions_over_limit_count": 8,
   "gate_status": "pass",
-  "generated_at": "2026-07-20T03:39:38.893605+00:00",
+  "generated_at": "2026-07-20T04:01:51.859194+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2390,7 +2390,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1030,
+      "line_count": 1031,
       "path": "tests/test_indicators.py",
       "source_kind": "test"
     },

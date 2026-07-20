@@ -769,6 +769,7 @@ _EVENT_ALPHA_TEST_MODULES = (
     "tests.event_alpha.test_canonical_imports",
     "tests.event_alpha.test_catalyst_search",
     "tests.event_alpha.test_catalyst_frames",
+    "tests.event_alpha.test_catalyst_count_contract",
     "tests.event_alpha.test_claim_semantics",
     "tests.event_alpha.test_cli_artifact_authority",
     "tests.event_alpha.test_core_opportunities",

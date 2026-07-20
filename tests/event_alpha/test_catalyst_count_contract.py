@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from crypto_rsi_scanner.event_alpha.radar import (
+    decision_catalyst_policy,
     decision_model,
     market_anomaly_scanner,
     market_reaction,
@@ -15,6 +16,57 @@ from crypto_rsi_scanner.event_alpha.radar.market_reaction import EventOpportunit
 
 
 INVALID_COUNTS = (True, 0.5, -1, float("nan"), float("inf"), "1")
+
+
+def test_catalyst_not_required_requires_explicit_semantic_truth():
+    for value in (
+        False,
+        None,
+        "",
+        0,
+        2,
+        -1,
+        0.5,
+        "false",
+        "0",
+        "no",
+        "off",
+        "unexpected",
+    ):
+        assert (
+            decision_catalyst_policy.catalyst_status(
+                {"catalyst_not_required": value},
+                (),
+            )
+            == "unknown"
+        )
+
+    for value in (True, 1, "1", "true", "yes", "y", "on"):
+        assert (
+            decision_catalyst_policy.catalyst_status(
+                {"catalyst_not_required": value},
+                (),
+            )
+            == "not_required"
+        )
+
+    for value in (False, 2, -1, 0.5, "false", "off", "unexpected"):
+        assert (
+            decision_catalyst_policy.catalyst_status(
+                {"catalyst_disproven": value},
+                (),
+            )
+            == "unknown"
+        )
+
+    for value in (True, 1, "1", "true", "yes", "y", "on"):
+        assert (
+            decision_catalyst_policy.catalyst_status(
+                {"catalyst_disproven": value},
+                (),
+            )
+            == "disproven"
+        )
 
 
 def _market_led_candidate(**overrides):

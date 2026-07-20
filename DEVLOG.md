@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Harden downstream Decision boolean semantics · Codex
+**Why:** After the anomaly-scanner fix, Decision catalyst policy and integrated
+merge policy still used Python truthiness for route-changing fields. A literal
+`false` string could mark catalysts not required, cap an official major-pair
+idea, satisfy fade/completed-move gates, create negative-catalyst direction, or
+select a non-mapping derivatives snapshot. Pytest collection order also masked
+that merge policy relied on compatibility-aggregator injection for `_int`.
+**Changes:**
+- Applied closed semantic-true parsing to catalyst disproof/not-required claims,
+  sector/quote controls, major-pair caps and explanations, fade readiness,
+  completed moves, and negative catalysts. Arbitrary nonzero numbers no longer
+  count as semantic booleans.
+- Required a non-empty mapping for derivatives representative selection and
+  made merge policy import its numeric/text dependencies directly; canonical
+  incident naming is now locally self-contained instead of depending on
+  aggregator-injected helpers.
+- Added direct regressions for false-like and valid true values, route/warning/
+  explanation parity, fade and completed-move gates, negative direction, and
+  derivatives snapshot shape. Registered the existing catalyst-count contract
+  module in the standalone compatibility runner.
+**Verify:** 118 focused catalyst-attribution/count, integrated-merge,
+market-surface, Decision Model v2, and Decision-surface tests passed. The five
+catalyst-count tests also passed through the standalone-runner adapter after it
+exposed and the patch removed the hidden `_int` dependency. Compileall and the
+full integrated-radar fixture smoke passed; strict doctor reported 0 blockers
+and 0 warnings, all legacy lanes were present, and the fixture dashboard
+rendered 14 pages. The exact live/no-send dashboard authority remained READY.
+Architecture cleanliness and `git diff --check` passed.
+**Notes/risks:** Valid booleans and canonical fixture routes remain unchanged.
+No threshold, score, provider boundary, authorization, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` changed. Full
+`make verify` was not rerun because it passed immediately before the two latest
+focused core slices; the direct, model, integrated, strict-doctor, and
+architecture gates cover this change.
+
 ## 2026-07-20 — Record the fortieth no-send market cycle · Codex
 **Why:** The canonical CoinGecko cadence boundary had passed and current
 readiness independently confirmed that the existing no-send authorization was
