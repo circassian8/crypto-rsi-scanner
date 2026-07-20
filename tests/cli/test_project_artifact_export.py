@@ -182,6 +182,27 @@ def test_standard_export_contains_only_manifested_canonical_artifacts(
     assert hashlib.sha256(manifest_raw).hexdigest()
 
 
+def test_standard_export_inventory_capacity_covers_retained_audit_growth(
+    tmp_path: Path,
+) -> None:
+    module = _load_export_module("project_artifact_export_inventory_capacity")
+    root, _current, _latest = _project_tree(tmp_path)
+    retained = root / "event_fade_cache" / "retained_history"
+    for index in range(4_096):
+        _write(retained / f"audit_{index:04d}.json", b"{}\n")
+
+    plan = module._project_artifact_export_plan(root, empirical_plan=None)
+
+    assert plan is not None
+    assert plan["inventory_file_count"] > 4_096
+    assert plan["inventory_file_count"] <= 8_192
+    assert plan["inventory_file_count"] == (
+        len(plan["all_artifact_paths"]) + len(plan["excluded_noise"])
+    )
+    assert plan["policy"]["limits"]["max_artifact_file_count"] == 8_192
+    assert plan["policy"]["limits"]["max_artifact_total_bytes"] == 3 * 1024**3
+
+
 def test_provider_unavailable_latest_attempt_is_manifested_canonical_truth(
     tmp_path: Path,
 ) -> None:

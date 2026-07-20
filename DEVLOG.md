@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Restore bounded audit-export headroom · Codex
+**Why:** The immutable project audit root reached 4,109 files after the
+fifty-second no-send cycle, thirteen above the original 4,096-file inventory
+ceiling. The source-with-artifacts exporter correctly failed closed even though
+its canonical selected payload remained small and safe.
+**Changes:** Raised the descriptor-anchored project/history inventory tier to
+8,192 files and 3 GiB. The independent standard-selection cap remains 512
+files / 384 MiB, the single-artifact cap remains 128 MiB, and every path,
+symlink/TOCTOU, secret, fingerprint, exact-selection, and source-drift check is
+unchanged. Successful exports now report the guard-relevant inventory count,
+limit, and headroom, including skipped machine-local noise. Added a synthetic
+retained-history regression above the old 4,096-file ceiling and documented the
+capacity decision. No immutable history was deleted, moved, compacted, or
+rewritten.
+**Verify:** `14` project-artifact selection and parent-symlink/TOCTOU tests
+passed in 1.57 seconds. `make export-src-with-artifacts PYTHON=python3` passed
+with 1,589 ZIP entries, 132 artifact entries, 130 canonical project artifacts,
+4,109 inventoried root files / 8,192 limit / 4,083 headroom, 3,908 excluded
+history entries, and `bad_entries=0`. `jq empty` and `git diff --check` passed.
+**Notes/risks:** This does not restore quantitative source-size blockers; source
+file/function/class counts remain advisory. Audit/resource ceilings remain
+finite security controls and should trigger an explicit retention review at the
+new boundary rather than silent evidence deletion.
+
 ## 2026-07-20 — Record the fifty-second no-send market cycle · Codex
 **Why:** The hourly cadence became eligible, so the evidence-first campaign
 needed one bounded authorized observation and a reconciled terminal report

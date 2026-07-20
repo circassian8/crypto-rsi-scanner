@@ -98,10 +98,10 @@ EMPIRICAL_LIMITS = {
     "max_standard_empirical_total_bytes": 268_435_456,
 }
 PROJECT_ARTIFACT_LIMITS = {
-    "max_artifact_file_count": 4_096,
-    "max_artifact_total_bytes": 1_610_612_736,
-    "max_history_file_count": 4_096,
-    "max_history_total_bytes": 1_610_612_736,
+    "max_artifact_file_count": 8_192,
+    "max_artifact_total_bytes": 3_221_225_472,
+    "max_history_file_count": 8_192,
+    "max_history_total_bytes": 3_221_225_472,
     "max_single_artifact_file_bytes": 134_217_728,
     "max_standard_artifact_file_count": 512,
     "max_standard_artifact_total_bytes": 402_653_184,
@@ -2022,6 +2022,7 @@ def _project_artifact_export_plan(
         "delegated_empirical_path_count": len(delegated_paths),
         "entries": entries,
         "excluded_noise": excluded_noise,
+        "inventory_file_count": len(inventoried),
         "missing_root_files": missing_root_files,
         "missing_shared_directories": missing_shared_directories,
         "policy": policy,
@@ -3302,6 +3303,18 @@ def main(root: Path = ROOT, out: Path = OUT) -> int:
     if project_plan is not None:
         project_manifest = _standard_project_artifact_manifest(project_plan)
         print(f"project_canonical_entries={len(project_plan['entries'])}")
+        print(
+            "project_inventory_entries="
+            f"{project_plan['inventory_file_count']}"
+        )
+        print(
+            "project_inventory_file_limit="
+            f"{project_plan['policy']['limits']['max_artifact_file_count']}"
+        )
+        print(
+            "project_inventory_file_headroom="
+            f"{project_plan['policy']['limits']['max_artifact_file_count'] - project_plan['inventory_file_count']}"
+        )
         print(
             "project_history_entries_excluded="
             f"{project_manifest['excluded_history_count']}"

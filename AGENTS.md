@@ -173,7 +173,10 @@ may be added later when a suitable environment already exists.
   epoch by default, or a wall-clock-safe `SOURCE_DATE_EPOCH`). It must retain
   the descriptor-anchored symlink/TOCTOU, bounded-inventory, exact-selection,
   post-write source-drift, and secret-scanning gates; never normalize review
-  archives by mutating input mtimes. Missing optional canonical sources are
+  archives by mutating input mtimes. The growing immutable project audit root
+  currently has a bounded 8,192-file / 3 GiB inventory tier; crossing either
+  remains a fail-closed retention-review signal, while the standard selected
+  archive keeps its tighter independent bounds. Missing optional canonical sources are
   reported as partial coverage, never healthy-empty. Tests that do not
   explicitly verify shipped artifacts use isolated temporary artifact bases;
   cumulative root stores are excluded from unrelated fixture tests. Local

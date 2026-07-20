@@ -58,10 +58,10 @@
     "output_filename": "crypto_rsi_scanner_artifact_history.zip"
   },
   "limits": {
-    "max_artifact_file_count": 4096,
-    "max_artifact_total_bytes": 1610612736,
-    "max_history_file_count": 4096,
-    "max_history_total_bytes": 1610612736,
+    "max_artifact_file_count": 8192,
+    "max_artifact_total_bytes": 3221225472,
+    "max_history_file_count": 8192,
+    "max_history_total_bytes": 3221225472,
     "max_single_artifact_file_bytes": 134217728,
     "max_review_timing_source_namespaces": 64,
     "max_standard_artifact_file_count": 512,

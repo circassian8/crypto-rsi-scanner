@@ -551,6 +551,26 @@ specific cohesive boundary needs restructuring. Any future quantitative limit
 requires a new explicit owner decision; it must not be inferred from the
 retained historical inventory.
 
+## 2026-07-20 - Grow the immutable audit inventory without removing its safety ceiling
+**Status:** accepted
+**Decision:** Raise the project artifact root and optional history inventory
+capacity from 4,096 files / 1.5 GiB to 8,192 files / 3 GiB. Keep the inventory
+descriptor-anchored and fail closed when either new ceiling is crossed. Keep
+the independent 512-file / 384 MiB standard-review selection and 128 MiB
+single-artifact bounds unchanged. Report current inventory count, ceiling, and
+headroom on every successful standard export. Never delete or move immutable
+audit history merely to make the export pass.
+**Why:** The fifty-second live/no-send cycle brought the legitimate immutable
+root to 4,109 files, thirteen above the original capacity. The failure was a
+retained-audit file-count ceiling, not a source-code line-size rule or an unsafe
+selected ZIP. A bounded next tier preserves TOCTOU/resource-exhaustion defense
+while providing honest operational headroom.
+**Revisit when:** Inventory approaches 8,192 files or 3 GiB, export latency
+becomes operationally material, or an explicit retention policy is approved.
+Prefer a separately manifested non-destructive history tier; do not silently
+remove evidence and do not convert these security/resource bounds into
+unbounded scans.
+
 ## 2026-07-19 - Do not infer an account fee from Bybit's public table
 **Status:** accepted
 **Decision:** Treat Bybit's public trading-fee table as product documentation,
