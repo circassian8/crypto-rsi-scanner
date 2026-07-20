@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Type Decision thesis-origin provenance · Codex
+**Why:** Thesis-origin policy accepted arbitrary containers through the generic
+text helper. Reproduced lists and mappings in scalar origin, pack, and class
+fields—and mappings or object members in plural fields—changed a market-led row
+to catalyst-led provenance. Malformed supporting source rows did the same.
+**Changes:** Decision thesis-origin projection now applies the observed closed
+shape: `_source_origin`, `source_origin`, `source_pack`, `source_class`, and
+`event_type` are optional non-empty scalar text; `source_origins` and
+`source_packs` are lists/tuples containing only non-empty text. Candidate and
+supporting-source provenance share the validator. Any malformed explicit claim
+adds `source_classification_invalid` and routes diagnostic; it cannot select a
+different origin policy. Valid scalar/list provenance remains unchanged. No
+origin taxonomy, score formula, weight, threshold, provider, or historical
+artifact changed.
+**Verify:** Six malformed candidate shapes and a malformed supporting-source
+row now hard-block; the valid market-origin scalar/list control remains
+market-led and actionable. `63` focused Decision tests and `150` Decision,
+consistency, surface, derivatives, fixture-route, snapshot-precedence, RSI,
+schema, merge, and pipeline tests passed. `make
+event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15 candidates,
+12 canonical cores/cards, strict doctor 0 blockers / 0 warnings, and 14
+dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and `git
+diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Record the fifty-first market cycle · Codex
 **Why:** The one-hour cadence became eligible with explicit CoinGecko
 authorization still present. The active Protocol-v2 evidence program requires

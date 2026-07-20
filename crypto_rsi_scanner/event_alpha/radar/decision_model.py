@@ -369,6 +369,8 @@ def _hard_blockers(
         blockers.append("market_data_quality_invalid")
     if decision_policy.market_classification_invalid(data):
         blockers.append("market_state_classification_invalid")
+    if decision_policy.source_classification_invalid(data, sources):
+        blockers.append("source_classification_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(

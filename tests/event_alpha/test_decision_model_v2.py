@@ -338,6 +338,45 @@ def test_malformed_market_state_classifications_cannot_create_directional_eviden
     assert "market_state_classification_invalid" not in valid.decision_hard_blockers
 
 
+def test_malformed_source_classifications_cannot_select_thesis_origin_policy():
+    malformed_candidates = (
+        {"source_origin": ["official_exchange"], "source_origins": []},
+        {"source_origin": {"official_exchange": True}, "source_origins": []},
+        {"source_origin": None, "source_origins": {"official_exchange": True}},
+        {"source_pack": {"official_exchange_listing_pack": True}},
+        {"source_class": {"official_exchange": True}},
+        {"source_packs": ["market_anomaly_pack", {"official": True}]},
+    )
+    for overrides in malformed_candidates:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**overrides)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "source_classification_invalid" in result.decision_hard_blockers
+
+    malformed_source_row = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=({"_source_origin": {"official_exchange": True}},),
+    )
+    assert malformed_source_row.radar_route == "diagnostic"
+    assert "source_classification_invalid" in malformed_source_row.decision_hard_blockers
+
+    valid = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            source_origin="market_anomaly",
+            source_origins=["market_anomaly"],
+            source_pack="market_anomaly_pack",
+            source_packs=["market_anomaly_pack"],
+            source_class="market_data",
+        )
+    )
+    assert valid.primary_thesis_origin == "market_led"
+    assert valid.radar_actionable is True
+    assert "source_classification_invalid" not in valid.decision_hard_blockers
+
+
 def test_acceptable_wide_spread_emits_higher_manipulation_warning():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(market_state_snapshot={"spread_bps": 120.0})

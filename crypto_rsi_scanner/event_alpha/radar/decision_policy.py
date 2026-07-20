@@ -39,6 +39,14 @@ _MARKET_CLASSIFICATION_FIELDS = (
     "market_state_class",
     "market_state",
 )
+_SOURCE_SCALAR_FIELDS = (
+    "_source_origin",
+    "source_origin",
+    "source_pack",
+    "source_class",
+    "event_type",
+)
+_SOURCE_LIST_FIELDS = ("source_origins", "source_packs")
 
 
 @dataclass(frozen=True)
@@ -299,22 +307,26 @@ def thesis_origin_values(
     """Return primary, ordered contributing, and legacy-summary origins."""
 
     source_rows = tuple(row for row in sources if isinstance(row, Mapping))
-    direct_values = [*_texts(data.get("source_origin")), *_texts(data.get("source_origins"))]
-    for row in source_rows:
-        direct_values.extend(_texts(row.get("_source_origin")))
-        direct_values.extend(_texts(row.get("source_origin")))
-        direct_values.extend(_texts(row.get("source_origins")))
-
-    supporting_values = [
-        *_texts(data.get("source_pack")),
-        *_texts(data.get("source_packs")),
-        *_texts(data.get("source_class")),
-        *_texts(data.get("event_type")),
+    direct_values = [
+        *_source_scalar_values(data, "source_origin"),
+        *_source_list_values(data, "source_origins"),
     ]
     for row in source_rows:
-        supporting_values.extend(_texts(row.get("source_pack")))
-        supporting_values.extend(_texts(row.get("source_class")))
-        supporting_values.extend(_texts(row.get("event_type")))
+        direct_values.extend(_source_scalar_values(row, "_source_origin"))
+        direct_values.extend(_source_scalar_values(row, "source_origin"))
+        direct_values.extend(_source_list_values(row, "source_origins"))
+
+    supporting_values = [
+        *_source_scalar_values(data, "source_pack"),
+        *_source_list_values(data, "source_packs"),
+        *_source_scalar_values(data, "source_class"),
+        *_source_scalar_values(data, "event_type"),
+    ]
+    for row in source_rows:
+        supporting_values.extend(_source_scalar_values(row, "source_pack"))
+        supporting_values.extend(_source_list_values(row, "source_packs"))
+        supporting_values.extend(_source_scalar_values(row, "source_class"))
+        supporting_values.extend(_source_scalar_values(row, "event_type"))
 
     ordered: list[str] = []
 
@@ -767,6 +779,18 @@ def market_classification_invalid(data: Mapping[str, Any]) -> bool:
     )
 
 
+def source_classification_invalid(
+    data: Mapping[str, Any],
+    sources: Iterable[Mapping[str, Any]] = (),
+) -> bool:
+    """Detect malformed fields that select Decision thesis-origin policy."""
+
+    return any(
+        _source_row_invalid(row)
+        for row in (data, *(item for item in sources if isinstance(item, Mapping)))
+    )
+
+
 def _market_classification_values(data: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(
         value
@@ -777,6 +801,36 @@ def _market_classification_values(data: Mapping[str, Any]) -> tuple[str, ...]:
 
 def _typed_text(value: object) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _source_row_invalid(row: Mapping[str, Any]) -> bool:
+    for field in _SOURCE_SCALAR_FIELDS:
+        if field not in row or row.get(field) in (None, ""):
+            continue
+        if not _typed_text(row.get(field)):
+            return True
+    for field in _SOURCE_LIST_FIELDS:
+        if field not in row or row.get(field) in (None, "", [], ()):
+            continue
+        value = row.get(field)
+        if not isinstance(value, (list, tuple)) or any(
+            not _typed_text(item) for item in value
+        ):
+            return True
+    return False
+
+
+def _source_scalar_values(row: Mapping[str, Any], field: str) -> tuple[str, ...]:
+    value = _typed_text(row.get(field))
+    return (value,) if value else ()
+
+
+def _source_list_values(row: Mapping[str, Any], field: str) -> tuple[str, ...]:
+    value = row.get(field)
+    if not isinstance(value, (list, tuple)):
+        return ()
+    values = tuple(_typed_text(item) for item in value)
+    return values if all(values) else ()
 
 
 def _clean_return_unit(value: object) -> str | None:
@@ -865,6 +919,7 @@ __all__ = (
     "market_snapshot",
     "market_classification_invalid",
     "market_label",
+    "source_classification_invalid",
     "is_suspicious_illiquid",
     "spread_status",
     "thesis_origin_values",
