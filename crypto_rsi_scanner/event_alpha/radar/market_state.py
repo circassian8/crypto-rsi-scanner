@@ -101,9 +101,15 @@ def snapshot_from_market_row(
 ) -> MarketStateSnapshot:
     """Build a stable market-state snapshot from a CoinGecko-style row."""
     observed = _observed_at(row, observed_at)
-    symbol = str(row.get("symbol") or row.get("ticker") or "").upper().strip()
-    coin_id = str(row.get("coin_id") or row.get("id") or "").strip()
-    canonical_asset_id = str(row.get("canonical_asset_id") or coin_id or symbol).strip()
+    symbol, _symbol_supplied = _identity_text(row, "symbol", "ticker")
+    symbol = symbol.upper()
+    coin_id, _coin_id_supplied = _identity_text(row, "coin_id", "id")
+    canonical_asset_id, canonical_asset_id_supplied = _identity_text(
+        row,
+        "canonical_asset_id",
+    )
+    if not canonical_asset_id_supplied:
+        canonical_asset_id = coin_id or symbol
     warnings: list[str] = []
     fields: list[str] = []
     source_unit = event_market_units.infer_return_unit(row, default=event_market_units.RETURN_UNIT_FRACTION)
@@ -128,6 +134,8 @@ def snapshot_from_market_row(
         volume_mcap = volume_24h / market_cap
     if not symbol and not coin_id:
         warnings.append("missing_asset_identity")
+    if canonical_asset_id_supplied and not canonical_asset_id:
+        warnings.append("invalid_canonical_asset_identity")
 
     freshness = str(
         row.get("market_context_freshness_status")
@@ -263,6 +271,24 @@ def _optional_string(value: object, *, field_name: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string")
     return value
+
+
+def _identity_text(
+    row: Mapping[str, Any],
+    *keys: str,
+) -> tuple[str, bool]:
+    """Resolve identity aliases without coercion or invalid-value fallthrough."""
+
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        if not isinstance(value, str):
+            return "", True
+        return value.strip(), True
+    return "", False
 
 
 def _source_unit_warnings(row: Mapping[str, Any]) -> tuple[str, ...]:

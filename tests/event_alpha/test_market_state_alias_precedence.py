@@ -5,6 +5,75 @@ from __future__ import annotations
 import json
 
 
+def test_market_state_identity_aliases_are_typed_and_presence_aware():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    valid_fallback = market_state.snapshot_from_market_row(
+        {
+            "ticker": "SAFE",
+            "id": "safe-token",
+        },
+        observed_at="2026-07-20T17:00:00Z",
+    )
+    assert valid_fallback.symbol == "SAFE"
+    assert valid_fallback.coin_id == "safe-token"
+    assert valid_fallback.canonical_asset_id == "safe-token"
+
+    malformed = {
+        "symbol": True,
+        "ticker": "BORROWED",
+        "coin_id": False,
+        "id": "borrowed-token",
+        "canonical_asset_id": {"unexpected": "mapping"},
+        "name": {"unexpected": "mapping"},
+        "return_unit": "percent_points",
+        "return_4h": 12.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 4.0,
+        "liquidity_usd": 100_000_000.0,
+        "spread_bps": 5.0,
+        "freshness_status": "fresh",
+    }
+    snapshot = market_state.snapshot_from_market_row(
+        malformed,
+        observed_at="2026-07-20T17:00:00Z",
+    )
+    assert snapshot.symbol == ""
+    assert snapshot.coin_id == ""
+    assert snapshot.canonical_asset_id == ""
+    assert "missing_asset_identity" in snapshot.warnings
+    assert "invalid_canonical_asset_identity" in snapshot.warnings
+
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [malformed],
+        observed_at="2026-07-20T17:00:00Z",
+    )
+    assert len(snapshots) == 1
+    assert anomalies == []
+
+
+def test_catalyst_queue_rejects_non_text_anomaly_identity():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    base = {
+        "needs_catalyst_search": True,
+        "market_anomaly_id": "mkt:safe:test",
+        "canonical_asset_id": "safe-token",
+        "symbol": "SAFE",
+        "coin_id": "safe-token",
+        "priority": 50.0,
+        "observed_at": "2026-07-20T17:00:00Z",
+    }
+    assert market_anomaly_scanner.build_catalyst_search_queue(
+        [{**base, "market_anomaly_id": True}]
+    ) == []
+    assert market_anomaly_scanner.build_catalyst_search_queue(
+        [{**base, "canonical_asset_id": False}]
+    ) == []
+
+
 def test_market_state_canonical_zero_values_override_legacy_aliases():
     from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
     from crypto_rsi_scanner.event_alpha.radar import market_state

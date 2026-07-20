@@ -204,6 +204,8 @@ def scan_market_rows(
                 continue
             snapshot_payload[key] = row.get(key)
         snapshot_rows.append(snapshot_payload)
+        if not _canonical_snapshot_identity(snapshot_payload):
+            continue
         if _is_sector_or_theme(snapshot_payload):
             continue
         anomaly_type = classify_market_state(snapshot_payload, row, cfg=cfg)
@@ -515,7 +517,31 @@ def build_catalyst_search_queue(
             anomaly.get("needs_catalyst_search")
         ):
             continue
-        anomaly_id = str(anomaly.get("market_anomaly_id") or anomaly.get("anomaly_id") or "")
+        anomaly_id = _first_typed_text(
+            anomaly,
+            "market_anomaly_id",
+            "anomaly_id",
+        )
+        canonical_asset_id = _first_typed_text(
+            anomaly,
+            "canonical_asset_id",
+            "coin_id",
+            "symbol",
+        )
+        if not anomaly_id or not canonical_asset_id:
+            continue
+        symbol = _text(anomaly.get("symbol")).upper()
+        coin_id = _text(anomaly.get("coin_id"))
+        market_state_class = _first_typed_text(
+            anomaly,
+            "market_state_class",
+            "anomaly_type",
+        )
+        anomaly_bucket = _first_typed_text(
+            anomaly,
+            "anomaly_bucket",
+            "market_anomaly_bucket",
+        )
         snapshot = anomaly.get("market_state_snapshot") if isinstance(anomaly.get("market_state_snapshot"), Mapping) else {}
         row_observed = _queue_observed_at(anomaly, snapshot, observed_at)
         search_deadline = row_observed + timedelta(hours=max(0.5, float(cfg.search_deadline_hours)))
@@ -532,11 +558,11 @@ def build_catalyst_search_queue(
             "run_id": run_id or anomaly.get("run_id"),
             "anomaly_id": anomaly_id,
             "market_anomaly_id": anomaly_id,
-            "canonical_asset_id": anomaly.get("canonical_asset_id"),
-            "symbol": anomaly.get("symbol"),
-            "coin_id": anomaly.get("coin_id"),
-            "market_state_class": anomaly.get("market_state_class") or anomaly.get("anomaly_type"),
-            "anomaly_bucket": anomaly.get("anomaly_bucket") or anomaly.get("market_anomaly_bucket"),
+            "canonical_asset_id": canonical_asset_id,
+            "symbol": symbol,
+            "coin_id": coin_id,
+            "market_state_class": market_state_class,
+            "anomaly_bucket": anomaly_bucket,
             "priority": anomaly.get("priority"),
             "suggested_source_packs": suggested_packs,
             "search_queries": search_queries,
@@ -765,9 +791,10 @@ def _anomaly_row(
     run_mode: str | None,
     run_id: str | None,
 ) -> dict[str, Any]:
-    symbol = str(snapshot.get("symbol") or "").upper()
-    coin_id = str(snapshot.get("coin_id") or "")
-    observed_at = str(snapshot.get("observed_at") or "")
+    symbol = _text(snapshot.get("symbol")).upper()
+    coin_id = _text(snapshot.get("coin_id"))
+    canonical_asset_id = _text(snapshot.get("canonical_asset_id"))
+    observed_at = _text(snapshot.get("observed_at"))
     bucket = _anomaly_bucket(snapshot, source_row, anomaly_type, cfg=cfg)
     priority_components = _priority_components(snapshot, source_row, anomaly_type, bucket=bucket)
     priority = sum(priority_components.values())
@@ -776,8 +803,8 @@ def _anomaly_row(
         {
             "symbol": symbol,
             "coin_id": coin_id,
-            "name": source_row.get("name"),
-            "canonical_asset_id": snapshot.get("canonical_asset_id") or coin_id or symbol,
+            "name": _text(source_row.get("name")),
+            "canonical_asset_id": canonical_asset_id,
             "market_state_class": anomaly_type,
             "anomaly_bucket": bucket,
         },
@@ -793,7 +820,7 @@ def _anomaly_row(
         "market_anomaly_id": _market_anomaly_id(symbol=symbol, coin_id=coin_id, anomaly_type=anomaly_type, observed_at=observed_at),
         "symbol": symbol,
         "coin_id": coin_id,
-        "canonical_asset_id": snapshot.get("canonical_asset_id") or coin_id or symbol,
+        "canonical_asset_id": canonical_asset_id,
         "anomaly_type": anomaly_type,
         "anomaly_bucket": bucket,
         "market_anomaly_bucket": bucket,
@@ -1062,10 +1089,14 @@ def _search_queries_for_anomaly(
     *,
     suggested_packs: Iterable[str],
 ) -> list[str]:
-    symbol = str(anomaly.get("symbol") or "").upper()
-    coin_id = str(anomaly.get("coin_id") or anomaly.get("canonical_asset_id") or "").strip()
-    name = str(anomaly.get("name") or "").strip()
-    bucket = str(anomaly.get("anomaly_bucket") or anomaly.get("market_anomaly_bucket") or "").strip()
+    symbol = _text(anomaly.get("symbol")).upper()
+    coin_id = _first_typed_text(anomaly, "coin_id", "canonical_asset_id")
+    name = _text(anomaly.get("name"))
+    bucket = _first_typed_text(
+        anomaly,
+        "anomaly_bucket",
+        "market_anomaly_bucket",
+    )
     roots = [value for value in (symbol, name, coin_id) if value and value.casefold() not in {"unknown", "sector"}]
     roots = list(dict.fromkeys(roots))[:3]
     pack_text = " ".join(str(item) for item in suggested_packs).casefold()
@@ -1093,8 +1124,8 @@ def _search_queries_for_anomaly(
 
 
 def _is_sector_or_theme(snapshot: Mapping[str, Any]) -> bool:
-    symbol = str(snapshot.get("symbol") or "").upper()
-    coin_id = str(snapshot.get("coin_id") or "").casefold()
+    symbol = _text(snapshot.get("symbol")).upper()
+    coin_id = _text(snapshot.get("coin_id")).casefold()
     if (
         _truthy(snapshot.get("is_theme_or_sector"))
         or _truthy(snapshot.get("quote_asset_excluded"))
@@ -1222,6 +1253,33 @@ def _count(value: object) -> int | None:
         parsed = int(value)
         return parsed if parsed >= 0 else None
     return None
+
+
+def _text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _first_typed_text(row: Mapping[str, Any], *keys: str) -> str:
+    """Resolve text aliases while preserving invalid higher-authority evidence."""
+
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return _text(value)
+    return ""
+
+
+def _canonical_snapshot_identity(snapshot: Mapping[str, Any]) -> bool:
+    return bool(
+        _text(snapshot.get("canonical_asset_id"))
+        and (
+            _text(snapshot.get("coin_id"))
+            or _text(snapshot.get("symbol"))
+        )
+    )
 
 
 def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:

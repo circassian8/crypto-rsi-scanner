@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require typed canonical market snapshot identity · Codex
+**Why:** The canonical market-state scanner still stringified malformed identity
+before classification. A reproduced row with boolean coin/symbol values and an
+object name became canonical asset `True`, a high-liquidity breakout, and a
+catalyst queue containing mapping-derived search text even though downstream
+incident linkage would later reject it.
+**Changes:** Market-state identity aliases now accept only real text, preserve
+invalid higher-authority fields instead of borrowing lower aliases, and expose
+an explicit invalid-canonical warning. The anomaly scanner retains malformed
+rows as diagnostic snapshots but requires a typed canonical asset plus coin ID
+or symbol before classification. Anomaly construction, search-query identity,
+sector checks, and catalyst-queue identity/output now share typed projection;
+non-text anomaly IDs or canonical assets are dropped. Valid absent-field alias
+fallback remains supported. No anomaly formula, weight, threshold, route, or
+provider behavior changed.
+**Verify:** The original `mkt:True` breakout reproduction now yields one
+diagnostic snapshot and zero anomalies. All `438` market-focused test cases
+passed, including snapshot, anomaly, feature-evidence, campaign, no-send,
+dashboard, and outcome surfaces. `python3 -m compileall -q crypto_rsi_scanner
+tests` and `git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; provider budgets and artifact/security bounds remain enforced.
+
 ## 2026-07-20 — Fail closed on legacy anomaly discovery inputs · Codex
 **Why:** The low-authority Event Alpha anomaly adapter still stringified asset
 identity and trusted its dataclass configuration. A reproduced boolean coin ID
