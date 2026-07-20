@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close temporal relative-strength provenance · Codex
+**Why:** Live market rows could contain a valid causal BTC-relative return while
+still labeling the `relative_strength` feature group `unavailable`. The value
+and its exact evidence were correct, but downstream quality counts and operator
+provenance understated direct evidence.
+**Changes:**
+- Temporal history now records
+  `benchmark_derived_temporal_history` on both a canonical relative-return field
+  and the group basis whenever that calculation supplies the canonical value.
+- Preserved stronger independently supplied canonical values/bases; their
+  temporal comparison remains separately named diagnostic evidence. Missing or
+  future benchmark context still creates no relative-strength basis.
+- Updated the Decision Radar North Star, working agreement, durable decision,
+  and roadmap. Existing immutable generations are not rewritten, and no score,
+  threshold, or route changed.
+**Verify:** 133 focused market-history, temporal-evidence, Decision-v2,
+no-send-generation, and numeric-finiteness tests passed. Python compileall,
+North Star JSON validation, the full fixture no-send smoke with strict doctor
+and dashboard rendering, architecture cleanliness, and diff check passed.
+**Notes/risks:** The architecture size report remains advisory as explicitly
+approved; its reported line-count observations do not block this change. The
+new basis appears only in future generations. No provider call, authorization
+change, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Close signed Bybit funding-settlement arithmetic · Codex
 **Why:** The selected derivatives contract preserves settled funding rates but
 not the historical settlement-time mark needed to calculate a funding transfer.

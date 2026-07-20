@@ -889,7 +889,12 @@ may be added later when a suitable environment already exists.
   warmup. BTC/ETH benchmark observations for relative-return features must be
   at or before the asset timestamp and within the configured backward
   tolerance; a future benchmark row is missing context, never an alignment
-  candidate. Canonical numeric market fields use presence-based precedence:
+  candidate. When temporal history supplies a canonical BTC/ETH-relative
+  return, its field and group basis must say
+  `benchmark_derived_temporal_history`; an observed value may not retain an
+  `unavailable` basis. A separately supplied canonical relative return keeps
+  its stronger pre-existing basis while the temporal value remains diagnostic.
+  Canonical numeric market fields use presence-based precedence:
   an explicit finite zero is observed evidence and must never fall through to
   a legacy alias, source row, benchmark alias, gate sentinel, or `n/a` rendering
   merely because it is falsey.

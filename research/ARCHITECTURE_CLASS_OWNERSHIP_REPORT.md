@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T00:19:06.791589+00:00`
+- generated_at: `2026-07-20T01:40:00.314677+00:00`
 - public_class_count: `514`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `6`
@@ -45,7 +45,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
 | `production_files_over_1200_lines` | 30 | advisory |
-| `production_files_over_1500_lines` | 1 | advisory |
+| `production_files_over_1500_lines` | 2 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
 | `functions_over_150_lines` | 6 | advisory |
@@ -92,7 +92,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines | status | revisit condition |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
-| `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1497 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |

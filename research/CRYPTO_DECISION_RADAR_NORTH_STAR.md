@@ -670,6 +670,11 @@ observation ID, so a computed feature cannot become detached from its exact
 baseline fingerprint between collection and classification. Temporal evidence
 entries are closed, JSON-safe, deep-copied, and schema-validated. Only fields
 explicitly identified as proxy inputs may be replaced by a temporal calculation.
+When causal history supplies the canonical BTC/ETH-relative value, its field and
+`relative_strength` group basis are `benchmark_derived_temporal_history`; an
+observed relative value cannot remain labeled unavailable. An independently
+supplied canonical value and stronger basis remain authoritative, with the
+temporal calculation retained only under its explicit diagnostic field.
 
 The optional `event_alpha.shadow_temporal_surprise` v1 comparison uses only
 positive finite provider-observed `volume_24h` and provider-observed or explicit

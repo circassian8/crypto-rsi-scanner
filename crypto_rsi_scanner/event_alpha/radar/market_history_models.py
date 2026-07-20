@@ -14,6 +14,7 @@ MARKET_HISTORY_ENRICHMENT_SCHEMA = "event_alpha.market_history_enrichment"
 MARKET_HISTORY_SUMMARY_SCHEMA = "event_alpha.market_history_summary"
 MARKET_HISTORY_SCHEMA_VERSION = 1
 TEMPORAL_BASELINE_BASIS = "temporal_baseline"
+TEMPORAL_RELATIVE_STRENGTH_BASIS = "benchmark_derived_temporal_history"
 RETURN_UNIT_PERCENT_POINTS = "percent_points"
 BASELINE_COUNTED = "counted"
 BASELINE_TOO_CLOSE = "too_close"

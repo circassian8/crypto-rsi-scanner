@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Relative-return values and feature bases must agree
+**Status:** accepted
+**Decision:** When causal temporal history supplies a canonical BTC- or
+ETH-relative return, label that field and the `relative_strength` feature group
+as `benchmark_derived_temporal_history` before market-quality projection. Do
+not leave an observed canonical relative value labeled `unavailable`. If an
+independently supplied canonical relative return already has a stronger basis,
+preserve that value and basis; retain the temporal calculation only as a
+separately named diagnostic. Missing or future benchmark evidence remains
+unavailable and must not create a direct-feature claim.
+**Why:** The temporal layer previously added valid relative-return values after
+normalization had already labeled the feature group unavailable. Downstream
+quality counts and operator provenance therefore understated direct evidence
+despite retaining the exact benchmark inputs.
+**Revisit when:** A versioned field-by-field feature graph replaces the current
+group basis. The replacement must still forbid value/basis contradictions and
+preserve canonical-source precedence.
+
 ## 2026-07-20 - Model funding as a signed settlement transfer
 **Status:** accepted as offline arithmetic; sources and holding policy remain unsealed
 **Decision:** For one supplied Bybit USDT-perpetual funding settlement, compute

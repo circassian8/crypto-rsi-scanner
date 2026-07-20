@@ -12,6 +12,7 @@ import pytest
 import crypto_rsi_scanner.event_alpha.radar.market_history as event_market_history
 import crypto_rsi_scanner.event_alpha.radar.market_history_readiness as market_history_readiness
 import crypto_rsi_scanner.event_alpha.radar.market_state as event_market_state
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 
 
 NOW = datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)
@@ -98,6 +99,11 @@ def test_market_history_enriches_temporal_features_and_preserves_lineage_and_bas
         return_unit="fraction",
         volume_zscore_24h=9.9,
         volume_zscore_basis="cross_sectional_log_turnover_proxy",
+        market_feature_basis={
+            "returns": "provider_derived_sparkline",
+            "relative_strength": "unavailable",
+            "spread": "unavailable",
+        },
         market_feature_evidence={
             "liquidity_usd": {"basis": "provider_observed", "provider": "coingecko"},
         },
@@ -135,6 +141,20 @@ def test_market_history_enriches_temporal_features_and_preserves_lineage_and_bas
         (120 / 112 - 1) * 100 - (1_050 / 1_030 - 1) * 100,
     )
     assert enriched["temporal_relative_return_vs_btc_1h_zscore"] is not None
+    assert (
+        enriched["relative_return_vs_btc_1h_basis"]
+        == event_market_history.TEMPORAL_RELATIVE_STRENGTH_BASIS
+    )
+    assert (
+        enriched["market_feature_basis"]["relative_strength"]
+        == event_market_history.TEMPORAL_RELATIVE_STRENGTH_BASIS
+    )
+    with_quality = market_no_send_features.attach_history_quality(enriched)
+    assert (
+        with_quality["market_data_quality"]["feature_basis"]["relative_strength"]
+        == event_market_history.TEMPORAL_RELATIVE_STRENGTH_BASIS
+    )
+    assert with_quality["direct_market_feature_count"] >= 2
     assert enriched["volume_zscore_24h"] == enriched["temporal_volume_zscore_24h"]
     assert enriched["volume_zscore_basis"] == event_market_history.TEMPORAL_BASELINE_BASIS
     assert enriched["cross_sectional_volume_zscore_24h"] == 9.9
@@ -208,6 +228,7 @@ def test_relative_returns_never_align_to_a_future_benchmark_observation():
         ["relative_return_vs_btc_1h_zscore"]["status"]
         == "missing_current"
     )
+    assert future_enriched.get("market_feature_basis", {}).get("relative_strength") is None
 
     prior_benchmark_at = NOW - timedelta(seconds=30)
     prior_result = event_market_history.enrich_market_rows_with_history(
@@ -231,6 +252,46 @@ def test_relative_returns_never_align_to_a_future_benchmark_observation():
     assert prior_result.enriched_rows[0][
         "temporal_relative_return_vs_btc_1h"
     ] == pytest.approx(0.0)
+    assert (
+        prior_result.enriched_rows[0]["market_feature_basis"]["relative_strength"]
+        == event_market_history.TEMPORAL_RELATIVE_STRENGTH_BASIS
+    )
+
+
+def test_temporal_relative_diagnostic_does_not_relabel_existing_canonical_basis():
+    current = _row(
+        "move-token",
+        NOW,
+        price=120,
+        volume=2_200,
+        relative_return_vs_btc_1h=7.5,
+        market_feature_basis={
+            "relative_strength": "benchmark_derived_same_observation",
+        },
+    )
+    history = [
+        _row("move-token", NOW - timedelta(hours=1), price=118, volume=2_000),
+        _row("bitcoin", NOW - timedelta(hours=1), price=209, volume=5_000, symbol="BTC"),
+    ]
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [
+            current,
+            _row("bitcoin", NOW, price=210, volume=5_100, symbol="BTC"),
+        ],
+        history,
+        now=NOW,
+        config=_config(min_baseline_observations=2),
+    )
+    enriched = result.enriched_rows[0]
+
+    assert enriched["relative_return_vs_btc_1h"] == 7.5
+    assert "relative_return_vs_btc_1h_basis" not in enriched
+    assert enriched["temporal_relative_return_vs_btc_1h"] != 7.5
+    assert (
+        enriched["market_feature_basis"]["relative_strength"]
+        == "benchmark_derived_same_observation"
+    )
 
 
 def test_turnover_basis_distinguishes_provider_value_from_derived_ratio():

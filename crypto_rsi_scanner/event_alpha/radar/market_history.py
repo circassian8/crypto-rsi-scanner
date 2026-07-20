@@ -25,6 +25,7 @@ from crypto_rsi_scanner.event_alpha.radar.market_history_models import (
     MARKET_HISTORY_SUMMARY_SCHEMA,
     RETURN_UNIT_PERCENT_POINTS,
     TEMPORAL_BASELINE_BASIS,
+    TEMPORAL_RELATIVE_STRENGTH_BASIS,
     MarketHistoryConfig,
     _MarketHistoryResult,
     _PreparedObservation,
@@ -749,6 +750,8 @@ def _enrich_relative_baselines(
                 if row.get(feature) in (None, ""):
                     row[feature] = relative
                     _declare_return_unit(row, feature)
+                    row[f"{feature}_basis"] = TEMPORAL_RELATIVE_STRENGTH_BASIS
+                    _record_temporal_relative_strength_basis(row)
                 evidence[temporal_field] = _feature_evidence(
                     current=current, sample_count=1, status="ready",
                     calculation=f"asset_return_minus_{name}_return", benchmark_asset_id=asset_id,
@@ -765,6 +768,22 @@ def _enrich_relative_baselines(
                 benchmark_asset_id=asset_id,
                 evidence_rows=historical_evidence_rows,
             )
+
+
+def _record_temporal_relative_strength_basis(row: dict[str, Any]) -> None:
+    """Close the group-level basis when history supplies the canonical value.
+
+    A stronger pre-existing basis remains authoritative.  This helper is only
+    called when the temporal calculation filled the canonical relative-return
+    field, so a parallel temporal diagnostic cannot relabel an independently
+    supplied canonical value.
+    """
+    raw_basis = row.get("market_feature_basis")
+    basis = dict(raw_basis) if isinstance(raw_basis, Mapping) else {}
+    current_basis = str(basis.get("relative_strength") or "").strip().casefold()
+    if current_basis in {"", "unavailable", "unknown", "not_evaluated"}:
+        basis["relative_strength"] = TEMPORAL_RELATIVE_STRENGTH_BASIS
+        row["market_feature_basis"] = basis
 
 
 def _finish_current_enrichment(

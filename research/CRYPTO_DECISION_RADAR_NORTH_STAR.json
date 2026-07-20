@@ -1892,6 +1892,12 @@
       "observation ids and baseline bounds"
     ],
     "direct_provider_fields_preserved": true,
+    "relative_strength_basis_contract": {
+      "canonical_temporal_value_basis": "benchmark_derived_temporal_history",
+      "existing_stronger_canonical_basis_preserved": true,
+      "missing_or_noncausal_benchmark_basis": "unavailable",
+      "observed_value_may_retain_unavailable_basis": false
+    },
     "feature_readiness_groups": [
       "volume",
       "turnover",
