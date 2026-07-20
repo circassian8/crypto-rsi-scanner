@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Composite costs must rederive every supplied component
+**Status:** accepted as offline arithmetic; full cost policy remains unsealed
+**Decision:** Combine Bybit visible-book drag, taker fees, and holding-interval
+funding only when the fee and funding projections can both be fully rederived
+from the same exact round trip and compare equal to their supplied values.
+Calculate fees from each side's actual executed quote value, not target notional
+or a mirrored long/short assumption. Preserve signed funding cash flow and
+reconcile one native-USDT gross-to-net identity. Label the modeled component set
+complete only for visible-book plus supplied unsealed taker fee plus supplied-
+schedule funding. Keep latency, beyond-book slippage, unavailable-cost behavior,
+source authority, final cost-model completeness, annex binding, and evidence
+eligibility false.
+**Why:** Correct component formulas do not prevent integration drift. A fee or
+funding projection from a different round trip—or a fee reused across reversed
+book sides—can produce a plausible but false all-in return. Full component
+rederivation closes that deterministic gap without selecting empirical policy.
+**Revisit when:** Genuine capture pairs and authoritative fee/funding evidence
+exist and the operator is ready to seal latency, slippage, unavailable-cost,
+style, tier, and source rules in the Protocol-v2 annex.
+
 ## 2026-07-20 - Reconcile funding over an exact supplied settlement schedule
 **Status:** accepted as offline arithmetic; schedule and source authority remain unsealed
 **Decision:** A Bybit funding-interval scenario must name one causal bounded

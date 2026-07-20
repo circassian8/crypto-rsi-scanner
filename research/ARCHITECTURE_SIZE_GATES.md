@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T02:18:53.392781+00:00`
+- generated_at: `2026-07-20T02:34:07.254741+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -61,9 +61,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_funding.py:model_bybit_funding_settlement_scenario` | 169 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_funding.py:model_bybit_funding_interval_scenario` | 204 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip` | 226 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress` | 213 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness` | 160 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:_impact_cost_lines` | 171 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress` | 230 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness` | 163 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:_impact_cost_lines` | 192 |
 
 ## Architecture Gates
 
@@ -116,6 +116,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
+| `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1279 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1276 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
@@ -124,7 +125,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1245 |
 | `crypto_rsi_scanner/event_alpha/artifacts/operator_state.py` | 1235 |
-| `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1235 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1205 |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 |
 | `crypto_rsi_scanner/event_alpha/dashboard/public_access.py` | 1200 |
@@ -173,9 +173,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1767 |
+| `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1279 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1245 |
-| `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1235 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py` | 1205 |
 
 ## Largest Test Files
@@ -219,9 +219,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_outcome_price_recovery_application.py` | 1038 |
 | `tests/event_alpha/test_empirical_research_reports.py` | 1031 |
 | `tests/test_indicators.py` | 1030 |
+| `tests/event_alpha/test_execution_quality_readiness.py` | 1013 |
 | `tests/event_alpha/test_official_macro_calendar_acquisition.py` | 999 |
 | `tests/event_alpha/test_discovery_pipeline.py` | 996 |
-| `tests/event_alpha/test_impact_hypotheses.py` | 987 |
 
 ## Files Over 1500 Lines
 

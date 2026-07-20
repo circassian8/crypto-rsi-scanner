@@ -2,8 +2,8 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T02:18:56.655078+00:00`
-- public_class_count: `514`
+- generated_at: `2026-07-20T02:34:10.769711+00:00`
+- public_class_count: `515`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `7`
 - production_classes_over_limit: `3`
@@ -312,6 +312,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_settlement_scenario` | 169 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_interval_scenario` | 204 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 226 | true |
-| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 213 | true |
-| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 160 | true |
-| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 171 | false |
+| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 230 | true |
+| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 163 | true |
+| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 192 | false |

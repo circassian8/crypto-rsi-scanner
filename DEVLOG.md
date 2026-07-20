@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Compose exact Bybit execution-cost scenarios · Codex
+**Why:** Correct visible-book, fee, and funding formulas could still be combined
+from different modeled round trips or from stale/tampered component values,
+producing a plausible but false all-in return.
+**Changes:**
+- Added a pure composite cost v1 projection that embeds one exact round trip,
+  fully rederives its supplied taker-fee and funding-interval projections, and
+  requires exact component equality before calculating one native-USDT
+  gross-to-net identity.
+- Fees remain based on each leg's actual executed quote value. Tests explicitly
+  prove that reversing long/short book sides can change fees at the same base
+  quantity; no mirrored-fee shortcut or target-notional estimate is used.
+- Preserved signed funding cash flow and exact visible-book drag while labeling
+  the modeled component scope narrowly. Latency, beyond-book slippage,
+  unavailable-cost policy, authoritative fee/schedule/rate/mark sources, final
+  cost-model completeness, annex binding, and evidence eligibility remain false.
+- Advanced execution-quality readiness to v20 and current Protocol-v2 progress
+  to v19, and aligned the North Star, venue decision package, progress note,
+  working agreement, durable decision, and roadmap.
+**Verify:** 219 focused Bybit execution-quality, immutable capture-pair, fee,
+funding, composite-cost, readiness, and Protocol-v2 tests passed. `make
+verify-fast` passed all 3,471 tests plus alert render, fixture backtest, and
+paper-scoreboard smokes. Python compileall, North Star JSON parsing,
+execution-quality fixture smoke/readiness, Protocol-v2 progress check,
+architecture cleanliness, and diff whitespace checks passed.
+**Notes/risks:** This is exact only for the supplied unsealed components. It
+does not make the cost model empirically complete or select a fee, schedule,
+holding policy, tier, order style, latency, slippage, or unavailable-cost rule.
+No authorization change, provider call, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Reconcile whole-interval Bybit funding scenarios · Codex
 **Why:** The existing pure cost primitive could model one exact funding
 settlement, but independently valid events could still be summed with a missing,

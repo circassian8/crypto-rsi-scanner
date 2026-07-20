@@ -24,6 +24,9 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
     OFFICIAL_MAKER_TAKER_URL,
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost import (
+    SCHEMA_VERSION as COMPOSITE_EXECUTION_COST_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -54,10 +57,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v18"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v19"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_unsealed_exact_expected_settlement_funding_interval_aggregation_"
+    "with_unsealed_identity_rederived_composite_execution_cost_"
+    "and_unsealed_exact_expected_settlement_funding_interval_aggregation_"
     "and_exact_leg_taker_fee_"
     "application_two_exact_immutable_"
     "capture_round_trip_target_mid_notional_floor_"
@@ -274,6 +278,23 @@ _EXPECTED_EXECUTION_DECISION = {
     "official_funding_history_url": OFFICIAL_FUNDING_HISTORY_URL,
     "official_instrument_info_url": OFFICIAL_INSTRUMENT_INFO_URL,
     "official_mark_price_kline_url": OFFICIAL_MARK_PRICE_KLINE_URL,
+    "composite_execution_cost_implemented": True,
+    "composite_execution_cost_schema_version": (
+        COMPOSITE_EXECUTION_COST_SCHEMA_VERSION
+    ),
+    "composite_component_identity_reconciled": True,
+    "composite_component_values_fully_rederived": True,
+    "composite_modeled_component_scope": (
+        "visible_book_plus_unsealed_taker_fee_plus_operator_supplied_"
+        "funding_schedule"
+    ),
+    "composite_complete_protocol_v2_cost_model": False,
+    "composite_funding_interval_coverage_complete": False,
+    "composite_latency_cost_included": False,
+    "composite_beyond_visible_book_slippage_included": False,
+    "composite_unavailable_cost_policy_sealed": False,
+    "composite_provider_calls": 0,
+    "composite_writes_performed": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
@@ -719,6 +740,23 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "protocol_v2_annex_bound=false provider_calls=0 "
             "writes_performed=false"
         ),
+        (
+            "composite_execution_cost_implemented=true schema="
+            f"{decision['composite_execution_cost_schema_version']}"
+        ),
+        (
+            "composite_component_identity_reconciled=true "
+            "component_values_fully_rederived=true scope="
+            f"{decision['composite_modeled_component_scope']}"
+        ),
+        (
+            "composite_complete_protocol_v2_cost_model=false "
+            "funding_interval_coverage_complete=false "
+            "latency_cost_included=false "
+            "beyond_visible_book_slippage_included=false "
+            "unavailable_cost_policy_sealed=false"
+        ),
+        "composite_provider_calls=0 writes_performed=false",
         (
             "capture_pair_round_trip_implemented=true schema="
             f"{decision['capture_pair_round_trip_schema_version']}"

@@ -658,6 +658,15 @@ may be added later when a suitable environment already exists.
   `holding_interval_funding_coverage_complete=false`, schedule/rate/mark
   sources unsealed, and the holding policy open until genuine evidence and the
   final annex exist.
+  The pure composite execution-cost scenario v1 may combine one exact visible-
+  book round trip with its taker-fee and funding-interval projections only after
+  fully rederiving both components and requiring exact value/identity equality.
+  Preserve side-specific executed quote values: reversing long/short book-walk
+  actions can change taker fees even at the same base quantity. The composite
+  scope is only visible-book drag plus supplied unsealed taker fees and supplied-
+  schedule funding. Keep latency, beyond-book slippage, unavailable-cost policy,
+  authoritative sources, final cost-model completeness, annex binding, and
+  evidence eligibility false.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

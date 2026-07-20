@@ -1475,7 +1475,7 @@
   "api_modules_with_multiple_public_classes": 0,
   "api_modules_with_multiple_public_classes_rows": [],
   "api_total_lines": 0,
-  "class_count": 756,
+  "class_count": 758,
   "class_exceptions_remaining": 3,
   "class_line_limit": 75,
   "classes_over_limit": [
@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10746,
+  "function_count": 10754,
   "function_line_limit": 150,
   "functions_over_150_lines": 7,
   "functions_over_limit": [
@@ -1568,7 +1568,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 213,
+      "line_count": 230,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1576,7 +1576,7 @@
     },
     {
       "function_name": "build_execution_quality_readiness",
-      "line_count": 160,
+      "line_count": 163,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": true,
       "qualname": "build_execution_quality_readiness",
@@ -1584,7 +1584,7 @@
     },
     {
       "function_name": "_impact_cost_lines",
-      "line_count": 171,
+      "line_count": 192,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": false,
       "qualname": "_impact_cost_lines",
@@ -1592,7 +1592,7 @@
     }
   ],
   "functions_over_limit_count": 7,
-  "generated_at": "2026-07-20T02:18:56.655078+00:00",
+  "generated_at": "2026-07-20T02:34:10.769711+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3248,7 +3248,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 213,
+      "line_count": 230,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -3256,7 +3256,7 @@
     },
     {
       "function_name": "build_execution_quality_readiness",
-      "line_count": 160,
+      "line_count": 163,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": true,
       "qualname": "build_execution_quality_readiness",
@@ -3264,7 +3264,7 @@
     },
     {
       "function_name": "_impact_cost_lines",
-      "line_count": 171,
+      "line_count": 192,
       "module": "crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness",
       "public": false,
       "qualname": "_impact_cost_lines",
@@ -3393,7 +3393,7 @@
       "split_status": "below_threshold"
     }
   ],
-  "public_class_count": 514,
+  "public_class_count": 515,
   "public_classes_by_module": {
     "crypto_rsi_scanner.alert_smoke": 1,
     "crypto_rsi_scanner.backups": 3,
@@ -3467,6 +3467,7 @@
     "crypto_rsi_scanner.event_alpha.operations.bitget_announcements_capture": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_capture": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context_set_freshness": 1,
+    "crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding": 1,
     "crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality": 1,
@@ -3832,6 +3833,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1279,
+        "path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1276,
         "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
@@ -3869,11 +3875,6 @@
       {
         "line_count": 1235,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1235,
-        "path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py",
         "threshold": 1200
       },
       {

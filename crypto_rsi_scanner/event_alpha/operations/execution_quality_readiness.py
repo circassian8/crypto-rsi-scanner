@@ -28,6 +28,9 @@ from .bybit_execution_fee import (
     OFFICIAL_MAKER_TAKER_URL,
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
+from .bybit_execution_cost import (
+    SCHEMA_VERSION as COMPOSITE_EXECUTION_COST_SCHEMA_VERSION,
+)
 from .bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -38,7 +41,7 @@ from .bybit_execution_funding import (
 )
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v19"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v20"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -202,6 +205,23 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "official_funding_history_url": OFFICIAL_FUNDING_HISTORY_URL,
     "official_instrument_info_url": OFFICIAL_INSTRUMENT_INFO_URL,
     "official_mark_price_kline_url": OFFICIAL_MARK_PRICE_KLINE_URL,
+    "composite_execution_cost_implemented": True,
+    "composite_execution_cost_schema_version": (
+        COMPOSITE_EXECUTION_COST_SCHEMA_VERSION
+    ),
+    "composite_component_identity_reconciled": True,
+    "composite_component_values_fully_rederived": True,
+    "composite_modeled_component_scope": (
+        "visible_book_plus_unsealed_taker_fee_plus_operator_supplied_"
+        "funding_schedule"
+    ),
+    "composite_complete_protocol_v2_cost_model": False,
+    "composite_funding_interval_coverage_complete": False,
+    "composite_latency_cost_included": False,
+    "composite_beyond_visible_book_slippage_included": False,
+    "composite_unavailable_cost_policy_sealed": False,
+    "composite_provider_calls": 0,
+    "composite_writes_performed": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
 }
@@ -789,6 +809,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_visible_book_taker_fee_scenario_v1",
             "bybit_funding_settlement_scenario_v1",
             "bybit_funding_interval_scenario_v1",
+            "bybit_composite_execution_cost_scenario_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -847,6 +868,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "the_pure_funding_projection_applies_one_supplied_settled_rate_and_settlement_mark_to_the_exact_position_quantity",
             "the_interval_projection_requires_an_exact_ordered_match_between_the_operator_supplied_expected_schedule_and_supplied_settlements_then_aggregates_signed_cashflows",
             "funding_sign_arithmetic_and_supplied_schedule_reconciliation_are_explicit_but_schedule_rate_mark_sources_and_holding_policy_remain_unsealed",
+            "the_composite_cost_projection_fully_rederives_and_identity_reconciles_visible_book_taker_fee_and_supplied_schedule_funding_components",
+            "the_composite_still_excludes_latency_beyond_book_slippage_and_unavailable_cost_policy_and_is_not_a_complete_protocol_v2_cost_model",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -1024,6 +1047,27 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"provider_calls={value['funding_settlement_provider_calls']} "
         "writes_performed="
         f"{str(value['funding_settlement_writes_performed']).casefold()}",
+        "composite_execution_cost_implemented="
+        f"{str(value['composite_execution_cost_implemented']).casefold()} "
+        f"schema={value['composite_execution_cost_schema_version']}",
+        "composite_component_identity_reconciled="
+        f"{str(value['composite_component_identity_reconciled']).casefold()} "
+        "component_values_fully_rederived="
+        f"{str(value['composite_component_values_fully_rederived']).casefold()}",
+        f"composite_modeled_component_scope={value['composite_modeled_component_scope']}",
+        "composite_complete_protocol_v2_cost_model="
+        f"{str(value['composite_complete_protocol_v2_cost_model']).casefold()} "
+        "funding_interval_coverage_complete="
+        f"{str(value['composite_funding_interval_coverage_complete']).casefold()} "
+        "latency_cost_included="
+        f"{str(value['composite_latency_cost_included']).casefold()} "
+        "beyond_visible_book_slippage_included="
+        f"{str(value['composite_beyond_visible_book_slippage_included']).casefold()} "
+        "unavailable_cost_policy_sealed="
+        f"{str(value['composite_unavailable_cost_policy_sealed']).casefold()}",
+        f"composite_provider_calls={value['composite_provider_calls']} "
+        "writes_performed="
+        f"{str(value['composite_writes_performed']).casefold()}",
         "capture_pair_round_trip_implemented="
         f"{str(value['capture_pair_round_trip_implemented']).casefold()} "
         f"schema={value['capture_pair_round_trip_schema_version']}",

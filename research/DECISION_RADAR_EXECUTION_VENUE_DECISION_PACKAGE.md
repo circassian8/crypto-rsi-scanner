@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v19`. Run
+`crypto_radar_execution_quality_readiness_v20`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -122,6 +122,17 @@ have been captured, that the supplied expected schedule is authoritative, or
 that a one-minute close is necessarily the exact funding-time mark. Schedule,
 rate, and mark source authority; genuine complete interval coverage; holding
 policy; and annex eligibility remain unsealed.
+
+The composite cost scenario v1 closes arithmetic composition without closing
+policy. It accepts one exact round trip plus its taker-fee and funding-interval
+projections, fully rederives both add-ons from their embedded decimal-text
+assumptions and lineages, and rejects any identity or value drift before
+combining visible-book drag, fees, and signed funding cash flow in native USDT.
+Because long and short book walks consume different sides, their exact executed
+quote values—and therefore their taker fees—need not match even at the same base
+quantity. The composite explicitly excludes latency, beyond-book slippage, and
+unavailable-cost policy and preserves every unsealed source and annex flag. It
+is not a complete Protocol-v2 cost model or evidence row.
 
 The selected Bybit capability now advertises only the actual native snapshot
 fields: USDT depth bands, USDT-notional side-specific price impact, native

@@ -36,6 +36,11 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   strictly reconcile and aggregate supplied events against one bounded,
   operator-supplied expected schedule. This proves only that supplied schedule;
   authoritative schedule/rate/mark coverage and holding policy remain unsealed;
+- pure composite cost arithmetic fully rederives those fee and funding
+  projections from the same exact round trip before combining them with
+  visible-book drag. It preserves side-specific executed-value fees and remains
+  incomplete without latency, beyond-book slippage, unavailable-cost policy,
+  authoritative sources, and annex binding;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;

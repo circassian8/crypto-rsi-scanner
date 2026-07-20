@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v18")
+    assert values["progress_version"].endswith("_v19")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -197,6 +197,22 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["funding_settlement_protocol_v2_annex_bound"] is False
     assert decision["funding_settlement_provider_calls"] == 0
     assert decision["funding_settlement_writes_performed"] is False
+    assert decision["composite_execution_cost_implemented"] is True
+    assert decision["composite_execution_cost_schema_version"] == (
+        "crypto_radar.bybit_composite_execution_cost_scenario.v1"
+    )
+    assert decision["composite_component_identity_reconciled"] is True
+    assert decision["composite_component_values_fully_rederived"] is True
+    assert decision["composite_modeled_component_scope"] == (
+        "visible_book_plus_unsealed_taker_fee_plus_operator_supplied_funding_schedule"
+    )
+    assert decision["composite_complete_protocol_v2_cost_model"] is False
+    assert decision["composite_funding_interval_coverage_complete"] is False
+    assert decision["composite_latency_cost_included"] is False
+    assert decision["composite_beyond_visible_book_slippage_included"] is False
+    assert decision["composite_unavailable_cost_policy_sealed"] is False
+    assert decision["composite_provider_calls"] == 0
+    assert decision["composite_writes_performed"] is False
     assert decision["target_notional_tier_set_sealed"] is False
     assert decision["base_quantity_selection_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
@@ -438,6 +454,12 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "funding_schedule_source_sealed=false" in output.out
     assert "funding_rate_source_sealed=false" in output.out
     assert "settlement_mark_source_sealed=false" in output.out
+    assert "composite_execution_cost_implemented=true" in output.out
+    assert "crypto_radar.bybit_composite_execution_cost_scenario.v1" in output.out
+    assert "composite_component_identity_reconciled=true" in output.out
+    assert "component_values_fully_rederived=true" in output.out
+    assert "composite_complete_protocol_v2_cost_model=false" in output.out
+    assert "composite_provider_calls=0 writes_performed=false" in output.out
     assert "capture_pair_round_trip_implemented=true" in output.out
     assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in output.out
     assert "capture_pair_exact_namespaces_required=true" in output.out
@@ -503,6 +525,8 @@ def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:
     assert "pure funding arithmetic" in note
     assert "operator-supplied expected schedule" in note
     assert "authoritative schedule/rate/mark coverage" in note
+    assert "pure composite cost arithmetic" in note
+    assert "side-specific executed-value fees" in note
     assert "synthetic-fixture capture/doctor" in note
     assert "retains\n  nothing" in note
     assert "v4 remains deprecated and live-ineligible" in note

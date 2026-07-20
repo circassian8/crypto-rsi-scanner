@@ -943,6 +943,18 @@ row Protocol-v2 evidence. `holding_interval_funding_coverage_complete=false`
 therefore remains explicit until genuine schedule, mark, and rate captures and
 the final funding holding policy are sealed.
 
+The pure composite cost scenario v1 now prevents a different integration error:
+adding a fee projection, funding projection, and visible-book result that do not
+belong to the same round trip. It fully rederives the fee and funding interval
+from the embedded assumptions and exact source round trip, requires exact value
+equality with both supplied component projections, and then reconciles gross
+return, side-specific executed-value taker fees, signed funding cash flow, and
+visible-book drag into one native-USDT net result. Its modeled component set is
+complete only for that declared scope. Latency cost, beyond-book slippage,
+unavailable-cost behavior, authoritative schedule/rate/mark/fee sources, final
+notional/style policy, and annex binding remain absent, so
+`composite_complete_protocol_v2_cost_model=false`.
+
 The selected capability and snapshot projection use the real native fields:
 `bid_depth_usdt_by_band`, `ask_depth_usdt_by_band`, and side-specific
 `*_price_impact_bps_by_notional_usdt`. The older generic `*_usd_*` interface is

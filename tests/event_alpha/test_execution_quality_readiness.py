@@ -32,6 +32,9 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
     OFFICIAL_MAKER_TAKER_URL,
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost import (
+    SCHEMA_VERSION as COMPOSITE_EXECUTION_COST_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -60,7 +63,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v19"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v20"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -230,6 +233,22 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["official_funding_history_url"] == OFFICIAL_FUNDING_HISTORY_URL
     assert impact["official_instrument_info_url"] == OFFICIAL_INSTRUMENT_INFO_URL
     assert impact["official_mark_price_kline_url"] == OFFICIAL_MARK_PRICE_KLINE_URL
+    assert impact["composite_execution_cost_implemented"] is True
+    assert impact["composite_execution_cost_schema_version"] == (
+        COMPOSITE_EXECUTION_COST_SCHEMA_VERSION
+    )
+    assert impact["composite_component_identity_reconciled"] is True
+    assert impact["composite_component_values_fully_rederived"] is True
+    assert impact["composite_modeled_component_scope"] == (
+        "visible_book_plus_unsealed_taker_fee_plus_operator_supplied_funding_schedule"
+    )
+    assert impact["composite_complete_protocol_v2_cost_model"] is False
+    assert impact["composite_funding_interval_coverage_complete"] is False
+    assert impact["composite_latency_cost_included"] is False
+    assert impact["composite_beyond_visible_book_slippage_included"] is False
+    assert impact["composite_unavailable_cost_policy_sealed"] is False
+    assert impact["composite_provider_calls"] == 0
+    assert impact["composite_writes_performed"] is False
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
@@ -254,6 +273,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_visible_book_taker_fee_scenario_v1",
         "bybit_funding_settlement_scenario_v1",
         "bybit_funding_interval_scenario_v1",
+        "bybit_composite_execution_cost_scenario_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -546,6 +566,12 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "holding_interval_funding_coverage_complete=false" in rendered
     assert "funding_schedule_source_sealed=false" in rendered
     assert OFFICIAL_INSTRUMENT_INFO_URL in rendered
+    assert "composite_execution_cost_implemented=true" in rendered
+    assert COMPOSITE_EXECUTION_COST_SCHEMA_VERSION in rendered
+    assert "composite_component_identity_reconciled=true" in rendered
+    assert "component_values_fully_rederived=true" in rendered
+    assert "composite_complete_protocol_v2_cost_model=false" in rendered
+    assert "composite_provider_calls=0" in rendered
     assert "funding_rate_source_sealed=false" in rendered
     assert "settlement_mark_source_sealed=false" in rendered
     assert "capture_pair_round_trip_implemented=true" in rendered
@@ -750,6 +776,7 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_visible_book_taker_fee_scenario_v1",
         "bybit_funding_settlement_scenario_v1",
         "bybit_funding_interval_scenario_v1",
+        "bybit_composite_execution_cost_scenario_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -947,6 +974,19 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     )
     assert readiness["holding_interval_funding_coverage_complete"] is False
     assert readiness["funding_schedule_source_sealed"] is False
+    assert readiness["composite_execution_cost_implemented"] is True
+    assert readiness["composite_execution_cost_schema_version"] == (
+        COMPOSITE_EXECUTION_COST_SCHEMA_VERSION
+    )
+    assert readiness["composite_component_identity_reconciled"] is True
+    assert readiness["composite_component_values_fully_rederived"] is True
+    assert readiness["composite_complete_protocol_v2_cost_model"] is False
+    assert readiness["composite_funding_interval_coverage_complete"] is False
+    assert readiness["composite_latency_cost_included"] is False
+    assert readiness["composite_beyond_visible_book_slippage_included"] is False
+    assert readiness["composite_unavailable_cost_policy_sealed"] is False
+    assert readiness["composite_provider_calls"] == 0
+    assert readiness["composite_writes_performed"] is False
     assert readiness["funding_rate_source_sealed"] is False
     assert readiness["settlement_mark_source_sealed"] is False
     assert readiness["funding_settlement_protocol_v2_annex_bound"] is False
