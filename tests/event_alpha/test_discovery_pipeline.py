@@ -17,6 +17,66 @@ globals().update({
 })
 
 
+def test_event_discovery_normalization_rejects_malformed_confidence():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def normalized(value, *, include_payload_confidence=True):
+        event = {
+            "event_name": "TEST scheduled update",
+            "event_type": "protocol_update",
+            "event_time": "2026-06-20T12:00:00Z",
+            "event_time_confidence": value,
+        }
+        if include_payload_confidence:
+            event["confidence"] = value
+        raw = RawDiscoveredEvent(
+            raw_id="test-confidence",
+            provider="fixture",
+            fetched_at=now,
+            published_at=now,
+            source_url="https://example.test/test-confidence",
+            title="TEST scheduled update",
+            body="TEST has a scheduled protocol update.",
+            raw_json={"event": event},
+            source_confidence=value,
+            content_hash="test-confidence",
+        )
+        return event_discovery.normalize_raw_event(raw)
+
+    for invalid in (True, float("nan"), float("inf"), float("-inf"), -0.1, 1.1, "invalid"):
+        event = normalized(invalid)
+
+        assert event.event_time_confidence == 0.0
+        assert event.confidence == 0.0
+
+        source_fallback = normalized(invalid, include_payload_confidence=False)
+        assert source_fallback.confidence == 0.0
+
+    valid = normalized("0.8")
+    assert valid.event_time_confidence == 0.8
+    assert valid.confidence == 0.8
+
+    raw = RawDiscoveredEvent(
+        raw_id="test-default-confidence",
+        provider="fixture",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/test-default-confidence",
+        title="TEST scheduled update",
+        body="TEST has a scheduled protocol update.",
+        raw_json={"event": {"event_time": "2026-06-20T12:00:00Z"}},
+        source_confidence=0.7,
+        content_hash="test-default-confidence",
+    )
+    defaulted = event_discovery.normalize_raw_event(raw)
+    assert defaulted.event_time_confidence == 1.0
+    assert defaulted.confidence == 0.7
+
+
 def test_event_discovery_transform_applies_llm_hints_before_resolver_validation():
     import json
     import tempfile

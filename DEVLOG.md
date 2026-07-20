@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Normalize discovery confidence upstream · Codex
+**Why:** Raw discovery normalization accepted arbitrary floats for event and
+event-time confidence. Boolean, non-finite, negative, and over-1 values could
+enter normalized events before resolver, dedupe, validation, and scoring.
+**Changes:** Added one finite, non-boolean `[0,1]` normalization boundary for
+explicit event confidence, source-confidence fallback, and event-time
+confidence. Explicit malformed values fail closed to zero; valid numeric strings
+remain compatible, and an event with a real time but no explicit time-confidence
+retains the existing 1.0 default. Added a public normalization regression. No
+score, threshold, route, provider, or historical artifact changed.
+**Verify:** All 56 focused discovery, news-provider, radar-pipeline, and
+impact-hypothesis tests passed. `compileall` and `git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Bound hypothesis source confidence · Codex
 **Why:** Public hypothesis generation trusted source confidence as an arbitrary
 float. Booleans and out-of-range/non-finite values could persist impossible

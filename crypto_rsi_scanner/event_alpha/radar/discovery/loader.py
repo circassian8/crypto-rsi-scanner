@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -57,15 +58,18 @@ def normalize_raw_event(raw: RawDiscoveredEvent) -> NormalizedEvent:
     event_type = str(event_payload.get("event_type") or payload.get("event_type") or _infer_event_type(title, body))
     event_time = parse_datetime(event_payload.get("event_time") or payload.get("event_time"))
     event_time_confidence_raw = event_payload.get("event_time_confidence", payload.get("event_time_confidence"))
-    event_time_confidence = (
-        float(event_time_confidence_raw) if event_time_confidence_raw is not None else (1.0 if event_time else 0.0)
+    event_time_confidence = _normalized_confidence(
+        event_time_confidence_raw,
+        default=1.0 if event_time else 0.0,
     )
     event_time_source_raw = event_payload.get("event_time_source", payload.get("event_time_source"))
     event_time_source = str(event_time_source_raw) if event_time_source_raw else ("explicit" if event_time else None)
     first_seen = raw.published_at or raw.fetched_at
     external_asset = event_payload.get("external_asset", payload.get("external_asset"))
     confidence_raw = event_payload.get("confidence", payload.get("confidence"))
-    confidence = float(confidence_raw) if confidence_raw is not None else raw.source_confidence
+    confidence = _normalized_confidence(
+        confidence_raw if confidence_raw is not None else raw.source_confidence,
+    )
     description = str(event_payload.get("description") or payload.get("description") or body or "")
     event_id = str(event_payload.get("event_id") or payload.get("event_id") or _event_id(
         event_name,
@@ -88,6 +92,20 @@ def normalize_raw_event(raw: RawDiscoveredEvent) -> NormalizedEvent:
         description=description or None,
         confidence=max(0.0, min(1.0, confidence)),
     )
+
+
+def _normalized_confidence(value: object, *, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return 0.0
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        return 0.0
+    return number
 
 
 def dedupe_events(events: Iterable[NormalizedEvent]) -> list[NormalizedEvent]:
