@@ -441,6 +441,62 @@ def test_malformed_catalyst_source_evidence_cannot_raise_confidence():
     assert "catalyst_source_evidence_invalid" not in valid.decision_hard_blockers
 
 
+def test_malformed_catalyst_state_claims_cannot_be_ignored_by_fallback_policy():
+    source_context = {
+        "source_origin": "official_exchange",
+        "source_origins": ["official_exchange"],
+        "source_pack": "official_exchange_listing_pack",
+        "source_class": "official_exchange",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "latest_source_url": "https://example.test/listing",
+        "latest_source_title": "Listing",
+        "official_exchange_event": {
+            "event_type": "spot_listing",
+            "source_url": "https://example.test/listing",
+            "title": "Listing",
+        },
+    }
+    malformed_claims = (
+        {"catalyst_status": {"status": "disproven"}},
+        {"catalyst_disproven": {"value": True}},
+        {"catalyst_not_required": "maybe"},
+        {"cause_status": ["ruled_out"]},
+        {"source_strength": {"value": "official_structured"}},
+        {"accepted_evidence_count": "1"},
+        {"catalyst_attribution_rejected": 2},
+    )
+
+    for malformed in malformed_claims:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**{**source_context, **malformed})
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "catalyst_state_claim_invalid" in result.decision_hard_blockers
+
+    malformed_source = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=({"accepted_evidence_count": {"count": 1}},),
+    )
+    assert malformed_source.radar_route == "diagnostic"
+    assert "catalyst_state_claim_invalid" in malformed_source.decision_hard_blockers
+
+    valid = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            **source_context,
+            catalyst_status="confirmed",
+            catalyst_disproven=False,
+            catalyst_not_required="false",
+            catalyst_attribution_rejected=0,
+            cause_status="confirmed",
+        )
+    )
+    assert valid.catalyst_status == "confirmed"
+    assert "catalyst_state_claim_invalid" not in valid.decision_hard_blockers
+
+
 def test_acceptable_wide_spread_emits_higher_manipulation_warning():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(market_state_snapshot={"spread_bps": 120.0})

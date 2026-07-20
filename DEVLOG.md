@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Type Decision catalyst-state claims · Codex
+**Why:** Malformed explicit catalyst state was ignored by the compatibility
+heuristic. An object-valued `catalyst_status`, malformed disproof/not-required
+flag, non-text cause/source strength, or invalid accepted-evidence count could
+be replaced by a more optimistic source-based fallback instead of exposing the
+contract failure.
+**Changes:** Candidate and supporting-source catalyst status, cause status,
+source strength, accepted-evidence count, disproof/not-required controls, and
+attribution-rejection controls now share typed validation. Catalyst status uses
+the closed Decision enum; cause/source strength require text; counts require
+non-negative integral numeric values; boolean controls retain native boolean,
+0/1, and established true/false spellings. Malformed explicit claims add
+`catalyst_state_claim_invalid` and route diagnostic. Valid confirmed,
+plausible, unknown, not-required, and disproven policy remains unchanged. No
+catalyst formula, source taxonomy, threshold, provider, or historical artifact
+changed.
+**Verify:** `2` focused catalyst source/state regressions passed. `184` Decision,
+consistency, surface, derivatives, fixture-route, snapshot-precedence, RSI,
+schema, merge, pipeline, catalyst-attribution, and unified-calendar tests
+passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; evidence-payload and artifact/
+security bounds remain enforced.
+
 ## 2026-07-20 — Fail closed on malformed Decision controls · Codex
 **Why:** Theme, quote-asset, and duplicate-suppression claims accepted a small
 set of semantic true values but treated every other object or number as false.

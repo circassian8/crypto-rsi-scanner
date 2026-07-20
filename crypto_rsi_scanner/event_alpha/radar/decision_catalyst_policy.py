@@ -27,6 +27,11 @@ _STRUCTURED_SOURCE_FIELDS = (
     "scheduled_catalyst_event",
     "unlock_event",
 )
+_CATALYST_BOOLEAN_FIELDS = (
+    "catalyst_disproven",
+    "catalyst_not_required",
+    "catalyst_attribution_rejected",
+)
 
 
 def catalyst_status(
@@ -157,6 +162,39 @@ def catalyst_source_evidence_invalid(
             if not isinstance(nested, Mapping) or not nested:
                 return True
             if _row_source_fields_invalid(nested):
+                return True
+    return False
+
+
+def catalyst_state_claims_invalid(
+    data: Mapping[str, Any],
+    sources: tuple[Mapping[str, Any], ...] = (),
+) -> bool:
+    """Detect malformed explicit catalyst status, count, and control claims."""
+
+    allowed_statuses = {item.value for item in CatalystStatus}
+    for row in (data, *sources):
+        if "catalyst_status" in row and row.get("catalyst_status") not in (None, ""):
+            status = _typed_text(row.get("catalyst_status")).casefold()
+            if status not in allowed_statuses:
+                return True
+        for field in ("cause_status", "source_strength"):
+            if (
+                field in row
+                and row.get(field) not in (None, "")
+                and not _typed_text(row.get(field))
+            ):
+                return True
+        if (
+            "accepted_evidence_count" in row
+            and row.get("accepted_evidence_count") not in (None, "")
+            and _count(row.get("accepted_evidence_count")) is None
+        ):
+            return True
+        for field in _CATALYST_BOOLEAN_FIELDS:
+            if field not in row or row.get(field) in (None, ""):
+                continue
+            if _semantic_boolean(row.get(field)) is None:
                 return True
     return False
 
@@ -362,11 +400,25 @@ def _typed_text(value: object) -> str:
 
 
 def _truthy(value: object) -> bool:
+    return _semantic_boolean(value) is True
+
+
+def _semantic_boolean(value: object) -> bool | None:
     if isinstance(value, bool):
         return value
-    if value is None:
-        return False
-    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        if float(value) == 1.0:
+            return True
+        if float(value) == 0.0:
+            return False
+        return None
+    if isinstance(value, str):
+        text = value.strip().casefold()
+        if text in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "no", "n", "off"}:
+            return False
+    return None
 
 
 def _texts(value: object) -> list[str]:
@@ -389,6 +441,7 @@ def _mapping(value: object) -> Mapping[str, Any]:
 __all__ = (
     "attribution_values",
     "attribution_warning",
+    "catalyst_state_claims_invalid",
     "catalyst_source_evidence_invalid",
     "catalyst_source_fields",
     "catalyst_status",
