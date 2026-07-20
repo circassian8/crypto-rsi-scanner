@@ -18,7 +18,10 @@ import re
 from typing import Any
 
 from ..artifacts.json_lines import loads_no_duplicate_keys
-from ..operations import market_no_send_features
+from ..operations import (
+    market_no_send_features,
+    market_observation_campaign_episode_frontier,
+)
 from .secure_reader import _DashboardNamespaceReadError, open_anchored_namespace
 
 
@@ -180,6 +183,10 @@ def _project_campaign_actions(
     metrics = _project_metrics(report.get("campaign_metrics"))
     review = _project_review_queue(report.get("human_review_queue"))
     outcomes = _project_outcome_gaps(report.get("outcomes"))
+    episode_coverage = _project_episode_coverage(
+        report.get("protocol_v2_episode_coverage_frontier"),
+        scorecard=report.get("decision_v2_episode_outcome_scorecard"),
+    )
     execution = _project_execution_quality(
         report.get("data_quality_limitations"),
         retained_observations=metrics["retained_observation_count"],
@@ -217,6 +224,7 @@ def _project_campaign_actions(
         "campaign_metrics": metrics,
         "human_review": review,
         "outcome_recovery": outcomes,
+        "episode_coverage": episode_coverage,
         "execution_quality": execution,
         "temporal_baseline": temporal_baseline,
         "pointer": {
@@ -249,6 +257,138 @@ def _project_metrics(value: Any) -> dict[str, int]:
     if projected["spread_available_count"] > projected["retained_observation_count"]:
         raise ValueError("campaign_report_spread_count_invalid")
     return projected
+
+
+def _project_episode_coverage(
+    value: Any,
+    *,
+    scorecard: Any,
+) -> dict[str, Any]:
+    frontier = _mapping(value, "protocol_v2_episode_coverage_frontier")
+    source = _mapping(scorecard, "decision_v2_episode_outcome_scorecard")
+    errors = (
+        market_observation_campaign_episode_frontier
+        .validate_protocol_v2_episode_coverage_frontier(
+            frontier,
+            scorecard=source,
+        )
+    )
+    if errors:
+        raise ValueError("campaign_episode_coverage_frontier_invalid")
+    routes = _project_episode_coverage_rows(
+        frontier.get("route_coverage"),
+        expected_names=(
+            market_observation_campaign_episode_frontier.CANONICAL_ROUTES
+        ),
+        label="route",
+    )
+    origins = _project_episode_coverage_rows(
+        frontier.get("primary_origin_coverage"),
+        expected_names=(
+            market_observation_campaign_episode_frontier
+            .CANONICAL_PRIMARY_ORIGINS
+        ),
+        label="primary_origin",
+    )
+    unobserved_routes = tuple(
+        row["name"] for row in routes if row["episode_count"] == 0
+    )
+    unobserved_origins = tuple(
+        row["name"] for row in origins if row["episode_count"] == 0
+    )
+    if tuple(frontier.get("unobserved_route_names") or ()) != unobserved_routes:
+        raise ValueError("campaign_unobserved_routes_mismatch")
+    if (
+        tuple(frontier.get("unobserved_primary_origin_names") or ())
+        != unobserved_origins
+    ):
+        raise ValueError("campaign_unobserved_origins_mismatch")
+    return {
+        "status": _identity(frontier.get("status"), "episode_coverage_status"),
+        "episode_count": _count(frontier.get("episode_count"), "episode_count"),
+        "repeat_member_count": _count(
+            frontier.get("repeat_member_count"), "repeat_member_count"
+        ),
+        "matured_episode_count": _count(
+            frontier.get("matured_episode_count"), "matured_episode_count"
+        ),
+        "route_population_count": len(routes),
+        "observed_route_count": _count(
+            frontier.get("observed_route_count"), "observed_route_count"
+        ),
+        "zero_episode_route_count": len(unobserved_routes),
+        "unobserved_route_names": unobserved_routes,
+        "route_coverage": routes,
+        "primary_origin_population_count": len(origins),
+        "observed_primary_origin_count": _count(
+            frontier.get("observed_primary_origin_count"),
+            "observed_primary_origin_count",
+        ),
+        "zero_episode_primary_origin_count": len(unobserved_origins),
+        "unobserved_primary_origin_names": unobserved_origins,
+        "primary_origin_coverage": origins,
+        "canonical_category_coverage_complete": (
+            frontier.get("canonical_category_coverage_complete") is True
+        ),
+        "minimum_sample_policy_sealed": False,
+        "sample_sufficiency_evaluable": False,
+        "statistical_independence_claim": False,
+        "protocol_v2_evidence_eligible": False,
+        "research_only": True,
+    }
+
+
+def _project_episode_coverage_rows(
+    value: Any,
+    *,
+    expected_names: Sequence[str],
+    label: str,
+) -> tuple[dict[str, Any], ...]:
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError(f"campaign_{label}_coverage_invalid")
+    if len(value) != len(expected_names):
+        raise ValueError(f"campaign_{label}_coverage_count_invalid")
+    rows: list[dict[str, Any]] = []
+    for index, (raw, expected_name) in enumerate(zip(value, expected_names, strict=True)):
+        row = _mapping(raw, f"{label}_coverage_{index}")
+        name = _identity(row.get("name"), f"{label}_coverage_name")
+        if name != expected_name:
+            raise ValueError(f"campaign_{label}_coverage_name_mismatch")
+        coverage_status = _identity(
+            row.get("coverage_status"), f"{label}_coverage_status"
+        )
+        projected = {
+            "name": name,
+            "coverage_status": coverage_status,
+            "episode_count": _count(row.get("episode_count"), "episode_count"),
+            "matured_episode_count": _count(
+                row.get("matured_episode_count"), "matured_episode_count"
+            ),
+            "due_missing_price_episode_count": _count(
+                row.get("due_missing_price_episode_count"),
+                "due_missing_price_episode_count",
+            ),
+            "not_due_episode_count": _count(
+                row.get("not_due_episode_count"), "not_due_episode_count"
+            ),
+            "contract_excluded_episode_count": _count(
+                row.get("contract_excluded_episode_count"),
+                "contract_excluded_episode_count",
+            ),
+            "scoreable_directional_episode_count": _count(
+                row.get("scoreable_directional_episode_count"),
+                "scoreable_directional_episode_count",
+            ),
+            "aligned_episode_count": _count(
+                row.get("aligned_episode_count"), "aligned_episode_count"
+            ),
+        }
+        if coverage_status != (
+            "observed" if projected["episode_count"] else "unobserved"
+        ):
+            raise ValueError(f"campaign_{label}_coverage_status_mismatch")
+        rows.append(projected)
+    return tuple(rows)
 
 
 def _project_current_exact_baseline_counts(
@@ -830,6 +970,7 @@ def _unavailable(reason: str) -> dict[str, Any]:
         "campaign_metrics": {},
         "human_review": {},
         "outcome_recovery": {},
+        "episode_coverage": {},
         "execution_quality": {},
         "provider_calls": 0,
         "writes": 0,

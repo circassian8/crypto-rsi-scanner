@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import replace
+from datetime import datetime, timedelta
+from functools import lru_cache
 import hashlib
 import json
 from pathlib import Path
@@ -12,17 +15,56 @@ from crypto_rsi_scanner.event_alpha.dashboard.campaign_operator_actions import (
 from crypto_rsi_scanner.event_alpha.dashboard.operator_work_queue import (
     render_operator_work_queue,
 )
+from crypto_rsi_scanner.event_alpha.dashboard.campaign_page import (
+    render_campaign_page,
+)
 from crypto_rsi_scanner.event_alpha.dashboard.system_pages import render_health_page
 from crypto_rsi_scanner.event_alpha.dashboard.today_page import (
     _control_regime_input_detail,
     render_today_page,
 )
-from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+from crypto_rsi_scanner.event_alpha.operations import (
+    market_no_send_features,
+    market_observation_campaign_episode_frontier,
+)
+from tests.event_alpha.test_decision_episode_scorecard import (
+    _candidate,
+    _core,
+    _episode,
+    _outcome,
+    _score,
+)
 from tests.event_alpha.test_dashboard_system_pages_v1 import _snapshot
 
 
 _GENERATED_AT = "2026-07-18T20:43:03.720770+00:00"
 _ASSET_IDS = tuple(f"asset-{index:02d}" for index in range(30))
+
+
+@lru_cache(maxsize=1)
+def _episode_contracts() -> tuple[dict[str, object], dict[str, object]]:
+    observed = datetime.fromisoformat(_GENERATED_AT) - timedelta(days=2)
+    evaluated = datetime.fromisoformat(_GENERATED_AT)
+    candidate = _candidate("dashboard-frontier", observed)
+    core = _core(candidate)
+    outcome = _outcome(
+        candidate,
+        core,
+        persisted_evaluated_at=evaluated,
+        primary_price=110.0,
+    )
+    scorecard = _score(
+        _episode([candidate], evaluated_at=evaluated),
+        [candidate],
+        [core],
+        [outcome],
+        evaluated_at=evaluated,
+    )
+    frontier = (
+        market_observation_campaign_episode_frontier
+        .build_protocol_v2_episode_coverage_frontier(scorecard)
+    )
+    return scorecard, frontier
 
 
 def _current_regime_input() -> dict[str, object]:
@@ -94,6 +136,7 @@ def _current_regime_input() -> dict[str, object]:
 
 
 def _campaign_report() -> dict[str, object]:
+    scorecard, frontier = _episode_contracts()
     return {
         "schema_id": "decision_radar_live_observation_campaign_report_v2",
         "schema_version": "decision_radar_live_observation_campaign_report_v2",
@@ -198,6 +241,8 @@ def _campaign_report() -> dict[str, object]:
                 )
             ],
         },
+        "decision_v2_episode_outcome_scorecard": deepcopy(scorecard),
+        "protocol_v2_episode_coverage_frontier": deepcopy(frontier),
         "outcomes": {
             "matured": 1,
             "pending": 3,
@@ -387,6 +432,12 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     )
     assert result["outcome_recovery"]["symbols"] == ("DEXE",)
     assert result["execution_quality"]["venue"] == "bybit"
+    assert result["episode_coverage"]["episode_count"] == 1
+    assert result["episode_coverage"]["observed_route_count"] == 1
+    assert result["episode_coverage"]["route_population_count"] == 8
+    assert result["episode_coverage"]["observed_primary_origin_count"] == 1
+    assert result["episode_coverage"]["primary_origin_population_count"] == 7
+    assert len(result["episode_coverage"]["unobserved_route_names"]) == 7
     assert result["temporal_baseline"]["feature_groups"]["turnover"][
         "warm_asset_count"
     ] == 30
@@ -565,6 +616,33 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     ]["diagnostic"]["routing_eligible"] = True
     _write_report(tmp_path, regime_policy_drift)
     assert _load(tmp_path)["status"] == "unavailable"
+
+    episode_coverage_drift = _campaign_report()
+    episode_coverage_drift["protocol_v2_episode_coverage_frontier"][
+        "episode_count"
+    ] += 1
+    _write_report(tmp_path, episode_coverage_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+
+def test_campaign_page_renders_complete_episode_coverage_taxonomy(
+    tmp_path: Path,
+) -> None:
+    _write_report(tmp_path, _campaign_report())
+    projection = _load(tmp_path)
+    snapshot = replace(_snapshot(), campaign_operator_actions=projection)
+
+    html = render_campaign_page(snapshot, query={})
+
+    assert "Protocol-v2 episode coverage" in html
+    assert "Frozen episodes cover 1/8 routes and 1/7 primary origins" in html
+    assert "High-confidence idea" in html
+    assert "Calendar / scheduled risk" in html
+    assert "Primary-origin coverage" in html
+    assert "Market-led" in html
+    assert "Fundamental-led" in html
+    assert "Minimum samples" in html
+    assert "remain unsealed" in html
 
 
 def test_campaign_operator_actions_rejects_oversized_report(tmp_path: Path) -> None:

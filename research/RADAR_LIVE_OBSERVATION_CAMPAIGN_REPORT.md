@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-20T10:32:35.361417+00:00` from local artifacts only.
+Generated at `2026-07-20T11:04:17.732737+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -300,6 +300,45 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 | dexe | dashboard_watch | long | matured | opposed | -0.01762238 | 50_69/45_64/45_64 |
 | pump-fun | dashboard_watch | long | not_due | not_evaluated | n/a | 70_84/45_64/45_64 |
 - Descriptive only: no route, score, calibration, threshold, or authority change is eligible.
+
+## Protocol-v2 episode coverage frontier
+
+This expands the frozen-episode scorecard across every canonical Decision route and primary origin, including categories with zero episodes. It is a descriptive coverage audit, not a sample-size decision or an independence claim.
+- Status: `descriptive_incomplete`
+- Frozen primary episodes: `3`
+- Matured episode outcomes: `2`
+- Observed routes: `2`/`8`
+- Zero-episode routes: `6` (`actionable_watch, high_confidence_watch, rapid_market_anomaly, fade_exhaustion_review, calendar_risk, diagnostic`)
+- Observed primary origins: `1`/`7`
+- Zero-episode primary origins: `6` (`catalyst_led, technical_led, derivatives_led, onchain_led, fundamental_led, macro_led`)
+- Minimum-sample policy sealed: `false`; sample sufficiency is not yet evaluable.
+- Statistical and cross-asset independence claimed: `false`.
+- Protocol-v2 evidence eligible: `false`.
+
+### Route coverage
+
+| Route | Coverage | Episodes | Matured | Due missing price | Not due | Excluded | Scoreable | Aligned |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| dashboard_watch | observed | 2 | 1 | 0 | 1 | 0 | 1 | 0 |
+| actionable_watch | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| high_confidence_watch | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| rapid_market_anomaly | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fade_exhaustion_review | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| risk_watch | observed | 1 | 1 | 0 | 0 | 0 | 1 | 1 |
+| calendar_risk | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| diagnostic | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+### Primary-origin coverage
+
+| Primary origin | Coverage | Episodes | Matured | Due missing price | Not due | Excluded | Scoreable | Aligned |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| market_led | observed | 3 | 2 | 0 | 1 | 0 | 2 | 1 |
+| catalyst_led | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| technical_led | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| derivatives_led | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| onchain_led | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fundamental_led | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| macro_led | unobserved | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Failed and blocked attempts
 

@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Expose the complete Protocol-v2 episode evidence frontier · Codex
+**Why:** The frozen Decision-v2 scorecard grouped only observed cohorts, so the
+campaign report and dashboard made six absent routes and six absent primary
+origins too easy to overlook. Operators need explicit evidence gaps before any
+minimum-sample or algorithm decision is sealed.
+**Changes:**
+- Added a closed `decision_radar.protocol_v2_episode_coverage_frontier` v1
+  projection over the validated episode scorecard. It emits all eight routes
+  and all seven primary origins in canonical order, binds exact scorecard
+  digests and evaluation time, closes outcome counts, and fails on source or
+  count drift.
+- Integrated the projection into the canonical campaign JSON/Markdown and the
+  pointer-matched read-only dashboard. The campaign page now shows every route,
+  exposes primary-origin coverage, and labels zero rows as missing evidence.
+- Refreshed genuine no-provider campaign truth: 3 fixed-start episodes, 4
+  dependent repeats, 2 matured outcomes, 2/8 observed routes
+  (`dashboard_watch`, `risk_watch`), and 1/7 observed origins (`market_led`).
+  Minimum samples, statistical/cross-asset independence, matched controls,
+  Protocol-v2 annex binding, and evidence eligibility remain unsealed/false.
+- Updated the Crypto and Event Alpha North Stars, Protocol-v2 current-progress
+  note, roadmap, and durable decision. No routing, score, threshold, provider,
+  artifact authority, or automatic policy behavior changed. Quantitative source
+  size limits remain advisory per the owner's instruction; security/artifact
+  byte bounds and behavioral gates remain enforced.
+**Verify:** New/focused campaign, episode, dashboard, empirical-report, and
+North-Star tests passed (`109` plus the reproducibility/frontier checks).
+`python3 -m compileall -q crypto_rsi_scanner tests`,
+`make radar-market-campaign-report PYTHON=python3` (`provider_calls=0`),
+`make radar-research-protocol-v2-progress-check PYTHON=python3`, dashboard
+readiness, dashboard smoke, and dashboard UX smoke passed. `make verify-fast
+PYTHON=python3` completed with `3,586` passing tests and one sandbox-only
+`PermissionError` when binding an ephemeral loopback socket; that exact
+dashboard concurrency test passed outside the restricted socket sandbox
+(`1 passed`). `git diff --check` passed. Full `make verify` was not duplicated
+because the broad package pass plus the exact environmental rerun covered every
+test, and this change adds no provider or production-policy boundary.
+
 ## 2026-07-20 — Reconcile active Protocol-v2 roadmap status · Codex
 **Why:** The completed regime-input change and canonical campaign report recorded
 the 10:27 timeout, but the long-lived active Protocol-v2 roadmap row still

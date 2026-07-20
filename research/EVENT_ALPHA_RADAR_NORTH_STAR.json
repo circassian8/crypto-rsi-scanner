@@ -435,7 +435,7 @@
       "sports_fixtures"
     ]
   },
-  "generated_at": "2026-07-20T07:55:07.901591+00:00",
+  "generated_at": "2026-07-20T11:06:35.691406+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1050,6 +1050,48 @@
     "auto_apply_thresholds_true": "blocker",
     "burn_in_contract_missing": "warning",
     "north_star_document_missing": "warning"
+  },
+  "protocol_v2_episode_coverage_frontier_policy": {
+    "canonical_primary_origins": [
+      "market_led",
+      "catalyst_led",
+      "technical_led",
+      "derivatives_led",
+      "onchain_led",
+      "fundamental_led",
+      "macro_led"
+    ],
+    "canonical_routes": [
+      "dashboard_watch",
+      "actionable_watch",
+      "high_confidence_watch",
+      "rapid_market_anomaly",
+      "fade_exhaustion_review",
+      "risk_watch",
+      "calendar_risk",
+      "diagnostic"
+    ],
+    "cross_asset_independence_claim": false,
+    "decision_score_eligible": false,
+    "downstream_behavior": "copy_validated_projection_without_re_evaluation",
+    "episode_independence": "fixed_start_declustered_not_statistically_independent",
+    "matched_control_available": false,
+    "minimum_sample_policy_sealed": false,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false,
+    "provider_calls": 0,
+    "research_only": true,
+    "routing_eligible": false,
+    "sample_sufficiency_evaluable": false,
+    "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
+    "schema_version": 1,
+    "source_binding": "exact_scorecard_contract_input_binding_and_evaluated_at",
+    "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
+    "source_scorecard_schema_version": 1,
+    "statistical_independence_claim": false,
+    "threshold_change_eligible": false,
+    "writes": 0,
+    "zero_episode_categories_explicit": true
   },
   "purpose": "Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.",
   "research_only": true,

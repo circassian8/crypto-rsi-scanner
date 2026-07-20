@@ -31,6 +31,9 @@ def test_event_alpha_radar_north_star_checked_artifacts_are_reproducible():
     assert decision_payload["shadow_temporal_surprise_policy"] == (
         rebuilt_payload["shadow_temporal_surprise_policy"]
     )
+    assert decision_payload[
+        "protocol_v2_episode_coverage_frontier_policy"
+    ] == rebuilt_payload["protocol_v2_episode_coverage_frontier_policy"]
 
     checked_burn_in = json.loads(
         (research / radar_north_star.BURN_IN_CONTRACT_JSON).read_text(encoding="utf-8")

@@ -31,6 +31,7 @@ from . import market_observation_campaign_baseline
 from . import market_observation_campaign_cadence
 from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
+from . import market_observation_campaign_episode_frontier
 from . import market_observation_campaign_outcome_gaps
 from . import market_observation_campaign_scorecard
 from . import market_observation_campaign_shadow_surprise
@@ -194,6 +195,10 @@ def build_campaign_report(
             evaluated_at=evaluated,
         )
     )
+    episode_coverage_frontier = (
+        market_observation_campaign_episode_frontier
+        .build_protocol_v2_episode_coverage_frontier(episode_scorecard)
+    )
     baseline = market_observation_campaign_baseline.build_baseline_maturity(
         base,
         evaluated=evaluated,
@@ -256,6 +261,7 @@ def build_campaign_report(
         episode_shadow=episode_shadow,
         episode_input_audit=episode_input_audit,
         episode_scorecard=episode_scorecard,
+        episode_coverage_frontier=episode_coverage_frontier,
         shadow_surprise_audit=shadow_surprise_audit,
         limitations=limitations,
         next_observation=next_observation,
@@ -351,6 +357,20 @@ def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
         raise MarketNoSendError(
             "decision episode scorecard report contract invalid: "
             + ";".join(scorecard_errors)
+        )
+    frontier_errors = (
+        market_observation_campaign_episode_frontier
+        .validate_protocol_v2_episode_coverage_frontier(
+            _mapping(report.get("protocol_v2_episode_coverage_frontier")),
+            scorecard=_mapping(
+                report.get("decision_v2_episode_outcome_scorecard")
+            ),
+        )
+    )
+    if frontier_errors:
+        raise MarketNoSendError(
+            "Protocol-v2 episode coverage frontier invalid: "
+            + ";".join(frontier_errors)
         )
     surprise_errors = (
         market_observation_campaign_shadow_surprise

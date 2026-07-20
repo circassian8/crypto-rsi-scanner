@@ -66,6 +66,15 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   UTC DNS failure and 10:27 UTC timeout both occurred before a successful
   post-implementation observation, so the current live coverage remains
   honestly zero;
+- the canonical campaign report now derives a digest-bound all-category
+  episode coverage frontier from the frozen Decision-v2 episode scorecard and
+  copies it into the dashboard without re-evaluation. Current genuine evidence
+  is three fixed-start episodes with four dependent repeats: two
+  `dashboard_watch`, one `risk_watch`, and only `market_led` as the primary
+  origin. The remaining six routes and six primary origins are explicit zero
+  rows. This is descriptive only: minimum samples, statistical/cross-asset
+  independence, matched controls, annex binding, and Protocol-v2 evidence
+  eligibility all remain false;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -108,6 +117,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   eligibility; v4 remains deprecated and live-ineligible;
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
+- six of eight canonical routes and six of seven canonical primary origins
+  still have no genuine fixed-start episode. A zero row means missing evidence,
+  not strength, weakness, safety, or validation;
 - prospective matched-control context remains incomplete: the current campaign
   has no successful post-implementation market-regime row and no sealed
   Protocol-v2 partition, so no complete match row or matched control is

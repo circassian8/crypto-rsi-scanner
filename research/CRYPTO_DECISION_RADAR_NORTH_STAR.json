@@ -1022,6 +1022,48 @@
     "auto_apply": false,
     "research_only": true
   },
+  "protocol_v2_episode_coverage_frontier_policy": {
+    "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
+    "schema_version": 1,
+    "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
+    "source_scorecard_schema_version": 1,
+    "canonical_routes": [
+      "dashboard_watch",
+      "actionable_watch",
+      "high_confidence_watch",
+      "rapid_market_anomaly",
+      "fade_exhaustion_review",
+      "risk_watch",
+      "calendar_risk",
+      "diagnostic"
+    ],
+    "canonical_primary_origins": [
+      "market_led",
+      "catalyst_led",
+      "technical_led",
+      "derivatives_led",
+      "onchain_led",
+      "fundamental_led",
+      "macro_led"
+    ],
+    "zero_episode_categories_explicit": true,
+    "source_binding": "exact_scorecard_contract_input_binding_and_evaluated_at",
+    "downstream_behavior": "copy_validated_projection_without_re_evaluation",
+    "minimum_sample_policy_sealed": false,
+    "sample_sufficiency_evaluable": false,
+    "episode_independence": "fixed_start_declustered_not_statistically_independent",
+    "statistical_independence_claim": false,
+    "cross_asset_independence_claim": false,
+    "matched_control_available": false,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false,
+    "routing_eligible": false,
+    "decision_score_eligible": false,
+    "threshold_change_eligible": false,
+    "provider_calls": 0,
+    "writes": 0,
+    "research_only": true
+  },
   "shadow_temporal_surprise_policy": {
     "schema_id": "event_alpha.shadow_temporal_surprise",
     "schema_version": 2,

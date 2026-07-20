@@ -172,6 +172,19 @@ def test_campaign_report_adds_episode_shadow_without_changing_headline_counts(
     assert scorecard["representative_count"] == 1
     assert scorecard["outcome_state_counts"]["contract_excluded"] == 1
     assert scorecard["policy_conclusion"] == "insufficient_for_policy_change"
+    frontier = report["protocol_v2_episode_coverage_frontier"]
+    assert frontier["schema_id"] == (
+        "decision_radar.protocol_v2_episode_coverage_frontier"
+    )
+    assert frontier["episode_count"] == 1
+    assert frontier["observed_route_count"] == 1
+    assert frontier["zero_episode_route_count"] == 7
+    assert frontier["observed_primary_origin_count"] == 1
+    assert frontier["zero_episode_primary_origin_count"] == 6
+    assert frontier["minimum_sample_policy_sealed"] is False
+    assert frontier["statistical_independence_claim"] is False
+    assert frontier["protocol_v2_evidence_eligible"] is False
+    assert frontier["provider_calls"] == frontier["writes"] == 0
     assert audit["schema_id"] == (
         "event_alpha.shadow_anomaly_episode_input_audit"
     )
@@ -202,6 +215,10 @@ def test_campaign_report_adds_episode_shadow_without_changing_headline_counts(
     assert "Structural membership status: `ready`" in markdown
     assert "## Decision-v2 episode outcomes (shadow)" in markdown
     assert "Policy conclusion: `insufficient_for_policy_change`" in markdown
+    assert "## Protocol-v2 episode coverage frontier" in markdown
+    assert "Observed routes: `1`/`8`" in markdown
+    assert "Observed primary origins: `1`/`7`" in markdown
+    assert "| calendar_risk | unobserved | 0 |" in markdown
     assert "Duplicate outcome identities: groups=`0`, rows=`0`" in markdown
     assert (
         "Cross-candidate outcome collisions: groups=`0`, candidates=`0`, rows=`0`"
@@ -556,6 +573,16 @@ def test_campaign_renderer_rejects_tampered_episode_shadow(tmp_path: Path):
         match="decision episode scorecard report contract invalid",
     ):
         market_observation_campaign.format_campaign_report(tampered_scorecard)
+
+    tampered_frontier = deepcopy(report)
+    tampered_frontier["protocol_v2_episode_coverage_frontier"][
+        "observed_route_count"
+    ] += 1
+    with pytest.raises(
+        MarketNoSendError,
+        match="Protocol-v2 episode coverage frontier invalid",
+    ):
+        market_observation_campaign.format_campaign_report(tampered_frontier)
 
 
 def test_campaign_distinguishes_observed_empty_outcome_ledger(tmp_path: Path):

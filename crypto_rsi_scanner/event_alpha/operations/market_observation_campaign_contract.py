@@ -35,6 +35,7 @@ def build_report_value(
     episode_shadow: Mapping[str, Any],
     episode_input_audit: Mapping[str, Any],
     episode_scorecard: Mapping[str, Any],
+    episode_coverage_frontier: Mapping[str, Any],
     shadow_surprise_audit: Mapping[str, Any],
     limitations: Sequence[Mapping[str, Any]],
     next_observation: Mapping[str, Any],
@@ -95,6 +96,9 @@ def build_report_value(
         "shadow_anomaly_episodes": dict(episode_shadow),
         "shadow_anomaly_episode_input_audit": dict(episode_input_audit),
         "decision_v2_episode_outcome_scorecard": dict(episode_scorecard),
+        "protocol_v2_episode_coverage_frontier": dict(
+            episode_coverage_frontier
+        ),
         "shadow_temporal_surprise_campaign_audit": dict(
             shadow_surprise_audit
         ),

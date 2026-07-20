@@ -154,10 +154,131 @@ def render_campaign_page(
         )
         + current_authority
         + render_metric_grid(metrics)
+        + _protocol_v2_episode_coverage(snapshot)
         + history
         + _maintenance_cycle_table(snapshot)
         + _campaign_metadata_disclosure(snapshot)
         + _maintenance_metadata_disclosure(snapshot)
+    )
+
+
+def _protocol_v2_episode_coverage(snapshot: DashboardSnapshot) -> str:
+    state = snapshot.campaign_operator_actions
+    raw = state.get("episode_coverage")
+    if state.get("status") != "ready" or not isinstance(raw, Mapping):
+        return ""
+    route_rows = [
+        row for row in raw.get("route_coverage") or () if isinstance(row, Mapping)
+    ]
+    origin_rows = [
+        row
+        for row in raw.get("primary_origin_coverage") or ()
+        if isinstance(row, Mapping)
+    ]
+    if not route_rows or not origin_rows:
+        return ""
+    route_table = data_table(
+        (
+            "Route",
+            "Coverage",
+            "Episodes",
+            "Matured",
+            "Not due",
+            "Missing price",
+            "Scoreable",
+            "Aligned",
+        ),
+        [
+            (
+                humanize_enum(row.get("name")),
+                badge(
+                    "Observed"
+                    if row.get("coverage_status") == "observed"
+                    else "No episode",
+                    tone=(
+                        "info"
+                        if row.get("coverage_status") == "observed"
+                        else "muted"
+                    ),
+                ),
+                display_count(row.get("episode_count")),
+                display_count(row.get("matured_episode_count")),
+                display_count(row.get("not_due_episode_count")),
+                display_count(row.get("due_missing_price_episode_count")),
+                display_count(row.get("scoreable_directional_episode_count")),
+                display_count(row.get("aligned_episode_count")),
+            )
+            for row in route_rows
+        ],
+        caption="Canonical Decision-route episode coverage",
+        compact=True,
+    )
+    origin_table = data_table(
+        (
+            "Primary origin",
+            "Coverage",
+            "Episodes",
+            "Matured",
+            "Not due",
+            "Missing price",
+            "Scoreable",
+            "Aligned",
+        ),
+        [
+            (
+                humanize_enum(row.get("name")),
+                badge(
+                    "Observed"
+                    if row.get("coverage_status") == "observed"
+                    else "No episode",
+                    tone=(
+                        "info"
+                        if row.get("coverage_status") == "observed"
+                        else "muted"
+                    ),
+                ),
+                display_count(row.get("episode_count")),
+                display_count(row.get("matured_episode_count")),
+                display_count(row.get("not_due_episode_count")),
+                display_count(row.get("due_missing_price_episode_count")),
+                display_count(row.get("scoreable_directional_episode_count")),
+                display_count(row.get("aligned_episode_count")),
+            )
+            for row in origin_rows
+        ],
+        caption="Canonical primary-origin episode coverage",
+        compact=True,
+    )
+    observed_routes = display_count(raw.get("observed_route_count"))
+    route_total = display_count(raw.get("route_population_count"))
+    observed_origins = display_count(raw.get("observed_primary_origin_count"))
+    origin_total = display_count(raw.get("primary_origin_population_count"))
+    summary = (
+        '<div class="alert alert-info"><strong>Descriptive evidence frontier.</strong> '
+        f'Frozen episodes cover {escape_html(observed_routes)}/{escape_html(route_total)} '
+        f'routes and {escape_html(observed_origins)}/{escape_html(origin_total)} primary '
+        'origins. Zero rows are missing evidence, not healthy-empty proof. Minimum samples, '
+        'statistical independence, matched controls, and Protocol-v2 eligibility remain '
+        'unsealed.</div>'
+    )
+    body = (
+        summary
+        + '<div class="campaign-desktop-table">'
+        + str(route_table)
+        + '</div>'
+        + str(disclosure(
+            "Primary-origin coverage",
+            origin_table,
+            summary=(
+                f"{observed_origins}/{origin_total} primary origins observed"
+            ),
+            css_class="campaign-technical-disclosure",
+        ))
+    )
+    return render_panel(
+        "Protocol-v2 episode coverage",
+        body,
+        eyebrow="Frozen Decision episodes · no policy conclusion",
     )
 
 

@@ -147,6 +147,55 @@ SHADOW_ANOMALY_EPISODE_POLICY: dict[str, Any] = {
     ],
 }
 
+PROTOCOL_V2_EPISODE_COVERAGE_FRONTIER_POLICY: dict[str, Any] = {
+    "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
+    "schema_version": 1,
+    "source_scorecard_schema_id": (
+        "event_alpha.decision_v2_episode_outcome_scorecard"
+    ),
+    "source_scorecard_schema_version": 1,
+    "canonical_routes": [
+        "dashboard_watch",
+        "actionable_watch",
+        "high_confidence_watch",
+        "rapid_market_anomaly",
+        "fade_exhaustion_review",
+        "risk_watch",
+        "calendar_risk",
+        "diagnostic",
+    ],
+    "canonical_primary_origins": [
+        "market_led",
+        "catalyst_led",
+        "technical_led",
+        "derivatives_led",
+        "onchain_led",
+        "fundamental_led",
+        "macro_led",
+    ],
+    "zero_episode_categories_explicit": True,
+    "source_binding": (
+        "exact_scorecard_contract_input_binding_and_evaluated_at"
+    ),
+    "downstream_behavior": "copy_validated_projection_without_re_evaluation",
+    "minimum_sample_policy_sealed": False,
+    "sample_sufficiency_evaluable": False,
+    "episode_independence": (
+        "fixed_start_declustered_not_statistically_independent"
+    ),
+    "statistical_independence_claim": False,
+    "cross_asset_independence_claim": False,
+    "matched_control_available": False,
+    "protocol_v2_annex_bound": False,
+    "protocol_v2_evidence_eligible": False,
+    "routing_eligible": False,
+    "decision_score_eligible": False,
+    "threshold_change_eligible": False,
+    "provider_calls": 0,
+    "writes": 0,
+    "research_only": True,
+}
+
 
 def append_shadow_policies_north_star(
     lines: list[str],
@@ -176,9 +225,25 @@ def append_shadow_policies_north_star(
         else:
             lines.append(f"- {key}: `{value}`")
     lines.append("")
+    frontier_policy = (
+        payload.get("protocol_v2_episode_coverage_frontier_policy")
+        if isinstance(
+            payload.get("protocol_v2_episode_coverage_frontier_policy"),
+            Mapping,
+        )
+        else {}
+    )
+    lines.extend(["## Protocol-v2 Episode Coverage Frontier", ""])
+    for key, value in frontier_policy.items():
+        if isinstance(value, list):
+            lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
+        else:
+            lines.append(f"- {key}: `{value}`")
+    lines.append("")
 
 
 __all__ = (
+    "PROTOCOL_V2_EPISODE_COVERAGE_FRONTIER_POLICY",
     "SHADOW_ANOMALY_EPISODE_POLICY",
     "SHADOW_TEMPORAL_SURPRISE_POLICY",
     "append_shadow_policies_north_star",

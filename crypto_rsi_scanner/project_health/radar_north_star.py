@@ -23,7 +23,12 @@ from .radar_north_star_evidence import (
     SOURCE_INDEPENDENCE_POLICY,
     append_source_independence_north_star,
 )
-from .radar_north_star_shadow import SHADOW_ANOMALY_EPISODE_POLICY, SHADOW_TEMPORAL_SURPRISE_POLICY, append_shadow_policies_north_star
+from .radar_north_star_shadow import (
+    PROTOCOL_V2_EPISODE_COVERAGE_FRONTIER_POLICY,
+    SHADOW_ANOMALY_EPISODE_POLICY,
+    SHADOW_TEMPORAL_SURPRISE_POLICY,
+    append_shadow_policies_north_star,
+)
 
 REPORT_SCHEMA_VERSION = "event_alpha_radar_north_star_v1"
 REPORT_JSON = "EVENT_ALPHA_RADAR_NORTH_STAR.json"
@@ -621,6 +626,9 @@ def build_north_star(*, generated_at: datetime | None = None) -> dict[str, Any]:
         "source_independence_policy": deepcopy(SOURCE_INDEPENDENCE_POLICY),
         "shadow_temporal_surprise_policy": deepcopy(SHADOW_TEMPORAL_SURPRISE_POLICY),
         "shadow_anomaly_episode_policy": deepcopy(SHADOW_ANOMALY_EPISODE_POLICY),
+        "protocol_v2_episode_coverage_frontier_policy": deepcopy(
+            PROTOCOL_V2_EPISODE_COVERAGE_FRONTIER_POLICY
+        ),
         "product_layers": deepcopy(PRODUCT_LAYERS),
         "decision_model_v2": deepcopy(DECISION_MODEL_V2),
         "market_no_send_generation": deepcopy(MARKET_NO_SEND_GENERATION),

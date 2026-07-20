@@ -8460,7 +8460,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "a5dd11e48777cf64ebd079266e0851339783390671111bc6903ab2cfd283a38d",
     "candidate_rows_supplied": 7,
-    "contract_digest": "7f6f047bd194f9d280ebad267a7a1cfc3b53fc72462db94334fc2335466d4564",
+    "contract_digest": "1c20c5a0b8208fad4883b4dc5e2fdfd0b341276bfba7afb201e90e3b576bf118",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "e414b0c03027697444797a2deec8939a6376d041ad695461a2e5d2661dd7b630",
     "core_rows_supplied": 7,
@@ -8475,7 +8475,7 @@
       "not_evaluated": 1,
       "opposed": 1
     },
-    "evaluated_at": "2026-07-20T10:32:35.361417+00:00",
+    "evaluated_at": "2026-07-20T11:04:17.732737+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -8864,7 +8864,7 @@
         }
       ]
     },
-    "input_binding_digest": "f90432d63fcc4a4bc330881aa16e042e6219790ce3c6911ef1aed68ec70aa999",
+    "input_binding_digest": "5015c15348037eb93d5a0e30a3616ed4b748f146ebca8410690a9c79a3d9ca84",
     "matched_control_available": false,
     "matured_episode_count": 2,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -9361,7 +9361,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "c3ffd54d38a49e190276e75a729c6f9f18c0a7bb8aaed58484ab086604048ba5",
+    "source_episode_contract_digest": "8b8e4f54a6407a694149a48b6598d8507b587a4d23ea0122b2f8a5fcc1f159d0",
     "source_episode_input_binding_digest": "ab6e897de16c57abb366c6aaab58ac80a25031aff9b48bbe08d498a3ff03a725",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -9372,7 +9372,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-20T10:32:35.361417+00:00",
+  "generated_at": "2026-07-20T11:04:17.732737+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -9389,7 +9389,7 @@
     "eligible_idea_count": 5,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-20T10:32:35.361417+00:00",
+    "generated_at": "2026-07-20T11:04:17.732737+00:00",
     "in_review_count": 0,
     "not_viewed_count": 5,
     "operator_action_commands_available_via_queue": true,
@@ -9493,7 +9493,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-20T10:32:35.361417+00:00",
+    "generated_at": "2026-07-20T11:04:17.732737+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -10049,7 +10049,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260720t081757299693z_58c38f4312b0",
-    "authority_checked_at": "2026-07-20T10:32:35.361417+00:00",
+    "authority_checked_at": "2026-07-20T11:04:17.732737+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -10372,6 +10372,227 @@
       "source": "final_publication_receipt_exact_binding"
     }
   ],
+  "protocol_v2_episode_coverage_frontier": {
+    "canonical_category_coverage_complete": false,
+    "contract_digest": "e4533786bcec79a36793f06720a3710a6e2dcc7b4ad860d349c7f37465b6d75e",
+    "cross_asset_independence_claim": false,
+    "episode_count": 3,
+    "episode_independence_status": "fixed_start_declustered_not_statistically_independent",
+    "matched_control_available": false,
+    "matured_episode_count": 2,
+    "minimum_sample_count": null,
+    "minimum_sample_policy_sealed": false,
+    "observed_primary_origin_count": 1,
+    "observed_route_count": 2,
+    "primary_origin_coverage": [
+      {
+        "aligned_episode_count": 1,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "observed",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 3,
+        "matured_episode_count": 2,
+        "name": "market_led",
+        "not_due_episode_count": 1,
+        "scoreable_directional_episode_count": 2
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "catalyst_led",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "technical_led",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "derivatives_led",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "onchain_led",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "fundamental_led",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "macro_led",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      }
+    ],
+    "primary_origin_population_count": 7,
+    "protocol_v2_annex_bound": false,
+    "protocol_v2_evidence_eligible": false,
+    "provider_calls": 0,
+    "repeat_member_count": 4,
+    "research_only": true,
+    "route_coverage": [
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "observed",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 2,
+        "matured_episode_count": 1,
+        "name": "dashboard_watch",
+        "not_due_episode_count": 1,
+        "scoreable_directional_episode_count": 1
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "actionable_watch",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "high_confidence_watch",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "rapid_market_anomaly",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "fade_exhaustion_review",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 1,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "observed",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 1,
+        "matured_episode_count": 1,
+        "name": "risk_watch",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 1
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "calendar_risk",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      },
+      {
+        "aligned_episode_count": 0,
+        "contract_excluded_episode_count": 0,
+        "coverage_status": "unobserved",
+        "due_missing_price_episode_count": 0,
+        "episode_count": 0,
+        "matured_episode_count": 0,
+        "name": "diagnostic",
+        "not_due_episode_count": 0,
+        "scoreable_directional_episode_count": 0
+      }
+    ],
+    "route_population_count": 8,
+    "routing_changes": 0,
+    "sample_sufficiency_evaluable": false,
+    "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
+    "schema_version": 1,
+    "score_changes": 0,
+    "source_scorecard_contract_digest": "1c20c5a0b8208fad4883b4dc5e2fdfd0b341276bfba7afb201e90e3b576bf118",
+    "source_scorecard_evaluated_at": "2026-07-20T11:04:17.732737+00:00",
+    "source_scorecard_input_binding_digest": "5015c15348037eb93d5a0e30a3616ed4b748f146ebca8410690a9c79a3d9ca84",
+    "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
+    "source_scorecard_schema_version": 1,
+    "statistical_independence_claim": false,
+    "status": "descriptive_incomplete",
+    "threshold_changes": 0,
+    "unobserved_primary_origin_names": [
+      "catalyst_led",
+      "technical_led",
+      "derivatives_led",
+      "onchain_led",
+      "fundamental_led",
+      "macro_led"
+    ],
+    "unobserved_route_names": [
+      "actionable_watch",
+      "high_confidence_watch",
+      "rapid_market_anomaly",
+      "fade_exhaustion_review",
+      "calendar_risk",
+      "diagnostic"
+    ],
+    "writes": 0,
+    "zero_episode_primary_origin_count": 6,
+    "zero_episode_route_count": 6
+  },
   "provider_failed_attempts": [
     {
       "artifact_namespace": "radar_market_no_send_20260718t002953190093z_d31fe5583f6d",
@@ -10574,7 +10795,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "06ff0cfd8530121d9414583636e43b6730000f30ae4382e9cb9f745b9b56d1ca",
+    "audit_digest": "c4df53f759bde60703221fd7c3e12d37f03ae32a8b53fe65c876802aadf6be03",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -10985,7 +11206,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "c3ffd54d38a49e190276e75a729c6f9f18c0a7bb8aaed58484ab086604048ba5",
+    "episode_contract_digest": "8b8e4f54a6407a694149a48b6598d8507b587a4d23ea0122b2f8a5fcc1f159d0",
     "episode_input_binding_digest": "ab6e897de16c57abb366c6aaab58ac80a25031aff9b48bbe08d498a3ff03a725",
     "episode_records_supplied": 7,
     "exact_outcome_join_count": 7,
@@ -11026,7 +11247,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "c3ffd54d38a49e190276e75a729c6f9f18c0a7bb8aaed58484ab086604048ba5",
+    "contract_digest": "8b8e4f54a6407a694149a48b6598d8507b587a4d23ea0122b2f8a5fcc1f159d0",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -11293,7 +11514,7 @@
         "window_end_exclusive_at": "2026-07-21T02:45:18.052686+00:00"
       }
     ],
-    "evaluated_at": "2026-07-20T10:32:35.361417+00:00",
+    "evaluated_at": "2026-07-20T11:04:17.732737+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

@@ -112,6 +112,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         *_shadow_surprise_audit_section(report),
         *_episode_shadow_lines_from_report(report),
         *_decision_episode_scorecard_section(report),
+        *_episode_coverage_frontier_section(report),
         "## Failed and blocked attempts",
         "",
     ])
@@ -631,6 +632,78 @@ def _decision_episode_scorecard_section(report: Mapping[str, Any]) -> list[str]:
             _mapping(report.get("decision_v2_episode_outcome_scorecard"))
         ),
         "",
+    ]
+
+
+def _episode_coverage_frontier_section(
+    report: Mapping[str, Any],
+) -> list[str]:
+    value = _mapping(report.get("protocol_v2_episode_coverage_frontier"))
+    route_rows = [
+        dict(row)
+        for row in value.get("route_coverage") or ()
+        if isinstance(row, Mapping)
+    ]
+    origin_rows = [
+        dict(row)
+        for row in value.get("primary_origin_coverage") or ()
+        if isinstance(row, Mapping)
+    ]
+    lines = [
+        "## Protocol-v2 episode coverage frontier",
+        "",
+        (
+            "This expands the frozen-episode scorecard across every canonical "
+            "Decision route and primary origin, including categories with zero "
+            "episodes. It is a descriptive coverage audit, not a sample-size "
+            "decision or an independence claim."
+        ),
+        f"- Status: `{_text(value.get('status'))}`",
+        f"- Frozen primary episodes: `{_int(value.get('episode_count'))}`",
+        f"- Matured episode outcomes: `{_int(value.get('matured_episode_count'))}`",
+        f"- Observed routes: `{_int(value.get('observed_route_count'))}`/"
+        f"`{_int(value.get('route_population_count'))}`",
+        f"- Zero-episode routes: `{_int(value.get('zero_episode_route_count'))}` "
+        f"(`{_joined(value.get('unobserved_route_names')) or 'none'}`)",
+        f"- Observed primary origins: "
+        f"`{_int(value.get('observed_primary_origin_count'))}`/"
+        f"`{_int(value.get('primary_origin_population_count'))}`",
+        f"- Zero-episode primary origins: "
+        f"`{_int(value.get('zero_episode_primary_origin_count'))}` "
+        f"(`{_joined(value.get('unobserved_primary_origin_names')) or 'none'}`)",
+        "- Minimum-sample policy sealed: `false`; sample sufficiency is not yet evaluable.",
+        "- Statistical and cross-asset independence claimed: `false`.",
+        "- Protocol-v2 evidence eligible: `false`.",
+        "",
+        "### Route coverage",
+        "",
+        "| Route | Coverage | Episodes | Matured | Due missing price | Not due | Excluded | Scoreable | Aligned |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    lines.extend(_episode_coverage_rows(route_rows))
+    lines.extend([
+        "",
+        "### Primary-origin coverage",
+        "",
+        "| Primary origin | Coverage | Episodes | Matured | Due missing price | Not due | Excluded | Scoreable | Aligned |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    ])
+    lines.extend(_episode_coverage_rows(origin_rows))
+    lines.append("")
+    return lines
+
+
+def _episode_coverage_rows(rows: list[dict[str, Any]]) -> list[str]:
+    return [
+        f"| {_md(row.get('name'))} | {_md(row.get('coverage_status'))} | "
+        f"{_int(row.get('episode_count'))} | "
+        f"{_int(row.get('matured_episode_count'))} | "
+        f"{_int(row.get('due_missing_price_episode_count'))} | "
+        f"{_int(row.get('not_due_episode_count'))} | "
+        f"{_int(row.get('contract_excluded_episode_count'))} | "
+        f"{_int(row.get('scoreable_directional_episode_count'))} | "
+        f"{_int(row.get('aligned_episode_count'))} |"
+        for row in rows
     ]
 
 

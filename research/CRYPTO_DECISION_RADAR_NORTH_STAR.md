@@ -787,6 +787,19 @@ The scorecard records zero provider calls, writes, routing, priority, Decision
 score, calibration, threshold, publication-authority, or automatic policy
 changes and inherits every Safety Invariant below.
 
+The closed `decision_radar.protocol_v2_episode_coverage_frontier` v1 expands
+that exact scorecard across all eight canonical Decision routes and all seven
+canonical primary origins. It names zero-episode categories explicitly and
+binds the scorecard schema, contract digest, input-binding digest, and
+evaluation clock; campaign reports and the dashboard copy this validated
+projection rather than recomputing cohorts. The current genuine campaign has
+three fixed-start episodes: two `dashboard_watch`, one `risk_watch`, and only
+the `market_led` primary origin. The other six routes and six origins are
+therefore visible evidence gaps, not healthy-empty or negative results. This
+frontier does not choose minimum samples, claim statistical or cross-asset
+independence, provide matched controls, bind the Protocol-v2 annex, or change
+routes, scores, thresholds, providers, artifacts, or policy.
+
 Prospective live/no-send observations now retain the exact point-in-time
 top-liquid universe membership, one-based volume rank, selected-set size,
 configured limit, and selection policy needed by a future Bybit intersection

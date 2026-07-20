@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Expose the complete episode taxonomy before choosing sample minimums
+**Status:** accepted as descriptive evidence accounting; policy remains unsealed
+**Decision:** Derive one closed Protocol-v2 episode coverage frontier from the
+validated frozen Decision-v2 episode scorecard. Include every canonical route
+and primary origin in canonical order, with explicit zero rows, and bind the
+projection to the scorecard schema, contract digest, input-binding digest, and
+evaluation time. Campaign reports and the read-only dashboard copy this value
+without re-evaluating cohorts and fail closed on source or count drift. Treat a
+zero row strictly as missing episode evidence. Do not infer minimum samples,
+sample sufficiency, statistical or cross-asset independence, matched controls,
+annex status, policy fitness, or route quality from this frontier, and do not
+change routing, scores, thresholds, providers, or authority.
+**Why:** Observed-only cohort tables made absent routes and origins easy to
+overlook. The current genuine campaign has only three fixed-start episodes in
+two routes and one primary origin; explicitly naming the other categories makes
+the collection gap actionable without pretending sparse dependent observations
+validate the engine.
+**Revisit when:** The Protocol-v2 annex has sealed episode definitions,
+partitions, untouched holdout, minimum samples, and dependency-aware analysis,
+and enough new genuine episodes exist to evaluate the predeclared requirements.
+
 ## 2026-07-20 - Replay current regime inputs without rewriting campaign evidence
 **Status:** accepted as operator diagnostic; no evidence or policy authority
 **Decision:** The campaign report may read the exact normalized market-source
