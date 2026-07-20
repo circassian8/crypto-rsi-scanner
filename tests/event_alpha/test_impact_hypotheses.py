@@ -978,6 +978,58 @@ def test_event_impact_path_rejects_malformed_numeric_evidence():
     assert valid_market.impact_path_strength == "strong"
 
 
+def test_hypothesis_promotion_diagnostics_reject_malformed_scores():
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+
+    def hypothesis(score, *, market_confirmation=40.0, stage="impact_path_validated"):
+        catalyst_link_only = stage == "catalyst_link_validated"
+        return event_impact_hypotheses.EventImpactHypothesis(
+            hypothesis_id="hyp:promotion-score",
+            event_cluster_id="cluster:promotion-score",
+            event_type="sports_event",
+            external_asset="World Cup",
+            impact_category="sports_fan_proxy",
+            candidate_sectors=("fan_tokens",),
+            candidate_symbols=("CHZ",),
+            candidate_coin_ids=("chiliz",),
+            crypto_candidate_assets=({"symbol": "CHZ", "coin_id": "chiliz"},),
+            validated_candidate_assets=({"symbol": "CHZ", "coin_id": "chiliz"},),
+            hypothesis_scope="token",
+            confidence=0.8,
+            hypothesis_score=score,
+            score_components={"market_confirmation": market_confirmation},
+            validation_stage=stage,
+            status="validated",
+            impact_path_reason="proxy_attention" if catalyst_link_only else "fan_token_event",
+            impact_path_type="proxy_attention" if catalyst_link_only else "fan_token_attention",
+            impact_path_strength="medium" if catalyst_link_only else "strong",
+            digest_eligible_by_impact_path=not catalyst_link_only,
+            opportunity_level="watchlist",
+        )
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = event_impact_hypotheses._with_promotion_diagnostics(hypothesis(malformed))
+        assert "score_below_promotion_threshold" in row.why_not_promoted
+
+    valid = event_impact_hypotheses._with_promotion_diagnostics(hypothesis(60.0))
+    assert valid.why_not_promoted == ()
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = event_impact_hypotheses._with_promotion_diagnostics(
+            hypothesis(
+                70.0,
+                market_confirmation=malformed,
+                stage="catalyst_link_validated",
+            )
+        )
+        assert "market_confirmation_missing" in row.why_not_promoted
+
+    observed = event_impact_hypotheses._with_promotion_diagnostics(
+        hypothesis(70.0, market_confirmation=40.0, stage="catalyst_link_validated")
+    )
+    assert "market_confirmation_missing" not in observed.why_not_promoted
+
+
 def test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths():
     # Validated hypotheses must persist the opportunity upgrade/downgrade
     # diagnostics on the row (and through the store), not only compute them

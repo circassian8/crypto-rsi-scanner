@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed in hypothesis promotion diagnostics · Codex
+**Why:** Direct float comparisons let NaN/infinite hypothesis or market scores
+skip the operator-facing threshold and missing-confirmation reasons, producing
+an empty `why_not_promoted` projection for malformed evidence.
+**Changes:** Routed the promotion threshold, score-below-threshold diagnostic,
+and catalyst-link market-confirmation diagnostic through the canonical finite,
+non-boolean 0–100 score boundary. Added public malformed-score and valid 60/40
+boundary controls. This changes explanation truth only; routing and scoring are
+unchanged.
+**Verify:** The new regression passed, followed by `51` focused impact-
+hypothesis, catalyst-frame, and discovery-pipeline tests.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Reject malformed candidate-asset confidence · Codex
 **Why:** Candidate discovery normalized an LLM mention with `confidence=NaN`
 to `1.0` and `identity_confidence=100`, allowing malformed advisory output to

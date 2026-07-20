@@ -184,7 +184,7 @@ def _with_promotion_diagnostics(
     if (
         hypothesis.status == HypothesisStatus.VALIDATED.value
         and hypothesis.validation_stage in _PROMOTABLE_VALIDATION_STAGES
-        and float(hypothesis.hypothesis_score or 0.0) >= 60.0
+        and _coerce_score(hypothesis.hypothesis_score) >= 60.0
         and (
             path_digest_eligible
             or path_strength == "strong"
@@ -208,7 +208,7 @@ def _with_promotion_diagnostics(
     if hypothesis.validation_stage in {
         ValidationStage.CATALYST_LINK_VALIDATED.value,
         ValidationStage.IDENTITY_VALIDATED.value,
-    } and float((hypothesis.score_components or {}).get("market_confirmation") or 0.0) < 40.0:
+    } and _coerce_score((hypothesis.score_components or {}).get("market_confirmation")) < 40.0:
         reasons.append("market_confirmation_missing")
     if (
         hypothesis.status == HypothesisStatus.VALIDATED.value
@@ -237,7 +237,7 @@ def _with_promotion_diagnostics(
         reasons.append("provider_backoff")
     if any("budget" in warning.casefold() for warning in warnings):
         reasons.append("llm_budget_exhausted")
-    if float(hypothesis.hypothesis_score or 0.0) < 60.0:
+    if _coerce_score(hypothesis.hypothesis_score) < 60.0:
         reasons.append("score_below_promotion_threshold")
     if hypothesis.rejection_reasons and not reasons:
         reasons.append("candidate_identity_not_validated")
