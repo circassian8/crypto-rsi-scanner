@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Revalidate Bybit identity at intraday publication · Codex
+**Why:** The live readiness boundary used the new canonical Bybit instrument
+parser, but immutable intraday publication still had an older private
+`str()`/`int()` reconstruction path. A jointly mutated summary/source capture
+could therefore cross that local parser before later projection checks.
+**Changes:** Intraday capture publication now delegates instrument parsing to
+the same exact execution-quality contract used by readiness and derivatives.
+A regression mutates both copies of the bound instrument rank to boolean and
+proves publication fails before writing. No capture schema, request budget,
+endpoint, score, threshold, route, or authorization changed.
+**Verify:** The focused publication regression passed, followed by the full
+`419`-test Bybit suite. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; provider budgets and artifact/security bounds remain enforced.
+
 ## 2026-07-20 — Fail closed on persisted Bybit instrument types · Codex
 **Why:** Intraday readiness reconstructed execution-capture instruments with
 `str()`/`int()` coercion. Reproduced booleans in canonical identity, liquidity

@@ -281,6 +281,18 @@ def test_source_instrument_and_capture_window_drift_fail_before_writes(
             responses=responses,
         )
 
+    malformed_instrument = deepcopy(summary)
+    malformed_instrument["eligible_instruments"][0]["liquidity_rank"] = True
+    malformed_instrument["source_execution_quality_capture"][
+        "eligible_instruments"
+    ][0]["liquidity_rank"] = True
+    with pytest.raises(BybitIntradayCaptureError, match="instrument_schema_invalid"):
+        persist_bybit_intraday_capture(
+            tmp_path,
+            summary=malformed_instrument,
+            responses=responses,
+        )
+
     future_source = deepcopy(summary)
     future_source["source_execution_quality_capture"]["completed_at"] = (
         "2026-07-17T12:31:00Z"

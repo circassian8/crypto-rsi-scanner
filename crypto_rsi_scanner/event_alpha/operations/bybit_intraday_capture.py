@@ -18,7 +18,9 @@ from .bybit_execution_quality import (
     MAX_RADAR_ASSETS,
     PUBLIC_API_BASE,
     BybitEligibleInstrument,
+    BybitExecutionQualityError,
     BybitPublicRequest,
+    bybit_eligible_instrument_from_values,
 )
 from .bybit_execution_quality_capture import BybitCapturedJSONResponse
 from .bybit_execution_quality_capture_errors import (
@@ -204,44 +206,9 @@ def _request_from_values(value: object) -> BybitPublicRequest:
 
 
 def _instrument_from_values(value: object) -> BybitEligibleInstrument:
-    if not isinstance(value, Mapping):
-        raise BybitIntradayCaptureError("eligible_instrument_schema_invalid")
-    expected = {
-        "base_asset", "canonical_asset_id", "contract_type", "delivery_time_ms",
-        "instrument_id", "launch_time_ms", "liquidity_rank",
-        "maximum_limit_order_quantity", "maximum_market_order_quantity",
-        "minimum_notional_value_usdt", "minimum_order_quantity", "quantity_step",
-        "quote_asset", "radar_symbol", "settle_asset", "status", "tick_size",
-    }
-    if set(value) != expected:
-        raise BybitIntradayCaptureError("eligible_instrument_schema_invalid")
     try:
-        return BybitEligibleInstrument(
-            canonical_asset_id=str(value["canonical_asset_id"]),
-            radar_symbol=str(value["radar_symbol"]),
-            liquidity_rank=int(value["liquidity_rank"]),
-            instrument_id=str(value["instrument_id"]),
-            base_asset=str(value["base_asset"]),
-            quote_asset=str(value["quote_asset"]),
-            settle_asset=str(value["settle_asset"]),
-            contract_type=str(value["contract_type"]),
-            status=str(value["status"]),
-            tick_size=str(value["tick_size"]),
-            quantity_step=str(value["quantity_step"]),
-            minimum_order_quantity=str(value["minimum_order_quantity"]),
-            maximum_limit_order_quantity=str(
-                value["maximum_limit_order_quantity"]
-            ),
-            maximum_market_order_quantity=str(
-                value["maximum_market_order_quantity"]
-            ),
-            minimum_notional_value_usdt=str(
-                value["minimum_notional_value_usdt"]
-            ),
-            launch_time_ms=int(value["launch_time_ms"]),
-            delivery_time_ms=int(value["delivery_time_ms"]),
-        )
-    except (KeyError, TypeError, ValueError) as exc:
+        return bybit_eligible_instrument_from_values(value)
+    except BybitExecutionQualityError as exc:
         raise BybitIntradayCaptureError("eligible_instrument_schema_invalid") from exc
 
 
