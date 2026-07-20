@@ -41,6 +41,13 @@ def build_parser() -> argparse.ArgumentParser:
             type=int,
             default=daily_operations_service.DEFAULT_INTERVAL_SECONDS,
         )
+        if name in {"readiness", "status"}:
+            command.add_argument(
+                "--output",
+                choices=("json", "summary"),
+                default="json",
+                help="emit the full compatibility JSON or a concise operator summary",
+            )
         if name == "cycle":
             command.add_argument("--dry-run", action="store_true")
         if name in {"install", "uninstall"}:
@@ -73,7 +80,12 @@ def run_cli(
             )
             payload["current_readiness"] = current.to_dict()
             payload.update(_current_report_values(current))
-            print(json.dumps(payload, indent=2, sort_keys=True))
+            _emit_readiness_output(
+                payload,
+                readiness=current,
+                command="status",
+                output=args.output,
+            )
             return 0
         if args.command == "readiness":
             result = _build_current_readiness(args, deps)
@@ -83,7 +95,12 @@ def run_cli(
             )
             payload = result.to_dict()
             payload.update(_current_report_values(result))
-            print(json.dumps(payload, indent=2, sort_keys=True))
+            _emit_readiness_output(
+                payload,
+                readiness=result,
+                command="readiness",
+                output=args.output,
+            )
             return 0
         if args.command == "cycle":
             result = daily_operations.run_daily_operations_cycle(
@@ -193,6 +210,113 @@ def _current_report_values(
         "expected_provider_activity",
     )
     return {field: current[field] for field in fields}
+
+
+def _emit_readiness_output(
+    payload: dict[str, object],
+    *,
+    readiness: daily_operations.DailyOperationsReadiness,
+    command: str,
+    output: str,
+) -> None:
+    if output == "json":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    print(_readiness_summary(payload, readiness=readiness, command=command))
+
+
+def _readiness_summary(
+    payload: dict[str, object],
+    *,
+    readiness: daily_operations.DailyOperationsReadiness,
+    command: str,
+) -> str:
+    """Render a bounded, credential-free operator view of readiness truth."""
+
+    market = readiness.market
+    dashboard = readiness.dashboard
+    scheduler = readiness.scheduler
+    lines: list[tuple[str, object]] = [
+        ("report", "decision_radar_daily_operations"),
+        ("command", command),
+        ("status", readiness.status),
+        ("reason", readiness.reason),
+        ("checked_at", readiness.checked_at),
+        ("proposed_namespace", readiness.artifact_namespace),
+        ("current_authorization", payload["current_authorization_status"]),
+        (
+            "current_provider_call_eligibility",
+            payload["current_provider_call_eligibility"],
+        ),
+        ("readiness_provider_calls", 0),
+        ("cycle_would_call_provider", market.will_call_provider),
+        ("cadence_status", market.cadence_status),
+        ("next_eligible_observation_at", market.next_eligible_observation_at),
+        ("baseline_status", market.baseline_status),
+        ("baseline_observations", market.baseline_observation_count),
+        (
+            "baseline_counted_observations",
+            market.baseline_counted_observation_count,
+        ),
+        (
+            "baseline_too_close_observations",
+            market.baseline_too_close_observation_count,
+        ),
+        (
+            "baseline_warm_assets",
+            f"{market.baseline_warm_asset_count}/{market.baseline_asset_count}",
+        ),
+        ("spread_data_status", market.spread_data_status),
+        ("calendar_snapshot_status", market.calendar_snapshot_status),
+        ("dashboard_owned", dashboard.owned),
+        ("scheduler_enabled", scheduler.enabled),
+        ("scheduler_loaded", scheduler.loaded),
+        ("scheduler_healthy", scheduler.healthy),
+        ("next_safe_command", market.next_safe_command),
+    ]
+    if command == "status":
+        state = payload.get("state")
+        closed_state = state if isinstance(state, dict) else {}
+        lines.extend(
+            (
+                ("cycle_rows_retained", payload.get("cycle_rows_retained")),
+                ("last_cycle_status", closed_state.get("last_cycle_status")),
+                ("last_cycle_reason", closed_state.get("last_cycle_reason")),
+                (
+                    "last_cycle_namespace",
+                    closed_state.get("last_cycle_namespace"),
+                ),
+                (
+                    "last_provider_attempt_status",
+                    closed_state.get("last_provider_attempt_status"),
+                ),
+                (
+                    "last_provider_attempted_at",
+                    closed_state.get("last_provider_attempted_at"),
+                ),
+            )
+        )
+    lines.extend(
+        (
+            ("status_receipt_refreshed", True),
+            ("no_send", True),
+            ("research_only", True),
+            (
+                "full_json_command",
+                f"make radar-daily-ops-{command} "
+                "RADAR_DAILY_OPS_OUTPUT=json PYTHON=.venv/bin/python",
+            ),
+        )
+    )
+    return "\n".join(f"{key}={_summary_value(value)}" for key, value in lines)
+
+
+def _summary_value(value: object) -> str:
+    if value is None:
+        return "unavailable"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value).replace("\r", " ").replace("\n", " ")
 
 
 __all__ = ("build_parser", "run_cli")

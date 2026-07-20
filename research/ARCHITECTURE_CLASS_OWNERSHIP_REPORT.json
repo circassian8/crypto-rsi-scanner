@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10902,
+  "function_count": 10925,
   "function_line_limit": 150,
   "functions_over_150_lines": 14,
   "functions_over_limit": [
@@ -1592,7 +1592,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 297,
+      "line_count": 310,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1624,7 +1624,7 @@
     },
     {
       "function_name": "build_campaign_report",
-      "line_count": 155,
+      "line_count": 160,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
       "public": true,
       "qualname": "build_campaign_report",
@@ -1648,7 +1648,7 @@
     }
   ],
   "functions_over_limit_count": 14,
-  "generated_at": "2026-07-20T10:33:00.053359+00:00",
+  "generated_at": "2026-07-20T11:49:37.072165+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3342,7 +3342,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 297,
+      "line_count": 310,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -3374,7 +3374,7 @@
     },
     {
       "function_name": "build_campaign_report",
-      "line_count": 155,
+      "line_count": 160,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
       "public": true,
       "qualname": "build_campaign_report",
@@ -3872,7 +3872,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1664,
+        "line_count": 1684,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
@@ -3977,13 +3977,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1276,
-        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
+        "line_count": 1283,
+        "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
         "threshold": 1200
       },
       {
-        "line_count": 1275,
-        "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
+        "line_count": 1276,
+        "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       },
       {
@@ -4039,7 +4039,7 @@
         "threshold": 1500
       },
       {
-        "line_count": 1664,
+        "line_count": 1684,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1500
       },

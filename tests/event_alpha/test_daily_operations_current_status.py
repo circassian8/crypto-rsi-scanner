@@ -124,3 +124,78 @@ def test_readiness_cli_persists_current_truth_without_provider_call(
     assert receipt["current_authorization_status"] == "not_authorized"
     assert receipt["provider_call_attempted"] is False
     assert "run" not in boundaries.events
+
+
+def test_readiness_cli_summary_is_concise_and_provider_safe(
+    tmp_path,
+    capsys,
+) -> None:
+    boundaries = _Boundaries(authorized=True, readiness_status="ready")
+
+    result = daily_operations_cli.run_cli(
+        [
+            "readiness",
+            "--artifact-base",
+            str(tmp_path),
+            "--top-n",
+            "30",
+            "--output",
+            "summary",
+        ],
+        dependencies=boundaries.dependencies(),
+    )
+    output = capsys.readouterr()
+
+    assert result == 0
+    assert output.err == ""
+    assert "report=decision_radar_daily_operations" in output.out
+    assert "command=readiness" in output.out
+    assert "current_authorization=authorized" in output.out
+    assert "current_provider_call_eligibility=eligible" in output.out
+    assert "readiness_provider_calls=0" in output.out
+    assert "status_receipt_refreshed=true" in output.out
+    assert "baseline_asset_readiness" not in output.out
+    assert "token" not in output.out.casefold()
+    assert "run" not in boundaries.events
+
+
+def test_status_cli_summary_preserves_latest_invocation_and_provider_attempt(
+    tmp_path,
+    capsys,
+) -> None:
+    boundaries = _Boundaries(authorized=False, readiness_status="blocked")
+    state = {
+        "last_cycle_status": "skipped",
+        "last_cycle_reason": "observation_cadence_waiting",
+        "last_cycle_namespace": "radar_market_no_send_previous",
+        "last_provider_attempt_status": "succeeded",
+        "last_provider_attempted_at": "2026-07-15T10:00:00+00:00",
+    }
+    (tmp_path / "event_radar_daily_operations_state.json").write_text(
+        json.dumps(state),
+        encoding="utf-8",
+    )
+
+    result = daily_operations_cli.run_cli(
+        [
+            "status",
+            "--artifact-base",
+            str(tmp_path),
+            "--top-n",
+            "30",
+            "--output",
+            "summary",
+        ],
+        dependencies=boundaries.dependencies(),
+    )
+    output = capsys.readouterr()
+
+    assert result == 0
+    assert output.err == ""
+    assert "command=status" in output.out
+    assert "last_cycle_status=skipped" in output.out
+    assert "last_cycle_reason=observation_cadence_waiting" in output.out
+    assert "last_provider_attempt_status=succeeded" in output.out
+    assert "last_provider_attempted_at=2026-07-15T10:00:00+00:00" in output.out
+    assert "readiness_provider_calls=0" in output.out
+    assert "run" not in boundaries.events

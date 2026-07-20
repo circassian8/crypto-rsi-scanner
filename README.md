@@ -33,6 +33,11 @@ make radar-daily-ops-status PYTHON=.venv/bin/python
 make radar-daily-ops-cycle PYTHON=.venv/bin/python
 ```
 
+The two observational commands default to a concise allowlisted operator
+summary. Use `RADAR_DAILY_OPS_OUTPUT=json` with either command for the unchanged
+full machine-readable payload. Both formats refresh the same status receipt and
+make zero provider calls.
+
 `make radar-market-no-send` remains only as a compatibility alias for the same
 Daily Operations cycle. The lower-level collection CLI cannot publish dashboard
 authority by itself.

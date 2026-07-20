@@ -1290,6 +1290,13 @@
       "requires_unique_successful_terminal_cycle_with_published_pointer_and_owned_restart": true
     },
     "maximum_market_provider_calls_per_eligible_cycle": 1,
+    "operator_output": {
+      "cli_default": "full_compatibility_json",
+      "make_default": "concise_allowlisted_summary",
+      "make_full_json_override": "RADAR_DAILY_OPS_OUTPUT=json",
+      "provider_calls_in_either_mode": 0,
+      "shared_evaluation_and_status_receipt": true
+    },
     "near_expiry_guidance": {
       "automatic_action": false,
       "install_command": "CONFIRM=1 make radar-daily-ops-install PYTHON=.venv/bin/python",

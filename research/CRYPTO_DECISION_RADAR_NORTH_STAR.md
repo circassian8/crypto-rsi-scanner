@@ -915,7 +915,10 @@ missing-action, and latency-cost rules.
 Daily Operations v1.1 is a local maintenance coordinator, not a trading system.
 It is implemented but remains disabled until the operator explicitly confirms
 LaunchAgent installation. Readiness/status perform no provider call and refresh
-only one bounded credential-free current-status receipt. A manual or scheduled
+only one bounded credential-free current-status receipt. Their Make surfaces
+default to a concise allowlisted operator summary; setting
+`RADAR_DAILY_OPS_OUTPUT=json` preserves the full machine-readable compatibility
+payload. Neither output mode changes provider eligibility or call behavior. A manual or scheduled
 cycle runs readiness before any possible provider call, respects the stable one-hour reservation,
 makes at most one bounded already-authorized CoinGecko no-send observation, and
 uses a new immutable namespace. It records attempted, skipped, blocked,

@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Make Daily Operations output operator-readable · Codex
+**Why:** Readiness and status were correct but printed the complete per-asset
+baseline object, burying authorization, cadence, and the next safe action in a
+large JSON document during routine manual operations.
+**Changes:** Added a concise, allowlisted readiness/status renderer covering
+current authorization, provider-call eligibility, cadence, baseline counts,
+spread/calendar availability, dashboard and scheduler truth, latest invocation,
+latest actual provider attempt, exact next action, receipt refresh, and safety
+state. The normal Make commands select that summary; the CLI default and
+`RADAR_DAILY_OPS_OUTPUT=json` retain the full compatibility JSON. Both formats
+use the same evaluation and persist the same bounded credential-free receipt.
+Updated the Make help, README, North Star Markdown/JSON, roadmap, and durable
+operator-output decision.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed. Focused
+Daily Operations current-status/service tests passed 22/22. The real
+`radar-daily-ops-readiness` and `radar-daily-ops-status` commands rendered the
+concise view with `readiness_provider_calls=0`; the JSON override parsed and
+reported `provider_call_attempted=false`. `radar-dashboard-readiness` remained
+READY for the exact revision-12 authority. Architecture cleanliness passed;
+the regenerated size/class reports remain advisory under the accepted size-limit
+policy. No sends, trades, orders, paper trades, RSI writes, or Event Alpha
+`TRIGGERED_FADE` were enabled.
+
 ## 2026-07-20 — Record the forty-fourth no-send market cycle · Codex
 **Why:** The persisted cadence became eligible while the existing CoinGecko
 authorization remained present. The campaign needed another honest observation

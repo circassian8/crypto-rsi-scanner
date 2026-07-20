@@ -111,6 +111,7 @@ RADAR_MARKET_NO_SEND_FETCH_ARG = $(if $(strip $(RADAR_MARKET_NO_SEND_FETCH_LIMIT
 RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
+RADAR_DAILY_OPS_OUTPUT ?= summary
 OFFICIAL_MACRO_OUTPUT_BASE ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/official_macro_calendar
 FED_FOMC_HTML ?=
 BLS_CALENDAR_ICS ?=
@@ -365,8 +366,8 @@ help:
 	@echo "  make radar-review-timing-queue  Discover receipt-backed ideas awaiting explicit human review; no provider call/write"
 	@echo "  CONFIRM=1 make radar-review-timing-view RADAR_REVIEW_NAMESPACE=... RADAR_REVIEW_IDEA_ID=...  Record first human view"
 	@echo "  CONFIRM=1 make radar-review-timing-complete RADAR_REVIEW_NAMESPACE=... RADAR_REVIEW_IDEA_ID=...  Record review completion"
-	@echo "  make radar-daily-ops-readiness     Check readiness and persist a bounded credential-free status receipt; no provider call"
-	@echo "  make radar-daily-ops-status        Read state and refresh the bounded credential-free status receipt; no provider call"
+	@echo "  make radar-daily-ops-readiness     Concise readiness + bounded credential-free status receipt; no provider call (RADAR_DAILY_OPS_OUTPUT=json for full JSON)"
+	@echo "  make radar-daily-ops-status        Concise state + bounded credential-free status receipt; no provider call (RADAR_DAILY_OPS_OUTPUT=json for full JSON)"
 	@echo "  make radar-daily-ops-dry-run       Exercise one automatic-cycle preflight with no writes or provider call"
 	@echo "  make radar-daily-ops-cycle         Run at most one authorized, cadence-eligible no-send observation"
 	@echo "  make radar-daily-ops-reconcile-publication  Seal proven current publication receipts; no call/restart"
@@ -1424,13 +1425,15 @@ radar-daily-ops-readiness:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_operations readiness \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG) \
-		--interval-seconds $(RADAR_DAILY_OPS_INTERVAL_SECONDS)
+		--interval-seconds $(RADAR_DAILY_OPS_INTERVAL_SECONDS) \
+		--output $(RADAR_DAILY_OPS_OUTPUT)
 
 radar-daily-ops-status:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_operations status \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 		--top-n $(RADAR_MARKET_NO_SEND_TOP_N) $(RADAR_MARKET_NO_SEND_FETCH_ARG) \
-		--interval-seconds $(RADAR_DAILY_OPS_INTERVAL_SECONDS)
+		--interval-seconds $(RADAR_DAILY_OPS_INTERVAL_SECONDS) \
+		--output $(RADAR_DAILY_OPS_OUTPUT)
 
 radar-daily-ops-reconcile-publication:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.daily_operations reconcile-publication \

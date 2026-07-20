@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T10:33:00.053359+00:00`
+- generated_at: `2026-07-20T11:49:37.072165+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `14`
@@ -317,10 +317,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_interval_scenario` | 204 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_latency` | `model_bybit_decision_price_latency_scenario` | 177 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 226 | true |
-| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 297 | true |
+| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 310 | true |
 | `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 168 | true |
 | `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 246 | false |
 | `crypto_rsi_scanner.event_alpha.operations.market_no_send_features` | `point_in_time_control_market_regime` | 163 | true |
-| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign` | `build_campaign_report` | 155 | true |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign` | `build_campaign_report` | 160 | true |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `build_campaign_shadow_surprise_audit` | 193 | true |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |

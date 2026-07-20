@@ -649,12 +649,19 @@ def test_make_targets_keep_install_confirmation_explicit() -> None:
         return result.stdout
 
     cycle = dry_run("radar-daily-ops-dry-run")
+    readiness = dry_run("radar-daily-ops-readiness")
+    readiness_json = dry_run(
+        "radar-daily-ops-readiness",
+        "RADAR_DAILY_OPS_OUTPUT=json",
+    )
     install_without = dry_run("radar-daily-ops-install")
     install_with = dry_run("radar-daily-ops-install", "CONFIRM=1")
     uninstall_with = dry_run("radar-daily-ops-uninstall", "CONFIRM=1")
 
     assert "daily_operations cycle" in cycle
     assert "--dry-run" in cycle
+    assert "--output summary" in readiness
+    assert "--output json" in readiness_json
     assert "--confirm" not in install_without
     assert install_with.count("--confirm") == 1
     assert uninstall_with.count("--confirm") == 1

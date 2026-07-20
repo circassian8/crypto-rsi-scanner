@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Keep Daily Operations JSON while making operator output concise
+**Status:** accepted
+**Decision:** Keep the Daily Operations CLI's default readiness/status output as
+the full compatibility JSON. The normal Make surfaces select a concise,
+allowlisted summary that exposes current authorization, call eligibility,
+cadence, baseline, dashboard/scheduler, source availability, latest invocation,
+latest actual provider attempt, exact next command, and safety state. Operators
+may set `RADAR_DAILY_OPS_OUTPUT=json` to recover the unchanged full payload.
+Both modes refresh the same bounded current-status receipt and make zero
+provider calls.
+**Why:** The complete readiness object contains large per-asset baseline detail
+that is valuable for machines but obscures the few facts needed for a safe
+manual decision. A separate rendering choice improves operator truth without
+forking evaluation or changing authorization.
+**Revisit when:** A versioned external consumer requires a different stable
+human-readable format or the compatibility JSON contract itself is revised.
+
 ## 2026-07-20 - Expose the complete episode taxonomy before choosing sample minimums
 **Status:** accepted as descriptive evidence accounting; policy remains unsealed
 **Decision:** Derive one closed Protocol-v2 episode coverage frontier from the
