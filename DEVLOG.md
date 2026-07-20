@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Normalize candidate-discovery score merging · Codex
+**Why:** Candidate-discovery attachment directly clamped a legacy hypothesis
+score and directly compared existing component values. Infinite scores could
+seed a false 100-point compatibility baseline, while NaN/non-finite candidate
+strength could survive beside a finite weighted result.
+**Changes:** Applied the canonical finite 0–100 score boundary before seeding
+legacy compatibility components and before merging candidate strength or
+rejection counts. Added a public candidate-discovery merge regression covering
+boolean/NaN/infinite inputs plus a valid finite control. Candidate suggestions
+remain non-validating, and the weighted score formula is unchanged.
+**Verify:** The new and adjacent end-to-end discovery tests passed, followed by
+`66` focused discovery, impact-hypothesis, catalyst-search, and Radar-pipeline
+tests. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Preserve canonical scores in hypothesis-family selection · Codex
 **Why:** Aggregation used truthiness for the final opportunity score, so an
 explicit final zero fell back to a higher legacy score. Comparisons against

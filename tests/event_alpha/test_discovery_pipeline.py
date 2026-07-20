@@ -642,6 +642,88 @@ def test_event_impact_candidate_discovery_suggests_then_requires_identity_valida
     assert validated.why_not_promoted == ()
 
 
+def test_candidate_discovery_merge_rejects_malformed_existing_scores():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="candidate-score-merge",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/candidate-score-merge",
+        title="VELVET opens a SpaceX crypto venue",
+        body="Velvet Capital offers SpaceX pre-IPO exposure.",
+        raw_json={
+            "asset": {
+                "name": "Velvet Capital",
+                "symbol": "VELVET",
+                "coin_id": "velvet",
+                "confidence": 0.9,
+            }
+        },
+        source_confidence=0.9,
+        content_hash="candidate-score-merge",
+    )
+
+    def attach(*, score, components):
+        hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+            hypothesis_id="hyp:candidate-score-merge",
+            event_cluster_id="cluster:candidate-score-merge",
+            event_type="ipo_proxy",
+            external_asset="SpaceX",
+            impact_category="rwa_preipo_proxy",
+            candidate_sectors=("tokenized_stock_venues",),
+            candidate_symbols=(),
+            confidence=0.4,
+            hypothesis_score=score,
+            score_components=components,
+            validation_stage="sector_hypothesis",
+            status="hypothesis",
+        )
+        query = SimpleNamespace(
+            anomaly_raw_id=hypothesis.hypothesis_id,
+            query="SpaceX crypto exposure",
+            query_type="candidate_discovery",
+        )
+        result = SimpleNamespace(
+            query=query,
+            raw_event=raw,
+            result_score=90,
+            result_score_reasons=("explicit_candidate_identity",),
+        )
+        search_result = SimpleNamespace(
+            result_events=(result,),
+            rejected_result_events=(),
+        )
+        return event_impact_hypotheses._apply_candidate_discovery_results(  # noqa: SLF001
+            (hypothesis,),
+            search_result,
+        )[0]
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = attach(score=malformed, components={})
+        assert row.score_components == {"candidate_asset_strength": 49.0}
+        assert row.hypothesis_score == 6.86
+        assert row.candidate_symbols == ("VELVET",)
+
+        existing = attach(
+            score=20.0,
+            components={"candidate_asset_strength": malformed},
+        )
+        assert existing.score_components["candidate_asset_strength"] == 49.0
+        assert existing.hypothesis_score == 6.86
+
+    valid = attach(score=50.0, components={})
+    assert valid.score_components["event_clarity"] == 50.0
+    assert valid.score_components["candidate_asset_strength"] == 49.0
+    assert valid.hypothesis_score == 35.86
+
+
 def test_event_discovery_asset_role_demotes_proxy_context_noise():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery

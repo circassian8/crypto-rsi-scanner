@@ -433,8 +433,8 @@ def _apply_candidate_discovery_results(
         crypto_assets = _merge_asset_rows(hypothesis.crypto_candidate_assets, accepted)
         symbols, coin_ids = _assets_from_asset_rows(crypto_assets)
         components = dict(hypothesis.score_components or {})
-        if not components and float(hypothesis.hypothesis_score or 0.0) > 0.0:
-            base = max(0.0, min(100.0, float(hypothesis.hypothesis_score or 0.0)))
+        base = _coerce_score(hypothesis.hypothesis_score)
+        if not components and base > 0.0:
             components.update({
                 "event_clarity": base,
                 "source_quality": base,
@@ -443,12 +443,12 @@ def _apply_candidate_discovery_results(
             })
         if accepted:
             components["candidate_asset_strength"] = max(
-                float(components.get("candidate_asset_strength") or 0.0),
+                _coerce_score(components.get("candidate_asset_strength")),
                 min(100.0, 35.0 + len(accepted) * 14.0),
             )
         if rejected:
             components["candidate_discovery_rejected"] = max(
-                float(components.get("candidate_discovery_rejected") or 0.0),
+                _coerce_score(components.get("candidate_discovery_rejected")),
                 float(len(rejected)),
             )
         score = _weighted_hypothesis_score(components, hypothesis.impact_category)
