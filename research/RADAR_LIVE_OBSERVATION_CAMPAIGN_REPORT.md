@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-20T09:38:57.992201+00:00` from local artifacts only.
+Generated at `2026-07-20T10:32:35.361417+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -20,7 +20,7 @@ Research and decision support only. This report contains no trade recommendation
 - Explicit first-view records: `0`
 - Completed human reviews: `0`
 - Ideas awaiting explicit review action: `5`
-- Provider failures: `12`
+- Provider failures: `13`
 - Preflight/blocked attempts: `1`
 - Event Alpha catalyst burn-in: `separate_not_aggregated`
 - Historical market-provenance v2 fields: `read_only_adapter`
@@ -111,6 +111,18 @@ Research and decision support only. This report contains no trade recommendation
 - Existing history cadence boundary: `2026-07-20T09:17:58.624044+00:00`
 - Eligibility basis: `same_asset_retained_history_before_future_observation`
 - Provider-call eligibility: `not inferred`; Daily Operations readiness remains authoritative.
+
+### Exact current control-regime input replay
+
+- Status: `incomplete`
+- Exact source binding: `true` (`event_market_no_send_market_rows.json`, SHA-256 `a698a3ca3feb0b4eefc6f4916a100001e6d3eece494dd96317b11564f156581b`)
+- Eligible causal 24-hour inputs: `28/30`
+- Missing current inputs: `2`
+- Read-only replay result: `unavailable` (`temporal_return_24h_incomplete`)
+  - `pump-fun (PUMP), rank 16`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
+  - `whitebit (WBT), rank 28`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
+- Retained history mutated by report: `false`; historical backfill: `false`.
+- Routing/policy/Protocol-v2 evidence eligibility: `false`; provider calls: `0`.
 
 Retained-history maturity and latest point-in-time feature availability are separate. Future-observation eligibility is conditional on the same canonical asset remaining in the next universe and does not claim unknown future membership or feature values are already observed. The table below measures only retained sample depth and elapsed coverage for the exact current asset set.
 
@@ -305,6 +317,7 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 | radar_market_no_send_20260720t014258693355z_872f6aefe7c7 | 2026-07-20T01:42:59.760808+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 | radar_market_no_send_20260720t061616599628z_a701f3ac24d3 | 2026-07-20T06:16:17.806575+00:00 | provider_unavailable | true | ClientConnectorDNSError |
 | radar_market_no_send_20260720t092712061292z_1df21f0b08e3 | 2026-07-20T09:27:13.404884+00:00 | provider_unavailable | true | ClientConnectorDNSError |
+| radar_market_no_send_20260720t102758318277z_6215f735b03e | 2026-07-20T10:27:59.695561+00:00 | provider_unavailable | true | TimeoutError |
 
 | Namespace | Observed at | Status | Provider attempted | Failure class |
 |---|---|---|---|---|
@@ -322,14 +335,14 @@ Only the frozen first member of each primary episode is evaluated; outcome matur
 
 ## Next observation
 
-- Next eligible time: `2026-07-20T10:27:13.404884+00:00`
+- Next eligible time: `2026-07-20T11:27:59.695561+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 43 counted real/no-send cycles and 7 canonical ideas; 2 outcomes are pending and 4 outcomes are matured. Provider history contains 12 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 30/36 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 39 bound generations and current authority is radar_market_no_send_20260720t081757299693z_58c38f4312b0. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 43 counted real/no-send cycles and 7 canonical ideas; 2 outcomes are pending and 4 outcomes are matured. Provider history contains 13 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 30/36 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 39 bound generations and current authority is radar_market_no_send_20260720t081757299693z_58c38f4312b0. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.

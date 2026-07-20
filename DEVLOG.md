@@ -17,6 +17,51 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Explain exact current regime-input gaps without backfill · Codex
+**Why:** Persistent campaign truth correctly showed zero historical market-regime
+coverage, but it did not explain that the exact current authority already had 28
+of 30 required causal inputs. Operators needed the concrete missing rows without
+turning a read-only replay into historical evidence or Decision policy.
+**Changes:**
+- Added a read-once normalized market-source snapshot bound to the current
+  generation's immutable manifest digest, row count, namespace, run, revision,
+  and operator digest. Only the currently authoritative generation receives the
+  replay; non-current generations retain `null`.
+- Added a closed diagnostic around the existing control-regime evaluator. It
+  reports eligible/missing inputs and bounded asset/symbol/rank/reason records,
+  while preserving zero provider calls, writes, history mutation, backfill,
+  routing, Decision-policy, and Protocol-v2 authority.
+- The canonical campaign report now proves `28/30` exact inputs and identifies
+  `pump-fun` / PUMP rank 16 and `whitebit` / WBT rank 28 as missing the causal
+  24-hour value, percent-point unit, and closed evidence reference. Historical
+  coverage remains separately and honestly `0/1,260`.
+- Projected the validated diagnostic through the bounded dashboard campaign
+  loader and Today baseline explanation. Tampered source, pointer, operator,
+  count, schema, or policy flags fail closed. Updated the North Star, Protocol-v2
+  current-progress note, roadmap, durable decision, campaign report, and
+  advisory architecture telemetry. Quantitative source-size measurements remain
+  advisory per the owner's instruction; security/artifact bounds and behavioral
+  architecture gates remain enforced.
+- At 10:27 UTC, made exactly one cadence-eligible already-authorized CoinGecko
+  no-send request outside the restricted network sandbox. It timed out after
+  8,692 ms without an HTTP status or retry. The non-authoritative terminal
+  namespace is `radar_market_no_send_20260720t102758318277z_6215f735b03e`;
+  provider failures are now 13, the prior revision-12 authority is unchanged,
+  and the next boundary is `2026-07-20T11:27:59.695561+00:00`.
+**Verify:** Compileall passed. Focused regime/campaign/dashboard tests passed
+`55/55`; the broader dashboard and campaign suite passed `470` sandbox-safe
+tests, and its sole loopback socket test passed separately outside the restricted
+sandbox (`1 passed`). Campaign report, dashboard readiness, dashboard smoke,
+dashboard UX smoke, architecture cleanliness, North Star JSON parsing,
+Protocol-v2 progress check, and `git diff --check` passed. Full `verify-fast`
+was not repeated because the immediately preceding logical change passed all
+`3,577` package tests and this
+change exercised every touched model/report/dashboard boundary with the broader
+targeted suite.
+**Notes/risks:** A successful complete post-collector market cycle is still
+required before genuine regime coverage can advance. No send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Collect causal market regime prospectively for future controls · Codex
 **Why:** The matched-control contract named market regime as a required
 point-in-time field, but the live campaign did not retain one and reconstructing

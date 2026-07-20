@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Replay current regime inputs without rewriting campaign evidence
+**Status:** accepted as operator diagnostic; no evidence or policy authority
+**Decision:** The campaign report may read the exact normalized market-source
+artifact for the one currently authoritative generation, but only after its
+bytes, row count, namespace, run, revision, and operator digest reconcile with
+the immutable manifest and current pointer. Re-run the closed control-regime
+projection read-only and expose eligible/missing input counts plus bounded
+canonical asset, symbol, rank, and field-level failure reasons. Keep historical
+coverage derived solely from retained history. The replay must not write or
+backfill history, call a provider, create a regime when the closed projection is
+unavailable, feed Decision routing, select controls, assign a partition, or
+grant Protocol-v2 evidence eligibility. Non-current generations do not carry a
+current-authority replay.
+**Why:** A historical coverage count of zero was correct but insufficiently
+actionable: the exact current generation already had 28 of 30 causal 24-hour
+inputs, with PUMP and WBT missing the value, unit, and evidence reference. A
+source-bound diagnostic explains that concrete gap without silently converting
+replay into persisted evidence.
+**Revisit when:** The current campaign-report contract is versioned again, or a
+sealed Protocol-v2 annex explicitly authorizes a separately validated use of
+persisted regime evidence.
+
 ## 2026-07-20 - Retain a causal control-only market regime without exposing it to Decision policy
 **Status:** accepted as prospective measurement; matched-control policy remains unsealed
 **Decision:** After a successful live/no-send history enrichment, derive one

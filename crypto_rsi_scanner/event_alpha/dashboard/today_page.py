@@ -569,6 +569,7 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
     missing_summary = ", ".join(str(value) for value in missing_ids[:5])
     if len(missing_ids) > 5:
         missing_summary += f", +{len(missing_ids) - 5} more"
+    regime_input_detail = _control_regime_input_detail(baseline)
     return (
         "Current exact-generation row readiness: "
         + " · ".join(exact_status_parts)
@@ -579,8 +580,66 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
         + (f"Missing/unassessed current assets: {missing_summary}. " if missing_summary else "")
         + "Conditional retained-history maturity by feature family: "
         + " · ".join(summaries)
-        + ". This does not claim unknown future membership or feature values are already "
+        + ". "
+        + regime_input_detail
+        + "This does not claim unknown future membership or feature values are already "
         "observed, and it is not provider-call eligibility."
+    )
+
+
+def _control_regime_input_detail(baseline: Mapping[str, Any]) -> str:
+    value = baseline.get("control_market_regime_input")
+    if not isinstance(value, Mapping):
+        return ""
+    expected = _non_negative_int(value.get("universe_expected_count"))
+    eligible = _non_negative_int(value.get("eligible_input_count"))
+    missing_count = _non_negative_int(value.get("missing_input_count"))
+    missing = value.get("missing_inputs")
+    if (
+        expected is None
+        or eligible is None
+        or missing_count is None
+        or eligible + missing_count != expected
+        or not isinstance(missing, (list, tuple))
+        or len(missing) != missing_count
+    ):
+        return ""
+    records: list[str] = []
+    labels = {
+        "market_history_not_counted": "not baseline-counted",
+        "observation_identity_missing": "observation ID missing",
+        "canonical_asset_identity_missing": "canonical identity missing",
+        "temporal_return_value_missing_or_invalid": "24h return unavailable",
+        "temporal_return_unit_invalid": "24h unit unavailable",
+        "temporal_return_evidence_invalid": "24h evidence unavailable",
+    }
+    for raw in missing:
+        if not isinstance(raw, Mapping):
+            return ""
+        asset_id = str(raw.get("canonical_asset_id") or "").strip()
+        symbol = str(raw.get("symbol") or "").strip()
+        rank = raw.get("point_in_time_volume_rank")
+        reasons = raw.get("reasons")
+        if not asset_id or not isinstance(reasons, (list, tuple)) or not reasons:
+            return ""
+        identity = asset_id + (f" ({symbol})" if symbol else "")
+        if type(rank) is int:
+            identity += f", rank {rank}"
+        records.append(
+            identity
+            + ": "
+            + ", ".join(labels.get(str(reason), str(reason)) for reason in reasons)
+        )
+    replay = str(value.get("replay_regime") or value.get("replay_reason") or "unavailable")
+    missing_text = (
+        " Missing inputs: " + "; ".join(records) + "."
+        if records
+        else ""
+    )
+    return (
+        f"Exact current control-regime replay: {eligible}/{expected} eligible causal "
+        f"24-hour inputs; result {replay}.{missing_text} The read-only report does not "
+        "backfill history or feed routing. "
     )
 
 

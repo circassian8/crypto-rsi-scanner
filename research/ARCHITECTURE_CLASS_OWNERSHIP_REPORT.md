@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T09:50:16.082514+00:00`
+- generated_at: `2026-07-20T10:33:00.053359+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `14`
@@ -44,8 +44,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 32 | advisory |
-| `production_files_over_1500_lines` | 2 | advisory |
+| `production_files_over_1200_lines` | 33 | advisory |
+| `production_files_over_1500_lines` | 3 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
 | `functions_over_150_lines` | 14 | advisory |
@@ -94,10 +94,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1476 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/config.py` | 1450 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py` | 1440 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1410 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1402 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |

@@ -802,10 +802,15 @@ percent-point `temporal_return_24h` evidence. BTC and the universe median both
 positive produce `risk_on`, both negative produce `risk_off`, and disagreement
 or a zero produces `mixed`. The exact input observation set is digest-bound and
 the result is copied only to those retained-history rows; it is not exposed to
-Decision evaluation. Campaign readiness reports exact coverage but performs no
-selection, outcome read, partition assignment, backfill, or policy change. It
-remains partial until a successful qualifying cycle has persisted that context
-and a pre-holdout Protocol-v2 partition is present.
+Decision evaluation. The campaign report separately replays the exact current
+authority's manifest-bound normalized market-source bytes and reports eligible
+versus missing inputs, canonical asset/symbol/rank, and field-level failure
+reasons. This replay is diagnostic only: it does not mutate retained history,
+backfill an unavailable regime, call a provider, or feed routing or policy.
+Campaign readiness reports exact historical coverage but performs no selection,
+outcome read, partition assignment, backfill, or policy change. It remains
+partial until a successful qualifying cycle has persisted that context and a
+pre-holdout Protocol-v2 partition is present.
 
 A fixture or mocked smoke generation can prove mechanics but is permanently
 ineligible for Decision campaign counting or real dashboard authority. The fixed

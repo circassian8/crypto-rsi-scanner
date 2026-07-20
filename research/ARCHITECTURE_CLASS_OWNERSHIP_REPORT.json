@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10892,
+  "function_count": 10902,
   "function_line_limit": 150,
   "functions_over_150_lines": 14,
   "functions_over_limit": [
@@ -1648,7 +1648,7 @@
     }
   ],
   "functions_over_limit_count": 14,
-  "generated_at": "2026-07-20T09:50:16.082514+00:00",
+  "generated_at": "2026-07-20T10:33:00.053359+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3123,13 +3123,6 @@
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1476,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
       "line_count": 1466,
       "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3146,6 +3139,13 @@
     {
       "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1440,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -3857,8 +3857,8 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 32,
-      "production_files_over_1500_lines": 2,
+      "production_files_over_1200_lines": 33,
+      "production_files_over_1500_lines": 3,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
       "shim_removal_blockers": 0
@@ -3869,6 +3869,11 @@
       {
         "line_count": 1767,
         "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1664,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
@@ -3892,11 +3897,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1476,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1466,
         "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
@@ -3909,6 +3909,11 @@
       {
         "line_count": 1449,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1440,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1200
       },
       {
@@ -4034,6 +4039,11 @@
         "threshold": 1500
       },
       {
+        "line_count": 1664,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "threshold": 1500
+      },
+      {
         "line_count": 1633,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1500
@@ -4065,8 +4075,8 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 32,
-    "production_files_over_1500_lines": 2,
+    "production_files_over_1200_lines": 33,
+    "production_files_over_1500_lines": 3,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,
     "shim_removal_blockers": 0

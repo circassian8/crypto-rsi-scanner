@@ -26,13 +26,29 @@ def write_countable_generation(
     proxy_feature_count: int = 0,
     core_rows: Sequence[Mapping[str, Any]] = (),
     integrated_outcome_rows: Sequence[Mapping[str, Any]] = (),
+    market_rows: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[Path, dict[str, Any], list[dict[str, Any]]]:
     directory = base / namespace
     directory.mkdir(parents=True, exist_ok=True)
     profile = "no_key_live"
     run_id = f"{observed_at}|{profile}"
     run_mode = "burn_in" if legacy else "operational"
-    selected_count = max(1, len(candidates))
+    source_rows = (
+        [dict(row) for row in market_rows]
+        if market_rows is not None
+        else [
+            {
+                "coin_id": f"fixture-{index}",
+                "symbol": f"F{index}",
+                "observed_at": observed_at,
+                "research_only": True,
+            }
+            for index in range(max(1, len(candidates)))
+        ]
+    )
+    if not source_rows:
+        raise ValueError("countable generation requires at least one market row")
+    selected_count = len(source_rows)
     raw_count = selected_count
     campaign = {} if legacy else {
         "measurement_program": DECISION_RADAR_MEASUREMENT_PROGRAM,
@@ -74,15 +90,7 @@ def write_countable_generation(
     market_no_send_io.write_json_atomic(source_path, {
         **common,
         "row_type": "event_market_no_send_source_cache",
-        "rows": [
-            {
-                "coin_id": f"fixture-{index}",
-                "symbol": f"F{index}",
-                "observed_at": observed_at,
-                "research_only": True,
-            }
-            for index in range(selected_count)
-        ],
+        "rows": source_rows,
     })
     source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
     ledger_path = directory / "event_market_no_send_request_ledger.json"

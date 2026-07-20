@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import json
 from pathlib import Path
 
@@ -12,12 +13,84 @@ from crypto_rsi_scanner.event_alpha.dashboard.operator_work_queue import (
     render_operator_work_queue,
 )
 from crypto_rsi_scanner.event_alpha.dashboard.system_pages import render_health_page
-from crypto_rsi_scanner.event_alpha.dashboard.today_page import render_today_page
+from crypto_rsi_scanner.event_alpha.dashboard.today_page import (
+    _control_regime_input_detail,
+    render_today_page,
+)
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 from tests.event_alpha.test_dashboard_system_pages_v1 import _snapshot
 
 
 _GENERATED_AT = "2026-07-18T20:43:03.720770+00:00"
 _ASSET_IDS = tuple(f"asset-{index:02d}" for index in range(30))
+
+
+def _current_regime_input() -> dict[str, object]:
+    rows = []
+    for rank in range(1, 31):
+        observation_id = f"regime-current-{rank}"
+        anchor_id = f"regime-anchor-{rank}"
+        rows.append({
+            "canonical_asset_id": "bitcoin" if rank == 1 else f"asset-{rank:02d}",
+            "symbol": "BTC" if rank == 1 else f"A{rank:02d}",
+            "observed_at": _GENERATED_AT,
+            "point_in_time_universe_member": True,
+            "point_in_time_volume_rank": rank,
+            "point_in_time_universe_size": 30,
+            "point_in_time_universe_limit": 30,
+            "point_in_time_universe_policy": "bounded_top_liquid_by_total_volume",
+            "market_history": {
+                "baseline_counted": True,
+                "observation_id": observation_id,
+            },
+            "temporal_return_24h": rank / 100.0,
+            "return_units": {"temporal_return_24h": "percent_points"},
+            "market_feature_evidence": {
+                "temporal_return_24h": {
+                    "basis": "temporal_baseline",
+                    "status": "ready",
+                    "calculation": "price_horizon_return",
+                    "sample_count": 1,
+                    "current_observation_id": observation_id,
+                    "baseline_first_observation_id": anchor_id,
+                    "baseline_last_observation_id": anchor_id,
+                    "baseline_input_observation_count": 1,
+                    "baseline_observation_ids_sha256": hashlib.sha256(
+                        json.dumps([anchor_id], separators=(",", ":")).encode()
+                    ).hexdigest(),
+                    "providers": ["coingecko"],
+                    "data_modes": ["live"],
+                    "research_only": True,
+                }
+            },
+        })
+    diagnostic = (
+        market_no_send_features
+        .point_in_time_control_market_regime_input_diagnostic(rows)
+    )
+    return {
+        "schema_id": "decision_radar.current_authority_control_market_regime_input",
+        "schema_version": 1,
+        "status": "ready",
+        "artifact_namespace": "radar_market_no_send_current",
+        "run_id": "2026-07-14T10:00:00+00:00|no_key_live",
+        "revision": 7,
+        "operator_state_sha256": "c" * 64,
+        "source_artifact": "event_market_no_send_market_rows.json",
+        "source_artifact_sha256": "d" * 64,
+        "source_artifact_size_bytes": 1_024,
+        "source_row_count": 30,
+        "source_binding_source": "manifest_request_cache_sha256",
+        "source_snapshot_verified": True,
+        "diagnostic": diagnostic,
+        "current_authority_only": True,
+        "report_replay_only": True,
+        "retained_history_mutated": False,
+        "historical_context_backfilled": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
 
 
 def _campaign_report() -> dict[str, object]:
@@ -60,6 +133,9 @@ def _campaign_report() -> dict[str, object]:
                     "baseline_status_counts": {"warming": 30},
                 },
                 "publication": {"currently_authoritative": True},
+                "current_authority_control_market_regime_input": (
+                    _current_regime_input()
+                ),
             }
         ],
         "baseline_maturity": {
@@ -289,6 +365,7 @@ def _load(root: Path) -> dict[str, object]:
         artifact_namespace="radar_market_no_send_current",
         run_id="2026-07-14T10:00:00+00:00|no_key_live",
         revision=7,
+        operator_state_sha256="c" * 64,
         current_market_observations=tuple(
             {"temporal_baseline_status": "warming"} for _index in range(30)
         ),
@@ -325,6 +402,13 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert result["temporal_baseline"]["current_exact_generation_status_counts"] == {
         "warming": 30
     }
+    regime_input = result["temporal_baseline"]["control_market_regime_input"]
+    assert regime_input["status"] == "ready"
+    assert regime_input["eligible_input_count"] == 30
+    assert regime_input["missing_input_count"] == 0
+    assert regime_input["replay_regime"] == "risk_on"
+    assert regime_input["source_snapshot_verified"] is True
+    assert regime_input["provider_calls"] == regime_input["writes"] == 0
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
     ] == 0
@@ -343,6 +427,49 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
         "coverage_deficit_seconds": 43_450,
     }
     assert "/private/" not in repr(result)
+
+
+def test_today_detail_names_exact_current_regime_input_gaps() -> None:
+    value = {
+        "status": "incomplete",
+        "universe_expected_count": 30,
+        "eligible_input_count": 28,
+        "missing_input_count": 2,
+        "missing_inputs": [
+            {
+                "canonical_asset_id": "pump-fun",
+                "symbol": "PUMP",
+                "point_in_time_volume_rank": 16,
+                "reasons": [
+                    "temporal_return_value_missing_or_invalid",
+                    "temporal_return_unit_invalid",
+                    "temporal_return_evidence_invalid",
+                ],
+            },
+            {
+                "canonical_asset_id": "whitebit",
+                "symbol": "WBT",
+                "point_in_time_volume_rank": 28,
+                "reasons": [
+                    "temporal_return_value_missing_or_invalid",
+                    "temporal_return_unit_invalid",
+                    "temporal_return_evidence_invalid",
+                ],
+            },
+        ],
+        "replay_status": "unavailable",
+        "replay_reason": "temporal_return_24h_incomplete",
+        "replay_regime": None,
+    }
+
+    detail = _control_regime_input_detail({
+        "control_market_regime_input": value,
+    })
+
+    assert "28/30 eligible causal 24-hour inputs" in detail
+    assert "pump-fun (PUMP), rank 16" in detail
+    assert "whitebit (WBT), rank 28" in detail
+    assert "does not backfill history or feed routing" in detail
 
 
 def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
@@ -423,6 +550,20 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
         "baseline_status_counts"
     ] = {"warm": 30}
     _write_report(tmp_path, exact_status_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    regime_binding_drift = _campaign_report()
+    regime_binding_drift["authoritative_generations"][0][
+        "current_authority_control_market_regime_input"
+    ]["source_artifact_sha256"] = "unbound"
+    _write_report(tmp_path, regime_binding_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    regime_policy_drift = _campaign_report()
+    regime_policy_drift["authoritative_generations"][0][
+        "current_authority_control_market_regime_input"
+    ]["diagnostic"]["routing_eligible"] = True
+    _write_report(tmp_path, regime_policy_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
 

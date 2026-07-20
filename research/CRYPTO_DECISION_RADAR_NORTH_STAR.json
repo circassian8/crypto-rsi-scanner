@@ -332,6 +332,18 @@
           "schema_version": 1,
           "selection_uses_outcomes": false
         },
+        "current_authority_market_regime_input_diagnostic": {
+          "current_authority_only": true,
+          "historical_context_backfilled": false,
+          "manifest_request_cache_digest_bound": true,
+          "missing_asset_identity_and_rank_retained": true,
+          "provider_calls": 0,
+          "report_replay_only": true,
+          "retained_history_mutated": false,
+          "routing_eligible": false,
+          "schema_id": "decision_radar.current_authority_control_market_regime_input",
+          "schema_version": 1
+        },
         "point_in_time_universe_fields": [
           "point_in_time_universe_member",
           "point_in_time_volume_rank",

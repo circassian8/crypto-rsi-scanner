@@ -18,6 +18,7 @@ import re
 from typing import Any
 
 from ..artifacts.json_lines import loads_no_duplicate_keys
+from ..operations import market_no_send_features
 from .secure_reader import _DashboardNamespaceReadError, open_anchored_namespace
 
 
@@ -70,6 +71,17 @@ _ZERO_QUEUE_SAFETY = (
     "telegram_sends",
     "trades",
 )
+_CURRENT_REGIME_INPUT_SCHEMA = (
+    "decision_radar.current_authority_control_market_regime_input"
+)
+_CURRENT_REGIME_INPUT_KEYS = {
+    "schema_id", "schema_version", "status", "artifact_namespace", "run_id",
+    "revision", "operator_state_sha256", "source_artifact",
+    "source_artifact_sha256", "source_artifact_size_bytes", "source_row_count",
+    "source_binding_source", "source_snapshot_verified", "diagnostic",
+    "current_authority_only", "report_replay_only", "retained_history_mutated",
+    "historical_context_backfilled", "provider_calls", "writes", "research_only",
+}
 
 
 def load_campaign_operator_actions(
@@ -79,6 +91,7 @@ def load_campaign_operator_actions(
     run_id: str,
     revision: int,
     current_market_observations: Sequence[Mapping[str, Any]],
+    operator_state_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Load one safe campaign-action projection without calls or writes."""
 
@@ -109,6 +122,7 @@ def load_campaign_operator_actions(
             run_id=run_id,
             revision=revision,
             current_market_observations=current_market_observations,
+            operator_state_sha256=operator_state_sha256,
         )
     except (KeyError, TypeError, UnicodeError, ValueError):
         return _unavailable("campaign_report_contract_invalid")
@@ -132,6 +146,7 @@ def _project_campaign_actions(
     run_id: str,
     revision: int,
     current_market_observations: Sequence[Mapping[str, Any]],
+    operator_state_sha256: str | None,
 ) -> dict[str, Any]:
     if (
         report.get("schema_id") != _REPORT_SCHEMA
@@ -180,6 +195,16 @@ def _project_campaign_actions(
         report.get("baseline_maturity"),
         current_exact_status_counts=current_exact_status_counts,
     )
+    current_regime_input = _project_current_control_regime_input(
+        report.get("authoritative_generations"),
+        artifact_namespace=artifact_namespace,
+        run_id=run_id,
+        revision=revision,
+        operator_state_sha256=operator_state_sha256,
+        expected_source_row_count=sum(current_exact_status_counts.values()),
+    )
+    if current_regime_input is not None:
+        temporal_baseline["control_market_regime_input"] = current_regime_input
     if metrics["review_timing_action_required"] != review["action_required_count"]:
         raise ValueError("campaign_report_review_count_mismatch")
     if metrics["matured_outcomes"] != outcomes["matured_count"]:
@@ -277,6 +302,96 @@ def _project_current_exact_baseline_counts(
     if not loaded or projected != loaded:
         raise ValueError("campaign_current_generation_baseline_counts_mismatch")
     return projected
+
+
+def _project_current_control_regime_input(
+    value: Any,
+    *,
+    artifact_namespace: str,
+    run_id: str,
+    revision: int,
+    operator_state_sha256: str | None,
+    expected_source_row_count: int,
+) -> dict[str, Any] | None:
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError("campaign_authoritative_generations_invalid")
+    matches = [
+        _mapping(raw, "authoritative_generation")
+        for raw in value
+        if isinstance(raw, Mapping)
+        and _mapping(raw.get("publication"), "generation_publication").get(
+            "currently_authoritative"
+        ) is True
+    ]
+    if len(matches) != 1:
+        raise ValueError("campaign_current_generation_count_invalid")
+    raw = matches[0].get("current_authority_control_market_regime_input")
+    if raw in (None, {}):
+        return None
+    projected = _mapping(raw, "current_control_market_regime_input")
+    if set(projected) != _CURRENT_REGIME_INPUT_KEYS or any((
+        projected.get("schema_id") != _CURRENT_REGIME_INPUT_SCHEMA,
+        projected.get("schema_version") != 1,
+        projected.get("status") not in {"ready", "incomplete", "unavailable"},
+        projected.get("artifact_namespace") != artifact_namespace,
+        projected.get("run_id") != run_id,
+        projected.get("revision") != revision,
+        projected.get("source_artifact")
+        != "event_market_no_send_market_rows.json",
+        projected.get("source_binding_source")
+        != "manifest_request_cache_sha256",
+        projected.get("source_snapshot_verified") is not True,
+        projected.get("current_authority_only") is not True,
+        projected.get("report_replay_only") is not True,
+        projected.get("retained_history_mutated") is not False,
+        projected.get("historical_context_backfilled") is not False,
+        projected.get("provider_calls") != 0,
+        projected.get("writes") != 0,
+        projected.get("research_only") is not True,
+    )):
+        raise ValueError("campaign_current_regime_input_invalid")
+    if operator_state_sha256 is not None and (
+        projected.get("operator_state_sha256") != operator_state_sha256
+    ):
+        raise ValueError("campaign_current_regime_operator_binding_mismatch")
+    digest = projected.get("source_artifact_sha256")
+    operator_digest = projected.get("operator_state_sha256")
+    source_size = projected.get("source_artifact_size_bytes")
+    source_rows = projected.get("source_row_count")
+    diagnostic = projected.get("diagnostic")
+    if not (
+        isinstance(digest, str)
+        and re.fullmatch(r"[0-9a-f]{64}", digest)
+        and isinstance(operator_digest, str)
+        and re.fullmatch(r"[0-9a-f]{64}", operator_digest)
+        and type(source_size) is int
+        and source_size > 0
+        and type(source_rows) is int
+        and source_rows >= 0
+        and source_rows == expected_source_row_count
+        and market_no_send_features.control_market_regime_input_diagnostic_valid(
+            diagnostic
+        )
+        and diagnostic.get("universe_row_count") == source_rows
+        and diagnostic.get("status") == projected.get("status")
+    ):
+        raise ValueError("campaign_current_regime_input_diagnostic_invalid")
+    return {
+        "status": projected["status"],
+        "source_artifact": projected["source_artifact"],
+        "source_artifact_sha256": digest,
+        "source_snapshot_verified": True,
+        "universe_expected_count": diagnostic["universe_expected_count"],
+        "eligible_input_count": diagnostic["eligible_input_count"],
+        "missing_input_count": diagnostic["missing_input_count"],
+        "missing_inputs": [dict(row) for row in diagnostic["missing_inputs"]],
+        "replay_status": diagnostic["replayed_control_market_regime"]["status"],
+        "replay_reason": diagnostic["replayed_control_market_regime"]["reason"],
+        "replay_regime": diagnostic["replayed_control_market_regime"]["regime"],
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
 
 
 def _project_temporal_baseline(

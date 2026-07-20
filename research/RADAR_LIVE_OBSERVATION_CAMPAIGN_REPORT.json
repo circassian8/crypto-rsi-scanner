@@ -26,6 +26,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 1,
@@ -133,6 +134,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -243,6 +245,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 1,
@@ -350,6 +353,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 1,
@@ -457,6 +461,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -563,6 +568,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -669,6 +675,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 1,
@@ -780,6 +787,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -890,6 +898,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1000,6 +1009,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1106,6 +1116,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1212,6 +1223,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1318,6 +1330,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1424,6 +1437,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1530,6 +1544,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1636,6 +1651,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1742,6 +1758,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1848,6 +1865,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -1954,6 +1972,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2060,6 +2079,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2166,6 +2186,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2272,6 +2293,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2378,6 +2400,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2484,6 +2507,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2590,6 +2614,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2696,6 +2721,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2802,6 +2828,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -2908,6 +2935,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warm": 26,
@@ -3015,6 +3043,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -3121,6 +3150,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -3227,6 +3257,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -3333,6 +3364,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -3439,6 +3471,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 1,
@@ -3546,6 +3579,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 1,
@@ -3653,6 +3687,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -3763,6 +3798,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warm": 27,
@@ -3870,6 +3906,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -3980,6 +4017,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -4086,6 +4124,109 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": {
+        "artifact_namespace": "radar_market_no_send_20260720t081757299693z_58c38f4312b0",
+        "current_authority_only": true,
+        "diagnostic": {
+          "all_inputs_ready": false,
+          "basis": "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1",
+          "bitcoin_input_ready": true,
+          "decision_policy_eligible": false,
+          "eligible_input_count": 28,
+          "historical_context_backfilled": false,
+          "missing_input_count": 2,
+          "missing_input_reason_counts": {
+            "temporal_return_evidence_invalid": 2,
+            "temporal_return_unit_invalid": 2,
+            "temporal_return_value_missing_or_invalid": 2
+          },
+          "missing_inputs": [
+            {
+              "canonical_asset_id": "pump-fun",
+              "point_in_time_volume_rank": 16,
+              "reasons": [
+                "temporal_return_evidence_invalid",
+                "temporal_return_unit_invalid",
+                "temporal_return_value_missing_or_invalid"
+              ],
+              "symbol": "PUMP"
+            },
+            {
+              "canonical_asset_id": "whitebit",
+              "point_in_time_volume_rank": 28,
+              "reasons": [
+                "temporal_return_evidence_invalid",
+                "temporal_return_unit_invalid",
+                "temporal_return_value_missing_or_invalid"
+              ],
+              "symbol": "WBT"
+            }
+          ],
+          "observed_at": "2026-07-20T08:17:58.624044+00:00",
+          "protocol_v2_evidence_eligible": false,
+          "provider_calls": 0,
+          "reason": "temporal_return_24h_incomplete",
+          "replayed_control_market_regime": {
+            "all_inputs_current_cycle": false,
+            "all_inputs_point_in_time_universe_members": false,
+            "all_inputs_temporal_return_evidence_ready": false,
+            "basis": "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1",
+            "btc_canonical_asset_id": null,
+            "btc_observation_id": null,
+            "btc_return_24h_percent_points": null,
+            "decision_policy_eligible": false,
+            "historical_context_backfilled": false,
+            "horizon_hours": 24,
+            "input_observation_ids": [],
+            "input_observations_sha256": null,
+            "observed_at": "2026-07-20T08:17:58.624044+00:00",
+            "protocol_v2_evidence_eligible": false,
+            "provider_calls": 0,
+            "reason": "temporal_return_24h_incomplete",
+            "regime": null,
+            "research_only": true,
+            "return_unit": "percent_points",
+            "routing_eligible": false,
+            "schema_id": "decision_radar.point_in_time_control_market_regime",
+            "schema_version": 1,
+            "selection_uses_outcomes": false,
+            "status": "unavailable",
+            "universe_expected_count": 30,
+            "universe_input_count": 0,
+            "universe_limit": 30,
+            "universe_median_return_24h_percent_points": null,
+            "universe_policy": "bounded_top_liquid_by_total_volume"
+          },
+          "research_only": true,
+          "retained_history_mutated": false,
+          "routing_eligible": false,
+          "schema_id": "decision_radar.point_in_time_control_market_regime_input_diagnostic",
+          "schema_version": 1,
+          "selection_uses_outcomes": false,
+          "status": "incomplete",
+          "universe_expected_count": 30,
+          "universe_limit": 30,
+          "universe_row_count": 30
+        },
+        "historical_context_backfilled": false,
+        "operator_state_sha256": "95f8a45f5528cba7ccfd0264928fa02acb68db62805462fe538fe873ebccae72",
+        "provider_calls": 0,
+        "report_replay_only": true,
+        "research_only": true,
+        "retained_history_mutated": false,
+        "revision": 12,
+        "run_id": "2026-07-20T08:17:58.624044+00:00|no_key_live",
+        "schema_id": "decision_radar.current_authority_control_market_regime_input",
+        "schema_version": 1,
+        "source_artifact": "event_market_no_send_market_rows.json",
+        "source_artifact_sha256": "a698a3ca3feb0b4eefc6f4916a100001e6d3eece494dd96317b11564f156581b",
+        "source_artifact_size_bytes": 1415275,
+        "source_binding_source": "manifest_request_cache_sha256",
+        "source_row_count": 30,
+        "source_snapshot_verified": true,
+        "status": "incomplete",
+        "writes": 0
+      },
       "data_quality": {
         "baseline_status_counts": {
           "warm": 27,
@@ -8221,7 +8362,7 @@
     "historical_ideas": 7,
     "matured_outcomes": 4,
     "pending_outcomes": 2,
-    "provider_failed_attempts": 12,
+    "provider_failed_attempts": 13,
     "proxy_feature_count": 1890,
     "real_candidates": 7,
     "real_cycles": 43,
@@ -8288,7 +8429,7 @@
     "spread_provider_selection": "selected_bybit_usdt_linear_perpetuals",
     "spread_readiness_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
     "status": "in_progress_baseline_warming",
-    "summary": "Decision Radar campaign v2 has 43 counted real/no-send cycles and 7 canonical ideas; 2 outcomes are pending and 4 outcomes are matured. Provider history contains 12 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 30/36 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 39 bound generations and current authority is radar_market_no_send_20260720t081757299693z_58c38f4312b0. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
+    "summary": "Decision Radar campaign v2 has 43 counted real/no-send cycles and 7 canonical ideas; 2 outcomes are pending and 4 outcomes are matured. Provider history contains 13 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 30/36 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 39 bound generations and current authority is radar_market_no_send_20260720t081757299693z_58c38f4312b0. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
   },
   "contract_version": 2,
   "data_quality_limitations": [
@@ -8319,7 +8460,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "a5dd11e48777cf64ebd079266e0851339783390671111bc6903ab2cfd283a38d",
     "candidate_rows_supplied": 7,
-    "contract_digest": "a902af91bbe796c9a188877676b9014ccd75d46852a2b7e48b0c5340127182a9",
+    "contract_digest": "7f6f047bd194f9d280ebad267a7a1cfc3b53fc72462db94334fc2335466d4564",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "e414b0c03027697444797a2deec8939a6376d041ad695461a2e5d2661dd7b630",
     "core_rows_supplied": 7,
@@ -8334,7 +8475,7 @@
       "not_evaluated": 1,
       "opposed": 1
     },
-    "evaluated_at": "2026-07-20T09:38:57.992201+00:00",
+    "evaluated_at": "2026-07-20T10:32:35.361417+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -8723,7 +8864,7 @@
         }
       ]
     },
-    "input_binding_digest": "024e6ea17bb453c58bc85803204c2e1a648a5094aca688fe753459b15c8b2d1f",
+    "input_binding_digest": "f90432d63fcc4a4bc330881aa16e042e6219790ce3c6911ef1aed68ec70aa999",
     "matched_control_available": false,
     "matured_episode_count": 2,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -9220,7 +9361,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "12fc35b781d6c13bc0e2b528427e8a59f2d8eb7a4bf058b8647240371809bc94",
+    "source_episode_contract_digest": "c3ffd54d38a49e190276e75a729c6f9f18c0a7bb8aaed58484ab086604048ba5",
     "source_episode_input_binding_digest": "ab6e897de16c57abb366c6aaab58ac80a25031aff9b48bbe08d498a3ff03a725",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -9231,7 +9372,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-20T09:38:57.992201+00:00",
+  "generated_at": "2026-07-20T10:32:35.361417+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -9248,7 +9389,7 @@
     "eligible_idea_count": 5,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-20T09:38:57.992201+00:00",
+    "generated_at": "2026-07-20T10:32:35.361417+00:00",
     "in_review_count": 0,
     "not_viewed_count": 5,
     "operator_action_commands_available_via_queue": true,
@@ -9352,7 +9493,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-20T09:38:57.992201+00:00",
+    "generated_at": "2026-07-20T10:32:35.361417+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -9396,16 +9537,16 @@
   "next_observation": {
     "authorization_rechecked_by_command": true,
     "blocking_reasons": [
-      "Decision Radar provider call is reserved until 2026-07-20T10:27:13.404884+00:00"
+      "Decision Radar provider call is reserved until 2026-07-20T11:27:59.695561+00:00"
     ],
     "cadence_status": "waiting",
     "eligible_now": false,
     "eligible_run_command": "make radar-daily-ops-cycle PYTHON=.venv/bin/python",
     "history_next_eligible_observation_at": "2026-07-20T09:17:58.624044+00:00",
-    "next_eligible_observation_at": "2026-07-20T10:27:13.404884+00:00",
+    "next_eligible_observation_at": "2026-07-20T11:27:59.695561+00:00",
     "next_safe_operator_command": "make radar-daily-ops-readiness PYTHON=.venv/bin/python",
     "provider_backoff_disabled_until": null,
-    "provider_call_reservation_next_at": "2026-07-20T10:27:13.404884+00:00",
+    "provider_call_reservation_next_at": "2026-07-20T11:27:59.695561+00:00",
     "rapid_cycles_do_not_advance_warmup": true
   },
   "non_authoritative_complete_generations": [
@@ -9435,6 +9576,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "cold": 30
@@ -9541,6 +9683,7 @@
       },
       "candidate_count": 1,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -9651,6 +9794,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -9757,6 +9901,7 @@
       },
       "candidate_count": 0,
       "candidate_count_matches_manifest": true,
+      "current_authority_control_market_regime_input": null,
       "data_quality": {
         "baseline_status_counts": {
           "warming": 30
@@ -9904,7 +10049,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260720t081757299693z_58c38f4312b0",
-    "authority_checked_at": "2026-07-20T09:38:57.992201+00:00",
+    "authority_checked_at": "2026-07-20T10:32:35.361417+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -10395,6 +10540,20 @@
       "provider_request_succeeded": false,
       "research_only": true,
       "run_id": "2026-07-20T09:27:13.404884+00:00|no_key_live"
+    },
+    {
+      "artifact_namespace": "radar_market_no_send_20260720t102758318277z_6215f735b03e",
+      "attempt_id": "ae1abcb24e75455b81de1000878697b6",
+      "attempt_status": "provider_unavailable",
+      "candidate_source_mode": "live_no_send",
+      "failure_class": "TimeoutError",
+      "no_send": true,
+      "observed_at": "2026-07-20T10:27:59.695561+00:00",
+      "provider": "coingecko",
+      "provider_call_attempted": true,
+      "provider_request_succeeded": false,
+      "research_only": true,
+      "run_id": "2026-07-20T10:27:59.695561+00:00|no_key_live"
     }
   ],
   "row_type": "decision_radar_live_observation_campaign_report",
@@ -10415,7 +10574,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "a00e81febd6c11c08f05cadcb27d119cf7f1e41297f75710ab428cc2d390ff07",
+    "audit_digest": "06ff0cfd8530121d9414583636e43b6730000f30ae4382e9cb9f745b9b56d1ca",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -10826,7 +10985,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "12fc35b781d6c13bc0e2b528427e8a59f2d8eb7a4bf058b8647240371809bc94",
+    "episode_contract_digest": "c3ffd54d38a49e190276e75a729c6f9f18c0a7bb8aaed58484ab086604048ba5",
     "episode_input_binding_digest": "ab6e897de16c57abb366c6aaab58ac80a25031aff9b48bbe08d498a3ff03a725",
     "episode_records_supplied": 7,
     "exact_outcome_join_count": 7,
@@ -10867,7 +11026,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "12fc35b781d6c13bc0e2b528427e8a59f2d8eb7a4bf058b8647240371809bc94",
+    "contract_digest": "c3ffd54d38a49e190276e75a729c6f9f18c0a7bb8aaed58484ab086604048ba5",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -11134,7 +11293,7 @@
         "window_end_exclusive_at": "2026-07-21T02:45:18.052686+00:00"
       }
     ],
-    "evaluated_at": "2026-07-20T09:38:57.992201+00:00",
+    "evaluated_at": "2026-07-20T10:32:35.361417+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

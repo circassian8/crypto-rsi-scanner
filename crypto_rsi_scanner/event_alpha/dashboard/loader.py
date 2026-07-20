@@ -208,6 +208,7 @@ def load_dashboard_snapshot(
                     run_id=snapshot.run_id,
                     revision=snapshot.revision,
                     current_market_observations=snapshot.current_market_observations,
+                    operator_state_sha256=snapshot.operator_state_sha256,
                 ),
                 research_lab=load_research_lab_snapshot(research_root),
             )

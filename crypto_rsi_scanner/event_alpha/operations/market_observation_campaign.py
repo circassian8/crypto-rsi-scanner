@@ -24,7 +24,7 @@ from ..dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from ..radar.integrated import api as integrated_radar
 from . import daily_operations_publication
 from . import decision_review_timing, decision_review_timing_queue
-from . import market_no_send_audit, market_no_send_history_cache
+from . import market_no_send_audit, market_no_send_features, market_no_send_history_cache
 from . import market_no_send_publication
 from . import market_observation_campaign_attempts
 from . import market_observation_campaign_baseline
@@ -59,6 +59,33 @@ OPERATIONS_RECEIPT_FILENAME = daily_operations_publication.OPERATIONS_RECEIPT_FI
 REQUEST_LEDGER_FILENAME = "event_market_no_send_request_ledger.json"
 HISTORY_FILENAME = "event_market_history.jsonl"
 OPERATOR_STATE_FILENAME = "event_alpha_operator_state.json"
+CURRENT_CONTROL_REGIME_INPUT_SCHEMA = (
+    "decision_radar.current_authority_control_market_regime_input"
+)
+CURRENT_CONTROL_REGIME_INPUT_SCHEMA_VERSION = 1
+_CURRENT_CONTROL_REGIME_INPUT_KEYS = frozenset((
+    "schema_id",
+    "schema_version",
+    "status",
+    "artifact_namespace",
+    "run_id",
+    "revision",
+    "operator_state_sha256",
+    "source_artifact",
+    "source_artifact_sha256",
+    "source_artifact_size_bytes",
+    "source_row_count",
+    "source_binding_source",
+    "source_snapshot_verified",
+    "diagnostic",
+    "current_authority_only",
+    "report_replay_only",
+    "retained_history_mutated",
+    "historical_context_backfilled",
+    "provider_calls",
+    "writes",
+    "research_only",
+))
 
 _attempt_row = market_observation_campaign_attempts.attempt_row
 _attempt_sort_key = market_observation_campaign_attempts.attempt_sort_key
@@ -336,6 +363,33 @@ def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
             "shadow temporal-surprise campaign audit invalid: "
             + ";".join(surprise_errors)
         )
+    _validate_current_control_regime_input_contract(report)
+
+
+def _validate_current_control_regime_input_contract(
+    report: Mapping[str, Any],
+) -> None:
+    current_rows = [
+        row
+        for row in report.get("authoritative_generations") or ()
+        if isinstance(row, Mapping)
+        and _mapping(row.get("publication")).get("currently_authoritative") is True
+    ]
+    if len(current_rows) > 1:
+        raise MarketNoSendError("current control-regime authority is ambiguous")
+    if not current_rows:
+        return
+    current = current_rows[0]
+    value = current.get("current_authority_control_market_regime_input")
+    pointer = _mapping(report.get("pointer"))
+    if not current_control_regime_input_valid(value) or any((
+        value.get("artifact_namespace") != current.get("artifact_namespace"),
+        value.get("run_id") != current.get("run_id"),
+        value.get("artifact_namespace") != pointer.get("artifact_namespace"),
+        value.get("run_id") != pointer.get("run_id"),
+        value.get("revision") != pointer.get("revision"),
+    )):
+        raise MarketNoSendError("current control-regime input contract invalid")
 
 
 def _shadow_minimum_sample_count(baseline: Mapping[str, Any]) -> int:
@@ -438,6 +492,7 @@ def _generation_row(
     validation: market_no_send_publication.CampaignGenerationValidation,
     current_authority: Mapping[str, Any],
 ) -> dict[str, Any]:
+    run_id = _text(manifest.get("run_id") or audit.get("exact_run_id"))
     operator = _read_json(namespace_dir / OPERATOR_STATE_FILENAME)
     snapshots = market_observation_campaign_snapshots.capture_generation_snapshots(
         namespace_dir,
@@ -447,6 +502,23 @@ def _generation_row(
     )
     candidates = snapshots["candidate"]["rows"]
     outcomes = snapshots["integrated_outcome"]["rows"]
+    current_regime_input: dict[str, Any] | None = None
+    if _current_authority_matches(
+        current_authority,
+        namespace=namespace_dir.name,
+        run_id=run_id,
+    ):
+        market_source = (
+            market_observation_campaign_snapshots.capture_market_source_snapshot(
+                namespace_dir,
+                manifest=manifest,
+                artifact="event_market_no_send_market_rows.json",
+            )
+        )
+        current_regime_input = _current_control_regime_input(
+            current_authority=current_authority,
+            market_source_snapshot=market_source,
+        )
     request = _read_json(namespace_dir / REQUEST_LEDGER_FILENAME)
     counted = validation.campaign_counted
     source = validation.counting_source
@@ -454,7 +526,6 @@ def _generation_row(
     route_counts = Counter(
         _text(row.get("radar_route")) or "diagnostic" for row in candidates
     )
-    run_id = _text(manifest.get("run_id") or audit.get("exact_run_id"))
     observed_at = _text(manifest.get("observed_at") or audit.get("generated_at"))
     publication_values, publication_artifacts = _generation_publication(
         namespace_dir,
@@ -505,6 +576,7 @@ def _generation_row(
             "revision": doctor.get("verified_revision") or operator.get("revision"),
         },
         "publication": publication_values,
+        "current_authority_control_market_regime_input": current_regime_input,
         "safety": _generation_safety(manifest, audit),
         "artifact_names": {
             "manifest": RUN_MANIFEST_FILENAME,
@@ -517,6 +589,122 @@ def _generation_row(
             snapshots
         ),
     }
+
+
+def _current_control_regime_input(
+    *,
+    current_authority: Mapping[str, Any],
+    market_source_snapshot: Mapping[str, Any],
+) -> dict[str, Any]:
+    rows = market_source_snapshot.get("rows")
+    if not isinstance(rows, (list, tuple)) or not all(
+        isinstance(row, Mapping) for row in rows
+    ):
+        raise MarketNoSendError("current control-regime source rows invalid")
+    diagnostic = (
+        market_no_send_features.point_in_time_control_market_regime_input_diagnostic(
+            rows
+        )
+    )
+    value = {
+        "schema_id": CURRENT_CONTROL_REGIME_INPUT_SCHEMA,
+        "schema_version": CURRENT_CONTROL_REGIME_INPUT_SCHEMA_VERSION,
+        "status": diagnostic["status"],
+        "artifact_namespace": current_authority.get("artifact_namespace"),
+        "run_id": current_authority.get("run_id"),
+        "revision": current_authority.get("revision"),
+        "operator_state_sha256": current_authority.get("operator_state_sha256"),
+        "source_artifact": market_source_snapshot.get("artifact"),
+        "source_artifact_sha256": market_source_snapshot.get("sha256"),
+        "source_artifact_size_bytes": market_source_snapshot.get("size_bytes"),
+        "source_row_count": market_source_snapshot.get("row_count"),
+        "source_binding_source": market_source_snapshot.get("binding_source"),
+        "source_snapshot_verified": market_source_snapshot.get("verified") is True,
+        "diagnostic": diagnostic,
+        "current_authority_only": True,
+        "report_replay_only": True,
+        "retained_history_mutated": False,
+        "historical_context_backfilled": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    if not current_control_regime_input_valid(
+        value,
+        expected_authority=current_authority,
+    ):
+        raise MarketNoSendError("current control-regime input contract invalid")
+    return value
+
+
+def current_control_regime_input_valid(
+    value: object,
+    *,
+    expected_authority: Mapping[str, Any] | None = None,
+) -> bool:
+    """Validate one exact-authority, read-only regime-input replay."""
+
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _CURRENT_CONTROL_REGIME_INPUT_KEYS
+        or value.get("schema_id") != CURRENT_CONTROL_REGIME_INPUT_SCHEMA
+        or value.get("schema_version")
+        != CURRENT_CONTROL_REGIME_INPUT_SCHEMA_VERSION
+        or value.get("status") not in {"ready", "incomplete", "unavailable"}
+        or value.get("source_artifact")
+        != "event_market_no_send_market_rows.json"
+        or value.get("source_binding_source")
+        != "manifest_request_cache_sha256"
+        or value.get("source_snapshot_verified") is not True
+        or value.get("current_authority_only") is not True
+        or value.get("report_replay_only") is not True
+        or value.get("retained_history_mutated") is not False
+        or value.get("historical_context_backfilled") is not False
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+        or value.get("research_only") is not True
+    ):
+        return False
+    diagnostic = value.get("diagnostic")
+    row_count = value.get("source_row_count")
+    digest = value.get("source_artifact_sha256")
+    if not (
+        market_no_send_features.control_market_regime_input_diagnostic_valid(
+            diagnostic
+        )
+        and value.get("status") == diagnostic.get("status")
+        and type(row_count) is int
+        and row_count >= 0
+        and row_count == diagnostic.get("universe_row_count")
+        and type(value.get("source_artifact_size_bytes")) is int
+        and value.get("source_artifact_size_bytes") > 0
+        and type(digest) is str
+        and len(digest) == 64
+        and all(character in "0123456789abcdef" for character in digest)
+        and type(value.get("revision")) is int
+        and value.get("revision") >= 1
+        and type(value.get("operator_state_sha256")) is str
+        and len(value.get("operator_state_sha256")) == 64
+        and all(
+            character in "0123456789abcdef"
+            for character in value.get("operator_state_sha256")
+        )
+    ):
+        return False
+    if expected_authority is not None and any(
+        value.get(field) != expected_authority.get(field)
+        for field in (
+            "artifact_namespace",
+            "run_id",
+            "revision",
+            "operator_state_sha256",
+        )
+    ):
+        return False
+    return bool(
+        _text(value.get("artifact_namespace"))
+        and _text(value.get("run_id"))
+    )
 
 
 def _generation_publication(

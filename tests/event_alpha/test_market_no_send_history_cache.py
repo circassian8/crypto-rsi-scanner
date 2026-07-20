@@ -185,6 +185,68 @@ def test_control_market_regime_fails_closed_on_incomplete_or_tampered_evidence()
     assert unavailable["reason"] == "current_cycle_context_invalid"
 
 
+def test_control_market_regime_input_diagnostic_names_every_incomplete_row():
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+    rows = _control_regime_rows(observed_at)
+    for row in rows[-2:]:
+        row.pop("temporal_return_24h")
+        row["return_units"].pop("temporal_return_24h")
+        row["market_feature_evidence"].pop("temporal_return_24h")
+
+    diagnostic = (
+        market_no_send_features
+        .point_in_time_control_market_regime_input_diagnostic(rows)
+    )
+
+    assert diagnostic["status"] == "incomplete"
+    assert diagnostic["reason"] == "temporal_return_24h_incomplete"
+    assert diagnostic["universe_row_count"] == 5
+    assert diagnostic["universe_expected_count"] == 5
+    assert diagnostic["eligible_input_count"] == 3
+    assert diagnostic["missing_input_count"] == 2
+    assert [
+        row["canonical_asset_id"] for row in diagnostic["missing_inputs"]
+    ] == ["market-flow-no-spread", "market-flow-low"]
+    assert diagnostic["missing_input_reason_counts"] == {
+        "temporal_return_evidence_invalid": 2,
+        "temporal_return_unit_invalid": 2,
+        "temporal_return_value_missing_or_invalid": 2,
+    }
+    assert diagnostic["bitcoin_input_ready"] is True
+    assert diagnostic["all_inputs_ready"] is False
+    assert diagnostic["retained_history_mutated"] is False
+    assert diagnostic["historical_context_backfilled"] is False
+    assert diagnostic["provider_calls"] == 0
+    assert market_no_send_features.control_market_regime_input_diagnostic_valid(
+        diagnostic
+    )
+
+    diagnostic["missing_inputs"][0]["reasons"] = ["invented_reason"]
+    assert not market_no_send_features.control_market_regime_input_diagnostic_valid(
+        diagnostic
+    )
+
+
+def test_control_market_regime_input_diagnostic_reports_ready_replay():
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+
+    diagnostic = (
+        market_no_send_features
+        .point_in_time_control_market_regime_input_diagnostic(
+            _control_regime_rows(observed_at)
+        )
+    )
+
+    assert diagnostic["status"] == "ready"
+    assert diagnostic["eligible_input_count"] == 5
+    assert diagnostic["missing_input_count"] == 0
+    assert diagnostic["missing_inputs"] == []
+    assert diagnostic["replayed_control_market_regime"]["regime"] == "risk_on"
+    assert market_no_send_features.control_market_regime_input_diagnostic_valid(
+        diagnostic
+    )
+
+
 @contextmanager
 def _provider_reserved_history(base, namespace: str, observed_at: datetime):
     with market_no_send_campaign_guard.acquire_campaign_reservation(

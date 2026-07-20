@@ -290,6 +290,9 @@ def _baseline_maturity_section(
         baseline.get("point_in_time_control_context_readiness")
     )
     current_quality = _mapping(current_generation.get("data_quality"))
+    current_regime_input = _mapping(
+        current_generation.get("current_authority_control_market_regime_input")
+    )
     latest_row_statuses = _mapping(current_quality.get("baseline_status_counts"))
     observed_asset_count = _int(current.get("observed_asset_count"))
     future_same_asset_eligibility = (
@@ -328,6 +331,10 @@ def _baseline_maturity_section(
         ),
         "- Provider-call eligibility: `not inferred`; Daily Operations readiness remains authoritative.",
         "",
+        "### Exact current control-regime input replay",
+        "",
+        *_current_control_regime_input_lines(current_regime_input),
+        "",
         (
             "Retained-history maturity and latest point-in-time feature availability are "
             "separate. Future-observation eligibility is conditional on the same canonical "
@@ -361,6 +368,72 @@ def _baseline_maturity_section(
         *_point_in_time_control_context_lines(control_context),
     ]
     return lines
+
+
+def _current_control_regime_input_lines(value: Mapping[str, Any]) -> list[str]:
+    if not value:
+        return [
+            "- Status: `unavailable`",
+            "- This compatibility report has no exact-authority regime-input replay.",
+        ]
+    diagnostic = _mapping(value.get("diagnostic"))
+    replayed = _mapping(diagnostic.get("replayed_control_market_regime"))
+    expected = _int(diagnostic.get("universe_expected_count"))
+    eligible = _int(diagnostic.get("eligible_input_count"))
+    missing = [
+        _mapping(row)
+        for row in diagnostic.get("missing_inputs") or ()
+        if isinstance(row, Mapping)
+    ]
+    lines = [
+        f"- Status: `{_md(value.get('status')) or 'unavailable'}`",
+        (
+            "- Exact source binding: "
+            f"`{str(value.get('source_snapshot_verified') is True).lower()}` "
+            f"(`{_md(value.get('source_artifact'))}`, SHA-256 "
+            f"`{_md(value.get('source_artifact_sha256')) or 'none'}`)"
+        ),
+        f"- Eligible causal 24-hour inputs: `{eligible}/{expected}`",
+        f"- Missing current inputs: `{_int(diagnostic.get('missing_input_count'))}`",
+        (
+            "- Read-only replay result: "
+            f"`{_md(replayed.get('status')) or 'unavailable'}`"
+            + (
+                f" (`{_md(replayed.get('reason'))}`)"
+                if replayed.get("reason")
+                else f" (`{_md(replayed.get('regime'))}`)"
+            )
+        ),
+    ]
+    for row in missing:
+        identity = _md(row.get("canonical_asset_id")) or "unknown"
+        symbol = _md(row.get("symbol"))
+        rank = row.get("point_in_time_volume_rank")
+        label = identity + (f" ({symbol})" if symbol else "")
+        if type(rank) is int:
+            label += f", rank {rank}"
+        reasons = ", ".join(
+            _control_regime_input_reason(reason)
+            for reason in row.get("reasons") or ()
+        )
+        lines.append(f"  - `{label}`: {reasons or 'input contract invalid'}")
+    lines.extend([
+        "- Retained history mutated by report: `false`; historical backfill: `false`.",
+        "- Routing/policy/Protocol-v2 evidence eligibility: `false`; provider calls: `0`.",
+    ])
+    return lines
+
+
+def _control_regime_input_reason(value: Any) -> str:
+    labels = {
+        "market_history_not_counted": "row is not baseline-counted",
+        "observation_identity_missing": "observation identity is missing",
+        "canonical_asset_identity_missing": "canonical asset identity is missing",
+        "temporal_return_value_missing_or_invalid": "causal 24-hour return is unavailable",
+        "temporal_return_unit_invalid": "causal 24-hour return unit is unavailable",
+        "temporal_return_evidence_invalid": "causal 24-hour evidence reference is unavailable",
+    }
+    return labels.get(_text(value), _md(value))
 
 
 def _point_in_time_control_context_lines(value: Mapping[str, Any]) -> list[str]:

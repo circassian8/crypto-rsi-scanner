@@ -42,6 +42,18 @@ CONTROL_MARKET_REGIME_REASONS = frozenset((
     "temporal_return_24h_incomplete",
     "btc_context_missing",
 ))
+CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_ID = (
+    "decision_radar.point_in_time_control_market_regime_input_diagnostic"
+)
+CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_VERSION = 1
+CONTROL_MARKET_REGIME_INPUT_REASON_CODES = frozenset((
+    "market_history_not_counted",
+    "observation_identity_missing",
+    "canonical_asset_identity_missing",
+    "temporal_return_value_missing_or_invalid",
+    "temporal_return_unit_invalid",
+    "temporal_return_evidence_invalid",
+))
 _CONTROL_MARKET_REGIME_KEYS = frozenset((
     "schema_id",
     "schema_version",
@@ -67,6 +79,32 @@ _CONTROL_MARKET_REGIME_KEYS = frozenset((
     "all_inputs_temporal_return_evidence_ready",
     "selection_uses_outcomes",
     "historical_context_backfilled",
+    "routing_eligible",
+    "decision_policy_eligible",
+    "protocol_v2_evidence_eligible",
+    "provider_calls",
+    "research_only",
+))
+_CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_KEYS = frozenset((
+    "schema_id",
+    "schema_version",
+    "status",
+    "reason",
+    "basis",
+    "observed_at",
+    "universe_row_count",
+    "universe_expected_count",
+    "universe_limit",
+    "eligible_input_count",
+    "missing_input_count",
+    "missing_inputs",
+    "missing_input_reason_counts",
+    "bitcoin_input_ready",
+    "all_inputs_ready",
+    "replayed_control_market_regime",
+    "selection_uses_outcomes",
+    "historical_context_backfilled",
+    "retained_history_mutated",
     "routing_eligible",
     "decision_policy_eligible",
     "protocol_v2_evidence_eligible",
@@ -875,6 +913,236 @@ def control_market_regime_evidence_valid(value: object) -> bool:
         and value.get("all_inputs_current_cycle") is True
         and value.get("all_inputs_point_in_time_universe_members") is True
         and value.get("all_inputs_temporal_return_evidence_ready") is True
+    )
+
+
+def point_in_time_control_market_regime_input_diagnostic(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Explain exact current-cycle regime input readiness without mutation.
+
+    This is a read-only replay diagnostic.  It does not make an unavailable
+    regime usable, write evidence to retained history, or expose the result to
+    routing.  Its purpose is to name the precise current rows and field-level
+    reasons that keep the closed regime projection from becoming observed.
+    """
+
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    replayed = point_in_time_control_market_regime(materialized)
+    missing_inputs: list[dict[str, Any]] = []
+    eligible_asset_ids: list[str] = []
+    for index, row in enumerate(materialized, start=1):
+        reasons: list[str] = []
+        history = row.get("market_history")
+        evidence = row.get("market_feature_evidence")
+        units = row.get("return_units")
+        observation_id = (
+            history.get("observation_id") if isinstance(history, Mapping) else None
+        )
+        raw_asset_id = row.get("canonical_asset_id")
+        asset_id = (
+            raw_asset_id.strip()
+            if isinstance(raw_asset_id, str)
+            and 0 < len(raw_asset_id.strip()) <= 160
+            else f"unidentified-row-{index}"
+        )
+        raw_symbol = row.get("symbol")
+        symbol = (
+            raw_symbol.strip()
+            if isinstance(raw_symbol, str) and len(raw_symbol.strip()) <= 32
+            else ""
+        )
+        rank = row.get("point_in_time_volume_rank")
+        if not isinstance(history, Mapping) or history.get("baseline_counted") is not True:
+            reasons.append("market_history_not_counted")
+        if not isinstance(observation_id, str) or not observation_id:
+            reasons.append("observation_identity_missing")
+        if asset_id.startswith("unidentified-row-"):
+            reasons.append("canonical_asset_identity_missing")
+        if finite_float(row.get("temporal_return_24h")) is None:
+            reasons.append("temporal_return_value_missing_or_invalid")
+        if (
+            not isinstance(units, Mapping)
+            or units.get("temporal_return_24h") != "percent_points"
+        ):
+            reasons.append("temporal_return_unit_invalid")
+        temporal_evidence = (
+            evidence.get("temporal_return_24h")
+            if isinstance(evidence, Mapping)
+            else None
+        )
+        if not isinstance(observation_id, str) or not _temporal_return_evidence_ready(
+            temporal_evidence,
+            observation_id=observation_id or "",
+        ):
+            reasons.append("temporal_return_evidence_invalid")
+        if reasons:
+            missing_inputs.append({
+                "canonical_asset_id": asset_id,
+                "symbol": symbol,
+                "point_in_time_volume_rank": (
+                    rank if type(rank) is int and rank > 0 else None
+                ),
+                "reasons": sorted(set(reasons)),
+            })
+        else:
+            eligible_asset_ids.append(asset_id)
+    missing_inputs.sort(key=lambda item: (
+        item["point_in_time_volume_rank"] is None,
+        item["point_in_time_volume_rank"] or 0,
+        item["canonical_asset_id"],
+    ))
+    reason_counts = Counter(
+        reason
+        for item in missing_inputs
+        for reason in item["reasons"]
+    )
+    expected = replayed.get("universe_expected_count")
+    limit = replayed.get("universe_limit")
+    status = (
+        "ready"
+        if replayed.get("status") == "observed"
+        else "incomplete"
+        if (
+            replayed.get("reason") == "temporal_return_24h_incomplete"
+            and type(expected) is int
+            and expected == len(materialized)
+            and 0 < len(eligible_asset_ids) < len(materialized)
+        )
+        else "unavailable"
+    )
+    value = {
+        "schema_id": CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_ID,
+        "schema_version": CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_VERSION,
+        "status": status,
+        "reason": replayed.get("reason"),
+        "basis": CONTROL_MARKET_REGIME_BASIS,
+        "observed_at": replayed.get("observed_at"),
+        "universe_row_count": len(materialized),
+        "universe_expected_count": expected if type(expected) is int else 0,
+        "universe_limit": limit if type(limit) is int else 0,
+        "eligible_input_count": len(eligible_asset_ids),
+        "missing_input_count": len(missing_inputs),
+        "missing_inputs": missing_inputs,
+        "missing_input_reason_counts": dict(sorted(reason_counts.items())),
+        "bitcoin_input_ready": "bitcoin" in eligible_asset_ids,
+        "all_inputs_ready": replayed.get("status") == "observed",
+        "replayed_control_market_regime": replayed,
+        "selection_uses_outcomes": False,
+        "historical_context_backfilled": False,
+        "retained_history_mutated": False,
+        "routing_eligible": False,
+        "decision_policy_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "research_only": True,
+    }
+    if not control_market_regime_input_diagnostic_valid(value):  # pragma: no cover
+        raise AssertionError("control market regime input diagnostic invalid")
+    return value
+
+
+def control_market_regime_input_diagnostic_valid(value: object) -> bool:
+    """Validate the closed read-only current-input diagnostic."""
+
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_KEYS
+        or value.get("schema_id")
+        != CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_ID
+        or value.get("schema_version")
+        != CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_VERSION
+        or value.get("status") not in {"ready", "incomplete", "unavailable"}
+        or value.get("basis") != CONTROL_MARKET_REGIME_BASIS
+        or value.get("selection_uses_outcomes") is not False
+        or value.get("historical_context_backfilled") is not False
+        or value.get("retained_history_mutated") is not False
+        or type(value.get("bitcoin_input_ready")) is not bool
+        or type(value.get("all_inputs_ready")) is not bool
+        or value.get("routing_eligible") is not False
+        or value.get("decision_policy_eligible") is not False
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("provider_calls") != 0
+        or value.get("research_only") is not True
+    ):
+        return False
+    replayed = value.get("replayed_control_market_regime")
+    if not control_market_regime_evidence_valid(replayed):
+        return False
+    row_count = value.get("universe_row_count")
+    expected = value.get("universe_expected_count")
+    limit = value.get("universe_limit")
+    eligible = value.get("eligible_input_count")
+    missing_count = value.get("missing_input_count")
+    missing_inputs = value.get("missing_inputs")
+    if not (
+        _nonnegative_integer(row_count)
+        and _nonnegative_integer(expected)
+        and _nonnegative_integer(limit)
+        and _nonnegative_integer(eligible)
+        and _nonnegative_integer(missing_count)
+        and eligible + missing_count == row_count
+        and isinstance(missing_inputs, list)
+        and len(missing_inputs) == missing_count
+        and len(missing_inputs) <= 256
+        and value.get("reason") == replayed.get("reason")
+        and value.get("observed_at") == replayed.get("observed_at")
+    ):
+        return False
+    expected_reason_counts: Counter[str] = Counter()
+    missing_asset_ids: set[str] = set()
+    for item in missing_inputs:
+        if not isinstance(item, Mapping) or set(item) != {
+            "canonical_asset_id",
+            "symbol",
+            "point_in_time_volume_rank",
+            "reasons",
+        }:
+            return False
+        asset_id = item.get("canonical_asset_id")
+        symbol = item.get("symbol")
+        rank = item.get("point_in_time_volume_rank")
+        reasons = item.get("reasons")
+        if not (
+            isinstance(asset_id, str)
+            and 0 < len(asset_id) <= 160
+            and asset_id not in missing_asset_ids
+            and isinstance(symbol, str)
+            and len(symbol) <= 32
+            and (rank is None or (type(rank) is int and rank > 0))
+            and isinstance(reasons, list)
+            and reasons
+            and reasons == sorted(set(reasons))
+            and all(reason in CONTROL_MARKET_REGIME_INPUT_REASON_CODES for reason in reasons)
+        ):
+            return False
+        missing_asset_ids.add(asset_id)
+        expected_reason_counts.update(reasons)
+    if value.get("missing_input_reason_counts") != dict(
+        sorted(expected_reason_counts.items())
+    ):
+        return False
+    if value.get("status") == "ready":
+        return bool(
+            replayed.get("status") == "observed"
+            and value.get("reason") is None
+            and row_count == expected == eligible
+            and missing_count == 0
+            and value.get("bitcoin_input_ready") is True
+            and value.get("all_inputs_ready") is True
+        )
+    if value.get("status") == "incomplete":
+        return bool(
+            replayed.get("status") == "unavailable"
+            and value.get("reason") == "temporal_return_24h_incomplete"
+            and row_count == expected
+            and 0 < eligible < row_count
+            and missing_count > 0
+            and value.get("all_inputs_ready") is False
+        )
+    return bool(
+        replayed.get("status") == "unavailable"
+        and value.get("all_inputs_ready") is False
     )
 
 

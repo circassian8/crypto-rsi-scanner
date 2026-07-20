@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from . import market_no_send_publication
 from .market_no_send_io import (
+    parse_json_object_bytes,
     parse_jsonl_bytes,
     read_regular_bytes,
 )
@@ -119,6 +120,71 @@ def capture_candidate_snapshot(
         snapshot_label="candidate",
         require_legacy_count=True,
     )
+
+
+def capture_market_source_snapshot(
+    namespace_dir: Path,
+    *,
+    manifest: Mapping[str, Any],
+    artifact: str,
+) -> dict[str, Any]:
+    """Read and bind the exact normalized market-source envelope once.
+
+    The countable-generation validator has already established the full
+    publication contract.  This second, read-once boundary exists so campaign
+    diagnostics are derived from the same bytes whose digest is stored in the
+    immutable generation manifest, rather than from a later directory scan or
+    the dashboard's intentionally smaller market projection.
+    """
+
+    if manifest.get("request_cache_artifact") != artifact:
+        raise MarketNoSendError("market_source_snapshot_artifact_mismatch")
+    raw = read_regular_bytes(namespace_dir / artifact)
+    if raw is None:
+        raise MarketNoSendError("market_source_snapshot_missing")
+    digest = hashlib.sha256(raw).hexdigest()
+    if not _sha256_digest(manifest.get("request_cache_sha256")) or (
+        manifest.get("request_cache_sha256") != digest
+    ):
+        raise MarketNoSendError("market_source_snapshot_digest_mismatch")
+    source = parse_json_object_bytes(raw)
+    rows = source.get("rows")
+    expected_row_count = manifest.get("selected_market_row_count")
+    if (
+        isinstance(expected_row_count, bool)
+        or not isinstance(expected_row_count, int)
+        or expected_row_count < 0
+        or not isinstance(rows, list)
+        or len(rows) != expected_row_count
+        or not all(isinstance(row, Mapping) for row in rows)
+    ):
+        raise MarketNoSendError("market_source_snapshot_row_count_mismatch")
+    identity_fields = (
+        "artifact_namespace",
+        "run_id",
+        "profile",
+        "run_mode",
+        "data_mode",
+        "provider",
+        "observed_at",
+        "selected_market_row_count",
+    )
+    if (
+        source.get("row_type") != "event_market_no_send_source_cache"
+        or any(source.get(field) != manifest.get(field) for field in identity_fields)
+        or source.get("no_send") is not True
+        or source.get("research_only") is not True
+    ):
+        raise MarketNoSendError("market_source_snapshot_identity_mismatch")
+    return {
+        "artifact": artifact,
+        "sha256": digest,
+        "size_bytes": len(raw),
+        "row_count": len(rows),
+        "binding_source": "manifest_request_cache_sha256",
+        "rows": tuple(dict(row) for row in rows),
+        "verified": True,
+    }
 
 
 def capture_generation_snapshots(
@@ -417,6 +483,7 @@ __all__ = (
     "capture_bound_jsonl_snapshot",
     "capture_candidate_snapshot",
     "capture_generation_snapshots",
+    "capture_market_source_snapshot",
     "generation_candidate_rows",
     "private_generation_snapshot_fields",
     "public_generation_rows",

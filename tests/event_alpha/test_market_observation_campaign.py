@@ -375,6 +375,65 @@ def _dashboard_authority(*_args, **_kwargs):
     )
 
 
+def _current_regime_market_rows(observed_at: str) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for rank in range(1, 31):
+        asset_id = (
+            "bitcoin" if rank == 1
+            else "pump-fun" if rank == 16
+            else "whitebit" if rank == 28
+            else f"asset-{rank:02d}"
+        )
+        symbol = "BTC" if rank == 1 else "PUMP" if rank == 16 else "WBT" if rank == 28 else f"A{rank:02d}"
+        observation_id = f"current-regime-observation-{rank}"
+        anchor_id = f"current-regime-anchor-{rank}"
+        row: dict[str, object] = {
+            "canonical_asset_id": asset_id,
+            "symbol": symbol,
+            "observed_at": observed_at,
+            "point_in_time_universe_member": True,
+            "point_in_time_volume_rank": rank,
+            "point_in_time_universe_size": 30,
+            "point_in_time_universe_limit": 30,
+            "point_in_time_universe_policy": (
+                "bounded_top_liquid_by_total_volume"
+            ),
+            "market_history": {
+                "baseline_counted": True,
+                "observation_id": observation_id,
+            },
+            "temporal_return_24h": float(rank) / 10.0,
+            "return_units": {"temporal_return_24h": "percent_points"},
+            "market_feature_evidence": {
+                "temporal_return_24h": {
+                    "basis": "temporal_baseline",
+                    "status": "ready",
+                    "calculation": "price_horizon_return",
+                    "sample_count": 1,
+                    "current_observation_id": observation_id,
+                    "baseline_first_observation_id": anchor_id,
+                    "baseline_last_observation_id": anchor_id,
+                    "baseline_input_observation_count": 1,
+                    "baseline_observation_ids_sha256": hashlib.sha256(
+                        json.dumps([anchor_id], separators=(",", ":")).encode(
+                            "utf-8"
+                        )
+                    ).hexdigest(),
+                    "providers": ["coingecko"],
+                    "data_modes": ["live"],
+                    "research_only": True,
+                }
+            },
+            "research_only": True,
+        }
+        if rank in {16, 28}:
+            row.pop("temporal_return_24h")
+            row["return_units"] = {}
+            row["market_feature_evidence"] = {}
+        rows.append(row)
+    return rows
+
+
 def test_historical_market_provenance_v2_uses_read_only_counting_adapter():
     manifest = _manifest(
         "historical_market_generation",
@@ -399,6 +458,85 @@ def test_historical_market_provenance_v2_uses_read_only_counting_adapter():
 
     assert counted is True
     assert source == "historical_market_provenance_v2_read_only_adapter"
+
+
+def test_current_authority_regime_input_replay_binds_exact_source_and_names_gaps(
+    tmp_path,
+):
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    namespace = "radar_market_no_send_regime"
+    observed_at = "2026-07-20T08:17:58.624044+00:00"
+    _manifest_path, manifest, _candidates = write_countable_generation(
+        base,
+        namespace,
+        observed_at,
+        candidates=[],
+        market_rows=_current_regime_market_rows(observed_at),
+    )
+    namespace_dir = base / namespace
+    snapshot = (
+        campaign.market_observation_campaign_snapshots
+        .capture_market_source_snapshot(
+            namespace_dir,
+            manifest=manifest,
+            artifact="event_market_no_send_market_rows.json",
+        )
+    )
+    authority = {
+        "artifact_namespace": namespace,
+        "run_id": manifest["run_id"],
+        "revision": 7,
+        "operator_state_sha256": "a" * 64,
+    }
+
+    value = campaign._current_control_regime_input(
+        current_authority=authority,
+        market_source_snapshot=snapshot,
+    )
+
+    assert value["status"] == "incomplete"
+    assert value["source_artifact_sha256"] == manifest["request_cache_sha256"]
+    assert value["source_snapshot_verified"] is True
+    diagnostic = value["diagnostic"]
+    assert diagnostic["eligible_input_count"] == 28
+    assert diagnostic["missing_input_count"] == 2
+    assert [row["canonical_asset_id"] for row in diagnostic["missing_inputs"]] == [
+        "pump-fun",
+        "whitebit",
+    ]
+    assert value["retained_history_mutated"] is False
+    assert value["provider_calls"] == value["writes"] == 0
+    assert campaign.current_control_regime_input_valid(
+        value,
+        expected_authority=authority,
+    )
+    rendered = "\n".join(
+        market_observation_campaign_render._current_control_regime_input_lines(
+            value
+        )
+    )
+    assert "Eligible causal 24-hour inputs: `28/30`" in rendered
+    assert "`pump-fun (PUMP), rank 16`" in rendered
+    assert "`whitebit (WBT), rank 28`" in rendered
+    assert "historical backfill: `false`" in rendered
+
+    source_path = namespace_dir / "event_market_no_send_market_rows.json"
+    source = market_no_send_io.read_json_object(source_path)
+    source["rows"][0]["temporal_return_24h"] = 999.0
+    market_no_send_io.write_json_atomic(source_path, source)
+    with pytest.raises(
+        campaign.MarketNoSendError,
+        match="market_source_snapshot_digest_mismatch",
+    ):
+        (
+            campaign.market_observation_campaign_snapshots
+            .capture_market_source_snapshot(
+                namespace_dir,
+                manifest=manifest,
+                artifact="event_market_no_send_market_rows.json",
+            )
+        )
 
 
 def test_campaign_report_is_deterministic_and_separates_attempt_classes(
@@ -437,6 +575,12 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert first["campaign_metrics"]["proxy_feature_count"] == 6
     assert len(first["authoritative_generations"]) == 1
     assert len(first["non_authoritative_complete_generations"]) == 1
+    assert first["authoritative_generations"][0][
+        "current_authority_control_market_regime_input"
+    ]["current_authority_only"] is True
+    assert first["non_authoritative_complete_generations"][0][
+        "current_authority_control_market_regime_input"
+    ] is None
     assert len(first["provider_failed_attempts"]) == 1
     assert len(first["blocked_or_preflight_attempts"]) == 1
     assert first["outcomes"]["source"] == "canonical_candidate_pending_base"
@@ -522,6 +666,8 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert "Existing history cadence boundary" in markdown
     assert "Provider-call eligibility: `not inferred`" in markdown
     assert "Prospective matched-control context" in markdown
+    assert "Exact current control-regime input replay" in markdown
+    assert "Retained history mutated by report: `false`" in markdown
     assert "Complete point-in-time universe rows: `2/8`" in markdown
     assert "Complete matched-control context rows: `0/8`" in markdown
     assert "Market-regime coverage: `0/8`" in markdown
