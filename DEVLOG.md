@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-seventh no-send market cycle · Codex
+**Why:** The hourly cadence was eligible and explicit CoinGecko authorization
+was already present, so the evidence-first campaign needed one genuine
+point-in-time observation without changing any threshold or provider policy.
+**Changes:** Made exactly one successful CoinGecko `/coins/markets` request
+(HTTP 200, 80 rows, 2,388 ms, no retry), selected 30 bounded top-liquid rows,
+and published
+`radar_market_no_send_20260720t143754109967z_c0093aeffaa6`. Campaign truth now
+records 47 cycles, 1,410 retained observations, 1,380 baseline-counted rows, 30
+too-close rows, and 150 prospective universe/liquidity-context rows. The
+generation is healthy-empty with zero anomalies and zero Decision ideas. The
+current universe is 28/30 warm; 27/30 causal 24-hour regime inputs are ready,
+while PUMP, WBT, and SHIB remain explicitly unavailable. No regime, partition,
+matched control, or actionable idea was fabricated.
+**Verify:** Pre-call readiness was `ready/eligible` with zero provider calls.
+The exact live namespace passed strict artifact doctor with zero blockers and
+warnings; dashboard readiness returned `READY`; publication and operations
+receipts bind revision 12 and operator-state SHA-256
+`b0bb824c0d5cd3cb197253432c2f77e5de4784324df8278863141fa4fe10adc2`;
+an external loopback HEAD returned HTTP 200 with the exact namespace, run,
+revision, and operator digest headers. Daily Operations status records the next
+eligible boundary at `2026-07-20T15:37:55.680401+00:00`.
+**Notes/risks:** The campaign still has zero spread observations, no sealed
+Protocol-v2 partition/matched-control contract, and five historical human-review
+items not yet viewed. All send/trade/order/paper/normal-RSI/`TRIGGERED_FADE`
+counters remain zero. Quantitative source-size limits remain advisory; security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Normalize market-anomaly source confidence before synthesis · Codex
 **Why:** The raw market-anomaly compatibility path synthesized a normalized
 event with direct float clamping. NaN and booleans could therefore become full
