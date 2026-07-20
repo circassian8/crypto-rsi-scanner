@@ -17,6 +17,20 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Clarify empty review-action status · Codex
+**Why:** The concise review-timing status printed `status=no_events` and zero
+records without its canonical scope disclosure, making an empty human-action
+ledger look like an empty reviewable-idea queue even though five ideas remain.
+**Changes:** Included the report's existing explicit-human-actions-only scope,
+zero-record meaning, and read-only queue command in concise status output. No
+schema/status value, human review event, eligible idea, provider, or empirical
+evidence changed.
+**Verify:** All 13 focused review-timing operation/Make-target tests passed (27
+unrelated Make-target tests deselected). `compileall`, `git diff --check`, and
+the real read-only concise status command passed and displayed the clarification.
+**Notes/risks:** The historical queue remains five `not_viewed` ideas. Recording
+a first view still requires explicit `CONFIRM=1` and a reviewer alias.
+
 ## 2026-07-20 — Require finite source-pack numeric evidence · Codex
 **Why:** Source-pack evaluation accepted infinite market confirmation as strong
 evidence and interpreted boolean unlock percentage as 100%. Mere presence of an

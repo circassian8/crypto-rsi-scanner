@@ -354,6 +354,43 @@ def test_status_without_ledger_is_clean_no_event_report(tmp_path: Path) -> None:
     assert report["provider_calls"] == 0
 
 
+def test_review_status_summary_distinguishes_no_actions_from_no_eligible_ideas() -> None:
+    report = {
+        "status": "no_events",
+        "evaluated_at": "2026-07-20T12:00:00+00:00",
+        "ledger_event_count": 0,
+        "idea_record_count": 0,
+        "first_viewed_count": 0,
+        "review_completed_count": 0,
+        "report_scope": "recorded_explicit_human_actions_only",
+        "zero_idea_records_meaning": "no_explicit_human_actions_recorded_not_no_eligible_ideas",
+        "eligible_idea_discovery_command": "make radar-review-timing-queue PYTHON=.venv/bin/python",
+        "provider_calls": 0,
+        "writes": 0,
+        "commands_require_explicit_confirmation": True,
+        "dashboard_reads_recorded_as_human_actions": False,
+        "protocol_v2_evidence_eligible": False,
+        "safety": {
+            "provider_calls": 0,
+            "telegram_sends": 0,
+            "trades": 0,
+            "orders": 0,
+            "event_alpha_paper_trades": 0,
+            "normal_rsi_writes": 0,
+            "event_alpha_triggered_fade": 0,
+            "production_policy_mutations": 0,
+        },
+        "research_only": True,
+    }
+
+    output = decision_review_timing_cli._render_summary("status", report)
+
+    assert "status=no_events" in output
+    assert "report_scope=recorded_explicit_human_actions_only" in output
+    assert "zero_idea_records_meaning=no_explicit_human_actions_recorded_not_no_eligible_ideas" in output
+    assert "eligible_idea_discovery_command=make radar-review-timing-queue" in output
+
+
 def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
     queue = {
         "status": "action_required",

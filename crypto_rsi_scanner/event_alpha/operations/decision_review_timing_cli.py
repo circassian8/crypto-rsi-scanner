@@ -120,6 +120,9 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
             "idea_record_count",
             "first_viewed_count",
             "review_completed_count",
+            "report_scope",
+            "zero_idea_records_meaning",
+            "eligible_idea_discovery_command",
         ):
             lines.append((field, result.get(field)))
     lines.extend(
