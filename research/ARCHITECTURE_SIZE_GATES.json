@@ -1917,7 +1917,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 278,
+      "line_count": 291,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1966,7 +1966,7 @@
   ],
   "functions_over_limit_count": 13,
   "gate_status": "pass",
-  "generated_at": "2026-07-20T08:01:09.143692+00:00",
+  "generated_at": "2026-07-20T08:51:18.419533+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2394,6 +2394,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1099,
+      "path": "tests/event_alpha/test_empirical_research_reports.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1088,
       "path": "tests/event_alpha/test_radar_pipeline.py",
       "source_kind": "test"
@@ -2414,12 +2420,6 @@
       "limit": 1500,
       "line_count": 1068,
       "path": "tests/event_alpha/test_dashboard_readiness.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1066,
-      "path": "tests/event_alpha/test_empirical_research_reports.py",
       "source_kind": "test"
     },
     {
@@ -4161,7 +4161,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "format_current_progress",
-      "line_count": 278,
+      "line_count": 291,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -4541,7 +4541,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 278,
+      "line_count": 291,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -5356,7 +5356,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "format_current_progress",
-      "line_count": 278,
+      "line_count": 291,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",

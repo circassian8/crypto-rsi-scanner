@@ -53,6 +53,11 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   each exact executed USDT value. If the penalty is absent, the all-in cost and
   net remain unavailable rather than silently using zero. Even a supplied zero
   is unobserved sensitivity, not empirical evidence or a sealed policy;
+- every new live/no-send row can now retain its exact point-in-time top-liquid
+  membership/rank/set-size/limit/policy and a separate outcome-blind control
+  liquidity tier. Campaign readiness and empirical projection v4 preserve exact
+  coverage into the Research Lab without selecting controls, reading outcomes,
+  backfilling old rows, or changing Decision policy;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -95,6 +100,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   eligibility; v4 remains deprecated and live-ineligible;
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
+- prospective matched-control context remains incomplete: the current campaign
+  has no collected market-regime context and no sealed Protocol-v2 partition,
+  so no complete match row or matched control is available.
 
 No Protocol-v2 replay, selection, or final-test target exists. The holdout is
 undefined and unopened. Missing evidence remains unavailable and cannot be

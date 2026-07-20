@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve prospective controls through empirical surfaces · Codex
+**Why:** The live campaign had begun collecting exact outcome-blind universe
+and liquidity context for future matched controls, but the empirical projection
+and Research Lab stripped that evidence. Operators therefore could not see
+either the new coverage or the regime/partition fields that are still missing.
+**Changes:**
+- Advanced `decision_radar.empirical_live_campaign_projection` to schema v4.
+  It validates the source contract, exact field coverage, campaign-count
+  reconciliation, selection metadata, and safety flags before retaining the
+  point-in-time control-context readiness projection. Schema v1/v2/v3 remains
+  readable and missing historical context remains compatibility-unavailable.
+- Added a Research Lab disclosure and semantic coverage table for the
+  prospective matched-control context. It reports the genuine 30/1,260
+  universe and control-liquidity coverage alongside zero regime, partition,
+  complete-row, and matched-control coverage without selecting a control,
+  reading outcomes, or implying Protocol-v2 authority.
+- Advanced the static Protocol-v2 progress contract to v22. It records the
+  implemented prospective collection/projection path and the explicit
+  `prospective_matched_control_context_incomplete` blocker without embedding
+  drift-prone live counts. Updated the North Star, roadmap, durable decision,
+  working agreement, and generated architecture/project-health reports.
+- Kept the sealed Protocol-v1 report bundle and hardening supplement unchanged;
+  a v4-bearing empirical publication remains a separately versioned future
+  action. No provider call, send, trade, order, paper trade, normal RSI write,
+  or Event Alpha `TRIGGERED_FADE` occurred in this change.
+**Verify:** Focused empirical/Research Lab suite: `77 passed`; compileall, North
+Star JSON parsing, Protocol-v2 progress check, dashboard smoke, dashboard UX
+smoke, architecture cleanliness, and `git diff --check` passed. Full
+`make verify PYTHON=python3` passed outside the restricted socket sandbox:
+`1448/1448` standalone compatibility checks and `3572 passed` in package pytest,
+followed by alert-render, offline backtest, and paper-scoreboard success. The
+first sandboxed full run stopped only because local socket binding was denied;
+the exact check passed in the unrestricted release run.
+**Notes/risks:** This is prospective descriptive evidence only. Genuine
+point-in-time market regime, a pre-holdout sealed partition, an outcome-blind
+selector, and independent route episodes remain required before matched-control
+or Protocol-v2 claims can exist.
+
 ## 2026-07-20 — Preserve forward point-in-time universe context · Codex
 **Why:** The live generation knew each asset's exact top-liquid position, but
 the rolling history discarded that context. Future matched controls and the

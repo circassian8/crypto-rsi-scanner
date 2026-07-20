@@ -185,7 +185,7 @@
     }
   },
   "decision_model_version": "crypto_radar_decision_model_v2",
-  "generated_at": "2026-07-20T07:17:32+00:00",
+  "generated_at": "2026-07-20T08:47:47+00:00",
   "empirical_validation_lab": {
     "additional_data_needed": [
       "observed bid-ask spread and order-book execution-quality snapshots",
@@ -269,14 +269,21 @@
       "live_and_replay_pooled": false,
       "live_no_send": "separate_fingerprinted_observational_lane",
       "live_projection_contract": {
-        "current_schema_version": 3,
+        "current_schema_version": 4,
         "supported_schema_versions": [
           1,
           2,
-          3
+          3,
+          4
         ],
         "causal_temporal_surprise_coverage_retained": true,
         "human_review_queue_and_timing_retained": true,
+        "point_in_time_control_context_retained": true,
+        "point_in_time_control_context_source_campaign_counts_reconciled": true,
+        "point_in_time_control_context_selection_uses_outcomes": false,
+        "point_in_time_control_context_historical_backfill": false,
+        "point_in_time_control_context_selects_controls": false,
+        "point_in_time_control_context_infers_missing_regime_or_partition": false,
         "dashboard_reads_count_as_human_actions": false,
         "missing_older_context": "compatibility_unavailable_not_zero",
         "statistical_independence_claimed": false,

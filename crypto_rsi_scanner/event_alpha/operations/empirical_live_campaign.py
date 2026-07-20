@@ -13,10 +13,12 @@ from . import market_observation_campaign_shadow_surprise
 SCHEMA_ID = "decision_radar.empirical_live_campaign_projection"
 LEGACY_SCHEMA_VERSION = 1
 PRIOR_SCHEMA_VERSION = 2
-SCHEMA_VERSION = 3
+CAUSAL_CONTEXT_SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SUPPORTED_SCHEMA_VERSIONS = (
     LEGACY_SCHEMA_VERSION,
     PRIOR_SCHEMA_VERSION,
+    CAUSAL_CONTEXT_SCHEMA_VERSION,
     SCHEMA_VERSION,
 )
 MAX_REPORT_BYTES = 2 * 1024 * 1024
@@ -49,6 +51,40 @@ _REVIEW_SAFETY_FIELDS = frozenset({
     "event_alpha_triggered_fade",
     "dashboard_authority_mutations",
     "production_policy_mutations",
+})
+CONTROL_CONTEXT_SCHEMA_ID = "decision_radar.point_in_time_control_context_readiness"
+CONTROL_CONTEXT_FIELD_NAMES = (
+    "observation_date",
+    "point_in_time_universe_member",
+    "point_in_time_volume_rank",
+    "point_in_time_universe_size",
+    "point_in_time_universe_limit",
+    "point_in_time_universe_policy",
+    "control_liquidity_tier",
+    "control_liquidity_tier_basis",
+    "market_regime",
+    "market_regime_basis",
+    "protocol_partition",
+    "protocol_partition_basis",
+)
+CONTROL_CONTEXT_UNIVERSE_FIELD_NAMES = CONTROL_CONTEXT_FIELD_NAMES[:8]
+CONTROL_CONTEXT_SELECTION_MATCH_FIELDS = (
+    "partition",
+    "observation_date",
+    "market_regime",
+    "liquidity_tier",
+)
+CONTROL_CONTEXT_SELECTION_FIELD_MAPPING = {
+    "partition": "protocol_partition",
+    "observation_date": "derived_from_observed_at_utc",
+    "market_regime": "market_regime",
+    "liquidity_tier": "control_liquidity_tier",
+}
+CONTROL_CONTEXT_STATUSES = frozenset({
+    "unavailable",
+    "empty",
+    "partial",
+    "ready_for_outcome_blind_selection",
 })
 
 
@@ -147,6 +183,9 @@ def project_live_campaign(report: Mapping[str, Any]) -> dict[str, Any]:
         },
         "shadow_temporal_surprise": _shadow_temporal_surprise_projection(report),
         "human_review": _human_review_projection(report),
+        "point_in_time_control_context": (
+            _point_in_time_control_context_projection(report, metrics=metrics)
+        ),
         "limitations": _limitations(report.get("data_quality_limitations")),
         "evidence_strength": "insufficient_sample" if matured < 5 else "descriptive_only",
         "replay_evidence_aggregated": False,
@@ -159,6 +198,162 @@ def project_live_campaign(report: Mapping[str, Any]) -> dict[str, Any]:
         "authorization_mutations": 0,
         "dashboard_authority_mutations": 0,
     }
+
+
+def _point_in_time_control_context_projection(
+    report: Mapping[str, Any],
+    *,
+    metrics: Mapping[str, Any],
+) -> dict[str, Any]:
+    baseline = report.get("baseline_maturity")
+    if baseline is None:
+        return _unavailable_point_in_time_control_context()
+    if not isinstance(baseline, Mapping):
+        raise ValueError("live campaign point-in-time control context invalid")
+    value = baseline.get("point_in_time_control_context_readiness")
+    if value is None:
+        return _unavailable_point_in_time_control_context()
+    if not isinstance(value, Mapping):
+        raise ValueError("live campaign point-in-time control context invalid")
+    _validate_point_in_time_control_context_source(value, metrics=metrics)
+    coverage = _mapping(value.get("field_coverage_counts"))
+    return {
+        "available": True,
+        "source_schema_id": CONTROL_CONTEXT_SCHEMA_ID,
+        "source_schema_version": 1,
+        "status": str(value["status"]),
+        "retained_observation_count": value["retained_observation_count"],
+        "counted_observation_count": value["counted_observation_count"],
+        "point_in_time_universe_context_row_count": value[
+            "point_in_time_universe_context_row_count"
+        ],
+        "complete_match_context_row_count": value[
+            "complete_match_context_row_count"
+        ],
+        "field_coverage_counts": {
+            field: coverage[field] for field in CONTROL_CONTEXT_FIELD_NAMES
+        },
+        "selection_match_fields": list(CONTROL_CONTEXT_SELECTION_MATCH_FIELDS),
+        "selection_field_mapping": dict(CONTROL_CONTEXT_SELECTION_FIELD_MAPPING),
+        "selection_uses_outcomes": False,
+        "selection_performed": False,
+        "historical_context_backfilled": False,
+        "matched_control_available": False,
+        "routing_eligible": False,
+        "priority_eligible": False,
+        "score_adjustment_eligible": False,
+        "decision_score_eligible": False,
+        "threshold_change_eligible": False,
+        "publication_authority": False,
+        "protocol_v2_evidence_eligible": False,
+        "policy_eligible": False,
+        "automatic_policy_effect": "none",
+        "auto_apply": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _unavailable_point_in_time_control_context() -> dict[str, Any]:
+    return {
+        "available": False,
+        "source_schema_id": "",
+        "source_schema_version": 0,
+        "status": "not_available_in_source_report",
+        "retained_observation_count": 0,
+        "counted_observation_count": 0,
+        "point_in_time_universe_context_row_count": 0,
+        "complete_match_context_row_count": 0,
+        "field_coverage_counts": {},
+        "selection_match_fields": [],
+        "selection_field_mapping": {},
+        "selection_uses_outcomes": False,
+        "selection_performed": False,
+        "historical_context_backfilled": False,
+        "matched_control_available": False,
+        "routing_eligible": False,
+        "priority_eligible": False,
+        "score_adjustment_eligible": False,
+        "decision_score_eligible": False,
+        "threshold_change_eligible": False,
+        "publication_authority": False,
+        "protocol_v2_evidence_eligible": False,
+        "policy_eligible": False,
+        "automatic_policy_effect": "none",
+        "auto_apply": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _validate_point_in_time_control_context_source(
+    value: Mapping[str, Any],
+    *,
+    metrics: Mapping[str, Any],
+) -> None:
+    error = "live campaign point-in-time control context invalid"
+    coverage = value.get("field_coverage_counts")
+    retained = value.get("retained_observation_count")
+    counted = value.get("counted_observation_count")
+    universe_complete = value.get("point_in_time_universe_context_row_count")
+    match_complete = value.get("complete_match_context_row_count")
+    if (
+        value.get("schema_id") != CONTROL_CONTEXT_SCHEMA_ID
+        or value.get("schema_version") != 1
+        or value.get("status") not in CONTROL_CONTEXT_STATUSES
+        or any(
+            type(item) is not int or item < 0
+            for item in (retained, counted, universe_complete, match_complete)
+        )
+        or retained < counted
+        or universe_complete > counted
+        or match_complete > universe_complete
+        or not isinstance(coverage, Mapping)
+        or set(coverage) != set(CONTROL_CONTEXT_FIELD_NAMES)
+        or any(type(coverage.get(field)) is not int for field in CONTROL_CONTEXT_FIELD_NAMES)
+        or any(
+            coverage[field] < 0 or coverage[field] > counted
+            for field in CONTROL_CONTEXT_FIELD_NAMES
+        )
+        or any(
+            universe_complete > coverage[field]
+            for field in CONTROL_CONTEXT_UNIVERSE_FIELD_NAMES
+        )
+        or any(
+            match_complete > coverage[field]
+            for field in CONTROL_CONTEXT_FIELD_NAMES
+        )
+        or value.get("selection_match_fields")
+        != list(CONTROL_CONTEXT_SELECTION_MATCH_FIELDS)
+        or value.get("selection_field_mapping")
+        != CONTROL_CONTEXT_SELECTION_FIELD_MAPPING
+        or value.get("selection_uses_outcomes") is not False
+        or value.get("selection_performed") is not False
+        or value.get("historical_context_backfilled") is not False
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+        or value.get("research_only") is not True
+        or metrics.get("retained_observation_count") != retained
+        or metrics.get("baseline_counted_observation_count") != counted
+    ):
+        raise ValueError(error)
+    expected_status = (
+        "empty"
+        if counted == 0
+        else "ready_for_outcome_blind_selection"
+        if match_complete == counted
+        else "partial"
+    )
+    if value.get("status") == "unavailable":
+        if any((retained, counted, universe_complete, match_complete)) or any(
+            coverage.values()
+        ):
+            raise ValueError(error)
+    elif value.get("status") != expected_status:
+        raise ValueError(error)
 
 
 def _shadow_temporal_surprise_projection(
@@ -583,6 +778,13 @@ def _number(value: Any) -> float | None:
 
 
 __all__ = [
+    "CAUSAL_CONTEXT_SCHEMA_VERSION",
+    "CONTROL_CONTEXT_FIELD_NAMES",
+    "CONTROL_CONTEXT_SCHEMA_ID",
+    "CONTROL_CONTEXT_SELECTION_FIELD_MAPPING",
+    "CONTROL_CONTEXT_SELECTION_MATCH_FIELDS",
+    "CONTROL_CONTEXT_STATUSES",
+    "CONTROL_CONTEXT_UNIVERSE_FIELD_NAMES",
     "LEGACY_SCHEMA_VERSION",
     "PRIOR_SCHEMA_VERSION",
     "SCHEMA_ID",

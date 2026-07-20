@@ -940,9 +940,14 @@ def test_rejects_boolean_live_projection_schema_version() -> None:
             "dashboard_reads_recorded_as_human_actions",
             True,
         ),
+        (
+            "point_in_time_control_context",
+            "selection_performed",
+            True,
+        ),
     ),
 )
-def test_rejects_resigned_live_campaign_v3_evidence_drift(
+def test_rejects_resigned_live_campaign_current_evidence_drift(
     section: str, field: str, value: object
 ) -> None:
     projection = empirical_live_campaign.project_live_campaign(_live_report())
@@ -960,6 +965,34 @@ def test_rejects_resigned_live_campaign_v3_evidence_drift(
         RuntimeError, match="empirical_research_report_live_binding_invalid"
     ):
         empirical_research_report_validation._validate_published_live(binding)
+
+
+@pytest.mark.parametrize(
+    ("schema_version", "removed_fields"),
+    (
+        (1, ("shadow_temporal_surprise", "human_review", "point_in_time_control_context")),
+        (2, ("shadow_temporal_surprise", "human_review", "point_in_time_control_context")),
+        (3, ("point_in_time_control_context",)),
+    ),
+)
+def test_published_live_campaign_keeps_prior_schema_versions_readable(
+    schema_version: int,
+    removed_fields: tuple[str, ...],
+) -> None:
+    projection = empirical_live_campaign.project_live_campaign(_live_report())
+    projection["schema_version"] = schema_version
+    for field in removed_fields:
+        projection.pop(field)
+    binding = {
+        "status": "provided_separate_observational_lane",
+        "canonical_projection": projection,
+        "canonical_projection_sha256": hashlib.sha256(
+            empirical_replay_store.canonical_json_bytes(projection)
+        ).hexdigest(),
+        "evidence_pooled_with_replay": False,
+    }
+
+    empirical_research_report_validation._validate_published_live(binding)
 
 
 def _resign_publication_bundle(

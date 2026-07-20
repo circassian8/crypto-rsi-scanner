@@ -50,6 +50,7 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
     CONTRACT_VERSION as FROZEN_CONTRACT_VERSION,
     readiness_sha256,
 )
+from crypto_rsi_scanner.event_alpha.operations import empirical_live_campaign
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
     BYBIT_NATIVE_METRICS,
     REMAINING_PROTOCOL_V2_COST_FIELDS,
@@ -68,9 +69,10 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v21"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v22"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
+    "with_prospective_outcome_blind_point_in_time_control_context_projection_"
     "with_fail_closed_residual_cost_availability_and_unsealed_per_leg_"
     "slippage_sensitivity_"
     "with_unsealed_decision_price_latency_and_identity_rederived_"
@@ -100,6 +102,7 @@ _CURRENT_BLOCKERS = (
     "authoritative_catalyst_unlock_onchain_fundamental_and_official_macro_sources_not_sealed",
     "historical_outcome_recovery_incomplete",
     "explicit_human_review_timing_and_source_independence_labels_incomplete",
+    "prospective_matched_control_context_incomplete",
     "partitions_and_untouched_holdout_not_sealed",
     "cost_model_not_sealed",
     "universe_routes_independent_episodes_and_minimum_samples_not_sealed",
@@ -370,6 +373,39 @@ _EXPECTED_EXECUTION_DECISION = {
     "credentials_or_private_account_data": False,
     "orders_or_execution_or_trading": False,
 }
+_EXPECTED_PROSPECTIVE_CONTROL_CONTEXT = {
+    "source_schema_id": empirical_live_campaign.CONTROL_CONTEXT_SCHEMA_ID,
+    "source_schema_version": 1,
+    "empirical_projection_schema_id": empirical_live_campaign.SCHEMA_ID,
+    "empirical_projection_schema_version": empirical_live_campaign.SCHEMA_VERSION,
+    "new_observation_context_collection_implemented": True,
+    "campaign_readiness_projection_implemented": True,
+    "research_lab_projection_implemented": True,
+    "selection_match_fields": list(
+        empirical_live_campaign.CONTROL_CONTEXT_SELECTION_MATCH_FIELDS
+    ),
+    "selection_field_mapping": dict(
+        empirical_live_campaign.CONTROL_CONTEXT_SELECTION_FIELD_MAPPING
+    ),
+    "selection_uses_outcomes": False,
+    "matched_control_selection_performed": False,
+    "historical_context_backfilled": False,
+    "market_regime_context_collection_implemented": False,
+    "protocol_partition_assignment_implemented": False,
+    "current_coverage_counts_embedded": False,
+    "current_coverage_source": (
+        "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json:"
+        "baseline_maturity.point_in_time_control_context_readiness"
+    ),
+    "routing_eligible": False,
+    "score_adjustment_eligible": False,
+    "threshold_change_eligible": False,
+    "protocol_v2_evidence_eligible": False,
+    "provider_calls": 0,
+    "file_reads": 0,
+    "writes": 0,
+    "research_only": True,
+}
 
 
 def current_progress_values() -> dict[str, Any]:
@@ -494,6 +530,9 @@ def current_progress_values() -> dict[str, Any]:
             "protocol_v2_evidence_eligible": False,
             "research_only": True,
         },
+        "prospective_control_context_contract": deepcopy(
+            _EXPECTED_PROSPECTIVE_CONTROL_CONTEXT
+        ),
         "current_activation_blockers": list(_CURRENT_BLOCKERS),
         "next_safe_commands": list(_NEXT_SAFE_COMMANDS),
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},
@@ -516,6 +555,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         "confirmed_execution_decision",
         "native_liquidation_contract",
         "structured_unlock_contract",
+        "prospective_control_context_contract",
         "current_activation_blockers",
         "next_safe_commands",
         "safety",
@@ -622,6 +662,10 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
     if unlock != expected_unlock:
         errors.append("structured_unlock_contract_mismatch")
 
+    control_context = value.get("prospective_control_context_contract")
+    if control_context != _EXPECTED_PROSPECTIVE_CONTROL_CONTEXT:
+        errors.append("prospective_control_context_contract_mismatch")
+
     blockers = value.get("current_activation_blockers")
     if blockers != list(_CURRENT_BLOCKERS):
         errors.append("current_activation_blockers_mismatch")
@@ -657,6 +701,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
     decision = payload["confirmed_execution_decision"]
     liquidation = payload["native_liquidation_contract"]
     unlock = payload["structured_unlock_contract"]
+    control_context = payload["prospective_control_context_contract"]
     lines = [
         "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS",
         f"status={payload['status']}",
@@ -909,6 +954,18 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "offline_normalizer=true fixture_capture_doctor=true "
             "full_multipage=false live_transport=false genuine_capture=false "
             "protocol_v2_evidence=false"
+        ),
+        (
+            "prospective_control_context="
+            f"{control_context['source_schema_id']}:v"
+            f"{control_context['source_schema_version']} "
+            "new_observation_collection=true campaign_readiness=true "
+            "empirical_projection_v4=true research_lab=true"
+        ),
+        (
+            "prospective_control_selection=not_performed outcomes_used=false "
+            "historical_backfill=false market_regime_collection=false "
+            "protocol_partition_assignment=false protocol_v2_evidence=false"
         ),
         (
             "provider_calls=0 credential_reads=0 environment_reads=0 file_reads=0 "

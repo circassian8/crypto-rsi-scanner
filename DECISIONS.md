@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Preserve prospective control context in empirical live projections
+**Status:** accepted; current sealed Protocol-v1 bundle remains immutable
+**Decision:** New `decision_radar.empirical_live_campaign_projection` values
+use schema v4. Copy the campaign's closed point-in-time control-context
+readiness into the separate live/no-send observational lane only after exact
+source schema, campaign-count reconciliation, per-field coverage, selection
+field, and zero-side-effect validation. Preserve universe/liquidity coverage as
+observed while leaving absent market-regime and Protocol-v2 partition coverage
+at zero. Never backfill historical rows, inspect outcomes, select a matched
+control, infer missing context, or grant routing, score, threshold, publication,
+policy, or Protocol-v2 authority. Keep schema v1/v2/v3 readable and label a
+missing older source field compatibility-unavailable. Do not rewrite the sealed
+seven-file Protocol-v1 bundle or its hardening supplement; a v4-bearing bundle
+requires a separate versioned publication and review.
+**Why:** The campaign now preserves honest prospective top-liquid and
+control-liquidity context, but the empirical projection previously stripped it.
+Carrying validated coverage into Research Lab closes that truth loss while
+showing exactly why matched controls are still unavailable.
+**Revisit when:** Genuine point-in-time market-regime context is collected, the
+Protocol-v2 partition rule is sealed before holdout access, and an outcome-blind
+selector can be reviewed against complete rows without changing Decision policy.
+
 ## 2026-07-20 - Retain point-in-time universe context without backfilling history
 **Status:** accepted as forward evidence collection; matched-control policy remains unsealed
 **Decision:** Every newly normalized no-send market row records its exact
@@ -38,7 +60,7 @@ partition rule is sealed before holdout access, and an outcome-blind selector
 can bind complete point-in-time rows to independent Decision episodes.
 
 ## 2026-07-20 - Carry causal coverage and explicit review truth only in forward empirical projections
-**Status:** accepted; current sealed Protocol-v1 bundle remains immutable
+**Status:** superseded by the 2026-07-20 schema-v4 control-context projection decision
 **Decision:** New `decision_radar.empirical_live_campaign_projection` values
 use schema v3. When the source campaign report contains the closed causal
 temporal-surprise audit and both human-review summaries, copy their bounded

@@ -446,6 +446,7 @@ def _validate_published_live(value: Any) -> None:
         raise RuntimeError("empirical_research_report_live_binding_invalid")
     if projection.get("schema_version") in (
         empirical_live_campaign.PRIOR_SCHEMA_VERSION,
+        empirical_live_campaign.CAUSAL_CONTEXT_SCHEMA_VERSION,
         empirical_live_campaign.SCHEMA_VERSION,
     ):
         episodes = projection.get("episodes")
@@ -455,9 +456,17 @@ def _validate_published_live(value: Any) -> None:
             or episodes.get("cross_asset_independence_claim") is not False
         ):
             raise RuntimeError("empirical_research_report_live_binding_invalid")
-    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+    if projection.get("schema_version") in (
+        empirical_live_campaign.CAUSAL_CONTEXT_SCHEMA_VERSION,
+        empirical_live_campaign.SCHEMA_VERSION,
+    ):
         _validate_published_live_shadow(projection.get("shadow_temporal_surprise"))
         _validate_published_live_human_review(projection.get("human_review"))
+    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+        _validate_published_live_control_context(
+            projection.get("point_in_time_control_context"),
+            metrics=projection.get("campaign_metrics"),
+        )
 
 
 def _validate_published_live_shadow(value: Any) -> None:
@@ -652,6 +661,95 @@ def _validate_published_live_human_review(value: Any) -> None:
     )
     if value.get("latency_evidence_status") != expected_latency_status:
         raise RuntimeError("empirical_research_report_live_binding_invalid")
+
+
+def _validate_published_live_control_context(
+    value: Any,
+    *,
+    metrics: Any,
+) -> None:
+    error = "empirical_research_report_live_binding_invalid"
+    if not isinstance(value, Mapping) or not isinstance(metrics, Mapping):
+        raise RuntimeError(error)
+    unavailable = (
+        empirical_live_campaign._unavailable_point_in_time_control_context()
+    )
+    if set(value) != set(unavailable):
+        raise RuntimeError(error)
+    if value.get("available") is False:
+        if value != unavailable:
+            raise RuntimeError(error)
+        return
+    coverage = value.get("field_coverage_counts")
+    retained = _count(value.get("retained_observation_count"))
+    counted = _count(value.get("counted_observation_count"))
+    universe_complete = _count(
+        value.get("point_in_time_universe_context_row_count")
+    )
+    match_complete = _count(value.get("complete_match_context_row_count"))
+    if (
+        value.get("available") is not True
+        or value.get("source_schema_id")
+        != empirical_live_campaign.CONTROL_CONTEXT_SCHEMA_ID
+        or value.get("source_schema_version") != 1
+        or value.get("status")
+        not in empirical_live_campaign.CONTROL_CONTEXT_STATUSES
+        or min(retained, counted, universe_complete, match_complete) < 0
+        or retained < counted
+        or universe_complete > counted
+        or match_complete > universe_complete
+        or not isinstance(coverage, Mapping)
+        or set(coverage)
+        != set(empirical_live_campaign.CONTROL_CONTEXT_FIELD_NAMES)
+        or any(_count(coverage.get(field)) < 0 for field in coverage)
+        or any(_count(coverage.get(field)) > counted for field in coverage)
+        or any(
+            universe_complete > _count(coverage.get(field))
+            for field in empirical_live_campaign.CONTROL_CONTEXT_UNIVERSE_FIELD_NAMES
+        )
+        or any(
+            match_complete > _count(coverage.get(field))
+            for field in empirical_live_campaign.CONTROL_CONTEXT_FIELD_NAMES
+        )
+        or value.get("selection_match_fields")
+        != list(empirical_live_campaign.CONTROL_CONTEXT_SELECTION_MATCH_FIELDS)
+        or value.get("selection_field_mapping")
+        != empirical_live_campaign.CONTROL_CONTEXT_SELECTION_FIELD_MAPPING
+        or value.get("selection_uses_outcomes") is not False
+        or value.get("selection_performed") is not False
+        or value.get("historical_context_backfilled") is not False
+        or value.get("matched_control_available") is not False
+        or value.get("routing_eligible") is not False
+        or value.get("priority_eligible") is not False
+        or value.get("score_adjustment_eligible") is not False
+        or value.get("decision_score_eligible") is not False
+        or value.get("threshold_change_eligible") is not False
+        or value.get("publication_authority") is not False
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("policy_eligible") is not False
+        or value.get("automatic_policy_effect") != "none"
+        or value.get("auto_apply") is not False
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+        or value.get("research_only") is not True
+        or metrics.get("retained_observation_count") != retained
+        or metrics.get("baseline_counted_observation_count") != counted
+    ):
+        raise RuntimeError(error)
+    expected_status = (
+        "empty"
+        if counted == 0
+        else "ready_for_outcome_blind_selection"
+        if match_complete == counted
+        else "partial"
+    )
+    if value.get("status") == "unavailable":
+        if any((retained, counted, universe_complete, match_complete)) or any(
+            coverage.values()
+        ):
+            raise RuntimeError(error)
+    elif value.get("status") != expected_status:
+        raise RuntimeError(error)
 
 
 def _count_mapping_closes(value: Mapping[str, Any], expected: int) -> bool:

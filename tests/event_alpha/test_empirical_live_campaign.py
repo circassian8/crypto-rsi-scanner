@@ -37,8 +37,56 @@ def _report():
         "campaign_metrics": {
             "real_cycles": 8,
             "real_observations": 240,
+            "retained_observation_count": 240,
+            "baseline_counted_observation_count": 210,
             "historical_ideas": 2,
             "route_counts": {"risk_watch": 2},
+        },
+        "baseline_maturity": {
+            "point_in_time_control_context_readiness": {
+                "schema_id": (
+                    "decision_radar.point_in_time_control_context_readiness"
+                ),
+                "schema_version": 1,
+                "status": "partial",
+                "retained_observation_count": 240,
+                "counted_observation_count": 210,
+                "point_in_time_universe_context_row_count": 30,
+                "complete_match_context_row_count": 0,
+                "field_coverage_counts": {
+                    "observation_date": 210,
+                    "point_in_time_universe_member": 30,
+                    "point_in_time_volume_rank": 30,
+                    "point_in_time_universe_size": 30,
+                    "point_in_time_universe_limit": 30,
+                    "point_in_time_universe_policy": 30,
+                    "control_liquidity_tier": 30,
+                    "control_liquidity_tier_basis": 30,
+                    "market_regime": 0,
+                    "market_regime_basis": 0,
+                    "protocol_partition": 0,
+                    "protocol_partition_basis": 0,
+                },
+                "selection_match_fields": [
+                    "partition",
+                    "observation_date",
+                    "market_regime",
+                    "liquidity_tier",
+                ],
+                "selection_field_mapping": {
+                    "partition": "protocol_partition",
+                    "observation_date": "derived_from_observed_at_utc",
+                    "market_regime": "market_regime",
+                    "liquidity_tier": "control_liquidity_tier",
+                },
+                "selection_uses_outcomes": False,
+                "selection_performed": False,
+                "historical_context_backfilled": False,
+                "protocol_v2_evidence_eligible": False,
+                "provider_calls": 0,
+                "writes": 0,
+                "research_only": True,
+            },
         },
         "shadow_anomaly_episodes": {
             "status": "ready",
@@ -168,7 +216,7 @@ def test_live_campaign_projection_stays_separate_and_insufficient() -> None:
     assert projection["evidence_mode"] == "live_no_send"
     assert projection["campaign_metrics"]["real_observations"] == 240
     assert projection["episodes"]["primary_episode_count"] == 1
-    assert projection["schema_version"] == 3
+    assert projection["schema_version"] == 4
     assert projection["episodes"]["statistical_independence_claim"] is False
     assert projection["episodes"]["cross_asset_independence_claim"] is False
     assert projection["episodes"]["representatives"][0]["radar_route"] == "risk_watch"
@@ -184,6 +232,16 @@ def test_live_campaign_projection_stays_separate_and_insufficient() -> None:
     assert projection["human_review"]["latency_evidence_status"] == (
         "unavailable_no_explicit_human_actions"
     )
+    controls = projection["point_in_time_control_context"]
+    assert controls["available"] is True
+    assert controls["status"] == "partial"
+    assert controls["counted_observation_count"] == 210
+    assert controls["point_in_time_universe_context_row_count"] == 30
+    assert controls["complete_match_context_row_count"] == 0
+    assert controls["field_coverage_counts"]["market_regime"] == 0
+    assert controls["selection_uses_outcomes"] is False
+    assert controls["historical_context_backfilled"] is False
+    assert controls["protocol_v2_evidence_eligible"] is False
 
 
 def test_live_campaign_loader_rejects_duplicate_keys_and_symlink(tmp_path: Path) -> None:
@@ -226,6 +284,7 @@ def test_live_campaign_projection_marks_older_source_context_unavailable() -> No
     report.pop("shadow_temporal_surprise_campaign_audit")
     report.pop("human_review_timing")
     report.pop("human_review_queue")
+    report.pop("baseline_maturity")
 
     projection = project_live_campaign(report)
 
@@ -242,6 +301,10 @@ def test_live_campaign_projection_marks_older_source_context_unavailable() -> No
     }
     assert projection["human_review"]["latency_evidence_status"] == (
         "unavailable_source_report_compatibility"
+    )
+    assert projection["point_in_time_control_context"]["available"] is False
+    assert projection["point_in_time_control_context"]["status"] == (
+        "not_available_in_source_report"
     )
 
 
@@ -286,4 +349,30 @@ def test_live_campaign_projection_rejects_review_status_count_contradiction() ->
     report["human_review_queue"]["status"] = "complete"
 
     with pytest.raises(ValueError, match="human review invalid"):
+        project_live_campaign(report)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    (
+        ("context", "selection_performed", True),
+        ("context", "historical_context_backfilled", True),
+        ("context", "complete_match_context_row_count", 31),
+        ("metrics", "baseline_counted_observation_count", 209),
+    ),
+)
+def test_live_campaign_projection_rejects_point_in_time_control_context_drift(
+    section: str,
+    field: str,
+    value: object,
+) -> None:
+    report = _report()
+    target = (
+        report["baseline_maturity"]["point_in_time_control_context_readiness"]
+        if section == "context"
+        else report["campaign_metrics"]
+    )
+    target[field] = value
+
+    with pytest.raises(ValueError, match="point-in-time control context invalid"):
         project_live_campaign(report)

@@ -717,8 +717,11 @@ def _live_replay_panel(
     if live.get("available") is True:
         shadow = _mapping(live.get("shadow_temporal_surprise"))
         human_review = _mapping(live.get("human_review"))
-        campaign_evidence = _live_shadow_coverage(shadow) + _live_human_review(
-            human_review
+        control_context = _mapping(live.get("point_in_time_control_context"))
+        campaign_evidence = (
+            _live_point_in_time_control_context(control_context)
+            + _live_shadow_coverage(shadow)
+            + _live_human_review(human_review)
         )
     control_rows = []
     for label, controls in (
@@ -748,6 +751,67 @@ def _live_replay_panel(
         + str(disclosure("Controls & benchmarks", controls_body, summary="No causal claim")),
         eyebrow="Evidence separation",
     )
+
+
+def _live_point_in_time_control_context(value: Mapping[str, Any]) -> str:
+    if value.get("available") is not True:
+        return str(disclosure(
+            "Prospective matched-control context",
+            '<p class="muted">This immutable campaign snapshot predates the closed point-in-time control-context projection. Missing compatibility data is not zero coverage, and no matched control is inferred.</p>',
+            summary="Unavailable in this snapshot",
+        ))
+    coverage = _mapping(value.get("field_coverage_counts"))
+    counted = _count(value.get("counted_observation_count"))
+    rows = (
+        (
+            "Observation date",
+            display_count(coverage.get("observation_date")),
+            display_count(counted),
+        ),
+        (
+            "Complete point-in-time universe context",
+            display_count(value.get("point_in_time_universe_context_row_count")),
+            display_count(counted),
+        ),
+        (
+            "Control liquidity tier",
+            display_count(coverage.get("control_liquidity_tier")),
+            display_count(counted),
+        ),
+        (
+            "Market regime",
+            display_count(coverage.get("market_regime")),
+            display_count(counted),
+        ),
+        (
+            "Protocol-v2 partition",
+            display_count(coverage.get("protocol_partition")),
+            display_count(counted),
+        ),
+        (
+            "Complete match context",
+            display_count(value.get("complete_match_context_row_count")),
+            display_count(counted),
+        ),
+    )
+    body = HtmlFragment(
+        str(data_table(
+            ("Control-selection evidence", "Covered rows", "Assessed rows"),
+            rows,
+            empty="No point-in-time control context is available.",
+            compact=True,
+        ))
+        + (
+            '<p class="muted">Coverage is prospective and outcome-blind. Historical rows were not backfilled; '
+            "no control was selected; and missing market-regime or sealed-partition context remains missing. "
+            "This projection cannot change routes, scores, thresholds, publication authority, or Protocol-v2 evidence status.</p>"
+        )
+    )
+    return str(disclosure(
+        "Prospective matched-control context",
+        body,
+        summary=humanize_enum(value.get("status")),
+    ))
 
 
 def _live_shadow_coverage(shadow: Mapping[str, Any]) -> str:

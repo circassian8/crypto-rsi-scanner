@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v21")
+    assert values["progress_version"].endswith("_v22")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -314,6 +314,18 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert unlock["genuine_capture_present"] is False
     assert unlock["subscription_terms_approved"] is False
     assert unlock["protocol_v2_evidence_eligible"] is False
+    controls = values["prospective_control_context_contract"]
+    assert controls["new_observation_context_collection_implemented"] is True
+    assert controls["campaign_readiness_projection_implemented"] is True
+    assert controls["empirical_projection_schema_version"] == 4
+    assert controls["research_lab_projection_implemented"] is True
+    assert controls["selection_uses_outcomes"] is False
+    assert controls["matched_control_selection_performed"] is False
+    assert controls["historical_context_backfilled"] is False
+    assert controls["market_regime_context_collection_implemented"] is False
+    assert controls["protocol_partition_assignment_implemented"] is False
+    assert controls["current_coverage_counts_embedded"] is False
+    assert controls["protocol_v2_evidence_eligible"] is False
     assert "historical_outcome_recovery_incomplete" in values[
         "current_activation_blockers"
     ]
@@ -394,6 +406,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     quantity_drift["confirmed_execution_decision"][
         "round_trip_base_quantity_reconciliation_implemented"
     ] = False
+    control_context_drift = progress.current_progress_values()
+    control_context_drift["prospective_control_context_contract"][
+        "matched_control_selection_performed"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -409,6 +425,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         native_field_drift,
         impact_drift,
         quantity_drift,
+        control_context_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -561,6 +578,12 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "structured_unlock_surface=tokenomist:v5" in output.out
     assert "fixture_capture_doctor=true" in output.out
     assert "full_multipage=false live_transport=false genuine_capture=false" in output.out
+    assert "prospective_control_context=" in output.out
+    assert "empirical_projection_v4=true research_lab=true" in output.out
+    assert "prospective_control_selection=not_performed" in output.out
+    assert "historical_backfill=false market_regime_collection=false" in output.out
+    assert "protocol_partition_assignment=false protocol_v2_evidence=false" in output.out
+    assert "- prospective_matched_control_context_incomplete" in output.out
     assert "offline/readiness/queue only; no provider calls" in output.out
     assert "radar-derivatives-bybit-liquidation-smoke" in output.out
     assert "radar-derivatives-bybit-liquidation-capture-smoke" in output.out

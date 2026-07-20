@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10877,
+  "function_count": 10882,
   "function_line_limit": 150,
   "functions_over_150_lines": 13,
   "functions_over_limit": [
@@ -1592,7 +1592,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 278,
+      "line_count": 291,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1640,7 +1640,7 @@
     }
   ],
   "functions_over_limit_count": 13,
-  "generated_at": "2026-07-20T08:01:12.941196+00:00",
+  "generated_at": "2026-07-20T08:51:22.212596+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3334,7 +3334,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 278,
+      "line_count": 291,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",

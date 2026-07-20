@@ -747,6 +747,19 @@ def test_research_lab_renders_causal_coverage_and_explicit_review_evidence(
         "completed_latency_sample_count": 0,
         "latency_evidence_status": "unavailable_no_explicit_human_actions",
     }
+    live["point_in_time_control_context"] = {
+        "available": True,
+        "status": "partial",
+        "counted_observation_count": 1260,
+        "point_in_time_universe_context_row_count": 30,
+        "complete_match_context_row_count": 0,
+        "field_coverage_counts": {
+            "observation_date": 1260,
+            "control_liquidity_tier": 30,
+            "market_regime": 0,
+            "protocol_partition": 0,
+        },
+    }
     projections["live"] = live
     lab["projections"] = projections
 
@@ -764,6 +777,16 @@ def test_research_lab_renders_causal_coverage_and_explicit_review_evidence(
     assert "Awaiting explicit action" in page.body
     assert "Only explicit confirmed operator actions count" in page.body
     assert "Unavailable no explicit human actions" in page.body
+    assert "Prospective matched-control context" in page.body
+    assert "Complete point-in-time universe context" in page.body
+    assert (
+        'data-label="Covered rows">30</td><td data-label="Assessed rows">1260</td>'
+        in page.body
+    )
+    assert "Market regime" in page.body
+    assert "Protocol-v2 partition" in page.body
+    assert "Historical rows were not backfilled" in page.body
+    assert "no control was selected" in page.body
 
 
 def test_research_lab_invalid_bundle_renders_inventory_only(tmp_path: Path) -> None:
