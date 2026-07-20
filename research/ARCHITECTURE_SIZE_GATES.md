@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T11:49:33.258140+00:00`
+- generated_at: `2026-07-20T12:57:54.981696+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -131,7 +131,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1283 |
-| `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1276 |
+| `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1278 |
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
@@ -172,7 +172,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 | Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly. | When adding another live-safe market provider or changing the generation transaction boundary. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 | Pure bounded targeted-review selection keeps outcome-aware categories, evidence bindings, deterministic ranking, and queue finalization in one policy-neutral path. | Split when another review category family or feedback-ledger integration is proposed, with frozen queue-digest fixtures first. |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
-| `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1276 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
+| `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1278 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 | The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface. | When the calendar page gains a new interaction family and has byte-stable page-section fixtures. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |

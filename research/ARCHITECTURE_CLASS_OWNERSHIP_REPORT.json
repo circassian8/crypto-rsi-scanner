@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10925,
+  "function_count": 10929,
   "function_line_limit": 150,
   "functions_over_150_lines": 14,
   "functions_over_limit": [
@@ -1648,7 +1648,7 @@
     }
   ],
   "functions_over_limit_count": 14,
-  "generated_at": "2026-07-20T11:49:37.072165+00:00",
+  "generated_at": "2026-07-20T12:57:58.855357+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3982,7 +3982,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1276,
+        "line_count": 1278,
         "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
         "threshold": 1200
       },

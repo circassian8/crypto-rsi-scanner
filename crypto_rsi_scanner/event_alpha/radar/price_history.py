@@ -313,6 +313,8 @@ def _binance_pair(symbol: str) -> str:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     if value in (None, ""):
         return None
     try:

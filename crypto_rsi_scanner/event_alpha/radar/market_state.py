@@ -468,6 +468,8 @@ def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value is None:
             return None

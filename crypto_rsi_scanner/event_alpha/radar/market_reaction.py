@@ -653,6 +653,8 @@ def _list_values(value: object) -> list[str]:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):

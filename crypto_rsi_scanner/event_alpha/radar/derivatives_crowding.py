@@ -1165,6 +1165,8 @@ def _text(value: object) -> str:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value in (None, ""):
             return None

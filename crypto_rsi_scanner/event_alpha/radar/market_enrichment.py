@@ -270,6 +270,8 @@ def _percent_to_fraction(value: object) -> float | None:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value is None:
             return None

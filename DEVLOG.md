@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close upstream boolean-numeric market normalization · Codex
+**Why:** The anomaly classifier rejected boolean numerics when called directly,
+but its shared upstream return normalizer still converted `true` to `100%`.
+That malformed provider value could therefore manufacture a confirmed breakout
+through the real scan path despite the existing semantic-boolean policy.
+**Changes:** Made booleans unavailable before numeric conversion in shared
+return-unit handling, market-state and market-reaction snapshots, derivatives
+crowding, CoinGecko market enrichment, asset-registry liquidity, outcome-price
+projection, and catalyst-attribution numerics. Added an end-to-end regression
+covering the full anomaly scan plus each adjacent boundary. Finite numeric zero
+remains valid; thresholds, weights, routes, providers, and historical artifacts
+are unchanged.
+**Verify:** The reproducer changed from `100.0 100.0 100.0` plus
+`confirmed_breakout` to unavailable numeric evidence. Focused market,
+enrichment, catalyst, and surface tests passed 101 tests; market-no-send,
+Decision-v2, and shadow-surprise integration tests passed 162 tests.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed; architecture cleanliness remained `OK`; and the local release gate
+`make verify PYTHON=python3` passed. Its provider-disabled fixtures emitted only
+the expected fail-soft mock-provider warnings. No real provider call, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+occurred, and no remote GitHub check was awaited.
+
 ## 2026-07-20 — Record the forty-fifth no-send market cycle · Codex
 **Why:** The next hourly cadence boundary was eligible and the existing
 CoinGecko authorization was present, so one bounded no-send observation could

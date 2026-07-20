@@ -94,6 +94,131 @@ def test_nonfinite_values_cannot_create_reaction_or_derivatives_crowding():
     json.dumps(state, allow_nan=False)
 
 
+def test_boolean_numerics_cannot_become_market_or_catalyst_evidence(tmp_path):
+    from crypto_rsi_scanner.event_alpha.radar import asset_registry
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+    from crypto_rsi_scanner.event_alpha.radar import derivatives_crowding
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+    from crypto_rsi_scanner.event_alpha.radar import market_enrichment
+    from crypto_rsi_scanner.event_alpha.radar import market_reaction
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+    from crypto_rsi_scanner.event_alpha.radar import market_units
+    from crypto_rsi_scanner.event_alpha.radar import price_history
+
+    now = "2026-07-20T12:00:00Z"
+    raw_market = {
+        "id": "boolean-market",
+        "coin_id": "boolean-market",
+        "symbol": "BOOL",
+        "observed_at": now,
+        "return_unit": "fraction",
+        "price": True,
+        "current_price": True,
+        "return_1h": True,
+        "return_4h": True,
+        "return_24h": True,
+        "relative_return_vs_btc_4h": True,
+        "market_cap": True,
+        "total_volume": True,
+        "volume_24h": True,
+        "volume_zscore_24h": True,
+        "liquidity_usd": True,
+        "spread_bps": True,
+        "open_interest_delta": True,
+        "funding_level": True,
+        "funding_zscore": True,
+        "liquidation_imbalance": True,
+        "price_change_percentage_24h_in_currency": True,
+        "sparkline_in_7d": {"price": [True] * 30},
+    }
+
+    assert market_units.normalize_return_fraction(True, "fraction") is None
+    assert market_units.normalize_return_percent_points(True, "fraction") is None
+    assert "invalid_return_value:return_4h" in market_units.validate_market_snapshot_units(
+        raw_market
+    )
+
+    snapshot = market_state.snapshot_from_market_row(raw_market, observed_at=now)
+    for field in (
+        "price",
+        "return_1h",
+        "return_4h",
+        "return_24h",
+        "relative_return_vs_btc_4h",
+        "volume_24h",
+        "volume_zscore_24h",
+        "volume_to_market_cap",
+        "liquidity_usd",
+        "spread_bps",
+        "open_interest_delta",
+        "funding_level",
+        "funding_zscore",
+        "liquidation_imbalance",
+    ):
+        assert getattr(snapshot, field) is None
+    assert snapshot.observed_fields == ()
+
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [raw_market],
+        observed_at=now,
+    )
+    assert anomalies == []
+    assert snapshots[0]["observed_fields"] == []
+
+    reaction = market_reaction.evaluate_market_reaction({
+        "market_snapshot": raw_market,
+        "derivatives_snapshot": raw_market,
+    })
+    assert reaction.market_state == "no_reaction"
+    assert reaction.market_state_snapshot.observed_fields == 0
+
+    derivatives = derivatives_crowding.normalize_derivatives_state(
+        raw_market,
+        observed_at=now,
+    )
+    for field in (
+        "open_interest",
+        "open_interest_delta_1h",
+        "open_interest_delta_4h",
+        "open_interest_delta_24h",
+        "funding_rate",
+        "funding_zscore",
+        "liquidation_imbalance",
+        "perp_spot_volume_ratio",
+    ):
+        assert derivatives[field] is None
+    assert derivatives_crowding._crowding_evidence(derivatives) == ()
+
+    enrichment = market_enrichment.market_snapshot_from_row(raw_market)
+    for field in (
+        "price",
+        "market_cap",
+        "volume_24h",
+        "return_1h",
+        "return_4h",
+        "return_24h",
+        "return_7d",
+        "volume_zscore_24h",
+    ):
+        assert field not in enrichment
+
+    universe = tmp_path / "boolean-universe.json"
+    universe.write_text(json.dumps({
+        "rows": [{
+            "id": "boolean-market",
+            "symbol": "BOOL",
+            "market_cap_rank": True,
+            "total_volume": True,
+        }]
+    }), encoding="utf-8")
+    assets = asset_registry.assets_from_coingecko_universe(universe)
+    assert len(assets) == 1
+    assert assets[0].liquidity_tier is None
+
+    assert price_history._float(True) is None
+    assert catalyst_attribution._finite_number(True) is None
+
+
 def test_nonfinite_or_shadowed_zero_universe_values_cannot_derive_liquidity(tmp_path):
     from crypto_rsi_scanner.event_alpha.radar import asset_registry
 

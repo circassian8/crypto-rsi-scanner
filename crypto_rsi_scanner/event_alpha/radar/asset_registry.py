@@ -429,6 +429,8 @@ def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:
 
 
 def _int(value: Any) -> int:
+    if isinstance(value, bool):
+        return 0
     try:
         return int(value)
     except (OverflowError, TypeError, ValueError):
@@ -436,6 +438,8 @@ def _int(value: Any) -> int:
 
 
 def _float(value: Any) -> float:
+    if isinstance(value, bool):
+        return 0.0
     try:
         parsed = float(value)
     except (TypeError, ValueError):

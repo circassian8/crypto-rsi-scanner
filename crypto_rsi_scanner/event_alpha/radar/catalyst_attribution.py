@@ -856,6 +856,8 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _finite_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):

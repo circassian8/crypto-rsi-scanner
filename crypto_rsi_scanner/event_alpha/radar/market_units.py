@@ -211,6 +211,8 @@ def _clean_unit(value: object) -> str:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value is None:
             return None
