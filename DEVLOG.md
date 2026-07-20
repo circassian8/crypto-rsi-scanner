@@ -17,6 +17,18 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the post-cluster local verification checkpoint · Codex
+**Why:** Five low-risk logical changes had accumulated since the prior broad
+local gate. The repository policy calls for a wider checkpoint after such a
+cluster without waiting for remote GitHub tests.
+**Changes:** No product or policy behavior changed. Recorded the local,
+provider-disabled verification result for the current `main` source.
+**Verify:** `make verify-fast PYTHON=python3` passed 3,594 tests in 188.37
+seconds, followed by the alert-render smoke, deterministic backtest fixture,
+and paper-scoreboard gate. The run used local ephemeral-loopback permission;
+provider authorization was stripped by the test harness and no GitHub check was
+waited on.
+
 ## 2026-07-20 — Make the human-review queue concise and actionable · Codex
 **Why:** Five genuine receipt-backed ideas await explicit first view, but the
 normal queue command buried each action inside a large digest-heavy JSON
