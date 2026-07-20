@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close Decision snapshot-container precedence · Codex
+**Why:** Return-field precedence already preserved invalid later values, but the
+three snapshot containers themselves were accepted only when mappings and
+silently ignored otherwise. A reproduced valid legacy `market_snapshot` plus
+explicit canonical `market_state_snapshot=[]`, boolean, or string retained
+`actionable_watch` by borrowing the legacy snapshot.
+**Changes:** Decision policy now exposes one container-contract check for
+`latest_market_snapshot`, `market_snapshot`, and `market_state_snapshot`.
+Present non-empty values must be mappings. A malformed explicit container adds
+`market_snapshot_contract_invalid` and routes diagnostic, even when another
+alias contains usable evidence. Absent/null optional aliases, valid empty
+mappings, valid multi-snapshot merge precedence, and the existing field-level
+invalidity protections remain unchanged. No return normalization, formula,
+weight, threshold, provider, or historical artifact changed.
+**Verify:** List, boolean, and string canonical-container reproductions now
+hard-block instead of borrowing the valid legacy snapshot; the valid mapping
+control remains actionable. `68` focused snapshot/Decision tests and `158`
+Decision, consistency, surface, derivatives, fixture-route, snapshot-
+precedence, RSI, schema, merge, pipeline, and catalyst-attribution propagation
+tests passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed
+with 15 candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0
+warnings, and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner
+tests` and `git diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Validate Decision catalyst source evidence · Codex
 **Why:** Catalyst policy and Decision scoring treated any truthy source URL/title
 as evidence. Reproduced mapping/list values and plain `"not a url"` upgraded an

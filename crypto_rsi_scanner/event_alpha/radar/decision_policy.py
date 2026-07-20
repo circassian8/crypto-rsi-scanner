@@ -166,6 +166,17 @@ def market_snapshot(data: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+def market_snapshot_invalid(data: Mapping[str, Any]) -> bool:
+    """Detect an explicit non-mapping market snapshot container."""
+
+    return any(
+        key in data
+        and data.get(key) not in (None, "")
+        and not isinstance(data.get(key), Mapping)
+        for key in ("latest_market_snapshot", "market_snapshot", "market_state_snapshot")
+    )
+
+
 def directional_bias(data: Mapping[str, Any]) -> str:
     """Derive directional research bias without using calendar context."""
 
@@ -917,6 +928,7 @@ __all__ = (
     "has_calendar_risk",
     "normalize_market_snapshot",
     "market_snapshot",
+    "market_snapshot_invalid",
     "market_classification_invalid",
     "market_label",
     "source_classification_invalid",
