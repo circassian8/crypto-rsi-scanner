@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-eighth no-send market cycle · Codex
+**Why:** The one-hour observation cadence became eligible while explicit
+CoinGecko authorization was present, so the campaign could advance one bounded
+point-in-time measurement without weakening any evidence or safety gate.
+**Changes:** Ran exactly one authorized Daily Operations cycle. The provider
+returned HTTP 200 with 80 bounded rows in 3,957 ms and no retry; the cycle
+published `radar_market_no_send_20260720t153817516889z_fe5d8ee82fb9`, wrote
+the immutable publication and operations receipts, and restarted the owned
+loopback dashboard. Regenerated the canonical campaign report: 48 successful
+cycles, 1,440 retained observations, 1,410 baseline-counted observations, 30
+too-close observations, 30/36 historically warm assets, 180 prospectively
+contextualized rows, seven historical ideas, four matured outcomes, two pending
+outcomes, and one `due_missing_price`. The current healthy-empty generation has
+30 observations, zero anomalies/ideas, and 26/30 exact rows fully warm; retained
+same-asset readiness is 28/30. Its causal 24-hour regime input is 27/30 ready,
+so no market regime, Protocol-v2 partition, or matched control was fabricated.
+**Verify:** The exact no-key-live strict doctor passed with zero blockers and
+zero warnings. Dashboard readiness and authority status matched namespace,
+run, revision 12, and operator-state SHA-256
+`846053da425166a3654516cd3d2c488688262580fbfb1f72a265f377d54d852e`.
+An external loopback HEAD returned HTTP 200 with the exact identity headers.
+`make radar-market-campaign-report PYTHON=python3` completed with zero provider
+calls.
+**Notes/risks:** The next provider boundary is
+`2026-07-20T16:38:19.109801+00:00`; do not retry before a fresh readiness gate.
+Spread, market-regime, partition, and matched-control coverage remain zero.
+Telegram sends, trades, orders, paper trades, normal RSI writes, and Event Alpha
+`TRIGGERED_FADE` creation all remained zero. The scheduler remains disabled.
+
 ## 2026-07-20 — Reconcile partial-validation strength components · Codex
 **Why:** Partial validation's weighted score already ignored malformed prior
 strength, but the stored component could remain NaN/infinite, making the audit
