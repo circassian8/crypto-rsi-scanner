@@ -21,8 +21,9 @@ decision, rationale, and revisit condition.
 **Decision:** Keep the Daily Operations CLI's default readiness/status output as
 the full compatibility JSON. The normal Make surfaces select a concise,
 allowlisted summary that exposes current authorization, call eligibility,
-cadence, baseline, dashboard/scheduler, source availability, latest invocation,
-latest actual provider attempt, exact next command, and safety state. Operators
+cadence, explicitly historical baseline warmth, prospective universe/regime/
+partition/match coverage, dashboard/scheduler, source availability, latest
+invocation, latest actual provider attempt, exact next command, and safety state. Operators
 may set `RADAR_DAILY_OPS_OUTPUT=json` to recover the unchanged full payload.
 Both modes refresh the same bounded current-status receipt and make zero
 provider calls.

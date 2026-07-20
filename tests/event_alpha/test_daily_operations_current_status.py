@@ -154,6 +154,12 @@ def test_readiness_cli_summary_is_concise_and_provider_safe(
     assert "current_provider_call_eligibility=eligible" in output.out
     assert "readiness_provider_calls=0" in output.out
     assert "status_receipt_refreshed=true" in output.out
+    assert "historical_baseline_warm_assets=0/0" in output.out
+    assert "control_context_status=unavailable" in output.out
+    assert "point_in_time_universe_context_rows=unavailable" in output.out
+    assert "market_regime_context_rows=unavailable" in output.out
+    assert "protocol_partition_context_rows=unavailable" in output.out
+    assert "complete_match_context_rows=unavailable" in output.out
     assert "telegram_sends=0" in output.out
     assert "trades_created=0" in output.out
     assert "orders_available=false" in output.out

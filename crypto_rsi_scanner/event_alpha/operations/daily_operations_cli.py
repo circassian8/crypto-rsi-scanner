@@ -236,6 +236,13 @@ def _readiness_summary(
     market = readiness.market
     dashboard = readiness.dashboard
     scheduler = readiness.scheduler
+    control_context = market.point_in_time_control_context_readiness
+    if not isinstance(control_context, dict):
+        control_context = {}
+    coverage = control_context.get("field_coverage_counts")
+    if not isinstance(coverage, dict):
+        coverage = {}
+    counted_rows = _summary_count(control_context.get("counted_observation_count"))
     lines: list[tuple[str, object]] = [
         ("report", "decision_radar_daily_operations"),
         ("command", command),
@@ -263,8 +270,28 @@ def _readiness_summary(
             market.baseline_too_close_observation_count,
         ),
         (
-            "baseline_warm_assets",
+            "historical_baseline_warm_assets",
             f"{market.baseline_warm_asset_count}/{market.baseline_asset_count}",
+        ),
+        ("control_context_status", control_context.get("status")),
+        (
+            "point_in_time_universe_context_rows",
+            _coverage_ratio(
+                control_context.get("point_in_time_universe_context_row_count"),
+                counted_rows,
+            ),
+        ),
+        (
+            "market_regime_context_rows",
+            _coverage_ratio(coverage.get("market_regime"), counted_rows),
+        ),
+        (
+            "protocol_partition_context_rows",
+            _coverage_ratio(coverage.get("protocol_partition"), counted_rows),
+        ),
+        (
+            "complete_match_context_rows",
+            _summary_count(control_context.get("complete_match_context_row_count")),
         ),
         ("spread_data_status", market.spread_data_status),
         ("calendar_snapshot_status", market.calendar_snapshot_status),
@@ -326,6 +353,17 @@ def _summary_value(value: object) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value).replace("\r", " ").replace("\n", " ")
+
+
+def _summary_count(value: object) -> int | None:
+    return value if type(value) is int and value >= 0 else None
+
+
+def _coverage_ratio(value: object, total: int | None) -> str | None:
+    count = _summary_count(value)
+    if count is None or total is None or count > total:
+        return None
+    return f"{count}/{total}"
 
 
 __all__ = ("build_parser", "run_cli")

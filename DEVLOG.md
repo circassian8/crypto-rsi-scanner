@@ -17,6 +17,20 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Disambiguate baseline and control coverage · Codex
+**Why:** The concise Daily Operations view's `30/36` warmth count described all
+historical campaign assets, but its original label could be mistaken for the
+latest 30-asset universe. It also omitted the already-computed prospective
+control-context frontier that explains Protocol-v2 readiness.
+**Changes:** Renamed the line to `historical_baseline_warm_assets` and added
+closed, no-recomputation coverage for point-in-time universe context, market
+regime, protocol partition, and complete match rows. Missing contracts render
+`unavailable` rather than fabricated zeros; valid zero coverage remains an
+explicit `0/total`.
+**Verify:** Focused current-status tests passed. The real readiness command made
+zero provider calls and rendered historical warmth `30/36`, universe context
+`60/1290`, regime `0/1290`, partition `0/1290`, and complete matches `0`.
+
 ## 2026-07-20 — Complete concise Daily Operations safety truth · Codex
 **Why:** The new concise readiness/status view identified itself as no-send and
 research-only but did not enumerate every zero-valued safety boundary that the
