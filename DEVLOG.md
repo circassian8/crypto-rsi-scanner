@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve canonical scores in hypothesis-family selection · Codex
+**Why:** Aggregation used truthiness for the final opportunity score, so an
+explicit final zero fell back to a higher legacy score. Comparisons against
+NaN/non-finite score or confidence could also retain the malformed row over
+valid later evidence.
+**Changes:** Added one family-ranking projection that uses the final score when
+present, preserves explicit zero, falls back only on absence, and applies the
+finite score/confidence boundaries. Duplicate winner selection and output
+ordering now use the same confidence rule. Added regressions for zero precedence,
+malformed-versus-valid aggregation, duplicate selection, and ordering. Existing
+score formulas and route policy are unchanged.
+**Verify:** The new regression passed, followed by `51` focused impact-
+hypothesis, catalyst-frame, source-independence integration, and watchlist-router
+tests. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Fail closed in hypothesis promotion diagnostics · Codex
 **Why:** Direct float comparisons let NaN/infinite hypothesis or market scores
 skip the operator-facing threshold and missing-confirmation reasons, producing

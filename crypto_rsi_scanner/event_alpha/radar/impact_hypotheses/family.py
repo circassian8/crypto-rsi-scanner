@@ -141,7 +141,14 @@ def _dedupe_hypotheses(items: Iterable[EventImpactHypothesis]) -> list[EventImpa
         merged = _merge_duplicate_hypotheses(current, item)
         by_key[item.hypothesis_id] = merged
     aggregated = _aggregate_validated_hypotheses(by_key.values())
-    return sorted(aggregated, key=lambda item: (item.status != HypothesisStatus.VALIDATED.value, -item.confidence, item.hypothesis_id))
+    return sorted(
+        aggregated,
+        key=lambda item: (
+            item.status != HypothesisStatus.VALIDATED.value,
+            -_bounded_confidence(item.confidence),
+            item.hypothesis_id,
+        ),
+    )
 
 
 def _aggregate_validated_hypotheses(items: Iterable[EventImpactHypothesis]) -> list[EventImpactHypothesis]:
@@ -203,13 +210,7 @@ def _merge_aggregated_hypotheses(
     current: EventImpactHypothesis,
     item: EventImpactHypothesis,
 ) -> EventImpactHypothesis:
-    winner = item if (
-        float(item.opportunity_score_final or item.hypothesis_score or 0.0),
-        float(item.confidence or 0.0),
-    ) > (
-        float(current.opportunity_score_final or current.hypothesis_score or 0.0),
-        float(current.confidence or 0.0),
-    ) else current
+    winner = item if _aggregated_hypothesis_rank(item) > _aggregated_hypothesis_rank(current) else current
     other = current if winner is item else item
     aggregate_id = _aggregated_candidate_id(winner)
     supporting_ids = tuple(dict.fromkeys((
@@ -272,11 +273,20 @@ def _aggregated_candidate_id(item: EventImpactHypothesis) -> str:
     return "agg:" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
 
 
+def _aggregated_hypothesis_rank(item: EventImpactHypothesis) -> tuple[float, float]:
+    score = (
+        _coerce_score(item.opportunity_score_final)
+        if item.opportunity_score_final is not None
+        else _coerce_score(item.hypothesis_score)
+    )
+    return score, _bounded_confidence(item.confidence)
+
+
 def _merge_duplicate_hypotheses(
     current: EventImpactHypothesis,
     item: EventImpactHypothesis,
 ) -> EventImpactHypothesis:
-    winner = item if item.confidence > current.confidence else current
+    winner = item if _bounded_confidence(item.confidence) > _bounded_confidence(current.confidence) else current
     other = current if winner is item else item
     components = dict(other.score_components or {})
     components.update(dict(winner.score_components or {}))

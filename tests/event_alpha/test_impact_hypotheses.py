@@ -114,6 +114,78 @@ def test_duplicate_hypothesis_merge_rejects_malformed_incident_confidence():
     assert valid.score_components["incident_confidence"] == 84.0
 
 
+def test_hypothesis_family_winner_selection_uses_finite_present_scores():
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as hypotheses
+    from crypto_rsi_scanner.event_alpha.radar.impact_hypotheses import family
+
+    def hypothesis(
+        hypothesis_id: str,
+        *,
+        final_score,
+        legacy_score,
+        confidence,
+        status="validated",
+    ):
+        return hypotheses.EventImpactHypothesis(
+            hypothesis_id=hypothesis_id,
+            event_cluster_id="cluster:family-rank",
+            incident_id="incident:family-rank",
+            event_type="sports_event",
+            external_asset="World Cup",
+            impact_category="sports_fan_proxy",
+            candidate_sectors=("fan_tokens",),
+            candidate_symbols=("CHZ",),
+            candidate_coin_ids=("chiliz",),
+            validated_candidate_assets=({"symbol": "CHZ", "coin_id": "chiliz"},),
+            candidate_role="proxy_instrument",
+            confidence=confidence,
+            hypothesis_score=legacy_score,
+            opportunity_score_final=final_score,
+            impact_path_type="fan_token_attention",
+            impact_path_reason="fan_token_event",
+            status=status,
+        )
+
+    explicit_zero = family._merge_aggregated_hypotheses(  # noqa: SLF001
+        hypothesis("hyp:zero-final", final_score=0.0, legacy_score=99.0, confidence=0.9),
+        hypothesis("hyp:ten-final", final_score=10.0, legacy_score=10.0, confidence=0.7),
+    )
+    assert explicit_zero.hypothesis_id == "hyp:ten-final"
+    assert explicit_zero.opportunity_score_final == 10.0
+
+    malformed = family._merge_aggregated_hypotheses(  # noqa: SLF001
+        hypothesis("hyp:malformed", final_score=float("inf"), legacy_score=99.0, confidence=float("nan")),
+        hypothesis("hyp:valid", final_score=60.0, legacy_score=60.0, confidence=0.8),
+    )
+    assert malformed.hypothesis_id == "hyp:valid"
+    assert malformed.opportunity_score_final == 60.0
+
+    duplicate = family._merge_duplicate_hypotheses(  # noqa: SLF001
+        hypothesis(
+            "hyp:duplicate-malformed",
+            final_score=None,
+            legacy_score=10.0,
+            confidence=float("nan"),
+            status="hypothesis",
+        ),
+        hypothesis(
+            "hyp:duplicate-valid",
+            final_score=None,
+            legacy_score=10.0,
+            confidence=0.7,
+            status="hypothesis",
+        ),
+    )
+    assert duplicate.hypothesis_id == "hyp:duplicate-valid"
+    assert duplicate.confidence == 0.7
+
+    ordered = family._dedupe_hypotheses((  # noqa: SLF001
+        hypothesis("hyp:sort-malformed", final_score=None, legacy_score=1.0, confidence=float("nan"), status="hypothesis"),
+        hypothesis("hyp:sort-valid", final_score=None, legacy_score=1.0, confidence=0.6, status="hypothesis"),
+    ))
+    assert [row.hypothesis_id for row in ordered] == ["hyp:sort-valid", "hyp:sort-malformed"]
+
+
 def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import config
