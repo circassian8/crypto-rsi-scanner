@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Bound hypothesis source confidence · Codex
+**Why:** Public hypothesis generation trusted source confidence as an arbitrary
+float. Booleans and out-of-range/non-finite values could persist impossible
+components such as `source_quality=inf` or `-500`, inflate event clarity, and
+raise the final hypothesis score.
+**Changes:** Added one finite, non-boolean `[0,1]` confidence boundary and used
+it for raw source confidence, normalized event confidence, event-time
+confidence, and suggested-asset confidence during hypothesis scoring. Added an
+end-to-end public generation regression proving invalid values are equivalent
+to unavailable confidence and valid `0.7` remains 70/100. No weights, score
+formula, threshold, route, provider, or historical artifact changed.
+**Verify:** A 55-test impact-hypothesis/radar/catalyst/evidence selection passed;
+all 58 impact-hypothesis/LLM/catalyst-frame tests passed; `compileall` and
+`git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Reject malformed hypothesis market-confirmation numerics · Codex
 **Why:** Public impact-hypothesis generation converted non-finite and boolean
 raw market values to numeric confirmation. In particular, an infinite anomaly

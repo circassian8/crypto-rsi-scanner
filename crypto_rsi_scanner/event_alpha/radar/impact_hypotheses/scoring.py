@@ -293,6 +293,18 @@ def _coerce_score(value: object) -> float:
         return 0.0
 
 
+def _bounded_confidence(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        return 0.0
+    return number
+
+
 def _optional_score(value: object) -> float | None:
     score = _coerce_score(value)
     return score if score > 0 else None
@@ -402,14 +414,18 @@ def _hypothesis_score_components(
     validated_assets: tuple[dict[str, Any], ...],
     suggested_assets: tuple[dict[str, Any], ...],
 ) -> dict[str, float]:
-    source_conf = max((float(raw.source_confidence or 0.0) for raw in raws), default=float(event.confidence or 0.0))
+    event_confidence = _bounded_confidence(event.confidence)
+    source_conf = max(
+        (_bounded_confidence(raw.source_confidence) for raw in raws),
+        default=event_confidence,
+    )
     keyword_hits = sum(
         1 for keyword in (*rule.get("keywords", ()), *rule.get("secondary", ()))
         if _term_hit(text, str(keyword))
     )
     market_confirmation = _market_confirmation_score(raws)
     components = {
-        "event_clarity": round(max(float(event.confidence or 0.0), source_conf) * 100, 2),
+        "event_clarity": round(max(event_confidence, source_conf) * 100, 2),
         "source_quality": round(source_conf * 100, 2),
         "catalyst_strength": round(min(100.0, 35.0 + keyword_hits * 12.0 + (15.0 if event.external_asset else 0.0)), 2),
         "sector_relevance": 80.0 if rule.get("sectors") else 35.0,
@@ -419,9 +435,12 @@ def _hypothesis_score_components(
         "cluster_confidence": round(max(0.0, min(100.0, float(getattr(cluster, "cluster_confidence", 0) or 0))), 2),
     }
     if event.event_time is not None:
-        components["event_time_quality"] = round(max(0.0, min(100.0, float(event.event_time_confidence or 0.0) * 100)), 2)
+        components["event_time_quality"] = round(_bounded_confidence(event.event_time_confidence) * 100, 2)
     if suggested_assets:
-        components["llm_candidate_confidence"] = round(max(float(row.get("confidence") or 0.0) for row in suggested_assets) * 100, 2)
+        components["llm_candidate_confidence"] = round(
+            max(_bounded_confidence(row.get("confidence")) for row in suggested_assets) * 100,
+            2,
+        )
     return components
 
 
@@ -504,12 +523,16 @@ def _hypothesis_confidence(
     raws: tuple[RawDiscoveredEvent, ...],
     cluster: event_graph.EventCluster | None,
 ) -> float:
-    source_conf = max((raw.source_confidence for raw in raws), default=event.confidence)
-    score = 0.30 + 0.35 * max(float(event.confidence or 0.0), float(source_conf or 0.0))
+    event_confidence = _bounded_confidence(event.confidence)
+    source_conf = max(
+        (_bounded_confidence(raw.source_confidence) for raw in raws),
+        default=event_confidence,
+    )
+    score = 0.30 + 0.35 * max(event_confidence, source_conf)
     if event.external_asset:
         score += 0.08
     if event.event_time is not None:
-        score += 0.06 * float(event.event_time_confidence or 0.0)
+        score += 0.06 * _bounded_confidence(event.event_time_confidence)
     keyword_hits = sum(1 for keyword in (*rule.get("keywords", ()), *rule.get("secondary", ())) if _term_hit(text, str(keyword)))
     score += min(0.16, keyword_hits * 0.035)
     if cluster is not None:

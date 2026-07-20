@@ -231,6 +231,69 @@ def test_event_impact_hypotheses_reject_malformed_market_confirmation_numerics()
     assert valid.score_components["market_confirmation"] == 90.0
 
 
+def test_event_impact_hypotheses_reject_malformed_source_confidence():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def generated(source_confidence):
+        raw = RawDiscoveredEvent(
+            raw_id="spacex",
+            provider="fixture",
+            fetched_at=now,
+            published_at=now,
+            source_url="https://example.test/spacex",
+            title="SpaceX pre-IPO exposure opens",
+            body="TEST token offers synthetic exposure to SpaceX.",
+            raw_json={},
+            source_confidence=source_confidence,
+            content_hash="spacex",
+        )
+        event = NormalizedEvent(
+            event_id="spacex",
+            raw_ids=(raw.raw_id,),
+            event_name=raw.title,
+            event_type="external_proxy_event",
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source=raw.provider,
+            source_urls=(raw.source_url,),
+            external_asset="SpaceX",
+            description=raw.body,
+            confidence=0.7,
+        )
+        result = EventDiscoveryResult(
+            raw_events=(raw,),
+            normalized_events=(event,),
+            links=(),
+            classifications=(),
+            candidates=(),
+        )
+        return next(
+            item
+            for item in event_impact_hypotheses.generate_impact_hypotheses(result, now=now)
+            if item.impact_category == "rwa_preipo_proxy"
+        )
+
+    unavailable = generated(0.0)
+    assert unavailable.score_components["source_quality"] == 0.0
+
+    for invalid in (True, float("nan"), float("inf"), float("-inf"), -0.1, 1.1):
+        malformed = generated(invalid)
+
+        assert malformed.score_components["source_quality"] == unavailable.score_components["source_quality"]
+        assert malformed.score_components["event_clarity"] == unavailable.score_components["event_clarity"]
+        assert malformed.hypothesis_score == unavailable.hypothesis_score
+        assert malformed.confidence == unavailable.confidence
+
+    valid = generated(0.7)
+    assert valid.score_components["source_quality"] == 70.0
+    assert valid.score_components["event_clarity"] == 70.0
+
+
 def test_event_impact_hypothesis_matching_uses_context_not_substrings():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
