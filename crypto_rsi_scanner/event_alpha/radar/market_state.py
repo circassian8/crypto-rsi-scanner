@@ -455,6 +455,11 @@ def _parse_observation_time(value: object) -> datetime | None:
 
 
 def _percent_value(value: object, *, unit: str | None) -> float | None:
+    # Provider booleans are semantic flags, never numeric market evidence. Keep
+    # this rejection at the ingestion boundary because market_units.py is part
+    # of the byte-frozen Protocol-v1 diagnostics contract.
+    if isinstance(value, bool):
+        return None
     return event_market_units.normalize_return_percent_points(value, unit)
 
 

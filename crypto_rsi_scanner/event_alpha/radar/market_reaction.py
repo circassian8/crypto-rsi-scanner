@@ -674,6 +674,10 @@ def _int(value: object) -> int | None:
 
 
 def _pct(value: object, *, unit_hint: str | None = None) -> float | None:
+    # Reject provider semantic booleans before the frozen return-unit helper can
+    # apply Python's bool-as-int conversion.
+    if isinstance(value, bool):
+        return None
     if unit_hint:
         return event_market_units.normalize_return_percent_points(value, unit_hint)
     number = _float(value)

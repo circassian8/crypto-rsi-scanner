@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve the frozen empirical contract at boolean ingestion · Codex
+**Why:** The boolean-numeric correction changed `market_units.py`, which is an
+exact byte-bound component of the immutable Protocol-v1 empirical hardening
+supplement. The standard review exporter correctly rejected that source/evidence
+drift before replacing its last known-good archive.
+**Changes:** Restored the frozen return-unit component byte-for-byte and moved
+the missing boolean checks into the market-state and market-reaction provider
+ingestion boundaries. All other boundary-specific boolean checks remain. The
+end-to-end anomaly regression still proves malformed provider booleans cannot
+become price, return, liquidity, spread, derivatives, outcome, catalyst, or
+anomaly evidence. Updated the current roadmap wording to distinguish the frozen
+diagnostic helper from provider trust boundaries; no historical artifact was
+rewritten or re-fingerprinted.
+**Verify:** All 21 numeric-finiteness regressions passed; `compileall` and
+`git diff --check` passed; the hardening supplement reproduced its original
+`670bfa…7343` ID and 3,139,732-byte payload; and the standard
+source-with-artifacts export completed with 1,587 entries and zero unsafe
+entries.
+**Notes/risks:** Quantitative source-size telemetry remains advisory. The
+4 MiB supplement limit and other artifact read/write bounds are security and
+integrity controls, not source-code size gates, and remain enforced.
+
 ## 2026-07-20 — Close upstream boolean-numeric market normalization · Codex
 **Why:** The anomaly classifier rejected boolean numerics when called directly,
 but its shared upstream return normalizer still converted `true` to `100%`.

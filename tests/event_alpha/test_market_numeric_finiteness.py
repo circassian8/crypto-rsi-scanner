@@ -102,7 +102,6 @@ def test_boolean_numerics_cannot_become_market_or_catalyst_evidence(tmp_path):
     from crypto_rsi_scanner.event_alpha.radar import market_enrichment
     from crypto_rsi_scanner.event_alpha.radar import market_reaction
     from crypto_rsi_scanner.event_alpha.radar import market_state
-    from crypto_rsi_scanner.event_alpha.radar import market_units
     from crypto_rsi_scanner.event_alpha.radar import price_history
 
     now = "2026-07-20T12:00:00Z"
@@ -131,12 +130,6 @@ def test_boolean_numerics_cannot_become_market_or_catalyst_evidence(tmp_path):
         "price_change_percentage_24h_in_currency": True,
         "sparkline_in_7d": {"price": [True] * 30},
     }
-
-    assert market_units.normalize_return_fraction(True, "fraction") is None
-    assert market_units.normalize_return_percent_points(True, "fraction") is None
-    assert "invalid_return_value:return_4h" in market_units.validate_market_snapshot_units(
-        raw_market
-    )
 
     snapshot = market_state.snapshot_from_market_row(raw_market, observed_at=now)
     for field in (
