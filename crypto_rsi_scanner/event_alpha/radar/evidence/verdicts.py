@@ -81,14 +81,20 @@ def _score_from_object(item: object | None, fallback: float) -> float:
     if item is None:
         return fallback
     components = dict(getattr(item, "score_components", {}) or {})
-    return (
-        _float(getattr(item, "final_opportunity_score", None))
-        or _float(components.get("final_opportunity_score"))
-        or _float(getattr(item, "opportunity_score_final", None))
-        or _float(components.get("opportunity_score_final"))
-        or _float(getattr(item, "hypothesis_score", None))
-        or fallback
-    )
+    for value in (
+        getattr(item, "final_opportunity_score", None),
+        components.get("final_opportunity_score"),
+        getattr(item, "opportunity_score_final", None),
+        components.get("opportunity_score_final"),
+        getattr(item, "hypothesis_score", None),
+    ):
+        if value in (None, "", [], {}, ()):
+            continue
+        parsed = _float(value)
+        # An explicit malformed higher-precedence value fails closed instead of
+        # borrowing a potentially stale compatibility alias.
+        return parsed if parsed is not None else fallback
+    return fallback
 
 
 def _level_from_object(item: object | None, fallback: str) -> str:
@@ -135,7 +141,13 @@ def _impact_path_rank(value: str | None) -> int:
 
 
 def _market_score_from_components(components: Mapping[str, Any]) -> float:
-    return _float(components.get("market_confirmation_score") or components.get("market_confirmation")) or 0.0
+    for field in ("market_confirmation_score", "market_confirmation"):
+        value = components.get(field)
+        if value in (None, "", [], {}, ()):
+            continue
+        parsed = _float(value)
+        return parsed if parsed is not None else 0.0
+    return 0.0
 
 
 def _market_level_from_components(components: Mapping[str, Any]) -> str | None:

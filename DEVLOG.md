@@ -17,6 +17,20 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve explicit zero in catalyst verdicts · Codex
+**Why:** Verdict precedence used truthiness. A canonical score or market
+confirmation of `0.0` was treated as missing and could be replaced by a stale
+component or legacy alias as high as `95.0`.
+**Changes:** Replaced truthy fallback chains with explicit first-present numeric
+precedence. Canonical zero now wins; an explicit malformed higher-precedence
+value fails closed to the validated fallback instead of borrowing lower aliases.
+Added public finalization regressions for both zero and malformed-with-stale-
+alias cases. No score formula, threshold, route, provider, or historical artifact
+changed.
+**Verify:** All 35 focused evidence-acquisition, evidence-quality, and zero-value
+presentation tests passed. `compileall` and `git diff --check` passed, and the
+standard source-with-artifacts export completed with zero unsafe entries.
+
 ## 2026-07-20 — Reject malformed catalyst-verdict numerics · Codex
 **Why:** Evidence-acquisition finalization still accepted booleans and non-finite
 floats when reading post-acquisition scores and market confirmation. Malformed

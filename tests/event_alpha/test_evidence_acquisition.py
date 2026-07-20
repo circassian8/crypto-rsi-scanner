@@ -111,14 +111,24 @@ def test_evidence_acquisition_invalid_numerics_cannot_become_verdict_evidence():
         )
         before = SimpleNamespace(
             opportunity_score_final=invalid,
+            final_opportunity_score=invalid,
             opportunity_level="exploratory",
-            score_components={"market_confirmation_score": invalid},
+            score_components={
+                "final_opportunity_score": 88.0,
+                "market_confirmation_score": invalid,
+                "market_confirmation": 95.0,
+            },
         )
         after = SimpleNamespace(
             opportunity_score_final=invalid,
+            final_opportunity_score=invalid,
             opportunity_level="exploratory",
             evidence_quality_score=invalid,
-            score_components={"market_confirmation_score": invalid},
+            score_components={
+                "final_opportunity_score": 88.0,
+                "market_confirmation_score": invalid,
+                "market_confirmation": 95.0,
+            },
         )
 
         finalized = event_evidence_acquisition._finalize_result(
@@ -135,6 +145,58 @@ def test_evidence_acquisition_invalid_numerics_cannot_become_verdict_evidence():
         assert finalized.post_refresh_market_confirmation_level == "none"
         assert finalized.market_confirmation_upgraded is False
         json.dumps(asdict(finalized), allow_nan=False)
+
+
+def test_evidence_acquisition_explicit_zero_beats_stale_score_aliases():
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
+
+    result = event_evidence_acquisition.EvidenceAcquisitionResult(
+        acquisition_id="acq:zero-precedence",
+        opportunity_id="core:zero-precedence",
+        core_opportunity_id="core:zero-precedence",
+        hypothesis_id="hyp:zero-precedence",
+        incident_id=None,
+        source_pack="market_anomaly_pack",
+        status="no_results",
+        evidence_quality_before=0.0,
+        evidence_quality_after=0.0,
+        opportunity_score_before=55.0,
+        opportunity_level_before="local_only",
+    )
+    stale_components = {
+        "final_opportunity_score": 88.0,
+        "opportunity_score_final": 91.0,
+        "market_confirmation_score": 0.0,
+        "market_confirmation": 95.0,
+    }
+    before = SimpleNamespace(
+        final_opportunity_score=0.0,
+        opportunity_score_final=91.0,
+        opportunity_level="local_only",
+        score_components=stale_components,
+    )
+    after = SimpleNamespace(
+        final_opportunity_score=0.0,
+        opportunity_score_final=91.0,
+        opportunity_level="local_only",
+        evidence_quality_score=0.0,
+        score_components=stale_components,
+    )
+
+    finalized = event_evidence_acquisition._finalize_result(
+        result,
+        before=before,
+        after=after,
+    )
+
+    assert finalized.initial_opportunity_score == 0.0
+    assert finalized.post_refresh_opportunity_score == 0.0
+    assert finalized.final_opportunity_score == 0.0
+    assert finalized.post_refresh_market_confirmation_score == 0.0
+    assert finalized.post_refresh_market_confirmation_level == "none"
+    assert finalized.market_confirmation_upgraded is False
 
 
 def test_evidence_acquisition_core_opportunity_dedupes_supporting_rows():
