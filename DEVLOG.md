@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-sixth no-send market cycle · Codex
+**Why:** The persisted hourly cadence became eligible while the existing
+CoinGecko authorization remained present. One bounded observation could advance
+temporal and prospective-control evidence without changing any model policy.
+**Changes:** Ran exactly one provider request and published
+`radar_market_no_send_20260720t133707294059z_ccd9076573e9`. Campaign truth is now
+46 cycles, 1,380 retained observations, 1,350 baseline-counted observations, and
+120 rows with prospective universe/liquidity context. The current generation is
+healthy-empty with 30 observations and zero Decision ideas. Its exact regime
+input audit is 27/30 ready; PUMP, WBT, and SHIB remain unavailable, so no market
+regime, partition, matched control, spread, or idea was invented.
+**Verify:** The pre-cycle cluster checkpoint `make verify-fast PYTHON=python3`
+passed 3,600 tests in 185.85 seconds plus alert-render, fixture-backtest, and
+paper-scoreboard gates. Daily Operations returned terminal `succeeded` after one
+successful provider attempt. The immutable publication receipt records strict
+doctor `OK` with 0 blockers / 0 warnings; dashboard readiness passed; and a
+host-loopback HEAD returned HTTP 200 with the exact namespace, run, revision 12,
+and operator-state SHA-256
+`782100b7e3198e5ffbb9dd711623c0c926c7f8869c2101c091711753a27fae7b`.
+All send/trade/order/paper/normal-RSI/`TRIGGERED_FADE` counters remained zero.
+**Notes/risks:** The next provider boundary is
+`2026-07-20T14:37:08.810581+00:00`. The standalone integrated-radar doctor target
+was also invoked and correctly checked its documented fixture namespace; it was
+not used as evidence for the live authority, whose receipt-bound strict doctor
+is the authoritative result. No GitHub check was awaited.
+
 ## 2026-07-20 — Parse catalyst market-refresh success semantically · Codex
 **Why:** Evidence finalization used Python truthiness for
 `market_refresh_success`, so the literal string `"false"` counted as a successful
