@@ -175,6 +175,62 @@ def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     assert "TRIGGERED_FADE" not in event_impact_hypotheses.format_impact_hypothesis_report(hypotheses)
 
 
+def test_event_impact_hypotheses_reject_malformed_market_confirmation_numerics():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def generated(*, anomaly=None, market=None):
+        raw = RawDiscoveredEvent(
+            raw_id="test-anomaly",
+            provider="market_anomaly",
+            fetched_at=now,
+            published_at=now,
+            source_url=None,
+            title="TEST market anomaly",
+            body="No catalyst has been identified.",
+            raw_json={
+                "market": {"symbol": "TEST", "coin_id": "test", **(market or {})},
+                "anomaly": dict(anomaly or {}),
+            },
+            source_confidence=0.7,
+            content_hash="test-anomaly",
+        )
+        result = EventDiscoveryResult(
+            raw_events=(raw,),
+            normalized_events=(),
+            links=(),
+            classifications=(),
+            candidates=(),
+        )
+        return next(
+            item
+            for item in event_impact_hypotheses.generate_impact_hypotheses(result, now=now)
+            if item.impact_category == "market_anomaly_unknown"
+        )
+
+    baseline = generated()
+    assert baseline.score_components["market_confirmation"] == 0.0
+
+    for anomaly, market in (
+        ({"score": True}, None),
+        ({"score": float("nan")}, None),
+        ({"score": float("inf")}, None),
+        ({"score": float("-inf")}, None),
+        (None, {"return_24h": True}),
+        (None, {"volume_zscore_24h": float("inf")}),
+    ):
+        malformed = generated(anomaly=anomaly, market=market)
+
+        assert malformed.score_components["market_confirmation"] == baseline.score_components["market_confirmation"]
+        assert malformed.hypothesis_score == baseline.hypothesis_score
+
+    valid = generated(anomaly={"score": 90.0})
+    assert valid.score_components["market_confirmation"] == 90.0
+
+
 def test_event_impact_hypothesis_matching_uses_context_not_substrings():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses

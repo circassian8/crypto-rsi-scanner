@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -468,9 +469,13 @@ def _market_confirmation_score(raws: Iterable[RawDiscoveredEvent]) -> float:
             ("return_24h", market.get("return_24h")),
         )
         for key, value in candidates:
+            if isinstance(value, bool):
+                continue
             try:
                 number = float(value or 0.0)
             except (TypeError, ValueError):
+                continue
+            if not math.isfinite(number):
                 continue
             if key != "anomaly_score" and abs(number) <= 3.0:
                 number *= 25.0

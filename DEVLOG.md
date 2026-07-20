@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reject malformed hypothesis market-confirmation numerics · Codex
+**Why:** Public impact-hypothesis generation converted non-finite and boolean
+raw market values to numeric confirmation. In particular, an infinite anomaly
+score became a perfect 100, and boolean market fields could manufacture partial
+confirmation.
+**Changes:** Required finite, non-boolean values before anomaly score, market
+return, volume z-score, or market-move evidence can contribute to the initial
+hypothesis market-confirmation component. Added an end-to-end public generation
+regression proving malformed values match the missing-evidence baseline and a
+valid 90-point anomaly remains 90. No score, threshold, route, provider, or
+historical artifact changed.
+**Verify:** All 40 focused impact-hypothesis, radar-pipeline, and catalyst-search
+tests passed. The narrower impact-hypothesis/evidence-quality selection passed
+26 tests; `compileall` and `git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Require valid event-time evidence for catalyst specificity · Codex
 **Why:** Evidence-quality scoring used raw truthiness for `event_time`. A boolean
 or arbitrary object upgraded an otherwise asset-only item from 50 to 72, while
