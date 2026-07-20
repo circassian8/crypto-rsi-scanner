@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-fourth no-send market cycle · Codex
+**Why:** The persisted cadence became eligible while the existing CoinGecko
+authorization remained present. The campaign needed another honest observation
+instead of inferred or backfilled evidence.
+**Changes:** Ran exactly one authorized Daily Operations cycle. CoinGecko
+succeeded, and strict publication made
+`radar_market_no_send_20260720t113410860015z_f8d4ea661d3a` the revision-12
+dashboard authority with operator-state SHA-256
+`caeaa53098f929488cccd62f6b8f4964e8fd8afe1fc1a090d2adeba3d13792a0`.
+Campaign truth is now 44 cycles / 1,320 retained / 1,290 baseline-counted / 30
+too-close observations, 13 provider failures, seven historical ideas, zero
+current ideas, four matured outcomes, two pending outcomes, and zero trusted
+spread. Prospective universe/liquidity context advanced from 30 to 60 counted
+rows. The current complete-set regime remains unavailable: PUMP rank 14 and WBT
+rank 28 lack closed causal 24-hour input evidence, so no regime, partition,
+match row, or control was inferred. Updated the roadmap and Protocol-v2 current
+progress; the next cadence boundary is `2026-07-20T12:34:12.287768+00:00`.
+**Verify:** Daily Operations returned `succeeded` /
+`published_and_restarted` after one provider attempt. The operator state is
+complete, strict doctor is `OK` with zero blockers/warnings, publication and
+operations receipts validate, and `make radar-dashboard-readiness
+PYTHON=python3` passed against the exact namespace/run/revision. The canonical
+campaign report regenerated with `provider_calls=0`. Telegram sends, trades,
+orders, Event Alpha paper trades, normal RSI writes, and Event Alpha
+`TRIGGERED_FADE` all remained zero. The owned loopback dashboard returned HTTP
+200 with exact namespace, run, revision, and operator-state response headers.
+
 ## 2026-07-20 — Preserve episode coverage in forward empirical evidence · Codex
 **Why:** The current campaign and Campaign dashboard exposed the complete
 route/origin frontier, but a future empirical live projection would still strip
