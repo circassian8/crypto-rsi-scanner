@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require finite source-pack numeric evidence · Codex
+**Why:** Source-pack evaluation accepted infinite market confirmation as strong
+evidence and interpreted boolean unlock percentage as 100%. Mere presence of an
+invalid market field also granted the generic market-confirmation token.
+**Changes:** Made the shared pack numeric reader finite and non-boolean, routed
+nested supply fallback through it, and required an actually parsed market
+observation before granting confirmation. Finite zero remains observed; all
+materiality/confirmation thresholds and pack requirements are unchanged. Added
+regressions for boolean/NaN/infinite market scores and unlock percentages. No
+route, provider, source authority, or historical artifact changed.
+**Verify:** All 63 focused source-registry, evidence-acquisition,
+core-opportunity, and scheduled-catalyst namespace tests passed. `compileall`
+and `git diff --check` passed. The first widened run correctly exposed the
+separate field-presence token path; it was fixed before the final green run.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Parse evidence-absence truth semantically · Codex
 **Why:** Source-coverage artifacts used Python truthiness for
 `evidence_absence_is_meaningful`. The literal string `"false"` became true in

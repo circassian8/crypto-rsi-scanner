@@ -420,6 +420,22 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert listing_eval["source_pack_validated_digest_sufficient"] is True
     assert listing_eval["source_pack_watchlist_requirements_met"] is True
     assert listing_eval["source_pack_impact_path_validating_source"] is True
+    for invalid_market_score in (True, float("nan"), float("inf"), float("-inf")):
+        malformed_market = event_source_packs.evaluate_pack_evidence(
+            {
+                "provider": "bybit_announcements",
+                "title": "Bybit Will List TESTUSDT",
+                "announcement_symbols": ("TEST",),
+                "announcement_pairs": ("TEST/USDT",),
+                "playbook_type": "listing_volatility",
+                "symbol": "TEST",
+                "coin_id": "test-token",
+                "market_confirmation_score": invalid_market_score,
+            },
+            pack=listing,
+        )
+        assert "strong_market_confirmation" not in malformed_market["source_pack_met_requirements"]
+        assert malformed_market["source_pack_watchlist_requirements_met"] is False
     listing_mismatch = event_source_packs.evaluate_pack_evidence(
         {
             "provider": "binance_announcements",
@@ -470,6 +486,23 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert large_unlock_eval["source_pack_validated_digest_sufficient"] is True
     assert large_unlock_eval["source_pack_watchlist_requirements_met"] is True
     assert "material_unlock" in large_unlock_eval["source_pack_met_requirements"]
+    for invalid_unlock in (True, float("nan"), float("inf"), float("-inf")):
+        malformed_unlock = event_source_packs.evaluate_pack_evidence(
+            {
+                "provider": "tokenomist",
+                "title": "BAD token cliff unlock",
+                "playbook_type": "unlock_supply_pressure",
+                "symbol": "BAD",
+                "coin_id": "bad-token",
+                "source_url": "https://tokenomist.ai/bad-token",
+                "supply": {"unlock_pct_circulating": invalid_unlock},
+                "event_time": "2026-07-01T00:00:00Z",
+                "as_of": "2026-06-20T00:00:00Z",
+            },
+            pack=unlock,
+        )
+        assert "material_unlock" not in malformed_unlock["source_pack_met_requirements"]
+        assert malformed_unlock["source_pack_watchlist_requirements_met"] is False
     small_unlock_eval = event_source_packs.evaluate_pack_evidence(
         {
             "provider": "tokenomist",

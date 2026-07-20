@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import math
 from typing import Any, Iterable, Mapping
 
 from . import source_registry as event_source_registry
@@ -608,7 +609,11 @@ def _met_requirement_tokens(
         tokens.update({"structured_calendar_source", "event_time_confirmation"})
     if assessment.source_class == event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value:
         tokens.update({"second_source_confirmation", "official_or_second_source", "source_quality"})
-    if _has_field(row, ("market_confirmation_score", "market_confirmation", "return_24h", "volume_zscore_24h")):
+    market_observation = _float_from_row(
+        row,
+        ("market_confirmation_score", "market_confirmation", "return_24h", "volume_zscore_24h"),
+    )
+    if market_observation is not None:
         tokens.add("market_confirmation")
     market_score = _float_from_row(row, ("market_confirmation_score", "market_confirmation"))
     if market_score is not None and market_score >= 70:
@@ -789,10 +794,14 @@ def _float_from_row(row: Mapping[str, Any], keys: Iterable[str]) -> float | None
     for key in keys:
         for source in (row, components, latest):
             try:
-                if source.get(key) not in (None, ""):
-                    return float(source.get(key))
+                value = source.get(key)
+                if value in (None, "") or isinstance(value, bool):
+                    continue
+                number = float(value)
             except (TypeError, ValueError, AttributeError):
                 continue
+            if math.isfinite(number):
+                return number
     return None
 
 
@@ -800,11 +809,7 @@ def _unlock_pct_normalized(row: Mapping[str, Any]) -> float | None:
     value = _float_from_row(row, ("unlock_pct_circulating", "percent_of_circulating_supply"))
     if value is None:
         supply = row.get("supply") if isinstance(row.get("supply"), Mapping) else {}
-        try:
-            raw = supply.get("unlock_pct_circulating") or supply.get("percent_of_circulating_supply")
-            value = float(raw) if raw not in (None, "") else None
-        except (TypeError, ValueError, AttributeError):
-            value = None
+        value = _float_from_row(supply, ("unlock_pct_circulating", "percent_of_circulating_supply"))
     if value is None:
         return None
     return value / 100.0 if value > 1.0 else value
