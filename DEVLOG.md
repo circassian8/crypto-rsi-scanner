@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the fiftieth market cycle · Codex
+**Why:** The manual no-send campaign reached its next cadence boundary while
+explicit CoinGecko authorization remained present, so one additional genuine
+point-in-time observation was needed to continue warming the Protocol-v2
+temporal and prospective control evidence.
+**Changes:** Ran exactly one Daily Operations cycle. One bounded
+`/coins/markets` request returned HTTP 200 with 80 rows in 2,593 ms and no
+retry, producing 30 selected observations in
+`radar_market_no_send_20260720t173906227254z_7704aafa460d`. Strict publication
+and the owned dashboard restart succeeded; revision 12 now binds operator-state
+SHA-256 `f252362b37ca0d7f2066687e6efc9cc967a5792a1999a7cdef4af92df2180819`
+and pointer SHA-256
+`42438c6a4610529dfdf75ac3164ab91d016b12d042c6dad5914cd2309a354eeb`.
+Campaign truth advanced to 50 cycles, 1,500 retained, 1,470 baseline-counted,
+and 30 too-close observations. Prospective point-in-time universe/liquidity
+context now covers 240 counted rows. The current generation is healthy-empty:
+zero anomalies and Decision ideas, 27/30 exact rows warm, and 28/30 retained
+same-asset next-observation readiness. The causal 24-hour regime input remains
+honestly 27/30: PUMP rank 16, WBT rank 26, and SHIB rank 30 are unavailable, so
+no regime, partition, or matched control was fabricated. Next eligibility is
+`2026-07-20T18:39:07.962564+00:00`.
+**Verify:** Exact strict artifact doctor returned `OK` with zero blockers and
+warnings. Exact dashboard readiness passed for run
+`2026-07-20T17:39:07.962564+00:00|no_key_live`; an external loopback `HEAD /`
+returned HTTP 200 with matching namespace, run, revision, and operator digest.
+The canonical campaign report regenerated with zero additional provider calls.
+**Notes/risks:** The cycle made one authorized market-data request. Telegram
+sends, trades, orders, paper trades, normal RSI writes, and Event Alpha
+`TRIGGERED_FADE` all remained zero. It did not call Bybit, recover DEXE prices,
+change thresholds, install scheduling, or bind Protocol v2. Quantitative source
+size remains advisory; provider budgets and artifact/security bounds remain
+enforced.
+
 ## 2026-07-20 — Require typed canonical market snapshot identity · Codex
 **Why:** The canonical market-state scanner still stringified malformed identity
 before classification. A reproduced row with boolean coin/symbol values and an
