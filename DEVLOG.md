@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Decompose Bybit decision-price latency exactly · Codex
+**Why:** The modeled round trip measured visible-book impact from each later
+execution-book midpoint, leaving price drift between the research decision and
+that book outside the cost identity. Naively adding that drift would double
+count the gross-return benchmark.
+**Changes:**
+- Added a pure decision-price latency v1 scenario over exact supplied entry and
+  exit best-bid/ask references. It preserves provider, acquisition, decision,
+  and later matching-engine clocks; requires causal ordering and distinct
+  reference/execution lineages; and decomposes signed adverse or favorable
+  midpoint drift for long and short positions.
+- Added a separate decision-reference composite that fully rederives the
+  latency, visible-book, taker-fee, and funding projections before reconciling
+  one native-USDT implementation-cost and net-return identity. Spread is not
+  added separately and favorable latency is not clamped away.
+- Kept supplied references, actual submission/fill latency, source authority,
+  latency policy, beyond-visible-book slippage, unavailable-cost behavior,
+  complete Protocol-v2 cost status, annex binding, and evidence eligibility
+  explicitly false.
+- Advanced execution-quality readiness to v21 and current Protocol-v2 progress
+  to v20, and aligned the North Star, execution-venue package, progress note,
+  working agreement, durable decision, and roadmap.
+**Verify:** 29 focused latency/composite tests and the offline Bybit execution-
+quality smoke passed. The complete focused execution-quality/readiness/progress
+suite passed 248 tests. Compileall, North Star/campaign JSON parsing,
+`git diff --check`, execution-quality readiness v21, Protocol-v2 progress v20,
+and architecture cleanliness passed; quantitative size observations remained
+advisory while every ownership/import/transitional blocker stayed at zero.
+`make verify-fast PYTHON=.venv/bin/python` passed 3,500 tests plus alert,
+backtest, and scoreboard smokes in 163.75 seconds under normal loopback
+permissions. The full `make verify PYTHON=.venv/bin/python` release gate then
+passed its 1,425-test standalone compatibility runner, the same 3,500-test
+package gate in 157.48 seconds, and all smokes. The initial sandboxed
+`verify-fast` attempt passed 3,499 tests and failed only because the sandbox
+denied an ephemeral `127.0.0.1` bind; that exact test passed under normal macOS
+permissions before the clean full-gate reruns.
+**Notes/risks:** This is exact only for supplied research inputs. It performs no
+provider call, credential read, write, send, trade, order, paper trade, normal
+RSI write, or Event Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-20 — Record the thirty-ninth no-send market cycle · Codex
 **Why:** The persisted Daily Operations boundary had passed and the existing
 CoinGecko authorization was still present, so one fresh point-in-time

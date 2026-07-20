@@ -31,6 +31,9 @@ from .bybit_execution_fee import (
 from .bybit_execution_cost import (
     SCHEMA_VERSION as COMPOSITE_EXECUTION_COST_SCHEMA_VERSION,
 )
+from .bybit_execution_cost_latency import (
+    SCHEMA_VERSION as DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION,
+)
 from .bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -39,9 +42,13 @@ from .bybit_execution_funding import (
     OFFICIAL_MARK_PRICE_KLINE_URL,
     SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
 )
+from .bybit_execution_latency import (
+    OFFICIAL_ORDERBOOK_URL,
+    SCHEMA_VERSION as DECISION_PRICE_LATENCY_SCHEMA_VERSION,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v20"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v21"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -222,6 +229,40 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "composite_unavailable_cost_policy_sealed": False,
     "composite_provider_calls": 0,
     "composite_writes_performed": False,
+    "decision_price_latency_scenario_implemented": True,
+    "decision_price_latency_scenario_schema_version": (
+        DECISION_PRICE_LATENCY_SCHEMA_VERSION
+    ),
+    "decision_price_latency_benchmark": "decision_book_mid_price",
+    "decision_price_latency_measurement_basis": (
+        "supplied_decision_book_mid_to_later_matching_engine_book_mid"
+    ),
+    "decision_price_latency_reference_best_bid_ask_required": True,
+    "decision_price_latency_reference_lineages_distinct": True,
+    "decision_price_latency_reference_and_execution_lineages_distinct": True,
+    "decision_price_latency_timeline_reconciled": True,
+    "decision_price_latency_actual_order_submission_observed": False,
+    "decision_price_latency_actual_fill_observed": False,
+    "decision_price_latency_realized_execution_observed": False,
+    "decision_price_latency_reference_sources_sealed": False,
+    "decision_price_latency_policy_sealed": False,
+    "official_orderbook_url": OFFICIAL_ORDERBOOK_URL,
+    "decision_reference_composite_cost_implemented": True,
+    "decision_reference_composite_cost_schema_version": (
+        DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION
+    ),
+    "decision_reference_composite_component_identity_reconciled": True,
+    "decision_reference_composite_component_values_fully_rederived": True,
+    "decision_reference_composite_modeled_component_scope": (
+        "decision_reference_latency_plus_visible_book_plus_unsealed_taker_"
+        "fee_plus_operator_supplied_funding_schedule"
+    ),
+    "decision_reference_composite_latency_cost_included": True,
+    "decision_reference_composite_complete_protocol_v2_cost_model": False,
+    "decision_reference_composite_beyond_visible_book_slippage_included": False,
+    "decision_reference_composite_unavailable_cost_policy_sealed": False,
+    "decision_reference_composite_provider_calls": 0,
+    "decision_reference_composite_writes_performed": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
 }
@@ -810,6 +851,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_funding_settlement_scenario_v1",
             "bybit_funding_interval_scenario_v1",
             "bybit_composite_execution_cost_scenario_v1",
+            "bybit_decision_price_latency_scenario_v1",
+            "bybit_decision_reference_composite_execution_cost_scenario_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -1068,6 +1111,33 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"composite_provider_calls={value['composite_provider_calls']} "
         "writes_performed="
         f"{str(value['composite_writes_performed']).casefold()}",
+        "decision_price_latency_scenario_implemented="
+        f"{str(value['decision_price_latency_scenario_implemented']).casefold()} "
+        f"schema={value['decision_price_latency_scenario_schema_version']} "
+        f"benchmark={value['decision_price_latency_benchmark']}",
+        "decision_price_latency_reference_best_bid_ask_required="
+        f"{str(value['decision_price_latency_reference_best_bid_ask_required']).casefold()} "
+        "timeline_reconciled="
+        f"{str(value['decision_price_latency_timeline_reconciled']).casefold()} "
+        "reference_lineages_distinct="
+        f"{str(value['decision_price_latency_reference_lineages_distinct']).casefold()}",
+        "decision_price_latency_actual_order_submission_observed="
+        f"{str(value['decision_price_latency_actual_order_submission_observed']).casefold()} "
+        "actual_fill_observed="
+        f"{str(value['decision_price_latency_actual_fill_observed']).casefold()} "
+        "policy_sealed="
+        f"{str(value['decision_price_latency_policy_sealed']).casefold()}",
+        "decision_reference_composite_cost_implemented="
+        f"{str(value['decision_reference_composite_cost_implemented']).casefold()} "
+        f"schema={value['decision_reference_composite_cost_schema_version']}",
+        "decision_reference_composite_latency_cost_included="
+        f"{str(value['decision_reference_composite_latency_cost_included']).casefold()} "
+        "complete_protocol_v2_cost_model="
+        f"{str(value['decision_reference_composite_complete_protocol_v2_cost_model']).casefold()} "
+        "beyond_visible_book_slippage_included="
+        f"{str(value['decision_reference_composite_beyond_visible_book_slippage_included']).casefold()} "
+        "unavailable_cost_policy_sealed="
+        f"{str(value['decision_reference_composite_unavailable_cost_policy_sealed']).casefold()}",
         "capture_pair_round_trip_implemented="
         f"{str(value['capture_pair_round_trip_implemented']).casefold()} "
         f"schema={value['capture_pair_round_trip_schema_version']}",

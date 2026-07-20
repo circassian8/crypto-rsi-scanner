@@ -27,6 +27,9 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost import (
     SCHEMA_VERSION as COMPOSITE_EXECUTION_COST_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_latency import (
+    SCHEMA_VERSION as DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -34,6 +37,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     OFFICIAL_INSTRUMENT_INFO_URL,
     OFFICIAL_MARK_PRICE_KLINE_URL,
     SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
+)
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_latency import (
+    OFFICIAL_ORDERBOOK_URL,
+    SCHEMA_VERSION as DECISION_PRICE_LATENCY_SCHEMA_VERSION,
 )
 from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 import (
     CONTRACT_VERSION as FROZEN_CONTRACT_VERSION,
@@ -57,9 +64,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v19"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v20"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
+    "with_unsealed_decision_price_latency_and_identity_rederived_"
+    "decision_reference_composite_cost_"
     "with_unsealed_identity_rederived_composite_execution_cost_"
     "and_unsealed_exact_expected_settlement_funding_interval_aggregation_"
     "and_exact_leg_taker_fee_"
@@ -295,6 +304,40 @@ _EXPECTED_EXECUTION_DECISION = {
     "composite_unavailable_cost_policy_sealed": False,
     "composite_provider_calls": 0,
     "composite_writes_performed": False,
+    "decision_price_latency_scenario_implemented": True,
+    "decision_price_latency_scenario_schema_version": (
+        DECISION_PRICE_LATENCY_SCHEMA_VERSION
+    ),
+    "decision_price_latency_benchmark": "decision_book_mid_price",
+    "decision_price_latency_measurement_basis": (
+        "supplied_decision_book_mid_to_later_matching_engine_book_mid"
+    ),
+    "decision_price_latency_reference_best_bid_ask_required": True,
+    "decision_price_latency_reference_lineages_distinct": True,
+    "decision_price_latency_reference_and_execution_lineages_distinct": True,
+    "decision_price_latency_timeline_reconciled": True,
+    "decision_price_latency_actual_order_submission_observed": False,
+    "decision_price_latency_actual_fill_observed": False,
+    "decision_price_latency_realized_execution_observed": False,
+    "decision_price_latency_reference_sources_sealed": False,
+    "decision_price_latency_policy_sealed": False,
+    "official_orderbook_url": OFFICIAL_ORDERBOOK_URL,
+    "decision_reference_composite_cost_implemented": True,
+    "decision_reference_composite_cost_schema_version": (
+        DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION
+    ),
+    "decision_reference_composite_component_identity_reconciled": True,
+    "decision_reference_composite_component_values_fully_rederived": True,
+    "decision_reference_composite_modeled_component_scope": (
+        "decision_reference_latency_plus_visible_book_plus_unsealed_taker_"
+        "fee_plus_operator_supplied_funding_schedule"
+    ),
+    "decision_reference_composite_latency_cost_included": True,
+    "decision_reference_composite_complete_protocol_v2_cost_model": False,
+    "decision_reference_composite_beyond_visible_book_slippage_included": False,
+    "decision_reference_composite_unavailable_cost_policy_sealed": False,
+    "decision_reference_composite_provider_calls": 0,
+    "decision_reference_composite_writes_performed": False,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
@@ -757,6 +800,32 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "unavailable_cost_policy_sealed=false"
         ),
         "composite_provider_calls=0 writes_performed=false",
+        (
+            "decision_price_latency_scenario_implemented=true schema="
+            f"{decision['decision_price_latency_scenario_schema_version']} "
+            "benchmark=decision_book_mid_price"
+        ),
+        (
+            "decision_price_latency_reference_best_bid_ask_required=true "
+            "timeline_reconciled=true reference_lineages_distinct=true "
+            "reference_and_execution_lineages_distinct=true"
+        ),
+        (
+            "decision_price_latency_actual_order_submission_observed=false "
+            "actual_fill_observed=false realized_execution_observed=false "
+            "reference_sources_sealed=false policy_sealed=false"
+        ),
+        (
+            "decision_reference_composite_cost_implemented=true schema="
+            f"{decision['decision_reference_composite_cost_schema_version']}"
+        ),
+        (
+            "decision_reference_composite_latency_cost_included=true "
+            "complete_protocol_v2_cost_model=false "
+            "beyond_visible_book_slippage_included=false "
+            "unavailable_cost_policy_sealed=false provider_calls=0 "
+            "writes_performed=false"
+        ),
         (
             "capture_pair_round_trip_implemented=true schema="
             f"{decision['capture_pair_round_trip_schema_version']}"

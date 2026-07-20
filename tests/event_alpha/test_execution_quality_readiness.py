@@ -35,6 +35,9 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost import (
     SCHEMA_VERSION as COMPOSITE_EXECUTION_COST_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_latency import (
+    SCHEMA_VERSION as DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
@@ -42,6 +45,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
     OFFICIAL_INSTRUMENT_INFO_URL,
     OFFICIAL_MARK_PRICE_KLINE_URL,
     SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
+)
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_latency import (
+    OFFICIAL_ORDERBOOK_URL,
+    SCHEMA_VERSION as DECISION_PRICE_LATENCY_SCHEMA_VERSION,
 )
 
 
@@ -63,7 +70,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v20"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v21"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -249,6 +256,47 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["composite_unavailable_cost_policy_sealed"] is False
     assert impact["composite_provider_calls"] == 0
     assert impact["composite_writes_performed"] is False
+    assert impact["decision_price_latency_scenario_implemented"] is True
+    assert impact["decision_price_latency_scenario_schema_version"] == (
+        DECISION_PRICE_LATENCY_SCHEMA_VERSION
+    )
+    assert impact["decision_price_latency_benchmark"] == "decision_book_mid_price"
+    assert impact["decision_price_latency_reference_best_bid_ask_required"] is True
+    assert impact["decision_price_latency_reference_lineages_distinct"] is True
+    assert (
+        impact["decision_price_latency_reference_and_execution_lineages_distinct"]
+        is True
+    )
+    assert impact["decision_price_latency_timeline_reconciled"] is True
+    assert impact["decision_price_latency_actual_order_submission_observed"] is False
+    assert impact["decision_price_latency_actual_fill_observed"] is False
+    assert impact["decision_price_latency_realized_execution_observed"] is False
+    assert impact["decision_price_latency_reference_sources_sealed"] is False
+    assert impact["decision_price_latency_policy_sealed"] is False
+    assert impact["official_orderbook_url"] == OFFICIAL_ORDERBOOK_URL
+    assert impact["decision_reference_composite_cost_implemented"] is True
+    assert impact["decision_reference_composite_cost_schema_version"] == (
+        DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION
+    )
+    assert impact[
+        "decision_reference_composite_component_identity_reconciled"
+    ] is True
+    assert impact[
+        "decision_reference_composite_component_values_fully_rederived"
+    ] is True
+    assert impact["decision_reference_composite_latency_cost_included"] is True
+    assert (
+        impact["decision_reference_composite_complete_protocol_v2_cost_model"]
+        is False
+    )
+    assert impact[
+        "decision_reference_composite_beyond_visible_book_slippage_included"
+    ] is False
+    assert impact[
+        "decision_reference_composite_unavailable_cost_policy_sealed"
+    ] is False
+    assert impact["decision_reference_composite_provider_calls"] == 0
+    assert impact["decision_reference_composite_writes_performed"] is False
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
@@ -274,6 +322,8 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_funding_settlement_scenario_v1",
         "bybit_funding_interval_scenario_v1",
         "bybit_composite_execution_cost_scenario_v1",
+        "bybit_decision_price_latency_scenario_v1",
+        "bybit_decision_reference_composite_execution_cost_scenario_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -572,6 +622,15 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "component_values_fully_rederived=true" in rendered
     assert "composite_complete_protocol_v2_cost_model=false" in rendered
     assert "composite_provider_calls=0" in rendered
+    assert "decision_price_latency_scenario_implemented=true" in rendered
+    assert DECISION_PRICE_LATENCY_SCHEMA_VERSION in rendered
+    assert "benchmark=decision_book_mid_price" in rendered
+    assert "decision_price_latency_reference_best_bid_ask_required=true" in rendered
+    assert "decision_price_latency_actual_order_submission_observed=false" in rendered
+    assert "actual_fill_observed=false" in rendered
+    assert "decision_reference_composite_cost_implemented=true" in rendered
+    assert DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION in rendered
+    assert "decision_reference_composite_latency_cost_included=true" in rendered
     assert "funding_rate_source_sealed=false" in rendered
     assert "settlement_mark_source_sealed=false" in rendered
     assert "capture_pair_round_trip_implemented=true" in rendered
@@ -777,6 +836,8 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_funding_settlement_scenario_v1",
         "bybit_funding_interval_scenario_v1",
         "bybit_composite_execution_cost_scenario_v1",
+        "bybit_decision_price_latency_scenario_v1",
+        "bybit_decision_reference_composite_execution_cost_scenario_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -987,6 +1048,21 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     assert readiness["composite_unavailable_cost_policy_sealed"] is False
     assert readiness["composite_provider_calls"] == 0
     assert readiness["composite_writes_performed"] is False
+    assert readiness["decision_price_latency_scenario_implemented"] is True
+    assert readiness["decision_price_latency_scenario_schema_version"] == (
+        DECISION_PRICE_LATENCY_SCHEMA_VERSION
+    )
+    assert readiness["decision_price_latency_actual_order_submission_observed"] is False
+    assert readiness["decision_price_latency_actual_fill_observed"] is False
+    assert readiness["decision_price_latency_policy_sealed"] is False
+    assert readiness["decision_reference_composite_cost_implemented"] is True
+    assert readiness["decision_reference_composite_cost_schema_version"] == (
+        DECISION_REFERENCE_COMPOSITE_COST_SCHEMA_VERSION
+    )
+    assert readiness["decision_reference_composite_latency_cost_included"] is True
+    assert readiness[
+        "decision_reference_composite_complete_protocol_v2_cost_model"
+    ] is False
     assert readiness["funding_rate_source_sealed"] is False
     assert readiness["settlement_mark_source_sealed"] is False
     assert readiness["funding_settlement_protocol_v2_annex_bound"] is False

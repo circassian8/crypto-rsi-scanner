@@ -130,9 +130,27 @@ assumptions and lineages, and rejects any identity or value drift before
 combining visible-book drag, fees, and signed funding cash flow in native USDT.
 Because long and short book walks consume different sides, their exact executed
 quote values—and therefore their taker fees—need not match even at the same base
-quantity. The composite explicitly excludes latency, beyond-book slippage, and
-unavailable-cost policy and preserves every unsealed source and annex flag. It
-is not a complete Protocol-v2 cost model or evidence row.
+quantity. This base composite explicitly excludes latency, beyond-book slippage,
+and unavailable-cost policy and preserves every unsealed source and annex flag.
+
+Decision-price latency now has a separate supplied-input contract grounded in
+implementation shortfall. Each entry/exit reference contains exact best
+bid/ask, provider observation, local acquisition, decision timestamp, bounded
+source reference, and a lineage distinct from both the other decision reference
+and the corresponding execution book. The decision must precede the later
+matching-engine book; the exit reference must also follow the modeled position
+open. For long and short cases, the projection reports signed midpoint-drift
+cost—positive adverse, negative favorable—and proves both the decision-mid to
+execution-mid identity and the decision-mid to visible-book identity. It does
+not clamp favorable drift or add spread again.
+
+The decision-reference composite then fully rederives latency plus the existing
+book, fee, and funding projections and reconciles them to the same modeled net
+result in native USDT. It is complete only for those supplied components. The
+project has not observed an order submission or fill, sealed the decision-book
+sources or latency policy, modeled beyond-visible-book slippage, selected an
+unavailable-cost rule, or bound the annex. Neither composite is a complete
+Protocol-v2 cost model or evidence row.
 
 The selected Bybit capability now advertises only the actual native snapshot
 fields: USDT depth bands, USDT-notional side-specific price impact, native

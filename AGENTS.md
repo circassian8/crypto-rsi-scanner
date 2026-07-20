@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v18 must expose those remaining cost fields rather
+  Execution-quality readiness v21 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -667,6 +667,19 @@ may be added later when a suitable environment already exists.
   schedule funding. Keep latency, beyond-book slippage, unavailable-cost policy,
   authoritative sources, final cost-model completeness, annex binding, and
   evidence eligibility false.
+  The pure decision-price latency scenario v1 may compare exact supplied entry
+  and exit best-bid/ask decision references with the later matching-engine book
+  midpoints already carried by one round trip. Preserve separate provider,
+  acquisition, and decision clocks; require the decision before its execution
+  book, the exit reference after modeled position open, and reference lineages
+  distinct from one another and from execution. Signed latency cost is positive
+  when adverse and negative when favorable; never clamp it or add spread again.
+  The decision-reference composite may join latency to visible-book, fee, and
+  funding only after fully rederiving every component and reconciling the same
+  modeled net result. Supplied reference completeness is not realized order/fill
+  latency. Keep decision sources and latency policy unsealed, actual submission
+  and fill observation false, beyond-book and unavailable-cost behavior absent,
+  and Protocol-v2 authority false.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

@@ -894,7 +894,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v18 records the owner-confirmed primary research
+Execution-quality readiness v21 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -954,6 +954,26 @@ complete only for that declared scope. Latency cost, beyond-book slippage,
 unavailable-cost behavior, authoritative schedule/rate/mark/fee sources, final
 notional/style policy, and annex binding remain absent, so
 `composite_complete_protocol_v2_cost_model=false`.
+
+Decision-price latency arithmetic is now separately closed for supplied
+research references. Each entry and exit reference carries exact best bid/ask,
+matching-engine observation time, local acquisition time, explicit decision
+time, source reference, and lineage. The reference must precede its later
+execution book, the exit reference must follow the modeled position open, and
+reference lineages cannot reuse each other or either execution lineage. The
+projection decomposes decision-reference gross return into signed midpoint
+drift and the existing execution-book gross return, then reconciles visible-book
+impact without adding spread again. Positive latency cost is adverse and a
+negative value is favorable; neither is clamped to zero.
+
+The decision-reference composite fully rederives that latency projection plus
+the existing visible-book, taker-fee, and funding components before accepting
+one native-USDT identity. This closes supplied-input implementation-shortfall
+arithmetic only. No order submission or fill was observed, the decision books
+and latency policy are unsealed, and beyond-visible-book slippage and
+unavailable-cost behavior remain absent. Therefore the new composite keeps
+`complete_protocol_v2_cost_model=false`, `protocol_v2_annex_bound=false`, and
+`protocol_v2_evidence_eligible=false`.
 
 The selected capability and snapshot projection use the real native fields:
 `bid_depth_usdt_by_band`, `ask_depth_usdt_by_band`, and side-specific

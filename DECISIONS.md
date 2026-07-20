@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Treat latency as signed decision-mid implementation shortfall
+**Status:** accepted as offline arithmetic; reference sources and policy remain unsealed
+**Decision:** Model one supplied entry and exit decision book from exact best
+bid/ask, provider observation, local acquisition, explicit decision timestamp,
+bounded source reference, and distinct lineage. Require each decision before
+its later matching-engine execution book, require the exit reference after the
+modeled position opens, and prohibit decision-reference lineage reuse across
+references or execution books. Decompose decision-reference gross return into
+signed midpoint drift and execution-book gross return, then join visible-book,
+taker-fee, and funding costs only by fully rederiving every component. Latency
+cost is positive when adverse and negative when favorable; never clamp it or
+add spread a second time. Keep actual order submission/fill observation,
+reference authority, latency policy, beyond-book slippage, unavailable-cost
+behavior, annex binding, and Protocol-v2 evidence authority false.
+**Why:** Measuring all costs from each execution book's own midpoint omits the
+price movement between a human/system decision and that later book. Simply
+adding the decision-to-execution price difference to the existing gross return
+would double count. The closed implementation-shortfall identity makes the
+benchmark explicit and preserves favorable as well as adverse movement without
+pretending supplied books are realized execution evidence.
+**Revisit when:** Genuine decision-time books, exact decision/submission/fill
+clocks, and immutable capture pairs exist and the operator is ready to seal the
+latency benchmark, allowed window, missing-evidence rule, and full cost annex.
+
 ## 2026-07-20 - Composite costs must rederive every supplied component
 **Status:** accepted as offline arithmetic; full cost policy remains unsealed
 **Decision:** Combine Bybit visible-book drag, taker fees, and holding-interval

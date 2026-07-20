@@ -38,9 +38,16 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   authoritative schedule/rate/mark coverage and holding policy remain unsealed;
 - pure composite cost arithmetic fully rederives those fee and funding
   projections from the same exact round trip before combining them with
-  visible-book drag. It preserves side-specific executed-value fees and remains
-  incomplete without latency, beyond-book slippage, unavailable-cost policy,
-  authoritative sources, and annex binding;
+  visible-book drag. It preserves side-specific executed-value fees;
+- pure decision-price latency arithmetic now compares exact supplied entry and
+  exit best-bid/ask decision references with the later matching-engine books,
+  preserves provider/acquisition/decision clocks and distinct lineages, and
+  decomposes signed midpoint drift from visible-book impact without counting
+  spread twice. A decision-reference composite fully rederives latency, book,
+  fee, and funding components before accepting one native-USDT identity. No
+  actual submission or fill is observed, so the result remains incomplete
+  without sealed references and policy, beyond-book slippage, unavailable-cost
+  behavior, authoritative fee/funding sources, and annex binding;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -60,8 +67,8 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - no genuine Bybit REST funding/open-interest/positioning capture exists;
 - the primary currency unit is sealed as native USDT, but the fee schedule,
   order style, notional tiers, final quantity policy, spread/impact application,
-  slippage, funding policy and sources, latency-cost, and unavailable-cost rules
-  remain unsealed;
+  slippage, funding policy and sources, decision-reference source/clock rules,
+  latency-cost policy, and unavailable-cost rules remain unsealed;
 - Bybit's public fee table is not treated as account- or symbol-authoritative,
   while its authenticated account fee-rate endpoint remains outside the
   confirmed public-only boundary and is neither authorized nor called;
