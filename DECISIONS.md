@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Reconcile funding over an exact supplied settlement schedule
+**Status:** accepted as offline arithmetic; schedule and source authority remain unsealed
+**Decision:** A Bybit funding-interval scenario must name one causal bounded
+schedule source covering the modeled position and provide the expected funding
+timestamps in strict order. The supplied settlement events must match that
+sequence exactly; omissions, duplicates, additions, reordering, timestamps at
+the entry/exit boundaries, and more than 256 events fail closed. Aggregate each
+event using the already accepted signed-settlement formula and reconcile the
+total cash flow to visible-book P&L. Label the result complete only relative to
+the operator-supplied expected schedule. Keep authoritative holding-interval
+coverage, schedule/rate/mark source sealing, realized execution, and
+Protocol-v2 eligibility false.
+**Why:** Summing independently valid settlement calculations is insufficient if
+the expected event set is not explicit. Bybit funding intervals are symbol-
+specific, so a missing or duplicated settlement can silently bias modeled P&L.
+Exact schedule/event reconciliation closes that arithmetic failure mode without
+pretending current instrument metadata proves the historical schedule.
+**Revisit when:** Genuine point-in-time instrument schedules, settled rates, and
+authoritative settlement marks have immutable capture and the final Protocol-v2
+holding-period funding policy is ready for human sealing.
+
 ## 2026-07-20 - Relative-return values and feature bases must agree
 **Status:** accepted
 **Decision:** When causal temporal history supplies a canonical BTC- or

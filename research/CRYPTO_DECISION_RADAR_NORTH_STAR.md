@@ -923,19 +923,25 @@ visible-book impact application, beyond-book slippage, funding treatment,
 latency cost, and unavailable-cost policy. Until then
 `protocol_v2_cost_model_sealed=false` remains operator truth.
 
-Funding settlement arithmetic is now closed for one supplied event without
-pretending that the evidence or holding policy is complete. Bybit defines a
-USDT-perpetual funding transfer as base quantity times the settlement mark
-price times the settled fractional rate: positive funding is paid by longs to
-shorts, while negative funding reverses that transfer. The pure v1 projection
-binds one such event strictly inside the modeled holding interval, carries an
-explicit positive-received/negative-paid cash-flow convention, and reconciles
-the signed transfer to visible-book P&L. It rejects percent/fraction mistakes,
-non-causal source clocks, unsafe references, and source-round-trip drift. This
-does not prove that every settlement in a holding interval is present, obtain
-the required settlement-time mark price, seal either source, call a provider,
-or make the row Protocol-v2 evidence. Complete interval coverage, genuine mark
-and rate captures, and the final funding holding policy therefore remain open.
+Funding settlement arithmetic is closed for one supplied event, and the pure
+interval v1 projection can now require an exact, strictly ordered match between
+an operator-supplied expected settlement schedule and the supplied events. It
+aggregates their signed cash flows and reconciles the result to visible-book
+P&L. Bybit defines a USDT-perpetual funding transfer as base quantity times the
+settlement mark price times the settled fractional rate: positive funding is
+paid by longs to shorts, while negative funding reverses that transfer. Bybit's
+[instrument metadata](https://bybit-exchange.github.io/docs/v5/market/instrument)
+exposes the symbol-specific `fundingInterval` in minutes;
+the interval projection therefore requires a bounded, causal schedule source
+and an effective window covering the modeled position. It rejects missing,
+duplicate, reordered, boundary-ambiguous, or extra settlement times as well as
+percent/fraction mistakes, unsafe references, and source-round-trip drift.
+This exact reconciliation proves only the supplied, unsealed schedule. It does
+not obtain a historical schedule, prove schedule authority, obtain required
+settlement-time marks or rates, seal any source, call a provider, or make the
+row Protocol-v2 evidence. `holding_interval_funding_coverage_complete=false`
+therefore remains explicit until genuine schedule, mark, and rate captures and
+the final funding holding policy are sealed.
 
 The selected capability and snapshot projection use the real native fields:
 `bid_depth_usdt_by_band`, `ask_depth_usdt_by_band`, and side-specific

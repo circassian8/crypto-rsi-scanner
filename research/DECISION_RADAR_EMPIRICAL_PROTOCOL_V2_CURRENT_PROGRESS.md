@@ -18,11 +18,24 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - selected execution-quality fields: native USDT depth and USDT-notional
   side-impact fields; the generic USD projection is inactive and unavailable;
 - each side impact is mid-referenced and already includes its crossing
-  half-spread, so standalone spread cannot be added to that same side; the
-  round-trip entry/exit snapshot policy remains unsealed;
+  half-spread, so standalone spread cannot be added to that same side;
 - buy size is exact USDT spent and sell size is exact USDT proceeds, so equal
-  numeric notionals do not prove equal base quantity; round-trip base-quantity
-  reconciliation remains unimplemented and unsealed;
+  numeric notionals do not prove equal base quantity; the pure round-trip v3
+  model instead carries one exact `qtyStep`-aligned base quantity through two
+  distinct books and independently causal entry/exit catalog constraints;
+- target-mid-notional sizing can floor one supplied USDT reference to the venue
+  quantity step and rederive an exact two-book scenario, while final tiers and
+  adoption of that rounding rule remain unsealed;
+- the read-only capture-pair contract can fully rederive a modeled round trip
+  from two exact immutable capture namespaces without guessing a latest
+  pointer; no genuine capture pair or annex binding exists;
+- pure taker-fee arithmetic applies separately supplied fractional rates to
+  each leg's exact executed USDT value, but fee rates and source authority
+  remain unsealed;
+- pure funding arithmetic applies exact signed settlement transfers and can
+  strictly reconcile and aggregate supplied events against one bounded,
+  operator-supplied expected schedule. This proves only that supplied schedule;
+  authoritative schedule/rate/mark coverage and holding policy remain unsealed;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -41,8 +54,9 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   insufficient history explicit rather than inventing a value;
 - no genuine Bybit REST funding/open-interest/positioning capture exists;
 - the primary currency unit is sealed as native USDT, but the fee schedule,
-  order style, notional tiers, spread/impact application, slippage, funding,
-  latency-cost, and unavailable-cost rules remain unsealed;
+  order style, notional tiers, final quantity policy, spread/impact application,
+  slippage, funding policy and sources, latency-cost, and unavailable-cost rules
+  remain unsealed;
 - Bybit's public fee table is not treated as account- or symbol-authoritative,
   while its authenticated account fee-rate endpoint remains outside the
   confirmed public-only boundary and is neither authorized nor called;

@@ -645,12 +645,19 @@ may be added later when a suitable environment already exists.
   cash flow is positive when received and negative when paid. Require the event
   strictly inside the modeled holding interval plus separate bounded rate/mark
   references, causal observation clocks, and lineages. The arithmetic is exact
-  only for those supplied inputs. It does not prove complete funding-event
-  coverage, obtain an exact settlement mark, treat a mark-price kline close as
-  exact, call a provider, read credentials, or grant annex/evidence authority.
-  Keep `holding_interval_funding_coverage_complete=false`, both sources
-  unsealed, and the holding policy open until genuine evidence and the final
-  annex exist.
+  only for those supplied inputs. The pure funding-interval scenario v1 may
+  additionally require an exact strictly ordered match between an operator-
+  supplied expected settlement schedule and the supplied events, then aggregate
+  their signed cash flows. Require a causal bounded schedule source whose
+  effective window covers the modeled hold, reject omissions, duplicates,
+  additions, reordering, and boundary timestamps, and cap the set at 256
+  events. This proves only the supplied unsealed schedule. It does not prove
+  complete authoritative funding-event coverage, obtain an exact settlement
+  mark, treat a mark-price kline close as exact, call a provider, read
+  credentials, or grant annex/evidence authority. Keep
+  `holding_interval_funding_coverage_complete=false`, schedule/rate/mark
+  sources unsealed, and the holding policy open until genuine evidence and the
+  final annex exist.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side

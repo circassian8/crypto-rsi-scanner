@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T01:40:00.314677+00:00`
+- generated_at: `2026-07-20T02:18:56.655078+00:00`
 - public_class_count: `514`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `6`
+- functions_over_limit_count: `7`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `6`
+- production_functions_over_limit: `7`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `6`
+- functions_over_150_lines: `7`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `84`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 2 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 6 | advisory |
+| `functions_over_150_lines` | 7 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -309,8 +309,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | module | function | lines | public |
 |---|---|---:|---:|
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee` | `model_bybit_visible_book_taker_fee_scenario` | 166 | true |
-| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_settlement_scenario` | 170 | true |
+| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_settlement_scenario` | 169 | true |
+| `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_interval_scenario` | 204 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality` | `model_bybit_visible_book_round_trip` | 226 | true |
-| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 201 | true |
-| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 158 | true |
-| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 158 | false |
+| `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 213 | true |
+| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 160 | true |
+| `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 171 | false |

@@ -25,8 +25,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
+    INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
     OFFICIAL_FUNDING_HISTORY_URL,
+    OFFICIAL_INSTRUMENT_INFO_URL,
     OFFICIAL_MARK_PRICE_KLINE_URL,
     SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
 )
@@ -52,10 +54,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v17"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v18"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_unsealed_single_settlement_funding_and_exact_leg_taker_fee_"
+    "with_unsealed_exact_expected_settlement_funding_interval_aggregation_"
+    "and_exact_leg_taker_fee_"
     "application_two_exact_immutable_"
     "capture_round_trip_target_mid_notional_floor_"
     "sizing_separate_entry_exit_catalog_bound_"
@@ -250,7 +253,18 @@ _EXPECTED_EXECUTION_DECISION = {
     "negative_funding_short_pays_long": True,
     "settlement_mark_price_required": True,
     "single_funding_event_arithmetic_implemented": True,
+    "funding_interval_aggregation_implemented": True,
+    "funding_interval_scenario_schema_version": (
+        FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION
+    ),
+    "expected_funding_settlement_set_reconciled": True,
+    "funding_settlement_order_strict": True,
+    "operator_supplied_schedule_coverage_complete_possible": True,
+    "funding_interval_coverage_scope": (
+        "operator_supplied_unsealed_expected_settlement_schedule"
+    ),
     "holding_interval_funding_coverage_complete": False,
+    "funding_schedule_source_sealed": False,
     "funding_rate_source_sealed": False,
     "settlement_mark_source_sealed": False,
     "funding_settlement_protocol_v2_annex_bound": False,
@@ -258,6 +272,7 @@ _EXPECTED_EXECUTION_DECISION = {
     "funding_settlement_writes_performed": False,
     "official_funding_fee_url": OFFICIAL_FUNDING_FEE_URL,
     "official_funding_history_url": OFFICIAL_FUNDING_HISTORY_URL,
+    "official_instrument_info_url": OFFICIAL_INSTRUMENT_INFO_URL,
     "official_mark_price_kline_url": OFFICIAL_MARK_PRICE_KLINE_URL,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
@@ -684,9 +699,21 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         ),
         (
             "single_funding_event_arithmetic_implemented=true "
+            "funding_interval_aggregation_implemented=true schema="
+            f"{decision['funding_interval_scenario_schema_version']} "
             "holding_interval_funding_coverage_complete=false"
         ),
         (
+            "expected_funding_settlement_set_reconciled=true "
+            "funding_settlement_order_strict=true "
+            "operator_supplied_schedule_coverage_complete_possible=true"
+        ),
+        (
+            "funding_interval_coverage_scope="
+            f"{decision['funding_interval_coverage_scope']}"
+        ),
+        (
+            "funding_schedule_source_sealed=false "
             "funding_rate_source_sealed=false "
             "settlement_mark_source_sealed=false "
             "protocol_v2_annex_bound=false provider_calls=0 "

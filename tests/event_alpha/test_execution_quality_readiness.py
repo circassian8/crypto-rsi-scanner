@@ -33,8 +33,10 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
 from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
+    INTERVAL_SCHEMA_VERSION as FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION,
     OFFICIAL_FUNDING_FEE_URL,
     OFFICIAL_FUNDING_HISTORY_URL,
+    OFFICIAL_INSTRUMENT_INFO_URL,
     OFFICIAL_MARK_PRICE_KLINE_URL,
     SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
 )
@@ -58,7 +60,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v18"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v19"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -207,7 +209,18 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["negative_funding_short_pays_long"] is True
     assert impact["settlement_mark_price_required"] is True
     assert impact["single_funding_event_arithmetic_implemented"] is True
+    assert impact["funding_interval_aggregation_implemented"] is True
+    assert impact["funding_interval_scenario_schema_version"] == (
+        FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION
+    )
+    assert impact["expected_funding_settlement_set_reconciled"] is True
+    assert impact["funding_settlement_order_strict"] is True
+    assert impact["operator_supplied_schedule_coverage_complete_possible"] is True
+    assert impact["funding_interval_coverage_scope"] == (
+        "operator_supplied_unsealed_expected_settlement_schedule"
+    )
     assert impact["holding_interval_funding_coverage_complete"] is False
+    assert impact["funding_schedule_source_sealed"] is False
     assert impact["funding_rate_source_sealed"] is False
     assert impact["settlement_mark_source_sealed"] is False
     assert impact["funding_settlement_protocol_v2_annex_bound"] is False
@@ -215,6 +228,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["funding_settlement_writes_performed"] is False
     assert impact["official_funding_fee_url"] == OFFICIAL_FUNDING_FEE_URL
     assert impact["official_funding_history_url"] == OFFICIAL_FUNDING_HISTORY_URL
+    assert impact["official_instrument_info_url"] == OFFICIAL_INSTRUMENT_INFO_URL
     assert impact["official_mark_price_kline_url"] == OFFICIAL_MARK_PRICE_KLINE_URL
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
@@ -239,6 +253,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_two_exact_immutable_capture_round_trip_v1",
         "bybit_visible_book_taker_fee_scenario_v1",
         "bybit_funding_settlement_scenario_v1",
+        "bybit_funding_interval_scenario_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -517,7 +532,20 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "negative_funding_short_pays_long=true" in rendered
     assert "settlement_mark_price_required=true" in rendered
     assert "single_funding_event_arithmetic_implemented=true" in rendered
+    assert "funding_interval_aggregation_implemented=true" in rendered
+    assert FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION in rendered
+    assert "expected_funding_settlement_set_reconciled=true" in rendered
+    assert "funding_settlement_order_strict=true" in rendered
+    assert (
+        "operator_supplied_schedule_coverage_complete_possible=true" in rendered
+    )
+    assert (
+        "funding_interval_coverage_scope="
+        "operator_supplied_unsealed_expected_settlement_schedule" in rendered
+    )
     assert "holding_interval_funding_coverage_complete=false" in rendered
+    assert "funding_schedule_source_sealed=false" in rendered
+    assert OFFICIAL_INSTRUMENT_INFO_URL in rendered
     assert "funding_rate_source_sealed=false" in rendered
     assert "settlement_mark_source_sealed=false" in rendered
     assert "capture_pair_round_trip_implemented=true" in rendered
@@ -721,6 +749,7 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_two_exact_immutable_capture_round_trip_v1",
         "bybit_visible_book_taker_fee_scenario_v1",
         "bybit_funding_settlement_scenario_v1",
+        "bybit_funding_interval_scenario_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -904,7 +933,20 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     )
     assert readiness["positive_funding_long_pays_short"] is True
     assert readiness["negative_funding_short_pays_long"] is True
+    assert readiness["funding_interval_aggregation_implemented"] is True
+    assert readiness["funding_interval_scenario_schema_version"] == (
+        FUNDING_INTERVAL_SCENARIO_SCHEMA_VERSION
+    )
+    assert readiness["expected_funding_settlement_set_reconciled"] is True
+    assert readiness["funding_settlement_order_strict"] is True
+    assert (
+        readiness["operator_supplied_schedule_coverage_complete_possible"] is True
+    )
+    assert readiness["funding_interval_coverage_scope"] == (
+        "operator_supplied_unsealed_expected_settlement_schedule"
+    )
     assert readiness["holding_interval_funding_coverage_complete"] is False
+    assert readiness["funding_schedule_source_sealed"] is False
     assert readiness["funding_rate_source_sealed"] is False
     assert readiness["settlement_mark_source_sealed"] is False
     assert readiness["funding_settlement_protocol_v2_annex_bound"] is False

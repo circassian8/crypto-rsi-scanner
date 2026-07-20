@@ -3,12 +3,14 @@
 Bybit USDT perpetual funding is a transfer between long and short positions at
 the funding timestamp.  This module applies one caller-supplied settled rate
 and settlement mark price to the exact base quantity already carried by the
-visible-book round-trip model.
+visible-book round-trip model.  A second pure projection can require an exact
+ordered match between a supplied expected settlement schedule and the supplied
+events, then aggregate their signed cash flows over the modeled holding period.
 
 The arithmetic is exact for the supplied decimal inputs.  The inputs remain an
-unsealed research scenario: this module does not obtain a settlement mark,
-prove that every funding event in a holding interval is present, call Bybit,
-read credentials, write artifacts, or bind the Protocol-v2 cost annex.
+unsealed research scenario: this module does not obtain a historical schedule
+or settlement mark, prove that a supplied schedule is authoritative, call
+Bybit, read credentials, write artifacts, or bind the Protocol-v2 cost annex.
 """
 
 from __future__ import annotations
@@ -18,17 +20,22 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import math
 import re
+from typing import Sequence
 
 from .bybit_execution_quality import (
+    OFFICIAL_INSTRUMENT_DOC,
     ROUND_TRIP_SCHEMA_VERSION,
     BybitVisibleBookRoundTrip,
 )
 
 
 SCHEMA_VERSION = "crypto_radar.bybit_funding_settlement_scenario.v1"
+INTERVAL_SCHEMA_VERSION = "crypto_radar.bybit_funding_interval_scenario.v1"
+MAX_INTERVAL_SETTLEMENTS = 256
 OFFICIAL_FUNDING_HISTORY_URL = (
     "https://bybit-exchange.github.io/docs/v5/market/history-fund-rate"
 )
+OFFICIAL_INSTRUMENT_INFO_URL = OFFICIAL_INSTRUMENT_DOC
 OFFICIAL_MARK_PRICE_KLINE_URL = (
     "https://bybit-exchange.github.io/docs/v5/market/mark-kline"
 )
@@ -115,6 +122,93 @@ class _BybitFundingSettlementScenario:
 
 
 BybitFundingSettlementScenario = _BybitFundingSettlementScenario
+
+
+@dataclass(frozen=True)
+class _BybitFundingSettlementInput:
+    """Exact supplied inputs for one retrospective funding settlement."""
+
+    funding_rate_fraction: str
+    settlement_mark_price_usdt: str
+    funding_settled_at: str
+    assumption_id: str
+    funding_rate_source_reference: str
+    funding_rate_source_observed_at: str
+    funding_rate_lineage_id: str
+    settlement_mark_source_reference: str
+    settlement_mark_source_observed_at: str
+    settlement_mark_lineage_id: str
+
+
+BybitFundingSettlementInput = _BybitFundingSettlementInput
+
+
+@dataclass(frozen=True)
+class _BybitFundingIntervalScenario:
+    """Exact aggregate over one operator-supplied expected settlement set."""
+
+    schema_version: str
+    source_round_trip_schema_version: str
+    source_settlement_schema_version: str
+    venue_id: str
+    execution_mode: str
+    instrument_id: str
+    canonical_asset_id: str
+    base_asset: str
+    quote_asset: str
+    position_side: str
+    base_quantity: str
+    modeled_position_opened_at: str
+    modeled_position_closed_at: str
+    funding_schedule_source_status: str
+    funding_schedule_source_reference: str
+    funding_schedule_source_observed_at: str
+    funding_schedule_effective_from: str
+    funding_schedule_effective_until: str
+    funding_schedule_lineage_id: str
+    funding_schedule_assumption_id: str
+    expected_funding_settlement_times: tuple[str, ...]
+    supplied_funding_settlement_times: tuple[str, ...]
+    expected_funding_settlement_count: int
+    funding_event_count: int
+    expected_settlement_set_reconciled: bool
+    funding_settlement_order_strict: bool
+    settlements: tuple[BybitFundingSettlementScenario, ...]
+    position_cashflow_sign_convention: str
+    total_unsigned_funding_transfer_usdt: float
+    total_position_funding_cashflow_usdt: float
+    total_position_funding_cost_usdt: float
+    total_position_funding_cost_bps_of_entry_mid_notional: float
+    gross_mid_mark_return_usdt: float
+    net_visible_book_return_usdt: float
+    net_after_visible_book_and_funding_usdt: float
+    total_visible_book_cost_usdt: float
+    total_visible_book_and_funding_cost_usdt: float
+    arithmetic_exact_for_supplied_inputs: bool
+    operator_supplied_schedule_coverage_complete: bool
+    coverage_scope: str
+    holding_interval_funding_coverage_complete: bool
+    funding_schedule_source_sealed: bool
+    settlement_mark_sources_sealed: bool
+    funding_rate_sources_sealed: bool
+    fees_included: bool
+    spread_added_separately: bool
+    latency_cost_included: bool
+    beyond_visible_book_slippage_included: bool
+    protocol_v2_annex_bound: bool
+    protocol_v2_evidence_eligible: bool
+    realized_execution: bool
+    provider_calls: int
+    credentials_read: bool
+    private_data_read: bool
+    writes_performed: bool
+    research_only: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+BybitFundingIntervalScenario = _BybitFundingIntervalScenario
 
 
 def _utc(value: object, field: str) -> datetime:
@@ -237,6 +331,21 @@ def _funding_direction(rate: Decimal) -> tuple[str, str, str]:
     return "zero_no_transfer", "none", "none"
 
 
+def _position_funding_cashflow(
+    *,
+    position_side: str,
+    position_value: Decimal,
+    rate: Decimal,
+) -> Decimal:
+    if rate == 0:
+        return Decimal("0")
+    if position_side == "long":
+        return -position_value * rate
+    if position_side == "short":
+        return position_value * rate
+    raise BybitExecutionFundingError("position_side_invalid")
+
+
 def model_bybit_funding_settlement_scenario(
     round_trip: BybitVisibleBookRoundTrip,
     *,
@@ -320,12 +429,11 @@ def model_bybit_funding_settlement_scenario(
 
     position_value = base_quantity * mark_price
     unsigned_transfer = position_value * abs(rate)
-    if rate == 0:
-        cashflow = Decimal("0")
-    elif source.position_side == "long":
-        cashflow = -position_value * rate
-    else:
-        cashflow = position_value * rate
+    cashflow = _position_funding_cashflow(
+        position_side=source.position_side,
+        position_value=position_value,
+        rate=rate,
+    )
     funding_cost = -cashflow
     net_after_funding = net_visible + cashflow
     combined_cost = visible_cost + funding_cost
@@ -409,13 +517,278 @@ def model_bybit_funding_settlement_scenario(
     )
 
 
+def _strict_settlement_times(
+    values: object,
+    *,
+    field: str,
+    opened_at: datetime,
+    closed_at: datetime,
+) -> tuple[datetime, ...]:
+    if (
+        isinstance(values, (str, bytes, bytearray))
+        or not isinstance(values, Sequence)
+    ):
+        raise BybitExecutionFundingError(f"{field}_must_be_sequence")
+    if len(values) > MAX_INTERVAL_SETTLEMENTS:
+        raise BybitExecutionFundingError(f"{field}_too_many")
+    parsed = tuple(
+        _utc(value, f"{field}_{index}")
+        for index, value in enumerate(values)
+    )
+    if any(not opened_at < value < closed_at for value in parsed):
+        raise BybitExecutionFundingError(
+            f"{field}_outside_modeled_holding_interval"
+        )
+    if any(left >= right for left, right in zip(parsed, parsed[1:])):
+        raise BybitExecutionFundingError(f"{field}_not_strictly_increasing")
+    return parsed
+
+
+def _settlement_inputs(values: object) -> tuple[BybitFundingSettlementInput, ...]:
+    if (
+        isinstance(values, (str, bytes, bytearray))
+        or not isinstance(values, Sequence)
+    ):
+        raise BybitExecutionFundingError("settlements_must_be_sequence")
+    if len(values) > MAX_INTERVAL_SETTLEMENTS:
+        raise BybitExecutionFundingError("settlements_too_many")
+    materialized = tuple(values)
+    if any(not isinstance(item, BybitFundingSettlementInput) for item in materialized):
+        raise BybitExecutionFundingError("settlement_input_type_invalid")
+    for field in (
+        "assumption_id",
+        "funding_rate_lineage_id",
+        "settlement_mark_lineage_id",
+    ):
+        identities = tuple(str(getattr(item, field)) for item in materialized)
+        if len(identities) != len(set(identities)):
+            raise BybitExecutionFundingError(f"duplicate_{field}")
+    return materialized
+
+
+def _zulu(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def model_bybit_funding_interval_scenario(
+    round_trip: BybitVisibleBookRoundTrip,
+    *,
+    settlements: Sequence[BybitFundingSettlementInput],
+    expected_funding_settlement_times: Sequence[str],
+    funding_schedule_assumption_id: str,
+    funding_schedule_source_reference: str,
+    funding_schedule_source_observed_at: str,
+    funding_schedule_effective_from: str,
+    funding_schedule_effective_until: str,
+    funding_schedule_lineage_id: str,
+) -> BybitFundingIntervalScenario:
+    """Reconcile and aggregate one supplied holding-interval settlement set.
+
+    Exact set equality proves only the caller-supplied unsealed schedule.  It
+    does not prove that the schedule or settlement sources are authoritative.
+    """
+
+    source = _validate_round_trip(round_trip)
+    opened_at = _utc(source.entry.acquired_at, "entry_acquired_at")
+    closed_at = _utc(source.exit.acquired_at, "exit_acquired_at")
+    expected_times = _strict_settlement_times(
+        expected_funding_settlement_times,
+        field="expected_funding_settlement_times",
+        opened_at=opened_at,
+        closed_at=closed_at,
+    )
+    supplied_inputs = _settlement_inputs(settlements)
+    supplied_times = _strict_settlement_times(
+        tuple(item.funding_settled_at for item in supplied_inputs),
+        field="supplied_funding_settlement_times",
+        opened_at=opened_at,
+        closed_at=closed_at,
+    )
+    if expected_times != supplied_times:
+        raise BybitExecutionFundingError("funding_settlement_set_mismatch")
+
+    schedule_observed = _utc(
+        funding_schedule_source_observed_at,
+        "funding_schedule_source_observed_at",
+    )
+    schedule_effective_from = _utc(
+        funding_schedule_effective_from,
+        "funding_schedule_effective_from",
+    )
+    schedule_effective_until = _utc(
+        funding_schedule_effective_until,
+        "funding_schedule_effective_until",
+    )
+    if schedule_observed > opened_at:
+        raise BybitExecutionFundingError(
+            "funding_schedule_source_observed_after_position_open"
+        )
+    if (
+        schedule_effective_from > opened_at
+        or schedule_effective_until < closed_at
+        or schedule_effective_from > schedule_effective_until
+    ):
+        raise BybitExecutionFundingError(
+            "funding_schedule_effective_window_incomplete"
+        )
+    schedule_reference = _source_reference(
+        funding_schedule_source_reference,
+        "funding_schedule_source_reference",
+        OFFICIAL_INSTRUMENT_INFO_URL,
+    )
+    schedule_assumption = _token(
+        funding_schedule_assumption_id,
+        "funding_schedule_assumption_id",
+    )
+    schedule_lineage = _token(
+        funding_schedule_lineage_id,
+        "funding_schedule_lineage_id",
+    )
+
+    projected: list[BybitFundingSettlementScenario] = []
+    base_quantity = _decimal(source.base_quantity, "base_quantity", positive=True)
+    total_unsigned_transfer = Decimal("0")
+    total_cashflow = Decimal("0")
+    for item in supplied_inputs:
+        scenario = model_bybit_funding_settlement_scenario(
+            source,
+            funding_rate_fraction=item.funding_rate_fraction,
+            settlement_mark_price_usdt=item.settlement_mark_price_usdt,
+            funding_settled_at=item.funding_settled_at,
+            assumption_id=item.assumption_id,
+            funding_rate_source_reference=item.funding_rate_source_reference,
+            funding_rate_source_observed_at=item.funding_rate_source_observed_at,
+            funding_rate_lineage_id=item.funding_rate_lineage_id,
+            settlement_mark_source_reference=item.settlement_mark_source_reference,
+            settlement_mark_source_observed_at=item.settlement_mark_source_observed_at,
+            settlement_mark_lineage_id=item.settlement_mark_lineage_id,
+        )
+        rate = _decimal_text(
+            scenario.funding_rate_fraction,
+            "funding_rate_fraction",
+            maximum_abs=MAX_ABSOLUTE_FUNDING_RATE_FRACTION,
+        )
+        mark_price = _decimal_text(
+            scenario.settlement_mark_price_usdt,
+            "settlement_mark_price_usdt",
+            positive=True,
+        )
+        position_value = base_quantity * mark_price
+        cashflow = _position_funding_cashflow(
+            position_side=source.position_side,
+            position_value=position_value,
+            rate=rate,
+        )
+        total_unsigned_transfer += abs(cashflow)
+        total_cashflow += cashflow
+        projected.append(scenario)
+
+    entry_mid_notional = _decimal(
+        source.entry_mid_notional_usdt,
+        "entry_mid_notional_usdt",
+        positive=True,
+    )
+    visible_cost = _decimal(
+        source.total_visible_book_cost_usdt,
+        "total_visible_book_cost_usdt",
+    )
+    gross_return = _decimal(
+        source.gross_mid_mark_return_usdt,
+        "gross_mid_mark_return_usdt",
+    )
+    net_visible = _decimal(
+        source.net_visible_book_return_usdt,
+        "net_visible_book_return_usdt",
+    )
+    if visible_cost < 0 or not _close(gross_return - net_visible, visible_cost):
+        raise BybitExecutionFundingError(
+            "round_trip_visible_cost_identity_invalid"
+        )
+    funding_cost = -total_cashflow
+    net_after_funding = net_visible + total_cashflow
+    combined_cost = visible_cost + funding_cost
+    if not _close(gross_return - net_after_funding, combined_cost):
+        raise BybitExecutionFundingError(
+            "funding_interval_adjusted_cost_identity_invalid"
+        )
+
+    expected_iso = tuple(_zulu(value) for value in expected_times)
+    supplied_iso = tuple(_zulu(value) for value in supplied_times)
+    return BybitFundingIntervalScenario(
+        schema_version=INTERVAL_SCHEMA_VERSION,
+        source_round_trip_schema_version=source.schema_version,
+        source_settlement_schema_version=SCHEMA_VERSION,
+        venue_id=source.venue_id,
+        execution_mode=source.execution_mode,
+        instrument_id=source.instrument_id,
+        canonical_asset_id=source.canonical_asset_id,
+        base_asset=source.base_asset,
+        quote_asset=source.quote_asset,
+        position_side=source.position_side,
+        base_quantity=source.base_quantity,
+        modeled_position_opened_at=_zulu(opened_at),
+        modeled_position_closed_at=_zulu(closed_at),
+        funding_schedule_source_status="operator_supplied_unsealed_scenario",
+        funding_schedule_source_reference=schedule_reference,
+        funding_schedule_source_observed_at=_zulu(schedule_observed),
+        funding_schedule_effective_from=_zulu(schedule_effective_from),
+        funding_schedule_effective_until=_zulu(schedule_effective_until),
+        funding_schedule_lineage_id=schedule_lineage,
+        funding_schedule_assumption_id=schedule_assumption,
+        expected_funding_settlement_times=expected_iso,
+        supplied_funding_settlement_times=supplied_iso,
+        expected_funding_settlement_count=len(expected_iso),
+        funding_event_count=len(projected),
+        expected_settlement_set_reconciled=True,
+        funding_settlement_order_strict=True,
+        settlements=tuple(projected),
+        position_cashflow_sign_convention="positive_received_negative_paid",
+        total_unsigned_funding_transfer_usdt=_float(total_unsigned_transfer),
+        total_position_funding_cashflow_usdt=_float(total_cashflow),
+        total_position_funding_cost_usdt=_float(funding_cost),
+        total_position_funding_cost_bps_of_entry_mid_notional=_float(
+            funding_cost / entry_mid_notional * Decimal("10000")
+        ),
+        gross_mid_mark_return_usdt=_float(gross_return),
+        net_visible_book_return_usdt=_float(net_visible),
+        net_after_visible_book_and_funding_usdt=_float(net_after_funding),
+        total_visible_book_cost_usdt=_float(visible_cost),
+        total_visible_book_and_funding_cost_usdt=_float(combined_cost),
+        arithmetic_exact_for_supplied_inputs=True,
+        operator_supplied_schedule_coverage_complete=True,
+        coverage_scope="operator_supplied_unsealed_expected_settlement_schedule",
+        holding_interval_funding_coverage_complete=False,
+        funding_schedule_source_sealed=False,
+        settlement_mark_sources_sealed=False,
+        funding_rate_sources_sealed=False,
+        fees_included=False,
+        spread_added_separately=False,
+        latency_cost_included=False,
+        beyond_visible_book_slippage_included=False,
+        protocol_v2_annex_bound=False,
+        protocol_v2_evidence_eligible=False,
+        realized_execution=False,
+        provider_calls=0,
+        credentials_read=False,
+        private_data_read=False,
+        writes_performed=False,
+        research_only=True,
+    )
+
+
 __all__ = (
+    "INTERVAL_SCHEMA_VERSION",
     "MAX_ABSOLUTE_FUNDING_RATE_FRACTION",
+    "MAX_INTERVAL_SETTLEMENTS",
     "OFFICIAL_FUNDING_FEE_URL",
     "OFFICIAL_FUNDING_HISTORY_URL",
+    "OFFICIAL_INSTRUMENT_INFO_URL",
     "OFFICIAL_MARK_PRICE_KLINE_URL",
     "SCHEMA_VERSION",
     "BybitExecutionFundingError",
+    "BybitFundingIntervalScenario",
+    "BybitFundingSettlementInput",
     "BybitFundingSettlementScenario",
+    "model_bybit_funding_interval_scenario",
     "model_bybit_funding_settlement_scenario",
 )

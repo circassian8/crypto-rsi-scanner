@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v17")
+    assert values["progress_version"].endswith("_v18")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -178,7 +178,20 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["negative_funding_short_pays_long"] is True
     assert decision["settlement_mark_price_required"] is True
     assert decision["single_funding_event_arithmetic_implemented"] is True
+    assert decision["funding_interval_aggregation_implemented"] is True
+    assert decision["funding_interval_scenario_schema_version"] == (
+        "crypto_radar.bybit_funding_interval_scenario.v1"
+    )
+    assert decision["expected_funding_settlement_set_reconciled"] is True
+    assert decision["funding_settlement_order_strict"] is True
+    assert (
+        decision["operator_supplied_schedule_coverage_complete_possible"] is True
+    )
+    assert decision["funding_interval_coverage_scope"] == (
+        "operator_supplied_unsealed_expected_settlement_schedule"
+    )
     assert decision["holding_interval_funding_coverage_complete"] is False
+    assert decision["funding_schedule_source_sealed"] is False
     assert decision["funding_rate_source_sealed"] is False
     assert decision["settlement_mark_source_sealed"] is False
     assert decision["funding_settlement_protocol_v2_annex_bound"] is False
@@ -410,7 +423,19 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "negative_funding_short_pays_long=true" in output.out
     assert "settlement_mark_price_required=true" in output.out
     assert "single_funding_event_arithmetic_implemented=true" in output.out
+    assert "funding_interval_aggregation_implemented=true" in output.out
+    assert "crypto_radar.bybit_funding_interval_scenario.v1" in output.out
+    assert "expected_funding_settlement_set_reconciled=true" in output.out
+    assert "funding_settlement_order_strict=true" in output.out
+    assert (
+        "operator_supplied_schedule_coverage_complete_possible=true" in output.out
+    )
+    assert (
+        "funding_interval_coverage_scope="
+        "operator_supplied_unsealed_expected_settlement_schedule" in output.out
+    )
     assert "holding_interval_funding_coverage_complete=false" in output.out
+    assert "funding_schedule_source_sealed=false" in output.out
     assert "funding_rate_source_sealed=false" in output.out
     assert "settlement_mark_source_sealed=false" in output.out
     assert "capture_pair_round_trip_implemented=true" in output.out
@@ -475,6 +500,9 @@ def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:
     assert "Tokenomist v5 cliff-unlock response normalization" in note
     assert "primary cost currency: native USDT" in note
     assert "fee schedule" in note
+    assert "pure funding arithmetic" in note
+    assert "operator-supplied expected schedule" in note
+    assert "authoritative schedule/rate/mark coverage" in note
     assert "synthetic-fixture capture/doctor" in note
     assert "retains\n  nothing" in note
     assert "v4 remains deprecated and live-ineligible" in note

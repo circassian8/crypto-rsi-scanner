@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reconcile whole-interval Bybit funding scenarios · Codex
+**Why:** The existing pure cost primitive could model one exact funding
+settlement, but independently valid events could still be summed with a missing,
+duplicated, added, or reordered settlement. That would silently bias a modeled
+perpetual holding-period return.
+**Changes:**
+- Added a pure funding-interval v1 projection that requires an exact strictly
+  ordered match between one bounded operator-supplied expected schedule and the
+  supplied settlements, then aggregates exact signed funding cash flow and
+  reconciles it to visible-book P&L.
+- Bound the scenario to one causal schedule reference/effective window, unique
+  event assumptions and rate/mark lineages, strict interior holding timestamps,
+  a 256-event limit, and the existing decimal-unit/source-round-trip checks.
+- Kept `holding_interval_funding_coverage_complete=false`, schedule/rate/mark
+  sources unsealed, and Protocol-v2 evidence/annex/realized-execution authority
+  false. No provider transport, credential, persistence, pointer, or policy path
+  was added.
+- Advanced execution-quality readiness to v19 and current Protocol-v2 progress
+  to v18, and aligned the North Star, venue decision package, progress note,
+  working agreement, durable decision, and roadmap.
+- Preserved the non-size public-module ownership gate through the existing
+  private-class/public-alias pattern. Quantitative file/function/class counts
+  remain advisory; the refreshed report passes with 10 new advisory
+  observations.
+**Verify:** 210 focused Bybit execution-quality, capture-pair, fee, funding,
+readiness, and Protocol-v2 tests passed. `make verify-fast` passed all 3,462
+tests plus alert render, fixture backtest, and paper-scoreboard smokes under
+normal macOS loopback permissions; the isolated standalone compatibility
+runner behind `make test` also passed. Python compileall, North Star JSON
+parsing, execution-quality fixture smoke/readiness, Protocol-v2 progress check,
+architecture cleanliness, and diff whitespace checks passed.
+**Notes/risks:** The first sandboxed broad run had one environmental
+`PermissionError` when a dashboard concurrency test attempted to bind an
+ephemeral loopback port; the exact test and the complete gate passed with normal
+macOS host permissions. The new projection proves completeness only relative to
+the supplied schedule, not a historical authoritative Bybit schedule. No
+authorization change, provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Record the 01:43 UTC no-send provider failure · Codex
 **Why:** The persisted cadence boundary had passed and existing CoinGecko live
 authorization was present, making one bounded research observation attempt
