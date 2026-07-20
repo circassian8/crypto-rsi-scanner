@@ -15,11 +15,16 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from ... import universe
+from ...state_features import liquidity_bucket
 from ..radar import market_enrichment
 from .market_no_send_io import read_jsonl
 from .market_provenance import DECISION_RADAR_MEASUREMENT_PROGRAM
 
 MARKET_SNAPSHOT_UNIT_VALIDATION_CONTRACT_VERSION = 1
+POINT_IN_TIME_UNIVERSE_POLICY = "bounded_top_liquid_by_total_volume"
+CONTROL_LIQUIDITY_TIER_BASIS = (
+    "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h"
+)
 
 
 @dataclass(frozen=True)
@@ -64,8 +69,9 @@ def normalize_market_rows(
     source_mode = candidate_source_mode or (
         "live_no_send" if data_mode == "live" else "mocked_fixture"
     )
-    normalized = [
-        _normalize_market_row(
+    normalized = []
+    for index, row in enumerate(ranked):
+        normalized_row = _normalize_market_row(
             row,
             observed_at=observed_at,
             provider=provider,
@@ -78,8 +84,14 @@ def normalize_market_rows(
             proxy_zscore=proxy_zscores.get(index),
             safety_counters=safety_counters,
         )
-        for index, row in enumerate(ranked)
-    ]
+        normalized.append(
+            _attach_point_in_time_universe_context(
+                normalized_row,
+                rank=index + 1,
+                selected_count=len(ranked),
+                requested_limit=top_n,
+            )
+        )
     return normalized, _normalization_audit(
         audit,
         excluded=excluded,
@@ -92,6 +104,36 @@ def normalize_market_rows(
         decision_radar_campaign_counted=decision_radar_campaign_counted,
         burn_in_counted=burn_in_counted,
     )
+
+
+def _attach_point_in_time_universe_context(
+    row: Mapping[str, Any],
+    *,
+    rank: int,
+    selected_count: int,
+    requested_limit: int,
+) -> dict[str, Any]:
+    """Retain outcome-blind universe context without changing Radar policy.
+
+    ``control_liquidity_tier`` deliberately has its own name.  It is the
+    existing empirical-control bucket and must not replace the operator-facing
+    ``liquidity_tier`` consumed by Decision routing.
+    """
+
+    output = dict(row)
+    output.update({
+        "point_in_time_universe_member": True,
+        "point_in_time_volume_rank": rank,
+        "point_in_time_universe_size": selected_count,
+        "point_in_time_universe_limit": requested_limit,
+        "point_in_time_universe_policy": POINT_IN_TIME_UNIVERSE_POLICY,
+        "control_liquidity_tier": liquidity_bucket(
+            output.get("liquidity_usd"),
+            output.get("volume_to_market_cap"),
+        ),
+        "control_liquidity_tier_basis": CONTROL_LIQUIDITY_TIER_BASIS,
+    })
+    return output
 
 
 def _normalize_market_row(
@@ -327,6 +369,11 @@ def _normalization_audit(
         "kept_count": len(rows),
         "excluded_count": int(sum(excluded.values())),
         "selection_order": "total_volume_desc",
+        "point_in_time_universe_policy": POINT_IN_TIME_UNIVERSE_POLICY,
+        "point_in_time_universe_context_count": sum(
+            row.get("point_in_time_universe_member") is True for row in rows
+        ),
+        "control_liquidity_tier_basis": CONTROL_LIQUIDITY_TIER_BASIS,
         "provider": provider,
         "data_mode": data_mode,
         "observed_at": observed_at.isoformat(),

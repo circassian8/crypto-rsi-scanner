@@ -913,6 +913,56 @@ def test_inputs_are_not_mutated_and_retained_history_can_be_rebuilt_deterministi
     assert json.dumps(rebuilt.summary, sort_keys=True)
 
 
+def test_point_in_time_control_context_is_preserved_without_backfilling_old_rows():
+    old = _row(
+        "move-token",
+        NOW - timedelta(hours=1),
+        price=100,
+        volume=10_000_000,
+    )
+    current = _row(
+        "move-token",
+        NOW,
+        price=101,
+        volume=120_000_000,
+        point_in_time_universe_member=True,
+        point_in_time_volume_rank=7,
+        point_in_time_universe_size=30,
+        point_in_time_universe_limit=30,
+        point_in_time_universe_policy="bounded_top_liquid_by_total_volume",
+        control_liquidity_tier="high",
+        control_liquidity_tier_basis=(
+            "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h"
+        ),
+    )
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [current],
+        [old],
+        now=NOW,
+        config=_config(),
+    )
+    by_time = {row["observed_at"]: row for row in result.retained_history}
+    old_retained = by_time[(NOW - timedelta(hours=1)).isoformat()]
+    current_retained = by_time[NOW.isoformat()]
+
+    assert "point_in_time_universe_member" not in old_retained
+    assert "control_liquidity_tier" not in old_retained
+    assert current_retained["point_in_time_universe_member"] is True
+    assert current_retained["point_in_time_volume_rank"] == 7
+    assert current_retained["point_in_time_universe_size"] == 30
+    assert current_retained["point_in_time_universe_limit"] == 30
+    assert current_retained["control_liquidity_tier"] == "high"
+
+    rebuilt = event_market_history.enrich_market_rows_with_history(
+        [],
+        result.retained_history,
+        now=NOW,
+        config=_config(),
+    )
+    assert rebuilt.retained_history == result.retained_history
+
+
 def test_market_history_requires_aware_clock_and_valid_bounded_config():
     with pytest.raises(ValueError, match="aware UTC"):
         event_market_history.enrich_market_rows_with_history([], [], now=datetime(2026, 7, 13, 12, 0))

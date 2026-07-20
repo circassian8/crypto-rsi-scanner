@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T07:34:59.542189+00:00`
+- generated_at: `2026-07-20T08:01:12.941196+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `13`
@@ -140,7 +140,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.notifications.router` | 5 | 24 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 | 4 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 | 21 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 7 | 61 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 7 | 64 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 | 30 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 | 36 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 | 57 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
@@ -234,7 +234,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.notifications.router` | 5 | 24 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.runs` | 2 | 4 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.notifications.watchlist_monitor` | 2 | 21 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
-| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 7 | 61 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.event_alpha.operations.market_no_send_models` | 7 | 64 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.burn_in` | 3 | 30 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback` | 2 | 36 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_alpha.outcomes.feedback_labels` | 4 | 57 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |

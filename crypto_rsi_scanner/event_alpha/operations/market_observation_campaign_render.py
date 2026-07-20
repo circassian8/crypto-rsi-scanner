@@ -286,6 +286,9 @@ def _baseline_maturity_section(
     current_generation: Mapping[str, Any],
 ) -> list[str]:
     current = _mapping(baseline.get("current_universe_maturity"))
+    control_context = _mapping(
+        baseline.get("point_in_time_control_context_readiness")
+    )
     current_quality = _mapping(current_generation.get("data_quality"))
     latest_row_statuses = _mapping(current_quality.get("baseline_status_counts"))
     observed_asset_count = _int(current.get("observed_asset_count"))
@@ -352,8 +355,48 @@ def _baseline_maturity_section(
         "#### Retained-history feature maturity",
         "",
         *_feature_maturity_lines(baseline.get("baseline_feature_readiness")),
+        "",
+        "### Prospective matched-control context",
+        "",
+        *_point_in_time_control_context_lines(control_context),
     ]
     return lines
+
+
+def _point_in_time_control_context_lines(value: Mapping[str, Any]) -> list[str]:
+    if not value:
+        return [
+            "- Status: `unavailable`",
+            "- This older report has no point-in-time control-context coverage projection.",
+        ]
+    coverage = _mapping(value.get("field_coverage_counts"))
+    counted = _int(value.get("counted_observation_count"))
+    return [
+        f"- Status: `{_text(value.get('status')) or 'unavailable'}`",
+        f"- Baseline-counted rows assessed: `{counted}`",
+        (
+            "- Complete point-in-time universe rows: "
+            f"`{_int(value.get('point_in_time_universe_context_row_count'))}/{counted}`"
+        ),
+        (
+            "- Complete matched-control context rows: "
+            f"`{_int(value.get('complete_match_context_row_count'))}/{counted}`"
+        ),
+        (
+            "- Control-liquidity coverage: "
+            f"`{_int(coverage.get('control_liquidity_tier'))}/{counted}`"
+        ),
+        (
+            "- Market-regime coverage: "
+            f"`{_int(coverage.get('market_regime'))}/{counted}`"
+        ),
+        (
+            "- Protocol-partition coverage: "
+            f"`{_int(coverage.get('protocol_partition'))}/{counted}`"
+        ),
+        "- Selection performed: `false`; outcomes are not read by this projection.",
+        "- Historical context backfilled: `false`; Protocol-v2 evidence eligible: `false`.",
+    ]
 
 
 def _current_authoritative_generation(

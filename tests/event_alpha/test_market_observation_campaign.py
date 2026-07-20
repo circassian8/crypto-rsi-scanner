@@ -285,6 +285,23 @@ def _readiness(*_args, **_kwargs):
                 "other_asset_count": 0,
             }
         },
+        "point_in_time_control_context_readiness": {
+            "schema_id": "decision_radar.point_in_time_control_context_readiness",
+            "schema_version": 1,
+            "status": "partial",
+            "retained_observation_count": 9,
+            "counted_observation_count": 8,
+            "point_in_time_universe_context_row_count": 2,
+            "complete_match_context_row_count": 0,
+            "field_coverage_counts": {
+                "control_liquidity_tier": 2,
+                "market_regime": 0,
+                "protocol_partition": 0,
+            },
+            "selection_performed": False,
+            "historical_context_backfilled": False,
+            "protocol_v2_evidence_eligible": False,
+        },
         "current_universe_maturity": {
             "status": "warming",
             "scope": "current_authoritative_universe",
@@ -504,6 +521,11 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert "Future-observation eligibility is conditional on the same canonical asset" in markdown
     assert "Existing history cadence boundary" in markdown
     assert "Provider-call eligibility: `not inferred`" in markdown
+    assert "Prospective matched-control context" in markdown
+    assert "Complete point-in-time universe rows: `2/8`" in markdown
+    assert "Complete matched-control context rows: `0/8`" in markdown
+    assert "Market-regime coverage: `0/8`" in markdown
+    assert "Historical context backfilled: `false`" in markdown
     assert "test-a [warming; samples 4/8 (gap 4)" in markdown
     assert "Causal temporal-surprise replay" in markdown
     assert "does not mean every projection is ready" in markdown

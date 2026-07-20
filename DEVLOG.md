@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve forward point-in-time universe context · Codex
+**Why:** The live generation knew each asset's exact top-liquid position, but
+the rolling history discarded that context. Future matched controls and the
+Bybit eligible-instrument intersection would otherwise depend on a later
+reconstruction of what the universe looked like.
+**Changes:**
+- Added exact point-in-time membership, one-based volume rank, selected-set
+  size, configured limit, and selection policy to normalized no-send rows.
+- Added a separate outcome-blind `control_liquidity_tier` using the existing
+  state-feature bucket. It does not replace or feed the operator-facing
+  `liquidity_tier`, so Decision routes, scores, and thresholds are unchanged.
+- Retained only explicitly supplied context in market history. Older rows stay
+  without the new fields; no historical backfill or reinterpretation occurs.
+- Added a read-only campaign readiness projection with exact per-field coverage.
+  It performs no selection or outcome read and remains partial while market
+  regime and Protocol-v2 partition evidence are absent.
+- Ran one cadence-eligible, already-authorized no-send cycle. Namespace
+  `radar_market_no_send_20260720t081757299693z_58c38f4312b0` became exact
+  dashboard authority with 30 observations, ranks 1-30, and zero ideas. Campaign
+  truth advanced to 43 cycles / 1,290 retained / 1,260 baseline-counted rows;
+  the new context is present on exactly 30 counted rows and absent from all
+  older rows.
+**Verify:** `97 passed` across the expanded market-history/campaign/model set;
+`83 passed` across Daily Operations and empirical-live tests; unrestricted
+`make verify-fast PYTHON=python3` passed all `3564` tests; compileall,
+architecture cleanliness, market no-send smoke, dashboard readiness/smoke,
+the source-export parent-symlink regression, and the exact live namespace's
+strict doctor passed. The live doctor reported zero blockers/warnings and every
+send/trade/order/paper/RSI/`TRIGGERED_FADE` counter remained zero.
+**Notes/risks:** This starts prospective evidence accumulation only. It does not
+make matched controls available, seal partitions, read a holdout, or grant
+Protocol-v2 eligibility.
+
 ## 2026-07-20 — Preserve causal coverage and human-review truth in empirical live projections · Codex
 **Why:** The genuine campaign report now contains a closed causal
 temporal-surprise coverage audit and an explicit receipt-backed human-review

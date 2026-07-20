@@ -9,6 +9,7 @@ import pytest
 
 from crypto_rsi_scanner.event_alpha.operations import market_no_send
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_campaign_guard
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_history_cache
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
 
@@ -25,6 +26,58 @@ def _normalized_rows(observed_at: datetime):
         decision_radar_campaign_counted=True,
     )
     return rows
+
+
+def test_normalization_retains_outcome_blind_point_in_time_universe_context():
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+    rows = _normalized_rows(observed_at)
+
+    assert [row["point_in_time_volume_rank"] for row in rows] == [1, 2, 3, 4, 5]
+    assert all(row["point_in_time_universe_member"] is True for row in rows)
+    assert all(row["point_in_time_universe_size"] == 5 for row in rows)
+    assert all(row["point_in_time_universe_limit"] == 5 for row in rows)
+    assert all(
+        row["point_in_time_universe_policy"]
+        == market_no_send_features.POINT_IN_TIME_UNIVERSE_POLICY
+        for row in rows
+    )
+    assert all(
+        row["control_liquidity_tier"] in {"high", "mid", "low", "unknown"}
+        for row in rows
+    )
+    assert all(
+        row["control_liquidity_tier_basis"]
+        == market_no_send_features.CONTROL_LIQUIDITY_TIER_BASIS
+        for row in rows
+    )
+    assert all("protocol_partition" not in row for row in rows)
+    assert all("market_regime" not in row for row in rows)
+
+
+def test_control_context_readiness_rejects_rank_and_basis_drift():
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+    row = {
+        **_normalized_rows(observed_at)[0],
+        "observed_at": observed_at.isoformat(),
+        "baseline_counted": True,
+        "point_in_time_volume_rank": 31,
+        "point_in_time_universe_size": 30,
+        "point_in_time_universe_limit": 30,
+        "control_liquidity_tier_basis": "untrusted_reconstruction",
+    }
+
+    result = (
+        market_no_send_history_cache._point_in_time_control_context_readiness(
+            [row],
+            cache_status="valid",
+        )
+    )
+
+    assert result["status"] == "partial"
+    assert result["counted_observation_count"] == 1
+    assert result["point_in_time_universe_context_row_count"] == 0
+    assert result["complete_match_context_row_count"] == 0
+    assert result["field_coverage_counts"]["control_liquidity_tier_basis"] == 0
 
 
 @contextmanager
@@ -87,6 +140,32 @@ def test_live_history_cache_rolls_across_immutable_generation_namespaces(tmp_pat
     assert all(row["measurement_program"] == "decision_radar_live_observation_campaign_v2" for row in retained)
     assert all(row["decision_radar_campaign_counted"] is True for row in retained)
     assert all(row["burn_in_counted"] is False for row in retained)
+    assert sorted(row["point_in_time_volume_rank"] for row in retained) == [
+        1, 1, 2, 2, 3, 3, 4, 4, 5, 5,
+    ]
+    context = market_no_send_history_cache.cache_readiness(
+        base,
+        history_filename=market_no_send.HISTORY_FILENAME,
+        now=second_at,
+    )["point_in_time_control_context_readiness"]
+    assert context["status"] == "partial"
+    assert context["counted_observation_count"] == 10
+    assert context["point_in_time_universe_context_row_count"] == 10
+    assert context["complete_match_context_row_count"] == 0
+    assert context["field_coverage_counts"]["control_liquidity_tier"] == 10
+    assert context["field_coverage_counts"]["market_regime"] == 0
+    assert context["field_coverage_counts"]["protocol_partition"] == 0
+    assert context["selection_uses_outcomes"] is False
+    assert context["selection_performed"] is False
+    assert context["selection_match_fields"] == [
+        "partition", "observation_date", "market_regime", "liquidity_tier",
+    ]
+    assert context["selection_field_mapping"]["liquidity_tier"] == (
+        "control_liquidity_tier"
+    )
+    assert context["historical_context_backfilled"] is False
+    assert context["protocol_v2_evidence_eligible"] is False
+    assert context["provider_calls"] == context["writes"] == 0
     assert (first_dir / market_no_send.HISTORY_FILENAME).read_bytes() == first_snapshot
 
 

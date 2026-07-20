@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Retain point-in-time universe context without backfilling history
+**Status:** accepted as forward evidence collection; matched-control policy remains unsealed
+**Decision:** Every newly normalized no-send market row records its exact
+top-liquid membership, one-based volume rank, selected-set size, configured
+limit, and selection policy. It also records a separate
+`control_liquidity_tier` from the existing state-feature bucket and its basis.
+Retained market history copies only explicitly supplied context; it never
+derives or backfills these fields onto older immutable observations. Keep the
+control bucket separate from the operator-facing `liquidity_tier`, so this
+instrumentation cannot change tradability, routing, scores, or thresholds.
+Readiness may measure field coverage but must not select controls, inspect
+outcomes, assign Protocol-v2 partitions, or grant Protocol-v2 evidence status.
+**Why:** Future matched non-idea controls and the exact Bybit instrument
+intersection need the universe as it was known at each observation, not a
+current ranking reconstructed later. Preserving that context prospectively
+closes evidence loss without silently rewriting the existing campaign or
+prematurely freezing the Protocol-v2 annex.
+**Revisit when:** Genuine market-regime context is collected, the Protocol-v2
+partition rule is sealed before holdout access, and an outcome-blind selector
+can bind complete point-in-time rows to independent Decision episodes.
+
 ## 2026-07-20 - Carry causal coverage and explicit review truth only in forward empirical projections
 **Status:** accepted; current sealed Protocol-v1 bundle remains immutable
 **Decision:** New `decision_radar.empirical_live_campaign_projection` values

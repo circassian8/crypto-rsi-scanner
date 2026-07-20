@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..radar import market_history, market_history_readiness
-from . import market_no_send_campaign_guard
+from . import market_no_send_campaign_guard, market_no_send_features
 from .market_no_send_io import (
     ensure_safe_namespace_dir,
     read_jsonl,
@@ -76,6 +76,12 @@ def cache_readiness(
         "baseline_rejection_counts": assessment.get("rejection_counts", {}),
         "cache_status": cache_status,
         "cache_error": "shared market history is invalid" if cache_status == "invalid" else None,
+        "point_in_time_control_context_readiness": (
+            _point_in_time_control_context_readiness(
+                rows,
+                cache_status=cache_status,
+            )
+        ),
     }
     if current_asset_ids is not None:
         result["current_universe_maturity"] = (
@@ -92,6 +98,174 @@ def cache_readiness(
             )
         )
     return result
+
+
+def _point_in_time_control_context_readiness(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    cache_status: str,
+) -> dict[str, Any]:
+    """Measure control-selection inputs without selecting or grading controls."""
+
+    counted = [dict(row) for row in rows if row.get("baseline_counted") is True]
+    coverage = {
+        "observation_date": sum(bool(_observation_date(row)) for row in counted),
+        "point_in_time_universe_member": sum(
+            row.get("point_in_time_universe_member") is True for row in counted
+        ),
+        "point_in_time_volume_rank": sum(
+            _positive_int(row.get("point_in_time_volume_rank")) for row in counted
+        ),
+        "point_in_time_universe_size": sum(
+            _positive_int(row.get("point_in_time_universe_size")) for row in counted
+        ),
+        "point_in_time_universe_limit": sum(
+            _positive_int(row.get("point_in_time_universe_limit")) for row in counted
+        ),
+        "point_in_time_universe_policy": sum(
+            _text(row.get("point_in_time_universe_policy"))
+            == market_no_send_features.POINT_IN_TIME_UNIVERSE_POLICY
+            for row in counted
+        ),
+        "control_liquidity_tier": sum(
+            _text(row.get("control_liquidity_tier")) in {"high", "mid", "low", "unknown"}
+            for row in counted
+        ),
+        "control_liquidity_tier_basis": sum(
+            _text(row.get("control_liquidity_tier_basis"))
+            == market_no_send_features.CONTROL_LIQUIDITY_TIER_BASIS
+            for row in counted
+        ),
+        "market_regime": sum(bool(_text(row.get("market_regime"))) for row in counted),
+        "market_regime_basis": sum(
+            bool(_text(row.get("market_regime_basis"))) for row in counted
+        ),
+        "protocol_partition": sum(
+            bool(_text(row.get("protocol_partition"))) for row in counted
+        ),
+        "protocol_partition_basis": sum(
+            bool(_text(row.get("protocol_partition_basis"))) for row in counted
+        ),
+    }
+    universe_fields = (
+        "observation_date",
+        "point_in_time_universe_member",
+        "point_in_time_volume_rank",
+        "point_in_time_universe_size",
+        "point_in_time_universe_limit",
+        "point_in_time_universe_policy",
+        "control_liquidity_tier",
+        "control_liquidity_tier_basis",
+    )
+    matched_fields = (
+        *universe_fields,
+        "market_regime",
+        "market_regime_basis",
+        "protocol_partition",
+        "protocol_partition_basis",
+    )
+    universe_complete = sum(
+        _point_in_time_universe_context_valid(row)
+        and all(_control_context_field_present(row, field) for field in universe_fields)
+        for row in counted
+    )
+    matched_complete = sum(
+        _point_in_time_universe_context_valid(row)
+        and all(_control_context_field_present(row, field) for field in matched_fields)
+        for row in counted
+    )
+    status = (
+        "unavailable"
+        if cache_status == "invalid"
+        else "empty"
+        if not counted
+        else "ready_for_outcome_blind_selection"
+        if matched_complete == len(counted)
+        else "partial"
+    )
+    return {
+        "schema_id": "decision_radar.point_in_time_control_context_readiness",
+        "schema_version": 1,
+        "status": status,
+        "retained_observation_count": len(rows),
+        "counted_observation_count": len(counted),
+        "point_in_time_universe_context_row_count": universe_complete,
+        "complete_match_context_row_count": matched_complete,
+        "field_coverage_counts": dict(sorted(coverage.items())),
+        "selection_match_fields": [
+            "partition",
+            "observation_date",
+            "market_regime",
+            "liquidity_tier",
+        ],
+        "selection_field_mapping": {
+            "partition": "protocol_partition",
+            "observation_date": "derived_from_observed_at_utc",
+            "market_regime": "market_regime",
+            "liquidity_tier": "control_liquidity_tier",
+        },
+        "selection_uses_outcomes": False,
+        "selection_performed": False,
+        "historical_context_backfilled": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _control_context_field_present(row: Mapping[str, Any], field: str) -> bool:
+    if field == "observation_date":
+        return bool(_observation_date(row))
+    if field == "point_in_time_universe_member":
+        return row.get(field) is True
+    if field in {
+        "point_in_time_volume_rank",
+        "point_in_time_universe_size",
+        "point_in_time_universe_limit",
+    }:
+        return _positive_int(row.get(field))
+    if field == "control_liquidity_tier":
+        return _text(row.get(field)) in {"high", "mid", "low", "unknown"}
+    return bool(_text(row.get(field)))
+
+
+def _point_in_time_universe_context_valid(row: Mapping[str, Any]) -> bool:
+    rank = row.get("point_in_time_volume_rank")
+    size = row.get("point_in_time_universe_size")
+    limit = row.get("point_in_time_universe_limit")
+    return bool(
+        row.get("point_in_time_universe_member") is True
+        and _positive_int(rank)
+        and _positive_int(size)
+        and _positive_int(limit)
+        and rank <= size <= limit
+        and _text(row.get("point_in_time_universe_policy"))
+        == market_no_send_features.POINT_IN_TIME_UNIVERSE_POLICY
+        and _text(row.get("control_liquidity_tier"))
+        in {"high", "mid", "low", "unknown"}
+        and _text(row.get("control_liquidity_tier_basis"))
+        == market_no_send_features.CONTROL_LIQUIDITY_TIER_BASIS
+    )
+
+
+def _observation_date(row: Mapping[str, Any]) -> str:
+    raw = _text(row.get("observed_at"))
+    if len(raw) < 10:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return parsed.date().isoformat() if parsed.tzinfo is not None else ""
+
+
+def _positive_int(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
+def _text(value: object) -> str:
+    return value.strip() if type(value) is str else ""
 
 
 def _current_universe_maturity(

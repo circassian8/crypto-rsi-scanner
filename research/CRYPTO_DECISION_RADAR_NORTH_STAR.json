@@ -303,6 +303,21 @@
     },
     "matched_controls": {
       "causal_claim": false,
+      "live_collection": {
+        "control_liquidity_tier_basis": "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h",
+        "control_liquidity_tier_field": "control_liquidity_tier",
+        "historical_context_backfilled": false,
+        "point_in_time_universe_fields": [
+          "point_in_time_universe_member",
+          "point_in_time_volume_rank",
+          "point_in_time_universe_size",
+          "point_in_time_universe_limit",
+          "point_in_time_universe_policy"
+        ],
+        "protocol_v2_evidence_eligible": false,
+        "selection_performed": false,
+        "status_until_regime_and_partition_exist": "partial"
+      },
       "match_fields": [
         "partition",
         "observation_date",

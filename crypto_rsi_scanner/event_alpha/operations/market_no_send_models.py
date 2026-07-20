@@ -87,6 +87,9 @@ class MarketNoSendReadiness:
     baseline_feature_readiness: dict[str, Any] = field(default_factory=dict)
     baseline_asset_readiness: dict[str, Any] = field(default_factory=dict)
     baseline_rejection_counts: dict[str, int] = field(default_factory=dict)
+    point_in_time_control_context_readiness: dict[str, Any] = field(
+        default_factory=dict
+    )
     cache_status: str = "missing"
     cache_error: str | None = None
     spread_data_status: str = "not_evaluated"

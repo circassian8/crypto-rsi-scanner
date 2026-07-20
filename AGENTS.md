@@ -296,8 +296,13 @@ may be added later when a suitable environment already exists.
   actually crossed the provider boundary are separate persisted facts; a later
   cadence skip or readiness block must never hide the preceding provider result.
   Legacy state may recover that distinction only from the bounded immutable
-  cycle journal, without rewriting artifacts. When maintenance is disabled,
-  cadence is eligible, and authority
+  cycle journal, without rewriting artifacts.
+  newly normalized no-send observations preserve exact point-in-time
+  top-liquid membership/rank/set-size/limit/policy plus a separate
+  measurement-only control-liquidity bucket. Retained history never backfills
+  those fields onto older rows, and readiness coverage alone cannot select a
+  control, assign a Protocol-v2 partition, or affect Decision policy. When
+  maintenance is disabled, cadence is eligible, and authority
   is within 90 minutes of expiry, Today and System Health show the remaining
   time, the exact no-provider readiness command, and the separately confirmed
   install/disable commands without running them. The LaunchAgent stays

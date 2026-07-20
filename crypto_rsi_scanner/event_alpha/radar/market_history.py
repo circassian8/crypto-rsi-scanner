@@ -50,6 +50,20 @@ _LINEAGE_FIELDS = (
     "decision_radar_campaign_counted", "decision_radar_campaign_reason",
     "contract_counted_status", "no_send_status", "research_only",
 )
+_POINT_IN_TIME_CONTEXT_FIELDS = (
+    "point_in_time_universe_member",
+    "point_in_time_volume_rank",
+    "point_in_time_universe_size",
+    "point_in_time_universe_limit",
+    "point_in_time_universe_policy",
+    "control_liquidity_tier",
+    "control_liquidity_tier_basis",
+    "market_regime",
+    "market_regime_basis",
+    "protocol_partition",
+    "protocol_partition_basis",
+)
+_CONTROL_LIQUIDITY_TIERS = {"high", "mid", "low", "unknown"}
 _PROXY_BASIS_MARKERS = ("proxy", "cross_sectional", "24h_volume")
 
 
@@ -1107,7 +1121,37 @@ def _observation_values(
     for key in _LINEAGE_FIELDS:
         if row.get(key) not in (None, ""):
             observation[key] = copy.deepcopy(row[key])
+    for key in _POINT_IN_TIME_CONTEXT_FIELDS:
+        value = _point_in_time_context_value(row, key)
+        if value is not None:
+            observation[key] = value
     return {key: value for key, value in observation.items() if value is not None}
+
+
+def _point_in_time_context_value(row: Mapping[str, Any], key: str) -> Any:
+    """Copy only closed point-in-time context; never infer it for old rows."""
+
+    value = row.get(key)
+    if key == "point_in_time_universe_member":
+        return value if type(value) is bool else None
+    if key in {
+        "point_in_time_volume_rank",
+        "point_in_time_universe_size",
+        "point_in_time_universe_limit",
+    }:
+        return value if type(value) is int and value > 0 else None
+    if key == "control_liquidity_tier":
+        return value if type(value) is str and value in _CONTROL_LIQUIDITY_TIERS else None
+    if key in {
+        "point_in_time_universe_policy",
+        "control_liquidity_tier_basis",
+        "market_regime",
+        "market_regime_basis",
+        "protocol_partition",
+        "protocol_partition_basis",
+    }:
+        return value if type(value) is str and 0 < len(value.strip()) <= 160 else None
+    return None
 
 
 def _rejected_current_row(row: Mapping[str, Any], reason: str) -> dict[str, Any]:
@@ -1418,7 +1462,11 @@ def _observation_quality(observation: Mapping[str, Any]) -> int:
     lineage = sum(observation.get(key) not in (None, "") for key in _LINEAGE_FIELDS)
     basis = observation.get("feature_basis")
     basis_count = len(basis) if isinstance(basis, Mapping) else 0
-    return int(numeric + lineage + basis_count)
+    context = sum(
+        observation.get(key) not in (None, "")
+        for key in _POINT_IN_TIME_CONTEXT_FIELDS
+    )
+    return int(numeric + lineage + basis_count + context)
 
 
 def _feature_signature(observation: Mapping[str, Any]) -> str:
@@ -1434,6 +1482,7 @@ def _feature_signature(observation: Mapping[str, Any]) -> str:
             "source",
             "market_data_source",
             "data_mode",
+            *_POINT_IN_TIME_CONTEXT_FIELDS,
         )
     }
     return _canonical_json(values)

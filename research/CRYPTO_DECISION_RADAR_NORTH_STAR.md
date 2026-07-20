@@ -781,6 +781,19 @@ The scorecard records zero provider calls, writes, routing, priority, Decision
 score, calibration, threshold, publication-authority, or automatic policy
 changes and inherits every Safety Invariant below.
 
+Prospective live/no-send observations now retain the exact point-in-time
+top-liquid universe membership, one-based volume rank, selected-set size,
+configured limit, and selection policy needed by a future Bybit intersection
+and matched-control pool. They also retain a separate
+`control_liquidity_tier`, computed by the existing state-feature liquidity
+bucket with its explicit basis. This field is measurement-only and never
+replaces the operator-facing `liquidity_tier` used by Decision routing. The
+rolling cache copies only context explicitly present on the original row, so
+historical observations are not backfilled or reinterpreted. Campaign
+readiness reports exact coverage but performs no selection, outcome read,
+partition assignment, or policy change. It remains partial until genuine
+market-regime evidence and a pre-holdout Protocol-v2 partition are present.
+
 A fixture or mocked smoke generation can prove mechanics but is permanently
 ineligible for Decision campaign counting or real dashboard authority. The fixed
 authoritative pointer changes only after a real, fresh, complete generation has
