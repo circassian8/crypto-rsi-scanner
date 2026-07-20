@@ -7,7 +7,10 @@ reads candidate rows when producing aggregate quality counts.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+import statistics
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
@@ -25,6 +28,65 @@ POINT_IN_TIME_UNIVERSE_POLICY = "bounded_top_liquid_by_total_volume"
 CONTROL_LIQUIDITY_TIER_BASIS = (
     "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h"
 )
+CONTROL_MARKET_REGIME_SCHEMA_ID = (
+    "decision_radar.point_in_time_control_market_regime"
+)
+CONTROL_MARKET_REGIME_SCHEMA_VERSION = 1
+CONTROL_MARKET_REGIME_BASIS = (
+    "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1"
+)
+CONTROL_MARKET_REGIMES = frozenset(("risk_on", "risk_off", "mixed"))
+CONTROL_MARKET_REGIME_REASONS = frozenset((
+    "current_rows_empty",
+    "current_cycle_context_invalid",
+    "temporal_return_24h_incomplete",
+    "btc_context_missing",
+))
+_CONTROL_MARKET_REGIME_KEYS = frozenset((
+    "schema_id",
+    "schema_version",
+    "status",
+    "reason",
+    "regime",
+    "basis",
+    "observed_at",
+    "horizon_hours",
+    "return_unit",
+    "btc_canonical_asset_id",
+    "btc_observation_id",
+    "btc_return_24h_percent_points",
+    "universe_input_count",
+    "universe_expected_count",
+    "universe_limit",
+    "universe_policy",
+    "universe_median_return_24h_percent_points",
+    "input_observation_ids",
+    "input_observations_sha256",
+    "all_inputs_current_cycle",
+    "all_inputs_point_in_time_universe_members",
+    "all_inputs_temporal_return_evidence_ready",
+    "selection_uses_outcomes",
+    "historical_context_backfilled",
+    "routing_eligible",
+    "decision_policy_eligible",
+    "protocol_v2_evidence_eligible",
+    "provider_calls",
+    "research_only",
+))
+_TEMPORAL_RETURN_EVIDENCE_KEYS = frozenset((
+    "basis",
+    "status",
+    "calculation",
+    "sample_count",
+    "current_observation_id",
+    "baseline_first_observation_id",
+    "baseline_last_observation_id",
+    "baseline_input_observation_count",
+    "baseline_observation_ids_sha256",
+    "providers",
+    "data_modes",
+    "research_only",
+))
 
 
 @dataclass(frozen=True)
@@ -552,6 +614,367 @@ def attach_history_quality(row: Mapping[str, Any]) -> dict[str, Any]:
         "proxy_market_feature_count": proxy_count,
     })
     return enriched
+
+
+def point_in_time_control_market_regime(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Build one closed control-only regime from exact current-cycle returns.
+
+    The context deliberately uses the separately derived temporal 24-hour
+    return, never the provider sparkline alias consumed by the Decision model.
+    It is attached only to retained research history by the persistence caller.
+    No outcome, route, score, or threshold is read here.
+    """
+
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    if not materialized:
+        return _unavailable_control_market_regime("current_rows_empty")
+    expected_values = [row.get("point_in_time_universe_size") for row in materialized]
+    limit_values = [row.get("point_in_time_universe_limit") for row in materialized]
+    policy_values = [row.get("point_in_time_universe_policy") for row in materialized]
+    observed_values = {str(row.get("observed_at") or "") for row in materialized}
+    rank_values = [row.get("point_in_time_volume_rank") for row in materialized]
+    expected = (
+        expected_values[0]
+        if all(item == expected_values[0] for item in expected_values)
+        else None
+    )
+    limit = (
+        limit_values[0]
+        if all(item == limit_values[0] for item in limit_values)
+        else None
+    )
+    policy = (
+        policy_values[0]
+        if all(item == policy_values[0] for item in policy_values)
+        else None
+    )
+    observed_at = next(iter(observed_values)) if len(observed_values) == 1 else ""
+    if (
+        type(expected) is not int
+        or expected < 1
+        or len(materialized) != expected
+        or type(limit) is not int
+        or limit < expected
+        or policy != POINT_IN_TIME_UNIVERSE_POLICY
+        or not all(type(rank) is int for rank in rank_values)
+        or sorted(rank_values) != list(range(1, expected + 1))
+        or any(row.get("point_in_time_universe_member") is not True for row in materialized)
+        or not _aware_iso8601(observed_at)
+    ):
+        return _unavailable_control_market_regime(
+            "current_cycle_context_invalid",
+            observed_at=observed_at or None,
+            universe_expected_count=expected if type(expected) is int else 0,
+            universe_limit=limit if type(limit) is int else 0,
+            universe_policy=str(policy or ""),
+        )
+
+    inputs: list[dict[str, Any]] = []
+    for row in sorted(
+        materialized,
+        key=lambda item: int(item["point_in_time_volume_rank"]),
+    ):
+        history = row.get("market_history")
+        evidence = row.get("market_feature_evidence")
+        return_units = row.get("return_units")
+        temporal_evidence = (
+            evidence.get("temporal_return_24h")
+            if isinstance(evidence, Mapping) else None
+        )
+        observation_id = (
+            history.get("observation_id") if isinstance(history, Mapping) else None
+        )
+        value = finite_float(row.get("temporal_return_24h"))
+        asset_id = str(row.get("canonical_asset_id") or "").strip()
+        if (
+            not isinstance(history, Mapping)
+            or history.get("baseline_counted") is not True
+            or not isinstance(observation_id, str)
+            or not observation_id
+            or not asset_id
+            or value is None
+            or not isinstance(return_units, Mapping)
+            or return_units.get("temporal_return_24h") != "percent_points"
+            or not _temporal_return_evidence_ready(
+                temporal_evidence,
+                observation_id=observation_id,
+            )
+        ):
+            return _unavailable_control_market_regime(
+                "temporal_return_24h_incomplete",
+                observed_at=observed_at,
+                universe_expected_count=expected,
+                universe_limit=limit,
+                universe_policy=policy,
+            )
+        inputs.append({
+            "canonical_asset_id": asset_id,
+            "observation_id": observation_id,
+            "observed_at": observed_at,
+            "point_in_time_volume_rank": row["point_in_time_volume_rank"],
+            "temporal_return_24h_percent_points": round(value, 12),
+            "temporal_return_evidence_sha256": _sha256_json(temporal_evidence),
+        })
+    if len({item["canonical_asset_id"] for item in inputs}) != expected:
+        return _unavailable_control_market_regime(
+            "current_cycle_context_invalid",
+            observed_at=observed_at,
+            universe_expected_count=expected,
+            universe_limit=limit,
+            universe_policy=policy,
+        )
+    btc = [item for item in inputs if item["canonical_asset_id"] == "bitcoin"]
+    if len(btc) != 1:
+        return _unavailable_control_market_regime(
+            "btc_context_missing",
+            observed_at=observed_at,
+            universe_expected_count=expected,
+            universe_limit=limit,
+            universe_policy=policy,
+        )
+    btc_return = float(btc[0]["temporal_return_24h_percent_points"])
+    median_return = round(statistics.median(
+        float(item["temporal_return_24h_percent_points"]) for item in inputs
+    ), 12)
+    regime = (
+        "risk_on"
+        if btc_return > 0.0 and median_return > 0.0
+        else "risk_off"
+        if btc_return < 0.0 and median_return < 0.0
+        else "mixed"
+    )
+    value = {
+        "schema_id": CONTROL_MARKET_REGIME_SCHEMA_ID,
+        "schema_version": CONTROL_MARKET_REGIME_SCHEMA_VERSION,
+        "status": "observed",
+        "reason": None,
+        "regime": regime,
+        "basis": CONTROL_MARKET_REGIME_BASIS,
+        "observed_at": observed_at,
+        "horizon_hours": 24,
+        "return_unit": "percent_points",
+        "btc_canonical_asset_id": "bitcoin",
+        "btc_observation_id": btc[0]["observation_id"],
+        "btc_return_24h_percent_points": round(btc_return, 12),
+        "universe_input_count": len(inputs),
+        "universe_expected_count": expected,
+        "universe_limit": limit,
+        "universe_policy": policy,
+        "universe_median_return_24h_percent_points": median_return,
+        "input_observation_ids": [item["observation_id"] for item in inputs],
+        "input_observations_sha256": _sha256_json(inputs),
+        "all_inputs_current_cycle": True,
+        "all_inputs_point_in_time_universe_members": True,
+        "all_inputs_temporal_return_evidence_ready": True,
+        "selection_uses_outcomes": False,
+        "historical_context_backfilled": False,
+        "routing_eligible": False,
+        "decision_policy_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "research_only": True,
+    }
+    if not control_market_regime_evidence_valid(value):  # pragma: no cover
+        raise AssertionError("control market regime evidence invalid")
+    return value
+
+
+def control_market_regime_evidence_valid(value: object) -> bool:
+    """Validate the closed compact regime evidence copied into history rows."""
+
+    if not isinstance(value, Mapping) or set(value) != _CONTROL_MARKET_REGIME_KEYS:
+        return False
+    if (
+        value.get("schema_id") != CONTROL_MARKET_REGIME_SCHEMA_ID
+        or type(value.get("schema_version")) is not int
+        or value.get("schema_version") != CONTROL_MARKET_REGIME_SCHEMA_VERSION
+        or value.get("status") not in {"observed", "unavailable"}
+        or value.get("basis") != CONTROL_MARKET_REGIME_BASIS
+        or value.get("horizon_hours") != 24
+        or value.get("return_unit") != "percent_points"
+        or value.get("selection_uses_outcomes") is not False
+        or value.get("historical_context_backfilled") is not False
+        or value.get("routing_eligible") is not False
+        or value.get("decision_policy_eligible") is not False
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or type(value.get("provider_calls")) is not int
+        or value.get("provider_calls") != 0
+        or value.get("research_only") is not True
+    ):
+        return False
+    if value.get("status") == "unavailable":
+        expected = value.get("universe_expected_count")
+        limit = value.get("universe_limit")
+        return (
+            value.get("reason") in CONTROL_MARKET_REGIME_REASONS
+            and value.get("regime") is None
+            and value.get("btc_canonical_asset_id") is None
+            and value.get("btc_observation_id") is None
+            and value.get("btc_return_24h_percent_points") is None
+            and value.get("universe_median_return_24h_percent_points") is None
+            and value.get("input_observation_ids") == []
+            and value.get("input_observations_sha256") is None
+            and value.get("all_inputs_current_cycle") is False
+            and value.get("all_inputs_point_in_time_universe_members") is False
+            and value.get("all_inputs_temporal_return_evidence_ready") is False
+            and _nonnegative_integer(value.get("universe_input_count"))
+            and _nonnegative_integer(expected)
+            and _nonnegative_integer(limit)
+            and value.get("universe_policy") in {"", POINT_IN_TIME_UNIVERSE_POLICY}
+            and (
+                value.get("observed_at") is None
+                or _aware_iso8601(value.get("observed_at"))
+            )
+        )
+    btc_return = finite_float(value.get("btc_return_24h_percent_points"))
+    median_return = finite_float(
+        value.get("universe_median_return_24h_percent_points")
+    )
+    expected_regime = (
+        "risk_on"
+        if btc_return is not None and median_return is not None
+        and btc_return > 0.0 and median_return > 0.0
+        else "risk_off"
+        if btc_return is not None and median_return is not None
+        and btc_return < 0.0 and median_return < 0.0
+        else "mixed"
+    )
+    expected = value.get("universe_expected_count")
+    limit = value.get("universe_limit")
+    observation_ids = value.get("input_observation_ids")
+    return bool(
+        value.get("reason") is None
+        and value.get("regime") in CONTROL_MARKET_REGIMES
+        and value.get("regime") == expected_regime
+        and _aware_iso8601(value.get("observed_at"))
+        and value.get("btc_canonical_asset_id") == "bitcoin"
+        and isinstance(value.get("btc_observation_id"), str)
+        and value.get("btc_observation_id")
+        and btc_return is not None
+        and median_return is not None
+        and type(expected) is int
+        and expected > 0
+        and type(value.get("universe_input_count")) is int
+        and value.get("universe_input_count") == expected
+        and type(limit) is int
+        and limit >= expected
+        and value.get("universe_policy") == POINT_IN_TIME_UNIVERSE_POLICY
+        and isinstance(observation_ids, list)
+        and len(observation_ids) == expected
+        and all(
+            isinstance(item, str) and 0 < len(item) <= 160
+            for item in observation_ids
+        )
+        and len(set(observation_ids)) == expected
+        and value.get("btc_observation_id") in observation_ids
+        and isinstance(value.get("input_observations_sha256"), str)
+        and len(value["input_observations_sha256"]) == 64
+        and all(character in "0123456789abcdef" for character in value["input_observations_sha256"])
+        and value.get("all_inputs_current_cycle") is True
+        and value.get("all_inputs_point_in_time_universe_members") is True
+        and value.get("all_inputs_temporal_return_evidence_ready") is True
+    )
+
+
+def _unavailable_control_market_regime(
+    reason: str,
+    *,
+    observed_at: str | None = None,
+    universe_expected_count: int = 0,
+    universe_limit: int = 0,
+    universe_policy: str = "",
+) -> dict[str, Any]:
+    value = {
+        "schema_id": CONTROL_MARKET_REGIME_SCHEMA_ID,
+        "schema_version": CONTROL_MARKET_REGIME_SCHEMA_VERSION,
+        "status": "unavailable",
+        "reason": reason,
+        "regime": None,
+        "basis": CONTROL_MARKET_REGIME_BASIS,
+        "observed_at": observed_at if _aware_iso8601(observed_at) else None,
+        "horizon_hours": 24,
+        "return_unit": "percent_points",
+        "btc_canonical_asset_id": None,
+        "btc_observation_id": None,
+        "btc_return_24h_percent_points": None,
+        "universe_input_count": 0,
+        "universe_expected_count": max(0, universe_expected_count),
+        "universe_limit": max(0, universe_limit),
+        "universe_policy": (
+            universe_policy
+            if universe_policy == POINT_IN_TIME_UNIVERSE_POLICY
+            else ""
+        ),
+        "universe_median_return_24h_percent_points": None,
+        "input_observation_ids": [],
+        "input_observations_sha256": None,
+        "all_inputs_current_cycle": False,
+        "all_inputs_point_in_time_universe_members": False,
+        "all_inputs_temporal_return_evidence_ready": False,
+        "selection_uses_outcomes": False,
+        "historical_context_backfilled": False,
+        "routing_eligible": False,
+        "decision_policy_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "research_only": True,
+    }
+    if not control_market_regime_evidence_valid(value):  # pragma: no cover
+        raise AssertionError("unavailable control market regime evidence invalid")
+    return value
+
+
+def _temporal_return_evidence_ready(
+    value: object,
+    *,
+    observation_id: str,
+) -> bool:
+    if not isinstance(value, Mapping) or set(value) != _TEMPORAL_RETURN_EVIDENCE_KEYS:
+        return False
+    anchor_id = value.get("baseline_first_observation_id")
+    return bool(
+        value.get("status") == "ready"
+        and value.get("basis") == "temporal_baseline"
+        and value.get("calculation") == "price_horizon_return"
+        and value.get("current_observation_id") == observation_id
+        and value.get("sample_count") == 1
+        and value.get("baseline_input_observation_count") == 1
+        and isinstance(anchor_id, str)
+        and anchor_id
+        and value.get("baseline_last_observation_id") == anchor_id
+        and value.get("baseline_observation_ids_sha256")
+        == _sha256_json([anchor_id])
+        and value.get("providers") == ["coingecko"]
+        and value.get("data_modes") == ["live"]
+        and value.get("research_only") is True
+    )
+
+
+def _sha256_json(value: object) -> str:
+    raw = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _aware_iso8601(value: object) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None
+
+
+def _nonnegative_integer(value: object) -> bool:
+    return type(value) is int and value >= 0
 
 
 def generation_feature_basis(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:

@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v22")
+    assert values["progress_version"].endswith("_v23")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -277,9 +277,12 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert "exact_eligible_instrument_set_not_sealed" in values[
         "current_activation_blockers"
     ]
-    assert "live_market_temporal_baseline_not_yet_warm" in values[
+    assert "live_market_temporal_baseline_not_yet_warm" not in values[
         "current_activation_blockers"
     ]
+    assert "complete_current_top_liquid_temporal_24h_regime_input_absent" in (
+        values["current_activation_blockers"]
+    )
     assert (
         "genuine_bybit_rest_funding_open_interest_positioning_capture_absent"
         in values["current_activation_blockers"]
@@ -322,7 +325,19 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert controls["selection_uses_outcomes"] is False
     assert controls["matched_control_selection_performed"] is False
     assert controls["historical_context_backfilled"] is False
-    assert controls["market_regime_context_collection_implemented"] is False
+    assert controls["market_regime_context_collection_implemented"] is True
+    assert controls["market_regime_schema_id"] == (
+        "decision_radar.point_in_time_control_market_regime"
+    )
+    assert controls["market_regime_basis"] == (
+        "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1"
+    )
+    assert controls["market_regime_input_field"] == "temporal_return_24h"
+    assert controls["market_regime_input_unit"] == "percent_points"
+    assert controls["market_regime_requires_complete_current_universe"] is True
+    assert controls["market_regime_current_rows_only"] is True
+    assert controls["market_regime_decision_policy_exposure"] is False
+    assert controls["market_regime_protocol_v2_evidence_eligible"] is False
     assert controls["protocol_partition_assignment_implemented"] is False
     assert controls["current_coverage_counts_embedded"] is False
     assert controls["protocol_v2_evidence_eligible"] is False
@@ -581,7 +596,10 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "prospective_control_context=" in output.out
     assert "empirical_projection_v4=true research_lab=true" in output.out
     assert "prospective_control_selection=not_performed" in output.out
-    assert "historical_backfill=false market_regime_collection=false" in output.out
+    assert "historical_backfill=false market_regime_collection=true" in output.out
+    assert "control_market_regime_basis=" in output.out
+    assert "input=temporal_return_24h:percent_points" in output.out
+    assert "decision_policy_exposure=false" in output.out
     assert "protocol_partition_assignment=false protocol_v2_evidence=false" in output.out
     assert "- prospective_matched_control_context_incomplete" in output.out
     assert "offline/readiness/queue only; no provider calls" in output.out

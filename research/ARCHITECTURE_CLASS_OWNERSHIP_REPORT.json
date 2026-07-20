@@ -1530,9 +1530,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10882,
+  "function_count": 10892,
   "function_line_limit": 150,
-  "functions_over_150_lines": 13,
+  "functions_over_150_lines": 14,
   "functions_over_limit": [
     {
       "function_name": "_validate_return_feature_consistency",
@@ -1592,7 +1592,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 291,
+      "line_count": 297,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1613,6 +1613,14 @@
       "public": false,
       "qualname": "_impact_cost_lines",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
+    },
+    {
+      "function_name": "point_in_time_control_market_regime",
+      "line_count": 163,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_features",
+      "public": true,
+      "qualname": "point_in_time_control_market_regime",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py"
     },
     {
       "function_name": "build_campaign_report",
@@ -1639,8 +1647,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 13,
-  "generated_at": "2026-07-20T08:51:22.212596+00:00",
+  "functions_over_limit_count": 14,
+  "generated_at": "2026-07-20T09:50:16.082514+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3274,7 +3282,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 13,
+  "production_functions_over_limit": 14,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_return_feature_consistency",
@@ -3334,7 +3342,7 @@
     },
     {
       "function_name": "format_current_progress",
-      "line_count": 291,
+      "line_count": 297,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -3355,6 +3363,14 @@
       "public": false,
       "qualname": "_impact_cost_lines",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
+    },
+    {
+      "function_name": "point_in_time_control_market_regime",
+      "line_count": 163,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_features",
+      "public": true,
+      "qualname": "point_in_time_control_market_regime",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py"
     },
     {
       "function_name": "build_campaign_report",
@@ -3835,7 +3851,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 13,
+      "functions_over_150_lines": 14,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -3856,7 +3872,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1565,
+        "line_count": 1633,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
       },
@@ -4018,7 +4034,7 @@
         "threshold": 1500
       },
       {
-        "line_count": 1565,
+        "line_count": 1633,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1500
       }
@@ -4043,7 +4059,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 13,
+    "functions_over_150_lines": 14,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

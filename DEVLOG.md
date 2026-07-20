@@ -17,6 +17,54 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Collect causal market regime prospectively for future controls · Codex
+**Why:** The matched-control contract named market regime as a required
+point-in-time field, but the live campaign did not retain one and reconstructing
+it later would leak future context. The implementation also needed to remain
+strictly outside Decision routing until Protocol v2 is sealed.
+**Changes:**
+- Added a closed control-only regime projection from exact causal
+  `temporal_return_24h` values. It requires one complete same-clock ranked
+  top-liquid universe, baseline-counted rows, ready CoinGecko/live temporal
+  evidence, percent-point units, BTC identity, unique rank-ordered observation
+  IDs, and an input digest. BTC and universe-median signs yield `risk_on`,
+  `risk_off`, or `mixed`; incomplete or malformed input is unavailable.
+- Persisted an observed result only on the exact current retained-history rows.
+  The enriched rows returned to the Decision pipeline remain unchanged, older
+  rows are never backfilled, and subsequent history rebuilds preserve only a
+  closed matching context. Readiness verifies row/clock/universe/rank/identity
+  binding before counting coverage.
+- Advanced the static Protocol-v2 current-progress contract to v23 and updated
+  the North Star, working agreement, roadmap, and durable decision. Collection
+  is implemented, while partition assignment, matched-control selection,
+  Decision-policy exposure, and Protocol-v2 evidence authority remain false.
+- The eligible 09:27 UTC no-send attempt made one authorized bounded CoinGecko
+  request and failed with `ClientConnectorDNSError`. The unrestricted retry
+  respected the persisted reservation and made no second call. Campaign truth
+  now records 12 provider failures, preserves the prior revision-12 authority,
+  and sets the next boundary to `2026-07-20T10:27:13.404884+00:00`.
+- Regenerated advisory architecture telemetry and the terminal campaign report.
+  Quantitative source-size measurements remain non-blocking; security/artifact
+  bounds and behavioral architecture checks remain enforced.
+**Verify:** `47 passed` in the focused history/regime/Protocol-progress suite
+and `145 passed` across market generation, campaign, empirical live projection,
+Research Lab, and Daily Operations. Compileall, North Star JSON parsing,
+Protocol-v2 progress check, market no-send smoke plus strict doctor, campaign
+report, dashboard readiness/smoke/UX smoke, architecture cleanliness, and
+`git diff --check` passed. `make verify-fast PYTHON=.venv/bin/python` passed
+outside the restricted socket sandbox with `3577 passed`, followed by alert
+rendering, offline backtest, and paper-scoreboard success. The first sandboxed
+run had `3576 passed` and only the expected loopback-bind `PermissionError`.
+Full `make verify` was not repeated because the immediately preceding logical
+change passed it and this change passed the complete package suite plus all
+matching operational gates.
+**Notes/risks:** The latest genuine generation has causal 24-hour input for
+28/30 current assets, so the new collector correctly reports unavailable and
+genuine regime coverage remains zero. A successful complete cycle, a sealed
+pre-holdout partition, and an outcome-blind selector are still required. No
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Preserve prospective controls through empirical surfaces · Codex
 **Why:** The live campaign had begun collecting exact outcome-blind universe
 and liquidity context for future matched controls, but the empirical projection

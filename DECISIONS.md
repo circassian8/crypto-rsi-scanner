@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Retain a causal control-only market regime without exposing it to Decision policy
+**Status:** accepted as prospective measurement; matched-control policy remains unsealed
+**Decision:** After a successful live/no-send history enrichment, derive one
+descriptive current-cycle regime only when the exact top-liquid set is complete,
+all rows share the same observation clock, every rank is present, every row is
+baseline-counted, and every row has closed `temporal_return_24h` evidence in
+percent points. Compare the BTC 24-hour return with the full-universe median:
+both positive is `risk_on`, both negative is `risk_off`, and every disagreement
+or zero case is `mixed`. Bind the inputs by observation IDs and digest, then copy
+the result only onto those exact retained-history observations. Do not expose it
+to the current Decision rows, backfill older observations, read outcomes, assign
+a Protocol-v2 partition, select controls, or change routes, scores, thresholds,
+or publication authority. Incomplete input evidence records an unavailable
+cycle result rather than inferring a regime.
+**Why:** Matched non-idea controls require market context known at the same
+observation clock. The causal temporal return is already available independently
+of the provider sparkline alias; closing the whole-set regime now prevents future
+evidence loss without letting a descriptive research field influence production
+policy. The 2026-07-20 09:27 UTC provider failure correctly produced no retained
+regime rows.
+**Revisit when:** A successful post-implementation live cycle has been observed,
+the Protocol-v2 partition rule is sealed before holdout access, and enough
+independent complete rows exist for an outcome-blind matched-control review.
+
 ## 2026-07-20 - Preserve prospective control context in empirical live projections
 **Status:** accepted; current sealed Protocol-v1 bundle remains immutable
 **Decision:** New `decision_radar.empirical_live_campaign_projection` values

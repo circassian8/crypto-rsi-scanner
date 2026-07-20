@@ -51,6 +51,7 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
     readiness_sha256,
 )
 from crypto_rsi_scanner.event_alpha.operations import empirical_live_campaign
+from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
     BYBIT_NATIVE_METRICS,
     REMAINING_PROTOCOL_V2_COST_FIELDS,
@@ -69,10 +70,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v22"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v23"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
     "with_prospective_outcome_blind_point_in_time_control_context_projection_"
+    "and_current_cycle_temporal_24h_market_regime_collection_"
     "with_fail_closed_residual_cost_availability_and_unsealed_per_leg_"
     "slippage_sensitivity_"
     "with_unsealed_decision_price_latency_and_identity_rederived_"
@@ -92,7 +94,7 @@ FROZEN_READINESS_SHA256 = (
     "683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603"
 )
 _CURRENT_BLOCKERS = (
-    "live_market_temporal_baseline_not_yet_warm",
+    "complete_current_top_liquid_temporal_24h_regime_input_absent",
     "exact_eligible_instrument_set_not_sealed",
     "bybit_public_reachability_unproven_after_recorded_403",
     "genuine_execution_quality_capture_absent",
@@ -390,7 +392,20 @@ _EXPECTED_PROSPECTIVE_CONTROL_CONTEXT = {
     "selection_uses_outcomes": False,
     "matched_control_selection_performed": False,
     "historical_context_backfilled": False,
-    "market_regime_context_collection_implemented": False,
+    "market_regime_context_collection_implemented": True,
+    "market_regime_schema_id": (
+        market_no_send_features.CONTROL_MARKET_REGIME_SCHEMA_ID
+    ),
+    "market_regime_schema_version": (
+        market_no_send_features.CONTROL_MARKET_REGIME_SCHEMA_VERSION
+    ),
+    "market_regime_basis": market_no_send_features.CONTROL_MARKET_REGIME_BASIS,
+    "market_regime_input_field": "temporal_return_24h",
+    "market_regime_input_unit": "percent_points",
+    "market_regime_requires_complete_current_universe": True,
+    "market_regime_current_rows_only": True,
+    "market_regime_decision_policy_exposure": False,
+    "market_regime_protocol_v2_evidence_eligible": False,
     "protocol_partition_assignment_implemented": False,
     "current_coverage_counts_embedded": False,
     "current_coverage_source": (
@@ -964,8 +979,14 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         ),
         (
             "prospective_control_selection=not_performed outcomes_used=false "
-            "historical_backfill=false market_regime_collection=false "
+            "historical_backfill=false market_regime_collection=true "
             "protocol_partition_assignment=false protocol_v2_evidence=false"
+        ),
+        (
+            "control_market_regime_basis="
+            f"{control_context['market_regime_basis']} "
+            "input=temporal_return_24h:percent_points "
+            "complete_current_universe_required=true decision_policy_exposure=false"
         ),
         (
             "provider_calls=0 credential_reads=0 environment_reads=0 file_reads=0 "

@@ -60,10 +60,26 @@ _POINT_IN_TIME_CONTEXT_FIELDS = (
     "control_liquidity_tier_basis",
     "market_regime",
     "market_regime_basis",
+    "market_regime_evidence",
     "protocol_partition",
     "protocol_partition_basis",
 )
 _CONTROL_LIQUIDITY_TIERS = {"high", "mid", "low", "unknown"}
+_CONTROL_MARKET_REGIMES = {"risk_on", "risk_off", "mixed"}
+_CONTROL_MARKET_REGIME_EVIDENCE_KEYS = {
+    "schema_id", "schema_version", "status", "reason", "regime", "basis",
+    "observed_at", "horizon_hours", "return_unit", "btc_canonical_asset_id",
+    "btc_observation_id", "btc_return_24h_percent_points",
+    "universe_input_count", "universe_expected_count", "universe_limit",
+    "universe_policy", "universe_median_return_24h_percent_points",
+    "input_observation_ids", "input_observations_sha256",
+    "all_inputs_current_cycle",
+    "all_inputs_point_in_time_universe_members",
+    "all_inputs_temporal_return_evidence_ready", "selection_uses_outcomes",
+    "historical_context_backfilled", "routing_eligible",
+    "decision_policy_eligible", "protocol_v2_evidence_eligible",
+    "provider_calls", "research_only",
+}
 _PROXY_BASIS_MARKERS = ("proxy", "cross_sectional", "24h_volume")
 
 
@@ -1142,6 +1158,21 @@ def _point_in_time_context_value(row: Mapping[str, Any], key: str) -> Any:
         return value if type(value) is int and value > 0 else None
     if key == "control_liquidity_tier":
         return value if type(value) is str and value in _CONTROL_LIQUIDITY_TIERS else None
+    if key == "market_regime_evidence":
+        return (
+            copy.deepcopy(dict(value))
+            if _closed_control_market_regime_evidence(value)
+            and value.get("observed_at") == row.get("observed_at")
+            and value.get("regime") == row.get("market_regime")
+            and value.get("basis") == row.get("market_regime_basis")
+            and value.get("universe_expected_count")
+            == row.get("point_in_time_universe_size")
+            and value.get("universe_limit")
+            == row.get("point_in_time_universe_limit")
+            and value.get("universe_policy")
+            == row.get("point_in_time_universe_policy")
+            else None
+        )
     if key in {
         "point_in_time_universe_policy",
         "control_liquidity_tier_basis",
@@ -1152,6 +1183,43 @@ def _point_in_time_context_value(row: Mapping[str, Any], key: str) -> Any:
     }:
         return value if type(value) is str and 0 < len(value.strip()) <= 160 else None
     return None
+
+
+def _closed_control_market_regime_evidence(value: object) -> bool:
+    """Accept only closed, control-only observed evidence for persistence."""
+
+    if not isinstance(value, Mapping) or set(value) != _CONTROL_MARKET_REGIME_EVIDENCE_KEYS:
+        return False
+    if (
+        value.get("schema_id") != "decision_radar.point_in_time_control_market_regime"
+        or value.get("schema_version") != 1
+        or value.get("status") != "observed"
+        or value.get("reason") is not None
+        or value.get("regime") not in _CONTROL_MARKET_REGIMES
+        or value.get("basis")
+        != "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1"
+        or value.get("horizon_hours") != 24
+        or value.get("return_unit") != "percent_points"
+        or value.get("selection_uses_outcomes") is not False
+        or value.get("historical_context_backfilled") is not False
+        or value.get("routing_eligible") is not False
+        or value.get("decision_policy_eligible") is not False
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("provider_calls") != 0
+        or value.get("research_only") is not True
+    ):
+        return False
+    try:
+        encoded = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        return False
+    return len(encoded) <= 8_192
 
 
 def _rejected_current_row(row: Mapping[str, Any], reason: str) -> dict[str, Any]:

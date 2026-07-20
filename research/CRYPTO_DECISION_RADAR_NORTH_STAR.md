@@ -796,9 +796,16 @@ bucket with its explicit basis. This field is measurement-only and never
 replaces the operator-facing `liquidity_tier` used by Decision routing. The
 rolling cache copies only context explicitly present on the original row, so
 historical observations are not backfilled or reinterpreted. Campaign
-readiness reports exact coverage but performs no selection, outcome read,
-partition assignment, or policy change. It remains partial until genuine
-market-regime evidence and a pre-holdout Protocol-v2 partition are present.
+history now has a prospective control-only market-regime collector. It requires
+the complete same-clock ranked universe, baseline-counted rows, and closed
+percent-point `temporal_return_24h` evidence. BTC and the universe median both
+positive produce `risk_on`, both negative produce `risk_off`, and disagreement
+or a zero produces `mixed`. The exact input observation set is digest-bound and
+the result is copied only to those retained-history rows; it is not exposed to
+Decision evaluation. Campaign readiness reports exact coverage but performs no
+selection, outcome read, partition assignment, backfill, or policy change. It
+remains partial until a successful qualifying cycle has persisted that context
+and a pre-holdout Protocol-v2 partition is present.
 
 A fixture or mocked smoke generation can prove mechanics but is permanently
 ineligible for Decision campaign counting or real dashboard authority. The fixed

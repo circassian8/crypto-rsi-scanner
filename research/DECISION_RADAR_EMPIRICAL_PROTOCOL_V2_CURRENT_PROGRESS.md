@@ -58,6 +58,13 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   liquidity tier. Campaign readiness and empirical projection v4 preserve exact
   coverage into the Research Lab without selecting controls, reading outcomes,
   backfilling old rows, or changing Decision policy;
+- a prospective control-only market-regime collector now requires one complete
+  same-clock top-liquid set with ready causal `temporal_return_24h` evidence.
+  It compares BTC with the universe median, binds the input observations by
+  digest, and writes `risk_on`, `risk_off`, or `mixed` only to those retained
+  history rows. It does not expose the field to Decision evaluation. The 09:27
+  UTC provider failure occurred before a successful post-implementation
+  observation, so the current live coverage remains honestly zero;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;
@@ -101,8 +108,11 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
 - prospective matched-control context remains incomplete: the current campaign
-  has no collected market-regime context and no sealed Protocol-v2 partition,
-  so no complete match row or matched control is available.
+  has no successful post-implementation market-regime row and no sealed
+  Protocol-v2 partition, so no complete match row or matched control is
+  available. The latest exact top-liquid generation has causal 24-hour regime
+  inputs for 28 of 30 rows; the collector correctly refuses to infer a regime
+  from that incomplete set.
 
 No Protocol-v2 replay, selection, or final-test target exists. The holdout is
 undefined and unopened. Missing evidence remains unavailable and cannot be

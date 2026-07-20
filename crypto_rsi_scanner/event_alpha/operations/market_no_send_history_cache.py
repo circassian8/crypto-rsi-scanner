@@ -8,6 +8,7 @@ and mock generations remain namespace-local and cannot warm Decision campaign da
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import stat
 from datetime import datetime, timezone
@@ -136,9 +137,9 @@ def _point_in_time_control_context_readiness(
             == market_no_send_features.CONTROL_LIQUIDITY_TIER_BASIS
             for row in counted
         ),
-        "market_regime": sum(bool(_text(row.get("market_regime"))) for row in counted),
+        "market_regime": sum(_control_market_regime_valid(row) for row in counted),
         "market_regime_basis": sum(
-            bool(_text(row.get("market_regime_basis"))) for row in counted
+            _control_market_regime_valid(row) for row in counted
         ),
         "protocol_partition": sum(
             bool(_text(row.get("protocol_partition"))) for row in counted
@@ -227,7 +228,35 @@ def _control_context_field_present(row: Mapping[str, Any], field: str) -> bool:
         return _positive_int(row.get(field))
     if field == "control_liquidity_tier":
         return _text(row.get(field)) in {"high", "mid", "low", "unknown"}
+    if field in {"market_regime", "market_regime_basis"}:
+        return _control_market_regime_valid(row)
     return bool(_text(row.get(field)))
+
+
+def _control_market_regime_valid(row: Mapping[str, Any]) -> bool:
+    evidence = row.get("market_regime_evidence")
+    observation_ids = (
+        evidence.get("input_observation_ids")
+        if isinstance(evidence, Mapping)
+        else None
+    )
+    rank = row.get("point_in_time_volume_rank")
+    return bool(
+        market_no_send_features.control_market_regime_evidence_valid(evidence)
+        and isinstance(evidence, Mapping)
+        and evidence.get("status") == "observed"
+        and row.get("market_regime") == evidence.get("regime")
+        and row.get("market_regime_basis") == evidence.get("basis")
+        and row.get("observed_at") == evidence.get("observed_at")
+        and row.get("point_in_time_universe_size")
+        == evidence.get("universe_expected_count")
+        and row.get("point_in_time_universe_limit") == evidence.get("universe_limit")
+        and row.get("point_in_time_universe_policy") == evidence.get("universe_policy")
+        and type(rank) is int
+        and isinstance(observation_ids, list)
+        and 1 <= rank <= len(observation_ids)
+        and row.get("observation_id") == observation_ids[rank - 1]
+    )
 
 
 def _point_in_time_universe_context_valid(row: Mapping[str, Any]) -> bool:
@@ -482,7 +511,17 @@ def enrich_and_persist_history(
         now=observed_at,
         config=config,
     )
-    retained = result.retained_history
+    enriched_rows = [dict(row) for row in result.enriched_rows]
+    control_regime = (
+        market_no_send_features.point_in_time_control_market_regime(enriched_rows)
+        if live_no_send
+        else None
+    )
+    retained = _attach_control_market_regime_to_retained_history(
+        result.retained_history,
+        enriched_rows=enriched_rows,
+        evidence=control_regime,
+    )
     if shared_path is not None:
         write_jsonl(shared_path, retained)
         campaign_reservation.assert_active(artifact_base_dir)
@@ -496,12 +535,55 @@ def enrich_and_persist_history(
         "shared_cache_namespace": LIVE_HISTORY_CACHE_NAMESPACE if live_no_send else None,
         "shared_seed_rows": len(shared_history),
         "generation_seed_rows": len(local_history),
+        "point_in_time_control_market_regime": control_regime,
     }
     return (
-        [dict(row) for row in result.enriched_rows],
+        enriched_rows,
         summary,
         hashlib.sha256(raw).hexdigest(),
     )
+
+
+def _attach_control_market_regime_to_retained_history(
+    retained_history: Sequence[Mapping[str, Any]],
+    *,
+    enriched_rows: Sequence[Mapping[str, Any]],
+    evidence: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Copy observed context only into exact current retained observations.
+
+    The Decision pipeline receives ``enriched_rows`` unchanged.  This keeps the
+    descriptive regime out of routing and scoring while making it available to
+    future outcome-blind matched-control selection.
+    """
+
+    retained = [dict(row) for row in retained_history]
+    if not isinstance(evidence, Mapping) or evidence.get("status") != "observed":
+        return retained
+    if not market_no_send_features.control_market_regime_evidence_valid(evidence):
+        raise MarketNoSendError("control market regime evidence is invalid")
+    current_ids = {
+        str(history["observation_id"])
+        for row in enriched_rows
+        if isinstance((history := row.get("market_history")), Mapping)
+        and history.get("baseline_counted") is True
+        and isinstance(history.get("observation_id"), str)
+        and history.get("observation_id")
+    }
+    expected = int(evidence["universe_input_count"])
+    if len(current_ids) != expected:
+        raise MarketNoSendError("control market regime current observation count mismatch")
+    matched = 0
+    for row in retained:
+        if row.get("observation_id") not in current_ids:
+            continue
+        row["market_regime"] = evidence["regime"]
+        row["market_regime_basis"] = evidence["basis"]
+        row["market_regime_evidence"] = copy.deepcopy(dict(evidence))
+        matched += 1
+    if matched != expected:
+        raise MarketNoSendError("control market regime retained observation mismatch")
+    return retained
 
 
 def _validate_live_campaign_rows(rows: Sequence[Mapping[str, Any]]) -> None:

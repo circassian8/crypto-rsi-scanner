@@ -314,6 +314,24 @@
         "control_liquidity_tier_basis": "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h",
         "control_liquidity_tier_field": "control_liquidity_tier",
         "historical_context_backfilled": false,
+        "market_regime_collection": {
+          "basis": "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1",
+          "complete_current_universe_required": true,
+          "decision_policy_exposure": false,
+          "historical_context_backfilled": false,
+          "input_field": "temporal_return_24h",
+          "input_unit": "percent_points",
+          "protocol_v2_evidence_eligible": false,
+          "regimes": [
+            "risk_on",
+            "risk_off",
+            "mixed"
+          ],
+          "retained_history_only": true,
+          "schema_id": "decision_radar.point_in_time_control_market_regime",
+          "schema_version": 1,
+          "selection_uses_outcomes": false
+        },
         "point_in_time_universe_fields": [
           "point_in_time_universe_member",
           "point_in_time_volume_rank",
@@ -323,7 +341,7 @@
         ],
         "protocol_v2_evidence_eligible": false,
         "selection_performed": false,
-        "status_until_regime_and_partition_exist": "partial"
+        "status_until_partition_and_complete_rows_exist": "partial"
       },
       "match_fields": [
         "partition",

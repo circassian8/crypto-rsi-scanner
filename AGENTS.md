@@ -300,8 +300,15 @@ may be added later when a suitable environment already exists.
   newly normalized no-send observations preserve exact point-in-time
   top-liquid membership/rank/set-size/limit/policy plus a separate
   measurement-only control-liquidity bucket. Retained history never backfills
-  those fields onto older rows, and readiness coverage alone cannot select a
-  control, assign a Protocol-v2 partition, or affect Decision policy. When
+  those fields onto older rows. After history enrichment, a successful cycle
+  may also retain one closed control-only market regime from the sign of BTC's
+  exact causal `temporal_return_24h` and the complete current universe median
+  (`risk_on`, `risk_off`, or `mixed`). It requires one complete same-clock
+  ranked universe with ready percent-point temporal evidence, binds the input
+  observation set by digest, and is copied only to those retained rows. It is
+  never copied into the Decision pipeline, inferred for incomplete input,
+  backfilled, or made routing/score/threshold/Protocol-v2 eligible. Readiness
+  coverage alone cannot select a control or assign a Protocol-v2 partition. When
   maintenance is disabled, cadence is eligible, and authority
   is within 90 minutes of expiry, Today and System Health show the remaining
   time, the exact no-provider readiness command, and the separately confirmed

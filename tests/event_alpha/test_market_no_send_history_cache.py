@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
@@ -25,6 +27,45 @@ def _normalized_rows(observed_at: datetime):
         candidate_source_mode="live_no_send",
         decision_radar_campaign_counted=True,
     )
+    return rows
+
+
+def _control_regime_rows(
+    observed_at: datetime,
+    *,
+    returns: tuple[float, ...] = (2.0, 1.0, 3.0, 0.5, 4.0),
+):
+    rows = _normalized_rows(observed_at)
+    assert len(rows) == len(returns)
+    for index, (row, value) in enumerate(zip(rows, returns, strict=True), start=1):
+        observation_id = f"control-regime-observation-{index}"
+        row["market_history"] = {
+            "baseline_counted": True,
+            "observation_id": observation_id,
+        }
+        row["temporal_return_24h"] = value
+        row["return_units"] = {"temporal_return_24h": "percent_points"}
+        row["market_feature_evidence"] = {
+            "temporal_return_24h": {
+                "basis": "temporal_baseline",
+                "status": "ready",
+                "calculation": "price_horizon_return",
+                "sample_count": 1,
+                "current_observation_id": observation_id,
+                "baseline_first_observation_id": f"control-regime-anchor-{index}",
+                "baseline_last_observation_id": f"control-regime-anchor-{index}",
+                "baseline_input_observation_count": 1,
+                "baseline_observation_ids_sha256": hashlib.sha256(
+                    json.dumps(
+                        [f"control-regime-anchor-{index}"],
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest(),
+                "providers": ["coingecko"],
+                "data_modes": ["live"],
+                "research_only": True,
+            }
+        }
     return rows
 
 
@@ -78,6 +119,70 @@ def test_control_context_readiness_rejects_rank_and_basis_drift():
     assert result["point_in_time_universe_context_row_count"] == 0
     assert result["complete_match_context_row_count"] == 0
     assert result["field_coverage_counts"]["control_liquidity_tier_basis"] == 0
+
+
+@pytest.mark.parametrize(
+    ("returns", "expected"),
+    [
+        ((2.0, 1.0, 3.0, 0.5, 4.0), "risk_on"),
+        ((-2.0, -1.0, -3.0, -0.5, -4.0), "risk_off"),
+        ((2.0, -1.0, -3.0, -0.5, 0.1), "mixed"),
+    ],
+)
+def test_control_market_regime_uses_exact_current_temporal_returns(
+    returns,
+    expected,
+):
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+
+    evidence = market_no_send_features.point_in_time_control_market_regime(
+        _control_regime_rows(observed_at, returns=returns)
+    )
+
+    assert evidence["status"] == "observed"
+    assert evidence["regime"] == expected
+    assert evidence["universe_input_count"] == 5
+    assert len(evidence["input_observation_ids"]) == 5
+    assert evidence["btc_canonical_asset_id"] == "bitcoin"
+    assert evidence["selection_uses_outcomes"] is False
+    assert evidence["routing_eligible"] is False
+    assert evidence["decision_policy_eligible"] is False
+    assert evidence["protocol_v2_evidence_eligible"] is False
+    assert market_no_send_features.control_market_regime_evidence_valid(evidence)
+
+
+def test_control_market_regime_fails_closed_on_incomplete_or_tampered_evidence():
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+    rows = _control_regime_rows(observed_at)
+    del rows[-1]["temporal_return_24h"]
+
+    unavailable = market_no_send_features.point_in_time_control_market_regime(rows)
+
+    assert unavailable["status"] == "unavailable"
+    assert unavailable["reason"] == "temporal_return_24h_incomplete"
+    assert unavailable["regime"] is None
+    assert market_no_send_features.control_market_regime_evidence_valid(unavailable)
+
+    observed = market_no_send_features.point_in_time_control_market_regime(
+        _control_regime_rows(observed_at)
+    )
+    observed["selection_uses_outcomes"] = True
+    assert not market_no_send_features.control_market_regime_evidence_valid(observed)
+
+    observed = market_no_send_features.point_in_time_control_market_regime(
+        _control_regime_rows(observed_at)
+    )
+    observed["input_observation_ids"][1] = observed["input_observation_ids"][0]
+    assert not market_no_send_features.control_market_regime_evidence_valid(observed)
+
+    malformed = _control_regime_rows(observed_at)
+    malformed[0]["point_in_time_universe_size"] = {"unexpected": "mapping"}
+    malformed[1]["point_in_time_volume_rank"] = [2]
+    unavailable = market_no_send_features.point_in_time_control_market_regime(
+        malformed
+    )
+    assert unavailable["status"] == "unavailable"
+    assert unavailable["reason"] == "current_cycle_context_invalid"
 
 
 @contextmanager
@@ -167,6 +272,85 @@ def test_live_history_cache_rolls_across_immutable_generation_namespaces(tmp_pat
     assert context["protocol_v2_evidence_eligible"] is False
     assert context["provider_calls"] == context["writes"] == 0
     assert (first_dir / market_no_send.HISTORY_FILENAME).read_bytes() == first_snapshot
+
+
+def test_live_history_persists_current_regime_only_after_temporal_evidence_is_ready(
+    tmp_path,
+):
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    first_dir = base / "market_generation_1"
+    second_dir = base / "market_generation_2"
+    market_no_send_io.ensure_safe_namespace_dir(first_dir)
+    market_no_send_io.ensure_safe_namespace_dir(second_dir)
+    first_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+    second_at = first_at + timedelta(hours=24)
+
+    with _provider_reserved_history(base, first_dir.name, first_at) as reservation:
+        _first_rows, first_summary, _digest = (
+            market_no_send_history_cache.enrich_and_persist_history(
+                _normalized_rows(first_at),
+                artifact_base_dir=base,
+                generation_namespace_dir=first_dir,
+                history_filename=market_no_send.HISTORY_FILENAME,
+                observed_at=first_at,
+                live_no_send=True,
+                campaign_reservation=reservation,
+            )
+        )
+    assert first_summary["point_in_time_control_market_regime"]["status"] == (
+        "unavailable"
+    )
+
+    with _provider_reserved_history(base, second_dir.name, second_at) as reservation:
+        second_rows, second_summary, _digest = (
+            market_no_send_history_cache.enrich_and_persist_history(
+                _normalized_rows(second_at),
+                artifact_base_dir=base,
+                generation_namespace_dir=second_dir,
+                history_filename=market_no_send.HISTORY_FILENAME,
+                observed_at=second_at,
+                live_no_send=True,
+                campaign_reservation=reservation,
+            )
+        )
+
+    regime = second_summary["point_in_time_control_market_regime"]
+    assert regime["status"] == "observed"
+    assert regime["regime"] == "mixed"
+    assert all("market_regime" not in row for row in second_rows)
+    retained = market_no_send_io.read_jsonl(
+        base
+        / market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE
+        / market_no_send.HISTORY_FILENAME
+    )
+    old_rows = [row for row in retained if row["observed_at"] == first_at.isoformat()]
+    current_rows = [row for row in retained if row["observed_at"] == second_at.isoformat()]
+    assert len(old_rows) == len(current_rows) == 5
+    assert all("market_regime" not in row for row in old_rows)
+    assert all(row["market_regime"] == "mixed" for row in current_rows)
+    assert all(row["market_regime_evidence"] == regime for row in current_rows)
+    tampered = dict(current_rows[0])
+    tampered["point_in_time_volume_rank"] = 2
+    assert not market_no_send_history_cache._control_market_regime_valid(tampered)
+
+    rebuilt = market_no_send_history_cache.market_history.enrich_market_rows_with_history(
+        [],
+        retained,
+        now=second_at,
+    )
+    assert list(rebuilt.retained_history) == retained
+
+    context = market_no_send_history_cache.cache_readiness(
+        base,
+        history_filename=market_no_send.HISTORY_FILENAME,
+        now=second_at,
+    )["point_in_time_control_context_readiness"]
+    assert context["status"] == "partial"
+    assert context["field_coverage_counts"]["market_regime"] == 5
+    assert context["field_coverage_counts"]["market_regime_basis"] == 5
+    assert context["complete_match_context_row_count"] == 0
+    assert context["historical_context_backfilled"] is False
 
 
 def test_mock_history_cannot_seed_or_mutate_live_cache(tmp_path):
