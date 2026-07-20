@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require typed Decision market classifications · Codex
+**Why:** Market state, anomaly type, and anomaly bucket fields were converted
+with `str()` before directional-bias and phase inference. Reproduced mappings
+and lists containing `confirmed_breakout` became long/breakout evidence and
+reached `actionable_watch`; boolean classifications could also retain an
+actionable route through otherwise strong numeric inputs.
+**Changes:** Decision policy now reads the six canonical market-classification
+aliases only as non-empty text for bias, phase, anomaly label, suspicious-
+liquidity classification, and review copy. Any explicit non-text claim adds the
+`market_state_classification_invalid` hard blocker and remains neutral,
+diagnostic evidence. The Decision scorer and policy helpers share the same
+typed first-label projection. Valid text classifications preserve their current
+meaning. No classification vocabulary, score formula, weight, threshold,
+provider, or historical artifact changed.
+**Verify:** Mapping, list, and boolean classification reproductions now remain
+neutral and diagnostic; the valid `confirmed_breakout` /
+`high_liquidity_breakout` control remains long and actionable. `62` focused
+Decision tests and `149` Decision, consistency, surface, derivatives, fixture-
+route, snapshot-precedence, RSI, schema, merge, and pipeline tests passed.
+`make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Type canonical Decision market-quality evidence · Codex
 **Why:** Decision v2 consumed route caps, temporal-baseline state, feature basis,
 and proxy-only claims through truthiness and `str()` coercion. Reproduced empty

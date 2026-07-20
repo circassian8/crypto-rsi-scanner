@@ -308,6 +308,36 @@ def test_malformed_market_quality_claims_fail_closed_without_alias_fallback():
     assert "market_data_quality_invalid" not in valid_direct.decision_hard_blockers
 
 
+def test_malformed_market_state_classifications_cannot_create_directional_evidence():
+    malformed_values = (
+        {"confirmed_breakout": False},
+        ["confirmed_breakout"],
+        True,
+    )
+    for value in malformed_values:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                market_state_class=value,
+                market_anomaly_bucket=value,
+            )
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert result.directional_bias == "neutral"
+        assert "market_state_classification_invalid" in result.decision_hard_blockers
+
+    valid = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_class="confirmed_breakout",
+            market_anomaly_bucket="high_liquidity_breakout",
+        )
+    )
+    assert valid.radar_actionable is True
+    assert valid.directional_bias == "long"
+    assert "market_state_classification_invalid" not in valid.decision_hard_blockers
+
+
 def test_acceptable_wide_spread_emits_higher_manipulation_warning():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(market_state_snapshot={"spread_bps": 120.0})

@@ -31,6 +31,14 @@ _ALLOWED_PHASES = {item.value for item in MarketPhase}
 _RETURN_FIELDS = frozenset(market_units.RETURN_KEYS)
 _MAX_NORMALIZED_RETURN_PERCENT_POINTS = 300.0
 _MAX_FRACTION_RETURN = _MAX_NORMALIZED_RETURN_PERCENT_POINTS / 100.0
+_MARKET_CLASSIFICATION_FIELDS = (
+    "market_anomaly_bucket",
+    "anomaly_bucket",
+    "market_anomaly_type",
+    "anomaly_type",
+    "market_state_class",
+    "market_state",
+)
 
 
 @dataclass(frozen=True)
@@ -153,14 +161,10 @@ def market_snapshot(data: Mapping[str, Any]) -> dict[str, Any]:
 def directional_bias(data: Mapping[str, Any]) -> str:
     """Derive directional research bias without using calendar context."""
 
-    state = " ".join(
-        str(data.get(field) or "")
-        for field in (
-            "anomaly_type", "market_anomaly_type", "market_state_class", "market_state",
-            "market_anomaly_bucket", "anomaly_bucket",
-        )
-    )
-    text = f"{state} {data.get('opportunity_type') or ''} {data.get('impact_path_type') or ''}".casefold()
+    state = " ".join(_market_classification_values(data))
+    opportunity_type = _typed_text(data.get("opportunity_type"))
+    impact_path_type = _typed_text(data.get("impact_path_type"))
+    text = f"{state} {opportunity_type} {impact_path_type}".casefold()
     if any(term in text for term in ("post_event_fade", "blowoff", "late_momentum", "fade_short")):
         return DirectionalBias.FADE_SHORT_REVIEW.value
     if any(term in text for term in ("risk_off", "selloff", "risk_only", "unlock", "delisting", "exploit")):
@@ -182,7 +186,7 @@ def is_suspicious_illiquid(data: Mapping[str, Any]) -> bool:
     """Return true for deterministic suspicious-low-liquidity classifications."""
 
     text = " ".join(
-        str(data.get(key) or "")
+        _typed_text(data.get(key))
         for key in (
             "market_anomaly_bucket", "anomaly_bucket", "market_anomaly_type", "anomaly_type",
             "market_state_class", "dex_onchain_classification", "diagnostics_reason",
@@ -704,17 +708,7 @@ def _origins_for_text(value: object) -> tuple[str, ...]:
 
 
 def _derive_market_phase(data: Mapping[str, Any]) -> str:
-    text = " ".join(
-        str(data.get(field) or "")
-        for field in (
-            "anomaly_type",
-            "market_anomaly_type",
-            "market_anomaly_bucket",
-            "anomaly_bucket",
-            "market_state_class",
-            "market_state",
-        )
-    ).casefold()
+    text = " ".join(_market_classification_values(data)).casefold()
     if any(term in text for term in ("blowoff", "exhaust", "post_event_fade")):
         return MarketPhase.EXHAUSTION.value
     if any(term in text for term in ("late_momentum", "extended")):
@@ -749,18 +743,40 @@ def _has_structured_context(data: Mapping[str, Any], fields: tuple[str, ...]) ->
 
 
 def _market_label(data: Mapping[str, Any]) -> str:
-    for field in (
-        "market_anomaly_bucket",
-        "anomaly_bucket",
-        "market_anomaly_type",
-        "anomaly_type",
-        "market_state_class",
-        "market_state",
-    ):
-        value = str(data.get(field) or "").strip().casefold()
+    for field in _MARKET_CLASSIFICATION_FIELDS:
+        value = _typed_text(data.get(field)).casefold()
         if value:
             return value
     return ""
+
+
+def market_label(data: Mapping[str, Any]) -> str:
+    """Return the first typed market classification without coercing objects."""
+
+    return _market_label(data)
+
+
+def market_classification_invalid(data: Mapping[str, Any]) -> bool:
+    """Detect an explicit non-text market-state classification claim."""
+
+    return any(
+        field in data
+        and data.get(field) not in (None, "")
+        and not _typed_text(data.get(field))
+        for field in _MARKET_CLASSIFICATION_FIELDS
+    )
+
+
+def _market_classification_values(data: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(
+        value
+        for field in _MARKET_CLASSIFICATION_FIELDS
+        if (value := _typed_text(data.get(field)))
+    )
+
+
+def _typed_text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _clean_return_unit(value: object) -> str | None:
@@ -847,6 +863,8 @@ __all__ = (
     "has_calendar_risk",
     "normalize_market_snapshot",
     "market_snapshot",
+    "market_classification_invalid",
+    "market_label",
     "is_suspicious_illiquid",
     "spread_status",
     "thesis_origin_values",

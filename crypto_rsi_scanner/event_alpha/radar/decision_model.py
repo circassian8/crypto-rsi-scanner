@@ -367,6 +367,8 @@ def _hard_blockers(
         blockers.append("asset_tradability_unverified")
     if _market_quality_metadata(market)["invalid_claims"]:
         blockers.append("market_data_quality_invalid")
+    if decision_policy.market_classification_invalid(data):
+        blockers.append("market_state_classification_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(
@@ -908,16 +910,13 @@ def _catalyst_source_fields(data: Mapping[str, Any]) -> tuple[str, str]:
 
 
 def _market_label(data: Mapping[str, Any]) -> str:
-    for key in ("market_anomaly_bucket", "anomaly_bucket", "market_anomaly_type", "anomaly_type", "market_state_class", "market_state"):
-        value = str(data.get(key) or "").strip().casefold()
-        if value:
-            return value
-    return ""
+    return decision_policy.market_label(data)
 
 
 def _specific_market_label(data: Mapping[str, Any]) -> str:
     for key in ("anomaly_type", "market_anomaly_type", "market_state_class", "market_state"):
-        value = str(data.get(key) or "").strip().casefold()
+        raw = data.get(key)
+        value = raw.strip().casefold() if isinstance(raw, str) else ""
         if value:
             return value
     return ""
