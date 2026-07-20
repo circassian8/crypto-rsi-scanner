@@ -153,8 +153,8 @@ def market_snapshot_from_row(row: Mapping[str, Any], *, now: datetime | None = N
     market_cap = _float(row.get("market_cap"))
     volume_24h = _float(row.get("total_volume"))
     snapshot = {
-        "coin_id": str(row.get("id") or ""),
-        "symbol": str(row.get("symbol") or "").upper(),
+        "coin_id": _text(row.get("id")),
+        "symbol": _text(row.get("symbol")).upper(),
         "timestamp": timestamp.isoformat(),
         "return_unit": event_market_units.RETURN_UNIT_FRACTION,
         "price": price,
@@ -222,7 +222,10 @@ def _market_keys(row: Mapping[str, Any], snapshot: Mapping[str, Any]) -> tuple[s
     out: list[str] = []
     seen: set[str] = set()
     for value in raw_values:
-        for key in (clean_text(value), str(value or "").upper()):
+        text = _text(value)
+        if not text:
+            continue
+        for key in (clean_text(text), text.upper()):
             if key and key not in seen:
                 seen.add(key)
                 out.append(key)
@@ -279,6 +282,10 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _as_utc(dt: datetime) -> datetime:

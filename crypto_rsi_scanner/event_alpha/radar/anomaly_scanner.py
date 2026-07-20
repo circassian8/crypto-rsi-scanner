@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
@@ -29,12 +30,15 @@ def discover_market_anomalies(
 ) -> tuple[RawDiscoveredEvent, ...]:
     """Convert hot market rows into low-authority research raw events."""
     cfg = cfg or EventAnomalyScannerConfig()
+    _validate_config(cfg)
     if not cfg.enabled:
         return ()
     observed_at = _as_utc(now or datetime.now(timezone.utc))
     candidates: list[tuple[float, Mapping[str, Any], dict[str, Any], tuple[str, ...]]] = []
     for row in market_rows:
         snapshot = event_market_enrichment.market_snapshot_from_row(row, now=observed_at)
+        if not snapshot.get("coin_id") and not snapshot.get("symbol"):
+            continue
         reasons = _anomaly_reasons(row, snapshot, cfg)
         if not reasons:
             continue
@@ -89,9 +93,9 @@ def _raw_event_from_anomaly(
     score: float,
     observed_at: datetime,
 ) -> RawDiscoveredEvent:
-    symbol = str(snapshot.get("symbol") or row.get("symbol") or "").upper()
-    coin_id = str(snapshot.get("coin_id") or row.get("id") or "")
-    name = str(row.get("name") or coin_id or symbol)
+    symbol = _text(snapshot.get("symbol") or row.get("symbol")).upper()
+    coin_id = _text(snapshot.get("coin_id") or row.get("id"))
+    name = _text(row.get("name")) or coin_id or symbol
     title = f"{symbol or name} market anomaly: {', '.join(reasons)}"
     body = (
         f"{name} ({symbol}) matched market-anomaly research filters: {', '.join(reasons)}. "
@@ -148,3 +152,29 @@ def _content_hash(payload: Mapping[str, Any]) -> str:
 
 def _as_utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+def _validate_config(cfg: EventAnomalyScannerConfig) -> None:
+    if type(cfg) is not EventAnomalyScannerConfig or type(cfg.enabled) is not bool:
+        raise ValueError("market_anomaly_scanner_config_invalid")
+    if not cfg.enabled:
+        return
+    thresholds = (
+        cfg.min_return_24h,
+        cfg.min_volume_mcap,
+        cfg.min_volume_zscore,
+    )
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or value <= 0
+        for value in thresholds
+    ):
+        raise ValueError("market_anomaly_scanner_config_invalid")
+    if type(cfg.max_assets) is not int or cfg.max_assets < 0:
+        raise ValueError("market_anomaly_scanner_config_invalid")
+
+
+def _text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""

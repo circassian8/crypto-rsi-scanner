@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on legacy anomaly discovery inputs · Codex
+**Why:** The low-authority Event Alpha anomaly adapter still stringified asset
+identity and trusted its dataclass configuration. A reproduced boolean coin ID
+became `market_anomaly:True`; the string `"false"` enabled scanning; and negative
+thresholds allowed an otherwise invalid configuration to manufacture a row.
+**Changes:** CoinGecko-style market enrichment now accepts coin ID, symbol, and
+alias keys only from real non-empty text. Anomaly discovery skips rows without
+a typed coin ID or symbol and uses typed display identity. Enabled scanner
+configuration now requires semantic boolean state, finite positive thresholds,
+and a real non-negative integer output count; a disabled scanner remains an
+inert no-op. Added malformed identity/configuration regressions and the disabled
+control. Valid production defaults, anomaly weights, thresholds, and routes are
+unchanged.
+**Verify:** The original malformed-identity and configuration reproductions now
+fail closed. `99` focused enrichment, anomaly discovery, catalyst-search,
+numeric-finiteness, discovery-pipeline, radar-pipeline, and operator-workflow
+tests passed. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; provider budgets and artifact/security bounds remain enforced.
+
 ## 2026-07-20 — Revalidate Bybit identity before request construction · Codex
 **Why:** The persisted-instrument readers were strict, but direct request
 builders still trusted manually constructed dataclass values. A reproduced

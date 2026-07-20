@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 
@@ -205,6 +207,70 @@ def test_event_anomaly_scanner_creates_store_only_research_rows():
     assert "proxy instrument" not in "; ".join(alert.verify)
     assert "not a confirmed proxy narrative" in (alert.rejected_reason or "")
     assert "low classifier confidence" in (alert.rejected_reason or "")
+
+
+def test_event_anomaly_scanner_does_not_stringify_asset_identity():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.anomaly_scanner as event_anomaly_scanner
+    import crypto_rsi_scanner.event_alpha.radar.market_enrichment as event_market_enrichment
+
+    now = datetime(2026, 7, 20, 17, 0, tzinfo=timezone.utc)
+    row = {
+        "id": True,
+        "symbol": False,
+        "name": {"unexpected": "mapping"},
+        "current_price": 1.0,
+        "market_cap": 100_000_000.0,
+        "total_volume": 60_000_000.0,
+        "price_change_percentage_24h_in_currency": 45.0,
+        "price_change_percentage_7d_in_currency": 120.0,
+        "volume_zscore_24h": 4.5,
+    }
+
+    assert event_market_enrichment.market_snapshots_from_rows([row], now=now) == {}
+    assert event_anomaly_scanner.discover_market_anomalies(
+        [row],
+        cfg=event_anomaly_scanner.EventAnomalyScannerConfig(enabled=True),
+        now=now,
+    ) == ()
+
+
+@pytest.mark.parametrize(
+    "config",
+    (
+        {"enabled": "false"},
+        {"enabled": True, "min_return_24h": -1.0},
+        {"enabled": True, "min_volume_mcap": float("nan")},
+        {"enabled": True, "min_volume_zscore": True},
+        {"enabled": True, "max_assets": True},
+        {"enabled": True, "max_assets": -1},
+    ),
+)
+def test_event_anomaly_scanner_rejects_malformed_configuration(
+    config: dict[str, object],
+):
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.anomaly_scanner as event_anomaly_scanner
+
+    with pytest.raises(ValueError, match="scanner_config_invalid"):
+        event_anomaly_scanner.discover_market_anomalies(
+            [],
+            cfg=event_anomaly_scanner.EventAnomalyScannerConfig(**config),
+            now=datetime(2026, 7, 20, 17, 0, tzinfo=timezone.utc),
+        )
+
+
+def test_disabled_event_anomaly_scanner_remains_an_inert_boundary():
+    import crypto_rsi_scanner.event_alpha.radar.anomaly_scanner as event_anomaly_scanner
+
+    assert event_anomaly_scanner.discover_market_anomalies(
+        [],
+        cfg=event_anomaly_scanner.EventAnomalyScannerConfig(
+            enabled=False,
+            min_return_24h=float("nan"),
+            max_assets=-1,
+        ),
+    ) == ()
 
 
 def test_event_alpha_cycle_search_loop_uses_fixture_evidence_and_respects_limits():
