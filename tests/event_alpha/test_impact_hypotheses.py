@@ -266,6 +266,53 @@ def test_event_impact_hypotheses_reject_malformed_market_confirmation_numerics()
     assert valid.score_components["market_confirmation"] == 90.0
 
 
+def test_market_anomaly_hypothesis_rejects_malformed_source_confidence():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def generated(source_confidence):
+        raw = RawDiscoveredEvent(
+            raw_id="confidence-anomaly",
+            provider="market_anomaly",
+            fetched_at=now,
+            published_at=now,
+            source_url=None,
+            title="TEST market anomaly",
+            body="No catalyst has been identified.",
+            raw_json={"market": {"symbol": "TEST", "coin_id": "test"}, "anomaly": {}},
+            source_confidence=source_confidence,
+            content_hash="confidence-anomaly",
+        )
+        result = EventDiscoveryResult(
+            raw_events=(raw,),
+            normalized_events=(),
+            links=(),
+            classifications=(),
+            candidates=(),
+        )
+        return next(
+            item
+            for item in event_impact_hypotheses.generate_impact_hypotheses(result, now=now)
+            if item.impact_category == "market_anomaly_unknown"
+        )
+
+    unavailable = generated(0.0)
+    for invalid in (True, float("nan"), float("inf"), float("-inf"), -0.1, 1.1, "invalid"):
+        malformed = generated(invalid)
+
+        assert malformed.score_components["source_quality"] == 0.0
+        assert malformed.score_components["event_clarity"] == 0.0
+        assert malformed.hypothesis_score == unavailable.hypothesis_score
+
+    valid = generated(0.7)
+    assert valid.score_components["source_quality"] == 70.0
+    assert valid.score_components["event_clarity"] == 70.0
+    assert valid.hypothesis_score > unavailable.hypothesis_score
+
+
 def test_event_impact_hypotheses_reject_malformed_source_confidence():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses

@@ -17,6 +17,19 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Normalize market-anomaly source confidence before synthesis · Codex
+**Why:** The raw market-anomaly compatibility path synthesized a normalized
+event with direct float clamping. NaN and booleans could therefore become full
+confidence before the downstream finite validator received the value.
+**Changes:** Routed synthetic anomaly-event source confidence through the
+canonical finite, non-boolean `[0,1]` boundary and added an end-to-end public
+generation regression. Valid confidence, weights, thresholds, routes, provider
+policy, and historical artifacts are unchanged.
+**Verify:** All 40 focused impact-hypothesis, catalyst-frame, and
+source-independence tests passed. `compileall` and `git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Reject malformed hypothesis confidence components · Codex
 **Why:** Shared hypothesis score coercion could turn NaN or infinity into 100,
 accept booleans as numbers, and let duplicate-family merging copy a malformed

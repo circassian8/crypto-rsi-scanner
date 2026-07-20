@@ -127,7 +127,7 @@ def _normalized_from_market_anomaly(raw: RawDiscoveredEvent, now: datetime) -> N
         source_urls=(raw.source_url,) if raw.source_url else (),
         external_asset=None,
         description=raw.body or raw.title,
-        confidence=max(0.0, min(1.0, float(raw.source_confidence or 0.0))),
+        confidence=_bounded_confidence(raw.source_confidence),
     )
 
 
