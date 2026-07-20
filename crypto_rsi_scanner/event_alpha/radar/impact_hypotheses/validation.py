@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -339,10 +340,16 @@ def _refresh_impact_validation_score(
 
 
 def _component_float(components: Mapping[str, float], key: str) -> float:
+    value = components.get(key)
+    if isinstance(value, bool):
+        return 0.0
     try:
-        return max(0.0, min(100.0, float(components.get(key) or 0.0)))
+        number = float(value or 0.0)
     except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(number):
+        return 0.0
+    return max(0.0, min(100.0, number))
 
 
 def _impact_validation_replace_kwargs(

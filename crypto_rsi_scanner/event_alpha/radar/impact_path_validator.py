@@ -8,6 +8,7 @@ rows, or event-fade triggers.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -444,7 +445,7 @@ def calculate_opportunity_score_v2(components: Mapping[str, float]) -> float:
     score = 0.0
     weight_sum = 0.0
     for key, weight in weights.items():
-        score += max(0.0, min(100.0, float(components.get(key) or 0.0))) * weight
+        score += _bounded_score(components.get(key)) * weight
         weight_sum += weight
     return max(0.0, min(100.0, score / max(0.01, weight_sum)))
 
@@ -908,10 +909,7 @@ def _evidence_specificity_score(
 ) -> float:
     score = 0.0
     if raw is not None:
-        try:
-            score = max(score, float(raw.source_confidence or 0.0) * 100)
-        except (TypeError, ValueError):
-            pass
+        score = max(score, _bounded_unit_confidence(raw.source_confidence) * 100)
         provider = clean_text(raw.provider)
         origin = clean_text(str((raw.raw_json or {}).get("source_origin") if isinstance(raw.raw_json, Mapping) else ""))
         if any(term in provider or term in origin for term in ("project", "official", "binance", "bybit", "coinmarketcal", "tokenomist")):
@@ -972,10 +970,31 @@ def _strength_score(strength: str) -> float:
 
 
 def _component_score(components: Mapping[str, float], key: str) -> float:
+    return _bounded_score(components.get(key))
+
+
+def _bounded_score(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
     try:
-        return max(0.0, min(100.0, float(components.get(key) or 0.0)))
+        number = float(value or 0.0)
     except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(number):
+        return 0.0
+    return max(0.0, min(100.0, number))
+
+
+def _bounded_unit_confidence(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        return 0.0
+    return number
 
 
 def _market_confirmation_score(raws: Iterable[RawDiscoveredEvent]) -> float:
@@ -990,9 +1009,13 @@ def _market_confirmation_score(raws: Iterable[RawDiscoveredEvent]) -> float:
             ("volume_zscore_24h", market.get("volume_zscore_24h")),
             ("return_24h", market.get("return_24h")),
         ):
+            if isinstance(value, bool):
+                continue
             try:
                 number = float(value or 0.0)
             except (TypeError, ValueError):
+                continue
+            if not math.isfinite(number):
                 continue
             if key != "anomaly_score" and abs(number) <= 3.0:
                 number *= 25.0

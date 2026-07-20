@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reject malformed validated impact-path numerics · Codex
+**Why:** The public validation path converted stored `NaN` market confirmation
+through ordinary float clamping, which reproduced as 100/100 evidence and
+upgraded a medium fan-token impact path to strong/digest-eligible.
+**Changes:** Added one finite, non-boolean score boundary throughout impact-path
+component and opportunity scoring; required raw source confidence to be a real
+`[0,1]` value; and ignored boolean/non-finite raw market values. The downstream
+validation projection now applies the same rule. Added a public end-to-end
+regression covering stored components, raw source confidence, raw market
+evidence, and valid finite controls. Existing weights, thresholds, and route
+policy are unchanged.
+**Verify:** `77` focused impact-hypothesis, catalyst-frame, watchlist-router, and
+CoreOpportunity tests passed. The new regression passed independently before
+the focused batch. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Record the forty-seventh no-send market cycle · Codex
 **Why:** The hourly cadence was eligible and explicit CoinGecko authorization
 was already present, so the evidence-first campaign needed one genuine

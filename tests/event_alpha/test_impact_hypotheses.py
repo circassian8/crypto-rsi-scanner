@@ -892,6 +892,92 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
         config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE = original_allow_stale_fixture
 
 
+def test_event_impact_path_rejects_malformed_numeric_evidence():
+    from datetime import datetime, timezone
+    import math
+
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+
+    def validate(
+        value=0.0,
+        *,
+        source_confidence=0.1,
+        raw_market_value=None,
+    ):
+        hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+            hypothesis_id="hyp:chz-malformed-market",
+            event_cluster_id="cluster:chz-malformed-market",
+            event_type="news",
+            external_asset="World Cup",
+            impact_category="sports_fan_proxy",
+            candidate_sectors=("fan_tokens",),
+            candidate_symbols=("CHZ",),
+            candidate_coin_ids=("chiliz",),
+            direction_hint="attention",
+            playbook_hint="sports_fan_proxy",
+            confidence=0.2,
+            hypothesis_score=20.0,
+            score_components={"market_confirmation": value},
+            validation_stage=event_impact_hypotheses.ValidationStage.VALIDATION_SEARCH_PENDING.value,
+            status=event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value,
+        )
+        source = RawDiscoveredEvent(
+            raw_id="chz-malformed-market",
+            provider="fixture_search",
+            fetched_at=now,
+            published_at=now,
+            source_url="https://example.test/chz-malformed-market",
+            title="CHZ fan token demand",
+            body="CHZ fan token demand rises into a World Cup fixture.",
+            raw_json={
+                "market": {"return_24h": raw_market_value},
+            } if raw_market_value is not None else {},
+            source_confidence=source_confidence,
+            content_hash="chz-malformed-market",
+        )
+        return event_impact_hypotheses.validate_hypotheses_with_raw_events(
+            (hypothesis,),
+            (source,),
+        )[0]
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = validate(malformed)
+        assert row.impact_path_strength == "medium"
+        assert row.digest_eligible_by_impact_path is False
+        assert row.why_digest_ineligible == "medium_impact_path_requires_market_confirmation"
+        assert row.opportunity_score_components["market_confirmation"] == 0.0
+        assert row.opportunity_score_components["liquidity_tradability"] == 0.0
+        assert all(math.isfinite(value) for value in row.opportunity_score_components.values())
+
+    valid = validate(40.0)
+    assert valid.impact_path_strength == "strong"
+    assert valid.digest_eligible_by_impact_path is True
+    assert valid.opportunity_score_components["market_confirmation"] == 40.0
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf"), -0.1, 1.1):
+        row = validate(source_confidence=malformed)
+        assert row.evidence_specificity_score == 30.0
+        assert row.impact_path_strength == "medium"
+        assert row.digest_eligible_by_impact_path is False
+
+    valid_source = validate(source_confidence=0.7)
+    assert valid_source.evidence_specificity_score == 100.0
+    assert valid_source.impact_path_strength == "strong"
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = validate(raw_market_value=malformed)
+        assert row.opportunity_score_components["market_confirmation"] == 0.0
+        assert row.impact_path_strength == "medium"
+        assert row.digest_eligible_by_impact_path is False
+
+    valid_market = validate(raw_market_value=1.6)
+    assert valid_market.opportunity_score_components["market_confirmation"] == 40.0
+    assert valid_market.impact_path_strength == "strong"
+
+
 def test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths():
     # Validated hypotheses must persist the opportunity upgrade/downgrade
     # diagnostics on the row (and through the store), not only compute them
