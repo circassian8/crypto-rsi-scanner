@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the fifty-first market cycle · Codex
+**Why:** The one-hour cadence became eligible with explicit CoinGecko
+authorization still present. The active Protocol-v2 evidence program requires
+regular point-in-time observations and a campaign report refreshed from every
+terminal cycle.
+**Changes:** Ran one bounded no-send Daily Operations cycle. One
+`/coins/markets` request returned HTTP 200 with 80 rows in 4,897 ms and no
+retry, then published
+`radar_market_no_send_20260720t184054653793z_11e82a3a5a1d` at revision 12.
+Immutable publication and dashboard-operations receipts bind pointer SHA-256
+`970aaee59723b3dc33c0a8277258953f9642dc294bacf13a9b954fec4d48844f`
+and operator-state SHA-256
+`2f7e3bec3a6356de8c5fbe56b4428a48aa4b6c5ca1255d54b17d86d0819e8ac8`.
+Regenerated the checked-in campaign report after terminal success. Campaign
+truth is now 51 cycles / 1,530 retained / 1,500 baseline-counted / 30 too-close
+observations, with prospective universe/liquidity context on 270 counted rows.
+The current generation has 30 observations, 27 warm / 3 warming baselines, and
+zero anomalies or Decision ideas. Retained same-asset next-observation
+readiness is 28/30. The causal 24-hour regime input remains 27/30: PUMP rank 16,
+WBT rank 24, and SHIB rank 30 lack valid temporal-return value, unit, and
+evidence. No regime, partition, or matched control was fabricated.
+**Verify:** The exact generation reports strict doctor 0 blockers / 0 warnings,
+valid final publication and operations receipts, and authoritative pointer
+revalidation. `make radar-daily-ops-status PYTHON=python3`, `make
+radar-market-campaign-report PYTHON=python3`, `make radar-dashboard-readiness
+PYTHON=python3`, and `make radar-dashboard-authority-status PYTHON=python3`
+passed without provider calls. An external loopback HEAD returned HTTP 200 with
+the exact namespace, run, revision, and operator digest. JSON parsing and `git
+diff --check` passed.
+**Notes/risks:** Next provider eligibility is
+`2026-07-20T19:40:56.440969+00:00`. Historical evidence remains 7 ideas, 4
+matured outcomes, 2 pending, and 1 `due_missing_price`; DEXE remains 5,931.614s
+beyond the allowed recovery window. There is still no trusted spread, genuine
+market regime, Protocol-v2 partition, or complete match. No send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Require typed Decision market classifications · Codex
 **Why:** Market state, anomaly type, and anomaly bucket fields were converted
 with `str()` before directional-bias and phase inference. Reproduced mappings
