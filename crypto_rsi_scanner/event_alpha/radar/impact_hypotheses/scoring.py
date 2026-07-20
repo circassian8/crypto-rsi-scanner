@@ -287,10 +287,15 @@ def _payload_mapping(payload: Mapping[str, Any], *keys: str) -> Mapping[str, Any
 
 
 def _coerce_score(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
     try:
-        return max(0.0, min(100.0, float(value or 0.0)))
+        number = float(value or 0.0)
     except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(number):
+        return 0.0
+    return max(0.0, min(100.0, number))
 
 
 def _bounded_confidence(value: object) -> float:
@@ -432,7 +437,7 @@ def _hypothesis_score_components(
         "candidate_asset_strength": round(min(100.0, len(crypto_candidate_assets) * 18.0 + (35.0 if suggested_assets else 0.0)), 2),
         "validation_strength": 95.0 if validated_assets else 0.0,
         "market_confirmation": round(market_confirmation, 2),
-        "cluster_confidence": round(max(0.0, min(100.0, float(getattr(cluster, "cluster_confidence", 0) or 0))), 2),
+        "cluster_confidence": round(_coerce_score(getattr(cluster, "cluster_confidence", 0)), 2),
     }
     if event.event_time is not None:
         components["event_time_quality"] = round(_bounded_confidence(event.event_time_confidence) * 100, 2)
@@ -458,16 +463,16 @@ def _weighted_hypothesis_score(components: Mapping[str, float], category: str) -
     score = 0.0
     weight_sum = 0.0
     for key, weight in weights.items():
-        score += max(0.0, min(100.0, float(components.get(key) or 0.0))) * weight
+        score += _coerce_score(components.get(key)) * weight
         weight_sum += weight
     if components.get("event_time_quality") is not None:
-        score += max(0.0, min(100.0, float(components.get("event_time_quality") or 0.0))) * 0.04
+        score += _coerce_score(components.get("event_time_quality")) * 0.04
         weight_sum += 0.04
     if components.get("impact_path_strength") is not None:
-        score += max(0.0, min(100.0, float(components.get("impact_path_strength") or 0.0))) * 0.08
+        score += _coerce_score(components.get("impact_path_strength")) * 0.08
         weight_sum += 0.08
     if components.get("llm_candidate_confidence") is not None:
-        score += max(0.0, min(100.0, float(components.get("llm_candidate_confidence") or 0.0))) * 0.05
+        score += _coerce_score(components.get("llm_candidate_confidence")) * 0.05
         weight_sum += 0.05
     final = score / max(0.01, weight_sum)
     if category == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:

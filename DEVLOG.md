@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reject malformed hypothesis confidence components · Codex
+**Why:** Shared hypothesis score coercion could turn NaN or infinity into 100,
+accept booleans as numbers, and let duplicate-family merging copy a malformed
+incident confidence back into canonical state after normalization.
+**Changes:** Made the 0–100 score boundary finite and non-boolean, reused it for
+cluster and weighted score components, and made duplicate merging remove an
+invalid incident-confidence component instead of preserving it from the winner.
+Added public generation and family-merge regressions. Valid finite scores,
+weights, thresholds, routes, provider policy, and historical artifacts are
+unchanged.
+**Verify:** All 75 focused impact-hypothesis, catalyst-frame,
+source-independence, incident-relevance, watchlist-router, and core-opportunity
+tests passed. `compileall` and `git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Clarify empty review-action status · Codex
 **Why:** The concise review-timing status printed `status=no_events` and zero
 records without its canonical scope disclosure, making an empty human-action

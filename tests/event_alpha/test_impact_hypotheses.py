@@ -79,6 +79,41 @@ def test_hypothesis_family_and_watchlist_preserve_source_independence_state():
     ]
 
 
+def test_duplicate_hypothesis_merge_rejects_malformed_incident_confidence():
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as hypotheses
+    from crypto_rsi_scanner.event_alpha.radar.impact_hypotheses import family
+
+    def hypothesis(hypothesis_id: str, value):
+        return hypotheses.EventImpactHypothesis(
+            hypothesis_id=hypothesis_id,
+            event_cluster_id="cluster:incident-confidence",
+            event_type="security_event",
+            external_asset="Protocol",
+            impact_category="security_or_regulatory_shock",
+            candidate_sectors=("infrastructure",),
+            candidate_symbols=("SAFE",),
+            confidence=0.8,
+            incident_confidence=value,
+            score_components={"incident_confidence": value},
+        )
+
+    for invalid in (True, float("nan"), float("inf"), float("-inf"), "invalid"):
+        merged = family._merge_duplicate_hypotheses(  # noqa: SLF001
+            hypothesis("hyp:a", invalid),
+            hypothesis("hyp:b", invalid),
+        )
+
+        assert merged.incident_confidence is None
+        assert "incident_confidence" not in merged.score_components
+
+    valid = family._merge_duplicate_hypotheses(  # noqa: SLF001
+        hypothesis("hyp:a", 84.0),
+        hypothesis("hyp:b", 72.0),
+    )
+    assert valid.incident_confidence == 84.0
+    assert valid.score_components["incident_confidence"] == 84.0
+
+
 def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import config
@@ -292,6 +327,83 @@ def test_event_impact_hypotheses_reject_malformed_source_confidence():
     valid = generated(0.7)
     assert valid.score_components["source_quality"] == 70.0
     assert valid.score_components["event_clarity"] == 70.0
+
+
+def test_event_impact_hypotheses_reject_malformed_cluster_confidence():
+    from datetime import datetime, timezone
+    import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="spacex-cluster",
+        provider="fixture",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex-cluster",
+        title="SpaceX pre-IPO exposure opens",
+        body="TEST token offers synthetic exposure to SpaceX.",
+        raw_json={},
+        source_confidence=0.7,
+        content_hash="spacex-cluster",
+    )
+    event = NormalizedEvent(
+        event_id="spacex-cluster",
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="external_proxy_event",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="SpaceX",
+        description=raw.body,
+        confidence=0.7,
+    )
+    result = EventDiscoveryResult(
+        raw_events=(raw,),
+        normalized_events=(event,),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+
+    def generated(cluster_confidence):
+        cluster = event_graph.EventCluster(
+            schema_version=event_graph.EVENT_GRAPH_SCHEMA_VERSION,
+            cluster_id="cluster:spacex",
+            external_asset_slug="spacex",
+            event_type=event.event_type,
+            event_date_bucket="2026-06-18",
+            external_asset=event.external_asset,
+            event_time=None,
+            event_ids=(event.event_id,),
+            raw_ids=(raw.raw_id,),
+            source_urls=(raw.source_url,),
+            cluster_confidence=cluster_confidence,
+        )
+        return next(
+            item
+            for item in event_impact_hypotheses.generate_impact_hypotheses(
+                result,
+                clusters=(cluster,),
+                now=now,
+            )
+            if item.impact_category == "rwa_preipo_proxy"
+        )
+
+    unavailable = generated(0.0)
+    for invalid in (True, float("nan"), float("inf"), float("-inf"), "invalid"):
+        malformed = generated(invalid)
+
+        assert malformed.score_components["cluster_confidence"] == 0.0
+        assert malformed.hypothesis_score == unavailable.hypothesis_score
+
+    valid = generated(75.0)
+    assert valid.score_components["cluster_confidence"] == 75.0
+    assert valid.hypothesis_score > unavailable.hypothesis_score
 
 
 def test_event_impact_hypothesis_matching_uses_context_not_substrings():

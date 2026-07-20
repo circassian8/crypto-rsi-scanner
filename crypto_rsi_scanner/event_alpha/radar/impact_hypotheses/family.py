@@ -290,11 +290,13 @@ def _merge_duplicate_hypotheses(
     )
     if incident_confidence:
         components["incident_confidence"] = incident_confidence
+    else:
+        components.pop("incident_confidence", None)
     incident_observed = bool(current.incident_market_reaction_observed or item.incident_market_reaction_observed)
     incident_causal = bool(current.incident_causal_mechanism_confirmed or item.incident_causal_mechanism_confirmed)
     return replace(
         winner,
-        incident_confidence=incident_confidence or winner.incident_confidence,
+        incident_confidence=incident_confidence or None,
         incident_canonical_name=winner.incident_canonical_name or winner.canonical_incident_name,
         incident_event_archetype=winner.incident_event_archetype or winner.event_archetype,
         incident_primary_subject=winner.incident_primary_subject or winner.primary_subject,
