@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import math
 import re
 from dataclasses import dataclass
 from dataclasses import replace
@@ -52,6 +53,16 @@ SOURCE_TRIAGE_SEND_TO_LLM = "send_to_llm_frame_analyzer"
 SOURCE_TRIAGE_RAW_OBSERVATION = "keep_raw_observation"
 SOURCE_TRIAGE_DIAGNOSTIC_ONLY = "diagnostic_only"
 SOURCE_TRIAGE_REJECT = "reject"
+
+
+def _source_flag_true(value: object) -> bool:
+    """Accept only explicit truth for source-quality policy fields."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 @dataclass(frozen=True)
@@ -214,7 +225,7 @@ def should_enrich_source(raw_event: RawDiscoveredEvent, *, min_source_confidence
     """Return true for high-signal rows worth full-content enrichment."""
     if not raw_event.source_url:
         return False
-    if float(raw_event.source_confidence or 0.0) < min_source_confidence:
+    if _float_or_zero(raw_event.source_confidence) < min_source_confidence:
         return False
     text = " ".join(str(part or "") for part in (raw_event.title, raw_event.body)).casefold()
     return any(
@@ -1042,7 +1053,9 @@ def _article_from_cache(cached: Mapping[str, Any], *, fallback_text: str) -> Eve
         body_text=str(article.get("body_text") or fallback_text or ""),
         body_char_count=_int_or_none(article.get("body_char_count")) or len(str(article.get("body_text") or fallback_text or "")),
         boilerplate_ratio=_float_or_zero(article.get("boilerplate_ratio")),
-        ticker_sidebar_detected=bool(article.get("ticker_sidebar_detected")),
+        ticker_sidebar_detected=_source_flag_true(
+            article.get("ticker_sidebar_detected")
+        ),
         article_quality_status=str(article.get("article_quality_status") or cached.get("article_quality_status") or ARTICLE_QUALITY_THIN),
         warnings=tuple(str(item) for item in (article.get("warnings") or ()) if item),
     )
@@ -1053,12 +1066,20 @@ def _triage_from_cache(cached: Mapping[str, Any]) -> EventSourceTriageResult | N
     if not triage:
         return None
     return EventSourceTriageResult(
-        is_real_article=bool(triage.get("is_real_article")),
-        source_is_official=bool(triage.get("source_is_official")),
-        source_is_recapped_news=bool(triage.get("source_is_recapped_news")),
-        source_is_affiliate_or_seo=bool(triage.get("source_is_affiliate_or_seo")),
-        source_has_direct_token_mechanism=bool(triage.get("source_has_direct_token_mechanism")),
-        source_has_candidate_and_catalyst=bool(triage.get("source_has_candidate_and_catalyst")),
+        is_real_article=_source_flag_true(triage.get("is_real_article")),
+        source_is_official=_source_flag_true(triage.get("source_is_official")),
+        source_is_recapped_news=_source_flag_true(
+            triage.get("source_is_recapped_news")
+        ),
+        source_is_affiliate_or_seo=_source_flag_true(
+            triage.get("source_is_affiliate_or_seo")
+        ),
+        source_has_direct_token_mechanism=_source_flag_true(
+            triage.get("source_has_direct_token_mechanism")
+        ),
+        source_has_candidate_and_catalyst=_source_flag_true(
+            triage.get("source_has_candidate_and_catalyst")
+        ),
         source_quality_score=_float_or_zero(triage.get("source_quality_score")),
         decision=str(triage.get("decision") or SOURCE_TRIAGE_RAW_OBSERVATION),
         reason_codes=tuple(str(item) for item in (triage.get("reason_codes") or ()) if item),
@@ -1169,7 +1190,9 @@ def _validate_source_quality_judgment(
         ARTICLE_QUALITY_FIXTURE_TEXT_USED,
     }:
         status = ARTICLE_QUALITY_THIN
-    is_real = bool(raw.get("is_real_article")) and status in USABLE_ARTICLE_QUALITY_STATUSES
+    is_real = _source_flag_true(
+        raw.get("is_real_article")
+    ) and status in USABLE_ARTICLE_QUALITY_STATUSES
     score = max(0.0, min(100.0, _float_or_zero(raw.get("source_quality_score"))))
     warnings = [str(item) for item in (raw.get("warnings") or ()) if item]
     if deterministic is not None and deterministic.decision in {SOURCE_TRIAGE_DIAGNOSTIC_ONLY, SOURCE_TRIAGE_REJECT}:
@@ -1218,12 +1241,21 @@ def validate_llm_source_triage(
     if quote and clean_quote not in clean_source:
         warnings.append("evidence_quote_missing_from_source")
         confidence = min(confidence, 0.50)
-    if bool(raw.get("candidate_catalyst_mechanism_present")) and not quote:
+    mechanism_present = _source_flag_true(
+        raw.get("candidate_catalyst_mechanism_present")
+    )
+    if mechanism_present and not quote:
         warnings.append("mechanism_without_quote")
         confidence = min(confidence, 0.50)
-    is_affiliate = bool(raw.get("is_affiliate_or_seo")) or page_type == "seo_affiliate"
-    is_real = bool(raw.get("is_real_article")) and quality in USABLE_ARTICLE_QUALITY_STATUSES
-    is_official = bool(raw.get("is_official_source")) or page_type == "official_announcement"
+    is_affiliate = _source_flag_true(
+        raw.get("is_affiliate_or_seo")
+    ) or page_type == "seo_affiliate"
+    is_real = _source_flag_true(
+        raw.get("is_real_article")
+    ) and quality in USABLE_ARTICLE_QUALITY_STATUSES
+    is_official = _source_flag_true(
+        raw.get("is_official_source")
+    ) or page_type == "official_announcement"
     if deterministic is not None and deterministic.decision in {SOURCE_TRIAGE_DIAGNOSTIC_ONLY, SOURCE_TRIAGE_REJECT}:
         is_real = False
         confidence = min(confidence, 0.45)
@@ -1246,9 +1278,10 @@ def validate_llm_source_triage(
         article_quality=quality,
         boilerplate_ratio_estimate=max(0.0, min(1.0, _float_or_zero(raw.get("boilerplate_ratio_estimate")))),
         is_official_source=is_official,
-        is_recap=bool(raw.get("is_recap")) or page_type == "market_recap",
+        is_recap=_source_flag_true(raw.get("is_recap"))
+        or page_type == "market_recap",
         is_affiliate_or_seo=is_affiliate,
-        candidate_catalyst_mechanism_present=bool(raw.get("candidate_catalyst_mechanism_present")) and bool(quote),
+        candidate_catalyst_mechanism_present=mechanism_present and bool(quote),
         evidence_quote=quote if not quote or clean_quote in clean_source else "",
         confidence=round(confidence, 3),
         reason=str(raw.get("reason") or "llm_source_triage_validated"),
@@ -1262,14 +1295,19 @@ def _optional_str(value: object) -> str | None:
 
 
 def _int_or_none(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
     try:
         return int(float(value))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
 
 
 def _float_or_zero(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
     try:
-        return float(value)  # type: ignore[arg-type]
+        parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0.0
+    return parsed if math.isfinite(parsed) else 0.0

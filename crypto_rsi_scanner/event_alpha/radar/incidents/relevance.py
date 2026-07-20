@@ -13,6 +13,17 @@ import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_gra
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
 
+
+def _incident_flag_true(value: object) -> bool:
+    """Accept only explicit truth for persisted incident policy fields."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
+
+
 def classify_incident_relevance(
     incident: event_incident_graph.CanonicalIncident,
     *,
@@ -43,7 +54,9 @@ def classify_incident_relevance(
     warnings: list[str] = []
     score = 0.0
 
-    if diagnostic_only or str(subject_quality or incident.subject_quality or "") in {"invalid", "diagnostic_only"}:
+    if _incident_flag_true(diagnostic_only) or str(
+        subject_quality or incident.subject_quality or ""
+    ) in {"invalid", "diagnostic_only"}:
         return {
             "incident_relevance_status": RELEVANCE_DIAGNOSTIC_ONLY,
             "incident_relevance_score": 0.0,
@@ -65,7 +78,7 @@ def classify_incident_relevance(
     if _has_crypto_asset_link(assets):
         reasons.append("linked_to_validated_crypto_candidate")
         score += 22.0
-    if market_like or bool(market.get("market_reaction_observed")):
+    if market_like or _incident_flag_true(market.get("market_reaction_observed")):
         reasons.append("market_dislocation_or_market_reaction")
         score += 25.0
     if incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES and _crypto_specific_text(text, incident=incident, assets=assets):
@@ -110,7 +123,7 @@ def classify_incident_relevance(
     elif (
         _has_crypto_asset_link(assets)
         or market_like
-        or bool(market.get("market_reaction_observed"))
+        or _incident_flag_true(market.get("market_reaction_observed"))
         or (
             incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES
             and _crypto_specific_text(text, incident=incident, assets=assets)
@@ -119,7 +132,8 @@ def classify_incident_relevance(
         status = RELEVANCE_CANONICAL_INCIDENT
         persistence = (
             "market_dislocation"
-            if market_like or bool(market.get("market_reaction_observed"))
+            if market_like
+            or _incident_flag_true(market.get("market_reaction_observed"))
             else "crypto_specific_incident"
         )
         score = max(score, 68.0)
@@ -166,7 +180,9 @@ def _should_persist_incident_row(
         return True
     if status in _RAW_RELEVANCE_STATUSES:
         return bool(store_raw_observations)
-    if bool(row.get("diagnostic_only")) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES:
+    if _incident_flag_true(
+        row.get("diagnostic_only")
+    ) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES:
         return bool(store_diagnostic)
     return True
 def _is_diagnostic_relevance(row: Mapping[str, Any]) -> bool:
@@ -193,7 +209,9 @@ def _is_hidden_relevance(
     return False
 def _is_strict_diagnostic_relevance(row: Mapping[str, Any]) -> bool:
     status = str(row.get("incident_relevance_status") or "").strip()
-    return bool(row.get("diagnostic_only")) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES
+    return _incident_flag_true(
+        row.get("diagnostic_only")
+    ) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES
 def _is_raw_observation_relevance(row: Mapping[str, Any]) -> bool:
     return str(row.get("incident_relevance_status") or "").strip() == RELEVANCE_RAW_OBSERVATION
 def _is_external_context_relevance(row: Mapping[str, Any]) -> bool:
@@ -298,10 +316,14 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
         data["external_context_hidden_by_default"] = status == RELEVANCE_EXTERNAL_CONTEXT_ONLY
         data["diagnostic_hidden_by_default"] = _is_diagnostic_relevance(data)
         return data
-    diagnostic = bool(data.get("diagnostic_only")) or str(data.get("incident_subject_quality") or "") == "diagnostic_only"
+    diagnostic = _incident_flag_true(data.get("diagnostic_only")) or str(
+        data.get("incident_subject_quality") or ""
+    ) == "diagnostic_only"
     linked_h = bool(data.get("linked_hypothesis_ids"))
     linked_w = bool(data.get("linked_watchlist_keys"))
-    market_observed = bool(data.get("market_reaction_observed") or data.get("market_reaction_confirmed"))
+    market_observed = _incident_flag_true(
+        data.get("market_reaction_observed")
+    ) or _incident_flag_true(data.get("market_reaction_confirmed"))
     archetype = str(data.get("event_archetype") or "")
     assets = data.get("linked_assets") or ()
     source_text = " ".join(str(data.get(key) or "") for key in (
@@ -380,7 +402,11 @@ def _downgraded_relevance_for_unqualified_links(row: Mapping[str, Any]) -> tuple
         return RELEVANCE_EXTERNAL_CONTEXT_ONLY, reason or "external_context_without_crypto_link"
     if archetype in _EXTERNAL_CATALYST_ARCHETYPES or archetype in _DIRECT_CRYPTO_ARCHETYPES:
         return RELEVANCE_INCIDENT_CANDIDATE, reason or "recognized_research_catalyst_candidate"
-    if bool(row.get("market_reaction_observed") or row.get("market_reaction_confirmed")) or archetype == "market_dislocation_unknown":
+    if (
+        _incident_flag_true(row.get("market_reaction_observed"))
+        or _incident_flag_true(row.get("market_reaction_confirmed"))
+        or archetype == "market_dislocation_unknown"
+    ):
         return RELEVANCE_CANONICAL_INCIDENT, "market_dislocation"
     return RELEVANCE_RAW_OBSERVATION, reason or "raw_observation_without_crypto_link"
 def _api_unqualified_reason(row: Mapping[str, Any]) -> str | None:

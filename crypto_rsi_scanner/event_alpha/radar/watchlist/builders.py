@@ -15,6 +15,7 @@ import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_qua
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 from crypto_rsi_scanner.event_alpha.radar.source_independence import validated_source_independence_container
 import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
+from .market import _optional_bool, _optional_int
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -245,12 +246,20 @@ def _hypothesis_material_change_reasons(
     previous_conflicts = _item_count(components.get("conflicting_claims"))
     if current_conflicts > previous_conflicts:
         reasons.append("incident_conflicting_claim_added")
-    current_market = bool(getattr(hypothesis, "market_reaction_confirmed", False))
-    previous_market = bool(components.get("market_reaction_confirmed"))
+    current_market = _optional_bool(
+        getattr(hypothesis, "market_reaction_confirmed", False)
+    ) is True
+    previous_market = _optional_bool(
+        components.get("market_reaction_confirmed")
+    ) is True
     if current_market and not previous_market:
         reasons.append("incident_market_reaction_confirmed")
-    current_causal = bool(getattr(hypothesis, "causal_mechanism_confirmed", False))
-    previous_causal = bool(components.get("causal_mechanism_confirmed"))
+    current_causal = _optional_bool(
+        getattr(hypothesis, "causal_mechanism_confirmed", False)
+    ) is True
+    previous_causal = _optional_bool(
+        components.get("causal_mechanism_confirmed")
+    ) is True
     if current_causal and not previous_causal:
         reasons.append("incident_causal_mechanism_confirmed")
     current_incident_confidence = _optional_float(getattr(hypothesis, "incident_confidence", None)) or 0.0
@@ -372,7 +381,7 @@ def _first_validated_asset(rows: Iterable[object]) -> dict[str, Any]:
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        if not bool(row.get("validated")):
+        if _optional_bool(row.get("validated")) is not True:
             continue
         symbol = str(row.get("symbol") or "").strip().upper()
         coin_id = str(row.get("coin_id") or "").strip()
@@ -432,20 +441,36 @@ def _material_change_reasons(
     previous_sources = _validated_corroboration_count(prior.latest_score_components)
     if current_sources is not None and previous_sources is not None and current_sources > previous_sources:
         reasons.append("new_independent_source")
-    current_time = int(alert.score_components.get("event_time_consensus") or alert.score_components.get("event_time_quality") or 0)
-    previous_time = int(
-        prior.latest_score_components.get("event_time_consensus")
-        or prior.latest_score_components.get("event_time_quality")
-        or 0
+    current_time = _optional_int(
+        alert.score_components.get("event_time_consensus")
     )
+    if current_time is None:
+        current_time = _optional_int(alert.score_components.get("event_time_quality"))
+    current_time = current_time or 0
+    previous_time = _optional_int(
+        prior.latest_score_components.get("event_time_consensus")
+    )
+    if previous_time is None:
+        previous_time = _optional_int(
+            prior.latest_score_components.get("event_time_quality")
+        )
+    previous_time = previous_time or 0
     if current_time >= 75 and current_time > previous_time:
         reasons.append("event_time_upgrade")
-    current_derivatives = int(alert.score_components.get("derivatives_crowding") or 0)
-    previous_derivatives = int(prior.latest_score_components.get("derivatives_crowding") or 0)
+    current_derivatives = _optional_int(
+        alert.score_components.get("derivatives_crowding")
+    ) or 0
+    previous_derivatives = _optional_int(
+        prior.latest_score_components.get("derivatives_crowding")
+    ) or 0
     if current_derivatives >= 50 and (previous_derivatives < 50 or current_derivatives - previous_derivatives >= 20):
         reasons.append("derivatives_crowding_upgrade")
-    current_cluster = int(alert.score_components.get("cluster_confidence") or 0)
-    previous_cluster = int(prior.latest_score_components.get("cluster_confidence") or 0)
+    current_cluster = _optional_int(
+        alert.score_components.get("cluster_confidence")
+    ) or 0
+    previous_cluster = _optional_int(
+        prior.latest_score_components.get("cluster_confidence")
+    ) or 0
     if current_cluster >= 65 and (previous_cluster < 65 or current_cluster - previous_cluster >= 15):
         reasons.append("cluster_confidence_upgrade")
     return tuple(dict.fromkeys(reasons))
@@ -454,7 +479,9 @@ def _material_change_reasons(
 def _score_jump(alert: event_alerts.EventAlertCandidate, prior: EventWatchlistEntry | None) -> int:
     if prior is None:
         return 0
-    return int(alert.opportunity_score) - int(prior.latest_score or 0)
+    return (_optional_int(alert.opportunity_score) or 0) - (
+        _optional_int(prior.latest_score) or 0
+    )
 
 
 def _state_from_alert(

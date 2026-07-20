@@ -1530,9 +1530,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10787,
+  "function_count": 10789,
   "function_line_limit": 150,
-  "functions_over_150_lines": 8,
+  "functions_over_150_lines": 9,
   "functions_over_limit": [
     {
       "function_name": "model_bybit_visible_book_taker_fee_scenario",
@@ -1597,10 +1597,18 @@
       "public": false,
       "qualname": "_impact_cost_lines",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
+    },
+    {
+      "function_name": "_entry_from_row",
+      "line_count": 160,
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
+      "public": false,
+      "qualname": "_entry_from_row",
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 8,
-  "generated_at": "2026-07-20T04:30:27.703042+00:00",
+  "functions_over_limit_count": 9,
+  "generated_at": "2026-07-20T04:46:44.060973+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3159,6 +3167,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1313,
+      "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1310,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3227,7 +3242,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 8,
+  "production_functions_over_limit": 9,
   "production_functions_over_limit_rows": [
     {
       "function_name": "model_bybit_visible_book_taker_fee_scenario",
@@ -3292,6 +3307,14 @@
       "public": false,
       "qualname": "_impact_cost_lines",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
+    },
+    {
+      "function_name": "_entry_from_row",
+      "line_count": 160,
+      "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
+      "public": false,
+      "qualname": "_entry_from_row",
+      "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
   "provider_class_split_status": [
@@ -3747,7 +3770,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 8,
+      "functions_over_150_lines": 9,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -3848,6 +3871,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1313,
+        "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1310,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send.py",
         "threshold": 1200
@@ -3865,11 +3893,6 @@
       {
         "line_count": 1276,
         "path": "crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1275,
-        "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
         "threshold": 1200
       },
       {
@@ -3955,7 +3978,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 8,
+    "functions_over_150_lines": 9,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

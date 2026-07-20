@@ -15,6 +15,7 @@ import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_qua
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 from crypto_rsi_scanner.event_alpha.radar.source_independence import validate_source_independence_contract
 import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
+from .market import _optional_bool, _optional_int
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -528,7 +529,9 @@ def _hypothesis_latest_score_components(
         "downgrade_warnings": list(getattr(hypothesis, "downgrade_warnings", ()) or ())[:8],
         "why_local_only": _optional_str(getattr(hypothesis, "why_local_only", None)),
         "why_not_watchlist": _optional_str(getattr(hypothesis, "why_not_watchlist", None)),
-        "frame_required": bool(getattr(hypothesis, "frame_required", False)),
+        "frame_required": _optional_bool(
+            getattr(hypothesis, "frame_required", False)
+        ) is True,
         "frame_status": _optional_str(getattr(hypothesis, "frame_status", None)),
         "frame_required_reason": _optional_str(getattr(hypothesis, "frame_required_reason", None)),
         "frame_gate_reason": _optional_str(getattr(hypothesis, "frame_gate_reason", None)),
@@ -803,7 +806,11 @@ def _row_entry_quality_state(
         final_state = persisted_final
     else:
         final_state = requested_state
-    state_quality_capped = bool(row.get("state_quality_capped")) if not has_quality else requested_state != final_state
+    state_quality_capped = (
+        _optional_bool(row.get("state_quality_capped")) is True
+        if not has_quality
+        else requested_state != final_state
+    )
     quality_state_block = _normalize_quality_state_block_reason(
         _optional_str(row.get("quality_state_block_reason")) or computed_block,
         quality,
@@ -941,9 +948,13 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             first_triggered_at=_optional_str(row.get("first_triggered_at")),
             first_invalidated_at=_optional_str(row.get("first_invalidated_at")),
             first_expired_at=_optional_str(row.get("first_expired_at")),
-            source_count=int(row.get("source_count") or 0),
-            highest_score=int(row.get("highest_score") or row.get("latest_score") or 0),
-            latest_score=int(row.get("latest_score") or 0),
+            source_count=_optional_int(row.get("source_count")) or 0,
+            highest_score=(
+                _optional_int(row.get("highest_score"))
+                or _optional_int(row.get("latest_score"))
+                or 0
+            ),
+            latest_score=_optional_int(row.get("latest_score")) or 0,
             latest_tier=str(row.get("latest_tier") or ""),
             latest_event_name=str(row.get("latest_event_name") or ""),
             latest_source=str(row.get("latest_source") or ""),
@@ -979,15 +990,23 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             upgrade_requirements=list(quality.get("upgrade_requirements") or []),
             downgrade_warnings=list(quality.get("downgrade_warnings") or []),
             alert_history=list(row.get("alert_history") or []),
-            state_changed=bool(row.get("state_changed")),
-            escalation=bool(row.get("escalation")),
-            score_jump=int(row.get("score_jump") or 0),
-            source_count_increased=bool(row.get("source_count_increased")),
-            event_time_upgraded=bool(row.get("event_time_upgraded")),
-            derivatives_crowding_upgraded=bool(row.get("derivatives_crowding_upgraded")),
-            cluster_confidence_upgraded=bool(row.get("cluster_confidence_upgraded")),
+            state_changed=_optional_bool(row.get("state_changed")) is True,
+            escalation=_optional_bool(row.get("escalation")) is True,
+            score_jump=_optional_int(row.get("score_jump")) or 0,
+            source_count_increased=_optional_bool(
+                row.get("source_count_increased")
+            ) is True,
+            event_time_upgraded=_optional_bool(
+                row.get("event_time_upgraded")
+            ) is True,
+            derivatives_crowding_upgraded=_optional_bool(
+                row.get("derivatives_crowding_upgraded")
+            ) is True,
+            cluster_confidence_upgraded=_optional_bool(
+                row.get("cluster_confidence_upgraded")
+            ) is True,
             material_change_reasons=tuple(str(value) for value in row.get("material_change_reasons") or ()),
-            should_alert=bool(row.get("should_alert")),
+            should_alert=_optional_bool(row.get("should_alert")) is True,
             suppressed_reason=_optional_str(row.get("suppressed_reason")),
             warnings=tuple(str(value) for value in row.get("warnings") or ()),
         )

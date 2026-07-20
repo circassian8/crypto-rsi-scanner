@@ -16,6 +16,7 @@ from crypto_rsi_scanner.event_alpha.radar.source_independence import (
 )
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
+from .relevance import _incident_flag_true
 
 def _row_from_incident(
     incident: event_incident_graph.CanonicalIncident,
@@ -276,7 +277,7 @@ def _incident_market_context(
         }
     best = sorted(candidates, key=lambda row: _float(row.get("market_confirmation_score")), reverse=True)[0]
     reaction_observed = any(
-        bool(row.get("market_reaction_confirmed"))
+        _incident_flag_true(row.get("market_reaction_confirmed"))
         or bool(row.get("market_context_source"))
         or _float(row.get("market_confirmation_score")) > 0
         or str(row.get("market_confirmation_level") or "").casefold() in {"weak", "moderate", "strong"}
@@ -284,9 +285,15 @@ def _incident_market_context(
     )
     return {
         "market_reaction_observed": reaction_observed,
-        "market_reaction_confirmed": any(bool(row.get("market_reaction_confirmed")) for row in candidates),
+        "market_reaction_confirmed": any(
+            _incident_flag_true(row.get("market_reaction_confirmed"))
+            for row in candidates
+        ),
         "market_reaction_level": _value(best, "market_confirmation_level") or "unknown",
-        "causal_mechanism_confirmed": any(bool(row.get("causal_mechanism_confirmed")) for row in candidates),
+        "causal_mechanism_confirmed": any(
+            _incident_flag_true(row.get("causal_mechanism_confirmed"))
+            for row in candidates
+        ),
         "market_context_source": _value(best, "market_context_source"),
         "market_context_asset": _value(best, "validated_symbol") or _value(best, "symbol") or _value(best, "coin_id"),
         "market_context_age": best.get("market_context_age_seconds"),

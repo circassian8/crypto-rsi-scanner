@@ -12,6 +12,94 @@ globals().update({
 })
 
 
+def test_watchlist_persisted_flags_require_semantic_truth(tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as watchlist
+
+    path = tmp_path / "false-like-watchlist.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "event_watchlist_v1",
+                "row_type": "event_watchlist_state",
+                "key": "hypothesis|false-like|security_or_regulatory_shock",
+                "event_id": "hyp:false-like",
+                "coin_id": "false-like",
+                "symbol": "FALSE",
+                "relationship_type": "impact_hypothesis",
+                "state": "RADAR",
+                "last_seen_at": "2026-06-18T12:00:00+00:00",
+                "latest_score": 60,
+                "highest_score": True,
+                "source_count": True,
+                "score_jump": True,
+                "state_quality_capped": "false",
+                "state_changed": "false",
+                "escalation": "off",
+                "source_count_increased": "0",
+                "event_time_upgraded": "no",
+                "derivatives_crowding_upgraded": 2,
+                "cluster_confidence_upgraded": "unknown",
+                "should_alert": "false",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    entry = watchlist.load_watchlist(path).entries[0]
+
+    assert entry.state_quality_capped is False
+    assert entry.source_count == 0
+    assert entry.highest_score == 60
+    assert entry.latest_score == 60
+    assert entry.score_jump == 0
+    assert entry.state_changed is False
+    assert entry.escalation is False
+    assert entry.source_count_increased is False
+    assert entry.event_time_upgraded is False
+    assert entry.derivatives_crowding_upgraded is False
+    assert entry.cluster_confidence_upgraded is False
+    assert entry.should_alert is False
+    assert watchlist._optional_bool(2) is None  # noqa: SLF001
+    assert watchlist._optional_bool("on") is True  # noqa: SLF001
+    assert watchlist._optional_int(True) is None  # noqa: SLF001
+
+    false_hypothesis = SimpleNamespace(
+        market_reaction_confirmed="false",
+        causal_mechanism_confirmed="off",
+    )
+    reasons = watchlist._hypothesis_material_change_reasons(  # noqa: SLF001
+        false_hypothesis,
+        None,
+        watchlist.EventWatchlistState.RADAR,
+        validated=True,
+    )
+    assert "incident_market_reaction_confirmed" not in reasons
+    assert "incident_causal_mechanism_confirmed" not in reasons
+
+    true_hypothesis = SimpleNamespace(
+        market_reaction_confirmed="yes",
+        causal_mechanism_confirmed=1,
+    )
+    true_reasons = watchlist._hypothesis_material_change_reasons(  # noqa: SLF001
+        true_hypothesis,
+        None,
+        watchlist.EventWatchlistState.RADAR,
+        validated=True,
+    )
+    assert "incident_market_reaction_confirmed" in true_reasons
+    assert "incident_causal_mechanism_confirmed" in true_reasons
+
+    assert watchlist._first_validated_asset(  # noqa: SLF001
+        ({"validated": "false", "symbol": "BAD"},)
+    ) == {}
+    assert watchlist._first_validated_asset(  # noqa: SLF001
+        ({"validated": "yes", "symbol": "GOOD"},)
+    )["symbol"] == "GOOD"
+
+
 def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
     import tempfile
     from dataclasses import replace

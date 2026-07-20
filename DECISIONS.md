@@ -19,19 +19,22 @@ decision, rationale, and revisit condition.
 ## 2026-07-20 - Parse Decision Radar policy booleans semantically
 **Status:** accepted
 **Decision:** Market-anomaly classification, Decision catalyst policy,
-integrated route policy, and both Event Fade snapshot-construction boundaries
-must parse boolean-like control fields through an explicit true vocabulary
-instead of Python object truthiness. Text values such as `false`, `0`, `no`,
-and `off`, arbitrary nonzero numbers, and unrecognized text cannot create a
-negative/disproven/not-required catalyst, post-event state/failure,
-derivatives-availability claim, major-pair cap, completed move, fade
-eligibility, confirmed catalyst, catalyst-search request, sector/quote control,
-duplicate suppression, market-reaction/causal confirmation, freshness cap, DEX
-new-pool claim, or proxy/supply/RSI/technical fade confirmation. A derivatives
-representative must carry a real non-empty mapping snapshot. Booleans are not
-numeric market features and cannot become `1.0` confidence, price, funding,
-positioning, liquidation, return, volume, liquidity, pool-age, supply, or RSI-
-score evidence.
+integrated route policy, both Event Fade snapshot-construction boundaries,
+source enrichment/LLM triage, incident projection/linkage, and persisted
+watchlist lifecycle state must parse boolean-like control fields through an
+explicit true vocabulary instead of Python object truthiness. Text values such
+as `false`, `0`, `no`, and `off`, arbitrary nonzero numbers, and unrecognized
+text cannot create a negative/disproven/not-required catalyst, post-event
+state/failure, derivatives-availability claim, major-pair cap, completed move,
+fade eligibility, confirmed catalyst, catalyst-search request, sector/quote
+control, duplicate suppression, real/official/direct-mechanism source claim,
+market-reaction/causal confirmation, incident relevance/validated-asset claim,
+watchlist alert/material-change state, freshness cap, DEX new-pool claim, or
+proxy/supply/RSI/technical fade confirmation. A derivatives representative
+must carry a real non-empty mapping snapshot. Booleans are not numeric market
+features and cannot become `1.0` confidence, source quality, price, funding,
+positioning, liquidation, return, volume, liquidity, pool-age, supply, incident
+market score, watchlist score, or RSI-score evidence.
 **Why:** Python considers every non-empty string truthy and considers booleans
 numeric. Untyped external or compatibility rows could therefore manufacture a
 risk/fade classification, crowding state, priority bonus, or source-knownness

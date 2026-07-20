@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T04:30:24.412777+00:00`
+- generated_at: `2026-07-20T04:46:40.539874+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -19,11 +19,11 @@ Static source inventory only. This report does not call providers, send Telegram
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `8`
+- production_functions_over_limit: `9`
 - test_size_gate_status: `advisory`
 - test_files_over_1500_lines: `3`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `8`
+- functions_over_limit_count: `9`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_count: `0`
@@ -31,7 +31,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - multi_public_class_modules_count: `84`
 - accepted_model_bundles_count: `83`
 - unresolved_multi_class_modules_count: `0`
-- new_violation_count: `13`
+- new_violation_count: `14`
 - moved_existing_violation_count: `0`
 - api_decomposition_gate_status: `advisory`
 - api_files_over_1500_lines: `0`
@@ -67,6 +67,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress` | 256 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness` | 166 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:_impact_cost_lines` | 219 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | 160 |
 
 ## Architecture Gates
 
@@ -82,7 +83,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 2 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 8 | advisory |
+| `functions_over_150_lines` | 9 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -117,11 +118,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 |
 | `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1350 |
 | `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1333 |
+| `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1313 |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1276 |
-| `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1275 |
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
@@ -160,11 +161,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1375 | Static architecture report aggregator preserving compatibility aliases and existing gate counters. | Split when adding a new architecture report family or when report schema v2 removes historical aliases. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 | Historical CLI report compatibility binder with broad scanner-service monkeypatch expectations. | When config/report command bodies move to focused service modules. |
 | `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1333 | The read-only health surface reconciles exact authority, maintenance, provider, request-ledger, and evidence-layer status without runtime inspection. | When health sections have independent golden render fixtures or the system-page contract reaches v2. |
+| `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1313 | Provider/cache enrichment flow is a cohesive behavior-critical boundary. | When adding a new enrichment source or cache policy. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 | Safety-critical no-send generation orchestrator owns one bounded provider call and fail-closed publication assembly. | When adding another live-safe market provider or changing the generation transaction boundary. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 | Pure bounded targeted-review selection keeps outcome-aware categories, evidence bindings, deterministic ranking, and queue finalization in one policy-neutral path. | Split when another review category family or feedback-ledger integration is proposed, with frozen queue-digest fixtures first. |
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 | Stable argparse flag bundle; splitting individual flag groups risks CLI default drift. | Next parser feature addition or when event-alpha flag groups can be snapshot-tested per submodule. |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1276 | Deterministic derivatives crowding evaluator with tightly coupled fixture smoke coverage. | When adding a new derivatives metric family or crowding class. |
-| `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1275 | Provider/cache enrichment flow is a cohesive behavior-critical boundary. | When adding a new enrichment source or cache policy. |
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 | The read-only calendar page keeps coverage, receipt, temporal, filter, and event-card truth in one server-rendered surface. | When the calendar page gains a new interaction family and has byte-stable page-section fixtures. |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 | Static deleted-shim/tombstone registry and report writer; large by design and non-behavioral. | When deleted-shim reporting can be split from old-import linting without changing gate output. |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 | Legacy notification-plan compatibility core; no-send semantics are more important than churn. | When notification plan rows are covered by schema-level golden fixtures. |
@@ -204,13 +205,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_bybit_liquidation_capture.py` | 1369 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1319 |
 | `tests/event_alpha/test_doctor_notifications.py` | 1298 |
+| `tests/event_alpha/test_watchlist_router.py` | 1295 |
 | `tests/event_alpha/test_burn_in_outcomes.py` | 1289 |
 | `tests/event_alpha/test_catalyst_search.py` | 1270 |
 | `tests/event_alpha/test_evidence_acquisition.py` | 1250 |
 | `tests/event_alpha/test_tokenomist_v5_capture.py` | 1247 |
 | `tests/event_alpha/test_daily_operations.py` | 1230 |
 | `tests/event_alpha/test_news_providers.py` | 1210 |
-| `tests/event_alpha/test_watchlist_router.py` | 1207 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 1206 |
 | `tests/event_alpha/test_market_observation_campaign_episodes.py` | 1151 |
 | `tests/event_alpha/test_notification_inbox_rehearsals.py` | 1120 |
@@ -226,7 +227,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_outcome_price_recovery_application.py` | 1038 |
 | `tests/event_alpha/test_empirical_research_reports.py` | 1031 |
 | `tests/test_indicators.py` | 1031 |
-| `tests/event_alpha/test_official_macro_calendar_acquisition.py` | 999 |
+| `tests/event_alpha/test_evidence_quality.py` | 1027 |
 
 ## Files Over 1500 Lines
 

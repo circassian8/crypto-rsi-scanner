@@ -12,12 +12,19 @@ import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_seman
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
+from .relevance import _incident_flag_true
 
 def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     """Return an operator-readable incident artifact report."""
-    include_diagnostic = bool(result.filters.get("include_diagnostic"))
-    include_raw = bool(result.filters.get("include_raw")) or include_diagnostic
-    include_external_context = bool(result.filters.get("include_external_context")) or include_diagnostic
+    include_diagnostic = _incident_flag_true(
+        result.filters.get("include_diagnostic")
+    )
+    include_raw = _incident_flag_true(
+        result.filters.get("include_raw")
+    ) or include_diagnostic
+    include_external_context = _incident_flag_true(
+        result.filters.get("include_external_context")
+    ) or include_diagnostic
     diagnostic_rows = [row for row in result.rows if _is_strict_diagnostic_relevance(row)]
     raw_rows = [row for row in result.rows if _is_raw_observation_relevance(row)]
     external_context_rows = [row for row in result.rows if _is_external_context_relevance(row)]
@@ -91,7 +98,10 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         "market_reaction_unknown_cause: "
         + str(sum(
             1 for row in display_rows
-            if (row.get("market_reaction_observed") or row.get("market_reaction_confirmed"))
+            if (
+                _incident_flag_true(row.get("market_reaction_observed"))
+                or _incident_flag_true(row.get("market_reaction_confirmed"))
+            )
             and row.get("current_cause_status") in {"unknown", "ruled_out"}
         ))
     )
@@ -120,6 +130,12 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     return "\n".join(rows).rstrip()
 def _incident_lines(row: Mapping[str, Any]) -> list[str]:
     assets = row.get("linked_assets") or []
+    frame_disagreement = _incident_flag_true(row.get("frame_rule_disagreement"))
+    reaction_confirmed = _incident_flag_true(row.get("market_reaction_confirmed"))
+    reaction_observed = _incident_flag_true(
+        row.get("market_reaction_observed")
+    ) or reaction_confirmed
+    causal_confirmed = _incident_flag_true(row.get("causal_mechanism_confirmed"))
     asset_text = ", ".join(
         f"{asset.get('symbol') or asset.get('coin_id') or 'asset'}:{asset.get('role') or 'unknown'}"
         for asset in list(assets)[:4]
@@ -146,7 +162,7 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
             f"corrective={len(row.get('corrective_frame_ids') or [])} "
             f"rule={row.get('rule_predicted_impact_path') or 'unknown'} "
             f"llm={row.get('llm_predicted_main_frame_type') or 'unknown'} "
-            f"disagreement={str(bool(row.get('frame_rule_disagreement'))).lower()} "
+            f"disagreement={str(frame_disagreement).lower()} "
             f"resolution={row.get('disagreement_resolution') or 'unknown'} "
             f"context={row.get('background_context_summary') or 'none'}"
         ),
@@ -168,10 +184,10 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
         + (", ".join(str(item) for item in row.get("material_update_reasons") or ()) or "none"),
         (
             "  market_vs_cause: "
-            f"reaction_observed={str(bool(row.get('market_reaction_observed') or row.get('market_reaction_confirmed'))).lower()} "
-            f"reaction_confirmed={str(bool(row.get('market_reaction_confirmed'))).lower()} "
+            f"reaction_observed={str(reaction_observed).lower()} "
+            f"reaction_confirmed={str(reaction_confirmed).lower()} "
             f"level={row.get('market_reaction_level') or 'unknown'} "
-            f"causal={str(bool(row.get('causal_mechanism_confirmed'))).lower()} "
+            f"causal={str(causal_confirmed).lower()} "
             f"source={row.get('market_context_source') or 'none'}"
         ),
     ]

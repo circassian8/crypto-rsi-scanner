@@ -916,3 +916,112 @@ def test_event_source_enrichment_triage_and_fixture_source_quality_judge():
     assert boilerplate is not None
     assert boilerplate.article_quality_status == "boilerplate_heavy"
     assert boilerplate.is_real_article is False
+
+
+def test_source_enrichment_persisted_and_llm_flags_require_semantic_truth():
+    import crypto_rsi_scanner.event_alpha.radar.source_enrichment as source_enrichment
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    bool_confidence = RawDiscoveredEvent(
+        raw_id="bool-confidence",
+        provider="fixture",
+        fetched_at=datetime(2026, 6, 18, 12, tzinfo=timezone.utc),
+        published_at=datetime(2026, 6, 18, 12, tzinfo=timezone.utc),
+        source_url="https://example.test/bool-confidence",
+        title="Token listing announcement",
+        body="A listing catalyst.",
+        raw_json={},
+        source_confidence=True,
+        content_hash="bool-confidence",
+    )
+    assert source_enrichment.should_enrich_source(bool_confidence) is False
+
+    cached = {
+        "article": {
+            "body_text": "A source body with enough text for the cache adapter.",
+            "article_quality_status": source_enrichment.ARTICLE_QUALITY_GOOD,
+            "ticker_sidebar_detected": "false",
+            "boilerplate_ratio": True,
+            "body_char_count": True,
+        },
+        "triage": {
+            "is_real_article": "false",
+            "source_is_official": "0",
+            "source_is_recapped_news": "no",
+            "source_is_affiliate_or_seo": "off",
+            "source_has_direct_token_mechanism": 2,
+            "source_has_candidate_and_catalyst": "unknown",
+            "source_quality_score": True,
+        },
+    }
+    article = source_enrichment._article_from_cache(  # noqa: SLF001
+        cached,
+        fallback_text="fallback",
+    )
+    triage = source_enrichment._triage_from_cache(cached)  # noqa: SLF001
+
+    assert article.ticker_sidebar_detected is False
+    assert article.boilerplate_ratio == 0.0
+    assert article.body_char_count == len(article.body_text)
+    assert triage is not None
+    assert triage.is_real_article is False
+    assert triage.source_is_official is False
+    assert triage.source_is_recapped_news is False
+    assert triage.source_is_affiliate_or_seo is False
+    assert triage.source_has_direct_token_mechanism is False
+    assert triage.source_has_candidate_and_catalyst is False
+    assert triage.source_quality_score == 0.0
+
+    quality = source_enrichment._validate_source_quality_judgment(  # noqa: SLF001
+        {
+            "is_real_article": "false",
+            "article_quality_status": source_enrichment.ARTICLE_QUALITY_GOOD,
+            "source_quality_score": True,
+        },
+        deterministic=None,
+    )
+    llm = source_enrichment.validate_llm_source_triage(
+        {
+            "page_type": "article",
+            "is_real_article": "false",
+            "article_quality": source_enrichment.ARTICLE_QUALITY_GOOD,
+            "boilerplate_ratio_estimate": True,
+            "is_official_source": "0",
+            "is_recap": "no",
+            "is_affiliate_or_seo": "off",
+            "candidate_catalyst_mechanism_present": "false",
+            "evidence_quote": "direct token mechanism",
+            "confidence": True,
+        },
+        source_text="This source describes a direct token mechanism.",
+    )
+
+    assert quality.is_real_article is False
+    assert quality.source_quality_score == 0.0
+    assert llm.is_real_article is False
+    assert llm.is_official_source is False
+    assert llm.is_recap is False
+    assert llm.is_affiliate_or_seo is False
+    assert llm.candidate_catalyst_mechanism_present is False
+    assert llm.boilerplate_ratio_estimate == 0.0
+    assert llm.confidence == 0.0
+    assert "mechanism_without_quote" not in llm.warnings
+
+    explicit_true = source_enrichment.validate_llm_source_triage(
+        {
+            "page_type": "article",
+            "is_real_article": "yes",
+            "article_quality": source_enrichment.ARTICLE_QUALITY_GOOD,
+            "is_official_source": "on",
+            "is_recap": 1,
+            "is_affiliate_or_seo": False,
+            "candidate_catalyst_mechanism_present": "true",
+            "evidence_quote": "direct token mechanism",
+            "confidence": 0.8,
+        },
+        source_text="This source describes a direct token mechanism.",
+    )
+    assert explicit_true.is_real_article is True
+    assert explicit_true.is_official_source is True
+    assert explicit_true.is_recap is True
+    assert explicit_true.candidate_catalyst_mechanism_present is True

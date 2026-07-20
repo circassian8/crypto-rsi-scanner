@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on catalyst context truthiness · Codex
+**Why:** Source-enrichment cache/LLM rows, incident context rows, and persisted
+watchlist rows still accepted Python truthiness. Literal false-like values
+could claim a real or official source, a direct catalyst mechanism, confirmed
+market/causal evidence, a validated incident asset, or an alert/material-change
+state; Boolean confidence and quality values could also become numeric evidence.
+**Changes:**
+- Added explicit semantic-true parsing across source cache reconstruction,
+  source-quality judgments, LLM source triage, incident context/relevance/report
+  projection, incident-watchlist linkage, and watchlist lifecycle reads.
+- Rejected booleans and non-finite values from source confidence/quality,
+  incident market scores, and persisted watchlist numeric adapters. Arbitrary
+  nonzero numerics no longer count as boolean source, incident, validation, or
+  watchlist evidence.
+- Added end-to-end regressions for false-like and explicit-true cached source,
+  LLM, incident, report-filter, watchlist alert, material-change, and validated-
+  asset fields.
+**Verify:** 101 focused source-quality/cache, catalyst-search, artifact-schema,
+incident-relevance/claim, CoreOpportunity, source-coverage, and watchlist tests
+passed, including the 3 new boundary regressions. Compileall, the impact-
+hypothesis smoke, and the full integrated-radar smoke passed; the integrated
+strict doctor reported 0 blockers and 0 warnings and its dashboard rendered 14
+pages. Architecture cleanliness, exact live dashboard readiness, and `git diff
+--check` passed; its 14 quantitative size observations are advisory only.
+**Notes/risks:** Canonical booleans and explicit `true`/`1`/`yes`/`on` values
+remain supported. No threshold, score weight, provider call, authorization,
+send, trade, order, paper trade, normal RSI write, or `TRIGGERED_FADE` ownership
+changed. Full `make verify` was not repeated because the immediately preceding
+release gate plus the focused and end-to-end gates cover this boundary-only
+hardening.
+
 ## 2026-07-20 — Harden Event Fade snapshot semantics · Codex
 **Why:** Event Fade is the only component permitted to own the
 `event_fade.py` + `proxy_fade` `TRIGGERED_FADE` path, but its JSON and discovery

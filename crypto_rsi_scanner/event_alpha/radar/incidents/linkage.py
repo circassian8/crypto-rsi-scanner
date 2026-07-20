@@ -12,6 +12,7 @@ import crypto_rsi_scanner.event_alpha.radar.claim_semantics as event_claim_seman
 import crypto_rsi_scanner.event_alpha.radar.incident_graph as event_incident_graph
 from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, RawDiscoveredEvent
 from .models import *  # noqa: F403
+from .relevance import _incident_flag_true
 
 def _unqualified_persistence_reason(link_quality: IncidentLinkQuality) -> str | None:
     if link_quality.qualified_watchlist_count > 0:
@@ -41,7 +42,9 @@ def _has_active_watchlist_row(rows: Iterable[Mapping[str, Any]]) -> bool:
             or row.get("state")
             or ""
         ).strip().upper()
-        if state in _ACTIVE_WATCHLIST_STATES or bool(row.get("should_alert")):
+        if state in _ACTIVE_WATCHLIST_STATES or _incident_flag_true(
+            row.get("should_alert")
+        ):
             return True
     return False
 def _strong_sector_hypothesis(row: Mapping[str, Any], *, incident: event_incident_graph.CanonicalIncident) -> bool:
@@ -66,7 +69,10 @@ def _has_explicit_material_update(
             continue
         if row.get("material_change_reasons"):
             return True
-        if bool(row.get("state_changed") or row.get("escalation")) and _has_active_watchlist_row((row,)):
+        if (
+            _incident_flag_true(row.get("state_changed"))
+            or _incident_flag_true(row.get("escalation"))
+        ) and _has_active_watchlist_row((row,)):
             return True
     return False
 def _watchlist_by_incident(watchlist_rows: Iterable[Mapping[str, Any] | object]) -> dict[str, list[Mapping[str, Any] | object]]:
@@ -101,7 +107,9 @@ def _linked_assets(
         validated_asset = row.get("validated_asset") if isinstance(row.get("validated_asset"), Mapping) else {}
         symbol = _value(row, "validated_symbol") or _value(validated_asset, "symbol")
         coin_id = _value(row, "validated_coin_id") or _value(validated_asset, "coin_id")
-        validated_identity = bool(symbol or coin_id or validated_asset.get("validated"))
+        validated_identity = bool(symbol or coin_id) or _incident_flag_true(
+            validated_asset.get("validated")
+        )
         if not symbol:
             symbols = row.get("candidate_symbols") or ()
             symbol = str(symbols[0]).upper() if symbols else ""

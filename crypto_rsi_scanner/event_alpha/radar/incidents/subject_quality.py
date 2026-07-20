@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -257,7 +258,7 @@ def _high_quality_external_candidate(
     if incident.event_archetype not in _EXTERNAL_CATALYST_ARCHETYPES:
         return False
     confidences = [
-        float(raw_by_id[raw_id].source_confidence or 0.0)
+        _float(raw_by_id[raw_id].source_confidence)
         for raw_id in incident.raw_ids
         if raw_id in raw_by_id
     ]
@@ -458,10 +459,13 @@ def _value(row: Mapping[str, Any], key: str) -> str:
     value = row.get(key)
     return str(value).strip() if value not in (None, "", [], {}) else ""
 def _float(value: Any) -> float:
+    if isinstance(value, bool):
+        return 0.0
     try:
-        return float(value or 0.0)
+        parsed = float(value or 0.0)
     except (TypeError, ValueError):
         return 0.0
+    return parsed if math.isfinite(parsed) else 0.0
 def _iso(value: object) -> str | None:
     if isinstance(value, datetime):
         dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)

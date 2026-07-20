@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -35,12 +36,15 @@ def _optional_str(value: Any) -> str | None:
 
 
 def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value in (None, ""):
             return None
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _optional_bool(value: Any) -> bool | None:
@@ -49,11 +53,15 @@ def _optional_bool(value: Any) -> bool | None:
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):
-        return bool(value)
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+        return None
     text = str(value).strip().casefold()
-    if text in {"true", "1", "yes", "y"}:
+    if text in {"true", "1", "1.0", "yes", "y", "on"}:
         return True
-    if text in {"false", "0", "no", "n"}:
+    if text in {"false", "0", "0.0", "no", "n", "off"}:
         return False
     return None
 
@@ -72,11 +80,13 @@ def _item_count(value: Any) -> int:
 
 
 def _optional_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value in (None, ""):
             return None
         return int(value)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
 
 

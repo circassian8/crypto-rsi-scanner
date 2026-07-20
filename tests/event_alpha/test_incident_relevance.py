@@ -12,6 +12,75 @@ globals().update({
 })
 
 
+def test_incident_policy_flags_require_semantic_truth():
+    from pathlib import Path
+
+    import crypto_rsi_scanner.event_alpha.radar.incidents as incidents
+
+    false_context = incidents._incident_market_context(  # noqa: SLF001
+        [
+            {
+                "market_reaction_confirmed": "false",
+                "causal_mechanism_confirmed": "off",
+                "market_confirmation_score": True,
+                "market_confirmation_level": "none",
+            }
+        ],
+        [],
+    )
+    true_context = incidents._incident_market_context(  # noqa: SLF001
+        [
+            {
+                "market_reaction_confirmed": "yes",
+                "causal_mechanism_confirmed": 1,
+                "market_confirmation_score": 80,
+                "market_confirmation_level": "strong",
+            }
+        ],
+        [],
+    )
+
+    assert false_context["market_reaction_observed"] is False
+    assert false_context["market_reaction_confirmed"] is False
+    assert false_context["causal_mechanism_confirmed"] is False
+    assert true_context["market_reaction_observed"] is True
+    assert true_context["market_reaction_confirmed"] is True
+    assert true_context["causal_mechanism_confirmed"] is True
+
+    effective = incidents._row_with_effective_relevance(  # noqa: SLF001
+        {
+            "incident_id": "incident:false-like",
+            "canonical_name": "False-like incident",
+            "event_archetype": "unknown",
+            "diagnostic_only": "false",
+            "market_reaction_observed": "false",
+            "market_reaction_confirmed": "off",
+            "causal_mechanism_confirmed": "no",
+        }
+    )
+    assert effective["incident_relevance_status"] == "raw_observation"
+    assert effective["diagnostic_hidden_by_default"] is True
+    assert incidents._has_active_watchlist_row(  # noqa: SLF001
+        ({"state": "QUALITY_BLOCKED", "should_alert": "false"},)
+    ) is False
+
+    result = incidents.EventIncidentStoreReadResult(
+        path=Path("event_incidents.jsonl"),
+        rows_read=1,
+        rows=[effective],
+        total_rows_read=1,
+        filters={"include_raw": "false", "include_diagnostic": "off"},
+    )
+    report = incidents.format_incidents_report(result)
+    assert "raw_observation_rows_hidden: 1" in report
+    assert "No stored incidents matched" in report
+
+    lines = "\n".join(incidents._incident_lines(effective))  # noqa: SLF001
+    assert "reaction_observed=false" in lines
+    assert "reaction_confirmed=false" in lines
+    assert "causal=false" in lines
+
+
 def test_event_incident_relevance_gates_raw_external_observations():
     import tempfile
     from datetime import datetime, timezone
