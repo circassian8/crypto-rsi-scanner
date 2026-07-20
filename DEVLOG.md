@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on malformed Decision safety claims · Codex
+**Why:** Decision safety recursively found actual sends/trades and required the
+root `research_only=true`, but several explicit malformed values still looked
+safe. Reproduced `execution_enabled=[]`, string zero send counts, and nested
+`research_only="false"` could retain an actionable route.
+**Changes:** Every present nested `research_only` claim must now be semantic
+boolean true. Send/execution/paper/RSI/alert controls require exact boolean
+false, while side-effect counters require a finite numeric zero. The historical
+`triggered_fade_created` field retains its documented counter semantics and
+therefore accepts exact false or numeric zero. Missing fields remain absent
+rather than fabricated, and any malformed explicit claim fails the existing
+research-safety hard gate. Secret/path behavior, score formulas, thresholds,
+routes, and provider boundaries are unchanged.
+**Verify:** The malformed reproductions now route `diagnostic` with
+`research_safety_invariant_failed`, while exact false/zero controls preserve the
+original actionable result. All `60` focused Decision tests passed, followed by
+`125` safety, schema, consistency, surface, merge, and pipeline tests. `make
+event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15 candidates,
+12 canonical cores/cards, strict doctor 0 blockers / 0 warnings, and 14
+dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and `git
+diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Require typed Decision identity and tradability · Codex
 **Why:** Decision v2 independently trusted already-enriched candidate fields and
 still coerced identity with `str()`. A reproduced boolean or mapping canonical

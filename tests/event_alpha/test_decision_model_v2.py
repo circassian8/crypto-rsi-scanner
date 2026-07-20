@@ -750,6 +750,41 @@ def test_nested_and_source_row_safety_failures_hard_block_promotion():
     assert "operator_path_safety_failed" in source_path.decision_hard_blockers
 
 
+def test_malformed_side_effect_and_research_only_claims_fail_closed():
+    from crypto_rsi_scanner.event_alpha.radar.decision_safety import (
+        source_safety_attestations,
+    )
+
+    malformed_candidates = (
+        _market_led_candidate(execution_enabled=[]),
+        _market_led_candidate(notification_send_enabled="false"),
+        _market_led_candidate(telegram_sends="0"),
+        _market_led_candidate(strict_alerts_created=None),
+        _market_led_candidate(source_context={"research_only": "false"}),
+    )
+    for row in malformed_candidates:
+        result = decision_model.evaluate_radar_decision(row)
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "research_safety_invariant_failed" in result.decision_hard_blockers
+
+    safe = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            execution_enabled=False,
+            notification_send_enabled=False,
+            telegram_sends=0,
+            strict_alerts_created=0.0,
+            source_context={"research_only": True},
+        )
+    )
+    assert safe.radar_actionable is True
+    assert safe.decision_hard_blockers == ()
+    assert source_safety_attestations(
+        [{"research_only": "false"}]
+    )["decision_source_side_effect_safety_failed"] is True
+
+
 def test_integrated_source_safety_attestations_survive_final_reevaluation():
     from crypto_rsi_scanner.event_alpha.radar.integrated_radar import build_integrated_candidates
     from crypto_rsi_scanner.event_alpha.radar.decision_safety import source_safety_attestations

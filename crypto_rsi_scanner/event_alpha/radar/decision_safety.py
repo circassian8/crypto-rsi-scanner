@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+import math
 from pathlib import Path
 from typing import Any
 
@@ -61,16 +62,27 @@ def has_unsafe_side_effect(data: Mapping[str, Any]) -> bool:
 
 
 def _mapping_has_unsafe_side_effect(data: Mapping[str, Any]) -> bool:
-    if data.get("research_only") is False:
+    if "research_only" in data and data.get("research_only") is not True:
         return True
-    fields = (
-        "normal_rsi_signal_written", "normal_rsi_signal_rows_written",
-        "triggered_fade_created", "trade_created", "trades_created",
-        "paper_trade_created", "paper_trades_created", "created_alert",
+    boolean_fields = (
+        "normal_rsi_signal_written", "trade_created",
+        "paper_trade_created", "created_alert",
         "notification_send_enabled", "execution_enabled", "paper_trading_enabled",
-        "normal_rsi_routing_enabled", "sent", "telegram_sends", "strict_alerts_created",
+        "normal_rsi_routing_enabled", "sent",
     )
-    return any(_truthy(data.get(field)) for field in fields)
+    if any(
+        field in data and data.get(field) is not False
+        for field in boolean_fields
+    ):
+        return True
+    counter_fields = (
+        "normal_rsi_signal_rows_written", "trades_created", "paper_trades_created",
+        "triggered_fade_created", "telegram_sends", "strict_alerts_created",
+    )
+    return any(
+        field in data and not _safe_zero_counter(data.get(field))
+        for field in counter_fields
+    )
 
 
 def has_unredacted_secret(data: Mapping[str, Any]) -> bool:
@@ -136,12 +148,12 @@ def _mapping_tree(value: object) -> Iterable[Mapping[str, Any]]:
             yield from _mapping_tree(child)
 
 
-def _truthy(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
+def _safe_zero_counter(value: object) -> bool:
+    if value is False:
+        return True
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(float(value)) and float(value) == 0.0
 
 
 __all__ = (
