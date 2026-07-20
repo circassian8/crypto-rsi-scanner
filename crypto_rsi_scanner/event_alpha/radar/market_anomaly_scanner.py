@@ -620,9 +620,16 @@ def _asset_rows(
     assets: list[event_asset_registry.CanonicalAsset] = []
     for row in rows:
         if isinstance(row, event_asset_registry.CanonicalAsset):
-            assets.append(row)
+            asset = event_asset_registry.CanonicalAsset.from_mapping(vars(row))
         elif isinstance(row, Mapping):
-            assets.append(event_asset_registry.CanonicalAsset.from_mapping(row, source="market_anomaly_registry"))
+            asset = event_asset_registry.CanonicalAsset.from_mapping(
+                row,
+                source="market_anomaly_registry",
+            )
+        else:
+            continue
+        if event_asset_registry.canonical_asset_identity_valid(asset):
+            assets.append(asset)
     return assets
 
 
@@ -632,17 +639,26 @@ def _assets_from_universe_rows(rows: Iterable[Mapping[str, Any]]) -> list[event_
         if not isinstance(row, Mapping):
             continue
         symbol = event_asset_registry.normalize_symbol(row.get("symbol"))
-        coin_id = str(row.get("coin_id") or row.get("id") or "").strip()
+        coin_id = _first_typed_text(row, "coin_id", "id")
         if not symbol or not coin_id:
             continue
+        canonical_claimed = (
+            "canonical_asset_id" in row
+            and row.get("canonical_asset_id") is not None
+            and row.get("canonical_asset_id") != ""
+        )
+        canonical_asset_id = _text(row.get("canonical_asset_id")) if canonical_claimed else coin_id
+        if not canonical_asset_id:
+            continue
+        name = _text(row.get("name"))
         is_quote = symbol in event_asset_registry.QUOTE_ASSETS
         is_theme = symbol in event_asset_registry.THEME_OR_SECTOR_SYMBOLS
         assets.append(event_asset_registry.CanonicalAsset(
-            canonical_asset_id=str(row.get("canonical_asset_id") or coin_id),
+            canonical_asset_id=canonical_asset_id,
             symbol=symbol,
             coin_id=coin_id,
-            name=str(row.get("name") or "") or None,
-            aliases=tuple(dict.fromkeys(str(item) for item in (symbol, coin_id, row.get("name")) if str(item or ""))),
+            name=name or None,
+            aliases=tuple(dict.fromkeys(item for item in (symbol, coin_id, name) if item)),
             is_quote_asset=is_quote,
             quote_asset_excluded=is_quote,
             major_base_asset=symbol in event_asset_registry.MAJOR_BASE_ASSETS,
@@ -725,11 +741,11 @@ def _merge_universe_metadata(row: dict[str, Any], universe_row: Mapping[str, Any
 
 
 def _merge_asset_metadata(row: dict[str, Any], asset: event_asset_registry.CanonicalAsset) -> None:
-    if not row.get("canonical_asset_id"):
+    if "canonical_asset_id" not in row or row.get("canonical_asset_id") in (None, ""):
         row["canonical_asset_id"] = asset.canonical_asset_id
-    if not row.get("coin_id") and asset.coin_id:
+    if ("coin_id" not in row or row.get("coin_id") in (None, "")) and asset.coin_id:
         row["coin_id"] = asset.coin_id
-    if not row.get("symbol") and asset.symbol:
+    if ("symbol" not in row or row.get("symbol") in (None, "")) and asset.symbol:
         row["symbol"] = asset.symbol
     row["asset_registry_symbol"] = asset.symbol
     row["asset_registry_coin_id"] = asset.coin_id

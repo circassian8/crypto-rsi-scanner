@@ -21,8 +21,11 @@ from .canonical_asset import (
     CanonicalAsset,
     _bool,
     _contracts,
+    _first_collection_claim,
+    _first_text_claim,
     _text,
     _tuple,
+    canonical_asset_identity_valid,
     is_quote_asset_symbol,
     is_theme_or_sector_symbol,
     normalize_symbol,
@@ -46,11 +49,12 @@ def load_asset_registry(path: str | Path | None) -> tuple[CanonicalAsset, ...]:
     rows = data.get("assets") if isinstance(data, Mapping) else data
     if not isinstance(rows, list):
         return ()
-    return tuple(
+    assets = (
         CanonicalAsset.from_mapping(row, source="fixture_registry")
         for row in rows
         if isinstance(row, Mapping)
     )
+    return tuple(asset for asset in assets if canonical_asset_identity_valid(asset))
 
 
 def load_asset_registry_artifact(path_or_dir: str | Path | None) -> tuple[CanonicalAsset, ...]:
@@ -82,17 +86,20 @@ def assets_from_coingecko_universe(path: str | Path | None) -> tuple[CanonicalAs
         if not isinstance(row, Mapping):
             continue
         symbol = normalize_symbol(row.get("symbol"))
-        coin_id = _text(row.get("id") or row.get("coin_id"))
+        coin_id, _coin_id_claimed = _first_text_claim(row, "id", "coin_id")
         if not symbol or not coin_id:
             continue
+        name = _text(row.get("name"))
         assets.append(
             CanonicalAsset(
                 canonical_asset_id=coin_id,
                 symbol=symbol,
                 coin_id=coin_id,
-                name=_text(row.get("name")),
-                aliases=tuple(dict.fromkeys((symbol, coin_id, _text(row.get("name"))))),
-                contracts_by_chain=_contracts(row.get("platforms") or row.get("contracts_by_chain")),
+                name=name,
+                aliases=tuple(dict.fromkeys(item for item in (symbol, coin_id, name) if item)),
+                contracts_by_chain=_contracts(
+                    _first_collection_claim(row, "platforms", "contracts_by_chain")[0]
+                ),
                 is_quote_asset=symbol in QUOTE_ASSETS,
                 quote_asset_excluded=symbol in QUOTE_ASSETS,
                 base_asset_excluded=False,
@@ -114,15 +121,42 @@ def assets_from_official_exchange(rows: Iterable[Mapping[str, Any]]) -> tuple[Ca
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        exchange = _text(row.get("exchange") or row.get("provider")) or "official_exchange"
-        scope = _text(row.get("listing_scope") or row.get("event_type"))
+        exchange = _first_text_claim(row, "exchange", "provider")[0] or "official_exchange"
+        scope = _first_text_claim(row, "listing_scope", "event_type")[0]
+        primary_symbol, primary_symbol_claimed = _first_text_claim(
+            row,
+            "symbol",
+            "validated_symbol",
+            "asset_symbol",
+        )
+        symbols_value, symbols_claimed = _first_collection_claim(
+            row,
+            "symbols",
+            "announcement_symbols",
+        )
+        coin_ids_value, coin_ids_claimed = _first_collection_claim(row, "coin_ids")
+        pairs_value, pairs_claimed = _first_collection_claim(row, "pairs")
+        if (
+            primary_symbol_claimed
+            and not primary_symbol
+            or symbols_claimed
+            and not _tuple(symbols_value)
+            or coin_ids_claimed
+            and not _tuple(coin_ids_value)
+            or pairs_claimed
+            and not _tuple(pairs_value)
+        ):
+            continue
         symbols = _candidate_symbols(row)
-        coin_ids = _tuple(row.get("coin_ids"))
-        pairs = _tuple(row.get("pairs"))
+        coin_ids = _tuple(coin_ids_value) if coin_ids_claimed else ()
+        pairs = _tuple(pairs_value) if pairs_claimed else ()
         if not symbols and pairs:
             symbols = tuple(dict.fromkeys(_pair_base_symbol(pair) for pair in pairs if _pair_base_symbol(pair)))
         for idx, symbol in enumerate(symbols):
-            coin_id = _text(row.get("coin_id")) or (coin_ids[idx] if idx < len(coin_ids) else None) or symbol.casefold()
+            explicit_coin_id, coin_id_claimed = _first_text_claim(row, "coin_id")
+            if coin_id_claimed and not explicit_coin_id:
+                continue
+            coin_id = explicit_coin_id or (coin_ids[idx] if idx < len(coin_ids) else None) or symbol.casefold()
             bybit_symbols = pairs if "bybit" in exchange.casefold() else ()
             binance_symbols = pairs if "binance" in exchange.casefold() else ()
             spot_symbols = pairs if scope in {"spot", "new_trading_pair", "spot_listing"} else ()
@@ -166,16 +200,25 @@ def assets_from_coinalyze(rows: Iterable[Mapping[str, Any]]) -> tuple[CanonicalA
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        market_symbol = _text(
-            row.get("coinalyze_symbol")
-            or row.get("market_symbol")
-            or row.get("market")
-            or row.get("symbol")
+        market_symbol, market_symbol_claimed = _first_text_claim(
+            row,
+            "coinalyze_symbol",
+            "market_symbol",
+            "market",
+            "symbol",
         )
-        base_symbol = normalize_symbol(row.get("base_symbol") or row.get("base_asset") or _base_from_market_symbol(market_symbol))
+        if market_symbol_claimed and not market_symbol:
+            continue
+        base_symbol_text, base_symbol_claimed = _first_text_claim(row, "base_symbol", "base_asset")
+        base_symbol = normalize_symbol(
+            base_symbol_text if base_symbol_claimed else _base_from_market_symbol(market_symbol)
+        )
         if not base_symbol:
             continue
-        coin_id = _text(row.get("coin_id") or row.get("validated_coin_id")) or base_symbol.casefold()
+        coin_id, coin_id_claimed = _first_text_claim(row, "coin_id", "validated_coin_id")
+        if coin_id_claimed and not coin_id:
+            continue
+        coin_id = coin_id or base_symbol.casefold()
         is_quote = base_symbol in QUOTE_ASSETS
         assets.append(
             CanonicalAsset(
@@ -230,7 +273,16 @@ def write_asset_registry_artifact(
     directory = Path(namespace_dir).expanduser()
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / ASSET_REGISTRY_JSON
-    rows = tuple(registry)
+    raw_rows = tuple(registry)
+    rows = tuple(
+        CanonicalAsset.from_mapping(vars(asset))
+        for asset in raw_rows
+        if isinstance(asset, CanonicalAsset)
+    )
+    if len(rows) != len(raw_rows) or any(
+        not canonical_asset_identity_valid(asset) for asset in rows
+    ):
+        raise ValueError("asset registry contains malformed canonical identity")
     payload = {
         "schema_version": 1,
         "row_type": "event_asset_registry",
@@ -248,6 +300,8 @@ def write_asset_registry_artifact(
 
 
 def registry_index_keys(asset: CanonicalAsset) -> tuple[str, ...]:
+    if not canonical_asset_identity_valid(asset):
+        return ()
     keys: list[str] = []
     for value in (
         asset.canonical_asset_id,
@@ -324,7 +378,10 @@ def _merge_assets(assets: Iterable[CanonicalAsset]) -> tuple[CanonicalAsset, ...
     records: dict[str, dict[str, Any]] = {}
     key_index: dict[str, str] = {}
     for asset in assets:
-        if not asset.canonical_asset_id or not asset.symbol:
+        if not isinstance(asset, CanonicalAsset):
+            continue
+        asset = CanonicalAsset.from_mapping(vars(asset), source=_text(asset.source))
+        if not canonical_asset_identity_valid(asset):
             continue
         incoming = asset.to_dict()
         target_id = None
@@ -371,8 +428,9 @@ def _merge_record(existing: dict[str, Any], incoming: Mapping[str, Any]) -> dict
 
 
 def _candidate_symbols(row: Mapping[str, Any]) -> tuple[str, ...]:
-    symbol = normalize_symbol(row.get("symbol") or row.get("validated_symbol") or row.get("asset_symbol"))
-    symbols = _tuple(row.get("symbols") or row.get("announcement_symbols"))
+    symbol = normalize_symbol(_first_text_claim(row, "symbol", "validated_symbol", "asset_symbol")[0])
+    symbols_value, symbols_claimed = _first_collection_claim(row, "symbols", "announcement_symbols")
+    symbols = _tuple(symbols_value) if symbols_claimed else ()
     normalized = [normalize_symbol(item) for item in ((*symbols, symbol) if symbol else symbols)]
     return tuple(dict.fromkeys(item for item in normalized if item))
 
@@ -390,7 +448,7 @@ def _base_from_market_symbol(value: Any) -> str:
 
 
 def _pair_base_symbol(pair: str) -> str:
-    text = str(pair or "").strip()
+    text = _text(pair)
     if "/" in text:
         return normalize_symbol(text.split("/", 1)[0])
     return _base_from_market_symbol(text)

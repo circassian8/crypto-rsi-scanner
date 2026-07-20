@@ -98,6 +98,10 @@ def resolve_row(
     reason_codes = list(dict.fromkeys(_list(enriched.get("reason_codes"))))
     asset = match.asset
     status = "unresolved"
+    if match.reason == "invalid_canonical_asset_id":
+        enriched["canonical_asset_id"] = None
+        resolver_warnings.append("canonical_asset_identity_invalid")
+        reason_codes.append("canonical_asset_identity_invalid")
     identity_trusted = _trusted_identity_match(
         original,
         asset,
@@ -368,13 +372,47 @@ def artifact_conflicts(namespace_dir: str | Path | None) -> dict[str, int]:
 
 class _ResolverIndex:
     def __init__(self, registry: Iterable[event_asset_registry.CanonicalAsset]):
-        self.registry = tuple(registry)
+        projected_assets = (
+            event_asset_registry.CanonicalAsset.from_mapping(vars(asset))
+            for asset in registry
+            if isinstance(asset, event_asset_registry.CanonicalAsset)
+        )
+        self.registry = tuple(
+            asset
+            for asset in projected_assets
+            if event_asset_registry.canonical_asset_identity_valid(asset)
+        )
         self.by_key: dict[str, list[event_asset_registry.CanonicalAsset]] = {}
         for asset in self.registry:
             for key in event_asset_registry.registry_index_keys(asset):
                 self.by_key.setdefault(key, []).append(asset)
 
     def match(self, row: Mapping[str, Any]) -> ResolutionMatch:
+        canonical_id, canonical_id_claimed = _text_claim(row, "canonical_asset_id")
+        if canonical_id_claimed:
+            if not canonical_id:
+                return ResolutionMatch(
+                    asset=None,
+                    confidence=0.0,
+                    reason="invalid_canonical_asset_id",
+                    input_identifier=None,
+                )
+            for key in event_asset_registry.identifier_key_variants(canonical_id):
+                matches = self.by_key.get(key)
+                if matches:
+                    asset = sorted(matches, key=lambda item: _asset_preference(item), reverse=True)[0]
+                    return ResolutionMatch(
+                        asset=asset,
+                        confidence=1.0,
+                        reason="canonical_asset_id_exact",
+                        input_identifier=canonical_id,
+                    )
+            return ResolutionMatch(
+                asset=None,
+                confidence=0.0,
+                reason="canonical_asset_id_unresolved",
+                input_identifier=canonical_id,
+            )
         identifiers = _row_identifiers(row)
         for value, reason, confidence in identifiers:
             for key in event_asset_registry.identifier_key_variants(value):
@@ -387,8 +425,6 @@ class _ResolverIndex:
 
 def _row_identifiers(row: Mapping[str, Any]) -> tuple[tuple[str, str, float], ...]:
     values: list[tuple[str, str, float]] = []
-    for key in ("canonical_asset_id",):
-        _append_identifier(values, row.get(key), f"{key}_exact", 1.0)
     for key in ("validated_coin_id", "coin_id", "asset_coin_id"):
         _append_identifier(values, row.get(key), f"{key}_exact", 0.98)
     for key in ("asset_registry_coin_id", "asset_registry_symbol"):
@@ -496,17 +532,22 @@ def _list(value: Any) -> tuple[str, ...]:
         return ()
     if isinstance(value, str):
         return (value,)
-    if isinstance(value, Mapping):
-        return tuple(str(key) for key in value)
-    if isinstance(value, Iterable):
-        return tuple(str(item) for item in value if str(item))
-    return (str(value),)
+    if isinstance(value, Iterable) and not isinstance(value, (Mapping, bytes, bytearray)):
+        return tuple(text for item in value if (text := _text(item)))
+    return ()
 
 
 def _text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _text_claim(row: Mapping[str, Any], key: str) -> tuple[str, bool]:
+    if key not in row:
+        return "", False
+    value = row.get(key)
+    if value is None or value == "":
+        return "", False
+    return _text(value), True
 
 
 def _bool(value: Any) -> bool:

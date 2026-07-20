@@ -52,9 +52,12 @@ def canonical_asset_from_mapping(
     *,
     source: str | None = None,
 ) -> CanonicalAsset:
-    symbol = normalize_symbol(row.get("symbol") or row.get("base_symbol") or "")
-    coin_id = _text(row.get("coin_id"))
-    canonical_id = _text(row.get("canonical_asset_id")) or coin_id or symbol.casefold()
+    symbol_text, _symbol_claimed = _first_text_claim(row, "symbol", "base_symbol")
+    symbol = normalize_symbol(symbol_text)
+    coin_id, coin_id_claimed = _first_text_claim(row, "coin_id")
+    canonical_id, canonical_id_claimed = _first_text_claim(row, "canonical_asset_id")
+    if not canonical_id_claimed:
+        canonical_id = "" if coin_id_claimed and not coin_id else coin_id or symbol.casefold()
     is_quote = _bool(row.get("is_quote_asset")) or symbol in QUOTE_ASSETS
     is_theme = _bool(row.get("is_theme_or_sector")) or symbol in THEME_OR_SECTOR_SYMBOLS
     diagnostics_reason = _text(row.get("diagnostics_reason"))
@@ -68,7 +71,9 @@ def canonical_asset_from_mapping(
         coin_id=coin_id,
         name=_text(row.get("name")),
         aliases=_tuple(row.get("aliases")),
-        contracts_by_chain=_contracts(row.get("contracts_by_chain") or row.get("contracts")),
+        contracts_by_chain=_contracts(
+            _first_collection_claim(row, "contracts_by_chain", "contracts")[0]
+        ),
         is_quote_asset=is_quote,
         quote_asset_excluded=_bool(row.get("quote_asset_excluded")) or is_quote,
         base_asset_excluded=_bool(row.get("base_asset_excluded")),
@@ -89,8 +94,8 @@ def canonical_asset_from_mapping(
         ),
         is_theme_or_sector=is_theme,
         diagnostics_reason=diagnostics_reason,
-        asset_role=_text(row.get("asset_role") or row.get("role")),
-        source=source or _text(row.get("source")),
+        asset_role=_first_text_claim(row, "asset_role", "role")[0],
+        source=_text(source) or _text(row.get("source")),
     )
 
 
@@ -127,6 +132,17 @@ def normalize_symbol(value: Any) -> str:
     return _text(value).strip().upper()
 
 
+def canonical_asset_identity_valid(asset: CanonicalAsset) -> bool:
+    """Return whether the canonical identity is real, non-empty text."""
+
+    return bool(
+        isinstance(asset.canonical_asset_id, str)
+        and asset.canonical_asset_id.strip()
+        and isinstance(asset.symbol, str)
+        and asset.symbol.strip()
+    )
+
+
 def quote_asset_symbols() -> tuple[str, ...]:
     return tuple(sorted(QUOTE_ASSETS))
 
@@ -144,13 +160,13 @@ def _contracts(value: Any) -> dict[str, tuple[str, ...]]:
         return {}
     out: dict[str, tuple[str, ...]] = {}
     for chain, addresses in value.items():
-        chain_key = str(chain or "").strip().casefold()
+        chain_key = _text(chain).casefold()
         if not chain_key:
             continue
         if isinstance(addresses, str):
             values = (addresses,)
-        elif isinstance(addresses, Iterable):
-            values = tuple(str(item).strip() for item in addresses if str(item).strip())
+        elif isinstance(addresses, Iterable) and not isinstance(addresses, (Mapping, bytes, bytearray)):
+            values = tuple(text for item in addresses if (text := _text(item)))
         else:
             continue
         if values:
@@ -163,19 +179,43 @@ def _tuple(value: Any) -> tuple[str, ...]:
         return ()
     if isinstance(value, str):
         values = (value,)
-    elif isinstance(value, Mapping):
-        values = tuple(str(key) for key in value)
-    elif isinstance(value, Iterable):
-        values = tuple(str(item) for item in value)
+    elif isinstance(value, Iterable) and not isinstance(value, (Mapping, bytes, bytearray)):
+        values = tuple(text for item in value if (text := _text(item)))
     else:
-        values = (str(value),)
-    return tuple(dict.fromkeys(item.strip() for item in values if item and item.strip()))
+        values = ()
+    return tuple(dict.fromkeys(item.strip() for item in values if item.strip()))
 
 
 def _text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _first_text_claim(row: Mapping[str, Any], *keys: str) -> tuple[str, bool]:
+    """Resolve typed aliases while preserving an invalid explicit claim."""
+
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return _text(value), True
+    return "", False
+
+
+def _first_collection_claim(row: Mapping[str, Any], *keys: str) -> tuple[Any, bool]:
+    """Resolve collection aliases without borrowing beneath malformed values."""
+
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        if isinstance(value, (Mapping, list, tuple, set, frozenset)) and not value:
+            continue
+        return value, True
+    return None, False
 
 
 def _bool(value: Any) -> bool:
@@ -194,6 +234,7 @@ __all__ = (
     "QUOTE_ASSETS",
     "THEME_OR_SECTOR_SYMBOLS",
     "canonical_asset_from_mapping",
+    "canonical_asset_identity_valid",
     "canonical_asset_to_dict",
     "is_quote_asset_symbol",
     "is_theme_or_sector_symbol",

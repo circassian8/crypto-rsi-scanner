@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close canonical asset identity coercion · Codex
+**Why:** The shared asset registry and resolver still stringified malformed
+identity. A reproduced boolean canonical ID plus mapping symbol became asset ID
+`True`, a searchable mapping representation, alias-map keys, and object-derived
+contract identifiers; an explicit invalid or conflicting canonical ID could
+also borrow a lower coin/symbol match.
+**Changes:** Canonical asset projection now accepts identity, aliases, venue
+symbols, chain names, and contract addresses only as real text. It preserves
+invalid higher-authority claims instead of borrowing lower aliases, while
+absent/blank legacy fields retain documented fallbacks. Registry load, merge,
+indexing, writing, CoinGecko/official-exchange/Coinalyze adapters, instrument
+resolution, and market-registry enrichment reproject through that closed
+identity contract. Malformed assets are excluded or rejected before artifact
+write; malformed resolver identity becomes explicit unresolved evidence, and a
+conflicting canonical ID cannot silently resolve through coin ID or symbol. No
+anomaly formula, weight, threshold, Decision score, route, or provider behavior
+changed.
+**Verify:** The original coercion reproduction now yields blank invalid identity,
+zero index keys, and no merged registry row. All `445` market-focused and
+canonical-identity tests passed, followed by `110` integrated/Decision tests.
+`make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Record the fiftieth market cycle · Codex
 **Why:** The manual no-send campaign reached its next cadence boundary while
 explicit CoinGecko authorization remained present, so one additional genuine
