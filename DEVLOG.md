@@ -17,6 +17,48 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the thirty-ninth no-send market cycle · Codex
+**Why:** The persisted Daily Operations boundary had passed and the existing
+CoinGecko authorization was still present, so one fresh point-in-time
+observation was eligible after the preceding DNS failure.
+**Changes:**
+- Performed exactly one bounded `/coins/markets` request with no retry. It
+  returned HTTP 200 with 80 rows in 1,470 ms, selected the configured top 30,
+  and published
+  `radar_market_no_send_20260720t024517023058z_d762de9c71a9` only after the
+  strict doctor, immutable publication/operations receipts, pointer update,
+  owned-dashboard restart, and exact HTTP identity probe succeeded.
+- Advanced canonical campaign truth to 39 real cycles, 1,170 retained
+  observations, 1,140 baseline-counted observations, 30 too-close rows, 30
+  warm retained-history assets, and 29/30 warm assets in the current universe.
+  Provider failures remain 10 and trusted spread coverage remains 0/1,170.
+- Preserved one new PUMP market-led `dashboard_watch` idea as research-only and
+  non-actionable: actionability 72.85, evidence confidence 52.45, risk 48.0,
+  unknown catalyst, unavailable spread, and a still-warming same-asset temporal
+  baseline. Campaign totals are now six candidates, one current idea, five
+  historical ideas, four matured outcomes, one pending outcome, and one
+  `due_missing_price` outcome.
+- Refreshed the canonical JSON/Markdown campaign report and roadmap authority
+  state. The review-timing queue now contains four receipt-backed ideas awaiting
+  an explicit first-view action; no human action was inferred from dashboard
+  access.
+**Verify:** Daily Operations returned `published_and_restarted`; the exact live
+strict doctor reports 0 blockers / 0 warnings at revision 12. Dashboard
+readiness is READY and authority status is authoritative for the new namespace,
+with operator-state SHA-256
+`20105280f8e1d851d108daddc44b6c06842cad0cdc2c1290c70133c855f525cf`
+and pointer SHA-256
+`218457f872f8c3d3da18a2ab05ae9e346e5fe3a220ad8af06aedfc7af849f46c`.
+The live dashboard returned HTTP 200 with exact namespace/run/revision/operator
+headers. Three focused Daily Operations, final-receipt reconciliation, and
+campaign CLI tests passed; campaign report generation completed from local
+artifacts only; JSON validation and diff whitespace checks passed.
+**Notes/risks:** Spread remains unavailable, so the current idea correctly
+stays dashboard-only. The next provider boundary is
+`2026-07-20T03:45:18.052686+00:00`; do not retry before fresh readiness. The
+recurring service remains uninstalled. No Telegram send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Compose exact Bybit execution-cost scenarios · Codex
 **Why:** Correct visible-book, fee, and funding formulas could still be combined
 from different modeled round trips or from stale/tampered component values,
