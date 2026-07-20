@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Protect canonical watchlist component truth · Codex
+**Why:** Hypothesis watchlist projection merged raw `score_components` last, so
+untrusted component keys could overwrite canonical scores, validation evidence,
+and route eligibility. A reproduced row stored canonical score 50 beside forged
+99/100 values and a NaN final score.
+**Changes:** Raw components are now projected first and canonical watchlist
+fields overwrite every reserved key. Non-finite float leaves become unavailable
+before persistence, and watchlist JSON serialization explicitly rejects any
+remaining NaN/infinity. Added an end-to-end persistence regression proving
+canonical 50-point score truth, validation/route truth, preservation of a valid
+custom component, and standards-compliant JSON. No score formula, threshold,
+route, evidence requirement, or provider policy changed.
+**Verify:** The new regression passed, followed by `71` focused watchlist,
+doctor-quality, notification-routing, operator-presentation, impact-hypothesis,
+and Radar-pipeline tests. `python3 -m compileall -q crypto_rsi_scanner tests`
+and `git diff --check` passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Record the forty-eighth no-send market cycle · Codex
 **Why:** The one-hour observation cadence became eligible while explicit
 CoinGecko authorization was present, so the campaign could advance one bounded

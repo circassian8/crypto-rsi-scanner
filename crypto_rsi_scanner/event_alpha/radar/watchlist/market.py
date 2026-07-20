@@ -106,6 +106,8 @@ def _json_ready(value: Any) -> Any:
         return str(value)
     if isinstance(value, Enum):
         return value.value
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     if isinstance(value, Mapping):
         return {str(key): _json_ready(child) for key, child in value.items()}
     if isinstance(value, (list, tuple)):

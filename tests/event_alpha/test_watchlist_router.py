@@ -100,6 +100,72 @@ def test_watchlist_persisted_flags_require_semantic_truth(tmp_path):
     )["symbol"] == "GOOD"
 
 
+def test_hypothesis_watchlist_canonical_fields_cannot_be_shadowed_by_components(tmp_path):
+    import json
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as hypotheses
+    import crypto_rsi_scanner.event_alpha.radar.watchlist as watchlist
+
+    hypothesis = hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:component-shadow",
+        event_cluster_id="cluster:component-shadow",
+        event_type="security_event",
+        external_asset="Component Shadow",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("security",),
+        candidate_symbols=("SHADOW",),
+        candidate_coin_ids=("component-shadow",),
+        validated_candidate_assets=({
+            "symbol": "SHADOW",
+            "coin_id": "component-shadow",
+            "validated": True,
+        },),
+        hypothesis_scope="token",
+        confidence=0.5,
+        hypothesis_score=50.0,
+        score_components={
+            "hypothesis_score": 99.0,
+            "score": 100.0,
+            "opportunity_score_final": float("nan"),
+            "validation_evidence": 1000,
+            "route_eligibility": "forged",
+            "noncanonical_nonfinite": float("inf"),
+            "valid_custom_component": 12.5,
+        },
+        validation_stage="impact_path_validated",
+        status="validated",
+        impact_path_type="exploit_security_event",
+        impact_path_strength="strong",
+        candidate_role="direct_subject",
+        opportunity_score_final=50.0,
+        opportunity_level="validated_digest",
+    )
+    path = tmp_path / "watchlist.jsonl"
+
+    result = watchlist.refresh_hypothesis_watchlist(
+        (hypothesis,),
+        cfg=watchlist.EventWatchlistConfig(enabled=True, state_path=path),
+        now=datetime(2026, 7, 20, tzinfo=timezone.utc),
+    )
+
+    assert result.rows_written == 1
+    entry = result.entries[0]
+    components = entry.latest_score_components
+    assert entry.latest_score == 50
+    assert components["hypothesis_score"] == 50
+    assert components["score"] == 50
+    assert components["opportunity_score_final"] == 50.0
+    assert components["validation_evidence"] == 100
+    assert components["route_eligibility"] == "validated_hypothesis_digest_candidate"
+    assert components["noncanonical_nonfinite"] is None
+    assert components["valid_custom_component"] == 12.5
+
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["latest_score_components"] == components
+    json.dumps(persisted, allow_nan=False)
+
+
 def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
     import tempfile
     from dataclasses import replace

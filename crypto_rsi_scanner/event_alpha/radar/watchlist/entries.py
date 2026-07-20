@@ -15,7 +15,7 @@ import crypto_rsi_scanner.event_alpha.outcomes.quality_fields as event_alpha_qua
 import crypto_rsi_scanner.event_alpha.radar.graph as event_graph
 from crypto_rsi_scanner.event_alpha.radar.source_independence import validate_source_independence_contract
 import crypto_rsi_scanner.event_alpha.radar.source_independence_store as event_source_independence_store
-from .market import _optional_bool, _optional_int
+from .market import _json_ready, _optional_bool, _optional_int
 from .models import *  # noqa: F403 - split modules share historical model names
 
 
@@ -441,7 +441,13 @@ def _hypothesis_latest_score_components(
     validated_asset: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     source_independence = _hypothesis_source_independence_fields(hypothesis)
+    raw_components = _json_ready(
+        dict(getattr(hypothesis, "score_components", {}) or {})
+    )
+    if not isinstance(raw_components, Mapping):
+        raw_components = {}
     return {
+        **dict(raw_components),
         "run_id": _optional_str(getattr(hypothesis, "run_id", None)),
         "profile": _optional_str(getattr(hypothesis, "profile", None)),
         "run_mode": _optional_str(getattr(hypothesis, "run_mode", None)),
@@ -569,7 +575,6 @@ def _hypothesis_latest_score_components(
         "external_entities": list(getattr(hypothesis, "external_entities", ()) or ())[:8],
         "crypto_candidate_assets": list(getattr(hypothesis, "crypto_candidate_assets", ()) or ())[:12],
         "rejected_candidate_assets": list(getattr(hypothesis, "rejected_candidate_assets", ()) or ())[:8],
-        **dict(getattr(hypothesis, "score_components", {}) or {}),
         **source_independence,
     }
 

@@ -581,7 +581,12 @@ def _append_entries(path: Path, entries: Iterable[EventWatchlistEntry]) -> int:
     ]
     with path.open("a", encoding="utf-8") as fh:
         for persisted in persisted_rows:
-            fh.write(json.dumps(persisted, sort_keys=True, separators=(",", ":")))
+            fh.write(json.dumps(
+                persisted,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ))
             fh.write("\n")
     return len(data)
 
