@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on malformed Decision timing and route text · Codex
+**Why:** Route/source-noise fields were stringified during control detection,
+while malformed values could otherwise be ignored. An invalid high-authority
+evaluation clock could also fall through to `observed_at` and manufacture a
+plausible expiry instead of exposing the timing-contract defect.
+**Changes:** Opportunity type, candidate role, impact path, playbook/effective
+playbook, diagnostics reason, and calendar warning now require actual text when
+explicitly supplied. Malformed values add `decision_text_claim_invalid`, route
+diagnostic, and are never rendered through object repr. Decision/evaluation/
+generation/observation/capture/as-of clocks now require timezone-aware
+timestamps when present in either the candidate or canonical market snapshot;
+malformed explicit timing adds `decision_timing_context_invalid`. Ordered clock
+authority stops at the first supplied field, so invalid high-authority evidence
+cannot borrow a lower alias. Valid expiry status, expiry derivation, source-
+noise controls, scores, thresholds, and route behavior are unchanged.
+**Verify:** `3` focused timing/text/expiry regressions passed. `200` Decision,
+consistency, surface, fixture-route, snapshot-precedence, derivatives, RSI,
+schema, merge, catalyst-attribution, propagation, and unified-calendar tests
+passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; artifact/security/provider bounds
+remain enforced.
+
 ## 2026-07-20 — Restore bounded audit-export headroom · Codex
 **Why:** The immutable project audit root reached 4,109 files after the
 fifty-second no-send cycle, thirteen above the original 4,096-file inventory

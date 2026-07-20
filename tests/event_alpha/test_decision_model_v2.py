@@ -131,6 +131,50 @@ def test_malformed_decision_control_claims_fail_closed():
         assert "decision_control_claim_invalid" in result.decision_hard_blockers
 
 
+def test_malformed_decision_routing_text_claims_fail_closed():
+    malformed_claims = (
+        {"opportunity_type": {"value": "UNCONFIRMED_RESEARCH"}},
+        {"candidate_role": ["candidate_asset"]},
+        {"impact_path_type": True},
+        {"playbook_type": {"value": "market_anomaly"}},
+        {"effective_playbook_type": 1},
+        {"diagnostics_reason": ["source_noise"]},
+        {"calendar_context_warning": {"warning": "scheduled risk"}},
+    )
+
+    for malformed in malformed_claims:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**malformed)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "decision_text_claim_invalid" in result.decision_hard_blockers
+        assert not any("{'warning':" in item for item in result.decision_warnings)
+
+
+def test_malformed_decision_timing_claims_do_not_borrow_lower_clocks():
+    malformed_clock = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            decision_evaluated_at={"timestamp": "2026-06-15T16:00:00Z"},
+            observed_at="2026-06-15T16:00:00Z",
+        )
+    )
+    malformed_status = decision_model.evaluate_radar_decision(
+        _market_led_candidate(expiry_status={"state": "active"})
+    )
+    expired = decision_model.evaluate_radar_decision(
+        _market_led_candidate(expiry_status="expired")
+    )
+
+    assert malformed_clock.expires_at is None
+    assert malformed_clock.radar_route == "diagnostic"
+    assert "decision_timing_context_invalid" in malformed_clock.decision_hard_blockers
+    assert malformed_status.radar_route == "diagnostic"
+    assert "decision_timing_context_invalid" in malformed_status.decision_hard_blockers
+    assert "idea_expired" in expired.decision_hard_blockers
+
+
 def test_unknown_catalyst_lowers_evidence_confidence_without_hard_block():
     unknown = decision_model.evaluate_radar_decision(_market_led_candidate())
     confirmed_row = _market_led_candidate(

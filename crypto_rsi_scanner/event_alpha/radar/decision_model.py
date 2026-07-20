@@ -430,6 +430,10 @@ def _hard_blockers(
         blockers.append("calendar_context_invalid")
     if decision_policy.origin_context_invalid(data):
         blockers.append("origin_context_invalid")
+    if decision_policy.decision_text_claims_invalid(data):
+        blockers.append("decision_text_claim_invalid")
+    if decision_policy.timing_context_invalid(data, market):
+        blockers.append("decision_timing_context_invalid")
     if _derivatives_context_invalid(data):
         blockers.append("derivatives_context_invalid")
     if _control_claims_invalid(data):
@@ -1124,7 +1128,7 @@ def _derivatives_freshness(
 
 def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
     text = " ".join(
-        str(data.get(key) or "")
+        _typed_text(data.get(key))
         for key in (
             "opportunity_type",
             "candidate_role",

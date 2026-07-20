@@ -74,6 +74,23 @@ _FUNDAMENTAL_CONTEXT_FIELDS = (
     "fundamental_state_snapshot",
     "protocol_fundamentals",
 )
+_DECISION_TEXT_CLAIM_FIELDS = (
+    "opportunity_type",
+    "candidate_role",
+    "impact_path_type",
+    "playbook_type",
+    "effective_playbook_type",
+    "diagnostics_reason",
+    "calendar_context_warning",
+)
+_TIMING_ANCHOR_FIELDS = (
+    "decision_evaluated_at",
+    "evaluated_at",
+    "generated_at",
+    "observed_at",
+    "captured_at",
+    "as_of",
+)
 
 
 @dataclass(frozen=True)
@@ -260,7 +277,7 @@ def decision_warnings(
         warnings.append(
             "Catalyst unknown: evidence confidence is lower and manipulation risk is higher; this is not an automatic hard block."
         )
-    calendar_warning = str(data.get("calendar_context_warning") or "").strip()
+    calendar_warning = _typed_text(data.get("calendar_context_warning"))
     if calendar_warning:
         warnings.append(calendar_warning[:240])
     if tradability in {TradabilityStatus.POOR.value, TradabilityStatus.BLOCKED.value}:
@@ -546,8 +563,8 @@ def timing_profile(data: Mapping[str, Any], market: Mapping[str, Any]) -> Timing
             MarketPhase.REVERSAL.value: 8,
         }[phase]
         expiry = anchor + timedelta(hours=ttl_hours)
-    expired = str(data.get("expiry_status") or "").strip().casefold() == "expired"
-    market_freshness = str(market.get("freshness_status") or "").strip().casefold()
+    expired = _typed_text(data.get("expiry_status")).casefold() == "expired"
+    market_freshness = _typed_text(market.get("freshness_status")).casefold()
     expired = expired or market_freshness == "expired"
     stale = market_freshness in {"stale", "invalid", "future"}
     if expiry is not None and anchor is not None and expiry <= anchor:
@@ -626,6 +643,38 @@ def origin_context_invalid(data: Mapping[str, Any]) -> bool:
         and data.get(field) not in (None, "", {})
         and not isinstance(data.get(field), Mapping)
         for field in (*_ONCHAIN_CONTEXT_FIELDS, *_FUNDAMENTAL_CONTEXT_FIELDS)
+    )
+
+
+def decision_text_claims_invalid(data: Mapping[str, Any]) -> bool:
+    """Reject malformed text that controls routing or operator copy."""
+
+    return any(
+        field in data
+        and data.get(field) not in (None, "")
+        and not _typed_text(data.get(field))
+        for field in _DECISION_TEXT_CLAIM_FIELDS
+    )
+
+
+def timing_context_invalid(
+    data: Mapping[str, Any],
+    market: Mapping[str, Any],
+) -> bool:
+    """Reject malformed explicit timing claims before expiry derivation."""
+
+    if (
+        "expiry_status" in data
+        and data.get("expiry_status") not in (None, "")
+        and not _typed_text(data.get("expiry_status"))
+    ):
+        return True
+    return any(
+        field in row
+        and row.get(field) not in (None, "")
+        and _parse_aware_timestamp(row.get(field)) is None
+        for row in (data, market)
+        for field in _TIMING_ANCHOR_FIELDS
     )
 
 
@@ -968,9 +1017,12 @@ def _first_aware_timestamp(
 ) -> datetime | None:
     for field in fields:
         for row in rows:
-            parsed = _parse_aware_timestamp(row.get(field))
-            if parsed is not None:
-                return parsed
+            if field not in row or row.get(field) in (None, ""):
+                continue
+            # Preserve ordered clock authority. An explicit malformed higher
+            # clock must not borrow a lower alias and manufacture a plausible
+            # expiry anchor.
+            return _parse_aware_timestamp(row.get(field))
     return None
 
 
@@ -1013,6 +1065,7 @@ __all__ = (
     "apply_validated_rsi_adjustments",
     "calendar_context_invalid",
     "configured_route",
+    "decision_text_claims_invalid",
     "decision_warnings",
     "directional_bias",
     "has_calendar_risk",
@@ -1027,6 +1080,7 @@ __all__ = (
     "spread_status",
     "thesis_origin_values",
     "timing_profile",
+    "timing_context_invalid",
     "timing_state_for_profile",
     "review_copy",
     "uses_market_lane",
