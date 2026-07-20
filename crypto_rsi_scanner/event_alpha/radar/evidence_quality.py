@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 import math
 from typing import Any, Mapping
@@ -196,7 +197,7 @@ def _specificity(
     payload: Mapping[str, Any],
 ) -> tuple[str, float, list[str]]:
     asset = _asset_present(text, symbol=symbol, coin_id=coin_id)
-    catalyst = any(_term_in_text(text, term) for term in _CATALYST_TERMS) or bool(payload.get("event_time"))
+    catalyst = any(_term_in_text(text, term) for term in _CATALYST_TERMS) or _has_valid_event_time(payload)
     mechanism = any(_term_in_text(text, term) for term in _MECHANISM_TERMS)
     if _publisher_noise(text, symbol=symbol, coin_id=coin_id):
         return EvidenceSpecificity.SOURCE_NOISE.value, 20.0, ["publisher_or_word_collision_noise"]
@@ -230,6 +231,22 @@ def _publisher_noise(text: str, *, symbol: str | None, coin_id: str | None) -> b
         or (symbol_text == "xrp" and "ripple effects" in text and "$xrp" not in text)
         or (symbol_text == "kcs" and "kucoin source" in text and "$kcs" not in text)
     )
+
+
+def _has_valid_event_time(payload: Mapping[str, Any]) -> bool:
+    event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+    value = event_payload.get("event_time")
+    if value is None or (isinstance(value, str) and not value.strip()):
+        value = payload.get("event_time")
+    if isinstance(value, datetime):
+        return True
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
 
 
 def _warnings(source_class: str, specificity: str, text: str) -> tuple[str, ...]:

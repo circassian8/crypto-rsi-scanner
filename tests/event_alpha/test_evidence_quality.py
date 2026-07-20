@@ -687,6 +687,46 @@ def test_evidence_quality_rejects_boolean_and_nonfinite_reliability_priors():
         assert "source_reliability_prior_applied" not in result.reason_codes
 
 
+def test_evidence_quality_requires_a_valid_event_time_for_catalyst_specificity():
+    import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+
+    row = {
+        "provider": "fixture",
+        "title": "TEST context update",
+        "body": "TEST context is available.",
+        "raw_json": {},
+    }
+    baseline = event_evidence_quality.evaluate_evidence_quality(
+        row,
+        symbol="TEST",
+        coin_id="test",
+    )
+    assert baseline.evidence_specificity == "token_only"
+
+    for invalid in (True, {"unexpected": "object"}, "not-a-timestamp"):
+        result = event_evidence_quality.evaluate_evidence_quality(
+            {**row, "raw_json": {"event_time": invalid}},
+            symbol="TEST",
+            coin_id="test",
+        )
+
+        assert result.evidence_specificity == baseline.evidence_specificity
+        assert result.evidence_quality_score == baseline.evidence_quality_score
+
+    for payload in (
+        {"event_time": "2026-07-20T12:00:00Z"},
+        {"event": {"event_time": "2026-07-20T12:00:00Z"}},
+    ):
+        result = event_evidence_quality.evaluate_evidence_quality(
+            {**row, "raw_json": payload},
+            symbol="TEST",
+            coin_id="test",
+        )
+
+        assert result.evidence_specificity == "token_and_catalyst"
+        assert result.evidence_quality_score == 72.0
+
+
 def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor

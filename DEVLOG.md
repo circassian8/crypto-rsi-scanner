@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require valid event-time evidence for catalyst specificity · Codex
+**Why:** Evidence-quality scoring used raw truthiness for `event_time`. A boolean
+or arbitrary object upgraded an otherwise asset-only item from 50 to 72, while
+the canonical nested event payload containing a valid timestamp was ignored.
+**Changes:** Added conservative top-level/nested event-time extraction and ISO
+validation before timing metadata can contribute catalyst specificity. Valid
+ISO strings and already-parsed datetimes retain the existing scoring behavior;
+booleans, mappings, blank values, and malformed strings remain unavailable.
+Added a public regression covering the baseline, malformed values, and both
+valid payload shapes. No score, threshold, route, provider, or historical
+artifact changed.
+**Verify:** All 61 focused evidence-quality, impact-hypothesis,
+evidence-acquisition, and catalyst-search tests passed. `compileall` and
+`git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory per the owner's
+instruction. Security, artifact, and provider-byte bounds remain enforced.
+
 ## 2026-07-20 — Record the forty-sixth no-send market cycle · Codex
 **Why:** The persisted hourly cadence became eligible while the existing
 CoinGecko authorization remained present. One bounded observation could advance
