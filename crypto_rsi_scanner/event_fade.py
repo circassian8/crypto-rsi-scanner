@@ -266,6 +266,8 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> int:
 
 
 def _finite(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
     try:
         return math.isfinite(float(value))
     except (TypeError, ValueError):
@@ -282,6 +284,42 @@ def _return_fraction(value: object) -> float | None:
         return None
     v = float(value)
     return v / 100.0 if abs(v) > 10.0 else v
+
+
+def _semantic_bool(value: object, *, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+        return default
+    text = str(value or "").strip().casefold()
+    if text in {"1", "1.0", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "0.0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
+def _semantic_optional_bool(value: object) -> bool | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+        return None
+    text = str(value).strip().casefold()
+    if text in {"1", "1.0", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "0.0", "false", "no", "n", "off"}:
+        return False
+    return None
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:
@@ -953,10 +991,10 @@ def _event_from_dict(data: Mapping[str, Any]) -> CatalystEvent:
         first_seen_time=_parse_dt(data.get("first_seen_time")),
         source=data.get("source"),
         source_url=data.get("source_url"),
-        confidence=float(data.get("confidence") or 0.0),
+        confidence=_num(data.get("confidence"), 0.0),
         external_asset=data.get("external_asset"),
-        is_proxy_narrative=bool(data.get("is_proxy_narrative")),
-        is_direct_beneficiary=bool(data.get("is_direct_beneficiary")),
+        is_proxy_narrative=_semantic_bool(data.get("is_proxy_narrative")),
+        is_direct_beneficiary=_semantic_bool(data.get("is_direct_beneficiary")),
         notes=data.get("notes"),
     )
 
@@ -967,7 +1005,7 @@ def _market_from_dict(data: Mapping[str, Any], event: CatalystEvent) -> EventMar
         symbol=str(data.get("symbol") or event.symbol).upper(),
         coin_id=data.get("coin_id", event.coin_id),
         timestamp=ts,
-        price=float(data.get("price") or 0.0),
+        price=_num(data.get("price"), 0.0),
         volume_24h=data.get("volume_24h"),
         spot_volume_24h=data.get("spot_volume_24h"),
         market_cap=data.get("market_cap"),
@@ -994,7 +1032,7 @@ def _derivatives_from_dict(data: Mapping[str, Any] | None, event: CatalystEvent)
     return EventDerivativesSnapshot(
         symbol=str(data.get("symbol") or event.symbol).upper(),
         timestamp=_parse_dt(data.get("timestamp")) or event.event_time or datetime.now(timezone.utc),
-        perp_available=bool(data.get("perp_available")),
+        perp_available=_semantic_bool(data.get("perp_available")),
         open_interest=data.get("open_interest"),
         open_interest_24h_change_pct=data.get("open_interest_24h_change_pct"),
         open_interest_to_market_cap=data.get("open_interest_to_market_cap"),
@@ -1014,14 +1052,18 @@ def _supply_from_dict(data: Mapping[str, Any] | None, event: CatalystEvent) -> E
     return EventSupplyPressureSnapshot(
         symbol=str(data.get("symbol") or event.symbol).upper(),
         timestamp=_parse_dt(data.get("timestamp")) or event.event_time or datetime.now(timezone.utc),
-        large_holder_exchange_inflow=data.get("large_holder_exchange_inflow"),
+        large_holder_exchange_inflow=_semantic_optional_bool(
+            data.get("large_holder_exchange_inflow")
+        ),
         cex_inflow_amount=data.get("cex_inflow_amount"),
         cex_inflow_pct_supply=data.get("cex_inflow_pct_supply"),
         unlock_amount=data.get("unlock_amount"),
         unlock_pct_circulating=data.get("unlock_pct_circulating"),
         top_holder_concentration=data.get("top_holder_concentration"),
-        team_or_mm_wallet_activity=data.get("team_or_mm_wallet_activity"),
-        admin_or_mint_risk=data.get("admin_or_mint_risk"),
+        team_or_mm_wallet_activity=_semantic_optional_bool(
+            data.get("team_or_mm_wallet_activity")
+        ),
+        admin_or_mint_risk=_semantic_optional_bool(data.get("admin_or_mint_risk")),
         notes=data.get("notes"),
     )
 
@@ -1041,12 +1083,14 @@ def _rsi_from_dict(data: Mapping[str, Any] | None, event: CatalystEvent) -> Even
         btc_rsi_daily=data.get("btc_rsi_daily"),
         btc_rsi_4h=data.get("btc_rsi_4h"),
         btc_rsi_1h=data.get("btc_rsi_1h"),
-        target_overbought_score=float(data.get("target_overbought_score") or 0.0),
-        target_oversold_score=float(data.get("target_oversold_score") or 0.0),
-        btc_risk_on_score=float(data.get("btc_risk_on_score") or 0.0),
-        btc_risk_off_score=float(data.get("btc_risk_off_score") or 0.0),
-        rsi_rollover_confirmed=bool(data.get("rsi_rollover_confirmed")),
-        bearish_rsi_divergence=data.get("bearish_rsi_divergence"),
+        target_overbought_score=_num(data.get("target_overbought_score"), 0.0),
+        target_oversold_score=_num(data.get("target_oversold_score"), 0.0),
+        btc_risk_on_score=_num(data.get("btc_risk_on_score"), 0.0),
+        btc_risk_off_score=_num(data.get("btc_risk_off_score"), 0.0),
+        rsi_rollover_confirmed=_semantic_bool(data.get("rsi_rollover_confirmed")),
+        bearish_rsi_divergence=_semantic_optional_bool(
+            data.get("bearish_rsi_divergence")
+        ),
     )
 
 
@@ -1057,10 +1101,14 @@ def _technical_from_dict(data: Mapping[str, Any] | None, event: CatalystEvent) -
         symbol=str(data.get("symbol") or event.symbol).upper(),
         timestamp=_parse_dt(data.get("timestamp")) or event.event_time or datetime.now(timezone.utc),
         event_vwap=data.get("event_vwap"),
-        price_below_event_vwap=data.get("price_below_event_vwap"),
-        failed_reclaim_event_vwap=data.get("failed_reclaim_event_vwap"),
-        lower_high_confirmed=data.get("lower_high_confirmed"),
-        first_support_broken=data.get("first_support_broken"),
+        price_below_event_vwap=_semantic_optional_bool(
+            data.get("price_below_event_vwap")
+        ),
+        failed_reclaim_event_vwap=_semantic_optional_bool(
+            data.get("failed_reclaim_event_vwap")
+        ),
+        lower_high_confirmed=_semantic_optional_bool(data.get("lower_high_confirmed")),
+        first_support_broken=_semantic_optional_bool(data.get("first_support_broken")),
         post_event_high=data.get("post_event_high"),
         post_event_lower_high=data.get("post_event_lower_high"),
         invalidation_level=data.get("invalidation_level"),
@@ -1154,7 +1202,7 @@ def format_fade_report(candidates: Iterable[FadeCandidate], cfg: EventFadeConfig
 
 def runtime_config(config_module: Any) -> EventFadeConfig:
     return EventFadeConfig(
-        enabled=bool(getattr(config_module, "EVENT_FADE_ENABLED", False)),
+        enabled=_semantic_bool(getattr(config_module, "EVENT_FADE_ENABLED", False)),
         mode=str(getattr(config_module, "EVENT_FADE_MODE", "alert_only")),
         min_watchlist_score=int(getattr(config_module, "EVENT_FADE_MIN_WATCHLIST_SCORE", 60)),
         min_armed_score=int(getattr(config_module, "EVENT_FADE_MIN_ARMED_SCORE", 75)),
@@ -1171,7 +1219,10 @@ def runtime_config(config_module: Any) -> EventFadeConfig:
         extreme_funding_8h=float(getattr(config_module, "EVENT_FADE_EXTREME_FUNDING_8H", 0.0010)),
         min_perp_spot_volume_ratio=float(getattr(config_module, "EVENT_FADE_MIN_PERP_SPOT_VOLUME_RATIO", 5.0)),
         min_rsi_overbought_score=float(getattr(config_module, "EVENT_FADE_MIN_RSI_OVERBOUGHT_SCORE", 60.0)),
-        block_btc_strong_risk_on=bool(getattr(config_module, "EVENT_FADE_BLOCK_BTC_STRONG_RISK_ON", True)),
+        block_btc_strong_risk_on=_semantic_bool(
+            getattr(config_module, "EVENT_FADE_BLOCK_BTC_STRONG_RISK_ON", True),
+            default=True,
+        ),
         max_spread_bps=float(getattr(config_module, "EVENT_FADE_MAX_SPREAD_BPS", 100.0)),
         min_depth_2pct_usd=float(getattr(config_module, "EVENT_FADE_MIN_DEPTH_2PCT_USD", 10_000.0)),
         default_risk_pct=float(getattr(config_module, "EVENT_FADE_DEFAULT_RISK_PCT", 0.005)),

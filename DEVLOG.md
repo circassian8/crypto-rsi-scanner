@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Harden Event Fade snapshot semantics · Codex
+**Why:** Event Fade is the only component permitted to own the
+`event_fade.py` + `proxy_fade` `TRIGGERED_FADE` path, but its JSON and discovery
+snapshot boundaries still used Python truthiness. Literal false-like strings
+could therefore become proxy, derivatives, supply, RSI, or technical
+confirmation, while booleans could become numeric price or score evidence.
+**Changes:**
+- Added fail-closed semantic parsing for Event Fade proxy/direct-beneficiary,
+  perpetual-availability, supply-risk, RSI rollover/divergence, and technical
+  confirmation fields at both the public JSON loader and discovery snapshot
+  construction boundary.
+- Rejected booleans from Event Fade numeric parsing, including confidence,
+  price, return, derivatives, supply, and RSI score inputs; explicit canonical
+  booleans and the closed true/false text vocabulary remain supported.
+- Applied the same semantics to runtime enable and BTC risk-on guard values and
+  added regressions proving malformed persisted values cannot promote a fade
+  candidate or create a short trigger.
+**Verify:** 78 focused fade-core, fade-validation, fade-review, discovery-
+provider, and alert-ranking tests passed, including both new boundary
+regressions. Compileall, the fixture Event Fade report, fade-review smoke, and
+full integrated-radar smoke passed; the integrated strict doctor reported 0
+blockers and 0 warnings and its dashboard rendered 14 pages. Architecture
+cleanliness, exact live dashboard readiness, and `git diff --check` passed.
+**Notes/risks:** The legitimate fixture fade-review route remains intact. No
+threshold, score weight, provider call, authorization, send, trade, order,
+paper trade, normal RSI write, or new Event Alpha `TRIGGERED_FADE` path was
+added. Full `make verify` was not repeated because the immediately preceding
+release gate and the focused plus end-to-end safety gates cover this isolated
+deserialization hardening.
+
 ## 2026-07-20 — Close remaining Decision truthiness gaps · Codex
 **Why:** The prior semantic-boolean passes closed anomaly classification,
 catalyst policy, and integrated merge fields, but adjacent operator-visible

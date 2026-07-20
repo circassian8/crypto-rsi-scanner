@@ -218,6 +218,137 @@ def test_event_fade_json_loader_and_feature_vector():
     assert ef.event_fade_feature_vector(candidate, ef.EventFadeConfig(min_watchlist_score=95))["signal_type"] == "NO_TRADE"
 
 
+def test_event_fade_loader_rejects_false_like_and_boolean_numeric_evidence():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from crypto_rsi_scanner import event_fade as ef
+
+    path = Path(tempfile.mkdtemp()) / "false-like-candidate.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "event": {
+                        "event_id": "false-like-fade",
+                        "coin_id": "false-like",
+                        "symbol": "FALSE",
+                        "event_name": "False-like fade metadata",
+                        "event_type": "ipo_proxy",
+                        "event_time": "2026-06-14T12:00:00Z",
+                        "first_seen_time": "2026-06-13T12:00:00Z",
+                        "confidence": True,
+                        "external_asset": "Example",
+                        "is_proxy_narrative": "false",
+                        "is_direct_beneficiary": "off",
+                    },
+                    "market": {
+                        "symbol": "FALSE",
+                        "coin_id": "false-like",
+                        "timestamp": "2026-06-15T16:00:00Z",
+                        "price": True,
+                        "return_24h": True,
+                        "return_72h": True,
+                        "return_7d": True,
+                        "volume_zscore_24h": True,
+                        "spread_bps": True,
+                    },
+                    "derivatives": {
+                        "symbol": "FALSE",
+                        "timestamp": "2026-06-15T16:00:00Z",
+                        "perp_available": "false",
+                        "open_interest_24h_change_pct": True,
+                        "funding_rate_8h": True,
+                    },
+                    "supply": {
+                        "symbol": "FALSE",
+                        "timestamp": "2026-06-15T16:00:00Z",
+                        "large_holder_exchange_inflow": "false",
+                        "team_or_mm_wallet_activity": "0",
+                        "admin_or_mint_risk": "off",
+                        "unlock_pct_circulating": True,
+                    },
+                    "rsi": {
+                        "symbol": "FALSE",
+                        "timestamp": "2026-06-15T16:00:00Z",
+                        "target_overbought_score": True,
+                        "btc_risk_on_score": True,
+                        "rsi_rollover_confirmed": "false",
+                        "bearish_rsi_divergence": "no",
+                    },
+                    "technical": {
+                        "symbol": "FALSE",
+                        "timestamp": "2026-06-15T16:00:00Z",
+                        "price_below_event_vwap": "false",
+                        "failed_reclaim_event_vwap": "0",
+                        "lower_high_confirmed": "no",
+                        "first_support_broken": "off",
+                        "invalidation_level": 2.0,
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    candidate = ef.load_event_fade_candidates(path)[0]
+    now = datetime(2026, 6, 15, 16, tzinfo=timezone.utc)
+
+    assert candidate.event.confidence == 0.0
+    assert candidate.event.is_proxy_narrative is False
+    assert candidate.event.is_direct_beneficiary is False
+    assert candidate.market.price == 0.0
+    assert candidate.derivatives is not None
+    assert candidate.derivatives.perp_available is False
+    assert candidate.supply is not None
+    assert candidate.supply.large_holder_exchange_inflow is False
+    assert candidate.supply.team_or_mm_wallet_activity is False
+    assert candidate.supply.admin_or_mint_risk is False
+    assert candidate.rsi is not None
+    assert candidate.rsi.target_overbought_score == 0.0
+    assert candidate.rsi.btc_risk_on_score == 0.0
+    assert candidate.rsi.rsi_rollover_confirmed is False
+    assert candidate.rsi.bearish_rsi_divergence is False
+    assert candidate.technical is not None
+    assert candidate.technical.price_below_event_vwap is False
+    assert candidate.technical.failed_reclaim_event_vwap is False
+    assert candidate.technical.lower_high_confirmed is False
+    assert candidate.technical.first_support_broken is False
+    assert ef.score_pre_event_pump(candidate.market) == 0
+    assert ef.score_supply_pressure(candidate.supply) == 0
+    assert ef.score_post_event_failure(
+        candidate.event, candidate.technical, candidate.rsi, now
+    ) == 0
+    signal = ef.generate_fade_signal(candidate, ef.EventFadeConfig(), now)
+    assert signal.signal_type == ef.FadeSignalType.NO_TRADE
+    assert signal.state == ef.FadeState.DISCOVERED
+
+    boolean_metrics = ef.EventDerivativesSnapshot(
+        symbol="FALSE",
+        timestamp=now,
+        perp_available=True,
+        open_interest_24h_change_pct=True,
+        open_interest_to_market_cap=True,
+        funding_rate_8h=True,
+        perp_spot_volume_ratio=True,
+        long_short_ratio=True,
+        basis=True,
+    )
+    assert ef.score_derivatives_crowding(boolean_metrics) == 20
+
+    runtime = ef.runtime_config(
+        SimpleNamespace(
+            EVENT_FADE_ENABLED="false",
+            EVENT_FADE_BLOCK_BTC_STRONG_RISK_ON="off",
+        )
+    )
+    assert runtime.enabled is False
+    assert runtime.block_btc_strong_risk_on is False
+
+
 def test_event_resolver_aliases_and_rejects_ticker_collision():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.discovery as event_discovery

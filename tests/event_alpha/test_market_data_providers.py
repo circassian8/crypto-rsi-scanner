@@ -454,6 +454,74 @@ def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
     assert velvet.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
 
 
+def test_event_discovery_snapshot_booleans_require_explicit_semantic_values():
+    from crypto_rsi_scanner.event_alpha.radar.discovery import snapshots
+    from crypto_rsi_scanner.event_core.models import DiscoveredAsset
+
+    now = datetime(2026, 6, 15, 16, tzinfo=timezone.utc)
+    asset = DiscoveredAsset(
+        coin_id="false-like",
+        symbol="FALSE",
+        name="False Like",
+        price=True,
+    )
+
+    market = snapshots._market_snapshot(asset, {"price": True}, now)  # noqa: SLF001
+    derivatives = snapshots._derivatives_snapshot(  # noqa: SLF001
+        asset, {"perp_available": "false"}, now
+    )
+    supply = snapshots._supply_snapshot(  # noqa: SLF001
+        asset,
+        {
+            "large_holder_exchange_inflow": "false",
+            "team_or_mm_wallet_activity": "0",
+            "admin_or_mint_risk": 2,
+        },
+        now,
+    )
+    rsi = snapshots._rsi_snapshot(  # noqa: SLF001
+        asset,
+        {
+            "target_overbought_score": True,
+            "target_oversold_score": True,
+            "btc_risk_on_score": True,
+            "btc_risk_off_score": True,
+            "rsi_rollover_confirmed": "false",
+            "bearish_rsi_divergence": "off",
+        },
+        now,
+    )
+    technical = snapshots._technical_snapshot(  # noqa: SLF001
+        asset,
+        {
+            "price_below_event_vwap": "false",
+            "failed_reclaim_event_vwap": "0",
+            "lower_high_confirmed": "no",
+            "first_support_broken": 2,
+        },
+        now,
+    )
+
+    assert market.price == 0.0
+    assert derivatives is not None and derivatives.perp_available is False
+    assert supply is not None
+    assert supply.large_holder_exchange_inflow is False
+    assert supply.team_or_mm_wallet_activity is False
+    assert supply.admin_or_mint_risk is None
+    assert rsi is not None
+    assert rsi.target_overbought_score == 0.0
+    assert rsi.target_oversold_score == 0.0
+    assert rsi.btc_risk_on_score == 0.0
+    assert rsi.btc_risk_off_score == 0.0
+    assert rsi.rsi_rollover_confirmed is False
+    assert rsi.bearish_rsi_divergence is False
+    assert technical is not None
+    assert technical.price_below_event_vwap is False
+    assert technical.failed_reclaim_event_vwap is False
+    assert technical.lower_high_confirmed is False
+    assert technical.first_support_broken is None
+
+
 def test_event_discovery_supply_providers_parse_fixtures():
     import json
     import tempfile

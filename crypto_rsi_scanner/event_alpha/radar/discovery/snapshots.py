@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -199,13 +200,55 @@ def _payload(data: object) -> dict[str, Any]:
     return dict(data) if isinstance(data, Mapping) else {}
 
 
+def _semantic_bool(value: object, *, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if value == 1:
+            return True
+        if value == 0:
+            return False
+        return default
+    text = str(value or "").strip().casefold()
+    if text in {"1", "1.0", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "0.0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
+def _semantic_optional_bool(value: object) -> bool | None:
+    if value in (None, ""):
+        return None
+    parsed = _semantic_bool(value)
+    if parsed:
+        return True
+    if isinstance(value, (bool, int, float)) and value == 0:
+        return False
+    if str(value).strip().casefold() in {"0", "0.0", "false", "no", "n", "off"}:
+        return False
+    return None
+
+
+def _number_or_zero(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
+    try:
+        parsed = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+    return parsed if math.isfinite(parsed) else 0.0
+
+
 def _market_snapshot(asset: DiscoveredAsset, data: object, now: datetime) -> event_fade.EventMarketSnapshot:
     p = _payload(data)
     return event_fade.EventMarketSnapshot(
         symbol=str(p.get("symbol") or asset.symbol).upper(),
         coin_id=p.get("coin_id", asset.coin_id),
         timestamp=_dt(p.get("timestamp"), now),
-        price=float(p.get("price") or asset.price or 0.0),
+        price=_number_or_zero(
+            p.get("price") if p.get("price") is not None else asset.price
+        ),
         volume_24h=p.get("volume_24h", asset.volume_24h),
         spot_volume_24h=p.get("spot_volume_24h"),
         market_cap=p.get("market_cap", asset.market_cap),
@@ -237,7 +280,7 @@ def _derivatives_snapshot(
     return event_fade.EventDerivativesSnapshot(
         symbol=str(p.get("symbol") or asset.symbol).upper(),
         timestamp=_dt(p.get("timestamp"), now),
-        perp_available=bool(p.get("perp_available")),
+        perp_available=_semantic_bool(p.get("perp_available")),
         open_interest=p.get("open_interest"),
         open_interest_24h_change_pct=p.get("open_interest_24h_change_pct"),
         open_interest_to_market_cap=p.get("open_interest_to_market_cap"),
@@ -258,14 +301,18 @@ def _supply_snapshot(asset: DiscoveredAsset, data: object, now: datetime) -> eve
     return event_fade.EventSupplyPressureSnapshot(
         symbol=str(p.get("symbol") or asset.symbol).upper(),
         timestamp=_dt(p.get("timestamp"), now),
-        large_holder_exchange_inflow=p.get("large_holder_exchange_inflow"),
+        large_holder_exchange_inflow=_semantic_optional_bool(
+            p.get("large_holder_exchange_inflow")
+        ),
         cex_inflow_amount=p.get("cex_inflow_amount"),
         cex_inflow_pct_supply=p.get("cex_inflow_pct_supply"),
         unlock_amount=p.get("unlock_amount"),
         unlock_pct_circulating=p.get("unlock_pct_circulating"),
         top_holder_concentration=p.get("top_holder_concentration"),
-        team_or_mm_wallet_activity=p.get("team_or_mm_wallet_activity"),
-        admin_or_mint_risk=p.get("admin_or_mint_risk"),
+        team_or_mm_wallet_activity=_semantic_optional_bool(
+            p.get("team_or_mm_wallet_activity")
+        ),
+        admin_or_mint_risk=_semantic_optional_bool(p.get("admin_or_mint_risk")),
         notes=p.get("notes"),
     )
 
@@ -286,12 +333,14 @@ def _rsi_snapshot(asset: DiscoveredAsset, data: object, now: datetime) -> event_
         btc_rsi_daily=p.get("btc_rsi_daily"),
         btc_rsi_4h=p.get("btc_rsi_4h"),
         btc_rsi_1h=p.get("btc_rsi_1h"),
-        target_overbought_score=float(p.get("target_overbought_score") or 0.0),
-        target_oversold_score=float(p.get("target_oversold_score") or 0.0),
-        btc_risk_on_score=float(p.get("btc_risk_on_score") or 0.0),
-        btc_risk_off_score=float(p.get("btc_risk_off_score") or 0.0),
-        rsi_rollover_confirmed=bool(p.get("rsi_rollover_confirmed")),
-        bearish_rsi_divergence=p.get("bearish_rsi_divergence"),
+        target_overbought_score=_number_or_zero(p.get("target_overbought_score")),
+        target_oversold_score=_number_or_zero(p.get("target_oversold_score")),
+        btc_risk_on_score=_number_or_zero(p.get("btc_risk_on_score")),
+        btc_risk_off_score=_number_or_zero(p.get("btc_risk_off_score")),
+        rsi_rollover_confirmed=_semantic_bool(p.get("rsi_rollover_confirmed")),
+        bearish_rsi_divergence=_semantic_optional_bool(
+            p.get("bearish_rsi_divergence")
+        ),
     )
 
 
@@ -303,10 +352,14 @@ def _technical_snapshot(asset: DiscoveredAsset, data: object, now: datetime) -> 
         symbol=str(p.get("symbol") or asset.symbol).upper(),
         timestamp=_dt(p.get("timestamp"), now),
         event_vwap=p.get("event_vwap"),
-        price_below_event_vwap=p.get("price_below_event_vwap"),
-        failed_reclaim_event_vwap=p.get("failed_reclaim_event_vwap"),
-        lower_high_confirmed=p.get("lower_high_confirmed"),
-        first_support_broken=p.get("first_support_broken"),
+        price_below_event_vwap=_semantic_optional_bool(
+            p.get("price_below_event_vwap")
+        ),
+        failed_reclaim_event_vwap=_semantic_optional_bool(
+            p.get("failed_reclaim_event_vwap")
+        ),
+        lower_high_confirmed=_semantic_optional_bool(p.get("lower_high_confirmed")),
+        first_support_broken=_semantic_optional_bool(p.get("first_support_broken")),
         post_event_high=p.get("post_event_high"),
         post_event_lower_high=p.get("post_event_lower_high"),
         invalidation_level=p.get("invalidation_level"),

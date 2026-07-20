@@ -1926,7 +1926,7 @@
   ],
   "functions_over_limit_count": 8,
   "gate_status": "pass",
-  "generated_at": "2026-07-20T04:17:48.526678+00:00",
+  "generated_at": "2026-07-20T04:30:24.412777+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2106,6 +2106,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1232,
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1205,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py",
       "source_kind": "production"
@@ -2162,12 +2168,6 @@
       "limit": 1500,
       "line_count": 1195,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/opportunity_audit.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1194,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/registry.py",
       "source_kind": "production"
     }
   ],
@@ -4358,6 +4358,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1232,
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1205,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py",
       "source_kind": "production"
@@ -4369,7 +4375,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 31,
+  "production_files_over_1200_lines": 32,
   "production_files_over_1500_lines": 2,
   "production_files_over_2000_lines": 0,
   "production_files_over_3000_lines": 0,
@@ -4658,12 +4664,18 @@
     },
     {
       "limit": 1500,
+      "line_count": 1232,
+      "path": "crypto_rsi_scanner/event_fade.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1205,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py",
       "source_kind": "production"
     }
   ],
-  "unresolved_production_files_over_1200_lines": 6,
+  "unresolved_production_files_over_1200_lines": 7,
   "v3_accepted_exceptions": {
     "class_exceptions_remaining": {
       "count": 3,
@@ -4744,7 +4756,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 31,
+      "production_files_over_1200_lines": 32,
       "production_files_over_1500_lines": 2,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -4899,6 +4911,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1232,
+        "path": "crypto_rsi_scanner/event_fade.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1205,
         "path": "crypto_rsi_scanner/event_alpha/operations/bybit_intraday_capture.py",
         "threshold": 1200
@@ -4990,7 +5007,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 31,
+    "production_files_over_1200_lines": 32,
     "production_files_over_1500_lines": 2,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,
