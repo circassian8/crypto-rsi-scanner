@@ -1396,6 +1396,32 @@ def test_implausible_fraction_return_fails_model_and_schema_validation():
     )
 
 
+def test_v2_schema_rejects_boolean_scores_and_market_returns():
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
+
+    candidate = _market_led_candidate()
+    valid = {**candidate, **decision_model.evaluate_radar_decision(candidate).to_dict()}
+    assert validate_contract(valid) == []
+
+    for field in (
+        "actionability_score",
+        "evidence_confidence_score",
+        "risk_score",
+        "urgency_score",
+        "chase_risk_score",
+    ):
+        malformed = deepcopy(valid)
+        malformed[field] = True
+        assert f"decision_model_invalid_score:{field}" in validate_contract(malformed)
+
+    malformed_return = deepcopy(valid)
+    malformed_return["market_state_snapshot"]["return_4h"] = True
+    assert (
+        "decision_model_invalid_return_value:market_state_snapshot:return_4h"
+        in validate_contract(malformed_return)
+    )
+
+
 def test_v2_schema_requires_ordered_origins_and_verified_actionable_spread():
     from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
 

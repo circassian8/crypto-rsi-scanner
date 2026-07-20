@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close boolean numerics in the Decision artifact schema · Codex
+**Why:** The live evaluator rejected boolean market values, but the independent
+persisted Decision-v2 validator still used Python float coercion. A tampered
+artifact could therefore present `true` as score `1.0` or a one-point return and
+pass that part of strict validation.
+**Changes:** Made the canonical schema's finite-number boundary reject booleans
+and routed all five top-level score checks through it. Added a regression for
+actionability, evidence-confidence, risk, urgency, chase-risk, and embedded
+market-return fields. Existing numeric strings remain compatibility-readable;
+finite numeric zero remains valid. No evaluator, score, threshold, route,
+provider, current authority, or historical artifact changed.
+**Verify:** All 68 focused Decision-v2 model/surface tests and all 42 artifact-
+schema/market-feature integrity tests passed. `compileall` and `git diff
+--check` passed. The standard source-with-artifacts release gate completed with
+zero unsafe entries.
+
 ## 2026-07-20 — Preserve the frozen empirical contract at boolean ingestion · Codex
 **Why:** The boolean-numeric correction changed `market_units.py`, which is an
 exact byte-bound component of the immutable Protocol-v1 empirical hardening

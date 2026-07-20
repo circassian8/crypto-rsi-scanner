@@ -658,9 +658,8 @@ def _validate_scores_and_expiry(
     if extended_contract:
         score_fields.extend(("urgency_score", "chase_risk_score"))
     for field in score_fields:
-        try:
-            score = float(row.get(field))
-        except (TypeError, ValueError):
+        score = _finite_number(row.get(field))
+        if score is None:
             errors.append(f"decision_model_invalid_score:{field}")
             continue
         if not 0.0 <= score <= 100.0:
@@ -788,6 +787,8 @@ def _return_unit(value: object) -> str | None:
 
 
 def _finite_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
