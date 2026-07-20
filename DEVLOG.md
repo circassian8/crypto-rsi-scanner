@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Require typed Decision calendar context · Codex
+**Why:** Decision routing ignored malformed explicit calendar evidence. A
+non-mapping event, mixed-type event list, or invalid schedule timestamp could
+therefore leave an otherwise actionable market idea outside scheduled-risk
+review instead of exposing the evidence defect.
+**Changes:** Decision policy now owns one typed calendar-context contract for
+single events, event collections, exact schedules, legacy event-start times,
+and window bounds. Present non-empty event containers must use the declared
+mapping/list shapes, every event-list member must be a non-empty mapping, and
+every supplied calendar timestamp must be timezone-aware and parseable.
+Malformed context adds `calendar_context_invalid` and routes diagnostic. Valid
+exact, windowed, unlock, nearby, unified-context, and legacy schedule evidence
+still routes `calendar_risk`; empty optional compatibility fields remain
+absent. No calendar event creates direction, and no score formula, weight,
+threshold, provider, or historical artifact changed.
+**Verify:** `4` focused calendar Decision regressions passed. `178` Decision,
+consistency, surface, derivatives, fixture-route, snapshot-precedence, RSI,
+schema, merge, pipeline, catalyst-attribution, and unified-calendar tests
+passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; evidence-payload and artifact/
+security bounds remain enforced.
+
 ## 2026-07-20 — Close Decision snapshot-container precedence · Codex
 **Why:** Return-field precedence already preserved invalid later values, but the
 three snapshot containers themselves were accepted only when mappings and

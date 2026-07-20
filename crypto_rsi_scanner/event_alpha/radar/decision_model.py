@@ -375,6 +375,8 @@ def _hard_blockers(
         blockers.append("catalyst_source_evidence_invalid")
     if decision_policy.market_snapshot_invalid(data):
         blockers.append("market_snapshot_contract_invalid")
+    if decision_policy.calendar_context_invalid(data):
+        blockers.append("calendar_context_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(

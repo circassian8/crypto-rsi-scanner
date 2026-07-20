@@ -47,6 +47,24 @@ _SOURCE_SCALAR_FIELDS = (
     "event_type",
 )
 _SOURCE_LIST_FIELDS = ("source_origins", "source_packs")
+_CALENDAR_SINGLE_EVENT_FIELDS = (
+    "unified_calendar_event",
+    "calendar_event",
+    "scheduled_catalyst_event",
+    "unlock_event",
+)
+_CALENDAR_EVENT_LIST_FIELDS = (
+    "unified_calendar_context",
+    "nearby_calendar_events",
+    "calendar_events",
+)
+_CALENDAR_TIMESTAMP_FIELDS = (
+    "scheduled_at",
+    "event_start_time",
+    "effective_time",
+    "window_start",
+    "window_end",
+)
 
 
 @dataclass(frozen=True)
@@ -546,19 +564,52 @@ def timing_profile(data: Mapping[str, Any], market: Mapping[str, Any]) -> Timing
 def has_calendar_risk(data: Mapping[str, Any]) -> bool:
     """Return true only for attached calendar evidence or a valid schedule."""
 
-    for field in (
-        "unified_calendar_event",
-        "calendar_event",
-        "scheduled_catalyst_event",
-        "unlock_event",
-    ):
+    for field in _CALENDAR_SINGLE_EVENT_FIELDS:
         if isinstance(data.get(field), Mapping) and bool(data.get(field)):
             return True
-    nearby = data.get("nearby_calendar_events") or data.get("calendar_events")
-    if isinstance(nearby, Iterable) and not isinstance(nearby, (str, bytes, Mapping)):
-        if any(isinstance(item, Mapping) and bool(item) for item in nearby):
+    for field in _CALENDAR_EVENT_LIST_FIELDS:
+        nearby = data.get(field)
+        if isinstance(nearby, (list, tuple)) and any(
+            isinstance(item, Mapping) and bool(item) for item in nearby
+        ):
             return True
     return _parse_aware_timestamp(data.get("scheduled_at")) is not None
+
+
+def calendar_context_invalid(data: Mapping[str, Any]) -> bool:
+    """Detect malformed explicit calendar containers and schedule timestamps."""
+
+    for field in _CALENDAR_SINGLE_EVENT_FIELDS:
+        if field not in data or data.get(field) in (None, "", {}):
+            continue
+        value = data.get(field)
+        if not isinstance(value, Mapping) or _calendar_event_timestamps_invalid(value):
+            return True
+    for field in _CALENDAR_EVENT_LIST_FIELDS:
+        if field not in data or data.get(field) in (None, "", [], ()):
+            continue
+        value = data.get(field)
+        if not isinstance(value, (list, tuple)) or any(
+            not isinstance(item, Mapping)
+            or not item
+            or _calendar_event_timestamps_invalid(item)
+            for item in value
+        ):
+            return True
+    return (
+        "scheduled_at" in data
+        and data.get("scheduled_at") not in (None, "")
+        and _parse_aware_timestamp(data.get("scheduled_at")) is None
+    )
+
+
+def _calendar_event_timestamps_invalid(event: Mapping[str, Any]) -> bool:
+    return any(
+        field in event
+        and event.get(field) not in (None, "")
+        and _parse_aware_timestamp(event.get(field)) is None
+        for field in _CALENDAR_TIMESTAMP_FIELDS
+    )
 
 
 def timing_state_for_profile(profile: TimingProfile, *, scheduled: bool) -> str:
@@ -922,6 +973,7 @@ def _clamp(value: float) -> float:
 __all__ = (
     "TimingProfile",
     "apply_validated_rsi_adjustments",
+    "calendar_context_invalid",
     "configured_route",
     "decision_warnings",
     "directional_bias",

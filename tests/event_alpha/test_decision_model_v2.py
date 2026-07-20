@@ -568,6 +568,61 @@ def test_selloff_with_attached_calendar_event_routes_to_calendar_risk():
     assert result.preferred_horizon == "scheduled_window"
 
 
+def test_malformed_calendar_context_cannot_bypass_scheduled_risk_review():
+    malformed_contexts = (
+        {"unified_calendar_event": []},
+        {"calendar_event": "2026-06-15T18:00:00Z"},
+        {"scheduled_catalyst_event": True},
+        {"unlock_event": [{"scheduled_at": "2026-06-15T18:00:00Z"}]},
+        {"unified_calendar_context": [{"scheduled_at": "not-a-time"}]},
+        {
+            "nearby_calendar_events": [
+                {"scheduled_at": "2026-06-15T18:00:00Z"},
+                "not-an-event",
+            ]
+        },
+        {"calendar_events": {"scheduled_at": "2026-06-15T18:00:00Z"}},
+        {"scheduled_at": "not-a-time"},
+    )
+
+    for malformed in malformed_contexts:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**malformed)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "calendar_context_invalid" in result.decision_hard_blockers
+
+
+def test_typed_calendar_context_preserves_exact_window_and_legacy_schedule_routes():
+    valid_contexts = (
+        {
+            "unified_calendar_context": [{
+                "event_id": "fomc-window",
+                "window_start": "2026-06-15T18:00:00Z",
+                "window_end": "2026-06-15T20:00:00Z",
+            }]
+        },
+        {
+            "scheduled_catalyst_event": {
+                "event_type": "project",
+                "event_start_time": "2026-06-15T20:00:00Z",
+            }
+        },
+        {"scheduled_at": "2026-06-15T18:00:00Z"},
+    )
+
+    for context in valid_contexts:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**context)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "calendar_risk"
+        assert "calendar_context_invalid" not in result.decision_hard_blockers
+
+
 def test_calendar_overlay_adds_bounded_risk_warning_and_expiry_without_bias():
     base_row = _market_led_candidate(observed_at="2026-06-15T16:00:00Z")
     base = decision_model.evaluate_radar_decision(base_row)
