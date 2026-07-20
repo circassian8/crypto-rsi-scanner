@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -263,7 +264,10 @@ def _incident_market_context(
                 "market_context_source": "raw_market_anomaly_snapshot" if anomaly else "raw_market_snapshot",
                 "market_context_asset": market.get("symbol") or market.get("coin_id") or market.get("id"),
                 "market_confirmation_level": "observed",
-                "market_confirmation_score": anomaly.get("score") or market.get("anomaly_score") or 1.0,
+                "market_confirmation_score": _raw_market_confirmation_score(
+                    anomaly,
+                    market,
+                ),
             })
     if not candidates:
         return {
@@ -275,11 +279,19 @@ def _incident_market_context(
             "market_context_asset": None,
             "market_context_age": None,
         }
-    best = sorted(candidates, key=lambda row: _float(row.get("market_confirmation_score")), reverse=True)[0]
+    best = sorted(
+        candidates,
+        key=lambda row: _bounded_market_confirmation_score(
+            row.get("market_confirmation_score")
+        ),
+        reverse=True,
+    )[0]
     reaction_observed = any(
         _incident_flag_true(row.get("market_reaction_confirmed"))
         or bool(row.get("market_context_source"))
-        or _float(row.get("market_confirmation_score")) > 0
+        or _bounded_market_confirmation_score(
+            row.get("market_confirmation_score")
+        ) > 0
         or str(row.get("market_confirmation_level") or "").casefold() in {"weak", "moderate", "strong"}
         for row in candidates
     )
@@ -295,9 +307,51 @@ def _incident_market_context(
             for row in candidates
         ),
         "market_context_source": _value(best, "market_context_source"),
-        "market_context_asset": _value(best, "validated_symbol") or _value(best, "symbol") or _value(best, "coin_id"),
-        "market_context_age": best.get("market_context_age_seconds"),
+        "market_context_asset": _value(best, "market_context_asset") or _value(best, "validated_symbol") or _value(best, "symbol") or _value(best, "coin_id"),
+        "market_context_age": _nonnegative_finite(
+            best.get("market_context_age_seconds")
+        ),
     }
+
+
+def _raw_market_confirmation_score(
+    anomaly: Mapping[str, Any],
+    market: Mapping[str, Any],
+) -> float:
+    """Return one raw context score without hiding explicit invalid evidence."""
+
+    for source, field in ((anomaly, "score"), (market, "anomaly_score")):
+        if field not in source:
+            continue
+        value = source.get(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        return _bounded_market_confirmation_score(value)
+    return 1.0
+
+
+def _bounded_market_confirmation_score(value: object) -> float:
+    if isinstance(value, bool):
+        return 0.0
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(parsed) or not 0.0 <= parsed <= 100.0:
+        return 0.0
+    return parsed
+
+
+def _nonnegative_finite(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) and parsed >= 0.0 else None
+
+
 def _incident_confidence(
     incident: event_incident_graph.CanonicalIncident,
     h_rows: list[dict[str, Any]],

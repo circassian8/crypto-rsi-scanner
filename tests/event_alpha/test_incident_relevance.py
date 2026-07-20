@@ -81,6 +81,69 @@ def test_incident_policy_flags_require_semantic_truth():
     assert "causal=false" in lines
 
 
+def test_incident_market_context_rejects_malformed_scores_and_preserves_raw_asset():
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.incidents as incidents
+
+    context = incidents._incident_market_context(  # noqa: SLF001
+        [
+            {
+                "market_context_source": "malformed",
+                "market_confirmation_score": 1000,
+                "market_confirmation_level": "malformed",
+                "market_context_age_seconds": float("nan"),
+                "symbol": "BAD",
+            },
+            {
+                "market_context_source": "validated",
+                "market_confirmation_score": 80,
+                "market_confirmation_level": "strong",
+                "market_context_age_seconds": 3600,
+                "symbol": "GOOD",
+            },
+        ],
+        [],
+    )
+
+    assert context["market_context_source"] == "validated"
+    assert context["market_context_asset"] == "GOOD"
+    assert context["market_reaction_level"] == "strong"
+    assert context["market_context_age"] == 3600.0
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf"), -1, 101):
+        malformed_only = incidents._incident_market_context(  # noqa: SLF001
+            [{"market_confirmation_score": malformed}],
+            [],
+        )
+        assert malformed_only["market_reaction_observed"] is False
+
+    incident = SimpleNamespace(raw_ids=("shadowed", "valid"))
+    raw_by_id = {
+        "shadowed": SimpleNamespace(raw_json={
+            "market": {
+                "symbol": "SHADOWED",
+                "coin_id": "shadowed",
+                "anomaly_score": 99,
+            },
+            "anomaly": {"score": 0},
+        }),
+        "valid": SimpleNamespace(raw_json={
+            "market": {"symbol": "VALID", "coin_id": "valid"},
+            "anomaly": {"score": 0.5},
+        }),
+    }
+    raw_context = incidents._incident_market_context(  # noqa: SLF001
+        [],
+        [],
+        incident=incident,
+        raw_by_id=raw_by_id,
+    )
+
+    assert raw_context["market_context_source"] == "raw_market_anomaly_snapshot"
+    assert raw_context["market_context_asset"] == "VALID"
+
+
 def test_event_incident_relevance_gates_raw_external_observations():
     import tempfile
     from datetime import datetime, timezone

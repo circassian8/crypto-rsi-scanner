@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve canonical incident market context · Codex
+**Why:** Canonical incident projection ranked raw market-confirmation values
+without a 0–100 contract. A reproduced score of 1000 beat valid 80-point
+evidence, while a raw anomaly's explicit asset identity was dropped from the
+stored incident context.
+**Changes:** Added one finite non-boolean 0–100 market score projector for
+incident selection and observed-reaction evidence. Raw anomaly score precedence
+is now presence-aware: explicit zero remains zero, explicit malformed evidence
+fails closed, and only genuinely absent values use the documented observed-
+context default. The selected raw `market_context_asset` now survives, and
+negative/non-finite context age becomes unavailable. Added public regressions
+for malformed scores, valid selection, alias shadowing, raw identity, and age.
+No score formula, threshold, route, or provider policy changed.
+**Verify:** The new regression passed, followed by `35` focused incident-
+relevance, claim-semantics, impact-hypothesis, and watchlist tests.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Protect canonical watchlist component truth · Codex
 **Why:** Hypothesis watchlist projection merged raw `score_components` last, so
 untrusted component keys could overwrite canonical scores, validation evidence,
