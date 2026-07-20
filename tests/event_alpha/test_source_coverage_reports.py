@@ -597,6 +597,41 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert doctor.degraded_provider_absence_marked_meaningful == 1
     assert doctor.missing_provider_recommendations_missing == 1
 
+    semantic_false_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        core_opportunity_rows=[
+            {
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "test",
+                "core_opportunity_id": "agg:false-source-coverage",
+                "source_pack": "proxy_preipo_rwa_pack",
+                "provider_coverage_status": "degraded",
+                "evidence_absence_is_meaningful": "false",
+            }
+        ],
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+        include_test_artifacts=True,
+        strict=True,
+    )
+    assert semantic_false_doctor.degraded_provider_absence_marked_meaningful == 0
+
+    from crypto_rsi_scanner.event_alpha.artifacts import opportunity_audit
+    from crypto_rsi_scanner.event_alpha.artifacts.research_cards.components import source_coverage as card_source_coverage
+
+    false_components = {
+        "provider": "binance_announcements",
+        "source_pack": "listing_liquidity_pack",
+        "provider_coverage_status": "complete",
+        "evidence_absence_is_meaningful": "false",
+        "symbol": "TEST",
+        "coin_id": "test-token",
+    }
+    card_lines = card_source_coverage._source_acquisition_lines(None, false_components)  # noqa: SLF001
+    audit_lines = opportunity_audit._source_acquisition_audit_lines({}, false_components)  # noqa: SLF001
+    assert "- Evidence absence meaningful: false" in card_lines
+    assert "- evidence absence meaningful: false" in audit_lines
+
     unobserved = event_alpha_source_coverage.build_source_coverage_report(
         provider_status_report=provider_report,
         provider_health_rows={},

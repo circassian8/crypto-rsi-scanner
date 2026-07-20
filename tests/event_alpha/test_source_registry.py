@@ -133,6 +133,23 @@ def test_event_source_registry_v2_provider_semantics():
     assert exchange.can_validate_catalyst is True
     assert "official_confirmation" in exchange.can_prove
     assert "listing_volatility" in exchange.useful_playbooks
+    complete_exchange = event_source_registry.assess_source(
+        {"provider": "binance_announcements", "title": "Binance Will List TEST"},
+        symbol="TEST",
+        coin_id="test-token",
+        provider_coverage_status="complete",
+    )
+    assert complete_exchange.evidence_absence_is_meaningful is True
+    explicit_false = event_source_registry.source_contract_metadata(
+        assessment=complete_exchange,
+        evidence_rows=({"evidence_absence_is_meaningful": "false"},),
+    )
+    assert explicit_false["evidence_absence_is_meaningful"] is False
+    explicit_true = event_source_registry.source_contract_metadata(
+        assessment=gdelt_degraded,
+        evidence_rows=({"evidence_absence_is_meaningful": "true"},),
+    )
+    assert explicit_true["evidence_absence_is_meaningful"] is True
 
     market_data = event_source_registry.assess_source(
         {"provider": "coingecko_market_data", "title": "RUNE price snapshot"},

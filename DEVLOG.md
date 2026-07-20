@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Parse evidence-absence truth semantically · Codex
+**Why:** Source-coverage artifacts used Python truthiness for
+`evidence_absence_is_meaningful`. The literal string `"false"` became true in
+the canonical contract, strict doctor, research card, and opportunity audit,
+creating contradictory operator truth.
+**Changes:** Added explicit true/false compatibility parsing to the canonical
+source contract, routed card/audit rendering through that result, and made the
+doctor use its existing semantic truth parser. Preserved the stronger
+receipt-backed coverage-pack override on cards. Added regressions for complete
+official coverage, degraded coverage, doctor behavior, and both trader-facing
+surfaces. No source authority, coverage policy, score, threshold, route,
+provider, or historical artifact changed.
+**Verify:** All 57 focused source-registry, source-coverage,
+evidence-acquisition, and core-opportunity tests passed. `compileall` and
+`git diff --check` passed.
+**Notes/risks:** Quantitative source-size limits remain advisory. Security,
+artifact, provider-read, and integrity bounds remain enforced.
+
 ## 2026-07-20 — Normalize discovery confidence upstream · Codex
 **Why:** Raw discovery normalization accepted arbitrary floats for event and
 event-time confidence. Boolean, non-finite, negative, and over-1 values could

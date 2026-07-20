@@ -885,9 +885,11 @@ def source_contract_metadata(
     cannot_prove = _contract_values(rows, "source_cannot_prove") or assessment.cannot_prove
     useful_playbooks = _contract_values(rows, "source_useful_playbooks") or assessment.useful_playbooks
     absence_values = [
-        bool(row.get("evidence_absence_is_meaningful"))
+        parsed
         for row in rows
         if "evidence_absence_is_meaningful" in row
+        for parsed in (_explicit_bool(row.get("evidence_absence_is_meaningful")),)
+        if parsed is not None
     ]
     coverage_values = _contract_values(rows, "provider_coverage_status")
     gap_values = _contract_values(rows, "source_coverage_gap_reason")
@@ -899,6 +901,20 @@ def source_contract_metadata(
         "provider_coverage_statuses": tuple(dict.fromkeys(str(item) for item in coverage_values if str(item))),
         "source_coverage_gap_reasons": tuple(dict.fromkeys(str(item) for item in gap_values if str(item))),
     }
+
+
+def _explicit_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+    if type(value) is int and value in {0, 1}:
+        return bool(value)
+    return None
 
 
 def coverage_gap_reason(provider: str | None, status: str | ProviderCoverageStatus | None) -> str | None:

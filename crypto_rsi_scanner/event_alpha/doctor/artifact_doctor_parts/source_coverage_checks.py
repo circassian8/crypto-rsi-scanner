@@ -43,7 +43,9 @@ def _source_coverage_metadata_conflicts(rows: Iterable[Mapping[str, Any]]) -> di
         recs = _tuple_value(row.get("source_coverage_recommended_actions") or row.get("recommended_actions"))
         if (missing or degraded) and not recs:
             out["missing_provider_recommendations_missing"] += 1
-        absence = bool(row.get("evidence_absence_is_meaningful") or row.get("evidence_absence_meaningful"))
+        absence = _truthy(row.get("evidence_absence_is_meaningful")) or _truthy(
+            row.get("evidence_absence_meaningful")
+        )
         if status in {"degraded", "unavailable", "not_configured"} and absence:
             out["degraded_provider_absence_marked_meaningful"] += 1
     return out

@@ -682,7 +682,7 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- source pack: {pack_name}",
         f"- source mission: {assessment.source_mission}",
         f"- provider coverage: {merged.get('provider_coverage_status') or assessment.provider_coverage_status}",
-        f"- evidence absence meaningful: {str(bool(merged.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
+        f"- evidence absence meaningful: {str(contract['evidence_absence_is_meaningful']).lower()}",
         f"- source quality prior/cap: {_first_present(merged.get('source_quality_prior'), assessment.source_quality_prior)}/{_first_present(merged.get('source_confidence_cap'), assessment.confidence_cap)}",
         f"- source can prove: {_source_contract_text(contract.get('source_can_prove'))}",
         f"- source cannot prove: {_source_contract_text(contract.get('source_cannot_prove'))}",

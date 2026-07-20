@@ -569,14 +569,14 @@ def _source_acquisition_lines(
         else (components.get("provider_coverage_status") or assessment.provider_coverage_status)
     )
     absence_meaningful = (
-        coverage_pack.get("evidence_absence_meaningful")
+        coverage_pack.get("evidence_absence_meaningful") is True
         if coverage_pack and coverage_pack.get("evidence_absence_meaningful") is not None
-        else components.get("evidence_absence_is_meaningful", assessment.evidence_absence_is_meaningful)
+        else contract["evidence_absence_is_meaningful"]
     )
     lines = [
         f"- Source pack: {pack_name}",
         f"- Coverage status: {coverage_status or 'unknown'}",
-        f"- Evidence absence meaningful: {str(bool(absence_meaningful)).lower()}",
+        f"- Evidence absence meaningful: {str(absence_meaningful).lower()}",
         f"- Source quality prior/cap: {_first_present(components.get('source_quality_prior'), assessment.source_quality_prior)}/{_first_present(components.get('source_confidence_cap'), assessment.confidence_cap)}",
         "- Source can prove: " + _source_contract_text(contract.get("source_can_prove")),
         "- Source cannot prove: " + _source_contract_text(contract.get("source_cannot_prove")),
