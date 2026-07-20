@@ -246,6 +246,25 @@ def test_authorized_readiness_is_exact_but_still_no_call_or_write() -> None:
     assert payload["directional_authority"] is False
 
 
+def test_malformed_execution_instrument_cannot_unlock_derivatives() -> None:
+    capture = deepcopy(_capture())
+    capture["eligible_instruments"][0]["liquidity_rank"] = True
+
+    payload = build_bybit_derivatives_live_readiness(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=NOW,
+        capture_loader=lambda _base: capture,
+        resolver=_resolver(),
+    )
+
+    assert payload["ready"] is False
+    assert payload["eligible_instrument_count"] == 0
+    assert payload["maximum_provider_requests_for_current_capture"] == 0
+    assert payload["reasons"] == ["eligible_instrument_schema_invalid"]
+    assert payload["provider_call_planned"] is False
+
+
 def test_confirmed_capture_seals_only_exact_transport_responses(
     tmp_path: Path,
 ) -> None:

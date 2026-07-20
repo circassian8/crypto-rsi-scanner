@@ -520,6 +520,115 @@ def bybit_base_symbol_requestable(value: object) -> bool:
     return isinstance(value, str) and bool(_ASSET_RE.fullmatch(value.strip().upper()))
 
 
+def bybit_eligible_instrument_from_values(
+    value: object,
+) -> BybitEligibleInstrument:
+    """Validate one persisted venue instrument without coercing evidence types."""
+
+    expected = {
+        "base_asset",
+        "canonical_asset_id",
+        "contract_type",
+        "delivery_time_ms",
+        "instrument_id",
+        "launch_time_ms",
+        "liquidity_rank",
+        "maximum_limit_order_quantity",
+        "maximum_market_order_quantity",
+        "minimum_notional_value_usdt",
+        "minimum_order_quantity",
+        "quantity_step",
+        "quote_asset",
+        "radar_symbol",
+        "settle_asset",
+        "status",
+        "tick_size",
+    }
+    if not isinstance(value, Mapping) or set(value) != expected:
+        raise BybitExecutionQualityError("eligible_instrument_schema_invalid")
+    text_fields = (
+        "canonical_asset_id",
+        "radar_symbol",
+        "instrument_id",
+        "base_asset",
+        "quote_asset",
+        "settle_asset",
+        "contract_type",
+        "status",
+        "tick_size",
+        "quantity_step",
+        "minimum_order_quantity",
+        "maximum_limit_order_quantity",
+        "maximum_market_order_quantity",
+        "minimum_notional_value_usdt",
+    )
+    if any(
+        not isinstance(value.get(field), str)
+        or value.get(field) != str(value.get(field)).strip()
+        or not value.get(field)
+        for field in text_fields
+    ):
+        raise BybitExecutionQualityError("eligible_instrument_text_invalid")
+    if (
+        type(value.get("liquidity_rank")) is not int
+        or type(value.get("launch_time_ms")) is not int
+        or type(value.get("delivery_time_ms")) is not int
+    ):
+        raise BybitExecutionQualityError("eligible_instrument_integer_invalid")
+
+    instrument = BybitEligibleInstrument(
+        canonical_asset_id=value["canonical_asset_id"],
+        radar_symbol=value["radar_symbol"],
+        liquidity_rank=value["liquidity_rank"],
+        instrument_id=value["instrument_id"],
+        base_asset=value["base_asset"],
+        quote_asset=value["quote_asset"],
+        settle_asset=value["settle_asset"],
+        contract_type=value["contract_type"],
+        status=value["status"],
+        tick_size=value["tick_size"],
+        quantity_step=value["quantity_step"],
+        minimum_order_quantity=value["minimum_order_quantity"],
+        maximum_limit_order_quantity=value["maximum_limit_order_quantity"],
+        maximum_market_order_quantity=value["maximum_market_order_quantity"],
+        minimum_notional_value_usdt=value["minimum_notional_value_usdt"],
+        launch_time_ms=value["launch_time_ms"],
+        delivery_time_ms=value["delivery_time_ms"],
+    )
+    if (
+        not _CANONICAL_ASSET_RE.fullmatch(instrument.canonical_asset_id)
+        or not _ASSET_RE.fullmatch(instrument.radar_symbol)
+        or not _ASSET_RE.fullmatch(instrument.base_asset)
+        or not _INSTRUMENT_RE.fullmatch(instrument.instrument_id)
+        or instrument.radar_symbol != instrument.base_asset
+        or instrument.instrument_id != f"{instrument.base_asset}{QUOTE_ASSET}"
+        or instrument.quote_asset != QUOTE_ASSET
+        or instrument.settle_asset != QUOTE_ASSET
+        or instrument.contract_type != CONTRACT_TYPE
+        or instrument.status != INSTRUMENT_STATUS
+        or not 1 <= instrument.liquidity_rank <= MAX_RADAR_ASSETS
+        or instrument.launch_time_ms < 0
+        or instrument.delivery_time_ms < 0
+    ):
+        raise BybitExecutionQualityError("eligible_instrument_contract_invalid")
+    decimal_fields = (
+        "tick_size",
+        "quantity_step",
+        "minimum_order_quantity",
+        "maximum_limit_order_quantity",
+        "maximum_market_order_quantity",
+        "minimum_notional_value_usdt",
+    )
+    for field in decimal_fields:
+        parsed = _decimal(getattr(instrument, field), field)
+        if _canonical_decimal_text(parsed) != getattr(instrument, field):
+            raise BybitExecutionQualityError(
+                "eligible_instrument_decimal_not_canonical"
+            )
+    _instrument_order_constraints(instrument)
+    return instrument
+
+
 def select_bybit_usdt_perpetual_instruments(
     radar_assets: Sequence[Mapping[str, object]],
     payload: Mapping[str, object],
@@ -1750,6 +1859,7 @@ __all__ = (
     "BybitTargetNotionalRoundTrip",
     "BybitTargetNotionalSizing",
     "bybit_base_symbol_requestable",
+    "bybit_eligible_instrument_from_values",
     "build_bybit_instrument_catalog_request",
     "build_bybit_orderbook_request",
     "build_bybit_public_request_plan",

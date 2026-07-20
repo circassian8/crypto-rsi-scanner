@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Fail closed on persisted Bybit instrument types · Codex
+**Why:** Intraday readiness reconstructed execution-capture instruments with
+`str()`/`int()` coercion. Reproduced booleans in canonical identity, liquidity
+rank, price constraints, or launch time—and noncanonical decimal text—could
+therefore unlock both intraday and derivatives provider plans.
+**Changes:** Added one canonical persisted-instrument parser to the Bybit
+execution-quality contract. It requires the exact field set, real text and
+integer types, canonical venue/base/instrument identity, bounded liquidity
+rank, non-negative venue clocks, canonical positive decimal constraints, and
+the existing quantity alignment/consistency rules. Immutable capture reading,
+intraday readiness, and derivatives readiness now share that parser; malformed
+evidence leaves the instrument set empty before any provider plan. Added five
+intraday mutations and a derivatives consumer regression. No request budget,
+endpoint, cost model, score, threshold, route, or authorization changed.
+**Verify:** `419` focused Bybit execution-quality, intraday, derivatives,
+funding, liquidation, capture, and live-boundary tests passed.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No Bybit or other provider call, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative
+source-size limits remain advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Require typed market-anomaly incident identity · Codex
 **Why:** Canonical incident construction stringified malformed market identity
 values. A reproduced snapshot with `symbol=true`, `coin_id=false`, and an

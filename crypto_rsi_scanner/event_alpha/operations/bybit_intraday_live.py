@@ -21,12 +21,12 @@ from typing import Any, Callable, Mapping, Sequence
 from ... import config
 from ..dashboard.readiness import DashboardReadinessError, resolve_authoritative_dashboard
 from .bybit_execution_quality import (
-    CONTRACT_TYPE,
-    INSTRUMENT_STATUS,
     MAX_RADAR_ASSETS,
     QUOTE_ASSET,
     BybitEligibleInstrument,
+    BybitExecutionQualityError,
     BybitPublicRequest,
+    bybit_eligible_instrument_from_values,
 )
 from .bybit_execution_quality_capture import (
     BybitCapturedJSONResponse,
@@ -138,68 +138,10 @@ def _iso(value: datetime) -> str:
 
 
 def _instrument_from_values(value: object) -> BybitEligibleInstrument:
-    if not isinstance(value, Mapping):
-        raise BybitIntradayLiveError("eligible_instrument_schema_invalid")
-    expected = {
-        "base_asset",
-        "canonical_asset_id",
-        "contract_type",
-        "delivery_time_ms",
-        "instrument_id",
-        "launch_time_ms",
-        "liquidity_rank",
-        "maximum_limit_order_quantity",
-        "maximum_market_order_quantity",
-        "minimum_notional_value_usdt",
-        "minimum_order_quantity",
-        "quantity_step",
-        "quote_asset",
-        "radar_symbol",
-        "settle_asset",
-        "status",
-        "tick_size",
-    }
-    if set(value) != expected:
-        raise BybitIntradayLiveError("eligible_instrument_schema_invalid")
     try:
-        instrument = BybitEligibleInstrument(
-            canonical_asset_id=str(value["canonical_asset_id"]),
-            radar_symbol=str(value["radar_symbol"]),
-            liquidity_rank=int(value["liquidity_rank"]),
-            instrument_id=str(value["instrument_id"]),
-            base_asset=str(value["base_asset"]),
-            quote_asset=str(value["quote_asset"]),
-            settle_asset=str(value["settle_asset"]),
-            contract_type=str(value["contract_type"]),
-            status=str(value["status"]),
-            tick_size=str(value["tick_size"]),
-            quantity_step=str(value["quantity_step"]),
-            minimum_order_quantity=str(value["minimum_order_quantity"]),
-            maximum_limit_order_quantity=str(
-                value["maximum_limit_order_quantity"]
-            ),
-            maximum_market_order_quantity=str(
-                value["maximum_market_order_quantity"]
-            ),
-            minimum_notional_value_usdt=str(
-                value["minimum_notional_value_usdt"]
-            ),
-            launch_time_ms=int(value["launch_time_ms"]),
-            delivery_time_ms=int(value["delivery_time_ms"]),
-        )
-    except (KeyError, TypeError, ValueError) as exc:
+        return bybit_eligible_instrument_from_values(value)
+    except BybitExecutionQualityError as exc:
         raise BybitIntradayLiveError("eligible_instrument_schema_invalid") from exc
-    if (
-        instrument.quote_asset != QUOTE_ASSET
-        or instrument.settle_asset != QUOTE_ASSET
-        or instrument.contract_type != CONTRACT_TYPE
-        or instrument.status != INSTRUMENT_STATUS
-        or instrument.radar_symbol != instrument.base_asset
-        or instrument.instrument_id != f"{instrument.base_asset}{QUOTE_ASSET}"
-        or not 1 <= instrument.liquidity_rank <= MAX_RADAR_ASSETS
-    ):
-        raise BybitIntradayLiveError("eligible_instrument_contract_invalid")
-    return instrument
 
 
 def _current_authority(

@@ -231,6 +231,38 @@ def test_authorized_readiness_is_exact_but_still_no_call_or_write() -> None:
     assert payload["artifact_persisted"] is False
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("canonical_asset_id", True),
+        ("liquidity_rank", True),
+        ("tick_size", True),
+        ("quantity_step", "0.0010"),
+        ("launch_time_ms", True),
+    ),
+)
+def test_malformed_execution_instrument_cannot_unlock_intraday(
+    field: str,
+    value: object,
+) -> None:
+    capture = deepcopy(_capture())
+    capture["eligible_instruments"][0][field] = value
+
+    payload = build_bybit_intraday_live_readiness(
+        artifact_base_dir="unused",
+        environ={LIVE_AUTH_ENV: "1"},
+        now=NOW,
+        capture_loader=lambda _base: capture,
+        resolver=_resolver(),
+    )
+
+    assert payload["ready"] is False
+    assert payload["eligible_instrument_count"] == 0
+    assert payload["maximum_provider_requests_for_current_capture"] == 0
+    assert payload["reasons"] == ["eligible_instrument_schema_invalid"]
+    assert payload["provider_call_planned"] is False
+
+
 def test_stale_or_low_quality_execution_capture_cannot_unlock_intraday() -> None:
     stale = deepcopy(_capture())
     stale["protocol_v2_input_quality_eligible"] = False
