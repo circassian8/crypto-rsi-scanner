@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Make the human-review queue actionable without changing evidence
+**Status:** accepted
+**Decision:** Keep review-timing CLI status/queue JSON as the compatibility
+default. The ordinary Make surfaces select a concise projection that preserves
+counts, exact namespace/idea identity, route/bias/clocks, the confirmation-
+gated next command, provider/write state, and all safety counters. Full JSON
+remains available with `RADAR_REVIEW_TIMING_OUTPUT=json`. Both formats evaluate
+the same receipt-backed queue and neither records a human action.
+**Why:** The five current actions were hidden inside a large digest-heavy
+payload. Human timing evidence is useful only when the operator can identify
+and explicitly confirm the exact action without confusing queue inspection for
+a view event.
+**Revisit when:** The queue schema or human-review workflow is versioned. Any
+replacement must keep explicit confirmation and must never infer attention from
+dashboard or command reads.
+
 ## 2026-07-20 - Treat calibration and discovery control as separate shadow research
 **Status:** accepted as research design; no implementation or policy authority
 **Decision:** Keep the accepted anomaly-detector order unchanged. Study adaptive

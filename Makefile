@@ -132,6 +132,7 @@ RADAR_REVIEW_IDEA_ID ?=
 RADAR_REVIEWER_ALIAS ?= owner
 RADAR_REVIEW_EVALUATED_AT ?=
 RADAR_REVIEW_EVALUATED_AT_ARG = $(if $(strip $(RADAR_REVIEW_EVALUATED_AT)),--evaluated-at $(RADAR_REVIEW_EVALUATED_AT),)
+RADAR_REVIEW_TIMING_OUTPUT ?= summary
 DEFILLAMA_MAPPING_REGISTRY ?=
 DEFILLAMA_MAPPING_REGISTRY_ARG = $(if $(strip $(DEFILLAMA_MAPPING_REGISTRY)),--registry $(DEFILLAMA_MAPPING_REGISTRY),)
 RADAR_RESEARCH_OUTPUT_ROOT ?= event_fade_cache/decision_radar_research_lab
@@ -362,8 +363,8 @@ help:
 	@echo "  make radar-market-no-send          Compatibility alias for one closed Daily Operations cycle"
 	@echo "  make radar-market-no-send-smoke    Prove the market generation offline; never updates the dashboard pointer"
 	@echo "  make radar-market-campaign-report  Rebuild the artifact-derived Decision Radar campaign report; no provider call"
-	@echo "  make radar-review-timing-status  Inspect explicit human review timing; no provider call/write"
-	@echo "  make radar-review-timing-queue  Discover receipt-backed ideas awaiting explicit human review; no provider call/write"
+	@echo "  make radar-review-timing-status  Concise explicit human review timing; no provider call/write (RADAR_REVIEW_TIMING_OUTPUT=json for full JSON)"
+	@echo "  make radar-review-timing-queue  Concise receipt-backed action queue; no provider call/write (RADAR_REVIEW_TIMING_OUTPUT=json for full JSON)"
 	@echo "  CONFIRM=1 make radar-review-timing-view RADAR_REVIEW_NAMESPACE=... RADAR_REVIEW_IDEA_ID=...  Record first human view"
 	@echo "  CONFIRM=1 make radar-review-timing-complete RADAR_REVIEW_NAMESPACE=... RADAR_REVIEW_IDEA_ID=...  Record review completion"
 	@echo "  make radar-daily-ops-readiness     Concise readiness + bounded credential-free status receipt; no provider call (RADAR_DAILY_OPS_OUTPUT=json for full JSON)"
@@ -1511,12 +1512,12 @@ radar-outcome-price-recovery-application-status:
 radar-review-timing-status:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.decision_review_timing_cli \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) status \
-		$(RADAR_REVIEW_EVALUATED_AT_ARG)
+		$(RADAR_REVIEW_EVALUATED_AT_ARG) --output $(RADAR_REVIEW_TIMING_OUTPUT)
 
 radar-review-timing-queue:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.decision_review_timing_cli \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) queue \
-		$(RADAR_REVIEW_EVALUATED_AT_ARG)
+		$(RADAR_REVIEW_EVALUATED_AT_ARG) --output $(RADAR_REVIEW_TIMING_OUTPUT)
 
 radar-review-timing-view:
 	@test -n "$(strip $(RADAR_REVIEW_NAMESPACE))" || { echo "RADAR_REVIEW_NAMESPACE is required" >&2; exit 2; }

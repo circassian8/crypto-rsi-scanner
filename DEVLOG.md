@@ -17,6 +17,20 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Make the human-review queue concise and actionable · Codex
+**Why:** Five genuine receipt-backed ideas await explicit first view, but the
+normal queue command buried each action inside a large digest-heavy JSON
+document.
+**Changes:** Added a concise status/queue projection with aggregate state,
+exact namespace/idea identity, route, bias, observation/availability clocks,
+next confirmed command, and every zero safety counter. Make selects it by
+default; CLI JSON and `RADAR_REVIEW_TIMING_OUTPUT=json` preserve the full
+compatibility payload. Evaluation, receipt validation, and explicit-confirmation
+semantics are unchanged; inspection never records a view.
+**Verify:** Focused review-timing tests passed. The real queue rendered five
+`not_viewed` records with exact confirmed commands, `provider_calls=0`,
+`writes=0`, and every safety counter zero. The JSON override remained parseable.
+
 ## 2026-07-20 — Extend anomaly research with error-governance candidates · Codex
 **Why:** The preregistered detector order covered robust tails, residuals,
 changepoints, and later EVT, but it did not specify how a future causal score

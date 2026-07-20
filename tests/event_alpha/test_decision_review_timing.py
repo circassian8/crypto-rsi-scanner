@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from crypto_rsi_scanner.event_alpha.operations import decision_review_timing as timing
+from crypto_rsi_scanner.event_alpha.operations import decision_review_timing_cli
 from crypto_rsi_scanner.event_alpha.operations import (
     decision_review_timing_queue as timing_queue,
 )
@@ -351,6 +352,66 @@ def test_status_without_ledger_is_clean_no_event_report(tmp_path: Path) -> None:
         "no_explicit_human_actions_recorded_not_no_eligible_ideas"
     )
     assert report["provider_calls"] == 0
+
+
+def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
+    queue = {
+        "status": "action_required",
+        "generated_at": "2026-07-20T12:00:00+00:00",
+        "eligible_generation_count": 1,
+        "eligible_idea_count": 1,
+        "action_required_count": 1,
+        "not_viewed_count": 1,
+        "in_review_count": 0,
+        "complete_count": 0,
+        "skipped_candidate_count": 2,
+        "provider_calls": 0,
+        "writes": 0,
+        "commands_require_explicit_confirmation": True,
+        "dashboard_reads_recorded_as_human_actions": False,
+        "protocol_v2_evidence_eligible": False,
+        "research_only": True,
+        "records": [
+            {
+                "review_status": "not_viewed",
+                "radar_route": "dashboard_watch",
+                "directional_bias": "long",
+                "artifact_namespace": "radar_market_no_send_exact",
+                "idea_id": "iar:exact",
+                "idea_observed_at": "2026-07-20T11:00:00+00:00",
+                "idea_available_at": "2026-07-20T11:00:08+00:00",
+                "next_action": "record_first_view",
+                "next_safe_command": (
+                    "CONFIRM=1 make radar-review-timing-view "
+                    "RADAR_REVIEW_NAMESPACE=radar_market_no_send_exact "
+                    "RADAR_REVIEW_IDEA_ID=iar:exact "
+                    "RADAR_REVIEWER_ALIAS=YOUR_ALIAS"
+                ),
+            }
+        ],
+        "safety": {
+            "provider_calls": 0,
+            "telegram_sends": 0,
+            "trades": 0,
+            "orders": 0,
+            "event_alpha_paper_trades": 0,
+            "normal_rsi_writes": 0,
+            "event_alpha_triggered_fade": 0,
+            "production_policy_mutations": 0,
+        },
+    }
+
+    output = decision_review_timing_cli._render_summary("queue", queue)
+
+    assert "action_required_count=1" in output
+    assert "record[1].artifact_namespace=radar_market_no_send_exact" in output
+    assert "record[1].idea_id=iar:exact" in output
+    assert "record[1].next_safe_command=CONFIRM=1 make" in output
+    assert "commands_require_explicit_confirmation=true" in output
+    assert "dashboard_reads_recorded_as_human_actions=false" in output
+    assert "safety.provider_calls=0" in output
+    assert "safety.orders=0" in output
+    assert "RADAR_REVIEW_TIMING_OUTPUT=json" in output
 
 
 def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(

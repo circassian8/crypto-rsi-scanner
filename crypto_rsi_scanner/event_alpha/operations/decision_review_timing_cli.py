@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Any
+from typing import Any, Mapping
 
 from . import decision_review_timing
 from . import decision_review_timing_queue
@@ -28,6 +28,7 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     status.add_argument("--evaluated-at")
+    status.add_argument("--output", choices=("json", "summary"), default="json")
     queue = subparsers.add_parser(
         "queue",
         help=(
@@ -36,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     queue.add_argument("--evaluated-at")
+    queue.add_argument("--output", choices=("json", "summary"), default="json")
 
     for command, help_text in (
         ("view", "Record the first explicit operator view"),
@@ -84,8 +86,110 @@ def main(argv: list[str] | None = None) -> int:
             reviewer_alias=args.reviewer_alias,
             confirm=args.confirm,
         )
-    print(json.dumps(result, indent=2, sort_keys=True))
+    output = getattr(args, "output", "json")
+    if output == "summary":
+        print(_render_summary(args.command, result))
+    else:
+        print(json.dumps(result, indent=2, sort_keys=True))
     return 0
+
+
+def _render_summary(command: str, result: Mapping[str, Any]) -> str:
+    """Render bounded human-action truth without changing queue evaluation."""
+
+    lines: list[tuple[str, object]] = [
+        ("report", "decision_radar_review_timing"),
+        ("command", command),
+        ("status", result.get("status")),
+        ("generated_at", result.get("generated_at") or result.get("evaluated_at")),
+    ]
+    if command == "queue":
+        for field in (
+            "eligible_generation_count",
+            "eligible_idea_count",
+            "action_required_count",
+            "not_viewed_count",
+            "in_review_count",
+            "complete_count",
+            "skipped_candidate_count",
+        ):
+            lines.append((field, result.get(field)))
+    else:
+        for field in (
+            "ledger_event_count",
+            "idea_record_count",
+            "first_viewed_count",
+            "review_completed_count",
+        ):
+            lines.append((field, result.get(field)))
+    lines.extend(
+        (
+            ("provider_calls", result.get("provider_calls")),
+            ("writes", result.get("writes")),
+            (
+                "commands_require_explicit_confirmation",
+                result.get("commands_require_explicit_confirmation"),
+            ),
+            (
+                "dashboard_reads_recorded_as_human_actions",
+                result.get("dashboard_reads_recorded_as_human_actions"),
+            ),
+            (
+                "protocol_v2_evidence_eligible",
+                result.get("protocol_v2_evidence_eligible"),
+            ),
+        )
+    )
+    records = result.get("records")
+    if type(records) is list:
+        for index, raw in enumerate(records, start=1):
+            if not isinstance(raw, Mapping):
+                continue
+            prefix = f"record[{index}]"
+            for field in (
+                "review_status",
+                "radar_route",
+                "directional_bias",
+                "artifact_namespace",
+                "idea_id",
+                "idea_observed_at",
+                "idea_available_at",
+                "next_action",
+                "next_safe_command",
+            ):
+                lines.append((f"{prefix}.{field}", raw.get(field)))
+    safety = result.get("safety")
+    if isinstance(safety, Mapping):
+        for field in (
+            "provider_calls",
+            "telegram_sends",
+            "trades",
+            "orders",
+            "event_alpha_paper_trades",
+            "normal_rsi_writes",
+            "event_alpha_triggered_fade",
+            "production_policy_mutations",
+        ):
+            lines.append((f"safety.{field}", safety.get(field)))
+    lines.extend(
+        (
+            ("research_only", result.get("research_only")),
+            (
+                "full_json_command",
+                f"make radar-review-timing-{command} "
+                "RADAR_REVIEW_TIMING_OUTPUT=json PYTHON=.venv/bin/python",
+            ),
+        )
+    )
+    return "\n".join(f"{key}={_summary_value(value)}" for key, value in lines)
+
+
+def _summary_value(value: object) -> str:
+    if value is None:
+        return "unavailable"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value).replace("\r", " ").replace("\n", " ")
 
 
 def _utc_now() -> str:
