@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-ninth market cycle · Codex
+**Why:** The manual no-send campaign reached its next cadence boundary while
+explicit CoinGecko authorization remained present, so one additional genuine
+point-in-time observation was needed to continue warming the Protocol-v2
+temporal/control evidence base.
+**Changes:** Ran exactly one Daily Operations cycle. One bounded `/coins/markets`
+request returned HTTP 200 with 80 rows in 2,986 ms and no retry, producing 30
+selected observations in
+`radar_market_no_send_20260720t163847908636z_cd383152e5e0`. Strict publication
+and owned dashboard restart succeeded; revision 12 now binds operator-state
+SHA-256 `454a143b41a416ef64e4e7aae81db6a4e94bc9194ceb68c06b81bf69aa339fbf`
+and pointer SHA-256
+`7cdf7a6d85c201e3d14e88d684b763464e1d36930a647489830d236c79b02eab`.
+Campaign truth advanced to 49 cycles, 1,470 retained, 1,440 baseline-counted,
+and 30 too-close observations. Prospective point-in-time universe/liquidity
+context now covers 210 counted rows. The current generation is healthy-empty:
+zero anomalies and Decision ideas, 27/30 exact rows warm, and 28/30 retained
+same-asset next-observation readiness. The causal 24-hour regime input remains
+honestly 27/30: PUMP rank 15, WBT rank 26, and SHIB rank 30 are unavailable, so
+no regime, partition, or matched control was fabricated. Next eligibility is
+`2026-07-20T17:38:49.528012+00:00`.
+**Verify:** Exact strict artifact doctor returned `OK` with zero blockers and
+warnings. Exact dashboard readiness passed for run
+`2026-07-20T16:38:49.528012+00:00|no_key_live`; loopback `HEAD /` returned HTTP
+200 with matching namespace, run, revision, and operator digest. The canonical
+campaign report regenerated with zero provider calls.
+**Notes/risks:** The cycle made one authorized market-data request. Telegram
+sends, trades, orders, paper trades, normal RSI writes, and Event Alpha
+`TRIGGERED_FADE` all remained zero. It did not call Bybit, recover DEXE prices,
+change thresholds, install scheduling, or bind Protocol v2.
+
 ## 2026-07-20 — Revalidate Bybit identity at intraday publication · Codex
 **Why:** The live readiness boundary used the new canonical Bybit instrument
 parser, but immutable intraday publication still had an older private
