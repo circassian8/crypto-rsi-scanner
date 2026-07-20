@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Extend anomaly research with error-governance candidates · Codex
+**Why:** The preregistered detector order covered robust tails, residuals,
+changepoints, and later EVT, but it did not specify how a future causal score
+would be calibrated or how repeated dependent discoveries would be governed.
+**Changes:** Advanced the research-only preregistration to schema v3 without
+changing its detector order. Added adaptive confidence-sequence thresholds,
+conformal calibration, a heavy-tail-aware changepoint comparator, and online
+p/e-value discovery control as separate shadow research. Closed the required
+assumption, causal-reference, hypothesis-order, trial-ledger, alert-burden,
+detection-delay, and no-claim-without-valid-input rules. Added primary research
+references and the matching durable decision/roadmap record.
+**Verify:** Validated the JSON document and its Markdown/JSON schema-version
+agreement, checked whitespace with `git diff --check`, and ran the static
+Protocol-v2 progress check. This documentation-only change made no provider
+call or write to campaign evidence and changed no code, threshold, score, route,
+holdout, authority, or safety boundary.
+
 ## 2026-07-20 — Disambiguate baseline and control coverage · Codex
 **Why:** The concise Daily Operations view's `30/36` warmth count described all
 historical campaign assets, but its original label could be mistaken for the

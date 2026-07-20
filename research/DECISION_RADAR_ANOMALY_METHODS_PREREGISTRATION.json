@@ -1,6 +1,6 @@
 {
   "schema_id": "decision_radar.anomaly_methods_preregistration",
-  "schema_version": 2,
+  "schema_version": 3,
   "status": "research_only_rank_1_shadow_implemented_not_calibrated",
   "as_of_date": "2026-07-20",
   "purpose": "Predeclare the order and evidence gates for future anomaly-method experiments without changing production policy.",
@@ -98,12 +98,58 @@
       ]
     }
   ],
+  "cross_cutting_research": [
+    {
+      "method": "adaptive_online_thresholding",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "causal_point_in_time_score_stream",
+        "predeclared_false_alert_and_miss_events",
+        "feedback_and_missingness_clocks_frozen",
+        "method_assumptions_verified_not_inferred",
+        "time_indexed_calibration_and_alert_burden_reported",
+        "no_validation_or_holdout_threshold_selection"
+      ]
+    },
+    {
+      "method": "conformal_score_calibration",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "causal_reference_set_bound_per_score",
+        "time_series_dependence_handled_by_predeclared_rule",
+        "coverage_drift_reported",
+        "descriptive_rank_never_relabelled_as_p_value"
+      ]
+    },
+    {
+      "method": "heavy_tail_aware_changepoint_comparator",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "bounded_feature_family",
+        "reset_and_missing_observation_rules_frozen",
+        "false_alarm_and_detection_delay_definitions_frozen",
+        "context_only_no_direction_catalyst_tradability_or_route_authority"
+      ]
+    },
+    {
+      "method": "online_multiple_discovery_control",
+      "state": "candidate_not_implemented",
+      "requirements": [
+        "valid_p_values_or_e_values_constructed",
+        "hypothesis_family_and_order_frozen",
+        "asset_horizon_time_dependence_explicit",
+        "method_validity_assumptions_verified",
+        "append_only_trial_ledger",
+        "no_false_discovery_claim_without_valid_inputs"
+      ]
+    }
+  ],
   "promotion_evidence": [
     "genuine_point_in_time_inputs_with_immutable_lineage",
     "predeclared_episode_grouping",
     "frozen_development_validation_and_untouched_holdout_partitions",
     "matured_primary_horizon_outcomes_and_matched_controls",
-    "coverage_missingness_degeneracy_false_positive_and_calibration_reporting",
+    "coverage_missingness_degeneracy_false_positive_time_indexed_calibration_alert_burden_and_detection_delay_reporting",
     "dependence_aware_uncertainty",
     "sealed_protocol_v2_parameters_thresholds_minimum_samples_costs_success_failure_and_rollback_rules",
     "separate_reviewed_promotion_decision"
@@ -114,6 +160,9 @@
     "minimum_samples",
     "costs",
     "route_scope",
+    "hypothesis_family_and_order",
+    "error_target",
+    "stopping_rule",
     "success_criteria",
     "failure_criteria",
     "rollback_rules"
@@ -151,6 +200,30 @@
     {
       "title": "Estimation of Tail-Related Risk Measures for Heteroscedastic Financial Time Series: an Extreme Value Approach",
       "url": "https://doi.org/10.1016/S0927-5398(00)00012-8"
+    },
+    {
+      "title": "Conformal k-NN Anomaly Detector for Univariate Data Streams",
+      "url": "https://proceedings.mlr.press/v60/ishimtsev17a.html"
+    },
+    {
+      "title": "Exact and Robust Conformal Inference Methods for Predictive Machine Learning with Dependent Data",
+      "url": "https://proceedings.mlr.press/v75/chernozhukov18a.html"
+    },
+    {
+      "title": "SAFFRON: an Adaptive Algorithm for Online Control of the False Discovery Rate",
+      "url": "https://proceedings.mlr.press/v80/ramdas18a.html"
+    },
+    {
+      "title": "Online Heavy-tailed Change-point Detection",
+      "url": "https://proceedings.mlr.press/v216/sankararaman23a.html"
+    },
+    {
+      "title": "Online Adaptive Anomaly Thresholding with Confidence Sequences",
+      "url": "https://proceedings.mlr.press/v235/sun24h.html"
+    },
+    {
+      "title": "Online Multiple Testing with e-values",
+      "url": "https://proceedings.mlr.press/v238/xu24a.html"
     }
   ]
 }

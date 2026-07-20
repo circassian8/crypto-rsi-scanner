@@ -4,6 +4,8 @@ Status: **research-only design record; rank 1 is implemented as an isolated
 shadow diagnostic but is not calibrated and is not eligible for routing,
 scoring, publication authority, alerts, or Protocol-v2 evidence**.
 
+Contract: `decision_radar.anomaly_methods_preregistration` schema v3.
+
 ## Purpose
 
 Decision Radar needs stronger anomaly evidence, but the current live campaign is
@@ -95,6 +97,59 @@ explainable univariate/residual candidates have a sealed benchmark, sufficient
 independent episodes, point-in-time feature matrices, and an explicit
 explanation/rollback contract.
 
+## Cross-cutting calibration and alert-volume research
+
+These are not additional detectors and do not alter the candidate order. They
+are possible ways to calibrate or govern a future detector after it produces a
+causal score.
+
+### Adaptive online thresholds
+
+Compare the unchanged fixed-threshold baseline with a shadow adaptive threshold
+only after the development stream has enough point-in-time observations and the
+target error event is defined before fitting. Confidence-sequence thresholding
+is worth testing because recent work explicitly studies online unsupervised
+threshold selection under distribution shift, including warm starts. Its
+guarantees must not be imported by analogy: Decision Radar first has to prove
+that its score, feedback clock, missingness, and dependence satisfy the chosen
+method's data contract. The experiment must report false alerts and misses over
+time, not only a pooled accuracy number.
+
+Conformal anomaly scores are another calibration candidate, not an automatic
+source of valid p-values. Time-series dependence violates ordinary
+exchangeability, so any conformal experiment must freeze a causal rolling or
+blocked calibration rule, preserve the exact reference set for every score,
+and test coverage drift. A descriptive rank from the current shadow is not a
+conformal p-value and must never be relabeled as one.
+
+### Heavy-tail-aware change detection
+
+The changepoint candidate should include one robust comparator designed for
+heavy-tailed streams rather than testing only a light-tailed Bayesian model.
+Clipped-estimator approaches with finite-sample false-positive analysis are a
+useful research candidate. They still require an explicit stream, bounded
+feature family, reset rule, missing-observation rule, false-alarm definition,
+and detection-delay metric. A changepoint remains context and cannot create
+direction, catalyst evidence, tradability, or a Decision route by itself.
+
+### Multiple discoveries over assets, horizons, and time
+
+If a future detector yields valid p-values or e-values, Protocol v2 must freeze
+the hypothesis order and family before applying any online false-discovery
+procedure. Asset, horizon, and timestamp tests are dependent; repeated rolling
+observations and one market-wide move cannot be treated as independent tests.
+SAFFRON is a candidate only if its validity assumptions are established for the
+sealed stream. E-value-based online methods are worth comparing when valid
+e-values can be constructed, but their dependence robustness does not excuse an
+invalid score-to-e-value conversion. Until then, report alert burden and every
+trial descriptively and make no FDR claim.
+
+The eventual comparison must preserve an append-only trial ledger, count alerts
+per operator day and per declustered episode, measure detection delay and
+expiry, and report family-level error/coverage by regime and liquidity. No
+method may choose its own threshold or stopping point from validation or
+holdout outcomes.
+
 ## Evaluation contract before any promotion proposal
 
 1. Finish genuine direct 1h/4h, execution-quality, derivatives, catalyst, and
@@ -107,10 +162,13 @@ explanation/rollback contract.
    primary-horizon idea outcomes and matched non-idea controls.
 5. Report coverage, missingness, degenerate-scale rate, provider/basis cohorts,
    false-positive burden, precision/recall where labels support them,
-   calibration, stability by regime, and uncertainty that respects dependence.
+   time-indexed calibration, alert burden per operator day and declustered
+   episode, detection delay, stability by regime, and uncertainty that respects
+   dependence.
 6. Predeclare candidate parameters, thresholds, minimum samples, costs, route
-   scope, success criteria, failure criteria, and rollback rules in the sealed
-   Protocol-v2 annex. Until then they remain unspecified.
+   scope, hypothesis family/order, error target, stopping rule, success
+   criteria, failure criteria, and rollback rules in the sealed Protocol-v2
+   annex. Until then they remain unspecified.
 7. A separate reviewed decision is required for any production promotion. A
    null or negative result leaves current policy unchanged.
 
@@ -128,6 +186,23 @@ explanation/rollback contract.
   for Heteroscedastic Financial Time Series: an Extreme Value
   Approach](https://doi.org/10.1016/S0927-5398(00)00012-8), *Journal of
   Empirical Finance* 7, 271-300.
+- Ishimtsev, V., Bernstein, A., Burnaev, E., and Nazarov, I. (2017), [Conformal
+  k-NN Anomaly Detector for Univariate Data
+  Streams](https://proceedings.mlr.press/v60/ishimtsev17a.html), PMLR 60.
+- Chernozhukov, V., Wuthrich, K., and Zhu, Y. (2018), [Exact and Robust
+  Conformal Inference Methods for Predictive Machine Learning with Dependent
+  Data](https://proceedings.mlr.press/v75/chernozhukov18a.html), PMLR 75.
+- Ramdas, A., Zrnic, T., Wainwright, M., and Jordan, M. (2018), [SAFFRON: an
+  Adaptive Algorithm for Online Control of the False Discovery
+  Rate](https://proceedings.mlr.press/v80/ramdas18a.html), PMLR 80.
+- Sankararaman, A. and Narayanaswamy, B. (2023), [Online Heavy-tailed
+  Change-point Detection](https://proceedings.mlr.press/v216/sankararaman23a.html),
+  PMLR 216.
+- Sun, S. H., Sankararaman, A., and Narayanaswamy, B. M. (2024), [Online
+  Adaptive Anomaly Thresholding with Confidence
+  Sequences](https://proceedings.mlr.press/v235/sun24h.html), PMLR 235.
+- Xu, Z. and Ramdas, A. (2024), [Online Multiple Testing with
+  e-values](https://proceedings.mlr.press/v238/xu24a.html), PMLR 238.
 
 These references motivate candidate families; they do not validate their use in
 Decision Radar. That requires the sealed point-in-time evaluation above.

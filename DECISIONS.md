@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Treat calibration and discovery control as separate shadow research
+**Status:** accepted as research design; no implementation or policy authority
+**Decision:** Keep the accepted anomaly-detector order unchanged. Study adaptive
+thresholding, conformal score calibration, heavy-tail-aware changepoint
+comparators, and online multiple-discovery control only as cross-cutting shadow
+research after a causal score stream and its assumptions are closed. A current
+descriptive rank is not a p-value. Freeze the hypothesis family/order, error
+target, stopping rule, calibration reference sets, feedback clocks, and
+dependence treatment before evaluation. Maintain an append-only trial ledger
+and report time-indexed calibration, alert burden per operator day and episode,
+and detection delay. Make no FDR, conformal-coverage, or confidence-sequence
+claim unless the selected method's input and dependence assumptions are proven.
+**Why:** A stronger detector can still overwhelm the operator or produce false
+confidence when many dependent asset/horizon/time tests are viewed repeatedly.
+Separating score construction from calibration and discovery governance makes
+those failure modes measurable without tuning the sparse campaign.
+**Revisit when:** Genuine point-in-time inputs, independent episodes, complete
+outcomes, frozen partitions, and the Protocol-v2 annex are ready to specify and
+evaluate exact numerical choices.
+
 ## 2026-07-20 - Keep Daily Operations JSON while making operator output concise
 **Status:** accepted
 **Decision:** Keep the Daily Operations CLI's default readiness/status output as
