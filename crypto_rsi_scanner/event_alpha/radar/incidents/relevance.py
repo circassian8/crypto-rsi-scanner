@@ -24,6 +24,25 @@ def _incident_flag_true(value: object) -> bool:
     return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
+_LINK_COUNT_FIELDS = (
+    "raw_link_count",
+    "qualified_link_count",
+    "qualified_hypothesis_count",
+    "qualified_watchlist_count",
+    "weak_link_count",
+    "quality_blocked_link_count",
+    "unknown_role_link_count",
+    "generic_sector_only_link_count",
+    "sector_only_link_count",
+)
+
+
+def _nonnegative_count(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return value if value >= 0 else 0
+
+
 def classify_incident_relevance(
     incident: event_incident_graph.CanonicalIncident,
     *,
@@ -295,7 +314,7 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     status = str(data.get("incident_relevance_status") or "").strip()
     if status:
         _ensure_existing_link_quality(data)
-        if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and int(data.get("qualified_link_count") or 0) <= 0:
+        if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and _nonnegative_count(data.get("qualified_link_count")) <= 0:
             status, reason = _downgraded_relevance_for_unqualified_links(data)
             data["incident_relevance_status"] = status
             data["canonical_persistence_reason"] = reason
@@ -368,7 +387,7 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     data.setdefault("external_context_hidden_by_default", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
     data.setdefault("diagnostic_hidden_by_default", _is_diagnostic_relevance(data))
     _ensure_existing_link_quality(data)
-    if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and int(data.get("qualified_link_count") or 0) <= 0:
+    if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and _nonnegative_count(data.get("qualified_link_count")) <= 0:
         status, reason = _downgraded_relevance_for_unqualified_links(data)
         data["incident_relevance_status"] = status
         data["canonical_persistence_reason"] = reason
@@ -410,13 +429,13 @@ def _downgraded_relevance_for_unqualified_links(row: Mapping[str, Any]) -> tuple
         return RELEVANCE_CANONICAL_INCIDENT, "market_dislocation"
     return RELEVANCE_RAW_OBSERVATION, reason or "raw_observation_without_crypto_link"
 def _api_unqualified_reason(row: Mapping[str, Any]) -> str | None:
-    if int(row.get("quality_blocked_link_count") or 0) > 0:
+    if _nonnegative_count(row.get("quality_blocked_link_count")) > 0:
         return "quality_blocked_link_only"
-    if int(row.get("unknown_role_link_count") or 0) > 0:
+    if _nonnegative_count(row.get("unknown_role_link_count")) > 0:
         return "unknown_role_link_only"
-    if int(row.get("generic_sector_only_link_count") or 0) > 0:
+    if _nonnegative_count(row.get("generic_sector_only_link_count")) > 0:
         return "sector_only_unqualified_link"
-    if int(row.get("weak_link_count") or 0) > 0:
+    if _nonnegative_count(row.get("weak_link_count")) > 0:
         return "weak_unqualified_watchlist_link"
     return None
 def _is_garbage_incident_subject(value: Any) -> bool:

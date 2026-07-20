@@ -123,7 +123,7 @@ def _link_row_quality(
     level = _first_text(merged.get("opportunity_level")).casefold()
     final_state = _first_text(merged.get("final_state_after_quality_gate"), merged.get("state")).upper()
     route = _first_text(merged.get("final_route_after_quality_gate"), merged.get("route")).upper()
-    score = _float(merged.get("opportunity_score_final"))
+    score = _bounded_score(merged.get("opportunity_score_final"))
     has_quality = any(
         key in merged and merged.get(key) not in (None, "", [], {})
         for key in (
@@ -142,7 +142,7 @@ def _link_row_quality(
     strong_sector = _strong_sector_hypothesis(merged, incident=incident)
     unknown_role = bool(role in _BAD_LINK_ROLES or (not role and not strong_sector))
     quality_blocked = bool(
-        merged.get("state_quality_capped")
+        _incident_flag_true(merged.get("state_quality_capped"))
         or final_state in _BAD_LINK_STATES
         or route in {"STORE_ONLY", "LOCAL_ONLY", "LOCAL_REPORT"}
         or level == "local_only"
@@ -258,7 +258,7 @@ def _high_quality_external_candidate(
     if incident.event_archetype not in _EXTERNAL_CATALYST_ARCHETYPES:
         return False
     confidences = [
-        _float(raw_by_id[raw_id].source_confidence)
+        _bounded_confidence(raw_by_id[raw_id].source_confidence)
         for raw_id in incident.raw_ids
         if raw_id in raw_by_id
     ]
@@ -323,8 +323,13 @@ def _row_with_effective_subject_quality(row: Mapping[str, Any]) -> dict[str, Any
     return data
 def _ensure_existing_link_quality(data: dict[str, Any]) -> None:
     if "qualified_link_count" in data and "link_quality_reasons" in data:
+        for field in _LINK_COUNT_FIELDS:
+            if field in data:
+                data[field] = _nonnegative_count(data.get(field))
         if "sector_only_link_count" not in data:
-            data["sector_only_link_count"] = int(data.get("generic_sector_only_link_count") or 0)
+            data["sector_only_link_count"] = _nonnegative_count(
+                data.get("generic_sector_only_link_count")
+            )
         return
     summary = _link_quality_from_existing_row(data)
     data.setdefault("raw_link_count", summary.raw_link_count)
@@ -466,6 +471,16 @@ def _float(value: Any) -> float:
     except (TypeError, ValueError):
         return 0.0
     return parsed if math.isfinite(parsed) else 0.0
+
+
+def _bounded_score(value: Any) -> float:
+    parsed = _float(value)
+    return parsed if 0.0 <= parsed <= 100.0 else 0.0
+
+
+def _bounded_confidence(value: Any) -> float:
+    parsed = _float(value)
+    return parsed if 0.0 <= parsed <= 1.0 else 0.0
 def _iso(value: object) -> str | None:
     if isinstance(value, datetime):
         dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)

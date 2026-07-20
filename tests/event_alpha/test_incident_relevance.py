@@ -144,6 +144,91 @@ def test_incident_market_context_rejects_malformed_scores_and_preserves_raw_asse
     assert raw_context["market_context_asset"] == "VALID"
 
 
+def test_incident_relevance_numeric_evidence_fails_closed():
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.incidents as incidents
+
+    incident = SimpleNamespace(
+        event_archetype="rwa_preipo_proxy",
+        raw_ids=("raw",),
+    )
+    valid_link = {
+        "validated_symbol": "SAFE",
+        "validated_coin_id": "safe",
+        "candidate_role": "direct_subject",
+        "impact_path_type": "exploit_security_event",
+        "evidence_specificity": "direct_token_mechanism",
+        "opportunity_level": "watchlist",
+        "opportunity_score_final": 80,
+    }
+    assert incidents._link_row_quality(  # noqa: SLF001
+        valid_link,
+        incident=incident,
+        source="hypothesis",
+    )["qualified"] is True
+    assert incidents._link_row_quality(  # noqa: SLF001
+        {**valid_link, "state_quality_capped": "false"},
+        incident=incident,
+        source="hypothesis",
+    )["qualified"] is True
+
+    for malformed in (101, 1000, "101"):
+        result = incidents._link_row_quality(  # noqa: SLF001
+            {**valid_link, "opportunity_score_final": malformed},
+            incident=incident,
+            source="hypothesis",
+        )
+        assert result["qualified"] is False
+        assert result["quality_blocked"] is True
+
+    capped = incidents._link_row_quality(  # noqa: SLF001
+        {**valid_link, "state_quality_capped": "true"},
+        incident=incident,
+        source="hypothesis",
+    )
+    assert capped["qualified"] is False
+    assert capped["quality_blocked"] is True
+
+    for malformed in (
+        True,
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        -0.1,
+        1.1,
+        100,
+    ):
+        raw_by_id = {"raw": SimpleNamespace(source_confidence=malformed)}
+        assert incidents._high_quality_external_candidate(  # noqa: SLF001
+            incident,
+            raw_by_id,
+            (),
+        ) is False
+    assert incidents._high_quality_external_candidate(  # noqa: SLF001
+        incident,
+        {"raw": SimpleNamespace(source_confidence=0.80)},
+        (),
+    ) is True
+
+    base_persisted = {
+        "incident_relevance_status": "active_incident",
+        "canonical_name": "Persisted numeric evidence",
+        "event_archetype": "exploit_security_event",
+        "qualified_link_count": 1,
+        "link_quality_reasons": ("qualified_hypothesis_link",),
+    }
+    assert incidents._row_with_effective_relevance(  # noqa: SLF001
+        base_persisted
+    )["incident_relevance_status"] == "active_incident"
+    for malformed in (True, float("nan"), "1", -1):
+        projected = incidents._row_with_effective_relevance(  # noqa: SLF001
+            {**base_persisted, "qualified_link_count": malformed}
+        )
+        assert projected["qualified_link_count"] == 0
+        assert projected["incident_relevance_status"] == "incident_candidate"
+
+
 def test_event_incident_relevance_gates_raw_external_observations():
     import tempfile
     from datetime import datetime, timezone

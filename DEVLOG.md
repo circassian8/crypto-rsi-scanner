@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Harden incident relevance evidence contracts · Codex
+**Why:** Incident link qualification accepted an out-of-range 101-point
+opportunity, interpreted `state_quality_capped="false"` as true, and allowed
+source confidence 1.1 to satisfy the 0.80 quality gate. Malformed persisted
+link counts could also crash read projection or preserve an active status.
+**Changes:** Link scores now use a finite non-boolean 0–100 boundary, source
+confidence uses `[0,1]`, and quality-cap state uses semantic boolean parsing.
+Existing incident link counts now require real non-negative integers; invalid
+booleans, floats, strings, negative values, and non-finite values project to
+zero and active/linked rows downgrade through the existing fail-closed policy.
+Added valid controls plus malformed score, cap, confidence, and persisted-count
+regressions. Existing weights, thresholds, and relevance taxonomy are unchanged.
+**Verify:** The new regression passed, followed by `24` focused incident-
+relevance, claim-semantics, doctor-quality, and watchlist tests.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Preserve canonical incident market context · Codex
 **Why:** Canonical incident projection ranked raw market-confirmation values
 without a 0–100 contract. A reproduced score of 1000 beat valid 80-point
