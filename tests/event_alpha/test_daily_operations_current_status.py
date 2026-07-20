@@ -154,6 +154,12 @@ def test_readiness_cli_summary_is_concise_and_provider_safe(
     assert "current_provider_call_eligibility=eligible" in output.out
     assert "readiness_provider_calls=0" in output.out
     assert "status_receipt_refreshed=true" in output.out
+    assert "telegram_sends=0" in output.out
+    assert "trades_created=0" in output.out
+    assert "orders_available=false" in output.out
+    assert "paper_trades_created=0" in output.out
+    assert "normal_rsi_signal_rows_written=0" in output.out
+    assert "triggered_fade_created=0" in output.out
     assert "baseline_asset_readiness" not in output.out
     assert "token" not in output.out.casefold()
     assert "run" not in boundaries.events

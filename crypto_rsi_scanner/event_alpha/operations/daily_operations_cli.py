@@ -299,6 +299,15 @@ def _readiness_summary(
     lines.extend(
         (
             ("status_receipt_refreshed", True),
+            ("telegram_sends", payload["telegram_sends"]),
+            ("trades_created", payload["trades_created"]),
+            ("orders_available", False),
+            ("paper_trades_created", payload["paper_trades_created"]),
+            (
+                "normal_rsi_signal_rows_written",
+                payload["normal_rsi_signal_rows_written"],
+            ),
+            ("triggered_fade_created", payload["triggered_fade_created"]),
             ("no_send", True),
             ("research_only", True),
             (

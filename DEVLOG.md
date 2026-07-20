@@ -17,6 +17,18 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Complete concise Daily Operations safety truth · Codex
+**Why:** The new concise readiness/status view identified itself as no-send and
+research-only but did not enumerate every zero-valued safety boundary that the
+full compatibility payload already carried.
+**Changes:** Added explicit Telegram-send, trade, order-availability, Event
+Alpha paper-trade, normal-RSI-write, and Event Alpha `TRIGGERED_FADE` fields to
+the concise operator output. Values come from the canonical payload where one
+exists; order availability remains explicitly false.
+**Verify:** Focused current-status tests passed and the real no-provider
+readiness command rendered every safety field at zero/false. No provider call,
+send, trade, order, paper trade, RSI write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Make Daily Operations output operator-readable · Codex
 **Why:** Readiness and status were correct but printed the complete per-asset
 baseline object, burying authorization, cadence, and the next safe action in a
