@@ -606,8 +606,12 @@ def _apply_frame_route_cap(hypothesis: EventImpactHypothesis) -> EventImpactHypo
         return hypothesis
     if hypothesis.opportunity_level in {"local_only", "exploratory"}:
         return hypothesis
-    current_score = _optional_score(hypothesis.opportunity_score_final)
-    capped_score = min(current_score if current_score is not None else float(hypothesis.hypothesis_score or 0.0), 54.0)
+    current_score = (
+        _coerce_score(hypothesis.opportunity_score_final)
+        if hypothesis.opportunity_score_final is not None
+        else _coerce_score(hypothesis.hypothesis_score)
+    )
+    capped_score = min(current_score, 54.0)
     components = dict(hypothesis.score_components or {})
     components["frame_gate_route_blocked"] = 1.0
     components["route_block_reason"] = block

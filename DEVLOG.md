@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve final-score truth through catalyst-frame caps · Codex
+**Why:** The catalyst-frame safety cap treated final score zero as absent and
+fell back to a high legacy hypothesis score; a present NaN final score could
+also survive the cap as NaN.
+**Changes:** The cap now reads a present final score by field presence, applies
+the finite non-boolean 0–100 boundary, and falls back to the legacy score only
+when the final field is absent. Added controls for explicit zero, malformed
+values, absence, and finite values below/above the existing 54 cap. Frame and
+route policy are unchanged.
+**Verify:** The new regression passed, followed by `68` focused catalyst-frame,
+impact-hypothesis, watchlist-router, and CoreOpportunity tests. The periodic
+local `verify-fast` batch reached `3,613 passed / 1 sandbox-only loopback-bind
+failure` in 195 seconds; the exact failed dashboard concurrency test then
+passed separately with loopback permission. No GitHub check was awaited.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** The verify-fast exception was macOS sandbox
+`PermissionError: [Errno 1]` at temporary loopback `socket.bind`, not a product
+assertion failure. No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Normalize candidate-discovery score merging · Codex
 **Why:** Candidate-discovery attachment directly clamped a legacy hypothesis
 score and directly compared existing component values. Infinite scores could

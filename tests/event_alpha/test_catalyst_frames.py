@@ -1428,3 +1428,53 @@ def test_missing_unresolved_catalyst_frame_caps_validated_hypothesis():
     assert capped.opportunity_score_final <= 54
     assert capped.route_block_reason == "catalyst_frame_unresolved"
     assert "catalyst_frame_unresolved" in capped.why_not_promoted
+
+
+def test_catalyst_frame_route_cap_preserves_zero_and_rejects_malformed_scores():
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+
+    def capped(final_score, *, legacy_score=90.0):
+        hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+            hypothesis_id="hyp:aave:score-cap",
+            event_cluster_id="incident:aave:score-cap",
+            event_type="news",
+            external_asset="Aave",
+            impact_category="security_or_regulatory_shock",
+            candidate_sectors=("defi",),
+            candidate_symbols=("AAVE",),
+            candidate_coin_ids=("aave",),
+            validated_candidate_assets=({"symbol": "AAVE", "coin_id": "aave", "validated": True},),
+            confidence=0.9,
+            hypothesis_score=legacy_score,
+            validation_stage="impact_path_validated",
+            status="validated",
+            impact_path_type="exploit_security_event",
+            impact_path_reason="exploit_security_event",
+            candidate_role="direct_subject",
+            opportunity_score_final=final_score,
+            opportunity_level="high_priority",
+            frame_required=True,
+            frame_status="unresolved",
+            frame_gate_reason="catalyst_frame_unresolved",
+            route_block_reason="catalyst_frame_unresolved",
+        )
+        return event_impact_hypotheses._with_promotion_diagnostics(hypothesis)
+
+    explicit_zero = capped(0.0)
+    assert explicit_zero.opportunity_score_final == 0.0
+    assert explicit_zero.opportunity_level == "exploratory"
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf")):
+        row = capped(malformed)
+        assert row.opportunity_score_final == 0.0
+        assert row.opportunity_level == "exploratory"
+        assert "catalyst_frame_unresolved" in row.why_not_promoted
+
+    absent = capped(None)
+    assert absent.opportunity_score_final == 54.0
+
+    finite_below_cap = capped(20.0)
+    assert finite_below_cap.opportunity_score_final == 20.0
+
+    finite_above_cap = capped(88.0)
+    assert finite_above_cap.opportunity_score_final == 54.0
