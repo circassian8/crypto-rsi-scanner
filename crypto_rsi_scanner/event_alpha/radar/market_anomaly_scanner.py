@@ -1095,7 +1095,11 @@ def _search_queries_for_anomaly(
 def _is_sector_or_theme(snapshot: Mapping[str, Any]) -> bool:
     symbol = str(snapshot.get("symbol") or "").upper()
     coin_id = str(snapshot.get("coin_id") or "").casefold()
-    if bool(snapshot.get("is_theme_or_sector")) or bool(snapshot.get("quote_asset_excluded")) or bool(snapshot.get("is_quote_asset")):
+    if (
+        _truthy(snapshot.get("is_theme_or_sector"))
+        or _truthy(snapshot.get("quote_asset_excluded"))
+        or _truthy(snapshot.get("is_quote_asset"))
+    ):
         return True
     if snapshot.get("is_tradable_asset") is False:
         return True
@@ -1204,9 +1208,9 @@ def _float(value: object) -> float | None:
 def _truthy(value: object) -> bool:
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
-        return math.isfinite(float(value)) and value != 0
-    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _count(value: object) -> int | None:

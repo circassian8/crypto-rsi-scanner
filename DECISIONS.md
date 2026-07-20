@@ -24,10 +24,12 @@ explicit true vocabulary instead of Python object truthiness. Text values such
 as `false`, `0`, `no`, and `off`, arbitrary nonzero numbers, and unrecognized
 text cannot create a negative/disproven/not-required catalyst, post-event
 state/failure, derivatives-availability claim, major-pair cap, completed move,
-fade eligibility, confirmed catalyst, or catalyst-search request. A derivatives
-representative must carry a real non-empty mapping snapshot. Booleans are not
-numeric market features and cannot become `1.0` funding, positioning,
-liquidation, return, or volume evidence.
+fade eligibility, confirmed catalyst, catalyst-search request, sector/quote
+control, duplicate suppression, market-reaction/causal confirmation, freshness
+cap, or DEX new-pool claim. A derivatives representative must carry a real
+non-empty mapping snapshot. Booleans are not numeric market features and cannot
+become `1.0` funding, positioning, liquidation, return, volume, liquidity, or
+pool-age evidence.
 **Why:** Python considers every non-empty string truthy and considers booleans
 numeric. Untyped external or compatibility rows could therefore manufacture a
 risk/fade classification, crowding state, priority bonus, or source-knownness

@@ -88,6 +88,16 @@ class VerdictAwareUpgradeDowngradeText:
     missing_evidence_text: str
 
 
+def _semantic_true(value: object) -> bool:
+    """Accept only explicit boolean truth for policy-changing flags."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
+
+
 @dataclass(frozen=True)
 class _OpportunityContext:
     components: dict[str, Any]
@@ -255,21 +265,24 @@ def _opportunity_context(
         ),
         claim_polarities=claim_polarities,
         incident_confidence=_score(components.get("incident_confidence"), getattr(hypothesis, "incident_confidence", None)),
-        market_reaction_confirmed=bool(
+        market_reaction_confirmed=_semantic_true(
             components.get("market_reaction_confirmed")
             if components.get("market_reaction_confirmed") is not None
             else getattr(hypothesis, "market_reaction_confirmed", False)
         ),
-        causal_mechanism_confirmed=bool(
+        causal_mechanism_confirmed=_semantic_true(
             components.get("causal_mechanism_confirmed")
             if components.get("causal_mechanism_confirmed") is not None
             else getattr(hypothesis, "causal_mechanism_confirmed", False)
         ),
         market_freshness_status=str(getattr(market_confirmation, "market_context_freshness_status", "") or components.get("market_context_freshness_status") or ""),
-        market_freshness_cap_applied=bool(
-            getattr(market_confirmation, "freshness_cap_applied", False)
-            or components.get("freshness_cap_applied")
-            or components.get("market_context_freshness_cap_applied")
+        market_freshness_cap_applied=any(
+            _semantic_true(value)
+            for value in (
+                getattr(market_confirmation, "freshness_cap_applied", False),
+                components.get("freshness_cap_applied"),
+                components.get("market_context_freshness_cap_applied"),
+            )
         ),
     )
 
@@ -753,7 +766,13 @@ def explain_upgrade_path(
         upgrades.append("needs_market_confirmation")
         downgrades.append("market_reaction_absent")
     freshness_status = str(data.get("market_context_freshness_status") or data.get("market_market_context_freshness_status") or "")
-    if freshness_status in {"stale", "missing", "unknown"} or bool(data.get("freshness_cap_applied") or data.get("market_freshness_cap_applied")):
+    if freshness_status in {"stale", "missing", "unknown"} or any(
+        _semantic_true(value)
+        for value in (
+            data.get("freshness_cap_applied"),
+            data.get("market_freshness_cap_applied"),
+        )
+    ):
         upgrades.append("needs_fresh_market_confirmation")
         downgrades.append("market_context_stale")
     if evidence_score < 65:

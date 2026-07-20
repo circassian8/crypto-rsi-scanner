@@ -678,6 +678,68 @@ def test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths():
         assert list(row["downgrade_warnings"]) == list(validated.downgrade_warnings)
 
 
+def test_opportunity_confirmation_and_freshness_flags_require_semantic_truth():
+    import crypto_rsi_scanner.event_alpha.radar.opportunity_verdict as verdicts
+
+    false_context = verdicts._opportunity_context(  # noqa: SLF001
+        impact_path=None,
+        market_confirmation=None,
+        evidence_quality=None,
+        hypothesis=None,
+        score_components={
+            "market_reaction_confirmed": "false",
+            "causal_mechanism_confirmed": "0",
+            "freshness_cap_applied": "no",
+            "market_context_freshness_cap_applied": 2,
+        },
+    )
+    true_context = verdicts._opportunity_context(  # noqa: SLF001
+        impact_path=None,
+        market_confirmation=None,
+        evidence_quality=None,
+        hypothesis=None,
+        score_components={
+            "market_reaction_confirmed": "true",
+            "causal_mechanism_confirmed": 1,
+            "freshness_cap_applied": "yes",
+        },
+    )
+
+    assert false_context.market_reaction_confirmed is False
+    assert false_context.causal_mechanism_confirmed is False
+    assert false_context.market_freshness_cap_applied is False
+    assert true_context.market_reaction_confirmed is True
+    assert true_context.causal_mechanism_confirmed is True
+    assert true_context.market_freshness_cap_applied is True
+
+    base_components = {
+        "opportunity_level": "watchlist",
+        "opportunity_score_final": 80,
+        "impact_path_strength": "strong",
+        "market_confirmation_level": "strong",
+        "market_confirmation_score": 75,
+        "evidence_quality_score": 80,
+        "timing_event_window": 80,
+        "liquidity_tradability": 80,
+        "market_context_freshness_status": "fresh",
+    }
+    false_upgrade = verdicts.explain_upgrade_path(
+        components={
+            **base_components,
+            "freshness_cap_applied": "false",
+            "market_freshness_cap_applied": "off",
+        }
+    )
+    true_upgrade = verdicts.explain_upgrade_path(
+        components={**base_components, "freshness_cap_applied": "true"}
+    )
+
+    assert "market_context_stale" not in false_upgrade.downgrade_warnings
+    assert "needs_fresh_market_confirmation" not in false_upgrade.upgrade_requirements
+    assert "market_context_stale" in true_upgrade.downgrade_warnings
+    assert "needs_fresh_market_confirmation" in true_upgrade.upgrade_requirements
+
+
 def test_event_opportunity_verdict_uses_incident_confidence_and_cause_status():
     import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
     import crypto_rsi_scanner.event_alpha.radar.impact_path_validator as event_impact_path_validator

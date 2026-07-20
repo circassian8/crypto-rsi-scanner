@@ -71,7 +71,7 @@ def format_market_anomaly_report(
             f"volume_z={_format_number(snapshot.get('volume_zscore_24h'))} "
             f"priority={_format_number(row.get('priority'))} "
             f"catalyst_search_role={row.get('catalyst_search_role') or 'confidence_enrichment'} "
-            f"catalyst_required={str(bool(row.get('decision_model_v2_catalyst_required'))).lower()}"
+            f"catalyst_required={str(_semantic_true(row.get('decision_model_v2_catalyst_required'))).lower()}"
         )
         confirms = row.get("what_confirms") if isinstance(row.get("what_confirms"), list) else []
         invalidates = row.get("what_invalidates") if isinstance(row.get("what_invalidates"), list) else []
@@ -238,14 +238,22 @@ def _is_sector_or_theme(snapshot: Mapping[str, Any]) -> bool:
     symbol = str(snapshot.get("symbol") or "").upper()
     coin_id = str(snapshot.get("coin_id") or "").casefold()
     if (
-        bool(snapshot.get("is_theme_or_sector"))
-        or bool(snapshot.get("quote_asset_excluded"))
-        or bool(snapshot.get("is_quote_asset"))
+        _semantic_true(snapshot.get("is_theme_or_sector"))
+        or _semantic_true(snapshot.get("quote_asset_excluded"))
+        or _semantic_true(snapshot.get("is_quote_asset"))
     ):
         return True
     if snapshot.get("is_tradable_asset") is False:
         return True
     return symbol == "SECTOR" or coin_id.startswith("sector:") or coin_id.endswith("_proxy")
+
+
+def _semantic_true(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _string_list(value: object) -> list[str]:

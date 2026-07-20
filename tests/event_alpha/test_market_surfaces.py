@@ -399,6 +399,84 @@ def test_market_anomaly_queue_parses_false_instead_of_using_string_truthiness():
     assert len(scanner.build_catalyst_search_queue([anomaly])) == 1
 
 
+def test_market_anomaly_sector_controls_require_explicit_semantic_truth():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_report as report
+
+    for false_value in (False, None, "false", "0", "no", "off", 2):
+        assert scanner._is_sector_or_theme(  # noqa: SLF001
+            {
+                "symbol": "MOVE",
+                "coin_id": "move-token",
+                "is_theme_or_sector": false_value,
+                "quote_asset_excluded": false_value,
+                "is_quote_asset": false_value,
+            }
+        ) is False
+        assert report._is_sector_or_theme(  # noqa: SLF001
+            {
+                "symbol": "MOVE",
+                "coin_id": "move-token",
+                "is_theme_or_sector": false_value,
+                "quote_asset_excluded": false_value,
+                "is_quote_asset": false_value,
+            }
+        ) is False
+
+    for true_value in (True, "true", "1", "yes", "y", "on", 1):
+        assert scanner._is_sector_or_theme(  # noqa: SLF001
+            {
+                "symbol": "MOVE",
+                "coin_id": "move-token",
+                "is_theme_or_sector": true_value,
+            }
+        ) is True
+        assert report._is_sector_or_theme(  # noqa: SLF001
+            {
+                "symbol": "MOVE",
+                "coin_id": "move-token",
+                "is_theme_or_sector": true_value,
+            }
+        ) is True
+
+    text = report.format_market_anomaly_report(
+        [
+            {
+                "symbol": "MOVE",
+                "market_state_class": scanner.CONFIRMED_BREAKOUT,
+                "decision_model_v2_catalyst_required": "false",
+            }
+        ],
+        cfg=scanner.MarketAnomalyScannerConfig(),
+    )
+    assert "catalyst_required=false" in text
+
+
+def test_market_confirmation_dex_flags_and_numeric_evidence_are_type_safe():
+    import crypto_rsi_scanner.event_alpha.radar.market_confirmation as confirmation
+
+    for false_value in (False, None, "false", "0", "no", "off", 2):
+        components, reasons, observed, illiquid = confirmation._dex_components(  # noqa: SLF001
+            {
+                "new_pool": false_value,
+                "new_pool_detected": false_value,
+                "pool_age_hours": True,
+            }
+        )
+        assert "new_dex_pool" not in components
+        assert confirmation.MarketConfirmationReason.NEW_DEX_POOL_DETECTED.value not in reasons
+        assert observed == 0
+        assert illiquid is False
+
+    components, reasons, observed, illiquid = confirmation._dex_components(  # noqa: SLF001
+        {"new_pool": "true"}
+    )
+    assert components["new_dex_pool"] == 8.0
+    assert confirmation.MarketConfirmationReason.NEW_DEX_POOL_DETECTED.value in reasons
+    assert observed == 1
+    assert illiquid is False
+
+
 def test_market_anomaly_artifacts_are_research_only_and_seed_search():
     import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as event_market_anomaly_scanner
 

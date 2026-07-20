@@ -1845,12 +1845,18 @@
     },
     {
       "limit": 1500,
-      "line_count": 1573,
+      "line_count": 1525,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1651,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "source_kind": "test"
     }
   ],
-  "files_over_limit_count": 4,
+  "files_over_limit_count": 5,
   "function_line_limit": 150,
   "functions_over_limit": [
     {
@@ -1920,7 +1926,7 @@
   ],
   "functions_over_limit_count": 8,
   "gate_status": "pass",
-  "generated_at": "2026-07-20T04:01:51.859194+00:00",
+  "generated_at": "2026-07-20T04:17:48.526678+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2088,7 +2094,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1241,
+      "line_count": 1245,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
@@ -2168,7 +2174,7 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 1573,
+      "line_count": 1651,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "source_kind": "test"
     },
@@ -2176,6 +2182,12 @@
       "limit": 1500,
       "line_count": 1570,
       "path": "tests/cli/test_make_targets.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1525,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
     {
@@ -2194,12 +2206,6 @@
       "limit": 1500,
       "line_count": 1497,
       "path": "tests/event_alpha/test_burn_in_operations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1490,
-      "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
     {
@@ -2234,6 +2240,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1431,
+      "path": "tests/event_alpha/test_core_opportunities.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1430,
       "path": "tests/event_alpha/test_catalyst_frames.py",
       "source_kind": "test"
@@ -2242,12 +2254,6 @@
       "limit": 1500,
       "line_count": 1422,
       "path": "tests/event_alpha/test_namespace_integrations.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1407,
-      "path": "tests/event_alpha/test_core_opportunities.py",
       "source_kind": "test"
     },
     {
@@ -2366,6 +2372,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1049,
+      "path": "tests/event_alpha/test_impact_hypotheses.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1040,
       "path": "tests/event_alpha/test_llm_radar.py",
       "source_kind": "test"
@@ -2398,12 +2410,6 @@
       "limit": 1500,
       "line_count": 999,
       "path": "tests/event_alpha/test_official_macro_calendar_acquisition.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 996,
-      "path": "tests/event_alpha/test_discovery_pipeline.py",
       "source_kind": "test"
     }
   ],
@@ -3980,8 +3986,8 @@
   ],
   "new_blocking_violation_count": 0,
   "new_blocking_violations": [],
-  "new_measurement_count": 12,
-  "new_violation_count": 12,
+  "new_measurement_count": 13,
+  "new_violation_count": 13,
   "new_violations": [
     {
       "category": "file_over_1500_lines",
@@ -4013,7 +4019,16 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1573,
+      "line_count": 1525,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "severity": "advisory",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_decision_model_v2.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 1651,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -4331,7 +4346,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1241,
+      "line_count": 1245,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
@@ -4603,8 +4618,8 @@
     }
   ],
   "telegram_sends": 0,
-  "test_files_over_1500_lines": 2,
-  "test_files_over_2000_lines": 2,
+  "test_files_over_1500_lines": 3,
+  "test_files_over_2000_lines": 3,
   "test_size_gate_status": "advisory",
   "trades_created": 0,
   "triggered_fade_created": 0,
@@ -4637,7 +4652,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1241,
+      "line_count": 1245,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
@@ -4874,7 +4889,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1241,
+        "line_count": 1245,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
         "threshold": 1200
       },
@@ -4989,6 +5004,7 @@
     "file:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
     "file:crypto_rsi_scanner/event_alpha/radar/market_history.py",
     "file:tests/cli/test_make_targets.py",
+    "file:tests/event_alpha/test_decision_model_v2.py",
     "file:tests/event_alpha/test_market_surfaces.py",
     "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_fee.py:model_bybit_visible_book_taker_fee_scenario",
     "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_funding.py:model_bybit_funding_interval_scenario",
@@ -5030,7 +5046,16 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1573,
+      "line_count": 1525,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "severity": "advisory",
+      "source_kind": "test",
+      "violation_id": "file:tests/event_alpha/test_decision_model_v2.py"
+    },
+    {
+      "category": "file_over_1500_lines",
+      "limit": 1500,
+      "line_count": 1651,
       "path": "tests/event_alpha/test_market_surfaces.py",
       "severity": "advisory",
       "source_kind": "test",

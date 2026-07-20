@@ -74,6 +74,41 @@ def test_market_led_unknown_catalyst_is_actionable_with_soft_penalty():
     assert any("not a trade instruction" in warning for warning in result.decision_warnings)
 
 
+def test_decision_sector_and_quote_blockers_require_explicit_semantic_truth():
+    false_like = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            is_theme_or_sector="false",
+            is_quote_asset="0",
+            quote_asset_excluded=2,
+            duplicate_suppressed="false",
+            is_duplicate=2,
+            suppressed_duplicate="off",
+        )
+    )
+
+    assert "theme_or_sector_control" not in false_like.decision_hard_blockers
+    assert "quote_asset_control" not in false_like.decision_hard_blockers
+    assert "duplicate_family_suppressed" not in false_like.decision_hard_blockers
+    assert false_like.radar_actionable is True
+
+    theme = decision_model.evaluate_radar_decision(
+        _market_led_candidate(is_theme_or_sector="true")
+    )
+    quote = decision_model.evaluate_radar_decision(
+        _market_led_candidate(quote_asset_excluded=1)
+    )
+    duplicate = decision_model.evaluate_radar_decision(
+        _market_led_candidate(duplicate_suppressed="yes")
+    )
+
+    assert "theme_or_sector_control" in theme.decision_hard_blockers
+    assert "quote_asset_control" in quote.decision_hard_blockers
+    assert "duplicate_family_suppressed" in duplicate.decision_hard_blockers
+    assert theme.radar_actionable is False
+    assert quote.radar_actionable is False
+    assert duplicate.radar_actionable is False
+
+
 def test_unknown_catalyst_lowers_evidence_confidence_without_hard_block():
     unknown = decision_model.evaluate_radar_decision(_market_led_candidate())
     confirmed_row = _market_led_candidate(

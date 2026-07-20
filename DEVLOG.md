@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close remaining Decision truthiness gaps · Codex
+**Why:** The prior semantic-boolean passes closed anomaly classification,
+catalyst policy, and integrated merge fields, but adjacent operator-visible
+paths still used Python object truthiness. Literal false-like values could hide
+an asset as a sector/quote control, suppress it as a duplicate, claim DEX
+new-pool evidence, confirm a market reaction or causal mechanism, or apply a
+stale-market cap.
+**Changes:**
+- Applied the same explicit semantic-true vocabulary to anomaly/report sector
+  and quote controls, Decision duplicate suppression, CoreOpportunity market-
+  freshness caps, opportunity confirmation/freshness flags, and rendered
+  catalyst-required state. Arbitrary nonzero numerics no longer count as true.
+- Made DEX new-pool claims require explicit semantic truth and rejected
+  booleans from all market-confirmation numeric feature parsing, preventing a
+  boolean pool age, funding, OI, volume, or liquidity value from becoming
+  numeric evidence.
+- Added regressions across market/anomaly reports, Decision blockers,
+  opportunity diagnostics, DEX scoring, and CoreOpportunity context for false-
+  like values plus every supported explicit true representation.
+**Verify:** 141 focused market-surface, Decision Model v2, opportunity-
+hypothesis, CoreOpportunity, and Decision-surface tests passed. Compileall,
+market-anomaly smoke, and the full integrated-radar fixture smoke passed; the
+integrated strict doctor reported 0 blockers and 0 warnings and the fixture
+dashboard rendered 14 pages. Architecture cleanliness and `git diff --check`
+passed; its 13 quantitative size observations are advisory only.
+**Notes/risks:** Valid canonical booleans and fixture routes are unchanged. No
+threshold, weight, provider call, authorization, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` changed. Full `make
+verify` was not repeated because it passed immediately before the recent
+semantic-hardening slices; the focused files and both end-to-end smokes cover
+this change directly.
+
 ## 2026-07-20 — Harden downstream Decision boolean semantics · Codex
 **Why:** After the anomaly-scanner fix, Decision catalyst policy and integrated
 merge policy still used Python truthiness for route-changing fields. A literal

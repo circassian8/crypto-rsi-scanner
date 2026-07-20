@@ -347,9 +347,11 @@ def _hard_blockers(
         blockers.append("canonical_asset_identity_untrusted")
     if data.get("is_tradable_asset") is False:
         blockers.append("asset_not_tradable")
-    if bool(data.get("is_theme_or_sector")) or symbol == "SECTOR":
+    if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
-    if bool(data.get("is_quote_asset")) or bool(data.get("quote_asset_excluded")):
+    if _truthy(data.get("is_quote_asset")) or _truthy(
+        data.get("quote_asset_excluded")
+    ):
         blockers.append("quote_asset_control")
     if _is_source_noise_or_control(data):
         blockers.append("source_noise_or_control")
@@ -1018,10 +1020,10 @@ def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
 
 def _is_duplicate(data: Mapping[str, Any]) -> bool:
     route = str(data.get("final_route_after_quality_gate") or data.get("route") or "").upper()
-    return bool(
-        data.get("duplicate_suppressed")
-        or data.get("is_duplicate")
-        or data.get("suppressed_duplicate")
+    return (
+        _truthy(data.get("duplicate_suppressed"))
+        or _truthy(data.get("is_duplicate"))
+        or _truthy(data.get("suppressed_duplicate"))
         or route == "SUPPRESS_DUPLICATE"
     )
 
@@ -1068,9 +1070,9 @@ def _count(value: object) -> int | None:
 def _truthy(value: object) -> bool:
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _texts(value: object) -> list[str]:

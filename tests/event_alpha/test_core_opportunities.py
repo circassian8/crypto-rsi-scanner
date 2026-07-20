@@ -893,6 +893,30 @@ def test_live_confirmation_gated_rows_surface_in_reports():
     assert "Live Confirmation Gated Candidates:" in review
 
 
+def test_core_market_freshness_caps_require_explicit_semantic_truth():
+    from crypto_rsi_scanner.event_alpha.radar.core import path_fields
+
+    for false_value in (False, None, "false", "0", "no", "off", 2):
+        flat = path_fields._market_context_from_flat(  # noqa: SLF001
+            {"market_context_freshness_cap_applied": false_value}
+        )
+        nested = path_fields._market_context_from_nested(  # noqa: SLF001
+            {"freshness_cap_applied": false_value}
+        )
+        assert flat["market_context_freshness_cap_applied"] is False
+        assert nested["market_context_freshness_cap_applied"] is False
+
+    for true_value in (True, "true", "1", "yes", "y", "on", 1):
+        flat = path_fields._market_context_from_flat(  # noqa: SLF001
+            {"market_context_freshness_cap_applied": true_value}
+        )
+        nested = path_fields._market_context_from_nested(  # noqa: SLF001
+            {"freshness_cap_applied": true_value}
+        )
+        assert flat["market_context_freshness_cap_applied"] is True
+        assert nested["market_context_freshness_cap_applied"] is True
+
+
 def test_event_core_opportunity_store_uses_refreshed_nested_market_context():
     import crypto_rsi_scanner.event_alpha.radar.core_opportunity_store as event_core_opportunity_store
 

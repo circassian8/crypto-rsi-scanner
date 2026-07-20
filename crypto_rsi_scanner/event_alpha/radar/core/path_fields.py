@@ -702,7 +702,7 @@ def _market_context_rank(item: Mapping[str, Any]) -> tuple[int, int, int, int, i
     data_quality = str(item.get("market_context_data_quality") or "").casefold()
     observed_at = str(item.get("market_context_observed_at") or "").strip()
     age = item.get("market_context_age_hours")
-    cap = bool(item.get("market_context_freshness_cap_applied"))
+    cap = _truthy(item.get("market_context_freshness_cap_applied"))
     snapshot_id = str(item.get("market_snapshot_id") or "").strip()
     return (
         3 if status == "fresh" else 2 if status == "fixture_allowed_stale" else 1 if status == "stale" else 0,
@@ -730,6 +730,6 @@ def _text_or_none(value: Any) -> str | None:
 def _truthy(value: Any) -> bool:
     if isinstance(value, bool):
         return value
-    if isinstance(value, str):
-        return value.strip().casefold() in {"1", "true", "yes", "y"}
-    return bool(value)
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}

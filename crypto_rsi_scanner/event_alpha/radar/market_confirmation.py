@@ -903,7 +903,9 @@ def _dex_components(row: Mapping[str, Any]) -> tuple[dict[str, float], list[str]
     volume_z = _float(_first(row, "dex_volume_zscore_24h", "volume_zscore_24h", "volume_zscore"))
     pool_age = _float(_first(row, "pool_age_hours", "age_hours"))
     price_impact = _percent_value(_first(row, "price_impact_2pct", "price_impact", "spread_bps"))
-    new_pool = bool(row.get("new_pool") or row.get("new_pool_detected"))
+    new_pool = _semantic_true(row.get("new_pool")) or _semantic_true(
+        row.get("new_pool_detected")
+    )
     illiquid = False
     if pool_liquidity is not None:
         observed += 1
@@ -1119,11 +1121,23 @@ def _first(row: Mapping[str, Any], *keys: str) -> object:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _semantic_true(value: object) -> bool:
+    """Accept only explicit boolean truth for policy-changing flags."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _percent_value(value: object) -> float | None:
