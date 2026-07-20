@@ -700,6 +700,72 @@ def test_research_lab_hides_absent_live_projection_and_renders_future_sealed_sta
     assert "<strong>No candidate recommendations</strong>" not in future_page.body
 
 
+def test_research_lab_renders_causal_coverage_and_explicit_review_evidence(
+    tmp_path: Path,
+) -> None:
+    research = tmp_path / "research"
+    _write_reports(research)
+    snapshot = load_dashboard_snapshot(
+        _FIXTURE_BASE,
+        _FIXTURE_NAMESPACE,
+        now=_NOW,
+        research_root=research,
+    )
+    lab = deepcopy(dict(snapshot.research_lab))
+    projections = deepcopy(dict(lab["projections"]))
+    live = deepcopy(dict(projections["live"]))
+    live["shadow_temporal_surprise"] = {
+        "available": True,
+        "status": "partial",
+        "evaluated_observation_count": 12,
+        "projection_status_counts": {
+            "ready": 2,
+            "partial": 7,
+            "unavailable": 3,
+        },
+        "all_features_have_ready_evidence": True,
+        "feature_coverage": {
+            "return_1h": {
+                "family": "direct_return",
+                "evaluated_observation_count": 12,
+                "ready_count": 4,
+                "status_counts": {
+                    "ready": 4,
+                    "insufficient_history": 5,
+                    "current_unavailable": 3,
+                },
+            }
+        },
+    }
+    live["human_review"] = {
+        "available": True,
+        "status": "action_required",
+        "eligible_idea_count": 5,
+        "action_required_count": 5,
+        "first_view_record_count": 0,
+        "completed_review_record_count": 0,
+        "completed_latency_sample_count": 0,
+        "latency_evidence_status": "unavailable_no_explicit_human_actions",
+    }
+    projections["live"] = live
+    lab["projections"] = projections
+
+    page = render_dashboard_page(
+        replace(snapshot, research_lab=lab),
+        "/research-lab",
+    )
+
+    assert "Causal feature coverage" in page.body
+    assert "Every projection uses only strictly earlier same-asset observations" in page.body
+    assert "All modeled features have some ready evidence" in page.body
+    assert "Return 1h" in page.body
+    assert "Human review evidence" in page.body
+    assert "Receipt-backed ideas" in page.body
+    assert "Awaiting explicit action" in page.body
+    assert "Only explicit confirmed operator actions count" in page.body
+    assert "Unavailable no explicit human actions" in page.body
+
+
 def test_research_lab_invalid_bundle_renders_inventory_only(tmp_path: Path) -> None:
     research = tmp_path / "research"
     _write_reports(research)

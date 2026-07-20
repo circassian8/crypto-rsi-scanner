@@ -5,7 +5,7 @@ Decision Radar organizes evidence for a human operator; it never places an
 order, creates a live or Event Alpha paper trade, writes a normal RSI signal,
 creates `TRIGGERED_FADE`, or sends a real notification by default.
 
-- generated_at: `2026-07-19T16:36:21+00:00`
+- generated_at: `2026-07-20T07:17:32+00:00`
 - schema_version: `crypto_decision_radar_north_star_v1`
 - decision_model_version: `crypto_radar_decision_model_v2`
 - canonical_projection_version: `crypto_radar_decision_projection_v1`
@@ -549,6 +549,18 @@ a separately fingerprinted observational lane, never pooled into historical
 sample sizes or used to turn an insufficient historical cohort into a policy
 candidate. Replay outcomes stay in immutable research-run artifacts and never
 enter or rewrite the mutable live campaign outcome ledger.
+
+New live/no-send empirical projections use schema v3 and retain the campaign's
+validated causal temporal-surprise coverage plus explicit human-review queue
+and timing state. They expose per-feature readiness, exact source/digest
+lineage, receipt-backed review counts, and whether any completed review-latency
+sample actually exists. They preserve `statistical_independence_claimed=false`,
+`protocol_v2_evidence_eligible=false`, and every zero-side-effect boundary.
+Older source context is labeled compatibility-unavailable rather than rendered
+as zero. Schema v1 and v2 remain readable. The current sealed seven-file
+Protocol-v1 bundle and its separately attested hardening supplement remain
+byte-immutable; a future v3-bearing empirical publication must be separately
+versioned and reviewed rather than silently refreshing those historical bytes.
 
 Publication is one closed seven-file bundle, in this exact order:
 

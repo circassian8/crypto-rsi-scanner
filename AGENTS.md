@@ -309,6 +309,18 @@ may be added later when a suitable environment already exists.
   `not_required`, and `present` are valid. Do not blanket-exempt fields that
   contain `authorization` from secret scanning; any other value in this status
   field must remain both an enum error and an unredacted-secret blocker.
+- **Empirical live/no-send projection:** new
+  `decision_radar.empirical_live_campaign_projection` values use schema v3 and
+  copy the already validated causal temporal-surprise campaign audit plus the
+  explicit human-review timing/queue summaries into the separate observational
+  lane. Revalidate closed accounting and zero-side-effect fields before copying;
+  keep statistical independence, policy, Protocol-v2 evidence, and automatic
+  application false. Dashboard reads never count as human actions, and no
+  completed review means no latency sample. Missing context in older source
+  reports is compatibility-unavailable, not healthy zero; schema v1/v2 remain
+  readable. Never rewrite the sealed seven-file Protocol-v1 report bundle or
+  its immutable hardening supplement to adopt v3. A future v3-bearing bundle
+  requires an explicitly versioned publication that preserves the old bytes.
 - **Event Alpha evidence-cycle readiness:**
   `make event-alpha-evidence-cycle-readiness PROFILE=notify_llm_quality
   ARTIFACT_NAMESPACE=<namespace>` is read-only, no-network, and no-write. It

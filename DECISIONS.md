@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Carry causal coverage and explicit review truth only in forward empirical projections
+**Status:** accepted; current sealed Protocol-v1 bundle remains immutable
+**Decision:** New `decision_radar.empirical_live_campaign_projection` values
+use schema v3. When the source campaign report contains the closed causal
+temporal-surprise audit and both human-review summaries, copy their bounded
+counts, feature coverage, source/digest lineage, and explicit latency-evidence
+state into the separate live/no-send observational lane. Revalidate the causal
+audit before projection, preserve every no-independence/no-policy/no-authority
+flag, and require closed review queue and ledger accounting. Dashboard reads
+never become human actions. Missing fields in older source reports become an
+explicit compatibility-unavailable state, never a healthy zero. Continue to
+read schema v1 and v2 projections. Do not rewrite the already sealed seven-file
+Protocol-v1 report bundle or its immutable hardening supplement to adopt v3.
+**Why:** The live campaign now measures causal feature readiness and exposes
+receipt-backed ideas awaiting explicit review, but the empirical projection
+previously stripped both. Copying validated truth closes that loss without
+pooling live evidence with replay, manufacturing latency samples, or erasing
+the immutable evidence boundary.
+**Revisit when:** A separately reviewed, versioned empirical publication is
+ready to supersede the current sealed bundle. It must preserve the existing
+bundle and supplement bytes, retain backward readability, and bind the exact
+campaign snapshot rather than silently refreshing a historical report.
+
 ## 2026-07-20 - Replay shadow temporal surprise causally without rewriting history
 **Status:** accepted as read-only campaign measurement
 **Decision:** Extend the existing canonical campaign report with one closed

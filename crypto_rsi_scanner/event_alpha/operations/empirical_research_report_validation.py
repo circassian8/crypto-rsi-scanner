@@ -444,7 +444,10 @@ def _validate_published_live(value: Any) -> None:
         != _sha256_bytes(_canonical_bytes(projection))
     ):
         raise RuntimeError("empirical_research_report_live_binding_invalid")
-    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+    if projection.get("schema_version") in (
+        empirical_live_campaign.PRIOR_SCHEMA_VERSION,
+        empirical_live_campaign.SCHEMA_VERSION,
+    ):
         episodes = projection.get("episodes")
         if (
             not isinstance(episodes, Mapping)
@@ -452,6 +455,215 @@ def _validate_published_live(value: Any) -> None:
             or episodes.get("cross_asset_independence_claim") is not False
         ):
             raise RuntimeError("empirical_research_report_live_binding_invalid")
+    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+        _validate_published_live_shadow(projection.get("shadow_temporal_surprise"))
+        _validate_published_live_human_review(projection.get("human_review"))
+
+
+def _validate_published_live_shadow(value: Any) -> None:
+    if not isinstance(value, Mapping):
+        raise RuntimeError("empirical_research_report_live_binding_invalid")
+    if value.get("available") is False:
+        if (
+            value.get("status") != "not_available_in_source_report"
+            or value.get("feature_coverage") != {}
+            or value.get("all_features_have_ready_evidence") is not False
+            or value.get("statistical_independence_claimed") is not False
+            or value.get("protocol_v2_evidence_eligible") is not False
+            or value.get("policy_eligible") is not False
+            or value.get("provider_calls") != 0
+            or value.get("writes") != 0
+        ):
+            raise RuntimeError("empirical_research_report_live_binding_invalid")
+        return
+    source = value.get("source_history")
+    coverage = value.get("feature_coverage")
+    projection_counts = value.get("projection_status_counts")
+    return_counts = value.get("return_status_counts")
+    evaluated = _count(value.get("evaluated_observation_count"))
+    input_rows = _count(value.get("input_row_count"))
+    excluded = _count(value.get("excluded_not_baseline_counted_count"))
+    rejected = _count(value.get("input_rejected_count"))
+    valid = _count(value.get("valid_baseline_counted_row_count"))
+    evaluation_errors = _count(value.get("evaluation_error_count"))
+    minimum_sample_count = _count(value.get("minimum_sample_count"))
+    source_status = source.get("status") if isinstance(source, Mapping) else None
+    source_sha = source.get("sha256") if isinstance(source, Mapping) else None
+    if (
+        value.get("available") is not True
+        or not isinstance(source, Mapping)
+        or source_status not in {"missing", "observed_empty", "observed", "unavailable"}
+        or (
+            source_status in {"observed", "observed_empty"}
+            and not _is_sha256(source_sha)
+        )
+        or (
+            source_status in {"missing", "unavailable"}
+            and source_sha != ""
+            and not _is_sha256(source_sha)
+        )
+        or _count(source.get("size_bytes")) < 0
+        or _count(source.get("row_count")) < 0
+        or not isinstance(coverage, Mapping)
+        or not coverage
+        or not isinstance(projection_counts, Mapping)
+        or not isinstance(return_counts, Mapping)
+        or min(
+            evaluated,
+            input_rows,
+            excluded,
+            rejected,
+            valid,
+            evaluation_errors,
+            minimum_sample_count,
+        ) < 0
+        or minimum_sample_count < 1
+        or input_rows != excluded + rejected + valid
+        or valid != evaluated + evaluation_errors
+        or _count(value.get("asset_count")) < 0
+        or not _is_sha256(value.get("source_bound_projection_digest"))
+        or not _is_sha256(value.get("causal_projection_digest"))
+        or value.get("statistical_independence_claimed") is not False
+        or value.get("routing_eligible") is not False
+        or value.get("priority_eligible") is not False
+        or value.get("score_adjustment_eligible") is not False
+        or value.get("decision_score_eligible") is not False
+        or value.get("threshold_change_eligible") is not False
+        or value.get("publication_authority") is not False
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("policy_eligible") is not False
+        or value.get("auto_apply") is not False
+        or value.get("historical_rows_rewritten") is not False
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+        or not _count_mapping_closes(projection_counts, evaluated)
+        or not _count_mapping_closes(return_counts, evaluated)
+    ):
+        raise RuntimeError("empirical_research_report_live_binding_invalid")
+    ready_features = 0
+    for feature, row in coverage.items():
+        if not isinstance(row, Mapping):
+            raise RuntimeError("empirical_research_report_live_binding_invalid")
+        statuses = row.get("status_counts")
+        ready = _count(row.get("ready_count"))
+        minimum = row.get("minimum_eligible_sample_count")
+        maximum = row.get("maximum_eligible_sample_count")
+        if (
+            row.get("feature") != feature
+            or not isinstance(row.get("family"), str)
+            or not row.get("family")
+            or row.get("evaluated_observation_count") != evaluated
+            or ready < 0
+            or not isinstance(statuses, Mapping)
+            or not _count_mapping_closes(statuses, evaluated)
+            or statuses.get("ready", 0) != ready
+            or row.get("minimum_sample_count") != minimum_sample_count
+            or not _optional_nonnegative_int(minimum)
+            or not _optional_nonnegative_int(maximum)
+            or (evaluated == 0 and (minimum is not None or maximum is not None))
+            or (
+                evaluated > 0
+                and (type(minimum) is not int or type(maximum) is not int)
+            )
+            or (
+                minimum is not None
+                and maximum is not None
+                and minimum > maximum
+            )
+            or not _is_sha256(row.get("projection_digest"))
+        ):
+            raise RuntimeError("empirical_research_report_live_binding_invalid")
+        ready_features += ready > 0
+    if value.get("all_features_have_ready_evidence") is not (
+        ready_features == len(coverage)
+    ):
+        raise RuntimeError("empirical_research_report_live_binding_invalid")
+
+
+def _validate_published_live_human_review(value: Any) -> None:
+    if not isinstance(value, Mapping):
+        raise RuntimeError("empirical_research_report_live_binding_invalid")
+    if value.get("available") is False:
+        if value != {
+            "available": False,
+            "status": "not_available_in_source_report",
+            "latency_evidence_status": "unavailable_source_report_compatibility",
+            "completed_latency_sample_count": 0,
+            "dashboard_reads_recorded_as_human_actions": False,
+            "protocol_v2_evidence_eligible": False,
+            "policy_eligible": False,
+            "provider_calls": 0,
+            "writes": 0,
+        }:
+            raise RuntimeError("empirical_research_report_live_binding_invalid")
+        return
+    fields = (
+        "eligible_generation_count",
+        "eligible_idea_count",
+        "action_required_count",
+        "not_viewed_count",
+        "in_review_count",
+        "queue_complete_count",
+        "skipped_candidate_count",
+        "ledger_event_count",
+        "idea_record_count",
+        "first_view_record_count",
+        "completed_review_record_count",
+        "incomplete_review_record_count",
+        "events_after_evaluated_at_count",
+        "completed_latency_sample_count",
+    )
+    counts = {field: _count(value.get(field)) for field in fields}
+    if (
+        value.get("available") is not True
+        or min(counts.values()) < 0
+        or counts["not_viewed_count"]
+        + counts["in_review_count"]
+        + counts["queue_complete_count"]
+        != counts["eligible_idea_count"]
+        or counts["not_viewed_count"] + counts["in_review_count"]
+        != counts["action_required_count"]
+        or counts["completed_review_record_count"]
+        + counts["incomplete_review_record_count"]
+        != counts["idea_record_count"]
+        or counts["completed_review_record_count"]
+        > counts["first_view_record_count"]
+        or counts["first_view_record_count"] > counts["idea_record_count"]
+        or counts["completed_latency_sample_count"]
+        != counts["completed_review_record_count"]
+        or value.get("explicit_human_actions_only") is not True
+        or value.get("dashboard_reads_recorded_as_human_actions") is not False
+        or value.get("commands_require_explicit_confirmation") is not True
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("policy_eligible") is not False
+        or value.get("automatic_policy_effect") != "none"
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+    ):
+        raise RuntimeError("empirical_research_report_live_binding_invalid")
+    expected_latency_status = (
+        "observed_descriptive"
+        if counts["completed_review_record_count"]
+        else "incomplete_no_completed_reviews"
+        if counts["first_view_record_count"]
+        else "unavailable_no_explicit_human_actions"
+        if counts["eligible_idea_count"]
+        else "unavailable_no_eligible_ideas"
+    )
+    if value.get("latency_evidence_status") != expected_latency_status:
+        raise RuntimeError("empirical_research_report_live_binding_invalid")
+
+
+def _count_mapping_closes(value: Mapping[str, Any], expected: int) -> bool:
+    return (
+        (bool(value) or expected == 0)
+        and all(_count(item) >= 0 for item in value.values())
+        and sum(value.values()) == expected
+    )
+
+
+def _optional_nonnegative_int(value: Any) -> bool:
+    return value is None or (type(value) is int and value >= 0)
 
 
 def _validate_published_conclusions(

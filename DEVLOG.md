@@ -17,6 +17,53 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve causal coverage and human-review truth in empirical live projections · Codex
+**Why:** The genuine campaign report now contains a closed causal
+temporal-surprise coverage audit and an explicit receipt-backed human-review
+queue, but the separate empirical live projection discarded both. That made
+the Research Lab understate available evidence and could blur “no recorded
+human action” into “no review work exists.”
+**Changes:**
+- Advanced `decision_radar.empirical_live_campaign_projection` to schema v3,
+  retaining bounded causal source/digest lineage, closed input/evaluation and
+  feature-readiness counts, review queue/timing counts, and an explicit latency
+  evidence state. Source audits, review records, status/count closure, exact
+  zero-side-effect fields, and no-independence/no-policy boundaries now fail
+  closed; schema v1/v2 remain readable and missing older context is labeled
+  compatibility-unavailable.
+- Added Research Lab disclosures for causal feature coverage and explicit human
+  review evidence. The page states that coverage is causal/descriptive, that
+  dashboard reads are not human actions, and that review latency remains
+  unavailable until a confirmed completion exists.
+- Preserved the current sealed seven-file Protocol-v1 empirical bundle and
+  hardening supplement byte-for-byte after confirming their immutable
+  publication contract. North Star, working agreement, roadmap, and durable
+  decision docs now require a separately versioned future publication for a
+  v3-bearing bundle.
+- Ran exactly one cadence-eligible, already-authorized CoinGecko no-send cycle.
+  It published
+  `radar_market_no_send_20260720t071718543034z_23c63aa4f900`, restarted the
+  owned dashboard, and refreshed campaign truth to 42 cycles, 1,260 retained
+  observations, 1,230 baseline-counted observations, seven historical ideas,
+  four matured outcomes, two pending outcomes, and five ideas awaiting explicit
+  review. The current generation is honest healthy-empty with zero current
+  ideas; all send/trade/order/paper/RSI/`TRIGGERED_FADE` counters are zero.
+**Verify:** `61 passed` across empirical live/report and Research Lab tests;
+current campaign schema-v3 projection validated; local `verify-fast` timing
+receipt reports `status=pass`, pytest exit `0`, and `3,559` tests with provider
+calls disabled and all safety counters zero; alert render smoke, backtest
+fixture, and scoreboard passed; compileall passed; dashboard readiness is READY
+for the exact new authority; dashboard, dashboard UX, and market no-send smokes
+passed; architecture cleanliness passed with size telemetry advisory-only
+(`gate_status=pass`, 18 observations); North Star generation and JSON parsing
+passed; immutable supplement check retained id
+`670bfa10b5b74ce2f213a5f6c07ace0333ae72880d62dddaee59622349eb7343`;
+`git diff --check` passed.
+**Notes/risks:** The live projection contract is ready for the next explicitly
+versioned empirical publication, but this change intentionally does not mutate
+the current Protocol-v1 report bundle. Human review remains a real operator
+action: five items are still not viewed and no latency sample is fabricated.
+
 ## 2026-07-20 — Audit shadow-v2 coverage over retained campaign history · Codex
 **Why:** The isolated robust temporal-surprise v2 implementation proved its
 mechanics but did not show how much of the genuine retained campaign can

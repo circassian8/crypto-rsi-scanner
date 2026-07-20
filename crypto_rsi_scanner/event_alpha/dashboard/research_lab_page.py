@@ -713,6 +713,13 @@ def _live_replay_panel(
         empty="No live or replay evidence is available. Missing evidence is not negative evidence.",
         compact=True,
     )
+    campaign_evidence = ""
+    if live.get("available") is True:
+        shadow = _mapping(live.get("shadow_temporal_surprise"))
+        human_review = _mapping(live.get("human_review"))
+        campaign_evidence = _live_shadow_coverage(shadow) + _live_human_review(
+            human_review
+        )
     control_rows = []
     for label, controls in (
         ("Development + validation", _mapping(validation.get("selection_controls"))),
@@ -737,9 +744,87 @@ def _live_replay_panel(
         '<p>Live no-send evidence is a separate observational lane and is never pooled into historical replay sample sizes.</p>'
         + live_snapshot_note
         + str(table)
+        + campaign_evidence
         + str(disclosure("Controls & benchmarks", controls_body, summary="No causal claim")),
         eyebrow="Evidence separation",
     )
+
+
+def _live_shadow_coverage(shadow: Mapping[str, Any]) -> str:
+    if shadow.get("available") is not True:
+        return str(disclosure(
+            "Causal feature coverage",
+            '<p class="muted">This immutable campaign snapshot predates the closed causal temporal-surprise coverage projection. Missing compatibility data is not zero evidence.</p>',
+            summary="Unavailable in this snapshot",
+        ))
+    coverage = _mapping(shadow.get("feature_coverage"))
+    rows = []
+    for feature, raw in sorted(coverage.items()):
+        row = _mapping(raw)
+        statuses = _mapping(row.get("status_counts"))
+        rows.append((
+            humanize_enum(feature),
+            humanize_enum(row.get("family")),
+            display_count(row.get("evaluated_observation_count")),
+            display_count(row.get("ready_count")),
+            display_count(statuses.get("insufficient_history")),
+            display_count(statuses.get("current_unavailable")),
+        ))
+    counts = _mapping(shadow.get("projection_status_counts"))
+    body = (
+        '<p class="muted">Every projection uses only strictly earlier same-asset observations. '
+        f"Evaluated: {escape_html(display_count(shadow.get('evaluated_observation_count')))}; "
+        f"complete: {escape_html(display_count(counts.get('ready')))}; "
+        f"partial: {escape_html(display_count(counts.get('partial')))}; "
+        f"unavailable: {escape_html(display_count(counts.get('unavailable')))}. "
+        "Coverage is descriptive; it does not alter routes, scores, thresholds, or authority.</p>"
+        + str(data_table(
+            ("Feature", "Family", "Evaluated", "Ready", "Warming", "Current unavailable"),
+            rows,
+            empty="No causal feature rows are available.",
+            compact=True,
+        ))
+    )
+    return str(disclosure(
+        "Causal feature coverage",
+        body,
+        summary=(
+            "All modeled features have some ready evidence"
+            if shadow.get("all_features_have_ready_evidence") is True
+            else "Feature coverage remains incomplete"
+        ),
+    ))
+
+
+def _live_human_review(human_review: Mapping[str, Any]) -> str:
+    if human_review.get("available") is not True:
+        return str(disclosure(
+            "Human review evidence",
+            '<p class="muted">This immutable campaign snapshot predates the explicit human-review queue projection. Dashboard reads are never inferred as human actions.</p>',
+            summary="Unavailable in this snapshot",
+        ))
+    rows = (
+        ("Receipt-backed ideas", display_count(human_review.get("eligible_idea_count"))),
+        ("Awaiting explicit action", display_count(human_review.get("action_required_count"))),
+        ("First views recorded", display_count(human_review.get("first_view_record_count"))),
+        ("Completed reviews", display_count(human_review.get("completed_review_record_count"))),
+        ("Latency samples", display_count(human_review.get("completed_latency_sample_count"))),
+    )
+    body = str(data_table(
+        ("Review evidence", "Count"),
+        rows,
+        empty="No human-review evidence is available.",
+        compact=True,
+    )) + (
+        '<p class="muted">Only explicit confirmed operator actions count. '
+        f"Latency status: {escape_html(humanize_enum(human_review.get('latency_evidence_status')))}. "
+        "The queue is descriptive and is not Protocol-v2 evidence until separately frozen.</p>"
+    )
+    return str(disclosure(
+        "Human review evidence",
+        body,
+        summary=humanize_enum(human_review.get("status")),
+    ))
 
 
 def _plural(count: int, singular: str) -> str:

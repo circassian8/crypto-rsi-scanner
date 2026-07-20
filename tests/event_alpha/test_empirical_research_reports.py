@@ -927,6 +927,41 @@ def test_rejects_boolean_live_projection_schema_version() -> None:
         empirical_research_report_validation._validate_published_live(binding)
 
 
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    (
+        (
+            "shadow_temporal_surprise",
+            "statistical_independence_claimed",
+            True,
+        ),
+        (
+            "human_review",
+            "dashboard_reads_recorded_as_human_actions",
+            True,
+        ),
+    ),
+)
+def test_rejects_resigned_live_campaign_v3_evidence_drift(
+    section: str, field: str, value: object
+) -> None:
+    projection = empirical_live_campaign.project_live_campaign(_live_report())
+    projection[section][field] = value
+    binding = {
+        "status": "provided_separate_observational_lane",
+        "canonical_projection": projection,
+        "canonical_projection_sha256": hashlib.sha256(
+            empirical_replay_store.canonical_json_bytes(projection)
+        ).hexdigest(),
+        "evidence_pooled_with_replay": False,
+    }
+
+    with pytest.raises(
+        RuntimeError, match="empirical_research_report_live_binding_invalid"
+    ):
+        empirical_research_report_validation._validate_published_live(binding)
+
+
 def _resign_publication_bundle(
     payloads: dict[str, bytes],
     mutate: Callable[
