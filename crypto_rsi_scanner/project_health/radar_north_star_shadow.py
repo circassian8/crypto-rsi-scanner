@@ -178,6 +178,12 @@ PROTOCOL_V2_EPISODE_COVERAGE_FRONTIER_POLICY: dict[str, Any] = {
         "exact_scorecard_contract_input_binding_and_evaluated_at"
     ),
     "downstream_behavior": "copy_validated_projection_without_re_evaluation",
+    "empirical_live_projection_schema_version": 5,
+    "empirical_live_projection_prior_versions_readable": [1, 2, 3, 4],
+    "research_lab_behavior": (
+        "render_sealed_live_snapshot_separately_from_historical_replay"
+    ),
+    "sealed_protocol_v1_bundle_rewritten": False,
     "minimum_sample_policy_sealed": False,
     "sample_sufficiency_evaluable": False,
     "episode_independence": (

@@ -75,6 +75,13 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   rows. This is descriptive only: minimum samples, statistical/cross-asset
   independence, matched controls, annex binding, and Protocol-v2 evidence
   eligibility all remain false;
+- forward empirical live projection v5 now preserves that exact closed
+  frontier for future empirical bundles and Research Lab rendering. Projection
+  schemas v1-v4 remain readable, including full v4 control-context validation;
+  an older source report becomes compatibility-unavailable rather than a
+  fabricated zero frontier. The currently sealed Protocol-v1 report bundle is
+  deliberately unchanged and therefore still carries its historical v1 live
+  projection;
 - exact-universe rule: top 30 liquidity-ranked Radar assets intersected with
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled,
   non-prelisting Bybit contracts;

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import hashlib
 from pathlib import Path
@@ -11,7 +12,11 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_live_campaign import (
     project_live_campaign,
 )
 from crypto_rsi_scanner.event_alpha.operations import (
+    market_observation_campaign_episode_frontier,
     market_observation_campaign_shadow_surprise,
+)
+from tests.event_alpha.test_market_observation_campaign_episode_frontier import (
+    _scorecard,
 )
 
 
@@ -216,7 +221,7 @@ def test_live_campaign_projection_stays_separate_and_insufficient() -> None:
     assert projection["evidence_mode"] == "live_no_send"
     assert projection["campaign_metrics"]["real_observations"] == 240
     assert projection["episodes"]["primary_episode_count"] == 1
-    assert projection["schema_version"] == 4
+    assert projection["schema_version"] == 5
     assert projection["episodes"]["statistical_independence_claim"] is False
     assert projection["episodes"]["cross_asset_independence_claim"] is False
     assert projection["episodes"]["representatives"][0]["radar_route"] == "risk_watch"
@@ -242,6 +247,56 @@ def test_live_campaign_projection_stays_separate_and_insufficient() -> None:
     assert controls["selection_uses_outcomes"] is False
     assert controls["historical_context_backfilled"] is False
     assert controls["protocol_v2_evidence_eligible"] is False
+    assert projection["episode_coverage_frontier"] == {
+        "available": False,
+        "status": "not_available_in_source_report",
+        "contract": {},
+        "protocol_v2_evidence_eligible": False,
+        "policy_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def test_live_campaign_projection_copies_closed_episode_frontier() -> None:
+    report = _report()
+    scorecard = _scorecard()
+    frontier = (
+        market_observation_campaign_episode_frontier
+        .build_protocol_v2_episode_coverage_frontier(scorecard)
+    )
+    report["decision_v2_episode_outcome_scorecard"] = scorecard
+    report["protocol_v2_episode_coverage_frontier"] = frontier
+
+    projection = project_live_campaign(report)
+    copied = projection["episode_coverage_frontier"]
+
+    assert copied["available"] is True
+    assert copied["contract"] == frontier
+    assert copied["contract"] is not frontier
+    assert copied["contract"]["route_population_count"] == 8
+    assert copied["contract"]["primary_origin_population_count"] == 7
+    assert copied["protocol_v2_evidence_eligible"] is False
+    assert copied["provider_calls"] == copied["writes"] == 0
+
+
+def test_live_campaign_projection_rejects_episode_frontier_drift() -> None:
+    report = _report()
+    scorecard = _scorecard()
+    frontier = (
+        market_observation_campaign_episode_frontier
+        .build_protocol_v2_episode_coverage_frontier(scorecard)
+    )
+    report["decision_v2_episode_outcome_scorecard"] = scorecard
+    report["protocol_v2_episode_coverage_frontier"] = deepcopy(frontier)
+    report["protocol_v2_episode_coverage_frontier"]["episode_count"] += 1
+
+    with pytest.raises(
+        ValueError,
+        match="episode coverage frontier invalid",
+    ):
+        project_live_campaign(report)
 
 
 def test_live_campaign_loader_rejects_duplicate_keys_and_symlink(tmp_path: Path) -> None:

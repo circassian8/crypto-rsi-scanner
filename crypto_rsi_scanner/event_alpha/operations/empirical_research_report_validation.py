@@ -17,6 +17,7 @@ from . import (
     empirical_replay_run,
     empirical_review,
     empirical_validation_protocol,
+    market_observation_campaign_episode_frontier,
 )
 
 
@@ -447,6 +448,7 @@ def _validate_published_live(value: Any) -> None:
     if projection.get("schema_version") in (
         empirical_live_campaign.PRIOR_SCHEMA_VERSION,
         empirical_live_campaign.CAUSAL_CONTEXT_SCHEMA_VERSION,
+        empirical_live_campaign.CONTROL_CONTEXT_SCHEMA_VERSION,
         empirical_live_campaign.SCHEMA_VERSION,
     ):
         episodes = projection.get("episodes")
@@ -458,14 +460,22 @@ def _validate_published_live(value: Any) -> None:
             raise RuntimeError("empirical_research_report_live_binding_invalid")
     if projection.get("schema_version") in (
         empirical_live_campaign.CAUSAL_CONTEXT_SCHEMA_VERSION,
+        empirical_live_campaign.CONTROL_CONTEXT_SCHEMA_VERSION,
         empirical_live_campaign.SCHEMA_VERSION,
     ):
         _validate_published_live_shadow(projection.get("shadow_temporal_surprise"))
         _validate_published_live_human_review(projection.get("human_review"))
-    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+    if projection.get("schema_version") in (
+        empirical_live_campaign.CONTROL_CONTEXT_SCHEMA_VERSION,
+        empirical_live_campaign.SCHEMA_VERSION,
+    ):
         _validate_published_live_control_context(
             projection.get("point_in_time_control_context"),
             metrics=projection.get("campaign_metrics"),
+        )
+    if projection.get("schema_version") == empirical_live_campaign.SCHEMA_VERSION:
+        _validate_published_live_episode_frontier(
+            projection.get("episode_coverage_frontier")
         )
 
 
@@ -749,6 +759,36 @@ def _validate_published_live_control_context(
         ):
             raise RuntimeError(error)
     elif value.get("status") != expected_status:
+        raise RuntimeError(error)
+
+
+def _validate_published_live_episode_frontier(value: Any) -> None:
+    error = "empirical_research_report_live_binding_invalid"
+    if not isinstance(value, Mapping):
+        raise RuntimeError(error)
+    unavailable = empirical_live_campaign._unavailable_episode_coverage_frontier()
+    if set(value) != set(unavailable):
+        raise RuntimeError(error)
+    if value.get("available") is False:
+        if value != unavailable:
+            raise RuntimeError(error)
+        return
+    contract = value.get("contract")
+    errors = (
+        market_observation_campaign_episode_frontier
+        .validate_protocol_v2_episode_coverage_frontier(contract)
+    )
+    if (
+        value.get("available") is not True
+        or not isinstance(contract, Mapping)
+        or errors
+        or value.get("status") != contract.get("status")
+        or value.get("protocol_v2_evidence_eligible") is not False
+        or value.get("policy_eligible") is not False
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+        or value.get("research_only") is not True
+    ):
         raise RuntimeError(error)
 
 

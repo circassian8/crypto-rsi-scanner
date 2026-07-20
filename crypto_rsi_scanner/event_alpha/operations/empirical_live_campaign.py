@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..artifacts.json_lines import loads_no_duplicate_keys
+from . import market_observation_campaign_episode_frontier
 from . import market_observation_campaign_shadow_surprise
 
 
@@ -14,11 +15,14 @@ SCHEMA_ID = "decision_radar.empirical_live_campaign_projection"
 LEGACY_SCHEMA_VERSION = 1
 PRIOR_SCHEMA_VERSION = 2
 CAUSAL_CONTEXT_SCHEMA_VERSION = 3
-SCHEMA_VERSION = 4
+CONTROL_CONTEXT_SCHEMA_VERSION = 4
+EPISODE_FRONTIER_SCHEMA_VERSION = 5
+SCHEMA_VERSION = EPISODE_FRONTIER_SCHEMA_VERSION
 SUPPORTED_SCHEMA_VERSIONS = (
     LEGACY_SCHEMA_VERSION,
     PRIOR_SCHEMA_VERSION,
     CAUSAL_CONTEXT_SCHEMA_VERSION,
+    CONTROL_CONTEXT_SCHEMA_VERSION,
     SCHEMA_VERSION,
 )
 MAX_REPORT_BYTES = 2 * 1024 * 1024
@@ -181,6 +185,10 @@ def project_live_campaign(report: Mapping[str, Any]) -> dict[str, Any]:
             "exclusive_cohorts": _cohort_projection(scorecard.get("exclusive_cohorts")),
             "origin_cohorts": _cohort_rows(scorecard.get("nonexclusive_thesis_origin_cohorts")),
         },
+        "episode_coverage_frontier": _episode_coverage_frontier_projection(
+            report,
+            scorecard=scorecard,
+        ),
         "shadow_temporal_surprise": _shadow_temporal_surprise_projection(report),
         "human_review": _human_review_projection(report),
         "point_in_time_control_context": (
@@ -197,6 +205,50 @@ def project_live_campaign(report: Mapping[str, Any]) -> dict[str, Any]:
         "writes": 0,
         "authorization_mutations": 0,
         "dashboard_authority_mutations": 0,
+    }
+
+
+def _episode_coverage_frontier_projection(
+    report: Mapping[str, Any],
+    *,
+    scorecard: Mapping[str, Any],
+) -> dict[str, Any]:
+    value = report.get("protocol_v2_episode_coverage_frontier")
+    if value is None:
+        return _unavailable_episode_coverage_frontier()
+    if not isinstance(value, Mapping):
+        raise ValueError("live campaign episode coverage frontier invalid")
+    errors = (
+        market_observation_campaign_episode_frontier
+        .validate_protocol_v2_episode_coverage_frontier(
+            value,
+            scorecard=scorecard,
+        )
+    )
+    if errors:
+        raise ValueError("live campaign episode coverage frontier invalid")
+    return {
+        "available": True,
+        "status": str(value["status"]),
+        "contract": dict(value),
+        "protocol_v2_evidence_eligible": False,
+        "policy_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _unavailable_episode_coverage_frontier() -> dict[str, Any]:
+    return {
+        "available": False,
+        "status": "not_available_in_source_report",
+        "contract": {},
+        "protocol_v2_evidence_eligible": False,
+        "policy_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
     }
 
 
@@ -779,12 +831,14 @@ def _number(value: Any) -> float | None:
 
 __all__ = [
     "CAUSAL_CONTEXT_SCHEMA_VERSION",
+    "CONTROL_CONTEXT_SCHEMA_VERSION",
     "CONTROL_CONTEXT_FIELD_NAMES",
     "CONTROL_CONTEXT_SCHEMA_ID",
     "CONTROL_CONTEXT_SELECTION_FIELD_MAPPING",
     "CONTROL_CONTEXT_SELECTION_MATCH_FIELDS",
     "CONTROL_CONTEXT_STATUSES",
     "CONTROL_CONTEXT_UNIVERSE_FIELD_NAMES",
+    "EPISODE_FRONTIER_SCHEMA_VERSION",
     "LEGACY_SCHEMA_VERSION",
     "PRIOR_SCHEMA_VERSION",
     "SCHEMA_ID",

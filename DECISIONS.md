@@ -23,8 +23,11 @@ validated frozen Decision-v2 episode scorecard. Include every canonical route
 and primary origin in canonical order, with explicit zero rows, and bind the
 projection to the scorecard schema, contract digest, input-binding digest, and
 evaluation time. Campaign reports and the read-only dashboard copy this value
-without re-evaluating cohorts and fail closed on source or count drift. Treat a
-zero row strictly as missing episode evidence. Do not infer minimum samples,
+without re-evaluating cohorts and fail closed on source or count drift. Forward
+empirical live projections use schema v5 to preserve the same contract for
+future Research Lab bundles, while schemas v1-v4 remain readable and the sealed
+Protocol-v1 report bundle remains byte-identical. Treat a zero row strictly as
+missing episode evidence. Do not infer minimum samples,
 sample sufficiency, statistical or cross-asset independence, matched controls,
 annex status, policy fitness, or route quality from this frontier, and do not
 change routing, scores, thresholds, providers, or authority.

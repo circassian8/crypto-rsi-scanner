@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Preserve episode coverage in forward empirical evidence · Codex
+**Why:** The current campaign and Campaign dashboard exposed the complete
+route/origin frontier, but a future empirical live projection would still strip
+that contract and Research Lab could not render it. The propagation gap needed
+closing without rewriting the sealed Protocol-v1 bundle.
+**Changes:**
+- Advanced `decision_radar.empirical_live_campaign_projection` to v5. A current
+  campaign report now copies the exact validated episode-frontier contract;
+  source/count/digest drift fails closed. Older source reports produce explicit
+  compatibility-unavailable state instead of fabricated zero coverage.
+- Kept empirical projection schemas v1-v4 readable and restored explicit v4
+  control-context validation after the version advance. Re-signed v5 bundles
+  with frontier drift are rejected.
+- Added a Research Lab disclosure for future v5 bundles that renders all live
+  route and primary-origin rows while labeling the content as the immutable
+  campaign snapshot sealed into that bundle, separate from historical replay.
+  The current seven-file Protocol-v1 bundle remains byte-identical and retains
+  its historical v1 live projection.
+- Advanced the static Protocol-v2 current-progress contract to v24 with the
+  v5/legacy compatibility boundary, eight-route/seven-origin taxonomy, zero
+  current-count embedding, no minimum samples or independence claim, and zero
+  I/O/policy authority. Updated both North Stars, current progress, roadmap, and
+  the durable frontier decision.
+**Verify:** Focused empirical projection, report validation, Research Lab,
+Protocol-v2 progress, frontier, and North-Star tests passed (`87/87`).
+`python3 -m compileall -q crypto_rsi_scanner tests`, Protocol-v2 progress check,
+dashboard smoke, dashboard UX smoke, JSON validation, and `git diff --check`
+passed. Full `make verify` was not repeated because the immediately preceding
+logical commit exercised all `3,587` package tests (including the one exact
+outside-sandbox loopback rerun), while this forward-only compatibility slice
+has dedicated projection/report/page coverage and no provider or production
+policy behavior.
+
 ## 2026-07-20 — Expose the complete Protocol-v2 episode evidence frontier · Codex
 **Why:** The frozen Decision-v2 scorecard grouped only observed cohorts, so the
 campaign report and dashboard made six absent routes and six absent primary

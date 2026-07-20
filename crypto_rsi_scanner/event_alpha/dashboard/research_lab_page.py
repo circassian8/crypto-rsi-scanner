@@ -718,8 +718,10 @@ def _live_replay_panel(
         shadow = _mapping(live.get("shadow_temporal_surprise"))
         human_review = _mapping(live.get("human_review"))
         control_context = _mapping(live.get("point_in_time_control_context"))
+        episode_frontier = _mapping(live.get("episode_coverage_frontier"))
         campaign_evidence = (
-            _live_point_in_time_control_context(control_context)
+            _live_episode_coverage_frontier(episode_frontier)
+            + _live_point_in_time_control_context(control_context)
             + _live_shadow_coverage(shadow)
             + _live_human_review(human_review)
         )
@@ -751,6 +753,94 @@ def _live_replay_panel(
         + str(disclosure("Controls & benchmarks", controls_body, summary="No causal claim")),
         eyebrow="Evidence separation",
     )
+
+
+def _live_episode_coverage_frontier(value: Mapping[str, Any]) -> str:
+    if not value:
+        return ""
+    if value.get("available") is not True:
+        return str(disclosure(
+            "Live episode coverage frontier",
+            '<p class="muted">This immutable live campaign snapshot predates '
+            "the closed all-route/all-origin frontier. Missing compatibility "
+            "data is not zero episode coverage.</p>",
+            summary="Not available in this historical live snapshot",
+        ))
+    contract = _mapping(value.get("contract"))
+    routes = _mapping_rows(contract.get("route_coverage"))
+    origins = _mapping_rows(contract.get("primary_origin_coverage"))
+    if not routes or not origins:
+        return ""
+    route_table = data_table(
+        (
+            "Route",
+            "Coverage",
+            "Episodes",
+            "Matured",
+            "Not due",
+            "Missing price",
+            "Scoreable",
+        ),
+        [
+            (
+                humanize_enum(row.get("name")),
+                "Observed"
+                if row.get("coverage_status") == "observed"
+                else "No episode",
+                display_count(row.get("episode_count")),
+                display_count(row.get("matured_episode_count")),
+                display_count(row.get("not_due_episode_count")),
+                display_count(row.get("due_missing_price_episode_count")),
+                display_count(row.get("scoreable_directional_episode_count")),
+            )
+            for row in routes
+        ],
+        caption="Live no-send route episode coverage",
+        compact=True,
+    )
+    origin_table = data_table(
+        ("Primary origin", "Coverage", "Episodes", "Matured", "Scoreable"),
+        [
+            (
+                humanize_enum(row.get("name")),
+                "Observed"
+                if row.get("coverage_status") == "observed"
+                else "No episode",
+                display_count(row.get("episode_count")),
+                display_count(row.get("matured_episode_count")),
+                display_count(row.get("scoreable_directional_episode_count")),
+            )
+            for row in origins
+        ],
+        caption="Live no-send primary-origin episode coverage",
+        compact=True,
+    )
+    observed_routes = display_count(contract.get("observed_route_count"))
+    route_total = display_count(contract.get("route_population_count"))
+    observed_origins = display_count(
+        contract.get("observed_primary_origin_count")
+    )
+    origin_total = display_count(contract.get("primary_origin_population_count"))
+    body = (
+        '<p class="muted">This is the exact live campaign snapshot sealed into '
+        "the empirical bundle. Zero rows are missing evidence, not negative "
+        "results. Minimum samples, independence, matched controls, and "
+        "Protocol-v2 eligibility remain unsealed.</p>"
+        + str(route_table)
+        + str(disclosure(
+            "Primary-origin coverage",
+            origin_table,
+            summary=f"{observed_origins}/{origin_total} origins observed",
+        ))
+    )
+    return str(disclosure(
+        "Live episode coverage frontier",
+        body,
+        summary=(
+            f"{observed_routes}/{route_total} routes · "
+            f"{observed_origins}/{origin_total} origins observed"
+        ),
+    ))
 
 
 def _live_point_in_time_control_context(value: Mapping[str, Any]) -> str:

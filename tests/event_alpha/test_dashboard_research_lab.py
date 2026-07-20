@@ -760,6 +760,46 @@ def test_research_lab_renders_causal_coverage_and_explicit_review_evidence(
             "protocol_partition": 0,
         },
     }
+    live["episode_coverage_frontier"] = {
+        "available": True,
+        "status": "descriptive_incomplete",
+        "contract": {
+            "observed_route_count": 1,
+            "route_population_count": len(ROUTES),
+            "observed_primary_origin_count": 1,
+            "primary_origin_population_count": len(ORIGINS),
+            "route_coverage": [
+                {
+                    "name": name,
+                    "coverage_status": (
+                        "observed" if name == "dashboard_watch" else "unobserved"
+                    ),
+                    "episode_count": 1 if name == "dashboard_watch" else 0,
+                    "matured_episode_count": 1 if name == "dashboard_watch" else 0,
+                    "not_due_episode_count": 0,
+                    "due_missing_price_episode_count": 0,
+                    "scoreable_directional_episode_count": (
+                        1 if name == "dashboard_watch" else 0
+                    ),
+                }
+                for name in ROUTES
+            ],
+            "primary_origin_coverage": [
+                {
+                    "name": name,
+                    "coverage_status": (
+                        "observed" if name == "market_led" else "unobserved"
+                    ),
+                    "episode_count": 1 if name == "market_led" else 0,
+                    "matured_episode_count": 1 if name == "market_led" else 0,
+                    "scoreable_directional_episode_count": (
+                        1 if name == "market_led" else 0
+                    ),
+                }
+                for name in ORIGINS
+            ],
+        },
+    }
     projections["live"] = live
     lab["projections"] = projections
 
@@ -787,6 +827,14 @@ def test_research_lab_renders_causal_coverage_and_explicit_review_evidence(
     assert "Protocol-v2 partition" in page.body
     assert "Historical rows were not backfilled" in page.body
     assert "no control was selected" in page.body
+    assert "Live episode coverage frontier" in page.body
+    assert "1/8 routes · 1/7 origins observed" in page.body
+    assert "Live no-send route episode coverage" in page.body
+    assert "High-confidence idea" in page.body
+    assert "No episode" in page.body
+    assert "Live no-send primary-origin episode coverage" in page.body
+    assert "Macro-led" in page.body
+    assert "Zero rows are missing evidence, not negative results" in page.body
 
 
 def test_research_lab_invalid_bundle_renders_inventory_only(tmp_path: Path) -> None:

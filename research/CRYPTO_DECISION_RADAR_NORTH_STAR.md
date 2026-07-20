@@ -800,6 +800,15 @@ frontier does not choose minimum samples, claim statistical or cross-asset
 independence, provide matched controls, bind the Protocol-v2 annex, or change
 routes, scores, thresholds, providers, artifacts, or policy.
 
+Forward empirical live projections use schema v5 to preserve that exact closed
+frontier as a separately validated contract. Schemas v1 through v4 remain
+readable; v4 still validates its point-in-time control context, while older
+source reports expose the frontier as compatibility-unavailable rather than
+zero. Research Lab renders a v5 frontier only as the immutable live snapshot
+sealed into its empirical bundle and keeps it separate from historical replay.
+The current sealed seven-file Protocol-v1 bundle remains byte-identical and is
+not silently regenerated to adopt v5.
+
 Prospective live/no-send observations now retain the exact point-in-time
 top-liquid universe membership, one-based volume rank, selected-set size,
 configured limit, and selection policy needed by a future Bybit intersection

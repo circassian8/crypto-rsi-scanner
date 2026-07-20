@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v23")
+    assert values["progress_version"].endswith("_v24")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -320,7 +320,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     controls = values["prospective_control_context_contract"]
     assert controls["new_observation_context_collection_implemented"] is True
     assert controls["campaign_readiness_projection_implemented"] is True
-    assert controls["empirical_projection_schema_version"] == 4
+    assert controls["empirical_projection_schema_version"] == 5
     assert controls["research_lab_projection_implemented"] is True
     assert controls["selection_uses_outcomes"] is False
     assert controls["matched_control_selection_performed"] is False
@@ -341,6 +341,22 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert controls["protocol_partition_assignment_implemented"] is False
     assert controls["current_coverage_counts_embedded"] is False
     assert controls["protocol_v2_evidence_eligible"] is False
+    frontier = values["episode_coverage_frontier_contract"]
+    assert frontier["source_schema_id"] == (
+        "decision_radar.protocol_v2_episode_coverage_frontier"
+    )
+    assert frontier["empirical_projection_schema_version"] == 5
+    assert frontier["empirical_prior_schema_versions_readable"] == [1, 2, 3, 4]
+    assert len(frontier["canonical_routes"]) == 8
+    assert len(frontier["canonical_primary_origins"]) == 7
+    assert frontier["zero_episode_categories_explicit"] is True
+    assert frontier["current_coverage_counts_embedded"] is False
+    assert frontier["sealed_protocol_v1_bundle_rewritten"] is False
+    assert frontier["minimum_sample_policy_sealed"] is False
+    assert frontier["statistical_independence_claim"] is False
+    assert frontier["protocol_v2_evidence_eligible"] is False
+    assert frontier["provider_calls"] == frontier["file_reads"] == 0
+    assert frontier["writes"] == 0
     assert "historical_outcome_recovery_incomplete" in values[
         "current_activation_blockers"
     ]
@@ -425,6 +441,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     control_context_drift["prospective_control_context_contract"][
         "matched_control_selection_performed"
     ] = True
+    episode_frontier_drift = progress.current_progress_values()
+    episode_frontier_drift["episode_coverage_frontier_contract"][
+        "minimum_sample_policy_sealed"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -441,6 +461,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         impact_drift,
         quantity_drift,
         control_context_drift,
+        episode_frontier_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -594,7 +615,10 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "fixture_capture_doctor=true" in output.out
     assert "full_multipage=false live_transport=false genuine_capture=false" in output.out
     assert "prospective_control_context=" in output.out
-    assert "empirical_projection_v4=true research_lab=true" in output.out
+    assert "empirical_projection_v5=true research_lab=true" in output.out
+    assert "episode_coverage_frontier=" in output.out
+    assert "routes=8 primary_origins=7" in output.out
+    assert "sealed_protocol_v1_bundle_rewritten=false" in output.out
     assert "prospective_control_selection=not_performed" in output.out
     assert "historical_backfill=false market_regime_collection=true" in output.out
     assert "control_market_regime_basis=" in output.out

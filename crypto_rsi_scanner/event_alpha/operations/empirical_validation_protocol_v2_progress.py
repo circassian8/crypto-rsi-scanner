@@ -52,6 +52,9 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
 )
 from crypto_rsi_scanner.event_alpha.operations import empirical_live_campaign
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+from crypto_rsi_scanner.event_alpha.operations import (
+    market_observation_campaign_episode_frontier,
+)
 from crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness import (
     BYBIT_NATIVE_METRICS,
     REMAINING_PROTOCOL_V2_COST_FIELDS,
@@ -70,10 +73,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v23"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v24"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
     "with_prospective_outcome_blind_point_in_time_control_context_projection_"
+    "and_forward_empirical_episode_coverage_frontier_projection_v5_"
     "and_current_cycle_temporal_24h_market_regime_collection_"
     "with_fail_closed_residual_cost_availability_and_unsealed_per_leg_"
     "slippage_sensitivity_"
@@ -421,6 +425,47 @@ _EXPECTED_PROSPECTIVE_CONTROL_CONTEXT = {
     "writes": 0,
     "research_only": True,
 }
+_EXPECTED_EPISODE_COVERAGE_FRONTIER = {
+    "source_schema_id": market_observation_campaign_episode_frontier.SCHEMA_ID,
+    "source_schema_version": (
+        market_observation_campaign_episode_frontier.SCHEMA_VERSION
+    ),
+    "empirical_projection_schema_id": empirical_live_campaign.SCHEMA_ID,
+    "empirical_projection_schema_version": empirical_live_campaign.SCHEMA_VERSION,
+    "empirical_prior_schema_versions_readable": [1, 2, 3, 4],
+    "canonical_routes": list(
+        market_observation_campaign_episode_frontier.CANONICAL_ROUTES
+    ),
+    "canonical_primary_origins": list(
+        market_observation_campaign_episode_frontier.CANONICAL_PRIMARY_ORIGINS
+    ),
+    "campaign_projection_implemented": True,
+    "empirical_projection_implemented": True,
+    "research_lab_projection_implemented": True,
+    "zero_episode_categories_explicit": True,
+    "source_scorecard_binding_required": True,
+    "older_source_missing_context_status": "not_available_in_source_report",
+    "current_coverage_counts_embedded": False,
+    "current_coverage_source": (
+        "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json:"
+        "protocol_v2_episode_coverage_frontier"
+    ),
+    "sealed_protocol_v1_bundle_rewritten": False,
+    "minimum_sample_policy_sealed": False,
+    "sample_sufficiency_evaluable": False,
+    "statistical_independence_claim": False,
+    "cross_asset_independence_claim": False,
+    "matched_control_available": False,
+    "protocol_v2_annex_bound": False,
+    "protocol_v2_evidence_eligible": False,
+    "routing_eligible": False,
+    "score_adjustment_eligible": False,
+    "threshold_change_eligible": False,
+    "provider_calls": 0,
+    "file_reads": 0,
+    "writes": 0,
+    "research_only": True,
+}
 
 
 def current_progress_values() -> dict[str, Any]:
@@ -548,6 +593,9 @@ def current_progress_values() -> dict[str, Any]:
         "prospective_control_context_contract": deepcopy(
             _EXPECTED_PROSPECTIVE_CONTROL_CONTEXT
         ),
+        "episode_coverage_frontier_contract": deepcopy(
+            _EXPECTED_EPISODE_COVERAGE_FRONTIER
+        ),
         "current_activation_blockers": list(_CURRENT_BLOCKERS),
         "next_safe_commands": list(_NEXT_SAFE_COMMANDS),
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},
@@ -571,6 +619,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         "native_liquidation_contract",
         "structured_unlock_contract",
         "prospective_control_context_contract",
+        "episode_coverage_frontier_contract",
         "current_activation_blockers",
         "next_safe_commands",
         "safety",
@@ -680,6 +729,9 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
     control_context = value.get("prospective_control_context_contract")
     if control_context != _EXPECTED_PROSPECTIVE_CONTROL_CONTEXT:
         errors.append("prospective_control_context_contract_mismatch")
+    episode_frontier = value.get("episode_coverage_frontier_contract")
+    if episode_frontier != _EXPECTED_EPISODE_COVERAGE_FRONTIER:
+        errors.append("episode_coverage_frontier_contract_mismatch")
 
     blockers = value.get("current_activation_blockers")
     if blockers != list(_CURRENT_BLOCKERS):
@@ -717,6 +769,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
     liquidation = payload["native_liquidation_contract"]
     unlock = payload["structured_unlock_contract"]
     control_context = payload["prospective_control_context_contract"]
+    episode_frontier = payload["episode_coverage_frontier_contract"]
     lines = [
         "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS",
         f"status={payload['status']}",
@@ -975,7 +1028,19 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             f"{control_context['source_schema_id']}:v"
             f"{control_context['source_schema_version']} "
             "new_observation_collection=true campaign_readiness=true "
-            "empirical_projection_v4=true research_lab=true"
+            f"empirical_projection_v{control_context['empirical_projection_schema_version']}="
+            "true research_lab=true"
+        ),
+        (
+            "episode_coverage_frontier="
+            f"{episode_frontier['source_schema_id']}:v"
+            f"{episode_frontier['source_schema_version']} "
+            f"routes={len(episode_frontier['canonical_routes'])} "
+            f"primary_origins={len(episode_frontier['canonical_primary_origins'])} "
+            "zero_categories_explicit=true empirical_projection_v5=true "
+            "sealed_protocol_v1_bundle_rewritten=false "
+            "minimum_samples_sealed=false independence_claimed=false "
+            "protocol_v2_evidence=false"
         ),
         (
             "prospective_control_selection=not_performed outcomes_used=false "

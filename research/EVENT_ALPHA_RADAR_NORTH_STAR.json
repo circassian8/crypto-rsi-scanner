@@ -435,7 +435,7 @@
       "sports_fixtures"
     ]
   },
-  "generated_at": "2026-07-20T11:06:35.691406+00:00",
+  "generated_at": "2026-07-20T11:25:58.170651+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1074,17 +1074,26 @@
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "downstream_behavior": "copy_validated_projection_without_re_evaluation",
+    "empirical_live_projection_prior_versions_readable": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "empirical_live_projection_schema_version": 5,
     "episode_independence": "fixed_start_declustered_not_statistically_independent",
     "matched_control_available": false,
     "minimum_sample_policy_sealed": false,
     "protocol_v2_annex_bound": false,
     "protocol_v2_evidence_eligible": false,
     "provider_calls": 0,
+    "research_lab_behavior": "render_sealed_live_snapshot_separately_from_historical_replay",
     "research_only": true,
     "routing_eligible": false,
     "sample_sufficiency_evaluable": false,
     "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
     "schema_version": 1,
+    "sealed_protocol_v1_bundle_rewritten": false,
     "source_binding": "exact_scorecard_contract_input_binding_and_evaluated_at",
     "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
     "source_scorecard_schema_version": 1,

@@ -906,6 +906,10 @@ def test_binds_valid_live_campaign_as_separate_canonical_projection(
     assert binding["canonical_projection"]["schema_id"] == (
         "decision_radar.empirical_live_campaign_projection"
     )
+    assert binding["canonical_projection"]["schema_version"] == 5
+    assert binding["canonical_projection"]["episode_coverage_frontier"] == (
+        empirical_live_campaign._unavailable_episode_coverage_frontier()
+    )
     assert binding["evidence_pooled_with_replay"] is False
 
 
@@ -967,12 +971,47 @@ def test_rejects_resigned_live_campaign_current_evidence_drift(
         empirical_research_report_validation._validate_published_live(binding)
 
 
+def test_rejects_resigned_live_campaign_episode_frontier_drift() -> None:
+    projection = empirical_live_campaign.project_live_campaign(_live_report())
+    projection["episode_coverage_frontier"]["status"] = "invented"
+    binding = {
+        "status": "provided_separate_observational_lane",
+        "canonical_projection": projection,
+        "canonical_projection_sha256": hashlib.sha256(
+            empirical_replay_store.canonical_json_bytes(projection)
+        ).hexdigest(),
+        "evidence_pooled_with_replay": False,
+    }
+
+    with pytest.raises(
+        RuntimeError, match="empirical_research_report_live_binding_invalid"
+    ):
+        empirical_research_report_validation._validate_published_live(binding)
+
+
 @pytest.mark.parametrize(
     ("schema_version", "removed_fields"),
     (
-        (1, ("shadow_temporal_surprise", "human_review", "point_in_time_control_context")),
-        (2, ("shadow_temporal_surprise", "human_review", "point_in_time_control_context")),
-        (3, ("point_in_time_control_context",)),
+        (
+            1,
+            (
+                "shadow_temporal_surprise",
+                "human_review",
+                "point_in_time_control_context",
+                "episode_coverage_frontier",
+            ),
+        ),
+        (
+            2,
+            (
+                "shadow_temporal_surprise",
+                "human_review",
+                "point_in_time_control_context",
+                "episode_coverage_frontier",
+            ),
+        ),
+        (3, ("point_in_time_control_context", "episode_coverage_frontier")),
+        (4, ("episode_coverage_frontier",)),
     ),
 )
 def test_published_live_campaign_keeps_prior_schema_versions_readable(

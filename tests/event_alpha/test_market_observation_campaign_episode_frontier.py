@@ -179,6 +179,14 @@ def test_north_star_keeps_episode_frontier_descriptive_and_complete() -> None:
         frontier_module.CANONICAL_PRIMARY_ORIGINS
     )
     assert policy["zero_episode_categories_explicit"] is True
+    assert policy["empirical_live_projection_schema_version"] == 5
+    assert policy["empirical_live_projection_prior_versions_readable"] == [
+        1,
+        2,
+        3,
+        4,
+    ]
+    assert policy["sealed_protocol_v1_bundle_rewritten"] is False
     assert policy["minimum_sample_policy_sealed"] is False
     assert policy["statistical_independence_claim"] is False
     assert policy["protocol_v2_evidence_eligible"] is False
