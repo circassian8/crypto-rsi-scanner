@@ -24,6 +24,12 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
     OFFICIAL_MAKER_TAKER_URL,
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
+    OFFICIAL_FUNDING_FEE_URL,
+    OFFICIAL_FUNDING_HISTORY_URL,
+    OFFICIAL_MARK_PRICE_KLINE_URL,
+    SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
+)
 from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 import (
     CONTRACT_VERSION as FROZEN_CONTRACT_VERSION,
     readiness_sha256,
@@ -46,10 +52,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
 SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v16"
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v17"
 PROGRESS_SOURCE = (
     "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
-    "with_unsealed_exact_leg_taker_fee_application_two_exact_immutable_"
+    "with_unsealed_single_settlement_funding_and_exact_leg_taker_fee_"
+    "application_two_exact_immutable_"
     "capture_round_trip_target_mid_notional_floor_"
     "sizing_separate_entry_exit_catalog_bound_"
     "dynamic_instrument_constraints_quantity_reconciled_round_trip_"
@@ -228,6 +235,30 @@ _EXPECTED_EXECUTION_DECISION = {
     "taker_fee_provider_calls": 0,
     "taker_fee_writes_performed": False,
     "official_maker_taker_url": OFFICIAL_MAKER_TAKER_URL,
+    "funding_settlement_application_implemented": True,
+    "funding_settlement_scenario_schema_version": (
+        FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION
+    ),
+    "funding_rate_unit": "fraction",
+    "funding_position_value_formula": (
+        "base_quantity_times_settlement_mark_price"
+    ),
+    "funding_position_cashflow_sign_convention": (
+        "positive_received_negative_paid"
+    ),
+    "positive_funding_long_pays_short": True,
+    "negative_funding_short_pays_long": True,
+    "settlement_mark_price_required": True,
+    "single_funding_event_arithmetic_implemented": True,
+    "holding_interval_funding_coverage_complete": False,
+    "funding_rate_source_sealed": False,
+    "settlement_mark_source_sealed": False,
+    "funding_settlement_protocol_v2_annex_bound": False,
+    "funding_settlement_provider_calls": 0,
+    "funding_settlement_writes_performed": False,
+    "official_funding_fee_url": OFFICIAL_FUNDING_FEE_URL,
+    "official_funding_history_url": OFFICIAL_FUNDING_HISTORY_URL,
+    "official_mark_price_kline_url": OFFICIAL_MARK_PRICE_KLINE_URL,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
     "exact_eligible_instrument_set_sealed": False,
@@ -635,6 +666,31 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         (
             "taker_fee_source_sealed=false protocol_v2_annex_bound=false "
             "provider_calls=0 writes_performed=false"
+        ),
+        (
+            "funding_settlement_application_implemented=true schema="
+            f"{decision['funding_settlement_scenario_schema_version']} "
+            "rate_unit=fraction"
+        ),
+        (
+            "funding_position_value_formula="
+            f"{decision['funding_position_value_formula']} "
+            "cashflow_sign=positive_received_negative_paid"
+        ),
+        (
+            "positive_funding_long_pays_short=true "
+            "negative_funding_short_pays_long=true "
+            "settlement_mark_price_required=true"
+        ),
+        (
+            "single_funding_event_arithmetic_implemented=true "
+            "holding_interval_funding_coverage_complete=false"
+        ),
+        (
+            "funding_rate_source_sealed=false "
+            "settlement_mark_source_sealed=false "
+            "protocol_v2_annex_bound=false provider_calls=0 "
+            "writes_performed=false"
         ),
         (
             "capture_pair_round_trip_implemented=true schema="

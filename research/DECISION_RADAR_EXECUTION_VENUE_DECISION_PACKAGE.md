@@ -7,7 +7,7 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v17`. Run
+`crypto_radar_execution_quality_readiness_v18`. Run
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
 static report or add `-json` to the target name for its closed structured form.
 Both commands read no environment, credentials, files, providers, or holdout
@@ -98,6 +98,23 @@ visible-book cost identities. It requires a bounded public/reference-assumption
 source and one declared effective window covering both observed book legs. It
 does not model maker fills, read the account fee endpoint, select a rate, or
 make the result annex/evidence eligible.
+
+The funding arithmetic is likewise closed only for one explicitly supplied
+settlement scenario. Bybit's official
+[funding formula](https://www.bybit.com/en/help-center/article/Funding-fee-calculation/%3Fcategory%3Dcd60af6303161fd598)
+uses contract quantity times the funding-time mark price times the settled
+fractional rate. Positive funding transfers from longs to shorts; negative
+funding reverses that direction. The pure funding-scenario v1 binds the event
+strictly inside the modeled position interval and reports signed position cash
+flow plus its reconciliation to visible-book P&L. It requires separate bounded
+rate and settlement-mark references and causal observation clocks. It does not
+claim that Bybit's
+[funding history](https://bybit-exchange.github.io/docs/v5/market/history-fund-rate)
+or [mark-price klines](https://bybit-exchange.github.io/docs/v5/market/mark-kline)
+have been captured, that every settlement in the holding interval is covered,
+or that a one-minute close is necessarily the exact funding-time mark. Source
+authority, complete interval coverage, genuine mark/rate evidence, holding
+policy, and annex eligibility remain unsealed.
 
 The selected Bybit capability now advertises only the actual native snapshot
 fields: USDT depth bands, USDT-notional side-specific price impact, native

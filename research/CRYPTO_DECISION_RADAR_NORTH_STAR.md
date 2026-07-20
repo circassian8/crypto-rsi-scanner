@@ -889,7 +889,7 @@ confirmed uninstall rollback. Nothing runs automatically. No service
 install/uninstall occurs without `CONFIRM=1`, and the service plist never embeds
 provider authorization or credentials.
 
-Execution-quality readiness v16 records the owner-confirmed primary research
+Execution-quality readiness v18 records the owner-confirmed primary research
 surface: Bybit USDT-linear perpetuals, public market data only, with current
 jurisdiction/account eligibility affirmed for this scope. The eligible-universe
 rule is the top 30 liquidity-ranked Decision Radar assets intersected with exact
@@ -917,6 +917,20 @@ selection and venue-step rounding, spread and
 visible-book impact application, beyond-book slippage, funding treatment,
 latency cost, and unavailable-cost policy. Until then
 `protocol_v2_cost_model_sealed=false` remains operator truth.
+
+Funding settlement arithmetic is now closed for one supplied event without
+pretending that the evidence or holding policy is complete. Bybit defines a
+USDT-perpetual funding transfer as base quantity times the settlement mark
+price times the settled fractional rate: positive funding is paid by longs to
+shorts, while negative funding reverses that transfer. The pure v1 projection
+binds one such event strictly inside the modeled holding interval, carries an
+explicit positive-received/negative-paid cash-flow convention, and reconciles
+the signed transfer to visible-book P&L. It rejects percent/fraction mistakes,
+non-causal source clocks, unsafe references, and source-round-trip drift. This
+does not prove that every settlement in a holding interval is present, obtain
+the required settlement-time mark price, seal either source, call a provider,
+or make the row Protocol-v2 evidence. Complete interval coverage, genuine mark
+and rate captures, and the final funding holding policy therefore remain open.
 
 The selected capability and snapshot projection use the real native fields:
 `bid_depth_usdt_by_band`, `ask_depth_usdt_by_band`, and side-specific

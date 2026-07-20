@@ -32,6 +32,12 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee import (
     OFFICIAL_MAKER_TAKER_URL,
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
+from crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding import (
+    OFFICIAL_FUNDING_FEE_URL,
+    OFFICIAL_FUNDING_HISTORY_URL,
+    OFFICIAL_MARK_PRICE_KLINE_URL,
+    SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
+)
 
 
 EXPECTED_VENUES = {
@@ -52,7 +58,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     result = build_execution_quality_readiness()
 
     assert result.contract_version == CONTRACT_VERSION
-    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v17"
+    assert CONTRACT_VERSION == "crypto_radar_execution_quality_readiness_v18"
     assert result.status == "execution_surface_selected_capture_contract_ready_inactive"
     assert result.selected_venue == "bybit"
     assert result.selected_execution_mode == "perpetual"
@@ -186,6 +192,30 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
     assert impact["taker_fee_provider_calls"] == 0
     assert impact["taker_fee_writes_performed"] is False
     assert impact["official_maker_taker_url"] == OFFICIAL_MAKER_TAKER_URL
+    assert impact["funding_settlement_application_implemented"] is True
+    assert impact["funding_settlement_scenario_schema_version"] == (
+        FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION
+    )
+    assert impact["funding_rate_unit"] == "fraction"
+    assert impact["funding_position_value_formula"] == (
+        "base_quantity_times_settlement_mark_price"
+    )
+    assert impact["funding_position_cashflow_sign_convention"] == (
+        "positive_received_negative_paid"
+    )
+    assert impact["positive_funding_long_pays_short"] is True
+    assert impact["negative_funding_short_pays_long"] is True
+    assert impact["settlement_mark_price_required"] is True
+    assert impact["single_funding_event_arithmetic_implemented"] is True
+    assert impact["holding_interval_funding_coverage_complete"] is False
+    assert impact["funding_rate_source_sealed"] is False
+    assert impact["settlement_mark_source_sealed"] is False
+    assert impact["funding_settlement_protocol_v2_annex_bound"] is False
+    assert impact["funding_settlement_provider_calls"] == 0
+    assert impact["funding_settlement_writes_performed"] is False
+    assert impact["official_funding_fee_url"] == OFFICIAL_FUNDING_FEE_URL
+    assert impact["official_funding_history_url"] == OFFICIAL_FUNDING_HISTORY_URL
+    assert impact["official_mark_price_kline_url"] == OFFICIAL_MARK_PRICE_KLINE_URL
     assert impact["target_notional_tier_set_sealed"] is False
     assert impact["base_quantity_selection_policy_sealed"] is False
     assert result.eligible_instrument_set == ()
@@ -208,6 +238,7 @@ def test_static_readiness_records_confirmed_surface_without_live_activation() ->
         "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
         "bybit_two_exact_immutable_capture_round_trip_v1",
         "bybit_visible_book_taker_fee_scenario_v1",
+        "bybit_funding_settlement_scenario_v1",
     )
     assert result.supported_live_adapters == (
         "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -478,6 +509,17 @@ def test_human_report_is_explicitly_selected_but_no_call() -> None:
     assert "taker_fee_applied_to_each_executed_leg_quote_value=true" in rendered
     assert "effective_window_must_cover_both_legs=true" in rendered
     assert "taker_fee_source_sealed=false" in rendered
+    assert "funding_settlement_application_implemented=true" in rendered
+    assert FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION in rendered
+    assert "funding_position_value_formula=base_quantity_times_settlement_mark_price" in rendered
+    assert "cashflow_sign=positive_received_negative_paid" in rendered
+    assert "positive_funding_long_pays_short=true" in rendered
+    assert "negative_funding_short_pays_long=true" in rendered
+    assert "settlement_mark_price_required=true" in rendered
+    assert "single_funding_event_arithmetic_implemented=true" in rendered
+    assert "holding_interval_funding_coverage_complete=false" in rendered
+    assert "funding_rate_source_sealed=false" in rendered
+    assert "settlement_mark_source_sealed=false" in rendered
     assert "capture_pair_round_trip_implemented=true" in rendered
     assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in rendered
     assert "capture_pair_exact_namespaces_required=true" in rendered
@@ -678,6 +720,7 @@ def test_cli_json_is_structured_static_and_secret_free(
         "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
         "bybit_two_exact_immutable_capture_round_trip_v1",
         "bybit_visible_book_taker_fee_scenario_v1",
+        "bybit_funding_settlement_scenario_v1",
     ]
     assert payload["supported_live_adapters"] == [
         "bybit_usdt_linear_perpetual_public_REST_capture_v5"
@@ -852,6 +895,19 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     )
     assert readiness["taker_fee_source_sealed"] is False
     assert readiness["taker_fee_protocol_v2_annex_bound"] is False
+    assert readiness["funding_settlement_application_implemented"] is True
+    assert readiness["funding_settlement_scenario_schema_version"] == (
+        FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION
+    )
+    assert readiness["funding_position_cashflow_sign_convention"] == (
+        "positive_received_negative_paid"
+    )
+    assert readiness["positive_funding_long_pays_short"] is True
+    assert readiness["negative_funding_short_pays_long"] is True
+    assert readiness["holding_interval_funding_coverage_complete"] is False
+    assert readiness["funding_rate_source_sealed"] is False
+    assert readiness["settlement_mark_source_sealed"] is False
+    assert readiness["funding_settlement_protocol_v2_annex_bound"] is False
     assert readiness["target_notional_tier_set_sealed"] is False
     assert readiness["base_quantity_selection_policy_sealed"] is False
     assert readiness["final_live_adapter_implemented"] is False

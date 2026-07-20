@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Close signed Bybit funding-settlement arithmetic · Codex
+**Why:** The selected derivatives contract preserves settled funding rates but
+not the historical settlement-time mark needed to calculate a funding transfer.
+Using a current mark retrospectively, or silently treating a one-minute close
+as exact, would create false precision.
+**Changes:**
+- Added a pure v1 single-settlement funding projection over the exact base
+  quantity and holding interval of a Bybit visible-book round trip. It applies
+  the official USDT-perpetual position-value formula and explicit positive-
+  long-pays / negative-short-pays direction.
+- Added signed position cash flow, funding cost, basis-point, visible-book P&L,
+  and combined-cost identities. Decimal units, plausible rates, strict holding
+  boundaries, causal source clocks, safe references, lineages, source identity,
+  and zero I/O all fail closed.
+- Advanced execution-quality readiness to v18 and current Protocol-v2 progress
+  to v17. Reconciled the North Star, execution-venue package, working agreement,
+  durable decision, and roadmap while keeping complete event coverage, genuine
+  settlement marks/rates, holding policy, and annex authority absent.
+**Verify:** 189 focused Bybit execution/capture, fee/funding, readiness, and
+current Protocol-v2 tests passed. Python compileall, North Star JSON validation,
+the offline Bybit smoke, static execution-quality readiness, current Protocol-v2
+progress check, architecture cleanliness, and diff check passed.
+**Notes/risks:** The arithmetic is exact only for supplied inputs. The module
+does not obtain a mark or rate, prove every settlement in the hold, call a
+provider, read credentials, write evidence, or make a result Protocol-v2
+eligible. No send, trade, order, paper trade, normal RSI write, Event Alpha
+`TRIGGERED_FADE`, authorization change, route change, or threshold change was
+added.
+
 ## 2026-07-20 — Apply exact taker fees to modeled Bybit round trips · Codex
 **Why:** The two-book round-trip model preserved exact executed quote values,
 but it did not yet apply trading fees. An immediately marketable limit order

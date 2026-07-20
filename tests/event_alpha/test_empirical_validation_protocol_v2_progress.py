@@ -31,7 +31,7 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v16")
+    assert values["progress_version"].endswith("_v17")
     assert values["as_of"] == "2026-07-20"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
@@ -163,6 +163,27 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert decision["taker_fee_protocol_v2_annex_bound"] is False
     assert decision["taker_fee_provider_calls"] == 0
     assert decision["taker_fee_writes_performed"] is False
+    assert decision["funding_settlement_application_implemented"] is True
+    assert decision["funding_settlement_scenario_schema_version"] == (
+        "crypto_radar.bybit_funding_settlement_scenario.v1"
+    )
+    assert decision["funding_rate_unit"] == "fraction"
+    assert decision["funding_position_value_formula"] == (
+        "base_quantity_times_settlement_mark_price"
+    )
+    assert decision["funding_position_cashflow_sign_convention"] == (
+        "positive_received_negative_paid"
+    )
+    assert decision["positive_funding_long_pays_short"] is True
+    assert decision["negative_funding_short_pays_long"] is True
+    assert decision["settlement_mark_price_required"] is True
+    assert decision["single_funding_event_arithmetic_implemented"] is True
+    assert decision["holding_interval_funding_coverage_complete"] is False
+    assert decision["funding_rate_source_sealed"] is False
+    assert decision["settlement_mark_source_sealed"] is False
+    assert decision["funding_settlement_protocol_v2_annex_bound"] is False
+    assert decision["funding_settlement_provider_calls"] == 0
+    assert decision["funding_settlement_writes_performed"] is False
     assert decision["target_notional_tier_set_sealed"] is False
     assert decision["base_quantity_selection_policy_sealed"] is False
     assert decision["data_boundary"] == "public_market_data_only"
@@ -381,6 +402,17 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "taker_fee_applied_to_each_executed_leg_quote_value=true" in output.out
     assert "effective_window_must_cover_both_legs=true" in output.out
     assert "taker_fee_source_sealed=false" in output.out
+    assert "funding_settlement_application_implemented=true" in output.out
+    assert "crypto_radar.bybit_funding_settlement_scenario.v1" in output.out
+    assert "base_quantity_times_settlement_mark_price" in output.out
+    assert "cashflow_sign=positive_received_negative_paid" in output.out
+    assert "positive_funding_long_pays_short=true" in output.out
+    assert "negative_funding_short_pays_long=true" in output.out
+    assert "settlement_mark_price_required=true" in output.out
+    assert "single_funding_event_arithmetic_implemented=true" in output.out
+    assert "holding_interval_funding_coverage_complete=false" in output.out
+    assert "funding_rate_source_sealed=false" in output.out
+    assert "settlement_mark_source_sealed=false" in output.out
     assert "capture_pair_round_trip_implemented=true" in output.out
     assert "crypto_radar.bybit_capture_pair_target_notional_round_trip.v1" in output.out
     assert "capture_pair_exact_namespaces_required=true" in output.out

@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Model funding as a signed settlement transfer
+**Status:** accepted as offline arithmetic; sources and holding policy remain unsealed
+**Decision:** For one supplied Bybit USDT-perpetual funding settlement, compute
+position value as exact base quantity times the supplied settlement mark price,
+then apply the supplied decimal-text fractional rate. Positive funding transfers
+from longs to shorts; negative funding transfers from shorts to longs. Report
+position cash flow as positive when received and negative when paid, and
+reconcile that signed transfer to the modeled visible-book P&L. Require the
+settlement strictly inside the modeled position interval plus bounded separate
+rate/mark references, causal source clocks, and lineages. Do not claim complete
+holding-interval coverage, an exact settlement mark, genuine source evidence,
+realized execution, or Protocol-v2 eligibility.
+**Why:** The venue formula and direction are deterministic, but the current
+derivatives context has settled rates without the historical mark price needed
+for an exact funding fee. Applying a current mark retrospectively—or treating a
+one-minute kline close as exact—would create false precision. A pure supplied-
+input projection closes arithmetic and sign handling while keeping the missing
+evidence visible.
+**Revisit when:** A genuine capture preserves every funding event and its
+authoritative settlement-time mark over a proposed holding interval, and the
+operator is ready to seal interval inclusion, source authority, and funding
+treatment in the Protocol-v2 annex.
+
 ## 2026-07-20 - Apply immediate-book fees as explicit taker scenarios
 **Status:** accepted as offline arithmetic; fee source and Protocol-v2 policy remain unsealed
 **Decision:** Treat every complete immediately marketable visible-book walk as

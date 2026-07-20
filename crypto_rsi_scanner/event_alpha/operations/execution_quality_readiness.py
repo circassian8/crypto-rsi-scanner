@@ -28,9 +28,15 @@ from .bybit_execution_fee import (
     OFFICIAL_MAKER_TAKER_URL,
     SCHEMA_VERSION as TAKER_FEE_SCENARIO_SCHEMA_VERSION,
 )
+from .bybit_execution_funding import (
+    OFFICIAL_FUNDING_FEE_URL,
+    OFFICIAL_FUNDING_HISTORY_URL,
+    OFFICIAL_MARK_PRICE_KLINE_URL,
+    SCHEMA_VERSION as FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION,
+)
 
 
-CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v17"
+CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v18"
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -158,6 +164,30 @@ _SELECTED_IMPACT_COST_SEMANTICS = {
     "taker_fee_provider_calls": 0,
     "taker_fee_writes_performed": False,
     "official_maker_taker_url": OFFICIAL_MAKER_TAKER_URL,
+    "funding_settlement_application_implemented": True,
+    "funding_settlement_scenario_schema_version": (
+        FUNDING_SETTLEMENT_SCENARIO_SCHEMA_VERSION
+    ),
+    "funding_rate_unit": "fraction",
+    "funding_position_value_formula": (
+        "base_quantity_times_settlement_mark_price"
+    ),
+    "funding_position_cashflow_sign_convention": (
+        "positive_received_negative_paid"
+    ),
+    "positive_funding_long_pays_short": True,
+    "negative_funding_short_pays_long": True,
+    "settlement_mark_price_required": True,
+    "single_funding_event_arithmetic_implemented": True,
+    "holding_interval_funding_coverage_complete": False,
+    "funding_rate_source_sealed": False,
+    "settlement_mark_source_sealed": False,
+    "funding_settlement_protocol_v2_annex_bound": False,
+    "funding_settlement_provider_calls": 0,
+    "funding_settlement_writes_performed": False,
+    "official_funding_fee_url": OFFICIAL_FUNDING_FEE_URL,
+    "official_funding_history_url": OFFICIAL_FUNDING_HISTORY_URL,
+    "official_mark_price_kline_url": OFFICIAL_MARK_PRICE_KLINE_URL,
     "target_notional_tier_set_sealed": False,
     "base_quantity_selection_policy_sealed": False,
 }
@@ -743,6 +773,7 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "bybit_usdt_linear_target_mid_notional_sizing_and_round_trip_v2",
             "bybit_two_exact_immutable_capture_round_trip_v1",
             "bybit_visible_book_taker_fee_scenario_v1",
+            "bybit_funding_settlement_scenario_v1",
         ),
         supported_live_adapters=(
             "bybit_usdt_linear_perpetual_public_REST_capture_v5",
@@ -798,6 +829,8 @@ def build_execution_quality_readiness() -> ExecutionQualityReadiness:
             "an_immediately_executing_market_or_marketable_limit_book_walk_is_taker_liquidity",
             "the_pure_fee_projection_applies_supplied_fractional_taker_rates_to_each_exact_executed_leg_value",
             "fee_rates_sources_effective_windows_and_final_policy_remain_unsealed",
+            "the_pure_funding_projection_applies_one_supplied_settled_rate_and_settlement_mark_to_the_exact_position_quantity",
+            "funding_sign_arithmetic_is_explicit_but_complete_interval_coverage_sources_and_holding_policy_remain_unsealed",
             "public_reference_fee_tables_do_not_prove_account_or_symbol_specific_rates",
             "authenticated_account_fee_access_is_outside_the_confirmed_public_only_scope",
             "fresh_capture_quality_does_not_become_protocol_v2_evidence_before_annex_binding",
@@ -935,6 +968,33 @@ def _impact_cost_lines(result: ExecutionQualityReadiness) -> tuple[str, ...]:
         f"provider_calls={value['taker_fee_provider_calls']} "
         "writes_performed="
         f"{str(value['taker_fee_writes_performed']).casefold()}",
+        "funding_settlement_application_implemented="
+        f"{str(value['funding_settlement_application_implemented']).casefold()} "
+        f"schema={value['funding_settlement_scenario_schema_version']} "
+        f"rate_unit={value['funding_rate_unit']}",
+        "funding_position_value_formula="
+        f"{value['funding_position_value_formula']} "
+        "cashflow_sign="
+        f"{value['funding_position_cashflow_sign_convention']}",
+        "positive_funding_long_pays_short="
+        f"{str(value['positive_funding_long_pays_short']).casefold()} "
+        "negative_funding_short_pays_long="
+        f"{str(value['negative_funding_short_pays_long']).casefold()} "
+        "settlement_mark_price_required="
+        f"{str(value['settlement_mark_price_required']).casefold()}",
+        "single_funding_event_arithmetic_implemented="
+        f"{str(value['single_funding_event_arithmetic_implemented']).casefold()} "
+        "holding_interval_funding_coverage_complete="
+        f"{str(value['holding_interval_funding_coverage_complete']).casefold()}",
+        "funding_rate_source_sealed="
+        f"{str(value['funding_rate_source_sealed']).casefold()} "
+        "settlement_mark_source_sealed="
+        f"{str(value['settlement_mark_source_sealed']).casefold()} "
+        "protocol_v2_annex_bound="
+        f"{str(value['funding_settlement_protocol_v2_annex_bound']).casefold()} "
+        f"provider_calls={value['funding_settlement_provider_calls']} "
+        "writes_performed="
+        f"{str(value['funding_settlement_writes_performed']).casefold()}",
         "capture_pair_round_trip_implemented="
         f"{str(value['capture_pair_round_trip_implemented']).casefold()} "
         f"schema={value['capture_pair_round_trip_schema_version']}",

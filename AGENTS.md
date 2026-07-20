@@ -571,7 +571,7 @@ may be added later when a suitable environment already exists.
   Any future cross-venue USD projection requires a separately sealed conversion
   source, clock, and policy. The fee schedule, order style, sizes, slippage,
   funding treatment, latency cost, and final annex remain unsealed.
-  Execution-quality readiness v17 must expose those remaining cost fields rather
+  Execution-quality readiness v18 must expose those remaining cost fields rather
   than claiming only the exact instrument set is pending. Bybit's public fee
   reference is not account- or symbol-authoritative because rates vary by
   region and account tier. The official account fee-rate endpoint requires
@@ -637,6 +637,20 @@ may be added later when a suitable environment already exists.
   credential, or file; performs no write; chooses no rate; and remains
   `fee_rate_source_sealed=false` and Protocol-v2-ineligible until the annex
   binds a reviewed source and policy.
+  The pure funding-settlement scenario v1 may apply one supplied settled
+  fractional funding rate and one supplied settlement mark to the exact base
+  quantity carried by a modeled round trip. Use
+  `position_value = base_quantity * settlement_mark_price`; positive funding
+  means longs pay shorts, and negative funding reverses that transfer. Position
+  cash flow is positive when received and negative when paid. Require the event
+  strictly inside the modeled holding interval plus separate bounded rate/mark
+  references, causal observation clocks, and lineages. The arithmetic is exact
+  only for those supplied inputs. It does not prove complete funding-event
+  coverage, obtain an exact settlement mark, treat a mark-price kline close as
+  exact, call a provider, read credentials, or grant annex/evidence authority.
+  Keep `holding_interval_funding_coverage_complete=false`, both sources
+  unsealed, and the holding policy open until genuine evidence and the final
+  annex exist.
   Quantity selection/rounding from a USDT tier, entry/exit order style, fees,
   funding, latency, beyond-book slippage, unavailable-cost behavior, and the
   final cost application policy remain unsealed. Never add equal-notional side
