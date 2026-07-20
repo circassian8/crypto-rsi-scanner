@@ -82,6 +82,11 @@ _DECISION_TEXT_CLAIM_FIELDS = (
     "effective_playbook_type",
     "diagnostics_reason",
     "calendar_context_warning",
+    "run_mode",
+    "profile",
+    "data_mode",
+    "data_acquisition_mode",
+    "candidate_source_mode",
 )
 _TIMING_ANCHOR_FIELDS = (
     "decision_evaluated_at",
@@ -682,12 +687,21 @@ def origin_context_invalid(data: Mapping[str, Any]) -> bool:
 def decision_text_claims_invalid(data: Mapping[str, Any]) -> bool:
     """Reject malformed text that controls routing or operator copy."""
 
-    return any(
+    if any(
         field in data
         and data.get(field) not in (None, "")
         and not _typed_text(data.get(field))
         for field in _DECISION_TEXT_CLAIM_FIELDS
-    )
+    ):
+        return True
+    if "directional_bias" in data and data.get("directional_bias") not in (
+        None,
+        "",
+    ):
+        return _typed_text(data.get("directional_bias")).casefold() not in {
+            item.value for item in DirectionalBias
+        }
+    return False
 
 
 def timing_context_invalid(
@@ -725,6 +739,34 @@ def market_execution_claims_invalid(market: Mapping[str, Any]) -> bool:
         if not value or value not in _ALLOWED_INPUT_SPREAD_STATUSES:
             return True
     return False
+
+
+def fixture_freshness_provenance_invalid(
+    data: Mapping[str, Any],
+    *,
+    freshness: str,
+) -> bool:
+    """Keep fixture-only stale tolerance out of live-style provenance."""
+
+    if freshness != "fixture_allowed_stale":
+        return False
+    run_mode = _typed_text(data.get("run_mode")).casefold()
+    profile = _typed_text(data.get("profile")).casefold()
+    if run_mode not in {"fixture", "test", "replay"} or not profile:
+        return True
+    provenance = " ".join(
+        _typed_text(data.get(field)).casefold()
+        for field in (
+            "profile",
+            "data_mode",
+            "data_acquisition_mode",
+            "candidate_source_mode",
+        )
+    )
+    return any(
+        term in provenance
+        for term in ("live", "operational", "burn_in", "notify", "research_send")
+    )
 
 
 def _calendar_event_timestamps_invalid(event: Mapping[str, Any]) -> bool:
@@ -1117,6 +1159,7 @@ __all__ = (
     "decision_text_claims_invalid",
     "decision_warnings",
     "directional_bias",
+    "fixture_freshness_provenance_invalid",
     "has_calendar_risk",
     "normalize_market_snapshot",
     "market_snapshot",

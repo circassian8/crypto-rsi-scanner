@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Bind fixture-stale tolerance to non-live provenance · Codex
+**Why:** `fixture_allowed_stale` is an intentional deterministic-fixture
+exception, but a fixture-like `run_mode` alone did not prove that the surrounding
+profile and acquisition lineage were non-live. Malformed or unknown explicit
+directional-bias claims could also be ignored while lower-level context supplied
+a usable bias.
+**Changes:** Decision routing now requires typed text for run/profile/data-mode
+provenance and accepts explicit directional bias only from the closed canonical
+enum. `fixture_allowed_stale` remains valid for fixture/test/replay runs only
+when a profile is present and no profile or acquisition/source-mode field claims
+live, operational, burn-in, notification, or send provenance. Contradictions add
+`fixture_freshness_provenance_invalid`; malformed text/bias adds the existing
+`decision_text_claim_invalid`; both fail closed to diagnostic research. Valid
+fixture behavior, live freshness rules, scores, thresholds, and routes are
+unchanged.
+**Verify:** `3` focused provenance/text regressions passed. `203` Decision,
+consistency, surface, fixture-route, snapshot-precedence, derivatives, RSI,
+schema, merge, catalyst-attribution, propagation, and unified-calendar tests
+passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; artifact/security/provider bounds
+remain enforced.
+
 ## 2026-07-20 — Preserve explicit Decision spread authority · Codex
 **Why:** Decision spread classification re-derived from the numeric value after
 recognizing only explicit stale/unavailable states. An explicit

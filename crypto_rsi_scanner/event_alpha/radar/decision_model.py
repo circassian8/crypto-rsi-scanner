@@ -120,7 +120,7 @@ def _evaluate_radar_decision(
     market = decision_policy.market_snapshot(data)
     bias = decision_policy.directional_bias(data)
     rsi_actionability_delta, rsi_risk_delta, rsi_reasons = validated_rsi_score_adjustments(data)
-    explicit_bias = str(data.get("directional_bias") or "").strip().casefold()
+    explicit_bias = _typed_text(data.get("directional_bias")).casefold()
     if not explicit_bias or explicit_bias != bias:
         rsi_actionability_delta, rsi_risk_delta, rsi_reasons = 0.0, 0.0, ()
     primary_origin, origins, origin = decision_policy.thesis_origin_values(
@@ -450,7 +450,12 @@ def _hard_blockers(
         blockers.append("source_noise_or_control")
 
     freshness = _freshness(data, market)
-    run_mode = str(data.get("run_mode") or "").casefold()
+    run_mode = _typed_text(data.get("run_mode")).casefold()
+    if decision_policy.fixture_freshness_provenance_invalid(
+        data,
+        freshness=freshness,
+    ):
+        blockers.append("fixture_freshness_provenance_invalid")
     if freshness in {"stale", "expired", "invalid", "future"} or (
         freshness == "fixture_allowed_stale" and run_mode not in {"fixture", "test", "replay"}
     ):

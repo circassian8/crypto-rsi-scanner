@@ -140,6 +140,11 @@ def test_malformed_decision_routing_text_claims_fail_closed():
         {"effective_playbook_type": 1},
         {"diagnostics_reason": ["source_noise"]},
         {"calendar_context_warning": {"warning": "scheduled risk"}},
+        {"run_mode": {"mode": "fixture"}},
+        {"profile": ["fixture"]},
+        {"data_acquisition_mode": {"mode": "live_provider"}},
+        {"directional_bias": {"bias": "long"}},
+        {"directional_bias": "bullish"},
     )
 
     for malformed in malformed_claims:
@@ -151,6 +156,46 @@ def test_malformed_decision_routing_text_claims_fail_closed():
         assert result.radar_route == "diagnostic"
         assert "decision_text_claim_invalid" in result.decision_hard_blockers
         assert not any("{'warning':" in item for item in result.decision_warnings)
+
+
+def test_fixture_stale_tolerance_requires_consistent_non_live_provenance():
+    valid = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            run_mode="fixture",
+            profile="fixture",
+            market_state_snapshot={"freshness_status": "fixture_allowed_stale"},
+        )
+    )
+    invalid_rows = (
+        _market_led_candidate(
+            run_mode="fixture",
+            profile="no_key_live",
+            market_state_snapshot={"freshness_status": "fixture_allowed_stale"},
+        ),
+        _market_led_candidate(
+            run_mode="fixture",
+            profile="fixture",
+            data_acquisition_mode="live_provider",
+            market_state_snapshot={"freshness_status": "fixture_allowed_stale"},
+        ),
+        _market_led_candidate(
+            run_mode="operational",
+            profile="fixture",
+            market_state_snapshot={"freshness_status": "fixture_allowed_stale"},
+        ),
+        _market_led_candidate(
+            run_mode="fixture",
+            market_state_snapshot={"freshness_status": "fixture_allowed_stale"},
+        ),
+    )
+
+    assert valid.radar_actionable is True
+    assert "fixture_freshness_provenance_invalid" not in valid.decision_hard_blockers
+    for row in invalid_rows:
+        result = decision_model.evaluate_radar_decision(row)
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "fixture_freshness_provenance_invalid" in result.decision_hard_blockers
 
 
 def test_malformed_decision_timing_claims_do_not_borrow_lower_clocks():
