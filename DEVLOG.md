@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Validate Decision catalyst source evidence · Codex
+**Why:** Catalyst policy and Decision scoring treated any truthy source URL/title
+as evidence. Reproduced mapping/list values and plain `"not a url"` upgraded an
+official-source row from unknown to plausible, removed missing-source evidence,
+and raised actionability from 65.2 to 84.2. An empty official-event mapping
+could also count as structured official evidence.
+**Changes:** Candidate, supporting-source, and nested official/scheduled/unlock
+source fields now share a typed contract. URL claims must be non-empty HTTP(S)
+URLs with a hostname and no embedded username/password; title claims must be
+text; structured source-event claims must be non-empty mappings. Source
+selection is presence-aware and does not borrow a lower value after an invalid
+higher claim. Invalid explicit source evidence adds
+`catalyst_source_evidence_invalid` and routes diagnostic. The catalyst heuristic
+now counts only a non-empty official event with a valid public source URL as
+structured official evidence, and plausible URL-based status uses the same
+canonical source view as Decision scoring. Valid HTTPS URLs, including ordinary
+queries, retain existing behavior. No catalyst taxonomy, formula, weight,
+threshold, provider, or historical artifact changed.
+**Verify:** Mapping/list URL-title pairs, invalid URL text, and an empty official
+event now hard-block without manufacturing catalyst confidence; a valid HTTPS
+control remains plausible and actionable. `64` focused Decision tests and `157`
+Decision, consistency, surface, derivatives, fixture-route, snapshot-
+precedence, RSI, schema, merge, pipeline, and catalyst-attribution propagation
+tests passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed
+with 15 candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0
+warnings, and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner
+tests` and `git diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Type Decision thesis-origin provenance · Codex
 **Why:** Thesis-origin policy accepted arbitrary containers through the generic
 text helper. Reproduced lists and mappings in scalar origin, pack, and class

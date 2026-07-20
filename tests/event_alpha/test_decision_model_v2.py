@@ -377,6 +377,48 @@ def test_malformed_source_classifications_cannot_select_thesis_origin_policy():
     assert "source_classification_invalid" not in valid.decision_hard_blockers
 
 
+def test_malformed_catalyst_source_evidence_cannot_raise_confidence():
+    source_context = {
+        "source_origin": "official_exchange",
+        "source_origins": ["official_exchange"],
+        "source_pack": "official_exchange_listing_pack",
+    }
+    malformed_sources = (
+        {
+            "latest_source_url": {"url": "https://example.test/listing"},
+            "latest_source_title": {"title": "Listing"},
+        },
+        {
+            "latest_source_url": ["https://example.test/listing"],
+            "latest_source_title": ["Listing"],
+        },
+        {"latest_source_url": "not a url", "latest_source_title": "Listing"},
+        {
+            "official_exchange_event": {},
+            "accepted_evidence_count": 1,
+        },
+    )
+    for malformed in malformed_sources:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**source_context, **malformed)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "catalyst_source_evidence_invalid" in result.decision_hard_blockers
+
+    valid = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            **source_context,
+            latest_source_url="https://example.test/listing?view=public",
+            latest_source_title="Listing",
+        )
+    )
+    assert valid.catalyst_status == "plausible"
+    assert valid.radar_actionable is True
+    assert "catalyst_source_evidence_invalid" not in valid.decision_hard_blockers
+
+
 def test_acceptable_wide_spread_emits_higher_manipulation_warning():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(market_state_snapshot={"spread_bps": 120.0})

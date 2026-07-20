@@ -9,16 +9,32 @@ from __future__ import annotations
 
 import math
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from . import catalyst_attribution as event_catalyst_attribution
 from .decision_models import CatalystStatus
+
+
+_SOURCE_URL_FIELDS = ("latest_source_url", "source_url", "url")
+_SOURCE_TITLE_FIELDS = (
+    "latest_source_title",
+    "source_title",
+    "title",
+    "event_name",
+)
+_STRUCTURED_SOURCE_FIELDS = (
+    "official_exchange_event",
+    "scheduled_catalyst_event",
+    "unlock_event",
+)
 
 
 def catalyst_status(
     data: Mapping[str, Any],
     sources: tuple[Mapping[str, Any], ...],
 ) -> str:
-    explicit = str(data.get("catalyst_status") or "").strip().casefold()
+    explicit = _typed_text(data.get("catalyst_status")).casefold()
+    source_url, _source_title = catalyst_source_fields(data)
     text = _row_text(data, sources)
     attributions, attribution_invalid, attribution_supplied = (
         _catalyst_attribution_values(data, sources)
@@ -49,15 +65,15 @@ def catalyst_status(
         return explicit
     evidence_rows = (data, *sources)
     official = any(
-        isinstance(row.get("official_exchange_event"), Mapping)
-        or str(row.get("source_class") or "")
+        _valid_structured_source_event(row.get("official_exchange_event"))
+        or _typed_text(row.get("source_class"))
         in {
             "official_exchange",
             "official_project",
             "structured_calendar",
             "structured_unlock",
         }
-        or str(row.get("source_strength") or "") == "official_structured"
+        or _typed_text(row.get("source_strength")) == "official_structured"
         for row in evidence_rows
     )
     accepted = sum(
@@ -97,18 +113,52 @@ def catalyst_status(
     if official and (
         accepted > 0
         or any(
-            isinstance(row.get("official_exchange_event"), Mapping)
+            _valid_structured_source_event(row.get("official_exchange_event"))
             for row in evidence_rows
         )
     ):
         return CatalystStatus.CONFIRMED.value
     if (accepted > 0 and catalyst_specific_source) or (
-        data.get("latest_source_url") and catalyst_specific_source
+        source_url and catalyst_specific_source
     ):
         return CatalystStatus.PLAUSIBLE.value
     if _truthy(data.get("catalyst_not_required")):
         return CatalystStatus.NOT_REQUIRED.value
     return CatalystStatus.UNKNOWN.value
+
+
+def catalyst_source_fields(data: Mapping[str, Any]) -> tuple[str, str]:
+    """Return typed, public source URL/title evidence with fixed precedence."""
+
+    owners: list[Mapping[str, Any]] = [data]
+    owners.extend(
+        value
+        for field in _STRUCTURED_SOURCE_FIELDS
+        if isinstance((value := data.get(field)), Mapping) and value
+    )
+    url = _first_valid_source_url(owners)
+    title = _first_source_title(owners)
+    return url, title
+
+
+def catalyst_source_evidence_invalid(
+    data: Mapping[str, Any],
+    sources: tuple[Mapping[str, Any], ...] = (),
+) -> bool:
+    """Detect malformed explicit source URL/title or structured-event claims."""
+
+    for row in (data, *sources):
+        if _row_source_fields_invalid(row):
+            return True
+        for field in _STRUCTURED_SOURCE_FIELDS:
+            if field not in row or row.get(field) in (None, ""):
+                continue
+            nested = row.get(field)
+            if not isinstance(nested, Mapping) or not nested:
+                return True
+            if _row_source_fields_invalid(nested):
+                return True
+    return False
 
 
 def attribution_warning(
@@ -248,6 +298,69 @@ def _count(value: object) -> int | None:
     return None
 
 
+def _row_source_fields_invalid(row: Mapping[str, Any]) -> bool:
+    for field in _SOURCE_URL_FIELDS:
+        if field not in row or row.get(field) in (None, ""):
+            continue
+        if not _valid_public_source_url(row.get(field)):
+            return True
+    for field in _SOURCE_TITLE_FIELDS:
+        if field not in row or row.get(field) in (None, ""):
+            continue
+        if not _typed_text(row.get(field)):
+            return True
+    return False
+
+
+def _valid_structured_source_event(value: object) -> bool:
+    if not isinstance(value, Mapping) or not value:
+        return False
+    return bool(_first_valid_source_url((value,)))
+
+
+def _first_valid_source_url(owners: tuple[Mapping[str, Any], ...] | list[Mapping[str, Any]]) -> str:
+    for owner in owners:
+        for field in _SOURCE_URL_FIELDS:
+            if field not in owner or owner.get(field) in (None, ""):
+                continue
+            value = owner.get(field)
+            return value.strip() if _valid_public_source_url(value) else ""
+    return ""
+
+
+def _first_source_title(owners: tuple[Mapping[str, Any], ...] | list[Mapping[str, Any]]) -> str:
+    for owner in owners:
+        for field in _SOURCE_TITLE_FIELDS:
+            if field not in owner or owner.get(field) in (None, ""):
+                continue
+            return _typed_text(owner.get(field))
+    return ""
+
+
+def _valid_public_source_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text or any(character.isspace() for character in text):
+        return False
+    try:
+        parsed = urlsplit(text)
+        hostname = parsed.hostname
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme.casefold() in {"http", "https"}
+        and parsed.netloc
+        and hostname
+        and parsed.username is None
+        and parsed.password is None
+    )
+
+
+def _typed_text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
 def _truthy(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -273,4 +386,10 @@ def _mapping(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
-__all__ = ("attribution_values", "attribution_warning", "catalyst_status")
+__all__ = (
+    "attribution_values",
+    "attribution_warning",
+    "catalyst_source_evidence_invalid",
+    "catalyst_source_fields",
+    "catalyst_status",
+)

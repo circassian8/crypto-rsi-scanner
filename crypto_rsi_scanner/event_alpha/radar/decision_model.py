@@ -371,6 +371,8 @@ def _hard_blockers(
         blockers.append("market_state_classification_invalid")
     if decision_policy.source_classification_invalid(data, sources):
         blockers.append("source_classification_invalid")
+    if decision_catalyst_policy.catalyst_source_evidence_invalid(data, sources):
+        blockers.append("catalyst_source_evidence_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(
@@ -900,15 +902,7 @@ def _missing_data(data: Mapping[str, Any], market: Mapping[str, Any]) -> tuple[s
 
 
 def _catalyst_source_fields(data: Mapping[str, Any]) -> tuple[str, str]:
-    url = str(data.get("latest_source_url") or "").strip()
-    title = str(data.get("latest_source_title") or data.get("event_name") or "").strip()
-    for field in ("official_exchange_event", "scheduled_catalyst_event", "unlock_event"):
-        nested = data.get(field)
-        if not isinstance(nested, Mapping):
-            continue
-        url = url or str(nested.get("source_url") or nested.get("url") or "").strip()
-        title = title or str(nested.get("title") or nested.get("event_name") or "").strip()
-    return url, title
+    return decision_catalyst_policy.catalyst_source_fields(data)
 
 
 def _market_label(data: Mapping[str, Any]) -> str:
