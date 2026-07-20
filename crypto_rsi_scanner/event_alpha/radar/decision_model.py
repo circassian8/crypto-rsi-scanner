@@ -414,6 +414,8 @@ def _hard_blockers(
         blockers.append("market_snapshot_contract_invalid")
     if decision_policy.calendar_context_invalid(data):
         blockers.append("calendar_context_invalid")
+    if decision_policy.origin_context_invalid(data):
+        blockers.append("origin_context_invalid")
     if _derivatives_context_invalid(data):
         blockers.append("derivatives_context_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":

@@ -1509,6 +1509,63 @@ def test_multiple_thesis_origins_preserve_primary_and_contributors():
     assert derivatives_only.thesis_origins == ("derivatives_led",)
 
 
+def test_malformed_origin_context_cannot_select_or_hide_thesis_policy():
+    malformed_contexts = (
+        {"technical_context": ["mean_reversion"]},
+        {"technical_context": True},
+        {"technical_setup_type": {"mean_reversion": True}},
+        {"dex_state_snapshot": []},
+        {"onchain_state_snapshot": True},
+        {"supply_state_snapshot": "unlock"},
+        {"fundamental_state_snapshot": []},
+        {"protocol_fundamentals": [{"tvl_usd": 1_000_000}]},
+        {
+            "dex_state_snapshot": [],
+            "onchain_state_snapshot": {
+                "freshness_status": "fresh",
+                "volume_change": 2.0,
+            },
+        },
+    )
+
+    for context in malformed_contexts:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**context)
+        )
+
+        assert result.primary_thesis_origin == "market_led"
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "origin_context_invalid" in result.decision_hard_blockers
+
+
+def test_typed_origin_context_preserves_technical_onchain_and_fundamental_origins():
+    technical = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            technical_context={},
+            technical_setup_type="mean_reversion",
+        )
+    )
+    onchain = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            dex_state_snapshot={},
+            onchain_state_snapshot={"freshness_status": "fresh", "volume_change": 2.0},
+        )
+    )
+    fundamental = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            fundamental_state_snapshot={"freshness_status": "fresh", "tvl_usd": 1_000_000},
+        )
+    )
+
+    assert technical.primary_thesis_origin == "technical_led"
+    assert technical.decision_hard_blockers == ()
+    assert onchain.thesis_origins == ("market_led", "onchain_led")
+    assert onchain.decision_hard_blockers == ()
+    assert fundamental.thesis_origins == ("market_led", "fundamental_led")
+    assert fundamental.decision_hard_blockers == ()
+
+
 def test_market_primary_with_confirmed_catalyst_contributor_can_be_high_confidence():
     source = {
         "_source_origin": "official_exchange",

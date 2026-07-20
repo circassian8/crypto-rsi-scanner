@@ -65,6 +65,15 @@ _CALENDAR_TIMESTAMP_FIELDS = (
     "window_start",
     "window_end",
 )
+_ONCHAIN_CONTEXT_FIELDS = (
+    "dex_state_snapshot",
+    "onchain_state_snapshot",
+    "supply_state_snapshot",
+)
+_FUNDAMENTAL_CONTEXT_FIELDS = (
+    "fundamental_state_snapshot",
+    "protocol_fundamentals",
+)
 
 
 @dataclass(frozen=True)
@@ -363,13 +372,7 @@ def thesis_origin_values(
         if value in _ALLOWED_ORIGINS and value not in ordered:
             ordered.append(value)
 
-    technical_context = any(
-        data.get(field) not in (None, "", [], {}, ())
-        for field in (
-            "technical_context",
-            "technical_setup_type",
-        )
-    ) or rsi_context_authoritative
+    technical_context = _has_technical_context(data) or rsi_context_authoritative
     if technical_context:
         add(ThesisOrigin.TECHNICAL_LED.value)
 
@@ -384,11 +387,11 @@ def thesis_origin_values(
         for origin in _origins_for_text(raw):
             add(origin)
 
-    if _has_structured_context(data, ("dex_state_snapshot", "onchain_state_snapshot", "supply_state_snapshot")):
+    if _has_structured_context(data, _ONCHAIN_CONTEXT_FIELDS):
         add(ThesisOrigin.ONCHAIN_LED.value)
     if _has_structured_context(data, ("derivatives_state_snapshot", "derivatives_snapshot")):
         add(ThesisOrigin.DERIVATIVES_LED.value)
-    if _has_structured_context(data, ("fundamental_state_snapshot", "protocol_fundamentals")):
+    if _has_structured_context(data, _FUNDAMENTAL_CONTEXT_FIELDS):
         add(ThesisOrigin.FUNDAMENTAL_LED.value)
     if _has_market_thesis(data):
         add(ThesisOrigin.MARKET_LED.value)
@@ -603,6 +606,29 @@ def calendar_context_invalid(data: Mapping[str, Any]) -> bool:
     )
 
 
+def origin_context_invalid(data: Mapping[str, Any]) -> bool:
+    """Detect malformed context containers that can select a thesis origin."""
+
+    if (
+        "technical_context" in data
+        and data.get("technical_context") not in (None, "", {})
+        and not isinstance(data.get("technical_context"), Mapping)
+    ):
+        return True
+    if (
+        "technical_setup_type" in data
+        and data.get("technical_setup_type") not in (None, "")
+        and not _typed_text(data.get("technical_setup_type"))
+    ):
+        return True
+    return any(
+        field in data
+        and data.get(field) not in (None, "", {})
+        and not isinstance(data.get(field), Mapping)
+        for field in (*_ONCHAIN_CONTEXT_FIELDS, *_FUNDAMENTAL_CONTEXT_FIELDS)
+    )
+
+
 def _calendar_event_timestamps_invalid(event: Mapping[str, Any]) -> bool:
     return any(
         field in event
@@ -813,7 +839,19 @@ def _has_market_snapshot(data: Mapping[str, Any]) -> bool:
 
 
 def _has_structured_context(data: Mapping[str, Any], fields: tuple[str, ...]) -> bool:
-    return any(isinstance(data.get(field), Mapping) and bool(data.get(field)) for field in fields)
+    for field in fields:
+        if field not in data or data.get(field) in (None, "", {}):
+            continue
+        value = data.get(field)
+        return isinstance(value, Mapping) and bool(value)
+    return False
+
+
+def _has_technical_context(data: Mapping[str, Any]) -> bool:
+    if "technical_context" in data and data.get("technical_context") not in (None, "", {}):
+        value = data.get("technical_context")
+        return isinstance(value, Mapping) and bool(value)
+    return bool(_typed_text(data.get("technical_setup_type")))
 
 
 def _market_label(data: Mapping[str, Any]) -> str:
@@ -983,6 +1021,7 @@ __all__ = (
     "market_snapshot_invalid",
     "market_classification_invalid",
     "market_label",
+    "origin_context_invalid",
     "source_classification_invalid",
     "is_suspicious_illiquid",
     "spread_status",

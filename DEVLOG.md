@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Type Decision origin-selecting context · Codex
+**Why:** Thesis-origin inference treated any non-empty technical value as
+technical evidence and silently ignored malformed on-chain/fundamental
+containers. Lists, booleans, or objects in the wrong fields could therefore
+select or hide origin policy without an explicit evidence defect.
+**Changes:** `technical_context` now requires a mapping,
+`technical_setup_type` requires text, and the compatibility DEX/on-chain,
+supply, and protocol-fundamental snapshot aliases require mappings. Malformed
+explicit context adds `origin_context_invalid` and routes diagnostic. Origin
+inference uses first-present non-empty container authority, so an invalid
+higher alias cannot borrow a valid lower alias; empty optional mappings retain
+legacy fallback. Valid technical, on-chain, and fundamental contexts preserve
+their established primary/contributing-origin order. Actual integrated DEX and
+protocol-metrics rows remain governed by their typed source provenance. No
+origin taxonomy, score, threshold, provider, or historical artifact changed.
+**Verify:** `3` focused multi-origin/context regressions passed. `182` Decision,
+consistency, surface, derivatives, fixture-route, snapshot-precedence, RSI,
+schema, merge, pipeline, catalyst-attribution, and unified-calendar tests
+passed. `make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Verification was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; evidence-payload and artifact/
+security bounds remain enforced.
+
 ## 2026-07-20 — Type Decision derivatives evidence · Codex
 **Why:** Decision v2 treated malformed derivatives context as merely absent and
 stringified arbitrary crowding-evidence objects. A reproduced non-mapping
