@@ -1,0 +1,1024 @@
+"""Causal campaign audit for the existing shadow temporal-surprise model.
+
+The audit replays retained, cadence-counted market observations against only
+strictly earlier same-asset history.  It is a deterministic report projection:
+it never rewrites historical rows, calls a provider, or grants policy authority.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
+from datetime import datetime, timezone
+from typing import Any
+
+from ..radar import market_shadow_surprise
+
+
+SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
+SCHEMA_VERSION = 1
+_SOURCE_STATUSES = {"missing", "observed_empty", "observed", "unavailable"}
+_AUDIT_STATUSES = {"unavailable", "empty", "warming", "partial", "ready"}
+_INPUT_REJECTION_REASONS = {
+    "baseline_counted_invalid",
+    "observation_id_invalid",
+    "canonical_asset_id_invalid",
+    "observed_at_invalid",
+    "duplicate_observation_id",
+    "duplicate_asset_observed_at",
+}
+_EVALUATION_ERROR_REASONS = {
+    "shadow_projection_type_error",
+    "shadow_projection_value_error",
+    "shadow_projection_assertion_error",
+}
+_FEATURES = (
+    *market_shadow_surprise.SUPPORTED_FEATURES,
+    *market_shadow_surprise.SUPPORTED_RETURN_FEATURES,
+)
+_FEATURE_FAMILIES = {
+    **{
+        feature: "activity"
+        for feature in market_shadow_surprise.SUPPORTED_FEATURES
+    },
+    **{
+        feature: (
+            "direct_return"
+            if feature.startswith("return_")
+            else "relative_return_btc"
+            if "_vs_btc_" in feature
+            else "relative_return_eth"
+        )
+        for feature in market_shadow_surprise.SUPPORTED_RETURN_FEATURES
+    },
+}
+_AUDIT_KEYS = {
+    "schema_id",
+    "schema_version",
+    "status",
+    "source_history",
+    "shadow_schema_id",
+    "shadow_schema_version",
+    "minimum_sample_count",
+    "input_row_count",
+    "excluded_not_baseline_counted_count",
+    "input_rejected_count",
+    "input_rejection_reason_counts",
+    "valid_baseline_counted_row_count",
+    "evaluated_observation_count",
+    "evaluation_error_count",
+    "evaluation_error_reason_counts",
+    "projection_status_counts",
+    "return_status_counts",
+    "feature_coverage",
+    "asset_projection_summaries",
+    "asset_count",
+    "source_bound_projection_digest",
+    "causal_projection_digest",
+    "all_features_have_ready_evidence",
+    "statistical_independence_claimed",
+    "routing_eligible",
+    "priority_eligible",
+    "score_adjustment_eligible",
+    "decision_score_eligible",
+    "threshold_change_eligible",
+    "publication_authority",
+    "protocol_v2_evidence_eligible",
+    "auto_apply",
+    "historical_rows_rewritten",
+    "provider_calls",
+    "writes",
+    "research_only",
+}
+_SOURCE_KEYS = {
+    "status",
+    "artifact",
+    "sha256",
+    "size_bytes",
+    "row_count",
+    "binding_source",
+}
+_FEATURE_COVERAGE_KEYS = {
+    "feature",
+    "family",
+    "evaluated_observation_count",
+    "ready_count",
+    "status_counts",
+    "minimum_sample_count",
+    "minimum_eligible_sample_count",
+    "maximum_eligible_sample_count",
+    "first_ready_observation",
+    "last_ready_observation",
+    "projection_digest",
+}
+_ASSET_SUMMARY_KEYS = {
+    "canonical_asset_id",
+    "evaluated_observation_count",
+    "first_observation",
+    "last_observation",
+    "first_source_bound_projection_sha256",
+    "last_source_bound_projection_sha256",
+    "first_causal_projection_sha256",
+    "last_causal_projection_sha256",
+    "projection_status_counts",
+    "source_bound_projection_digest",
+    "causal_projection_digest",
+}
+_REFERENCE_KEYS = {"observation_id", "observed_at"}
+_ZERO_FALSE_FIELDS = (
+    "statistical_independence_claimed",
+    "routing_eligible",
+    "priority_eligible",
+    "score_adjustment_eligible",
+    "decision_score_eligible",
+    "threshold_change_eligible",
+    "publication_authority",
+    "protocol_v2_evidence_eligible",
+    "auto_apply",
+    "historical_rows_rewritten",
+)
+_ZERO_COUNT_FIELDS = ("provider_calls", "writes")
+
+
+def build_campaign_shadow_surprise_audit(
+    history_snapshot: Mapping[str, Any],
+    *,
+    minimum_sample_count: int,
+) -> dict[str, Any]:
+    """Replay shadow-v2 diagnostics over one already-captured history snapshot."""
+
+    if (
+        isinstance(minimum_sample_count, bool)
+        or not isinstance(minimum_sample_count, int)
+        or minimum_sample_count < 1
+    ):
+        raise ValueError("minimum_sample_count must be a positive integer")
+    source = _source_projection(history_snapshot)
+    raw_rows = history_snapshot.get("rows")
+    rows = list(raw_rows) if isinstance(raw_rows, (tuple, list)) else []
+    if source["status"] not in {"observed", "observed_empty"}:
+        audit = _empty_audit(
+            source,
+            minimum_sample_count=minimum_sample_count,
+            status="unavailable",
+        )
+        _assert_valid(audit)
+        return audit
+    if source["row_count"] != len(rows) or any(
+        not isinstance(row, Mapping) for row in rows
+    ):
+        audit = _empty_audit(
+            source,
+            minimum_sample_count=minimum_sample_count,
+            status="unavailable",
+            input_row_count=len(rows),
+            input_rejected_count=len(rows),
+            input_rejection_reason_counts={
+                "baseline_counted_invalid": len(rows)
+            } if rows else {},
+        )
+        _assert_valid(audit)
+        return audit
+
+    prepared, excluded_count, rejection_counts = _prepare_rows(rows)
+    projections: list[dict[str, Any]] = []
+    evaluation_errors: Counter[str] = Counter()
+    feature_records: dict[str, list[dict[str, Any]]] = {
+        feature: [] for feature in _FEATURES
+    }
+    by_asset: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    grouped_rows: dict[str, tuple[dict[str, Any], ...]] = {}
+    for row in prepared:
+        grouped_rows.setdefault(row["canonical_asset_id"], ())
+    for asset_id in grouped_rows:
+        grouped_rows[asset_id] = tuple(
+            item
+            for item in prepared
+            if item["canonical_asset_id"] == asset_id
+        )
+    benchmark_rows = {
+        benchmark: tuple(
+            row
+            for row in prepared
+            if row["canonical_asset_id"].casefold()
+            in {asset_id.casefold() for asset_id in asset_ids}
+        )
+        for benchmark, asset_ids in market_shadow_surprise.BENCHMARK_ASSET_IDS.items()
+    }
+
+    for current in prepared:
+        current_at = _parse_aware_utc(current["observed_at"])
+        same_asset = grouped_rows[current["canonical_asset_id"]]
+        priors = tuple(
+            row
+            for row in same_asset
+            if _parse_aware_utc(row["observed_at"]) < current_at
+        )
+        current_benchmarks = {
+            benchmark: tuple(
+                row
+                for row in candidates
+                if _parse_aware_utc(row["observed_at"]) <= current_at
+            )
+            for benchmark, candidates in benchmark_rows.items()
+        }
+        try:
+            projection = market_shadow_surprise.evaluate_shadow_temporal_surprise(
+                current,
+                priors,
+                minimum_sample_count=minimum_sample_count,
+                history_artifact=source["artifact"],
+                history_sha256=source["sha256"],
+                benchmark_observations=current_benchmarks,
+            )
+        except TypeError:
+            evaluation_errors["shadow_projection_type_error"] += 1
+            continue
+        except ValueError:
+            evaluation_errors["shadow_projection_value_error"] += 1
+            continue
+        except AssertionError:
+            evaluation_errors["shadow_projection_assertion_error"] += 1
+            continue
+        compact = _compact_projection(current, projection)
+        projections.append(compact)
+        by_asset[current["canonical_asset_id"]].append(compact)
+        _append_feature_records(
+            current,
+            projection,
+            feature_records=feature_records,
+        )
+
+    feature_coverage = {
+        feature: _feature_coverage(
+            feature,
+            feature_records[feature],
+            minimum_sample_count=minimum_sample_count,
+        )
+        for feature in _FEATURES
+    }
+    asset_summaries = [
+        _asset_summary(asset_id, by_asset[asset_id])
+        for asset_id in sorted(by_asset)
+        if by_asset[asset_id]
+    ]
+    projection_status_counts = Counter(
+        str(row["status"]) for row in projections
+    )
+    return_status_counts = Counter(
+        str(row["return_status"]) for row in projections
+    )
+    rejected_count = sum(rejection_counts.values())
+    evaluated_count = len(projections)
+    all_features_ready = bool(feature_coverage) and all(
+        coverage["ready_count"] > 0
+        for coverage in feature_coverage.values()
+    )
+    status = _audit_status(
+        source_status=source["status"],
+        input_row_count=len(rows),
+        evaluated_count=evaluated_count,
+        rejected_count=rejected_count,
+        evaluation_error_count=sum(evaluation_errors.values()),
+        all_features_ready=all_features_ready,
+    )
+    audit = {
+        "schema_id": SCHEMA_ID,
+        "schema_version": SCHEMA_VERSION,
+        "status": status,
+        "source_history": source,
+        "shadow_schema_id": (
+            market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
+        ),
+        "shadow_schema_version": (
+            market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION
+        ),
+        "minimum_sample_count": minimum_sample_count,
+        "input_row_count": len(rows),
+        "excluded_not_baseline_counted_count": excluded_count,
+        "input_rejected_count": rejected_count,
+        "input_rejection_reason_counts": dict(sorted(rejection_counts.items())),
+        "valid_baseline_counted_row_count": len(prepared),
+        "evaluated_observation_count": evaluated_count,
+        "evaluation_error_count": sum(evaluation_errors.values()),
+        "evaluation_error_reason_counts": dict(sorted(evaluation_errors.items())),
+        "projection_status_counts": dict(sorted(projection_status_counts.items())),
+        "return_status_counts": dict(sorted(return_status_counts.items())),
+        "feature_coverage": feature_coverage,
+        "asset_projection_summaries": asset_summaries,
+        "asset_count": len(asset_summaries),
+        "source_bound_projection_digest": _sha256_json(projections),
+        "causal_projection_digest": _sha256_json([
+            {
+                key: value
+                for key, value in projection.items()
+                if key != "source_bound_projection_sha256"
+            }
+            for projection in projections
+        ]),
+        "all_features_have_ready_evidence": all_features_ready,
+        "statistical_independence_claimed": False,
+        "routing_eligible": False,
+        "priority_eligible": False,
+        "score_adjustment_eligible": False,
+        "decision_score_eligible": False,
+        "threshold_change_eligible": False,
+        "publication_authority": False,
+        "protocol_v2_evidence_eligible": False,
+        "auto_apply": False,
+        "historical_rows_rewritten": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    _assert_valid(audit)
+    return audit
+
+
+def validate_campaign_shadow_surprise_audit(
+    value: Mapping[str, Any],
+) -> list[str]:
+    """Validate the closed report projection and its accounting equations."""
+
+    if not isinstance(value, Mapping):
+        return ["audit_not_mapping"]
+    errors: list[str] = []
+    _exact_keys(value, _AUDIT_KEYS, "audit", errors)
+    if value.get("schema_id") != SCHEMA_ID:
+        errors.append("schema_id_invalid")
+    if type(value.get("schema_version")) is not int or value.get(
+        "schema_version"
+    ) != SCHEMA_VERSION:
+        errors.append("schema_version_invalid")
+    if value.get("status") not in _AUDIT_STATUSES:
+        errors.append("status_invalid")
+    if value.get("shadow_schema_id") != (
+        market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
+    ):
+        errors.append("shadow_schema_id_invalid")
+    if value.get("shadow_schema_version") != (
+        market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION
+    ):
+        errors.append("shadow_schema_version_invalid")
+    minimum = value.get("minimum_sample_count")
+    if type(minimum) is not int or minimum < 1:
+        errors.append("minimum_sample_count_invalid")
+
+    source = value.get("source_history")
+    if not isinstance(source, Mapping):
+        errors.append("source_history_invalid")
+        source = {}
+    _validate_source(source, errors=errors)
+    counts = _validated_counts(value, errors=errors)
+    rejection_counts = _reason_counts(
+        value.get("input_rejection_reason_counts"),
+        allowed=_INPUT_REJECTION_REASONS,
+        label="input_rejection",
+        errors=errors,
+    )
+    evaluation_reason_counts = _reason_counts(
+        value.get("evaluation_error_reason_counts"),
+        allowed=_EVALUATION_ERROR_REASONS,
+        label="evaluation_error",
+        errors=errors,
+    )
+    if counts:
+        if counts["input_row_count"] != (
+            counts["excluded_not_baseline_counted_count"]
+            + counts["input_rejected_count"]
+            + counts["valid_baseline_counted_row_count"]
+        ):
+            errors.append("input_row_count_not_closed")
+        if counts["valid_baseline_counted_row_count"] != (
+            counts["evaluated_observation_count"]
+            + counts["evaluation_error_count"]
+        ):
+            errors.append("evaluation_count_not_closed")
+        if counts["input_rejected_count"] != sum(rejection_counts.values()):
+            errors.append("input_rejection_count_mismatch")
+        if counts["evaluation_error_count"] != sum(
+            evaluation_reason_counts.values()
+        ):
+            errors.append("evaluation_error_count_mismatch")
+
+    feature_coverage = value.get("feature_coverage")
+    if not isinstance(feature_coverage, Mapping) or set(feature_coverage) != set(
+        _FEATURES
+    ):
+        errors.append("feature_coverage_keys_invalid")
+        feature_coverage = {}
+    evaluated_count = counts.get("evaluated_observation_count", 0)
+    for feature in _FEATURES:
+        coverage = feature_coverage.get(feature)
+        _validate_feature_coverage(
+            feature,
+            coverage,
+            evaluated_count=evaluated_count,
+            minimum_sample_count=minimum if type(minimum) is int else None,
+            errors=errors,
+        )
+
+    asset_summaries = value.get("asset_projection_summaries")
+    if not isinstance(asset_summaries, list):
+        errors.append("asset_projection_summaries_invalid")
+        asset_summaries = []
+    _validate_asset_summaries(
+        asset_summaries,
+        evaluated_count=evaluated_count,
+        errors=errors,
+    )
+    if type(value.get("asset_count")) is not int or value.get("asset_count") != len(
+        asset_summaries
+    ):
+        errors.append("asset_count_invalid")
+    _validate_status_counts(
+        value.get("projection_status_counts"),
+        expected_total=evaluated_count,
+        label="projection_status",
+        errors=errors,
+    )
+    _validate_status_counts(
+        value.get("return_status_counts"),
+        expected_total=evaluated_count,
+        label="return_status",
+        errors=errors,
+    )
+    all_features_ready = bool(feature_coverage) and all(
+        isinstance(coverage, Mapping)
+        and type(coverage.get("ready_count")) is int
+        and coverage.get("ready_count") > 0
+        for coverage in feature_coverage.values()
+    )
+    if value.get("all_features_have_ready_evidence") is not all_features_ready:
+        errors.append("all_features_ready_mismatch")
+    expected_status = _audit_status(
+        source_status=str(source.get("status") or "unavailable"),
+        input_row_count=counts.get("input_row_count", 0),
+        evaluated_count=evaluated_count,
+        rejected_count=counts.get("input_rejected_count", 0),
+        evaluation_error_count=counts.get("evaluation_error_count", 0),
+        all_features_ready=all_features_ready,
+    )
+    if value.get("status") != expected_status:
+        errors.append("status_derivation_mismatch")
+    for field in (
+        "source_bound_projection_digest",
+        "causal_projection_digest",
+    ):
+        if not _sha256(value.get(field)):
+            errors.append(f"{field}_invalid")
+    for field in _ZERO_FALSE_FIELDS:
+        if value.get(field) is not False:
+            errors.append(f"{field}_must_be_false")
+    for field in _ZERO_COUNT_FIELDS:
+        if value.get(field) != 0:
+            errors.append(f"{field}_must_be_zero")
+    if value.get("research_only") is not True:
+        errors.append("research_only_must_be_true")
+    return sorted(set(errors))
+
+
+def _prepare_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], int, Counter[str]]:
+    excluded = 0
+    rejected: dict[int, str] = {}
+    basic: list[tuple[int, dict[str, Any], datetime]] = []
+    for index, raw in enumerate(rows):
+        row = dict(raw)
+        baseline_counted = row.get("baseline_counted")
+        if baseline_counted is False:
+            excluded += 1
+            continue
+        if baseline_counted is not True:
+            rejected[index] = "baseline_counted_invalid"
+            continue
+        if not _identity(row.get("observation_id")):
+            rejected[index] = "observation_id_invalid"
+            continue
+        if not _identity(row.get("canonical_asset_id")):
+            rejected[index] = "canonical_asset_id_invalid"
+            continue
+        try:
+            observed_at = _parse_aware_utc(row.get("observed_at"))
+        except (TypeError, ValueError):
+            rejected[index] = "observed_at_invalid"
+            continue
+        row["observation_id"] = _identity(row["observation_id"])
+        row["canonical_asset_id"] = _identity(row["canonical_asset_id"])
+        row["observed_at"] = observed_at.isoformat()
+        basic.append((index, row, observed_at))
+
+    by_id: dict[str, list[int]] = defaultdict(list)
+    by_asset_time: dict[tuple[str, datetime], list[int]] = defaultdict(list)
+    for index, row, observed_at in basic:
+        by_id[row["observation_id"]].append(index)
+        by_asset_time[(row["canonical_asset_id"], observed_at)].append(index)
+    for indexes in by_id.values():
+        if len(indexes) > 1:
+            for index in indexes:
+                rejected.setdefault(index, "duplicate_observation_id")
+    for indexes in by_asset_time.values():
+        if len(indexes) > 1:
+            for index in indexes:
+                rejected.setdefault(index, "duplicate_asset_observed_at")
+
+    prepared = [
+        row
+        for index, row, _ in basic
+        if index not in rejected
+    ]
+    prepared.sort(
+        key=lambda row: (
+            _parse_aware_utc(row["observed_at"]),
+            row["canonical_asset_id"],
+            row["observation_id"],
+        )
+    )
+    return prepared, excluded, Counter(rejected.values())
+
+
+def _append_feature_records(
+    current: Mapping[str, Any],
+    projection: Mapping[str, Any],
+    *,
+    feature_records: dict[str, list[dict[str, Any]]],
+) -> None:
+    reference = _reference(current)
+    activity = projection.get("features")
+    returns = projection.get("return_features")
+    if not isinstance(activity, Mapping) or not isinstance(returns, Mapping):
+        raise AssertionError("closed shadow projection lost feature mappings")
+    for feature in _FEATURES:
+        feature_value = (
+            activity.get(feature)
+            if feature in market_shadow_surprise.SUPPORTED_FEATURES
+            else returns.get(feature)
+        )
+        if not isinstance(feature_value, Mapping):
+            raise AssertionError("closed shadow projection lost a feature value")
+        sample_count = feature_value.get("sample_count")
+        if type(sample_count) is not int or sample_count < 0:
+            raise AssertionError("closed shadow projection has invalid sample count")
+        feature_records[feature].append({
+            "reference": reference,
+            "status": str(feature_value.get("status") or "unavailable"),
+            "sample_count": sample_count,
+            "projection_sha256": _sha256_json(feature_value),
+        })
+
+
+def _compact_projection(
+    current: Mapping[str, Any],
+    projection: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "canonical_asset_id": current["canonical_asset_id"],
+        **_reference(current),
+        "status": str(projection.get("status") or "unavailable"),
+        "return_status": str(projection.get("return_status") or "unavailable"),
+        "source_bound_projection_sha256": _sha256_json(projection),
+        "causal_projection_sha256": _sha256_json({
+            key: value
+            for key, value in projection.items()
+            if key != "history_artifact_sha256"
+        }),
+    }
+
+
+def _feature_coverage(
+    feature: str,
+    records: Sequence[Mapping[str, Any]],
+    *,
+    minimum_sample_count: int,
+) -> dict[str, Any]:
+    status_counts = Counter(str(row["status"]) for row in records)
+    ready = [row for row in records if row["status"] == "ready"]
+    samples = [int(row["sample_count"]) for row in records]
+    return {
+        "feature": feature,
+        "family": _FEATURE_FAMILIES[feature],
+        "evaluated_observation_count": len(records),
+        "ready_count": len(ready),
+        "status_counts": dict(sorted(status_counts.items())),
+        "minimum_sample_count": minimum_sample_count,
+        "minimum_eligible_sample_count": min(samples) if samples else None,
+        "maximum_eligible_sample_count": max(samples) if samples else None,
+        "first_ready_observation": (
+            dict(ready[0]["reference"]) if ready else None
+        ),
+        "last_ready_observation": (
+            dict(ready[-1]["reference"]) if ready else None
+        ),
+        "projection_digest": _sha256_json(list(records)),
+    }
+
+
+def _asset_summary(
+    asset_id: str,
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "canonical_asset_id": asset_id,
+        "evaluated_observation_count": len(records),
+        "first_observation": {
+            key: records[0][key] for key in _REFERENCE_KEYS
+        },
+        "last_observation": {
+            key: records[-1][key] for key in _REFERENCE_KEYS
+        },
+        "first_source_bound_projection_sha256": records[0][
+            "source_bound_projection_sha256"
+        ],
+        "last_source_bound_projection_sha256": records[-1][
+            "source_bound_projection_sha256"
+        ],
+        "first_causal_projection_sha256": records[0][
+            "causal_projection_sha256"
+        ],
+        "last_causal_projection_sha256": records[-1][
+            "causal_projection_sha256"
+        ],
+        "projection_status_counts": dict(sorted(Counter(
+            str(row["status"]) for row in records
+        ).items())),
+        "source_bound_projection_digest": _sha256_json(list(records)),
+        "causal_projection_digest": _sha256_json([
+            {
+                key: value
+                for key, value in record.items()
+                if key != "source_bound_projection_sha256"
+            }
+            for record in records
+        ]),
+    }
+
+
+def _empty_audit(
+    source: Mapping[str, Any],
+    *,
+    minimum_sample_count: int,
+    status: str,
+    input_row_count: int = 0,
+    input_rejected_count: int = 0,
+    input_rejection_reason_counts: Mapping[str, int] | None = None,
+) -> dict[str, Any]:
+    feature_coverage = {
+        feature: _feature_coverage(
+            feature,
+            (),
+            minimum_sample_count=minimum_sample_count,
+        )
+        for feature in _FEATURES
+    }
+    return {
+        "schema_id": SCHEMA_ID,
+        "schema_version": SCHEMA_VERSION,
+        "status": status,
+        "source_history": dict(source),
+        "shadow_schema_id": market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID,
+        "shadow_schema_version": market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION,
+        "minimum_sample_count": minimum_sample_count,
+        "input_row_count": input_row_count,
+        "excluded_not_baseline_counted_count": 0,
+        "input_rejected_count": input_rejected_count,
+        "input_rejection_reason_counts": dict(
+            sorted((input_rejection_reason_counts or {}).items())
+        ),
+        "valid_baseline_counted_row_count": 0,
+        "evaluated_observation_count": 0,
+        "evaluation_error_count": 0,
+        "evaluation_error_reason_counts": {},
+        "projection_status_counts": {},
+        "return_status_counts": {},
+        "feature_coverage": feature_coverage,
+        "asset_projection_summaries": [],
+        "asset_count": 0,
+        "source_bound_projection_digest": _sha256_json([]),
+        "causal_projection_digest": _sha256_json([]),
+        "all_features_have_ready_evidence": False,
+        "statistical_independence_claimed": False,
+        "routing_eligible": False,
+        "priority_eligible": False,
+        "score_adjustment_eligible": False,
+        "decision_score_eligible": False,
+        "threshold_change_eligible": False,
+        "publication_authority": False,
+        "protocol_v2_evidence_eligible": False,
+        "auto_apply": False,
+        "historical_rows_rewritten": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _source_projection(snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    status = snapshot.get("status")
+    return {
+        "status": status if status in _SOURCE_STATUSES else "unavailable",
+        "artifact": snapshot.get("artifact") if _identity(snapshot.get("artifact")) else None,
+        "sha256": snapshot.get("sha256") if _sha256(snapshot.get("sha256")) else None,
+        "size_bytes": snapshot.get("size_bytes") if _nonnegative_int(snapshot.get("size_bytes")) else 0,
+        "row_count": snapshot.get("row_count") if _nonnegative_int(snapshot.get("row_count")) else 0,
+        "binding_source": (
+            snapshot.get("binding_source")
+            if _identity(snapshot.get("binding_source"))
+            else "campaign_market_history_path"
+        ),
+    }
+
+
+def _audit_status(
+    *,
+    source_status: str,
+    input_row_count: int,
+    evaluated_count: int,
+    rejected_count: int,
+    evaluation_error_count: int,
+    all_features_ready: bool,
+) -> str:
+    if source_status not in {"observed", "observed_empty"}:
+        return "unavailable"
+    if input_row_count == 0:
+        return "empty"
+    if evaluated_count == 0:
+        return "unavailable"
+    if rejected_count or evaluation_error_count:
+        return "partial"
+    return "ready" if all_features_ready else "warming"
+
+
+def _validate_source(source: Mapping[str, Any], *, errors: list[str]) -> None:
+    _exact_keys(source, _SOURCE_KEYS, "source_history", errors)
+    if source.get("status") not in _SOURCE_STATUSES:
+        errors.append("source_history_status_invalid")
+    if source.get("artifact") is not None and not _identity(source.get("artifact")):
+        errors.append("source_history_artifact_invalid")
+    if source.get("sha256") is not None and not _sha256(source.get("sha256")):
+        errors.append("source_history_sha256_invalid")
+    for field in ("size_bytes", "row_count"):
+        if not _nonnegative_int(source.get(field)):
+            errors.append(f"source_history_{field}_invalid")
+    if not _identity(source.get("binding_source")):
+        errors.append("source_history_binding_source_invalid")
+    if source.get("status") in {"observed", "observed_empty"}:
+        if source.get("artifact") is None:
+            errors.append("observed_source_artifact_missing")
+        if source.get("sha256") is None:
+            errors.append("observed_source_sha256_missing")
+
+
+def _validated_counts(
+    value: Mapping[str, Any],
+    *,
+    errors: list[str],
+) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for field in (
+        "input_row_count",
+        "excluded_not_baseline_counted_count",
+        "input_rejected_count",
+        "valid_baseline_counted_row_count",
+        "evaluated_observation_count",
+        "evaluation_error_count",
+    ):
+        raw = value.get(field)
+        if not _nonnegative_int(raw):
+            errors.append(f"{field}_invalid")
+        else:
+            result[field] = raw
+    return result
+
+
+def _reason_counts(
+    raw: Any,
+    *,
+    allowed: set[str],
+    label: str,
+    errors: list[str],
+) -> dict[str, int]:
+    if not isinstance(raw, Mapping):
+        errors.append(f"{label}_reason_counts_invalid")
+        return {}
+    result: dict[str, int] = {}
+    for reason, count in raw.items():
+        if reason not in allowed:
+            errors.append(f"{label}_reason_invalid")
+        if not _positive_int(count):
+            errors.append(f"{label}_reason_count_invalid")
+        else:
+            result[str(reason)] = count
+    return result
+
+
+def _validate_feature_coverage(
+    feature: str,
+    coverage: Any,
+    *,
+    evaluated_count: int,
+    minimum_sample_count: int | None,
+    errors: list[str],
+) -> None:
+    if not isinstance(coverage, Mapping):
+        errors.append(f"feature_coverage_{feature}_invalid")
+        return
+    _exact_keys(coverage, _FEATURE_COVERAGE_KEYS, f"feature_{feature}", errors)
+    if coverage.get("feature") != feature:
+        errors.append(f"feature_coverage_{feature}_identity_invalid")
+    if coverage.get("family") != _FEATURE_FAMILIES[feature]:
+        errors.append(f"feature_coverage_{feature}_family_invalid")
+    if coverage.get("evaluated_observation_count") != evaluated_count:
+        errors.append(f"feature_coverage_{feature}_evaluation_count_mismatch")
+    if coverage.get("minimum_sample_count") != minimum_sample_count:
+        errors.append(f"feature_coverage_{feature}_minimum_mismatch")
+    ready_count = coverage.get("ready_count")
+    if not _nonnegative_int(ready_count) or ready_count > evaluated_count:
+        errors.append(f"feature_coverage_{feature}_ready_count_invalid")
+    _validate_status_counts(
+        coverage.get("status_counts"),
+        expected_total=evaluated_count,
+        label=f"feature_{feature}",
+        errors=errors,
+    )
+    status_counts = coverage.get("status_counts")
+    if isinstance(status_counts, Mapping) and ready_count != status_counts.get(
+        "ready", 0
+    ):
+        errors.append(f"feature_coverage_{feature}_ready_count_mismatch")
+    minimum = coverage.get("minimum_eligible_sample_count")
+    maximum = coverage.get("maximum_eligible_sample_count")
+    if evaluated_count == 0:
+        if minimum is not None or maximum is not None:
+            errors.append(f"feature_coverage_{feature}_sample_range_invalid")
+    elif (
+        not _nonnegative_int(minimum)
+        or not _nonnegative_int(maximum)
+        or minimum > maximum
+    ):
+        errors.append(f"feature_coverage_{feature}_sample_range_invalid")
+    first = coverage.get("first_ready_observation")
+    last = coverage.get("last_ready_observation")
+    if (ready_count == 0) != (first is None and last is None):
+        errors.append(f"feature_coverage_{feature}_ready_reference_mismatch")
+    for label, reference in (("first", first), ("last", last)):
+        if reference is not None and not _valid_reference(reference):
+            errors.append(f"feature_coverage_{feature}_{label}_reference_invalid")
+    if not _sha256(coverage.get("projection_digest")):
+        errors.append(f"feature_coverage_{feature}_projection_digest_invalid")
+
+
+def _validate_asset_summaries(
+    summaries: Sequence[Any],
+    *,
+    evaluated_count: int,
+    errors: list[str],
+) -> None:
+    asset_ids: list[str] = []
+    total = 0
+    for index, summary in enumerate(summaries):
+        if not isinstance(summary, Mapping):
+            errors.append("asset_projection_summary_invalid")
+            continue
+        _exact_keys(summary, _ASSET_SUMMARY_KEYS, f"asset_summary_{index}", errors)
+        asset_id = _identity(summary.get("canonical_asset_id"))
+        if not asset_id:
+            errors.append("asset_projection_summary_identity_invalid")
+        else:
+            asset_ids.append(asset_id)
+        count = summary.get("evaluated_observation_count")
+        if not _positive_int(count):
+            errors.append("asset_projection_summary_count_invalid")
+            count = 0
+        total += count
+        for field in ("first_observation", "last_observation"):
+            if not _valid_reference(summary.get(field)):
+                errors.append(f"asset_projection_summary_{field}_invalid")
+        for field in (
+            "first_source_bound_projection_sha256",
+            "last_source_bound_projection_sha256",
+            "first_causal_projection_sha256",
+            "last_causal_projection_sha256",
+            "source_bound_projection_digest",
+            "causal_projection_digest",
+        ):
+            if not _sha256(summary.get(field)):
+                errors.append(f"asset_projection_summary_{field}_invalid")
+        _validate_status_counts(
+            summary.get("projection_status_counts"),
+            expected_total=count,
+            label="asset_projection",
+            errors=errors,
+        )
+    if asset_ids != sorted(set(asset_ids)):
+        errors.append("asset_projection_summary_order_or_uniqueness_invalid")
+    if total != evaluated_count:
+        errors.append("asset_projection_summary_count_mismatch")
+
+
+def _validate_status_counts(
+    raw: Any,
+    *,
+    expected_total: int,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(raw, Mapping):
+        errors.append(f"{label}_counts_invalid")
+        return
+    total = 0
+    for status, count in raw.items():
+        if not _identity(status) or not _positive_int(count):
+            errors.append(f"{label}_count_invalid")
+            continue
+        total += count
+    if total != expected_total:
+        errors.append(f"{label}_count_total_mismatch")
+
+
+def _reference(row: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        "observation_id": str(row["observation_id"]),
+        "observed_at": str(row["observed_at"]),
+    }
+
+
+def _valid_reference(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and set(value) == _REFERENCE_KEYS
+        and bool(_identity(value.get("observation_id")))
+        and _aware_time_or_none(value.get("observed_at")) is not None
+    )
+
+
+def _parse_aware_utc(value: Any) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise TypeError("timestamp must be a non-empty string")
+    parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def _aware_time_or_none(value: Any) -> datetime | None:
+    try:
+        return _parse_aware_utc(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _identity(value: Any) -> str:
+    return value.strip() if isinstance(value, str) and value.strip() else ""
+
+
+def _positive_int(value: Any) -> bool:
+    return type(value) is int and value > 0
+
+
+def _nonnegative_int(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _sha256_json(value: Any) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _exact_keys(
+    value: Mapping[str, Any],
+    expected: set[str],
+    label: str,
+    errors: list[str],
+) -> None:
+    if set(value) != expected:
+        errors.append(f"{label}_keys_invalid")
+
+
+def _assert_valid(value: Mapping[str, Any]) -> None:
+    errors = validate_campaign_shadow_surprise_audit(value)
+    if errors:
+        raise AssertionError(
+            "campaign shadow-surprise audit invalid: " + ";".join(errors)
+        )
+
+
+__all__ = (
+    "SCHEMA_ID",
+    "SCHEMA_VERSION",
+    "build_campaign_shadow_surprise_audit",
+    "validate_campaign_shadow_surprise_audit",
+)

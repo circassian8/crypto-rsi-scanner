@@ -109,6 +109,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
         "## Anomaly episodes (shadow)",
         "",
+        *_shadow_surprise_audit_section(report),
         *_episode_shadow_lines_from_report(report),
         *_decision_episode_scorecard_section(report),
         "## Failed and blocked attempts",
@@ -166,6 +167,60 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         "",
     ])
     return "\n".join(lines)
+
+
+def _shadow_surprise_audit_section(report: Mapping[str, Any]) -> list[str]:
+    audit = _mapping(report.get("shadow_temporal_surprise_campaign_audit"))
+    source = _mapping(audit.get("source_history"))
+    features = _mapping(audit.get("feature_coverage"))
+    lines = [
+        "### Causal temporal-surprise replay",
+        "",
+        (
+            "This is a read-only replay of the shadow model over retained, "
+            "cadence-counted observations. Each projection uses only strictly "
+            "earlier same-asset history; it does not rewrite historical rows or "
+            "change routes, scores, thresholds, or authority."
+        ),
+        f"- Audit status: `{_text(audit.get('status'))}`",
+        f"- Shadow schema: `{_text(audit.get('shadow_schema_id'))}` v`{_int(audit.get('shadow_schema_version'))}`",
+        f"- Exact history rows: `{_int(source.get('row_count'))}`",
+        f"- Baseline-counted rows replayed: `{_int(audit.get('evaluated_observation_count'))}`",
+        f"- Non-counted rows excluded: `{_int(audit.get('excluded_not_baseline_counted_count'))}`",
+        f"- Input rejections: `{_int(audit.get('input_rejected_count'))}`",
+        f"- Evaluation errors: `{_int(audit.get('evaluation_error_count'))}`",
+        f"- Assets replayed: `{_int(audit.get('asset_count'))}`",
+        f"- Source-bound projection digest: `{_text(audit.get('source_bound_projection_digest'))}`",
+        f"- Causal-value projection digest: `{_text(audit.get('causal_projection_digest'))}`",
+        (
+            "- An audit status of `ready` means every modeled feature has some "
+            "ready evidence; it does not mean every projection is ready. The "
+            "counts below remain authoritative."
+        ),
+        "- Statistical independence claimed: `false`",
+        "- Protocol-v2 evidence eligible: `false`",
+        "",
+        "| Feature | Family | Ready / evaluated | Status counts | Sample range |",
+        "|---|---|---:|---|---:|",
+    ]
+    for feature in sorted(features):
+        coverage = _mapping(features.get(feature))
+        minimum = coverage.get("minimum_eligible_sample_count")
+        maximum = coverage.get("maximum_eligible_sample_count")
+        sample_range = (
+            f"{minimum}–{maximum}"
+            if type(minimum) is int and type(maximum) is int
+            else "n/a"
+        )
+        lines.append(
+            f"| {_md(feature)} | {_md(coverage.get('family'))} | "
+            f"{_int(coverage.get('ready_count'))} / "
+            f"{_int(coverage.get('evaluated_observation_count'))} | "
+            f"{_counts(_mapping(coverage.get('status_counts'))) or 'none'} | "
+            f"{sample_range} |"
+        )
+    lines.extend(["", "### Decision episodes", ""])
+    return lines
 
 
 def _authority_proven(pointer: Mapping[str, Any]) -> bool:

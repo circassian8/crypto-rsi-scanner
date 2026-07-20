@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Replay shadow temporal surprise causally without rewriting history
+**Status:** accepted as read-only campaign measurement
+**Decision:** Extend the existing canonical campaign report with one closed
+`decision_radar.shadow_temporal_surprise_campaign_audit` projection built from
+the report's already captured exact history snapshot. Replay only rows whose
+canonical contract says `baseline_counted=true`; exclude rapid non-counted rows
+and reject malformed or duplicate identities with closed accounting. Evaluate
+each accepted row against strictly earlier same-asset history and canonical
+BTC/ETH rows at or before its clock. Publish per-feature coverage, per-asset
+summaries, a source-bound digest that changes with the exact history snapshot,
+and a causal-value digest whose prior values remain stable when only later rows
+are appended. Do not rewrite historical rows, infer statistical independence,
+or grant routing, score, threshold, publication, or Protocol-v2 authority.
+**Why:** The isolated v2 implementation proved mechanics, but it did not show
+how much of the genuine retained campaign can actually evaluate each feature or
+where insufficient and degenerate histories remain. A deterministic causal
+replay exposes that empirical coverage without tuning policy or creating a
+second model.
+**Revisit when:** A sealed Protocol-v2 annex defines dependence-aware episodes,
+matched controls, partitions, sample minima, costs, and promotion criteria, and
+genuine matured outcomes are sufficient for an out-of-sample comparison.
+
 ## 2026-07-20 - Extend robust temporal surprise with causal signed-return tails
 **Status:** accepted as shadow-only research instrumentation
 **Decision:** Advance `event_alpha.shadow_temporal_surprise` to schema v2 while

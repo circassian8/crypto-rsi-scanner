@@ -1530,9 +1530,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 10824,
+  "function_count": 10854,
   "function_line_limit": 150,
-  "functions_over_150_lines": 11,
+  "functions_over_150_lines": 13,
   "functions_over_limit": [
     {
       "function_name": "_validate_return_feature_consistency",
@@ -1615,6 +1615,22 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
     },
     {
+      "function_name": "build_campaign_report",
+      "line_count": 155,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
+      "public": true,
+      "qualname": "build_campaign_report",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py"
+    },
+    {
+      "function_name": "build_campaign_shadow_surprise_audit",
+      "line_count": 193,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": true,
+      "qualname": "build_campaign_shadow_surprise_audit",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
       "function_name": "_entry_from_row",
       "line_count": 160,
       "module": "crypto_rsi_scanner.event_alpha.radar.watchlist.entries",
@@ -1623,8 +1639,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 11,
-  "generated_at": "2026-07-20T06:02:05.050055+00:00",
+  "functions_over_limit_count": 13,
+  "generated_at": "2026-07-20T06:56:22.831422+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3099,15 +3115,15 @@
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1466,
-      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+      "line_count": 1476,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1451,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+      "line_count": 1466,
+      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -3258,7 +3274,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 11,
+  "production_functions_over_limit": 13,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_return_feature_consistency",
@@ -3339,6 +3355,22 @@
       "public": false,
       "qualname": "_impact_cost_lines",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py"
+    },
+    {
+      "function_name": "build_campaign_report",
+      "line_count": 155,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
+      "public": true,
+      "qualname": "build_campaign_report",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py"
+    },
+    {
+      "function_name": "build_campaign_shadow_surprise_audit",
+      "line_count": 193,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": true,
+      "qualname": "build_campaign_shadow_surprise_audit",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
     },
     {
       "function_name": "_entry_from_row",
@@ -3803,7 +3835,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 11,
+      "functions_over_150_lines": 13,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -3844,13 +3876,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1466,
-        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
+        "line_count": 1476,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
-        "line_count": 1451,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "line_count": 1466,
+        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
       },
       {
@@ -4011,7 +4043,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 11,
+    "functions_over_150_lines": 13,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,

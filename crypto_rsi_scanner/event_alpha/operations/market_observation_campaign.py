@@ -33,6 +33,7 @@ from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
 from . import market_observation_campaign_outcome_gaps
 from . import market_observation_campaign_scorecard
+from . import market_observation_campaign_shadow_surprise
 from . import market_observation_campaign_snapshots
 from . import market_observation_outcomes
 from .market_no_send_models import SAFETY_COUNTERS
@@ -172,6 +173,13 @@ def build_campaign_report(
         history_filename=HISTORY_FILENAME,
         current_asset_ids=current_authority.get("_current_asset_ids"),
     )
+    shadow_surprise_audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            history_snapshot,
+            minimum_sample_count=_shadow_minimum_sample_count(baseline),
+        )
+    )
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
     metrics.update(_review_metric_values(review_timing, review_queue))
     metrics["provider_failed_attempts"] = len(provider_failed)
@@ -221,6 +229,7 @@ def build_campaign_report(
         episode_shadow=episode_shadow,
         episode_input_audit=episode_input_audit,
         episode_scorecard=episode_scorecard,
+        shadow_surprise_audit=shadow_surprise_audit,
         limitations=limitations,
         next_observation=next_observation,
         conclusion=conclusion,
@@ -316,6 +325,22 @@ def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
             "decision episode scorecard report contract invalid: "
             + ";".join(scorecard_errors)
         )
+    surprise_errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(
+            _mapping(report.get("shadow_temporal_surprise_campaign_audit"))
+        )
+    )
+    if surprise_errors:
+        raise MarketNoSendError(
+            "shadow temporal-surprise campaign audit invalid: "
+            + ";".join(surprise_errors)
+        )
+
+
+def _shadow_minimum_sample_count(baseline: Mapping[str, Any]) -> int:
+    value = baseline.get("baseline_min_observations")
+    return value if type(value) is int and value > 0 else 8
 
 
 def _load_generations(

@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-20T06:02:05.050055+00:00`
+- generated_at: `2026-07-20T06:56:22.831422+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `11`
+- functions_over_limit_count: `13`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `11`
+- production_functions_over_limit: `13`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `11`
+- functions_over_150_lines: `13`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `84`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 2 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 11 | advisory |
+| `functions_over_150_lines` | 13 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -94,8 +94,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1476 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1451 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/config.py` | 1450 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1410 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
@@ -320,4 +320,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress` | `format_current_progress` | 278 | true |
 | `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `build_execution_quality_readiness` | 168 | true |
 | `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 246 | false |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign` | `build_campaign_report` | 155 | true |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `build_campaign_shadow_surprise_audit` | 193 | true |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |

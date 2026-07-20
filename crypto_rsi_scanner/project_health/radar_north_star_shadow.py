@@ -62,6 +62,31 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "overlapping_return_samples_are_independent": False,
     "same_asset_relative_return_status": "not_applicable",
     "attachment": "top_level_post_scan_snapshot_and_anomaly_metadata_only",
+    "campaign_audit_schema_id": (
+        "decision_radar.shadow_temporal_surprise_campaign_audit"
+    ),
+    "campaign_audit_schema_version": 1,
+    "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
+    "campaign_audit_replay": (
+        "each_counted_row_against_strictly_earlier_same_asset_rows_and_"
+        "at_or_before_benchmarks"
+    ),
+    "campaign_audit_non_counted_rows": "excluded_with_exact_count",
+    "campaign_audit_invalid_or_duplicate_rows": "rejected_with_closed_reason_counts",
+    "campaign_audit_source_bound_digest": (
+        "changes_when_exact_history_snapshot_fingerprint_changes"
+    ),
+    "campaign_audit_causal_digest": (
+        "prior_projection_values_stable_when_only_later_rows_are_appended"
+    ),
+    "campaign_audit_ready_semantics": (
+        "every_modeled_feature_has_some_ready_evidence_not_every_projection_ready"
+    ),
+    "campaign_audit_historical_rows_rewritten": False,
+    "campaign_audit_provider_calls": 0,
+    "campaign_audit_writes": 0,
+    "campaign_audit_statistical_independence_claimed": False,
+    "campaign_audit_protocol_v2_evidence_eligible": False,
     "canonical_history_or_provider_source_mutated": False,
     "copied_to_decision_projection": False,
     "routing_eligible": False,

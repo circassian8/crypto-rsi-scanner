@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from crypto_rsi_scanner.event_alpha.artifacts import operator_state
 from crypto_rsi_scanner.event_alpha.dashboard.readiness import CURRENT_NAMESPACE_POINTER
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_cli
@@ -429,6 +431,20 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert first["campaign_metrics"]["review_timing_completed_reviews"] == 0
     assert first["campaign_metrics"]["review_timing_action_required"] == 0
     assert first["pointer"]["exact_operator_binding"] is True
+    shadow_audit = first["shadow_temporal_surprise_campaign_audit"]
+    assert shadow_audit["status"] == "unavailable"
+    assert shadow_audit["source_history"]["status"] == "missing"
+    assert shadow_audit["source_history"]["row_count"] == 0
+    assert shadow_audit["input_row_count"] == 0
+    assert shadow_audit["excluded_not_baseline_counted_count"] == 0
+    assert shadow_audit["input_rejected_count"] == 0
+    assert shadow_audit["valid_baseline_counted_row_count"] == 0
+    assert shadow_audit["evaluated_observation_count"] == 0
+    assert shadow_audit["evaluation_error_count"] == 0
+    assert shadow_audit["provider_calls"] == 0
+    assert shadow_audit["writes"] == 0
+    assert shadow_audit["routing_eligible"] is False
+    assert shadow_audit["protocol_v2_evidence_eligible"] is False
     conclusion = first["campaign_v2_conclusion"]
     assert conclusion["baseline_status"] == "warming"
     assert conclusion["baseline_coverage"] == {
@@ -489,6 +505,16 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert "Existing history cadence boundary" in markdown
     assert "Provider-call eligibility: `not inferred`" in markdown
     assert "test-a [warming; samples 4/8 (gap 4)" in markdown
+    assert "Causal temporal-surprise replay" in markdown
+    assert "does not mean every projection is ready" in markdown
+
+    tampered = json.loads(json.dumps(first))
+    tampered["shadow_temporal_surprise_campaign_audit"]["routing_eligible"] = True
+    with pytest.raises(
+        campaign.MarketNoSendError,
+        match="shadow temporal-surprise campaign audit invalid",
+    ):
+        campaign.format_campaign_report(tampered)
 
 
 def test_final_receipts_reconcile_attempt_publication_operations_and_current(

@@ -109,6 +109,34 @@ lower/upper fields. They are not p-values. Rolling horizon samples overlap and
 are explicitly not claimed to be statistically independent. V2 sets no anomaly
 threshold and does not promote any route or score.
 
+## Campaign-level causal replay
+
+The canonical live campaign report replays this same closed v2 evaluator over
+the exact retained market-history snapshot it has already read. It does not
+create another model or reinterpret stored rows. Only rows carrying
+`baseline_counted=true` enter the replay; rapid non-counted rows are excluded
+with an exact count, while malformed identities, clocks, counting flags, and
+duplicate observation or asset-time identities are rejected with closed reason
+counts.
+
+Every accepted observation is evaluated against strictly earlier observations
+for the same canonical asset. BTC and ETH context is restricted to canonical
+benchmark rows at or before that observation's clock. The report retains
+per-feature ready/status/sample coverage, per-asset summaries, input and
+evaluation accounting, and two complementary digests:
+
+- the source-bound digest changes when the exact history snapshot fingerprint
+  changes, even if an older projection's causal inputs did not;
+- the causal-value digest removes only that whole-snapshot hash, so an older
+  projection remains byte-comparable when later observations are appended.
+
+An audit status of `ready` means each modeled feature has at least one ready
+projection. It does not claim that every observation is ready, that rolling
+rows are independent, or that the values qualify as Protocol-v2 evidence. The
+report remains read-only, performs no provider call, rewrites no historical
+row, and cannot change routes, priorities, scores, thresholds, publication, or
+authority.
+
 ## Isolation and integrity contract
 
 - Compute from the exact fingerprinted generation history snapshot only after

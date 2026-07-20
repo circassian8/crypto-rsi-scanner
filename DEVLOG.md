@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Audit shadow-v2 coverage over retained campaign history · Codex
+**Why:** The isolated robust temporal-surprise v2 implementation proved its
+mechanics but did not show how much of the genuine retained campaign can
+actually evaluate each feature. The next empirical step was a causal,
+policy-neutral coverage audit before any algorithm or threshold discussion.
+**Changes:**
+- Added a closed campaign audit that consumes the campaign report's one-read
+exact market-history snapshot, excludes non-counted rows, rejects malformed or
+duplicate identities with closed accounting, and replays every accepted row
+only against strictly earlier same-asset history and at-or-before canonical
+BTC/ETH observations.
+- Added per-feature ready/status/sample coverage, per-asset summaries, input and
+evaluation error counts, and separate source-bound and causal-value digests.
+The latter keeps an older projection comparable when only later history is
+appended; neither digest grants evidence authority.
+- Integrated the projection into canonical JSON/Markdown campaign truth with a
+fail-closed render/write validator and explicit wording that audit `ready`
+means some ready evidence for every modeled feature, not every projection ready.
+- Current genuine history replays 1,200 cadence-counted observations across 36
+assets with zero input rejections or evaluation errors. Every modeled feature
+has some ready evidence, while only 48 full projections are ready; 879 are
+partial and 273 unavailable, so the report keeps the limitation visible.
+- Synchronized the North Star contracts, anomaly-method preregistration,
+research-method note, working agreement, durable decision, roadmap, current
+campaign report, and generated project-health reports. Quantitative source-size
+observations remain advisory only as the owner requested.
+**Verify:** 69 focused shadow/campaign/North-Star tests passed; compileall, JSON
+validation, and `git diff --check` passed. `radar-market-campaign-report`
+completed from local artifacts with zero provider calls. Daily Operations
+dry-run stopped at cadence with no provider call; exact dashboard readiness
+remained READY on the prior revision-12 authority. The market no-send fixture
+smoke passed strict doctor 0/0 and remained campaign-excluded.
+`architecture-cleanliness-check` passed with size telemetry advisory. The
+outside-sandbox `make verify-fast PYTHON=.venv/bin/python` gate passed 3,551
+pytest tests, alert rendering, fixture backtest, and paper scoreboard in 167.56
+seconds. The first sandboxed attempt's only failure was the expected denied
+temporary loopback bind; the same complete gate passed with that local-socket
+permission.
+**Notes/risks:** The replay is deterministic research instrumentation, not a
+new model. It rewrites no history, calls no provider, and cannot affect routes,
+scores, thresholds, publication, Protocol-v2 eligibility, sends, trades,
+orders, paper trades, normal RSI rows, or Event Alpha `TRIGGERED_FADE`. Full
+`make verify` was not repeated because the immediately preceding logical change
+already passed it and this slice's focused plus `verify-fast` coverage is the
+risk-appropriate gate.
+
 ## 2026-07-20 — Record a bounded no-send provider failure · Codex
 **Why:** The authorized CoinGecko observation cadence became eligible, so Daily
 Operations needed one honest terminal attempt while preserving the one-request

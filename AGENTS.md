@@ -988,6 +988,15 @@ may be added later when a suitable environment already exists.
   cards, routes, priorities, scores, thresholds, alerts, or execution. Every
   policy-authority flag remains false until a separate sealed, episode-level,
   out-of-sample promotion decision.
+  The canonical campaign report also replays the same closed v2 evaluator over
+  its one-read exact retained-history snapshot. It evaluates only cadence-counted
+  rows against strictly earlier same-asset history and at-or-before canonical
+  benchmark rows, reports closed exclusions/rejections, feature coverage,
+  per-asset summaries, and separate source-bound and causal-value digests, and
+  rewrites no history. Audit status `ready` means every modeled feature has some
+  ready evidence, not that every projection is ready. The replay makes no
+  provider call or write, claims no statistical independence, and remains
+  routing/score/threshold/publication/Protocol-v2-ineligible.
   Human review timing uses the separate append-only shared campaign ledger
   `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
   `make radar-review-timing-status` is read-only/no-network and reports only

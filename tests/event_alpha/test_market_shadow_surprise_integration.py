@@ -12,6 +12,7 @@ from crypto_rsi_scanner.event_alpha.operations import (
     market_no_send,
     market_no_send_authority,
     market_no_send_io,
+    market_observation_campaign_shadow_surprise,
 )
 from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
 from crypto_rsi_scanner.event_alpha.radar import market_anomaly_receipt
@@ -130,6 +131,18 @@ def _route_truth(row: dict) -> dict:
             "priority_components",
             "search_queries",
         )
+    }
+
+
+def _campaign_history_snapshot(rows: list[dict], *, seed: bytes = b"history") -> dict:
+    return {
+        "rows": tuple(deepcopy(rows)),
+        "status": "observed" if rows else "observed_empty",
+        "artifact": market_no_send.HISTORY_FILENAME,
+        "sha256": hashlib.sha256(seed).hexdigest(),
+        "size_bytes": len(seed),
+        "row_count": len(rows),
+        "binding_source": "campaign_market_history_exact_bytes",
     }
 
 
@@ -442,3 +455,141 @@ def test_shadow_surprise_requires_exact_unique_current_history_identity():
             history_artifact=market_no_send.HISTORY_FILENAME,
             history_sha256="a" * 64,
         )
+
+
+def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effects():
+    rows = _history_rows(_current_market_row())
+
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(rows),
+            minimum_sample_count=4,
+        )
+    )
+
+    assert audit["schema_id"] == (
+        "decision_radar.shadow_temporal_surprise_campaign_audit"
+    )
+    assert audit["shadow_schema_version"] == 2
+    assert audit["input_row_count"] == 31
+    assert audit["excluded_not_baseline_counted_count"] == 1
+    assert audit["input_rejected_count"] == 0
+    assert audit["valid_baseline_counted_row_count"] == 30
+    assert audit["evaluated_observation_count"] == 30
+    assert audit["evaluation_error_count"] == 0
+    assert audit["asset_count"] == 3
+    assert audit["feature_coverage"]["return_1h"]["ready_count"] > 0
+    assert audit["feature_coverage"]["relative_return_vs_btc_1h"][
+        "ready_count"
+    ] > 0
+    assert audit["feature_coverage"]["return_24h"]["ready_count"] == 0
+    assert audit["all_features_have_ready_evidence"] is False
+    assert audit["status"] == "warming"
+    assert audit["statistical_independence_claimed"] is False
+    assert audit["routing_eligible"] is False
+    assert audit["decision_score_eligible"] is False
+    assert audit["threshold_change_eligible"] is False
+    assert audit["protocol_v2_evidence_eligible"] is False
+    assert audit["historical_rows_rewritten"] is False
+    assert audit["provider_calls"] == audit["writes"] == 0
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(audit)
+    ) == []
+
+
+def test_campaign_shadow_replay_causal_digest_ignores_later_source_rows():
+    rows = _history_rows(_current_market_row())
+    before = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(rows, seed=b"before"),
+            minimum_sample_count=4,
+        )
+    )
+    future = deepcopy(next(
+        row for row in rows if row["observation_id"] == "obs-current"
+    ))
+    future.update({
+        "observation_id": "obs-future",
+        "observed_at": (NOW + timedelta(hours=1)).isoformat(),
+        "price": float(future["price"]) * 1.01,
+    })
+    after = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot([*rows, future], seed=b"after"),
+            minimum_sample_count=4,
+        )
+    )
+    before_asset = next(
+        row
+        for row in before["asset_projection_summaries"]
+        if row["canonical_asset_id"] == "token-b"
+    )
+    after_asset = next(
+        row
+        for row in after["asset_projection_summaries"]
+        if row["canonical_asset_id"] == "token-b"
+    )
+
+    assert before_asset["first_causal_projection_sha256"] == after_asset[
+        "first_causal_projection_sha256"
+    ]
+    assert before_asset["first_source_bound_projection_sha256"] != after_asset[
+        "first_source_bound_projection_sha256"
+    ]
+    assert after_asset["evaluated_observation_count"] == (
+        before_asset["evaluated_observation_count"] + 1
+    )
+
+
+def test_campaign_shadow_replay_rejects_duplicate_identity_and_closes_counts():
+    rows = _history_rows(_current_market_row())
+    rows.append(deepcopy(rows[0]))
+
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(rows),
+            minimum_sample_count=4,
+        )
+    )
+
+    assert audit["status"] == "partial"
+    assert audit["input_rejected_count"] == 2
+    assert audit["input_rejection_reason_counts"] == {
+        "duplicate_observation_id": 2
+    }
+    assert audit["input_row_count"] == (
+        audit["excluded_not_baseline_counted_count"]
+        + audit["input_rejected_count"]
+        + audit["valid_baseline_counted_row_count"]
+    )
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(audit)
+    ) == []
+
+
+def test_campaign_shadow_replay_validator_rejects_policy_and_count_drift():
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(_history_rows(_current_market_row())),
+            minimum_sample_count=4,
+        )
+    )
+    tampered = deepcopy(audit)
+    tampered["routing_eligible"] = True
+    tampered["evaluated_observation_count"] += 1
+
+    errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(tampered)
+    )
+
+    assert "routing_eligible_must_be_false" in errors
+    assert "evaluation_count_not_closed" in errors
+    assert "projection_status_count_total_mismatch" in errors

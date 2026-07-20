@@ -705,6 +705,19 @@ matched-control evidence supports a separate sealed out-of-sample decision. The
 detailed method and limitations are recorded in
 `research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
 
+The canonical campaign report now replays that same closed v2 evaluator over
+its one-read exact retained-history snapshot. Only cadence-counted rows enter;
+each is evaluated against strictly earlier observations for the same canonical
+asset and at-or-before canonical BTC/ETH rows. The report closes excluded,
+rejected, and evaluated counts, exposes feature/status/sample coverage and
+per-asset summaries, and publishes both a source-bound digest and a causal-value
+digest whose older projection values remain stable when only later rows are
+appended. Audit status `ready` means every modeled feature has some ready
+evidence, not that every projection is ready. The replay rewrites no history,
+makes no provider call or write, claims no statistical independence, and is
+not eligible for routes, scores, thresholds, publication authority, or
+Protocol-v2 evidence.
+
 Repeated campaign observations of one persistent market move are measured with
 the closed `event_alpha.shadow_anomaly_episodes` v1 contract. It partitions
 each exact canonical asset with a fixed-start, half-open 24-hour primary window

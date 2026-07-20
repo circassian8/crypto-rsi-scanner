@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-20T06:21:55.150991+00:00` from local artifacts only.
+Generated at `2026-07-20T06:58:27.507369+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -192,6 +192,39 @@ Human review is counted only through explicit confirmed actions; dashboard GET/H
 - No explicit human review timing has been recorded; eligible queue rows remain unmeasured until the operator confirms a real action.
 
 ## Anomaly episodes (shadow)
+
+### Causal temporal-surprise replay
+
+This is a read-only replay of the shadow model over retained, cadence-counted observations. Each projection uses only strictly earlier same-asset history; it does not rewrite historical rows or change routes, scores, thresholds, or authority.
+- Audit status: `ready`
+- Shadow schema: `event_alpha.shadow_temporal_surprise` v`2`
+- Exact history rows: `1230`
+- Baseline-counted rows replayed: `1200`
+- Non-counted rows excluded: `30`
+- Input rejections: `0`
+- Evaluation errors: `0`
+- Assets replayed: `36`
+- Source-bound projection digest: `ce53c786b15ec7c5c60f42fce82a4634745b4a0a16c56538947c3bc27cba7245`
+- Causal-value projection digest: `64f6a207fabdc0f659ecbf965e83fcd36eb9d06284b09f29e173cab2816b7584`
+- An audit status of `ready` means every modeled feature has some ready evidence; it does not mean every projection is ready. The counts below remain authoritative.
+- Statistical independence claimed: `false`
+- Protocol-v2 evidence eligible: `false`
+
+| Feature | Family | Ready / evaluated | Status counts | Sample range |
+|---|---|---:|---|---:|
+| relative_return_vs_btc_1h | relative_return_btc | 279 / 1200 | current_unavailable=640, insufficient_history=241, not_applicable=40, ready=279 | 0–18 |
+| relative_return_vs_btc_24h | relative_return_btc | 264 / 1200 | current_unavailable=661, insufficient_history=235, not_applicable=40, ready=264 | 0–17 |
+| relative_return_vs_btc_4h | relative_return_btc | 304 / 1200 | current_unavailable=617, insufficient_history=239, not_applicable=40, ready=304 | 0–19 |
+| relative_return_vs_eth_1h | relative_return_eth | 279 / 1200 | current_unavailable=640, insufficient_history=241, not_applicable=40, ready=279 | 0–18 |
+| relative_return_vs_eth_24h | relative_return_eth | 264 / 1200 | current_unavailable=661, insufficient_history=235, not_applicable=40, ready=264 | 0–17 |
+| relative_return_vs_eth_4h | relative_return_eth | 304 / 1200 | current_unavailable=617, insufficient_history=239, not_applicable=40, ready=304 | 0–19 |
+| return_1h | direct_return | 256 / 1200 | current_unavailable=662, degenerate_scale=33, insufficient_history=249, ready=256 | 0–18 |
+| return_24h | direct_return | 267 / 1200 | current_unavailable=683, degenerate_scale=7, insufficient_history=243, ready=267 | 0–17 |
+| return_4h | direct_return | 305 / 1200 | current_unavailable=638, degenerate_scale=10, insufficient_history=247, ready=305 | 0–19 |
+| turnover_24h | activity | 925 / 1200 | degenerate_scale=8, insufficient_history=267, ready=925 | 0–39 |
+| volume_24h | activity | 922 / 1200 | degenerate_scale=11, insufficient_history=267, ready=922 | 0–39 |
+
+### Decision episodes
 
 Repeated observations are grouped into fixed-start descriptive episodes; they are not claimed to be statistically independent.
 - Input status: `partial`

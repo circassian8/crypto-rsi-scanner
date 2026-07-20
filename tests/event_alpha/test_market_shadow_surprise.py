@@ -810,6 +810,18 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     assert policy["return_families_kept_separate"] is True
     assert policy["return_tail_ranks_are_p_values"] is False
     assert policy["overlapping_return_samples_are_independent"] is False
+    assert policy["campaign_audit_schema_id"] == (
+        "decision_radar.shadow_temporal_surprise_campaign_audit"
+    )
+    assert policy["campaign_audit_schema_version"] == 1
+    assert policy["campaign_audit_input"] == (
+        "one_read_exact_campaign_history_snapshot"
+    )
+    assert policy["campaign_audit_historical_rows_rewritten"] is False
+    assert policy["campaign_audit_provider_calls"] == 0
+    assert policy["campaign_audit_writes"] == 0
+    assert policy["campaign_audit_statistical_independence_claimed"] is False
+    assert policy["campaign_audit_protocol_v2_evidence_eligible"] is False
     assert policy["derived_ratio_validation"] == (
         "volume_div_market_cap_rel_tol_1e-9_abs_tol_1e-12"
     )

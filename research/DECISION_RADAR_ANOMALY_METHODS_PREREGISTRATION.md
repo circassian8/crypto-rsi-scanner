@@ -25,6 +25,12 @@ holdout.
   families. Historical v1 values remain readable.
 - That shadow value is explicitly barred from routes, priorities, Decision
   scores, thresholds, and automatic application.
+- The canonical campaign report now performs a deterministic causal replay of
+  that exact shadow evaluator over its one-read retained-history snapshot. It
+  exposes per-feature coverage, degeneracy/status counts, exact input
+  rejections, per-asset summaries, and source-bound plus causal-value digests.
+  This is measurement plumbing only: it does not rewrite history or qualify as
+  independent, calibrated, or Protocol-v2 evidence.
 - The present campaign has overlapping observations and sparse matured ideas;
   repeated cycles are not independent samples.
 
