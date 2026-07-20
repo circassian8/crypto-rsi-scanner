@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import math
 from typing import Any, Mapping
 
 from crypto_rsi_scanner.event_alpha.providers import source_registry as event_source_registry
@@ -259,11 +260,15 @@ def _raw_mapping(raw: RawDiscoveredEvent | Mapping[str, Any] | None) -> dict[str
 
 
 def _prior_score(value: float | None) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value is None:
             return None
         number = float(value)
     except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
         return None
     if 0.0 <= number <= 1.0:
         number *= 100.0

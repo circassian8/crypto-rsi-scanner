@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reject malformed source-reliability priors · Codex
+**Why:** Evidence-quality prior normalization converted `true`, NaN, and
+infinities to an effective `100/100`, adding the maximum +10 quality adjustment
+and claiming that a reliability prior had been applied.
+**Changes:** Made source-reliability priors boolean-safe and finite-only before
+fraction-to-percent normalization. Added public scoring regressions proving all
+malformed values remain unavailable, leave the baseline score unchanged, and do
+not emit the applied-prior reason. Finite priors and compatibility numeric
+strings remain unchanged; no source cap, score formula, threshold, route,
+provider, or historical artifact changed.
+**Verify:** All 19 focused evidence-quality/source-registry tests passed.
+`compileall` and `git diff --check` passed, and the standard source-with-
+artifacts export completed with zero unsafe entries. An initial command named
+two nonexistent test files and ran zero tests; it was corrected to the actual
+repository test paths before recording this result.
+
 ## 2026-07-20 — Preserve explicit zero in catalyst verdicts · Codex
 **Why:** Verdict precedence used truthiness. A canonical score or market
 confirmation of `0.0` was treated as missing and could be replaced by a stale

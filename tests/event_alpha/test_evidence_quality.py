@@ -658,6 +658,35 @@ def test_evidence_quality_uses_registry_authority_and_contract_caps():
     assert quality.evidence_quality_score <= registry.confidence_cap
 
 
+def test_evidence_quality_rejects_boolean_and_nonfinite_reliability_priors():
+    import crypto_rsi_scanner.event_alpha.radar.evidence_quality as event_evidence_quality
+
+    row = {
+        "provider": "gdelt",
+        "source_url": "https://reuters.example/story",
+        "title": "TEST market context",
+        "body": "General context mentions TEST without an official catalyst.",
+    }
+    baseline = event_evidence_quality.evaluate_evidence_quality(
+        row,
+        symbol="TEST",
+        coin_id="test",
+    )
+
+    for invalid in (True, float("nan"), float("inf"), float("-inf")):
+        result = event_evidence_quality.evaluate_evidence_quality(
+            row,
+            symbol="TEST",
+            coin_id="test",
+            source_reliability_prior=invalid,
+            use_source_reliability_prior=True,
+        )
+
+        assert result.evidence_quality_score == baseline.evidence_quality_score
+        assert result.source_reliability_prior is None
+        assert "source_reliability_prior_applied" not in result.reason_codes
+
+
 def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.llm.extractor as event_llm_extractor
