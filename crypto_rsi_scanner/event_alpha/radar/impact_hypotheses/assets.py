@@ -50,7 +50,7 @@ def _external_entities_for_event(
             "name": str(event.external_asset).strip(),
             "source": "normalized_event",
             "entity_type": str(event.event_type or "external_catalyst"),
-            "confidence": round(max(0.0, min(1.0, float(event.confidence or 0.0))), 4),
+            "confidence": round(_bounded_confidence(event.confidence), 4),
         })
     for raw in raws:
         payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
@@ -61,7 +61,7 @@ def _external_entities_for_event(
                 "name": raw_external,
                 "source": raw.provider,
                 "entity_type": str(event_payload.get("event_type") or payload.get("event_type") or event.event_type or ""),
-                "confidence": round(max(0.0, min(1.0, float(raw.source_confidence or 0.0))), 4),
+                "confidence": round(_bounded_confidence(raw.source_confidence), 4),
             })
     for alias in sorted(_EXTERNAL_ENTITY_ALIASES):
         if _term_hit(text, alias):
@@ -78,7 +78,7 @@ def _external_entities_for_event(
             continue
         key = clean_text(name)
         existing = by_name.get(key)
-        if existing is None or float(row.get("confidence") or 0.0) > float(existing.get("confidence") or 0.0):
+        if existing is None or _bounded_confidence(row.get("confidence")) > _bounded_confidence(existing.get("confidence")):
             by_name[key] = row
     return tuple(by_name.values())
 
@@ -180,7 +180,7 @@ def _asset_knowledge_components(asset: Mapping[str, Any] | None) -> dict[str, An
         "role_capabilities": knowledge.role_capabilities.as_dict(),
         "role_source": str(row.get("role_source") or event_identity.ROLE_SOURCE_RESOLVER_EXACT),
         "asset_role_source": str(row.get("role_source") or event_identity.ROLE_SOURCE_RESOLVER_EXACT),
-        "identity_confidence": float(row.get("identity_confidence") or 0.0),
+        "identity_confidence": _coerce_score(row.get("identity_confidence")),
         "identity_evidence": tuple(str(value) for value in identity_evidence if str(value)),
         "collision_risk": "high" if knowledge.common_word_collision_risk else "none",
     }
@@ -200,10 +200,7 @@ def _suggested_assets_by_event(
             if extraction is None:
                 continue
             for mention in extraction.crypto_asset_mentions:
-                try:
-                    confidence = float(mention.confidence or 0.0)
-                except (TypeError, ValueError):
-                    confidence = 0.0
+                confidence = _bounded_confidence(mention.confidence)
                 if confidence < 0.70:
                     continue
                 if str(mention.mention_type or "") in {"publisher_or_source", "ordinary_word"}:
@@ -222,7 +219,7 @@ def _suggested_assets_by_event(
                     "coin_id": coin_id,
                     "contract_address": contract,
                     "mention_type": str(mention.mention_type or ""),
-                    "confidence": round(max(0.0, min(1.0, confidence)), 4),
+                    "confidence": round(confidence, 4),
                     "evidence": " | ".join(quote.text for quote in mention.evidence_quotes[:3]),
                     "validated": False,
                 })
@@ -239,10 +236,7 @@ def _validated_assets_by_event(result: EventDiscoveryResult) -> dict[str, tuple[
         link = getattr(candidate, "link", None)
         if event is None or asset is None:
             continue
-        try:
-            link_confidence = float(getattr(link, "link_confidence", 0.0) or 0.0)
-        except (TypeError, ValueError):
-            link_confidence = 0.0
+        link_confidence = _bounded_confidence(getattr(link, "link_confidence", 0.0))
         symbol = str(getattr(asset, "symbol", "") or "").strip().upper()
         coin_id = str(getattr(asset, "coin_id", "") or "").strip()
         if not symbol and not coin_id:
@@ -252,7 +246,7 @@ def _validated_assets_by_event(result: EventDiscoveryResult) -> dict[str, tuple[
             "name": str(getattr(asset, "name", "") or "").strip(),
             "symbol": symbol,
             "coin_id": coin_id,
-            "link_confidence": round(max(0.0, min(1.0, link_confidence)), 4),
+            "link_confidence": round(link_confidence, 4),
             "reason": str(getattr(link, "match_reason", "") or ""),
             "evidence": " | ".join(str(value) for value in getattr(link, "evidence", ())[:3]),
             "validated": True,

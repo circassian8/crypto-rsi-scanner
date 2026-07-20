@@ -53,10 +53,7 @@ def _candidate_asset_from_discovery_raw(raw: RawDiscoveredEvent) -> dict[str, An
     for mention in mentions:
         if not isinstance(mention, Mapping):
             continue
-        try:
-            confidence = float(mention.get("confidence") or 0.0)
-        except (TypeError, ValueError):
-            confidence = 0.0
+        confidence = _bounded_confidence(mention.get("confidence"))
         if confidence < 0.70:
             continue
         mention_type = clean_text(mention.get("mention_type"))
@@ -64,7 +61,7 @@ def _candidate_asset_from_discovery_raw(raw: RawDiscoveredEvent) -> dict[str, An
             continue
         row = _asset_row_from_mapping(mention, source="candidate_discovery_search", raw_id=raw.raw_id)
         if row:
-            row["confidence"] = round(max(0.0, min(1.0, confidence)), 4)
+            row["confidence"] = round(confidence, 4)
             row.setdefault("source_title", raw.title)
             return row
     fallback = _candidate_asset_from_text(title_body, raw_id=raw.raw_id, title=raw.title)
@@ -144,10 +141,12 @@ def _asset_row_from_mapping(
     contract = str(asset.get("contract_address") or asset.get("address") or "").strip()
     if not any((symbol, coin_id, name, contract)):
         return None
-    try:
-        confidence = float(asset.get("confidence") or 0.75)
-    except (TypeError, ValueError):
-        confidence = 0.75
+    raw_confidence = asset.get("confidence")
+    confidence = (
+        0.75
+        if raw_confidence is None or raw_confidence == ""
+        else _bounded_confidence(raw_confidence)
+    )
     return {
         "source": source,
         "raw_id": raw_id,
@@ -155,11 +154,11 @@ def _asset_row_from_mapping(
         "symbol": symbol,
         "coin_id": coin_id,
         "contract_address": contract,
-        "confidence": round(max(0.0, min(1.0, confidence)), 4),
+        "confidence": round(confidence, 4),
         "evidence": str(asset.get("evidence") or asset.get("evidence_quote") or ""),
         "source_title": str(asset.get("source_title") or asset.get("title") or ""),
         "role_source": str(asset.get("role_source") or event_identity.ROLE_SOURCE_LLM_SUGGESTION),
-        "identity_confidence": round(max(0.0, min(100.0, confidence * 100.0)), 2),
+        "identity_confidence": round(confidence * 100.0, 2),
         "identity_evidence": tuple(str(value) for value in (asset.get("evidence") or asset.get("evidence_quote") or "", asset.get("title") or "") if str(value)),
         "validated": False,
     }

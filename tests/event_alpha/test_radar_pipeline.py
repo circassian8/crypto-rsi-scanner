@@ -508,6 +508,85 @@ def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_va
     assert hypothesis.status == event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value
 
 
+def test_event_impact_hypothesis_generation_rejects_malformed_llm_asset_confidence():
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_alpha.radar.llm.extraction_models import (
+        EventLLMCryptoAssetMention,
+        EventLLMRawEventExtraction,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.llm.extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_core.models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="spacex-malformed-llm-mention",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex-malformed",
+        title="SpaceX pre-IPO attention rises",
+        body="A speculative report discusses private-market demand without naming a crypto asset.",
+        raw_json={},
+        source_confidence=0.9,
+        content_hash="spacex-malformed-llm-mention",
+    )
+    event = NormalizedEvent(
+        event_id=raw.raw_id,
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=now,
+        event_time_confidence=0.85,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="SpaceX",
+        description=raw.body,
+        confidence=0.9,
+    )
+
+    def generate(confidence):
+        extraction = EventLLMRawEventExtraction(
+            schema_version="event_llm_extraction_v1",
+            provider="fixture",
+            model="fixture",
+            prompt_version="test",
+            raw_id=raw.raw_id,
+            confidence=0.9,
+            external_catalysts=(),
+            crypto_asset_mentions=(
+                EventLLMCryptoAssetMention(
+                    name="Velvet Capital",
+                    symbol="VELVET",
+                    coin_id="velvet",
+                    contract_address=None,
+                    mention_type="project_or_token",
+                    confidence=confidence,
+                ),
+            ),
+        )
+        return event_impact_hypotheses.generate_impact_hypotheses(
+            EventDiscoveryResult((raw,), (event,), (), (), ()),
+            extraction_rows=(EventLLMExtractionReportRow(raw_event=raw, extraction=extraction),),
+            now=now,
+            taxonomy={},
+        )
+
+    for malformed in (True, float("nan"), float("inf"), float("-inf"), -0.1, 1.1):
+        hypothesis = generate(malformed)[0]
+        assert hypothesis.candidate_symbols == ()
+        assert hypothesis.suggested_candidate_assets == ()
+        assert hypothesis.crypto_candidate_assets == ()
+        assert hypothesis.candidate_source == "none"
+
+    valid = generate(0.92)[0]
+    assert valid.candidate_symbols == ("VELVET",)
+    assert valid.suggested_candidate_assets[0]["confidence"] == 0.92
+    assert valid.status == event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value
+
+
 def test_event_impact_hypothesis_separates_external_entities_from_crypto_candidates():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses

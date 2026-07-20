@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reject malformed candidate-asset confidence · Codex
+**Why:** Candidate discovery normalized an LLM mention with `confidence=NaN`
+to `1.0` and `identity_confidence=100`, allowing malformed advisory output to
+create a validation-search asset.
+**Changes:** Applied the canonical finite, non-boolean `[0,1]` confidence
+boundary to extracted suggestions, structured candidate payloads, normalized
+external entities, and deterministic resolver links. Missing structured
+candidate confidence still defaults to `0.75`; explicit zero is now preserved;
+and malformed or out-of-range values resolve to zero. Identity confidence uses
+the matching finite 0–100 boundary. Added public generation and candidate-
+discovery regressions with malformed and valid controls. Suggested assets still
+cannot count as deterministic validation.
+**Verify:** The two new regressions passed, followed by `63` focused Radar
+pipeline, discovery, impact-hypothesis, and catalyst-search tests.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; security, artifact, provider-read, and integrity bounds remain
+enforced.
+
 ## 2026-07-20 — Reject malformed validated impact-path numerics · Codex
 **Why:** The public validation path converted stored `NaN` market confirmation
 through ordinary float clamping, which reproduced as 100/100 evidence and

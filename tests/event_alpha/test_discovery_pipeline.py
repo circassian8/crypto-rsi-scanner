@@ -468,6 +468,50 @@ def test_event_candidate_discovery_rejects_common_word_false_positives():
         assert rejected[0]["rejection_reason"] == reason
 
 
+def test_event_candidate_discovery_preserves_missing_default_but_not_malformed_confidence():
+    from datetime import datetime, timezone
+
+    import crypto_rsi_scanner.event_alpha.radar.impact_hypotheses as event_impact_hypotheses
+    from crypto_rsi_scanner.event_core.models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
+
+    def candidate(confidence_marker):
+        asset = {
+            "name": "Candidate Project",
+            "symbol": "CAND",
+            "coin_id": "candidate-project",
+        }
+        if confidence_marker != "missing":
+            asset["confidence"] = confidence_marker
+        raw = RawDiscoveredEvent(
+            raw_id="candidate-confidence",
+            provider="fixture_search",
+            fetched_at=now,
+            published_at=now,
+            source_url="https://example.test/candidate-confidence",
+            title="Structured candidate lookup",
+            body="Candidate discovery result.",
+            raw_json={"candidate_asset": asset},
+            source_confidence=0.75,
+            content_hash="candidate-confidence",
+        )
+        return event_impact_hypotheses._candidate_asset_from_discovery_raw(raw)
+
+    missing = candidate("missing")
+    assert missing["confidence"] == 0.75
+    assert missing["identity_confidence"] == 75.0
+
+    for malformed in (True, 0.0, float("nan"), float("inf"), float("-inf"), -0.1, 1.1):
+        row = candidate(malformed)
+        assert row["confidence"] == 0.0
+        assert row["identity_confidence"] == 0.0
+
+    valid = candidate(0.82)
+    assert valid["confidence"] == 0.82
+    assert valid["identity_confidence"] == 82.0
+
+
 def test_event_impact_candidate_discovery_suggests_then_requires_identity_validation():
     from datetime import datetime, timezone
     import crypto_rsi_scanner.event_alpha.radar.catalyst_search as event_catalyst_search
