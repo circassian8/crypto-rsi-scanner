@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the fortieth no-send market cycle · Codex
+**Why:** The canonical CoinGecko cadence boundary had passed and current
+readiness independently confirmed that the existing no-send authorization was
+present and the single bounded provider call was eligible.
+**Changes:**
+- Ran exactly one Daily Operations cycle. CoinGecko returned HTTP 200 with 80
+  bounded rows in 1,724 ms and no retry, and the coordinator published
+  `radar_market_no_send_20260720t034737165617z_09633a07e871`.
+- Preserved immutable prepublication, final-publication, and owned-dashboard
+  operations receipts for exact revision-12 authority; the dashboard restarted
+  under the owned process and now serves that exact namespace.
+- Refreshed canonical campaign truth to 40 successful cycles, 1,200 retained
+  observations, 1,170 baseline-counted observations, 30 too-close observations,
+  10 provider failures, six historical ideas, zero current ideas, four matured
+  outcomes, one pending outcome, one `due_missing_price`, and zero trusted
+  spread observations.
+**Verify:** The cycle returned `published_and_restarted`; strict doctor recorded
+0 blockers and 0 warnings. Dashboard authority revalidation and readiness both
+passed for the exact namespace/run/revision. Daily Operations status reports
+`waiting_cadence` with the next provider boundary at
+`2026-07-20T04:47:38.264380+00:00`. Campaign pointer/publication/operations,
+request-ledger, and safety projections reconcile.
+**Notes/risks:** The current exact generation contains 30 observations and zero
+Decision ideas; this is healthy-empty, not missing data. Spread remains 0/1,200,
+and Bybit execution/intraday/derivatives authorization and reachability remain
+separate blockers. No retry, authorization mutation, Telegram send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Prevent truthy-false market anomalies · Codex
 **Why:** The core anomaly scanner used Python truthiness for several semantic
 booleans and allowed booleans through its numeric parser. A literal string such
