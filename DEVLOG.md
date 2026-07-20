@@ -17,6 +17,19 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Parse catalyst market-refresh success semantically · Codex
+**Why:** Evidence finalization used Python truthiness for
+`market_refresh_success`, so the literal string `"false"` counted as a successful
+refresh and could preserve a stale stronger opportunity verdict.
+**Changes:** Added explicit true/false parsing at the final-verdict boundary and
+made a present component value authoritative over a stale object attribute.
+Added a public regression proving false-like refresh metadata cannot trigger
+the stronger-refresh preservation or combined-refresh paths. No score,
+threshold, route taxonomy, provider, or historical artifact changed.
+**Verify:** All 33 focused evidence-acquisition and quality-feedback tests
+passed. `compileall` and `git diff --check` passed, and the standard source-
+with-artifacts export completed with zero unsafe entries.
+
 ## 2026-07-20 — Reject malformed source-reliability priors · Codex
 **Why:** Evidence-quality prior normalization converted `true`, NaN, and
 infinities to an effective `100/100`, adding the maximum +10 quality adjustment

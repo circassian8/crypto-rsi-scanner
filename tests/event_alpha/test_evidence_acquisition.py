@@ -147,6 +147,50 @@ def test_evidence_acquisition_invalid_numerics_cannot_become_verdict_evidence():
         json.dumps(asdict(finalized), allow_nan=False)
 
 
+def test_evidence_acquisition_false_refresh_claim_cannot_preserve_stale_strength():
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
+
+    result = event_evidence_acquisition.EvidenceAcquisitionResult(
+        acquisition_id="acq:false-refresh",
+        opportunity_id="core:false-refresh",
+        core_opportunity_id="core:false-refresh",
+        hypothesis_id="hyp:false-refresh",
+        incident_id=None,
+        source_pack="market_anomaly_pack",
+        status="accepted_evidence_found",
+        accepted_evidence=({"evidence_quality_score": 72.0},),
+        evidence_quality_before=60.0,
+        evidence_quality_after=72.0,
+        opportunity_score_before=88.0,
+        opportunity_level_before="high_priority",
+    )
+    before = SimpleNamespace(
+        opportunity_score_final=88.0,
+        opportunity_level="high_priority",
+        market_refresh_success=True,
+        score_components={"market_refresh_success": "false"},
+    )
+    after = SimpleNamespace(
+        opportunity_score_final=72.0,
+        opportunity_level="validated_digest",
+        evidence_quality_score=72.0,
+        score_components={"market_refresh_success": "false"},
+    )
+
+    finalized = event_evidence_acquisition._finalize_result(
+        result,
+        before=before,
+        after=after,
+    )
+
+    assert finalized.final_opportunity_score == 72.0
+    assert finalized.final_opportunity_level == "validated_digest"
+    assert finalized.final_verdict_source == "evidence_acquisition"
+    assert finalized.final_verdict_reason == "accepted_source_pack_evidence"
+
+
 def test_evidence_acquisition_explicit_zero_beats_stale_score_aliases():
     from types import SimpleNamespace
 

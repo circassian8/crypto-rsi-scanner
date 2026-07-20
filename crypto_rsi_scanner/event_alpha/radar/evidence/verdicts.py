@@ -58,8 +58,8 @@ def _canonical_final_verdict(
 ) -> tuple[float, str, str, str]:
     before_components = dict(getattr(before, "score_components", {}) or {})
     after_components = dict(getattr(after, "score_components", {}) or {})
-    before_has_refresh = bool(before_components.get("market_refresh_success") or getattr(before, "market_refresh_success", False))
-    after_has_refresh = bool(after_components.get("market_refresh_success") or getattr(after, "market_refresh_success", False))
+    before_has_refresh = _market_refresh_succeeded(before, before_components)
+    after_has_refresh = _market_refresh_succeeded(after, after_components)
     after_weaker = (
         _level_rank(after_level) < _level_rank(before_level)
         or after_score < before_score - 0.01
@@ -163,6 +163,28 @@ def _market_level_from_score(score: float) -> str | None:
     if score > 0:
         return "weak"
     return "none"
+
+
+def _market_refresh_succeeded(
+    item: object | None,
+    components: Mapping[str, Any],
+) -> bool:
+    if "market_refresh_success" in components:
+        return _semantic_bool(components.get("market_refresh_success")) is True
+    return _semantic_bool(getattr(item, "market_refresh_success", None)) is True
+
+
+def _semantic_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    text = str(value).strip().casefold()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", ""}:
+        return False
+    return None
 
 
 def _market_freshness_from_components(components: Mapping[str, Any]) -> str | None:
