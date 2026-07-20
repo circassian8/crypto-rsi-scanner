@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import json
 from pathlib import Path
 import socket
@@ -13,6 +14,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_derivatives_context import 
     MAX_PLANNED_REQUESTS,
     BybitDerivativesContextError,
     build_bybit_derivatives_request_plan,
+    build_bybit_derivatives_requests,
     main,
     normalize_bybit_derivatives_context,
     run_fixture_smoke,
@@ -93,6 +95,42 @@ def test_request_plan_is_bounded_public_get_only_and_non_executable() -> None:
     assert plan["provider_call_planned"] is False
     assert plan["provider_call_attempted"] is False
     assert plan["orders_available"] is False
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("canonical_asset_id", True),
+        ("liquidity_rank", True),
+        ("minimum_notional_value_usdt", True),
+        ("minimum_notional_value_usdt", "05"),
+    ),
+)
+def test_derivatives_requests_revalidate_complete_typed_instrument_contract(
+    field: str,
+    value: object,
+) -> None:
+    malformed = replace(_instrument(), **{field: value})
+
+    with pytest.raises(
+        BybitDerivativesContextError, match="instrument_contract_invalid"
+    ):
+        build_bybit_derivatives_requests((malformed,))
+
+
+@pytest.mark.parametrize("field", ("canonical_asset_id", "liquidity_rank"))
+def test_derivatives_requests_reject_duplicate_canonical_identity_dimensions(
+    field: str,
+) -> None:
+    selected = select_bybit_usdt_perpetual_instruments(
+        _json(QUALITY_DIR, "radar_assets.json"),
+        _json(QUALITY_DIR, "instruments_info.json"),
+    )
+    first, second = selected
+    duplicated = replace(second, **{field: getattr(first, field)})
+
+    with pytest.raises(BybitDerivativesContextError, match="identity_duplicate"):
+        build_bybit_derivatives_requests((first, duplicated))
 
 
 def test_snapshot_preserves_native_identity_units_clocks_and_point_in_time_values() -> None:

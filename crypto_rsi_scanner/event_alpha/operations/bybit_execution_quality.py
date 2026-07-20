@@ -784,6 +784,9 @@ def build_bybit_orderbook_request(
 ) -> BybitPublicRequest:
     """Build one exact 200-level public order-book request."""
 
+    if type(instrument) is not BybitEligibleInstrument:
+        raise BybitExecutionQualityError("eligible_instrument_schema_invalid")
+    instrument = bybit_eligible_instrument_from_values(instrument.to_dict())
     return BybitPublicRequest(
         method="GET",
         path=ORDERBOOK_PATH,
@@ -804,18 +807,26 @@ def build_bybit_public_request_plan(
         raise BybitExecutionQualityError("eligible_instrument_set_empty")
     if len(instruments) > MAX_RADAR_ASSETS:
         raise BybitExecutionQualityError("eligible_instrument_set_exceeds_30")
-    seen: set[str] = set()
+    seen_instruments: set[str] = set()
+    seen_assets: set[str] = set()
+    seen_bases: set[str] = set()
+    seen_ranks: set[int] = set()
     requests: list[BybitPublicRequest] = [build_bybit_instrument_catalog_request()]
-    for instrument in instruments:
+    for supplied in instruments:
+        if type(supplied) is not BybitEligibleInstrument:
+            raise BybitExecutionQualityError("eligible_instrument_schema_invalid")
+        instrument = bybit_eligible_instrument_from_values(supplied.to_dict())
         if (
-            instrument.instrument_id in seen
-            or instrument.quote_asset != QUOTE_ASSET
-            or instrument.settle_asset != QUOTE_ASSET
-            or instrument.contract_type != CONTRACT_TYPE
-            or instrument.status != INSTRUMENT_STATUS
+            instrument.instrument_id in seen_instruments
+            or instrument.canonical_asset_id in seen_assets
+            or instrument.base_asset in seen_bases
+            or instrument.liquidity_rank in seen_ranks
         ):
-            raise BybitExecutionQualityError("eligible_instrument_contract_invalid")
-        seen.add(instrument.instrument_id)
+            raise BybitExecutionQualityError("eligible_instrument_identity_not_unique")
+        seen_instruments.add(instrument.instrument_id)
+        seen_assets.add(instrument.canonical_asset_id)
+        seen_bases.add(instrument.base_asset)
+        seen_ranks.add(instrument.liquidity_rank)
         requests.append(build_bybit_orderbook_request(instrument))
     if len(requests) > MAX_PLANNED_REQUESTS:
         raise BybitExecutionQualityError("request_plan_exceeds_bound")

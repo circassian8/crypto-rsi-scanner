@@ -19,6 +19,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality import (
     TARGET_NOTIONAL_ROUND_TRIP_SCHEMA_VERSION,
     TARGET_NOTIONAL_SIZING_SCHEMA_VERSION,
     BybitExecutionQualityError,
+    build_bybit_orderbook_request,
     build_bybit_public_request_plan,
     main,
     model_bybit_target_notional_visible_book_round_trip,
@@ -162,6 +163,38 @@ def test_request_plan_is_bounded_public_get_only_and_non_executable() -> None:
     assert payload["provider_call_attempted"] is False
     assert payload["order_operations_available"] is False
     assert payload["research_only"] is True
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("canonical_asset_id", True),
+        ("liquidity_rank", True),
+        ("tick_size", True),
+        ("tick_size", "01.0"),
+    ),
+)
+def test_request_builders_revalidate_complete_typed_instrument_contract(
+    field: str,
+    value: object,
+) -> None:
+    malformed = replace(_selected()[0], **{field: value})
+
+    with pytest.raises(BybitExecutionQualityError, match="eligible_instrument"):
+        build_bybit_orderbook_request(malformed)
+    with pytest.raises(BybitExecutionQualityError, match="eligible_instrument"):
+        build_bybit_public_request_plan((malformed,))
+
+
+@pytest.mark.parametrize("field", ("canonical_asset_id", "liquidity_rank"))
+def test_request_plan_rejects_duplicate_canonical_identity_dimensions(
+    field: str,
+) -> None:
+    first, second = _selected()
+    duplicated = replace(second, **{field: getattr(first, field)})
+
+    with pytest.raises(BybitExecutionQualityError, match="identity_not_unique"):
+        build_bybit_public_request_plan((first, duplicated))
 
 
 def test_orderbook_normalizes_quote_units_freshness_lineage_and_sequences() -> None:

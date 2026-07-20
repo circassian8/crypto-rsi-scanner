@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Revalidate Bybit identity before request construction · Codex
+**Why:** The persisted-instrument readers were strict, but direct request
+builders still trusted manually constructed dataclass values. A reproduced
+instrument with boolean canonical identity, rank, and constraint evidence could
+emit an order-book plan and four derivatives requests despite never satisfying
+the canonical venue-instrument contract.
+**Changes:** Order-book, public execution-quality plan, 1h/4h kline, and
+derivatives request construction now revalidate the complete typed Bybit
+instrument through the shared non-coercing parser. Multi-instrument plans also
+require unique venue instrument, canonical asset, base asset, and liquidity-rank
+dimensions. Added regressions for boolean identity/rank/constraint fields,
+noncanonical decimal text, and cross-instrument identity collisions. No endpoint,
+request budget, provider authorization, score, threshold, or route changed.
+**Verify:** The original malformed-instrument reproduction now fails closed at
+all four builders. `435` focused Bybit execution-quality, intraday, derivatives,
+funding, liquidation, capture, and live-boundary tests passed.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** No provider call, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits
+remain advisory; provider budgets and artifact/security bounds remain enforced.
+
 ## 2026-07-20 — Record the forty-ninth market cycle · Codex
 **Why:** The manual no-send campaign reached its next cadence boundary while
 explicit CoinGecko authorization remained present, so one additional genuine

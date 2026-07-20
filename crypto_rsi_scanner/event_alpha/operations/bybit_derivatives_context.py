@@ -22,14 +22,14 @@ from urllib.parse import urlencode
 
 from .bybit_execution_quality import (
     BYBIT_CATEGORY,
-    CONTRACT_TYPE,
     EXECUTION_MODE,
-    INSTRUMENT_STATUS,
     PUBLIC_API_BASE,
     QUOTE_ASSET,
     VENUE_ID,
     BybitEligibleInstrument,
+    BybitExecutionQualityError,
     BybitPublicRequest,
+    bybit_eligible_instrument_from_values,
     select_bybit_usdt_perpetual_instruments,
 )
 
@@ -213,15 +213,14 @@ def _decimal(
 
 
 def _valid_instrument(instrument: BybitEligibleInstrument) -> None:
-    if (
-        instrument.instrument_id != f"{instrument.base_asset}{QUOTE_ASSET}"
-        or instrument.radar_symbol != instrument.base_asset
-        or instrument.quote_asset != QUOTE_ASSET
-        or instrument.settle_asset != QUOTE_ASSET
-        or instrument.contract_type != CONTRACT_TYPE
-        or instrument.status != INSTRUMENT_STATUS
-    ):
+    if type(instrument) is not BybitEligibleInstrument:
         raise BybitDerivativesContextError("eligible_instrument_contract_invalid")
+    try:
+        bybit_eligible_instrument_from_values(instrument.to_dict())
+    except BybitExecutionQualityError as exc:
+        raise BybitDerivativesContextError(
+            "eligible_instrument_contract_invalid"
+        ) from exc
 
 
 def build_bybit_derivatives_request_plan(
@@ -256,11 +255,24 @@ def build_bybit_derivatives_requests(
 
     if not instruments or len(instruments) > MAX_RADAR_ASSETS:
         raise BybitDerivativesContextError("derivatives_instrument_count_invalid")
-    if len({row.instrument_id for row in instruments}) != len(instruments):
-        raise BybitDerivativesContextError("derivatives_instrument_identity_duplicate")
+    identities: set[tuple[str, str, str, int]] = set()
     requests: list[BybitPublicRequest] = []
     for instrument in instruments:
         _valid_instrument(instrument)
+        identity = (
+            instrument.instrument_id,
+            instrument.canonical_asset_id,
+            instrument.base_asset,
+            instrument.liquidity_rank,
+        )
+        if any(
+            value in {row[index] for row in identities}
+            for index, value in enumerate(identity)
+        ):
+            raise BybitDerivativesContextError(
+                "derivatives_instrument_identity_duplicate"
+            )
+        identities.add(identity)
         common = (("category", BYBIT_CATEGORY), ("symbol", instrument.instrument_id))
         requests.extend(
             (

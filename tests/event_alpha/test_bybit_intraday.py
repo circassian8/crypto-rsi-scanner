@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -97,6 +98,25 @@ def test_request_uses_exact_latest_completed_bucket_and_public_contract() -> Non
     assert completed_kline_cutoff_ms("2026-07-17T12:00:00Z", "60") == (
         1784289599999
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("canonical_asset_id", True),
+        ("liquidity_rank", True),
+        ("quantity_step", True),
+        ("quantity_step", "00.001"),
+    ),
+)
+def test_kline_request_revalidates_complete_typed_instrument_contract(
+    field: str,
+    value: object,
+) -> None:
+    malformed = replace(_instrument(), **{field: value})
+
+    with pytest.raises(BybitIntradayError, match="instrument_contract_invalid"):
+        build_bybit_kline_request(malformed, interval="60", as_of=STARTED)
 
 
 @pytest.mark.parametrize(

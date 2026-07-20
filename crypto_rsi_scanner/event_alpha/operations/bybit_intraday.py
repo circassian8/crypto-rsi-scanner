@@ -26,12 +26,12 @@ from ...indicators import wilder_rsi
 
 from .bybit_execution_quality import (
     BYBIT_CATEGORY,
-    CONTRACT_TYPE,
-    INSTRUMENT_STATUS,
     PUBLIC_API_BASE,
     QUOTE_ASSET,
     BybitEligibleInstrument,
+    BybitExecutionQualityError,
     BybitPublicRequest,
+    bybit_eligible_instrument_from_values,
     select_bybit_usdt_perpetual_instruments,
 )
 
@@ -47,7 +47,6 @@ RSI_PERIOD = 14
 RSI_METHOD = "wilder_rma_sma_seed"
 MAX_PROVIDER_CLOCK_SKEW_SECONDS = 60
 MAX_PROVIDER_RESPONSE_AGE_SECONDS = 15.0
-_INSTRUMENT_RE = re.compile(r"^[A-Z0-9]{4,32}$")
 _LINEAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 
@@ -166,16 +165,12 @@ def _integer(value: object, field: str) -> int:
 
 
 def _valid_instrument(instrument: BybitEligibleInstrument) -> None:
-    if (
-        not _INSTRUMENT_RE.fullmatch(instrument.instrument_id)
-        or instrument.instrument_id != f"{instrument.base_asset}{QUOTE_ASSET}"
-        or instrument.radar_symbol != instrument.base_asset
-        or instrument.quote_asset != QUOTE_ASSET
-        or instrument.settle_asset != QUOTE_ASSET
-        or instrument.contract_type != CONTRACT_TYPE
-        or instrument.status != INSTRUMENT_STATUS
-    ):
+    if type(instrument) is not BybitEligibleInstrument:
         raise BybitIntradayError("eligible_instrument_contract_invalid")
+    try:
+        bybit_eligible_instrument_from_values(instrument.to_dict())
+    except BybitExecutionQualityError as exc:
+        raise BybitIntradayError("eligible_instrument_contract_invalid") from exc
 
 
 def completed_kline_cutoff_ms(as_of: datetime | str, interval: str) -> int:
