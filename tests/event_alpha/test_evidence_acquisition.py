@@ -88,6 +88,55 @@ def test_evidence_acquisition_final_upgrade_status_tracks_final_verdict_not_evid
     assert quality["opportunity_level"] == "high_priority"
 
 
+def test_evidence_acquisition_invalid_numerics_cannot_become_verdict_evidence():
+    import json
+    from dataclasses import asdict
+    from types import SimpleNamespace
+
+    import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
+
+    for invalid in (True, float("nan"), float("inf"), float("-inf")):
+        result = event_evidence_acquisition.EvidenceAcquisitionResult(
+            acquisition_id="acq:invalid-numeric",
+            opportunity_id="core:invalid-numeric",
+            core_opportunity_id="core:invalid-numeric",
+            hypothesis_id="hyp:invalid-numeric",
+            incident_id=None,
+            source_pack="market_anomaly_pack",
+            status="no_results",
+            evidence_quality_before=40.0,
+            evidence_quality_after=40.0,
+            opportunity_score_before=55.0,
+            opportunity_level_before="exploratory",
+        )
+        before = SimpleNamespace(
+            opportunity_score_final=invalid,
+            opportunity_level="exploratory",
+            score_components={"market_confirmation_score": invalid},
+        )
+        after = SimpleNamespace(
+            opportunity_score_final=invalid,
+            opportunity_level="exploratory",
+            evidence_quality_score=invalid,
+            score_components={"market_confirmation_score": invalid},
+        )
+
+        finalized = event_evidence_acquisition._finalize_result(
+            result,
+            before=before,
+            after=after,
+        )
+
+        assert finalized.initial_opportunity_score == 55.0
+        assert finalized.post_refresh_opportunity_score == 55.0
+        assert finalized.final_opportunity_score == 55.0
+        assert finalized.post_refresh_evidence_quality_score == 40.0
+        assert finalized.post_refresh_market_confirmation_score == 0.0
+        assert finalized.post_refresh_market_confirmation_level == "none"
+        assert finalized.market_confirmation_upgraded is False
+        json.dumps(asdict(finalized), allow_nan=False)
+
+
 def test_evidence_acquisition_core_opportunity_dedupes_supporting_rows():
     import crypto_rsi_scanner.event_alpha.radar.evidence_acquisition as event_evidence_acquisition
 

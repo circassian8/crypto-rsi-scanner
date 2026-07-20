@@ -17,6 +17,22 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reject malformed catalyst-verdict numerics · Codex
+**Why:** Evidence-acquisition finalization still accepted booleans and non-finite
+floats when reading post-acquisition scores and market confirmation. Malformed
+source or compatibility objects could therefore replace a valid fallback score,
+create non-JSON numeric output, or manufacture weak/strong market confirmation.
+**Changes:** Made the verdict numeric parser boolean-safe and finite-only. Added
+a public finalization regression covering `true`, NaN, and both infinities across
+opportunity score, evidence quality, score deltas, and market confirmation. The
+closed behavior keeps the previously validated score/quality and reports no
+market confirmation. Finite values and numeric strings retain compatibility;
+no route, score formula, threshold, provider, or historical artifact changed.
+**Verify:** All 38 focused evidence-acquisition, evidence-quality, and source-
+independence integration tests passed. `compileall` and `git diff --check`
+passed, and the standard source-with-artifacts export completed with zero unsafe
+entries.
+
 ## 2026-07-20 — Close boolean numerics in the Decision artifact schema · Codex
 **Why:** The live evaluator rejected boolean market values, but the independent
 persisted Decision-v2 validator still used Python float coercion. A tampered

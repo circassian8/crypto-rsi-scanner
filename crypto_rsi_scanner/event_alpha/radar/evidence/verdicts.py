@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -233,12 +234,15 @@ def _acquisition_id(opportunity_id: str, hypothesis_id: str | None, source_pack:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value in (None, "", [], {}, ()):
             return None
-        return float(value)  # type: ignore[arg-type]
+        parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _as_utc(dt: datetime) -> datetime:
