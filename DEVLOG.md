@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Prevent truthy-false market anomalies · Codex
+**Why:** The core anomaly scanner used Python truthiness for several semantic
+booleans and allowed booleans through its numeric parser. A literal string such
+as `false` could therefore create risk/fade/source/crowding claims, while
+`true` could become numeric `1.0` evidence.
+**Changes:**
+- Parsed negative-catalyst, post-event, post-event-failure, derivatives,
+  catalyst-confirmation, and search-queue flags through an explicit true
+  vocabulary.
+- Rejected booleans as numeric market features and required actual numeric
+  derivative metrics or non-empty instrument identifiers for availability.
+- Added public-behavior regressions for false-like text, boolean numeric
+  crowding inputs, source/derivatives priority claims, and queue admission.
+**Verify:** 109 focused market-surface, timestamp-integrity, alias-precedence,
+Decision Model, and Decision-surface tests passed. Compileall, market-anomaly
+smoke, integrated-radar smoke with strict doctor, architecture cleanliness, and
+`git diff --check` passed. Architecture reports retain 12 quantitative size
+observations as advisory; blocking size violations, class-ownership debt, old
+imports, and transitional paths remain zero. Full `make verify` was not rerun
+because it had passed immediately before this focused core-logic slice and the
+risk-appropriate targeted gates exercised both direct and integrated behavior.
+**Notes/risks:** No threshold, weight, valid canonical row, provider boundary,
+route policy, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` behavior is intentionally changed. Malformed claims now remain
+unavailable instead of promoting an anomaly.
+
 ## 2026-07-20 — Reconcile Bybit composite readiness wording · Codex
 **Why:** The execution-quality readiness implications still used the generic
 phrase “the composite” for the older base composite and said latency was

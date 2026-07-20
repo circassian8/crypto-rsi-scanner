@@ -309,6 +309,96 @@ def test_market_anomaly_scanner_classifies_fixture_rows():
     assert all(row.get("search_queries") for row in anomalies)
 
 
+def test_market_anomaly_boolean_semantics_cannot_manufacture_risk_or_crowding():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    false_claims = {
+        "negative_catalyst": "false",
+        "risk_off_catalyst": "0",
+        "event_passed": "no",
+        "event_has_passed": "false",
+        "post_event": "off",
+        "post_event_monitoring": False,
+        "post_event_failure": "false",
+        "failed_reclaim": "0",
+        "price_below_event_vwap": "no",
+    }
+    quiet_snapshot = {
+        "return_4h": 0.0,
+        "return_24h": 0.0,
+        "volume_zscore_24h": 3.0,
+    }
+    assert scanner.classify_market_state(quiet_snapshot, false_claims) == (
+        scanner.NO_REACTION
+    )
+
+    boolean_numerics = {
+        "return_4h": 1.0,
+        "return_24h": 30.0,
+        "volume_zscore_24h": 1.0,
+        "open_interest_delta": True,
+        "funding_level": True,
+        "funding_zscore": True,
+        "liquidation_imbalance": True,
+    }
+    assert scanner.classify_market_state(boolean_numerics) == scanner.LATE_MOMENTUM
+
+
+def test_market_anomaly_false_metadata_does_not_add_source_or_derivatives_claims():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    rows = [
+        {
+            "id": "typed-token",
+            "symbol": "typed",
+            "return_unit": "percent_points",
+            "return_4h": 10.0,
+            "return_24h": 20.0,
+            "relative_return_vs_btc_4h": 10.0,
+            "volume_zscore_24h": 3.0,
+            "liquidity_usd": 10_000_000.0,
+            "derivatives_available": "false",
+            "open_interest_delta": False,
+            "funding_level": False,
+            "funding_zscore": False,
+            "catalyst_confirmed": "false",
+            "accepted_evidence_count": 0,
+            "observed_at": "2026-06-15T16:00:00Z",
+        }
+    ]
+    _, anomalies = scanner.scan_market_rows(
+        rows,
+        observed_at="2026-06-15T16:00:00Z",
+    )
+
+    assert len(anomalies) == 1
+    assert anomalies[0]["anomaly_type"] == scanner.CONFIRMED_BREAKOUT
+    assert anomalies[0]["derivatives_available"] is False
+    assert anomalies[0]["priority_components"]["derivatives_availability"] == 0.0
+    assert anomalies[0]["source_catalyst_knownness"] == "unknown"
+
+
+def test_market_anomaly_queue_parses_false_instead_of_using_string_truthiness():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    anomaly = {
+        "market_anomaly_id": "mkt:typed-token:test",
+        "canonical_asset_id": "typed-token",
+        "symbol": "TYPED",
+        "coin_id": "typed-token",
+        "market_state_class": scanner.CONFIRMED_BREAKOUT,
+        "anomaly_bucket": scanner.HIGH_LIQUIDITY_BREAKOUT,
+        "priority": 50.0,
+        "needs_catalyst_search": "false",
+        "observed_at": "2026-06-15T16:00:00Z",
+        "suggested_source_packs_to_search": ["official_project"],
+    }
+    assert scanner.build_catalyst_search_queue([anomaly]) == []
+
+    anomaly["needs_catalyst_search"] = "true"
+    assert len(scanner.build_catalyst_search_queue([anomaly])) == 1
+
+
 def test_market_anomaly_artifacts_are_research_only_and_seed_search():
     import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as event_market_anomaly_scanner
 

@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-20 - Parse anomaly boolean claims semantically
+**Status:** accepted
+**Decision:** Core market-anomaly classification must parse boolean-like control
+fields through the existing explicit true vocabulary instead of Python object
+truthiness. Text values such as `false`, `0`, `no`, and `off` cannot create a
+negative catalyst, post-event state/failure, derivatives-availability claim,
+confirmed catalyst, or catalyst-search request. Booleans are not numeric market
+features and cannot become `1.0` funding, positioning, liquidation, return, or
+volume evidence.
+**Why:** Python considers every non-empty string truthy and considers booleans
+numeric. Untyped external or compatibility rows could therefore manufacture a
+risk/fade classification, crowding state, priority bonus, or source-knownness
+claim even when their literal value said false.
+**Revisit when:** A versioned upstream schema rejects these malformed types
+before the classifier and every compatibility path is proven to enforce it.
+
 ## 2026-07-20 - Treat latency as signed decision-mid implementation shortfall
 **Status:** accepted as offline arithmetic; reference sources and policy remain unsealed
 **Decision:** Model one supplied entry and exit decision book from exact best

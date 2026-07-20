@@ -243,9 +243,27 @@ def classify_market_state(
     funding_z = _float(snapshot.get("funding_zscore")) or 0.0
     oi_delta = _float(snapshot.get("open_interest_delta")) or 0.0
     liquidation_imbalance = abs(_float(snapshot.get("liquidation_imbalance")) or 0.0)
-    negative_catalyst = bool(row.get("negative_catalyst") or row.get("risk_off_catalyst"))
-    event_passed = bool(row.get("event_passed") or row.get("event_has_passed") or row.get("post_event") or row.get("post_event_monitoring"))
-    post_event_failure = bool(row.get("post_event_failure") or row.get("failed_reclaim") or row.get("price_below_event_vwap"))
+    negative_catalyst = any(
+        _truthy(row.get(key))
+        for key in ("negative_catalyst", "risk_off_catalyst")
+    )
+    event_passed = any(
+        _truthy(row.get(key))
+        for key in (
+            "event_passed",
+            "event_has_passed",
+            "post_event",
+            "post_event_monitoring",
+        )
+    )
+    post_event_failure = any(
+        _truthy(row.get(key))
+        for key in (
+            "post_event_failure",
+            "failed_reclaim",
+            "price_below_event_vwap",
+        )
+    )
     fade_crowding = oi_delta >= 10.0 or funding_z >= 1.5 or funding >= 0.03 or liquidation_imbalance >= 0.50 or volume_z >= 2.0
 
     if event_passed and fade_crowding and (post_event_failure or r4 <= cfg.post_event_fade_return_4h or r24 <= cfg.post_event_fade_return_24h):
@@ -493,7 +511,9 @@ def build_catalyst_search_queue(
     cfg = cfg or MarketAnomalyScannerConfig()
     queue: list[dict[str, Any]] = []
     for anomaly in anomalies:
-        if not isinstance(anomaly, Mapping) or not bool(anomaly.get("needs_catalyst_search")):
+        if not isinstance(anomaly, Mapping) or not _truthy(
+            anomaly.get("needs_catalyst_search")
+        ):
             continue
         anomaly_id = str(anomaly.get("market_anomaly_id") or anomaly.get("anomaly_id") or "")
         snapshot = anomaly.get("market_state_snapshot") if isinstance(anomaly.get("market_state_snapshot"), Mapping) else {}
@@ -1001,21 +1021,40 @@ def _event_age_score(event_age_hours: float | None) -> float:
 
 
 def _derivatives_available(snapshot: Mapping[str, Any], source_row: Mapping[str, Any]) -> bool:
-    if bool(source_row.get("derivatives_available") or snapshot.get("derivatives_available")):
+    if _truthy(source_row.get("derivatives_available")) or _truthy(
+        snapshot.get("derivatives_available")
+    ):
         return True
-    for key in ("perp_symbols", "coinalyze_symbols", "open_interest_delta", "funding_level", "funding_zscore"):
+    for key in ("perp_symbols", "coinalyze_symbols"):
         value = source_row.get(key) if key in source_row else snapshot.get(key)
-        if value not in (None, "", [], (), {}):
+        if _has_identifier_values(value):
+            return True
+    for key in ("open_interest_delta", "funding_level", "funding_zscore"):
+        value = source_row.get(key) if key in source_row else snapshot.get(key)
+        if _float(value) is not None:
             return True
     return False
 
 
 def _has_confirming_source(source_row: Mapping[str, Any]) -> bool:
-    for key in ("source_url", "official_source_url", "published_at", "event_time", "catalyst_confirmed"):
+    for key in ("source_url", "official_source_url", "published_at", "event_time"):
         if source_row.get(key):
             return True
+    if _truthy(source_row.get("catalyst_confirmed")):
+        return True
     accepted = _count(source_row.get("accepted_evidence_count"))
     return bool((accepted is not None and accepted > 0) or source_row.get("source_urls"))
+
+
+def _has_identifier_values(value: object) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, IterableABC) and not isinstance(
+        value,
+        (str, bytes, Mapping),
+    ):
+        return any(isinstance(item, str) and bool(item.strip()) for item in value)
+    return False
 
 
 def _search_queries_for_anomaly(
@@ -1151,6 +1190,8 @@ def _string_list(value: object) -> list[str]:
 
 
 def _float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         if value is None:
             return None
@@ -1158,6 +1199,14 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return math.isfinite(float(value)) and value != 0
+    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
 
 
 def _count(value: object) -> int | None:
