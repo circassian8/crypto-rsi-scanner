@@ -365,6 +365,8 @@ def _hard_blockers(
         blockers.append("asset_not_tradable")
     elif identity.is_tradable_asset is not True:
         blockers.append("asset_tradability_unverified")
+    if _market_quality_metadata(market)["invalid_claims"]:
+        blockers.append("market_data_quality_invalid")
     if _truthy(data.get("is_theme_or_sector")) or symbol == "SECTOR":
         blockers.append("theme_or_sector_control")
     if _truthy(data.get("is_quote_asset")) or _truthy(

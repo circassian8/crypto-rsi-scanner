@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Type canonical Decision market-quality evidence · Codex
+**Why:** Decision v2 consumed route caps, temporal-baseline state, feature basis,
+and proxy-only claims through truthiness and `str()` coercion. Reproduced empty
+lists, mappings, unknown status text, string `"false"`, and a non-mapping quality
+object all retained an actionable route; an invalid higher-authority cap could
+also borrow a valid nested alias.
+**Changes:** Market-quality metadata now resolves consumed fields with explicit,
+presence-aware precedence. Quality and feature-basis containers must be
+mappings, basis keys/values must be non-empty text, route/baseline states must
+belong to their closed enums, and the proxy-only claim must be a boolean.
+Malformed explicit evidence cannot borrow a lower alias and adds the
+`market_data_quality_invalid` hard blocker, diagnostic routing, and an operator
+warning. Absent legacy quality metadata remains compatible; valid direct warm
+evidence remains actionable. Existing formulas, weights, thresholds, valid
+quality caps, routes, and provider behavior are unchanged.
+**Verify:** All eight original malformed reproductions plus invalid-alias and
+unknown-enum controls now route diagnostic, while the valid typed direct control
+remains `actionable_watch`. `61` focused Decision-model tests and `126`
+Decision, consistency, surface, schema, merge, and pipeline tests passed. `make
+event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15 candidates,
+12 canonical cores/cards, strict doctor 0 blockers / 0 warnings, and 14
+dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and `git
+diff --check` passed.
+**Notes/risks:** The smoke was fixture-only. No provider call, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source size remains advisory; provider budgets and artifact/security
+bounds remain enforced.
+
 ## 2026-07-20 — Fail closed on malformed Decision safety claims · Codex
 **Why:** Decision safety recursively found actual sends/trades and required the
 root `research_only=true`, but several explicit malformed values still looked

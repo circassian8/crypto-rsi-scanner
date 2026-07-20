@@ -20,35 +20,85 @@ _PROXY_BASIS_TERMS = (
     "unknown",
 )
 
+_MARKET_ROUTE_CAPS = frozenset({"dashboard_watch", "diagnostic"})
+_TEMPORAL_BASELINE_STATUSES = frozenset({
+    "warm",
+    "warming",
+    "cold",
+    "unavailable",
+    "stale",
+    "not_evaluated",
+    "insufficient_history",
+})
+_LIMITED_BASELINE_STATUSES = _TEMPORAL_BASELINE_STATUSES - {"warm"}
+
 
 def _market_quality_metadata(market: Mapping[str, Any]) -> dict[str, Any]:
     raw_quality = market.get("market_data_quality")
+    quality_claimed = "market_data_quality" in market
     quality = dict(raw_quality) if isinstance(raw_quality, Mapping) else {}
-    raw_basis = market.get("market_feature_basis") or quality.get("feature_basis")
-    basis = dict(raw_basis) if isinstance(raw_basis, Mapping) else {}
-    route_cap = str(
-        market.get("market_route_cap")
-        or quality.get("market_route_cap")
-        or ""
-    ).strip().casefold()
-    baseline_status = str(
-        market.get("temporal_baseline_status")
-        or market.get("baseline_status")
-        or quality.get("temporal_baseline_status")
-        or quality.get("baseline_status")
-        or ""
-    ).strip().casefold()
-    explicit_proxy_only = market.get("proxy_only_market_features")
-    if explicit_proxy_only is None:
-        explicit_proxy_only = quality.get("proxy_only")
-    explicit = bool(
-        quality
-        or basis
-        or route_cap
-        or baseline_status
-        or explicit_proxy_only is not None
+    invalid: list[str] = []
+    if quality_claimed and not isinstance(raw_quality, Mapping):
+        invalid.append("market_data_quality")
+
+    raw_basis, basis_claimed = _first_claim(
+        (market, "market_feature_basis"),
+        (quality, "feature_basis"),
     )
-    basis_values = tuple(str(value or "").strip().casefold() for value in basis.values())
+    basis: dict[str, str] = {}
+    if basis_claimed:
+        if isinstance(raw_basis, Mapping):
+            for key, value in raw_basis.items():
+                if (
+                    not isinstance(key, str)
+                    or not key.strip()
+                    or not isinstance(value, str)
+                    or not value.strip()
+                ):
+                    invalid.append("market_feature_basis")
+                    basis = {}
+                    break
+                basis[key.strip()] = value.strip().casefold()
+        else:
+            invalid.append("market_feature_basis")
+
+    raw_route_cap, route_cap_claimed = _first_claim(
+        (market, "market_route_cap"),
+        (quality, "market_route_cap"),
+    )
+    route_cap = _typed_enum(raw_route_cap, _MARKET_ROUTE_CAPS)
+    if route_cap_claimed and not route_cap:
+        invalid.append("market_route_cap")
+
+    raw_baseline_status, baseline_status_claimed = _first_claim(
+        (market, "temporal_baseline_status"),
+        (market, "baseline_status"),
+        (quality, "temporal_baseline_status"),
+        (quality, "baseline_status"),
+    )
+    baseline_status = _typed_enum(
+        raw_baseline_status,
+        _TEMPORAL_BASELINE_STATUSES,
+    )
+    if baseline_status_claimed and not baseline_status:
+        invalid.append("temporal_baseline_status")
+
+    explicit_proxy_only, proxy_only_claimed = _first_claim(
+        (market, "proxy_only_market_features"),
+        (quality, "proxy_only"),
+    )
+    if proxy_only_claimed and not isinstance(explicit_proxy_only, bool):
+        invalid.append("proxy_only_market_features")
+        explicit_proxy_only = None
+
+    explicit = bool(
+        quality_claimed
+        or basis_claimed
+        or route_cap_claimed
+        or baseline_status_claimed
+        or proxy_only_claimed
+    )
+    basis_values = tuple(basis.values())
     direct_values = tuple(
         value
         for value in basis_values
@@ -71,6 +121,7 @@ def _market_quality_metadata(market: Mapping[str, Any]) -> dict[str, Any]:
         "proxy_only": proxy_only,
         "direct_feature_count": len(direct_values),
         "proxy_feature_count": len(proxy_values),
+        "invalid_claims": tuple(dict.fromkeys(invalid)),
     }
 
 
@@ -78,6 +129,8 @@ def _market_quality_allows_actionable(market: Mapping[str, Any]) -> bool:
     quality = _market_quality_metadata(market)
     if not quality["explicit"]:
         return True
+    if quality["invalid_claims"]:
+        return False
     if quality["proxy_only"]:
         return False
     if quality["route_cap"] in {"dashboard_watch", "diagnostic"}:
@@ -87,7 +140,7 @@ def _market_quality_allows_actionable(market: Mapping[str, Any]) -> bool:
         or market.get("volume_zscore_basis")
         or ""
     ).casefold()
-    if quality["baseline_status"] in {"warming", "cold", "unavailable", "stale"} and (
+    if quality["baseline_status"] in _LIMITED_BASELINE_STATUSES and (
         not volume_basis or any(term in volume_basis for term in _PROXY_BASIS_TERMS)
     ):
         return False
@@ -105,9 +158,10 @@ def _quality_adjusted_urgency(
     if spread_status in {SpreadStatus.UNAVAILABLE.value, SpreadStatus.STALE.value}:
         adjusted = min(adjusted, 55.0)
     if quality["explicit"] and (
-        quality["proxy_only"]
+        quality["invalid_claims"]
+        or quality["proxy_only"]
         or quality["route_cap"] in {"dashboard_watch", "diagnostic"}
-        or quality["baseline_status"] in {"warming", "cold", "unavailable", "stale"}
+        or quality["baseline_status"] in _LIMITED_BASELINE_STATUSES
     ):
         adjusted = min(adjusted, 45.0)
     return round(_clamp(adjusted), 2)
@@ -141,7 +195,7 @@ def _apply_market_quality_score_caps(
         risk_components["proxy_market_data_risk"] = 70.0
         penalty_points["proxy_only_market_evidence"] = 16.0
         labels.append("proxy_only_market_evidence_dashboard_only")
-    if quality["baseline_status"] in {"warming", "cold", "unavailable", "stale"}:
+    if quality["baseline_status"] in _LIMITED_BASELINE_STATUSES:
         evidence_confidence = min(evidence_confidence, 62.0)
         risk = max(risk, 48.0)
         penalty_points["temporal_baseline_not_warm"] = 10.0
@@ -163,11 +217,15 @@ def _market_quality_warnings(
 ) -> tuple[str, ...]:
     quality = _market_quality_metadata(market)
     warnings: list[str] = []
+    if quality["invalid_claims"]:
+        warnings.append(
+            "Explicit market-data-quality metadata is malformed; the idea is retained only as diagnostic research evidence."
+        )
     if quality["proxy_only"]:
         warnings.append(
             "Market evidence is proxy-only; the idea is capped to dashboard review and cannot receive urgent/actionable routing."
         )
-    if quality["baseline_status"] in {"warming", "cold", "unavailable", "stale"}:
+    if quality["baseline_status"] in _LIMITED_BASELINE_STATUSES:
         warnings.append(
             "The rolling temporal market baseline is not warm; cross-sectional context remains review-only."
         )
@@ -180,6 +238,20 @@ def _market_quality_warnings(
 
 def _clamp(value: float) -> float:
     return max(0.0, min(100.0, float(value)))
+
+
+def _first_claim(*claims: tuple[Mapping[str, Any], str]) -> tuple[object, bool]:
+    for owner, field in claims:
+        if field in owner:
+            return owner.get(field), True
+    return None, False
+
+
+def _typed_enum(value: object, allowed: frozenset[str]) -> str:
+    if not isinstance(value, str):
+        return ""
+    normalized = value.strip().casefold()
+    return normalized if normalized in allowed else ""
 
 
 __all__: tuple[str, ...] = ()

@@ -261,6 +261,53 @@ def test_proxy_only_market_evidence_is_score_and_route_capped():
     assert any("proxy-only" in warning for warning in result.decision_warnings)
 
 
+def test_malformed_market_quality_claims_fail_closed_without_alias_fallback():
+    malformed_snapshots = (
+        {"proxy_only_market_features": "false"},
+        {"market_route_cap": []},
+        {"market_route_cap": {"route": "diagnostic"}},
+        {"temporal_baseline_status": []},
+        {"temporal_baseline_status": {"state": "warming"}},
+        {"market_feature_basis": []},
+        {"market_data_quality": []},
+        {"market_feature_basis": {"volume_zscore_24h": []}},
+        {
+            "market_route_cap": [],
+            "market_data_quality": {"market_route_cap": "dashboard_watch"},
+        },
+        {"temporal_baseline_status": "boiling"},
+    )
+
+    for snapshot in malformed_snapshots:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(market_state_snapshot=snapshot)
+        )
+
+        assert result.radar_actionable is False
+        assert result.radar_route == "diagnostic"
+        assert "market_data_quality_invalid" in result.decision_hard_blockers
+        assert any(
+            "market-data-quality metadata is malformed" in warning
+            for warning in result.decision_warnings
+        )
+
+    valid_direct = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            market_state_snapshot={
+                "proxy_only_market_features": False,
+                "market_feature_basis": {
+                    "volume_zscore_24h": "temporal_direct",
+                    "spread_bps": "direct_execution_quality",
+                },
+                "temporal_baseline_status": "warm",
+            }
+        )
+    )
+    assert valid_direct.radar_actionable is True
+    assert valid_direct.radar_route == "actionable_watch"
+    assert "market_data_quality_invalid" not in valid_direct.decision_hard_blockers
+
+
 def test_acceptable_wide_spread_emits_higher_manipulation_warning():
     result = decision_model.evaluate_radar_decision(
         _market_led_candidate(market_state_snapshot={"spread_bps": 120.0})
