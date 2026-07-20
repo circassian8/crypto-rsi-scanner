@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the forty-first no-send market cycle · Codex
+**Why:** The explicitly authorized CoinGecko observation cadence was eligible,
+so the temporal baseline could advance without weakening the one-request,
+no-send, or publication gates.
+**Changes:**
+- Ran exactly one authorized Daily Operations cycle. CoinGecko returned HTTP
+  200 with 80 bounded rows in 1,503 ms and no retry; the cycle selected 30
+  point-in-time observations and published
+  `radar_market_no_send_20260720t051613549060z_98c33fca29f9`.
+- Preserved immutable attempt, publication, and owned-dashboard operations
+  receipts for revision 12. The generation produced one PUMP confirmed-breakout
+  candidate routed to research-only `dashboard_watch`; its 74.01 actionability,
+  52.45 evidence confidence, and 48.0 risk remain non-actionable because spread
+  is unavailable and its same-asset temporal baseline is still warming.
+- Refreshed campaign truth to 41 successful cycles, 1,230 retained observations,
+  1,200 baseline-counted observations, 28/30 retained current-universe warm
+  assets, 7 total candidates, 4 matured outcomes, 2 pending outcomes, and one
+  exact `due_missing_price`. The next provider boundary is
+  `2026-07-20T06:16:14.675298+00:00`.
+**Verify:** The exact live namespace passed strict artifact doctor with zero
+blockers and zero warnings. All 84 focused campaign, publication, dashboard-
+readiness, and campaign-guard tests passed. Campaign report regeneration,
+dashboard authority status, and exact dashboard readiness passed; an outside-
+sandbox HEAD probe returned HTTP 200 with the exact namespace, run, revision,
+and operator-state digest headers. The pointer, receipt, campaign, and operator-
+state bindings agree, and `git diff --check` passed.
+**Notes/risks:** Trusted spread remains 0/1,230, so no actionable or rapid route
+was manufactured. The scheduler remains intentionally uninstalled. The cycle
+made no Telegram send, trade, order, paper trade, normal RSI write, or Event
+Alpha `TRIGGERED_FADE`.
+
 ## 2026-07-20 — Fail closed on missing residual execution cost · Codex
 **Why:** The Bybit cost stack could exactly compose decision-price latency,
 visible-book drag, taker fees, and supplied-schedule funding, but it had no
