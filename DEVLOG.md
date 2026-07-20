@@ -17,6 +17,16 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Reconcile active Protocol-v2 roadmap status · Codex
+**Why:** The completed regime-input change and canonical campaign report recorded
+the 10:27 timeout, but the long-lived active Protocol-v2 roadmap row still
+contained the preceding failure count and cadence boundary.
+**Changes:** Updated that active row to 13 provider failures, the DNS-plus-timeout
+post-collector history, the exact 28/30 PUMP/WBT diagnostic, and the next
+eligible boundary at `2026-07-20T11:27:59.695561+00:00`.
+**Verify:** `git diff --check` passed; this is documentation-only and does not
+call a provider or change runtime state.
+
 ## 2026-07-20 — Explain exact current regime-input gaps without backfill · Codex
 **Why:** Persistent campaign truth correctly showed zero historical market-regime
 coverage, but it did not explain that the exact current authority already had 28
