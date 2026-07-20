@@ -7277,7 +7277,7 @@
     "baseline_warm_asset_count": 29,
     "cache_error": null,
     "cache_status": "valid",
-    "cadence_status": "waiting",
+    "cadence_status": "eligible",
     "current_universe_maturity": {
       "baseline_counted_observation_count": 1022,
       "baseline_feature_readiness": {
@@ -7674,7 +7674,7 @@
     "historical_ideas": 5,
     "matured_outcomes": 4,
     "pending_outcomes": 0,
-    "provider_failed_attempts": 9,
+    "provider_failed_attempts": 10,
     "proxy_feature_count": 1730,
     "real_candidates": 5,
     "real_cycles": 38,
@@ -7741,7 +7741,7 @@
     "spread_provider_selection": "selected_bybit_usdt_linear_perpetuals",
     "spread_readiness_command": "make radar-execution-quality-bybit-readiness PYTHON=.venv/bin/python",
     "status": "in_progress_baseline_warming",
-    "summary": "Decision Radar campaign v2 has 38 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 9 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 29/36 warm retained assets; exact current-universe status is warming with 27/30 warm assets. Pointer history contains 34 bound generations and current authority is radar_market_no_send_20260719t234519880892z_5da362f6c3b8. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
+    "summary": "Decision Radar campaign v2 has 38 counted real/no-send cycles and 5 canonical ideas; 0 outcomes are pending and 4 outcomes are matured. Provider history contains 10 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 29/36 warm retained assets; exact current-universe status is warming with 27/30 warm assets. Pointer history contains 34 bound generations and current authority is radar_market_no_send_20260719t234519880892z_5da362f6c3b8. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread."
   },
   "contract_version": 2,
   "data_quality_limitations": [
@@ -7772,7 +7772,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "64116ac1e5d43fdd6273aa1a723f1172a9ee3b48d936cd600b2331944a46ed05",
     "candidate_rows_supplied": 5,
-    "contract_digest": "a62a778ac86ea4005c7b44237304f9673621bf6cf8b78dd66e00b9e77858603a",
+    "contract_digest": "2cb8c9c16f986005cc9ca26a90cf58c8a9f2a9fa91f9bfc2c5525d00cd546d53",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "5a0b2e443d58e7f8e0f31a1eefb81a1ddbe26d7dbe95479bc21ed77ec9a2b0d6",
     "core_rows_supplied": 5,
@@ -7787,7 +7787,7 @@
       "not_evaluated": 0,
       "opposed": 1
     },
-    "evaluated_at": "2026-07-19T23:45:30.224311+00:00",
+    "evaluated_at": "2026-07-20T01:43:16.595200+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -8130,7 +8130,7 @@
         }
       ]
     },
-    "input_binding_digest": "0fdde6b80671ba5300f882ae9dbd55304745edd9be312626b6971829ab40584d",
+    "input_binding_digest": "f0ead2fea454c025bb4dbdba1423a686ef5cd9736039f8c6bec8181ec65c7409",
     "matched_control_available": false,
     "matured_episode_count": 2,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -8501,7 +8501,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "ca00b01248797dacaa4f07599f16fb733e5343c73913f5bab1a2e54e4764a579",
+    "source_episode_contract_digest": "21bf103670497dce3c1e37f836b449b12018909b3b7aa9b223cb89fd035962be",
     "source_episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -8512,7 +8512,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-19T23:45:30.224311+00:00",
+  "generated_at": "2026-07-20T01:43:16.595200+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -8529,7 +8529,7 @@
     "eligible_idea_count": 3,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-19T23:45:30.224311+00:00",
+    "generated_at": "2026-07-20T01:43:16.595200+00:00",
     "in_review_count": 0,
     "not_viewed_count": 3,
     "operator_action_commands_available_via_queue": true,
@@ -8609,7 +8609,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-19T23:45:30.224311+00:00",
+    "generated_at": "2026-07-20T01:43:16.595200+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -8653,16 +8653,16 @@
   "next_observation": {
     "authorization_rechecked_by_command": true,
     "blocking_reasons": [
-      "Decision Radar provider call is reserved until 2026-07-20T00:45:20.832390+00:00"
+      "Decision Radar provider call is reserved until 2026-07-20T02:42:59.760808+00:00"
     ],
     "cadence_status": "waiting",
     "eligible_now": false,
     "eligible_run_command": "make radar-daily-ops-cycle PYTHON=.venv/bin/python",
     "history_next_eligible_observation_at": "2026-07-20T00:45:20.832390+00:00",
-    "next_eligible_observation_at": "2026-07-20T00:45:20.832390+00:00",
+    "next_eligible_observation_at": "2026-07-20T02:42:59.760808+00:00",
     "next_safe_operator_command": "make radar-daily-ops-readiness PYTHON=.venv/bin/python",
     "provider_backoff_disabled_until": null,
-    "provider_call_reservation_next_at": "2026-07-20T00:45:20.832390+00:00",
+    "provider_call_reservation_next_at": "2026-07-20T02:42:59.760808+00:00",
     "rapid_cycles_do_not_advance_warmup": true
   },
   "non_authoritative_complete_generations": [
@@ -9160,7 +9160,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260719t234519880892z_5da362f6c3b8",
-    "authority_checked_at": "2026-07-19T23:45:30.224311+00:00",
+    "authority_checked_at": "2026-07-20T01:43:16.595200+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -9569,6 +9569,20 @@
       "provider_request_succeeded": false,
       "research_only": true,
       "run_id": "2026-07-19T22:44:51.024092+00:00|no_key_live"
+    },
+    {
+      "artifact_namespace": "radar_market_no_send_20260720t014258693355z_872f6aefe7c7",
+      "attempt_id": "6f0a8b7b77f945eaae5ccf22af98f58c",
+      "attempt_status": "provider_unavailable",
+      "candidate_source_mode": "live_no_send",
+      "failure_class": "ClientConnectorDNSError",
+      "no_send": true,
+      "observed_at": "2026-07-20T01:42:59.760808+00:00",
+      "provider": "coingecko",
+      "provider_call_attempted": true,
+      "provider_request_succeeded": false,
+      "research_only": true,
+      "run_id": "2026-07-20T01:42:59.760808+00:00|no_key_live"
     }
   ],
   "row_type": "decision_radar_live_observation_campaign_report",
@@ -9589,7 +9603,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "2fd4be2d0eaf6255b8ff038a680dae176704cf994e846767df5d4e89c0e676b5",
+    "audit_digest": "ccaf7cb52cf1721011b64332c19a0ceb2e97ae293f659e02a78914cb59d0ac84",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -9955,7 +9969,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "ca00b01248797dacaa4f07599f16fb733e5343c73913f5bab1a2e54e4764a579",
+    "episode_contract_digest": "21bf103670497dce3c1e37f836b449b12018909b3b7aa9b223cb89fd035962be",
     "episode_input_binding_digest": "bd07b951e0cd7e23a3012a753db2afa69b23e9441bf1bd9a38f0baf05d40683c",
     "episode_records_supplied": 5,
     "exact_outcome_join_count": 5,
@@ -9996,7 +10010,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "ca00b01248797dacaa4f07599f16fb733e5343c73913f5bab1a2e54e4764a579",
+    "contract_digest": "21bf103670497dce3c1e37f836b449b12018909b3b7aa9b223cb89fd035962be",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -10178,7 +10192,7 @@
         "window_end_exclusive_at": "2026-07-19T02:47:37.287740+00:00"
       }
     ],
-    "evaluated_at": "2026-07-19T23:45:30.224311+00:00",
+    "evaluated_at": "2026-07-20T01:43:16.595200+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,

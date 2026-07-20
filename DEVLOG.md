@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-20 — Record the 01:43 UTC no-send provider failure · Codex
+**Why:** The persisted cadence boundary had passed and existing CoinGecko live
+authorization was present, making one bounded research observation attempt
+eligible.
+**Changes:**
+- Daily Operations attempted exactly one `/coins/markets` request. DNS
+  resolution failed as `ClientConnectorDNSError` in 2 ms before any HTTP
+  response, with zero rows and zero retries.
+- Retained the failed terminal namespace
+  `radar_market_no_send_20260720t014258693355z_872f6aefe7c7` as non-authoritative
+  evidence, advanced the campaign provider-failure count from 9 to 10, and
+  reserved the next provider boundary until
+  `2026-07-20T02:42:59.760808+00:00`.
+- Refreshed the campaign report without changing its 38 successful cycles,
+  1,140 retained observations, 1,110 baseline-counted observations, or five
+  historical ideas. The prior revision-12 dashboard authority remains exact.
+**Verify:** Daily Operations status records the failed terminal cycle and the
+waiting cadence. Campaign report refresh made zero provider calls. Dashboard
+readiness is READY and authority status is authoritative for
+`radar_market_no_send_20260719t234519880892z_5da362f6c3b8`.
+**Notes/risks:** The request was not retried or bypassed. The recurring service
+remains uninstalled. No pointer publication/restart, authorization change,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred.
+
 ## 2026-07-20 — Close temporal relative-strength provenance · Codex
 **Why:** Live market rows could contain a valid causal BTC-relative return while
 still labeling the `relative_strength` feature group `unavailable`. The value
