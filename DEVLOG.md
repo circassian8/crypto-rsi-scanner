@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the guarded 21:09 provider failure · Codex
+**Why:** The hourly observation boundary became eligible, so the campaign needed
+one honest no-send attempt. The restricted local sandbox could not resolve the
+CoinGecko host, and that failure must remain visible rather than being retried or
+reported as a successful observation.
+**Changes:**
+- Daily Operations recorded terminal failed namespace
+  `radar_market_no_send_20260721t210946136672z_2faf702ab87a` after one provider
+  attempt failed during DNS resolution. It published no pointer and retained no
+  market observation.
+- Re-invocation with network approval re-read the attempt ledger and cadence,
+  then skipped without a second provider call. The next eligible boundary is
+  `2026-07-21T22:09:48.945031+00:00`.
+- Regenerated canonical campaign truth: 61 counted cycles / 1,830 observations
+  remain unchanged, while provider failures advanced from 13 to 14. Updated the
+  active roadmap state without weakening cadence or failure handling.
+**Verify:** Daily Operations status distinguishes the latest terminal cadence
+skip from the latest provider attempt failure, reports current authorization as
+present, and schedules the exact next boundary. Campaign report reconciliation
+and dashboard authority status passed; the prior revision-12 namespace and
+pointer digest remain exact.
+**Notes/risks:** This was not a provider HTTP response and no retry/bypass was
+attempted. No generation became authoritative. Sends, trades, orders, paper
+trades, normal RSI writes, and Event Alpha `TRIGGERED_FADE` all remain zero.
+
 ## 2026-07-21 — Make Bybit derivatives readiness concise · Codex
 **Why:** The safe funding/OI/basis/positioning readiness command expanded nested
 execution and derivatives capture packets, hiding its real dependency order and
