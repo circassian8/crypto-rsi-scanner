@@ -28,6 +28,7 @@ from crypto_rsi_scanner.event_alpha.operations import (
     market_no_send_features,
     market_observation_campaign_episode_frontier,
     market_observation_campaign_regime_audit,
+    market_observation_campaign_shadow_surprise,
 )
 from tests.event_alpha.test_decision_episode_scorecard import (
     _candidate,
@@ -160,6 +161,57 @@ def _control_regime_generation_audit() -> dict[str, object]:
     )
 
 
+@lru_cache(maxsize=1)
+def _shadow_surprise_audit() -> dict[str, object]:
+    end = datetime.fromisoformat(_GENERATED_AT)
+    rows: list[dict[str, object]] = []
+    for asset_index, asset_id in enumerate(("asset-a", "bitcoin", "ethereum")):
+        for index in range(12):
+            volume = float(
+                1_000_000
+                + asset_index * 200_000
+                + index * 17_000
+                + (index % 3) * 3_000
+            )
+            market_cap = float(10_000_000 + asset_index * 2_000_000 + index * 9_000)
+            rows.append({
+                "observation_id": f"shadow-{asset_id}-{index}",
+                "canonical_asset_id": asset_id,
+                "observed_at": (end - timedelta(hours=11 - index)).isoformat(),
+                "price": float(
+                    100 * (asset_index + 1)
+                    + index * (0.37 + asset_index * 0.11)
+                    + (index % 4) * 0.07
+                ),
+                "volume_24h": volume,
+                "market_cap": market_cap,
+                "turnover_24h": volume / market_cap,
+                "feature_basis": {
+                    "price": "provider_observed",
+                    "volume_24h": "provider_observed",
+                    "market_cap": "provider_observed",
+                    "turnover_24h": "derived_provider_ratio",
+                },
+                "baseline_counted": True,
+                "research_only": True,
+            })
+    return (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            {
+                "rows": tuple(rows),
+                "status": "observed",
+                "artifact": "event_market_history.jsonl",
+                "sha256": "e" * 64,
+                "size_bytes": 4_096,
+                "row_count": len(rows),
+                "binding_source": "campaign_market_history_exact_bytes",
+            },
+            minimum_sample_count=4,
+        )
+    )
+
+
 def _campaign_report() -> dict[str, object]:
     scorecard, frontier = _episode_contracts()
     return {
@@ -208,6 +260,9 @@ def _campaign_report() -> dict[str, object]:
         ],
         "control_market_regime_generation_audit": (
             _control_regime_generation_audit()
+        ),
+        "shadow_temporal_surprise_campaign_audit": deepcopy(
+            _shadow_surprise_audit()
         ),
         "baseline_maturity": {
             "next_eligible_observation_at": (
@@ -500,6 +555,15 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
         "eligible_input_count"
     ] == 30
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
+    shadow = result["shadow_temporal_surprise"]
+    assert shadow["schema_version"] == 2
+    assert shadow["evaluated_observation_count"] == 36
+    assert shadow["provider_calls"] == shadow["writes"] == 0
+    volume_shadow = shadow["feature_coverage"]["volume_24h"]
+    assert volume_shadow["ready_count"] > 0
+    assert volume_shadow["robust_z_median"] is not None
+    assert volume_shadow["descriptive_tail_rank_kind"] == "upper"
+    assert volume_shadow["tail_ranks_are_p_values"] is False
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
     ] == 0
@@ -700,6 +764,13 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, episode_coverage_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    shadow_drift = deepcopy(_campaign_report())
+    shadow_drift["shadow_temporal_surprise_campaign_audit"]["feature_coverage"][
+        "volume_24h"
+    ]["tail_ranks_are_p_values"] = True
+    _write_report(tmp_path, shadow_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     tmp_path: Path,
@@ -712,6 +783,10 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
 
     assert "Protocol-v2 episode coverage" in html
     assert "Causal 24-hour input history" in html
+    assert "Shadow anomaly distributions" in html
+    assert "Robust z p05 / med / p95" in html
+    assert "The ranks are not p-values" in html
+    assert "Canonical causal shadow replay distributions" in html
     assert "Observed history, not a policy input" in html
     assert "Verified source envelopes" in html
     assert "Frozen episodes cover 1/8 routes and 1/7 primary origins" in html

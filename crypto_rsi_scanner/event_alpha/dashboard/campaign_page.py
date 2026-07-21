@@ -17,7 +17,13 @@ from .components import (
 )
 from .layer_coverage import DashboardLayerCoverage, dashboard_layer_coverage_by_key
 from .models import DashboardSnapshot
-from .presentation import UNAVAILABLE, humanize_enum, humanize_reason, present_time
+from .presentation import (
+    UNAVAILABLE,
+    format_number,
+    humanize_enum,
+    humanize_reason,
+    present_time,
+)
 from .system_page_support import (
     as_mapping,
     display_count,
@@ -155,11 +161,126 @@ def render_campaign_page(
         + current_authority
         + render_metric_grid(metrics)
         + _control_regime_generation_history(snapshot)
+        + _shadow_surprise_distributions(snapshot)
         + _protocol_v2_episode_coverage(snapshot)
         + history
         + _maintenance_cycle_table(snapshot)
         + _campaign_metadata_disclosure(snapshot)
         + _maintenance_metadata_disclosure(snapshot)
+    )
+
+
+def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
+    state = snapshot.campaign_operator_actions
+    raw = state.get("shadow_temporal_surprise")
+    if state.get("status") != "ready" or not isinstance(raw, Mapping) or not raw:
+        return ""
+    feature_coverage = raw.get("feature_coverage")
+    if not isinstance(feature_coverage, Mapping) or not feature_coverage:
+        return ""
+    rows = []
+    for feature, value in sorted(feature_coverage.items()):
+        if not isinstance(value, Mapping):
+            continue
+        minimum_sample = value.get("minimum_eligible_sample_count")
+        maximum_sample = value.get("maximum_eligible_sample_count")
+        sample_range = (
+            f"{display_count(minimum_sample)}–{display_count(maximum_sample)}"
+            if minimum_sample is not None and maximum_sample is not None
+            else UNAVAILABLE
+        )
+        rows.append((
+            humanize_enum(feature),
+            humanize_enum(value.get("family")),
+            (
+                f"{display_count(value.get('ready_count'))} / "
+                f"{display_count(value.get('evaluated_observation_count'))}"
+            ),
+            sample_range,
+            _distribution_triplet(
+                value,
+                ("robust_z_p05", "robust_z_median", "robust_z_p95"),
+                decimals=3,
+                signed=True,
+            ),
+            humanize_enum(value.get("descriptive_tail_rank_kind")),
+            _distribution_triplet(
+                value,
+                (
+                    "descriptive_tail_rank_minimum",
+                    "descriptive_tail_rank_median",
+                    "descriptive_tail_rank_p95",
+                ),
+                decimals=4,
+            ),
+            _shadow_extreme_observation(
+                value.get("minimum_tail_observation"),
+                now=snapshot.generation_authority_checked_at,
+            ),
+        ))
+    statuses = raw.get("projection_status_counts")
+    statuses = statuses if isinstance(statuses, Mapping) else {}
+    values = (
+        ("Audit status", badge(humanize_enum(raw.get("status")), tone="info")),
+        ("Evaluated observations", display_count(raw.get("evaluated_observation_count"))),
+        ("Assets replayed", display_count(raw.get("asset_count"))),
+        ("Complete projections", display_count(statuses.get("ready"))),
+        ("Partial projections", display_count(statuses.get("partial"))),
+        ("Unavailable projections", display_count(statuses.get("unavailable"))),
+    )
+    body = (
+        '<div class="alert alert-info"><strong>Descriptive shadow evidence only.</strong> '
+        "Robust-z magnitude and empirical rank answer different questions. The ranks are not "
+        "p-values, overlapping samples are not independent, and none of these values changes "
+        "routes, scores, thresholds, or current authority.</div>"
+        + str(definition_list(values, css_class="definition-grid"))
+        + str(data_table(
+            (
+                "Feature",
+                "Family",
+                "Ready / evaluated",
+                "Sample range",
+                "Robust z p05 / med / p95",
+                "Rank family",
+                "Rank min / med / p95",
+                "Rarest-rank observation",
+            ),
+            rows,
+            caption="Canonical causal shadow replay distributions",
+            empty="No ready shadow distributions are available.",
+            compact=True,
+        ))
+    )
+    return render_panel(
+        "Shadow anomaly distributions",
+        body,
+        eyebrow="Causal replay · copied from canonical campaign truth",
+    )
+
+
+def _distribution_triplet(
+    value: Mapping[str, Any],
+    fields: tuple[str, str, str],
+    *,
+    decimals: int,
+    signed: bool = False,
+) -> str:
+    return " / ".join(
+        format_number(value.get(field), decimals=decimals, signed=signed)
+        for field in fields
+    )
+
+
+def _shadow_extreme_observation(value: Any, *, now: Any) -> HtmlFragment | str:
+    if not isinstance(value, Mapping):
+        return UNAVAILABLE
+    asset_id = value.get("canonical_asset_id")
+    observed_at = value.get("observed_at")
+    if asset_id in (None, "") or observed_at in (None, ""):
+        return UNAVAILABLE
+    return HtmlFragment(
+        f"{escape_html(humanize_enum(asset_id))}<br>"
+        f'{time_element(present_time(observed_at, now=now), primary="utc")}'
     )
 
 

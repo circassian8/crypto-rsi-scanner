@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Surface canonical shadow distributions in the dashboard · Codex
+**Why:** The campaign report now correctly pairs robust-z history with
+finite-sample empirical ranks, but the live operator dashboard still exposed
+only older readiness counts. That context should reach the primary surface
+without downstream recalculation or loss.
+**Changes:** The descriptor-anchored, pointer-matched campaign loader now runs
+the canonical shadow-audit validator and copies a bounded 11-feature projection
+containing readiness, sample range, robust-z quantiles, the correct upper- or
+two-sided rank quantiles, exact rarest-rank observation identity, digests, and
+all zero-authority flags. Campaign History adds a responsive “Shadow anomaly
+distributions” panel that places z-score and rank distributions side by side
+and explicitly says ranks are not p-values, overlapping samples are not
+independent, and no route/score/threshold/authority changes. Malformed audit
+drift fails the complete campaign context closed; older compatible reports
+without the audit simply omit the panel. The exact cycle-59 report projects
+1,740 evaluated observations and 312 complete shadow projections with zero
+calls/writes.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed; focused
+campaign-dashboard tests passed (`9 passed`). The broader campaign/truth/UX/
+release/dashboard group passed 149 tests inside the restricted sandbox; its
+only loopback concurrency test was denied socket binding by the sandbox and
+then passed on the exact permitted rerun. `make radar-dashboard-smoke
+PYTHON=python3`, `make radar-dashboard-ux-smoke PYTHON=python3`, and `make
+radar-dashboard-readiness PYTHON=python3` passed. A direct render of the real
+revision-12 cycle-59 snapshot confirmed the panel and no-p-value warning with
+`provider_calls=0` and `writes=0`.
+**Notes/risks:** The currently running owned server was restarted by cycle 59
+before this source change; the next owned Daily Operations restart will load
+the new panel. No provider, history, Decision value, outcome, route, score,
+threshold, publication authority, send, trade, order, paper trade, RSI write,
+or Event Alpha `TRIGGERED_FADE` changed. Quantitative source-size limits remain
+advisory; security, artifact, provider, request, and resource bounds remain
+enforced. Full `make verify` was not run because the localized read-only
+projection and presentation paths passed their focused and broader dashboard
+gates.
+
 ## 2026-07-21 — Record the fifty-ninth no-send market cycle · Codex
 **Why:** The hourly observation boundary became eligible with existing explicit
 CoinGecko authorization. Advancing the genuine point-in-time stream is the

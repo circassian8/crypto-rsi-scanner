@@ -22,6 +22,7 @@ from ..operations import (
     market_no_send_features,
     market_observation_campaign_episode_frontier,
     market_observation_campaign_regime_audit,
+    market_observation_campaign_shadow_surprise,
 )
 from .secure_reader import _DashboardNamespaceReadError, open_anchored_namespace
 
@@ -220,6 +221,9 @@ def _project_campaign_actions(
         temporal_baseline[
             "control_market_regime_generation_audit"
         ] = regime_generation_audit
+    shadow_surprise = _project_shadow_surprise_audit(
+        report.get("shadow_temporal_surprise_campaign_audit")
+    )
     if metrics["review_timing_action_required"] != review["action_required_count"]:
         raise ValueError("campaign_report_review_count_mismatch")
     if metrics["matured_outcomes"] != outcomes["matured_count"]:
@@ -233,6 +237,7 @@ def _project_campaign_actions(
         "human_review": review,
         "outcome_recovery": outcomes,
         "episode_coverage": episode_coverage,
+        "shadow_temporal_surprise": shadow_surprise or {},
         "execution_quality": execution,
         "temporal_baseline": temporal_baseline,
         "pointer": {
@@ -240,6 +245,157 @@ def _project_campaign_actions(
             "run_id": run_id,
             "revision": revision,
         },
+    }
+
+
+def _project_shadow_surprise_audit(
+    value: Any,
+) -> dict[str, Any] | None:
+    if value in (None, {}):
+        return None
+    audit = _mapping(value, "shadow_temporal_surprise_campaign_audit")
+    errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(audit)
+    )
+    if errors:
+        raise ValueError("campaign_shadow_temporal_surprise_invalid")
+    feature_coverage = _mapping(
+        audit.get("feature_coverage"),
+        "shadow_temporal_surprise_feature_coverage",
+    )
+    if len(feature_coverage) > 16:
+        raise ValueError("campaign_shadow_temporal_surprise_features_oversized")
+    projected_features = {
+        _identity(feature, "shadow_feature_identity"): (
+            _project_shadow_surprise_feature(feature, row)
+        )
+        for feature, row in sorted(feature_coverage.items())
+    }
+    projection_status_counts = _project_status_counts(
+        audit.get("projection_status_counts"),
+        label="shadow_projection_status",
+    )
+    evaluated = _count(
+        audit.get("evaluated_observation_count"),
+        "shadow_evaluated_observation_count",
+    )
+    if sum(projection_status_counts.values()) != evaluated:
+        raise ValueError("campaign_shadow_projection_status_count_mismatch")
+    return {
+        "schema_id": _identity(audit.get("schema_id"), "shadow_audit_schema_id"),
+        "schema_version": _count(
+            audit.get("schema_version"), "shadow_audit_schema_version"
+        ),
+        "status": _identity(audit.get("status"), "shadow_audit_status"),
+        "shadow_schema_id": _identity(
+            audit.get("shadow_schema_id"), "shadow_source_schema_id"
+        ),
+        "shadow_schema_version": _count(
+            audit.get("shadow_schema_version"), "shadow_source_schema_version"
+        ),
+        "evaluated_observation_count": evaluated,
+        "asset_count": _count(audit.get("asset_count"), "shadow_asset_count"),
+        "projection_status_counts": projection_status_counts,
+        "feature_coverage": projected_features,
+        "source_bound_projection_digest": _identity(
+            audit.get("source_bound_projection_digest"),
+            "shadow_source_bound_digest",
+        ),
+        "causal_projection_digest": _identity(
+            audit.get("causal_projection_digest"),
+            "shadow_causal_digest",
+        ),
+        "all_features_have_ready_evidence": (
+            audit.get("all_features_have_ready_evidence") is True
+        ),
+        "statistical_independence_claimed": False,
+        "tail_ranks_are_p_values": False,
+        "routing_eligible": False,
+        "score_adjustment_eligible": False,
+        "threshold_change_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _project_shadow_surprise_feature(
+    feature: str,
+    value: Any,
+) -> dict[str, Any]:
+    row = _mapping(value, "shadow_temporal_surprise_feature")
+    reference = row.get("minimum_descriptive_tail_rank_observation")
+    projected_reference = None
+    if isinstance(reference, Mapping):
+        projected_reference = {
+            "canonical_asset_id": _identity(
+                reference.get("canonical_asset_id"), "shadow_extreme_asset"
+            ),
+            "observation_id": _identity(
+                reference.get("observation_id"), "shadow_extreme_observation"
+            ),
+            "observed_at": _timestamp(
+                reference.get("observed_at"), "shadow_extreme_observed_at"
+            ),
+        }
+    return {
+        "feature": _identity(row.get("feature"), "shadow_feature"),
+        "family": _identity(row.get("family"), "shadow_feature_family"),
+        "evaluated_observation_count": _count(
+            row.get("evaluated_observation_count"),
+            "shadow_feature_evaluated_count",
+        ),
+        "ready_count": _count(row.get("ready_count"), "shadow_feature_ready_count"),
+        "status_counts": _project_status_counts(
+            row.get("status_counts"), label="shadow_feature_status"
+        ),
+        "minimum_eligible_sample_count": _optional_count(
+            row.get("minimum_eligible_sample_count"),
+            "shadow_feature_minimum_sample_count",
+        ),
+        "maximum_eligible_sample_count": _optional_count(
+            row.get("maximum_eligible_sample_count"),
+            "shadow_feature_maximum_sample_count",
+        ),
+        "robust_z_p05": _optional_finite_number(
+            row.get("robust_z_p05"), "shadow_feature_robust_z_p05"
+        ),
+        "robust_z_median": _optional_finite_number(
+            row.get("robust_z_median"), "shadow_feature_robust_z_median"
+        ),
+        "robust_z_p95": _optional_finite_number(
+            row.get("robust_z_p95"), "shadow_feature_robust_z_p95"
+        ),
+        "descriptive_tail_rank_kind": _identity(
+            row.get("descriptive_tail_rank_kind"), "shadow_feature_tail_kind"
+        ),
+        "descriptive_tail_rank_minimum": _optional_finite_number(
+            row.get("descriptive_tail_rank_minimum"),
+            "shadow_feature_tail_minimum",
+        ),
+        "descriptive_tail_rank_median": _optional_finite_number(
+            row.get("descriptive_tail_rank_median"),
+            "shadow_feature_tail_median",
+        ),
+        "descriptive_tail_rank_p95": _optional_finite_number(
+            row.get("descriptive_tail_rank_p95"),
+            "shadow_feature_tail_p95",
+        ),
+        "minimum_tail_observation": projected_reference,
+        "tail_ranks_are_p_values": False,
+        "overlapping_samples_are_independent": False,
+    }
+
+
+def _project_status_counts(value: Any, *, label: str) -> dict[str, int]:
+    raw = _mapping(value, label)
+    if len(raw) > 16:
+        raise ValueError(f"{label}_oversized")
+    return {
+        _identity(status, label): _count(count, label)
+        for status, count in sorted(raw.items())
     }
 
 
@@ -1103,6 +1259,21 @@ def _count(value: Any, label: str) -> int:
     if not math.isfinite(numeric) or numeric < 0 or not numeric.is_integer():
         raise ValueError(f"{label}_invalid")
     return int(numeric)
+
+
+def _optional_count(value: Any, label: str) -> int | None:
+    return None if value is None else _count(value, label)
+
+
+def _optional_finite_number(value: Any, label: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label}_invalid")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"{label}_invalid")
+    return result
 
 
 def _text(value: Any, maximum: int) -> str:
