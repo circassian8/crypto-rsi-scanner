@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record the sixty-third no-send market cycle · Codex
+**Why:** The hourly boundary was eligible and the existing explicit CoinGecko
+authorization was still present, so the campaign needed one genuine
+point-in-time observation before more operator-surface work.
+**Changes:**
+- Ran exactly one authorized, no-send Daily Operations cycle. CoinGecko returned
+  HTTP 200 with 80 bounded market rows in 1,574 ms and no retry; the pipeline
+  selected 30 observations and published
+  `radar_market_no_send_20260721t231117895453z_3d8bbbdc0a7a`.
+- Preserved the immutable publication and operations receipts, revision-12
+  pointer authority, owned dashboard restart, and exact loopback identity. The
+  generation contains zero anomalies and zero Decision ideas rather than
+  lowering thresholds or inventing evidence.
+- Refreshed the canonical campaign report to 63 real cycles, 1,890 retained
+  observations, 1,860 cadence-counted observations, 30 too-close observations,
+  and 630 point-in-time universe/liquidity rows. The current universe remains
+  28/30 warm because HBAR and TON lack enough closed temporal evidence.
+**Verify:** Preflight readiness was `ready/eligible` with zero provider calls.
+The cycle succeeded with one provider attempt; exact strict doctor reports zero
+blockers and zero warnings. Dashboard readiness and authority status pass for
+the exact namespace; publication and operations receipts bind operator-state
+SHA-256 `099f7d721105a788522d2425703b9847a0bf7bb3121ddecef49d92e546ca88df`
+and pointer SHA-256
+`2436c7f27261b8e663fc1feec3b42b606127c7b1cf6840772e5a5190c849f8d8`.
+Post-cycle status records the next eligible boundary as
+`2026-07-22T00:11:20.518841+00:00`.
+**Notes/risks:** Telegram sends, trades, orders, paper trades, normal RSI writes,
+and Event Alpha `TRIGGERED_FADE` remain zero. Spread, official-calendar, regime,
+partition, and matched-control evidence remain unavailable; no route, score,
+threshold, protocol, holdout, authorization, or scheduler changed. Quantitative
+source-size findings remain advisory.
+
 ## 2026-07-22 — Identify human-review actions with canonical idea context · Codex
 **Why:** The improved queue showed recurrence but still required the operator to
 decode opaque IDs before knowing which asset, anomaly, and score state needed
