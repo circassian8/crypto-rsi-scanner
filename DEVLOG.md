@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Close canonical asset boolean coercion · Codex
+**Why:** The canonical asset adapter treated every nonzero numeric as true.
+For example, `is_tradable_asset=2` became a valid boolean before the raw market
+scanner could detect the malformed claim, allowing invalid registry metadata to
+assert tradability.
+**Changes:** Canonical asset boolean controls now accept only actual booleans,
+numeric 0/1, and the existing closed semantic strings. Arbitrary numerics,
+non-finite values, structures, and unknown strings resolve conservatively to
+false. Symbol-derived quote, theme, and BTC/ETH major-base protections remain
+unchanged, as do valid numeric/string controls.
+**Verify:** A regression covers arbitrary positive/negative/fractional and
+non-finite values across all canonical asset controls, plus valid numeric/string
+true controls. Canonical identity/registry and market-surface tests passed (`104
+passed`); `python3 -m compileall -q crypto_rsi_scanner tests` and `git diff
+--check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests earlier in this prompt and the full affected registry/market surfaces
+were rerun. No instrument mapping, anomaly threshold, score, route, provider
+call, authority, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` changed. Quantitative source-size limits remain advisory.
+
 ## 2026-07-21 — Reject malformed empirical replay identity and lineage · Codex
 **Why:** The point-in-time replay kernel stringified asset identity and
 `market_data_source` values. Structured or boolean inputs could become

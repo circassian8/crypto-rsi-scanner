@@ -60,6 +60,38 @@ def test_projection_keeps_absent_identity_fallback_and_typed_members() -> None:
     assert asset.contracts_by_chain == {"ethereum": ("0xabc",)}
 
 
+def test_projection_does_not_launder_arbitrary_numeric_boolean_controls() -> None:
+    malformed = CanonicalAsset.from_mapping(
+        {
+            "canonical_asset_id": "malformed-controls",
+            "symbol": "MALFORMED",
+            "is_tradable_asset": 2,
+            "is_quote_asset": 2,
+            "quote_asset_excluded": -1,
+            "base_asset_excluded": float("inf"),
+            "major_base_asset": float("nan"),
+            "is_theme_or_sector": 3.5,
+        }
+    )
+    canonical_true = CanonicalAsset.from_mapping(
+        {
+            "canonical_asset_id": "canonical-controls",
+            "symbol": "CANONICAL",
+            "is_tradable_asset": 1,
+            "major_base_asset": "true",
+        }
+    )
+
+    assert malformed.is_tradable_asset is False
+    assert malformed.is_quote_asset is False
+    assert malformed.quote_asset_excluded is False
+    assert malformed.base_asset_excluded is False
+    assert malformed.major_base_asset is False
+    assert malformed.is_theme_or_sector is False
+    assert canonical_true.is_tradable_asset is True
+    assert canonical_true.major_base_asset is True
+
+
 def test_registry_load_and_merge_drop_malformed_canonical_identity(tmp_path: Path) -> None:
     path = tmp_path / "registry.json"
     path.write_text(
@@ -175,4 +207,3 @@ def test_resolver_and_market_enrichment_reproject_direct_registry_values() -> No
     assert rows[0]["instrument_resolver_status"] == "unresolved"
     assert resolutions[0]["resolver_match_reason"] == "unresolved"
     assert market_anomaly_scanner._asset_rows((malformed_alias,))[0].aliases == ()
-

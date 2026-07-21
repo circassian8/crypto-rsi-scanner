@@ -224,7 +224,7 @@ def _bool(value: Any) -> bool:
     if value is None:
         return False
     if isinstance(value, (int, float)):
-        return bool(value)
+        return float(value) == 1.0
     return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
