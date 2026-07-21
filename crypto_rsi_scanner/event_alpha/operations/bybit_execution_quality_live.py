@@ -104,6 +104,13 @@ COLLECT_COMMAND = (
 CAPTURE_COMMAND = (
     "CONFIRM=1 make radar-execution-quality-bybit-capture PYTHON=.venv/bin/python"
 )
+READINESS_OUTPUT_JSON = "json"
+READINESS_OUTPUT_SUMMARY = "summary"
+READINESS_OUTPUT_CHOICES = (READINESS_OUTPUT_JSON, READINESS_OUTPUT_SUMMARY)
+READINESS_FULL_JSON_COMMAND = (
+    "make -s radar-execution-quality-bybit-readiness "
+    "RADAR_BYBIT_EXECUTION_READINESS_OUTPUT=json PYTHON=.venv/bin/python"
+)
 AUTHORIZATION_ACTION = (
     f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_then_rerun_readiness"
 )
@@ -428,6 +435,168 @@ def build_bybit_execution_quality_live_readiness(
         ),
         **SAFETY,
     }
+
+
+def format_bybit_execution_quality_readiness_summary(
+    payload: Mapping[str, object],
+) -> str:
+    """Render bounded readiness truth without duplicating asset/capture payloads."""
+
+    status = _summary_text(payload.get("status"), "status")
+    ready = _summary_bool(payload.get("ready"), "ready")
+    checked_at = _summary_text(payload.get("checked_at"), "checked_at")
+    authority = payload.get("current_authority")
+    if authority is None:
+        authority_namespace = "unavailable"
+        authority_revision = "unavailable"
+    elif isinstance(authority, Mapping):
+        authority_namespace = _summary_text(
+            authority.get("artifact_namespace"), "authority_namespace", 192
+        )
+        authority_revision = str(
+            _summary_int(authority.get("revision"), "authority_revision")
+        )
+    else:
+        raise BybitExecutionQualityLiveError("current_authority_invalid")
+    reasons = _summary_text_list(payload.get("reasons"), "reasons", limit=32)
+    radar_assets = _summary_int(payload.get("radar_asset_count"), "radar_asset_count")
+    query_assets = _summary_int(
+        payload.get("provider_query_asset_count"), "provider_query_asset_count"
+    )
+    excluded_assets = _summary_int(
+        payload.get("preflight_excluded_asset_count"),
+        "preflight_excluded_asset_count",
+    )
+    if query_assets + excluded_assets != radar_assets:
+        raise BybitExecutionQualityLiveError("provider_query_asset_count_mismatch")
+    request_bound = _summary_int(
+        payload.get("maximum_provider_requests_for_current_universe"),
+        "maximum_provider_requests_for_current_universe",
+    )
+    catalog_bound = _summary_int(
+        payload.get("instrument_catalog_request_bound"),
+        "instrument_catalog_request_bound",
+    )
+    orderbook_bound = _summary_int(
+        payload.get("orderbook_request_bound"), "orderbook_request_bound"
+    )
+    if request_bound != catalog_bound + orderbook_bound:
+        raise BybitExecutionQualityLiveError("provider_request_bound_mismatch")
+    authorized = _summary_bool(
+        payload.get("runtime_provider_authorized"),
+        "runtime_provider_authorized",
+    )
+    provider_planned = _summary_bool(
+        payload.get("provider_call_planned"), "provider_call_planned"
+    )
+    provider_attempted = _summary_bool(
+        payload.get("provider_call_attempted"), "provider_call_attempted"
+    )
+    writes = _summary_bool(payload.get("writes_performed"), "writes_performed")
+    orders = _summary_bool(payload.get("orders_available"), "orders_available")
+    safety_counts = {
+        key: _summary_int(payload.get(key), key)
+        for key in (
+            "telegram_sends",
+            "trades_created",
+            "paper_trades_created",
+            "normal_rsi_signal_rows_written",
+            "triggered_fade_created",
+        )
+    }
+    lines = (
+        "report=decision_radar_bybit_execution_quality_readiness",
+        f"status={status}",
+        f"ready={str(ready).lower()}",
+        f"checked_at={checked_at}",
+        "execution_surface=bybit:usdt_linear_perpetual:USDT",
+        f"authority_namespace={authority_namespace}",
+        f"authority_revision={authority_revision}",
+        f"runtime_provider_authorized={str(authorized).lower()}",
+        f"radar_assets={radar_assets}",
+        f"provider_query_assets={query_assets}",
+        f"preflight_excluded_assets={excluded_assets}",
+        (
+            "provider_request_bound="
+            f"{request_bound} (catalog={catalog_bound},orderbooks={orderbook_bound})"
+        ),
+        "request_strategy="
+        + _summary_text(payload.get("provider_request_strategy"), "request_strategy"),
+        "latest_capture_status="
+        + _summary_text(payload.get("latest_capture_status"), "latest_capture_status"),
+        "evidence_publication_status="
+        + _summary_text(
+            payload.get("evidence_publication_status"),
+            "evidence_publication_status",
+        ),
+        f"reasons={','.join(reasons) if reasons else 'none'}",
+        "expected_provider_activity="
+        + _summary_text(
+            payload.get("expected_provider_activity"),
+            "expected_provider_activity",
+        ),
+        "expected_activity_if_authorized_and_confirmed="
+        + _summary_text(
+            payload.get("expected_provider_activity_if_authorized_and_confirmed"),
+            "expected_provider_activity_if_authorized_and_confirmed",
+        ),
+        "operator_action_required="
+        + _summary_text(
+            payload.get("operator_action_required"), "operator_action_required", 512
+        ),
+        "next_safe_command="
+        + _summary_text(payload.get("next_safe_command"), "next_safe_command", 512),
+        "authorization_boundary="
+        + _summary_text(
+            payload.get("authorization_boundary"), "authorization_boundary", 512
+        ),
+        "rollback_disable_command="
+        + _summary_text(
+            payload.get("rollback_disable_command"),
+            "rollback_disable_command",
+            256,
+        ),
+        "recorded_403_policy="
+        + _summary_text(payload.get("recorded_403_policy"), "recorded_403_policy"),
+        f"provider_call_planned={str(provider_planned).lower()}",
+        f"provider_call_attempted={str(provider_attempted).lower()}",
+        f"writes_performed={str(writes).lower()}",
+        f"orders_available={str(orders).lower()}",
+        "safety_counts="
+        + ",".join(f"{key}:{value}" for key, value in safety_counts.items()),
+        f"full_json_command={READINESS_FULL_JSON_COMMAND}",
+    )
+    return "\n".join(lines)
+
+
+def _summary_text(value: object, label: str, limit: int = 256) -> str:
+    text = value.strip() if isinstance(value, str) else ""
+    if not text or len(text) > limit or any(ord(character) < 32 for character in text):
+        raise BybitExecutionQualityLiveError(f"{label}_invalid")
+    return text
+
+
+def _summary_int(value: object, label: str) -> int:
+    if type(value) is not int or value < 0:
+        raise BybitExecutionQualityLiveError(f"{label}_invalid")
+    return value
+
+
+def _summary_bool(value: object, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise BybitExecutionQualityLiveError(f"{label}_invalid")
+    return value
+
+
+def _summary_text_list(
+    value: object,
+    label: str,
+    *,
+    limit: int,
+) -> tuple[str, ...]:
+    if not isinstance(value, list) or len(value) > limit:
+        raise BybitExecutionQualityLiveError(f"{label}_invalid")
+    return tuple(_summary_text(item, label, 128) for item in value)
 
 
 def collect_authoritative_bybit_execution_quality(
@@ -864,6 +1033,11 @@ def _parser() -> argparse.ArgumentParser:
             type=Path,
             default=Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR),
         )
+    subparsers.choices["readiness"].add_argument(
+        "--output",
+        choices=READINESS_OUTPUT_CHOICES,
+        default=READINESS_OUTPUT_JSON,
+    )
     for command in ("collect", "capture"):
         subparsers.choices[command].add_argument(
             "--timeout-seconds",
@@ -880,7 +1054,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = build_bybit_execution_quality_live_readiness(
             artifact_base_dir=args.artifact_base
         )
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        if args.output == READINESS_OUTPUT_SUMMARY:
+            print(format_bybit_execution_quality_readiness_summary(payload))
+        else:
+            print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
     if args.command == "status":
         payload = bybit_execution_quality_capture_status(args.artifact_base)
@@ -927,6 +1104,7 @@ __all__ = (
     "READINESS_COMMAND",
     "BybitExecutionQualityLiveError",
     "build_bybit_execution_quality_live_readiness",
+    "format_bybit_execution_quality_readiness_summary",
     "capture_authoritative_bybit_execution_quality",
     "collect_authoritative_bybit_execution_quality",
     "main",

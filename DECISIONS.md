@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep Bybit execution readiness concise and current-authority-bound
+**Status:** accepted
+**Decision:** The normal `radar-execution-quality-bybit-readiness` Make target
+prints a strict bounded summary of exact authority, authorization, eligible and
+excluded coverage, current request bound, capture state, fail-closed policy,
+operator action, and safety. Full packet JSON remains available through
+`RADAR_BYBIT_EXECUTION_READINESS_OUTPUT=json`; direct Python CLI usage retains
+JSON as its compatibility default. Static contracts retain the absolute
+31-request ceiling but must not copy a volatile “current” universe count; the
+readiness result owns that exact current-authority measurement.
+**Why:** The prior 448-line packet repeated asset projections and buried the
+actual blockers, while its checked-in 29-candidate statement became stale as
+the authoritative universe changed. The concise view makes the safe next action
+visible without weakening count reconciliation or hiding the full evidence.
+**Revisit when:** A machine consumer needs another versioned structured view;
+retain JSON compatibility and fail closed on any authority, coverage, or request
+count drift.
+
 ## 2026-07-21 - Keep DefiLlama mapping review concise and explicit
 **Status:** accepted
 **Decision:** The normal

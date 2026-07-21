@@ -39,6 +39,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live impo
     _fetch_public_json,
     build_bybit_execution_quality_live_readiness,
     collect_authoritative_bybit_execution_quality,
+    format_bybit_execution_quality_readiness_summary,
     main,
     partition_bybit_provider_query_assets,
     project_authoritative_radar_assets,
@@ -182,6 +183,36 @@ def test_readiness_is_no_call_and_requires_exact_authority_plus_explicit_auth() 
     assert payload["credentials_read"] is False
     assert payload["orders_available"] is False
     assert payload["writes_performed"] is False
+
+    summary = format_bybit_execution_quality_readiness_summary(payload)
+    assert "report=decision_radar_bybit_execution_quality_readiness" in summary
+    assert "status=blocked" in summary
+    assert "runtime_provider_authorized=false" in summary
+    assert "radar_assets=1" in summary
+    assert "provider_query_assets=1" in summary
+    assert "provider_request_bound=2 (catalog=1,orderbooks=1)" in summary
+    assert "reasons=runtime_provider_authorization_absent" in summary
+    assert "expected_provider_activity=none_readiness_only" in summary
+    assert "provider_call_planned=false" in summary
+    assert "provider_call_attempted=false" in summary
+    assert "writes_performed=false" in summary
+    assert "RADAR_BYBIT_EXECUTION_READINESS_OUTPUT=json" in summary
+
+
+def test_readiness_summary_fails_closed_on_request_count_drift() -> None:
+    payload = build_bybit_execution_quality_live_readiness(
+        artifact_base_dir="unused",
+        environ={},
+        now=NOW,
+        resolver=_resolver((_observation("bitcoin", "BTC", 3_000.0),)),
+    )
+    payload["orderbook_request_bound"] = 2
+
+    with pytest.raises(
+        BybitExecutionQualityLiveError,
+        match="provider_request_bound_mismatch",
+    ):
+        format_bybit_execution_quality_readiness_summary(payload)
 
 
 def test_readiness_fails_closed_when_current_generation_is_not_authoritative() -> None:
@@ -711,6 +742,21 @@ def test_readiness_cli_on_untrusted_local_pointer_is_safe_and_no_call(
     assert payload["writes_performed"] is False
     assert "must-not-print" not in output.out
 
+    assert main(
+        [
+            "readiness",
+            "--artifact-base",
+            str(tmp_path),
+            "--output",
+            "summary",
+        ]
+    ) == 0
+    summary = capsys.readouterr().out
+    assert "authority_namespace=unavailable" in summary
+    assert "provider_call_attempted=false" in summary
+    assert "writes_performed=false" in summary
+    assert "must-not-print" not in summary
+
 
 def test_collect_cli_requires_explicit_confirmation_before_any_boundary(
     monkeypatch: pytest.MonkeyPatch,
@@ -770,6 +816,7 @@ def test_make_targets_keep_readiness_separate_from_authorized_collection() -> No
     ).stdout
 
     assert "bybit_execution_quality_live readiness" in readiness
+    assert "--output summary" in readiness
     assert "bybit_execution_quality_live collect" not in readiness
     assert "bybit_execution_quality_live collect" in collection
     assert "bybit_execution_quality_live capture" in capture

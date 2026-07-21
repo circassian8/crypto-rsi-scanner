@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Make Bybit execution readiness concise · Codex
+**Why:** The normal readiness command printed a 448-line packet whose repeated
+asset projections buried the absent authorization, missing capture, exact
+request bound, and recorded 403 policy. Durable docs also froze a changing
+29-candidate count as “current.”
+**Changes:**
+- Added a strict bounded summary renderer that reconciles authority, universe
+  coverage, request bounds, authorization, capture/publication state, operator
+  action, recorded fail-closed policy, and every research-only safety counter.
+- Made the normal Make target use the concise summary while retaining full JSON
+  through an explicit output variable. Direct Python CLI usage keeps JSON as
+  its compatibility default.
+- Removed volatile current-universe counts from North Star and venue contracts;
+  the absolute 31-request ceiling remains durable and current-authority
+  readiness owns the exact current count.
+**Verify:** Compileall and all 29 focused Bybit live/capture/readiness tests
+passed. The real current-authority summary reported 30 Radar assets, 30 query
+assets, zero exclusions, a 31-request maximum, absent authorization, no capture,
+and zero calls/writes/orders/sends/trades/paper/RSI/`TRIGGERED_FADE`; explicit
+JSON mode retained the full packet. North Star JSON validation, architecture
+cleanliness, and diff checks passed; size findings remain advisory.
+**Notes/risks:** No provider call was made. Authorization and immutable capture
+remain absent, and the recorded 403/no-retry/no-proxy/no-VPN/no-region-bypass
+policy is unchanged. No score, route, threshold, artifact, or authority changed.
+
 ## 2026-07-21 — Make DefiLlama mapping review concise · Codex
 **Why:** The safe current-authority mapping command printed the entire 30-asset
 universe twice, making its four actual blockers and human next action hard to

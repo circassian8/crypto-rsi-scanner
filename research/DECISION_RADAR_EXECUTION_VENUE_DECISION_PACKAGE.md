@@ -398,8 +398,8 @@ and [Rate Limit Rules](https://bybit-exchange.github.io/docs/v5/rate-limit).
   `category=linear&status=Trading&limit=1000` catalog request, rejects a
   missing or non-empty continuation cursor as incomplete, and then uses one 200-level
   order-book request per exact eligible instrument. The absolute bound is 31
-  GETs; the current 29-candidate universe bound is 30, while the actual count is
-  one plus the eligible-instrument count. It makes no retries and stops on the
+  GETs; the exact current-authority bound is reported by readiness and is one
+  plus the eligible-instrument count. It makes no retries and stops on the
   first 403, 429, regional restriction, malformed response, or authority
   failure. Non-contract-shaped
   symbols are rejected before the provider boundary rather than consuming a

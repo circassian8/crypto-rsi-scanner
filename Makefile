@@ -112,6 +112,7 @@ RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
 RADAR_DAILY_OPS_OUTPUT ?= summary
+RADAR_BYBIT_EXECUTION_READINESS_OUTPUT ?= summary
 OFFICIAL_MACRO_OUTPUT_BASE ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/official_macro_calendar
 FED_FOMC_HTML ?=
 BLS_CALENDAR_ICS ?=
@@ -414,7 +415,7 @@ help:
 	@echo "  CONFIRM=1 make radar-intraday-bybit-collect  Collect direct completed 1h/4h bars without persistence"
 	@echo "  CONFIRM=1 make radar-intraday-bybit-capture  Collect and seal exact direct 1h/4h responses"
 	@echo "  make radar-intraday-bybit-status  Validate the latest immutable direct-bar capture; no call/write"
-	@echo "  make radar-execution-quality-bybit-readiness  Check exact authority and Bybit authorization; no call/write"
+	@echo "  make radar-execution-quality-bybit-readiness  Concise exact-authority and Bybit authorization check; no call/write (RADAR_BYBIT_EXECUTION_READINESS_OUTPUT=json for full JSON)"
 	@echo "  CONFIRM=1 make radar-execution-quality-bybit-collect  Probe bounded public books only when separately authorized"
 	@echo "  CONFIRM=1 make radar-execution-quality-bybit-capture  Seal exact public responses only when separately authorized"
 	@echo "  make radar-execution-quality-bybit-status  Validate the latest immutable capture; no call/write"
@@ -1770,7 +1771,8 @@ radar-intraday-bybit-status:
 radar-execution-quality-bybit-readiness:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.bybit_execution_quality_live readiness \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR)
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--output $(RADAR_BYBIT_EXECUTION_READINESS_OUTPUT)
 
 radar-execution-quality-bybit-collect:
 	env RSI_EVENT_ALERTS_ENABLED=0 \

@@ -581,16 +581,19 @@ may be added later when a suitable environment already exists.
   liquidity. The separately gated
   public REST adapter and immutable capture contract are implemented but
   inactive. `make radar-execution-quality-bybit-readiness` binds to the exact
-  authoritative Radar generation, and `make
+  authoritative Radar generation and prints a concise readiness summary by
+  default; use `RADAR_BYBIT_EXECUTION_READINESS_OUTPUT=json` for the full
+  structured packet. `make
   radar-execution-quality-bybit-status` validates the latest capture; neither
   makes a provider call or write. Capture requires the already-present
   `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` plus the exact
   `CONFIRM=1` target. Capture v5 first requests one complete `Trading` linear
   instrument catalog with `limit=1000`, requires an explicit empty continuation
-  cursor (missing or non-empty fails closed), and then requests one 200-level book per
-  exact eligible instrument. Its absolute bound is 31 GETs and the current
-  29-candidate universe bound is 30; actual calls are one plus the eligible
-  count. It follows no redirects, ignores ambient proxies, and makes no retries.
+  cursor (missing or non-empty fails closed), and then requests one 200-level
+  book per exact eligible instrument. Its absolute bound is 31 GETs; the exact
+  current bound comes only from current-authority readiness and is one plus the
+  eligible count. It follows no redirects, ignores ambient proxies, and makes
+  no retries.
   Every book must remain within the 15-second provider-observation age policy
   when the full sequential set completes. Acquisition freshness and completion
   freshness remain separate, and only completion-fresh sets may be Protocol-v2

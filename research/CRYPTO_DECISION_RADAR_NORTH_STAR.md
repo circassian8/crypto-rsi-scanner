@@ -1200,10 +1200,11 @@ write. A confirmed capture requires the already-present dedicated authorization
 flag. Capture v5 performs one complete
 `category=linear&status=Trading&limit=1000` instrument-catalog GET, rejects any
 missing or non-empty continuation cursor as incomplete, and then performs one 200-level order-book
-GET per exact eligible instrument. Its absolute bound is 31 and the current
-29-candidate authority bound is 30; actual calls are one plus the eligible
-count. It never retries and has no credential, private-data, order, trading, or
-send surface. Every individual book retains acquisition freshness, while the
+GET per exact eligible instrument. Its absolute bound is 31; the current
+authority-specific bound is reported by readiness as one catalog request plus
+the exact eligible-instrument count. It never retries and has no credential,
+private-data, order, trading, or send surface. Every individual book retains
+acquisition freshness, while the
 closed set is fresh only when every provider observation is still at most 15
 seconds old at full-set completion. A complete but aged set remains immutable
 evidence and is explicitly Protocol-v2 input-quality-ineligible. Only a complete
