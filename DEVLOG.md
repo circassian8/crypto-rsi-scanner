@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Fail closed on malformed benchmark evidence · Codex
+**Why:** Source-row unit validation did not cover the separate BTC/ETH rows used
+to derive relative returns. A BTC object-valued unit could therefore make a
+different asset appear `+10%` relative and manufacture `confirmed_breakout`
+even though the malformed BTC snapshot itself was correctly blocked.
+**Changes:** Relative-return derivation now consumes only a mapping whose unit
+contract is closed; invalid BTC/ETH benchmark metadata is omitted and recorded
+as an explicit unit warning on the dependent snapshot. Automatic benchmark
+selection now uses typed, presence-aware identities, rejects conflicting known
+BTC/ETH identity, and returns no benchmark when multiple rows claim the same
+role instead of silently selecting the last one. Valid unique fixture and
+mixed-unit benchmark behavior is unchanged.
+**Verify:** The exact cross-row reproduction changed from a VICTIM
+`confirmed_breakout` with derived BTC-relative `10.0` and no warnings to an
+unavailable relative return, `invalid_btc_benchmark_return_unit_metadata`, and
+zero anomalies. Focused market-unit/state/surface and Decision tests passed
+(`152 passed`); the wider RSI universe, history, no-send, campaign,
+market-state, unit-health, anomaly-surface, and Decision suite passed (`290
+passed`). `make event-alpha-integrated-radar-smoke PYTHON=python3` passed with
+15 candidates, 12 canonical cores/cards, 14 dashboard pages, and strict doctor
+0 blockers / 0 warnings. `python3 -m compileall -q crypto_rsi_scanner tests`
+and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the affected
+benchmark, normalization, detector, Decision, and integrated-doctor paths were
+exercised directly. No provider call, authority change, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source-file size remains advisory; artifact, security, provider,
+request, unit, identity, and resource bounds remain enforced.
+
 ## 2026-07-21 — Reject malformed market return-unit metadata · Codex
 **Why:** An object-valued `return_unit` was converted to printable text, then
 heuristically inferred as fractional input. A raw `0.10` move consequently

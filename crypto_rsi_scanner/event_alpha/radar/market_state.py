@@ -147,6 +147,12 @@ def snapshot_from_market_row(
     warnings: list[str] = []
     fields: list[str] = []
     source_unit_contract_valid = _source_return_unit_contract_valid(row)
+    usable_btc_benchmark, btc_benchmark_unit_contract_valid = (
+        _usable_return_benchmark(btc_benchmark)
+    )
+    usable_eth_benchmark, eth_benchmark_unit_contract_valid = (
+        _usable_return_benchmark(eth_benchmark)
+    )
     source_unit = (
         event_market_units.infer_return_unit(
             row,
@@ -158,8 +164,8 @@ def snapshot_from_market_row(
     normalized_returns = (
         _normalized_return_values(
             row,
-            btc_benchmark=btc_benchmark,
-            eth_benchmark=eth_benchmark,
+            btc_benchmark=usable_btc_benchmark,
+            eth_benchmark=usable_eth_benchmark,
             source_unit=source_unit,
         )
         if source_unit_contract_valid
@@ -217,6 +223,10 @@ def snapshot_from_market_row(
     ))
     if not source_unit_contract_valid:
         unit_warnings.append("invalid_source_return_unit_metadata")
+    if not btc_benchmark_unit_contract_valid:
+        unit_warnings.append("invalid_btc_benchmark_return_unit_metadata")
+    if not eth_benchmark_unit_contract_valid:
+        unit_warnings.append("invalid_eth_benchmark_return_unit_metadata")
     if row.get("return_unit") not in (None, "") or any(
         key in row for key in event_market_units.RETURN_UNIT_METADATA_KEYS
     ):
@@ -418,6 +428,22 @@ def _canonical_source_return_unit(value: object) -> str | None:
     return _RETURN_UNIT_ALIASES.get(value.strip().casefold())
 
 
+def _usable_return_benchmark(
+    value: Mapping[str, Any] | None,
+) -> tuple[Mapping[str, Any], bool]:
+    """Return only a mapping with a closed unit contract for relative returns."""
+
+    if value is None:
+        return {}, True
+    if not isinstance(value, Mapping):
+        return {}, False
+    if not value:
+        return {}, True
+    if not _source_return_unit_contract_valid(value):
+        return {}, False
+    return value, True
+
+
 def _normalized_return_values(
     row: Mapping[str, Any],
     *,
@@ -534,17 +560,35 @@ def _normalized_return_values(
 
 
 def benchmark_rows(market_rows: list[Mapping[str, Any]]) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
-    """Return BTC and ETH benchmark rows when present."""
-    btc: Mapping[str, Any] = {}
-    eth: Mapping[str, Any] = {}
+    """Return one unambiguous, typed BTC and ETH benchmark row when present."""
+
+    candidates: dict[str, list[Mapping[str, Any]]] = {
+        "bitcoin": [],
+        "ethereum": [],
+    }
     for row in market_rows:
-        symbol = str(row.get("symbol") or "").upper()
-        coin_id = str(row.get("coin_id") or row.get("id") or "").casefold()
-        if symbol == "BTC" or coin_id == "bitcoin":
-            btc = row
-        elif symbol == "ETH" or coin_id == "ethereum":
-            eth = row
-    return btc, eth
+        if not isinstance(row, Mapping):
+            continue
+        symbol, symbol_supplied = _identity_text(row, "symbol")
+        coin_id, coin_id_supplied = _identity_text(row, "coin_id", "id")
+        if (symbol_supplied and not symbol) or (coin_id_supplied and not coin_id):
+            continue
+        symbol_kind = {
+            "BTC": "bitcoin",
+            "ETH": "ethereum",
+        }.get(symbol.upper())
+        coin_kind = coin_id.casefold() if coin_id.casefold() in candidates else None
+        if symbol_kind and coin_kind and symbol_kind != coin_kind:
+            continue
+        kind = symbol_kind or coin_kind
+        if kind:
+            candidates[kind].append(row)
+    btc = candidates["bitcoin"]
+    eth = candidates["ethereum"]
+    return (
+        btc[0] if len(btc) == 1 else {},
+        eth[0] if len(eth) == 1 else {},
+    )
 
 
 def _observed_at(row: Mapping[str, Any], observed_at: datetime | str | None) -> datetime:

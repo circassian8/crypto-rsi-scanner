@@ -54,6 +54,29 @@ def test_market_state_identity_aliases_are_typed_and_presence_aware():
     assert anomalies == []
 
 
+def test_benchmark_selection_rejects_invalid_fallthrough_conflict_and_duplicates():
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    valid_eth = {"coin_id": "ethereum", "symbol": "ETH"}
+    invalid_btc, eth = market_state.benchmark_rows([
+        {"coin_id": False, "id": "bitcoin", "symbol": "NOTBTC"},
+        valid_eth,
+    ])
+    assert invalid_btc == {}
+    assert eth is valid_eth
+
+    conflicting_btc, _eth = market_state.benchmark_rows([
+        {"coin_id": "ethereum", "symbol": "BTC"},
+    ])
+    assert conflicting_btc == {}
+
+    duplicate_btc, _eth = market_state.benchmark_rows([
+        {"coin_id": "bitcoin", "symbol": "BTC", "price": 1},
+        {"id": "bitcoin", "symbol": "BTC", "price": 2},
+    ])
+    assert duplicate_btc == {}
+
+
 def test_catalyst_queue_rejects_non_text_anomaly_identity():
     from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
 

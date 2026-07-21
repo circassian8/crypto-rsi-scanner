@@ -499,6 +499,47 @@ def test_market_no_send_preserves_valid_mixed_return_units():
     assert [row["anomaly_type"] for row in anomalies] == ["confirmed_breakout"]
 
 
+def test_malformed_benchmark_units_cannot_create_relative_breakout():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    rows = [
+        {
+            "id": "bitcoin",
+            "coin_id": "bitcoin",
+            "symbol": "BTC",
+            "return_unit": {"borrowed": "fraction"},
+            "return_4h": 0.10,
+            "return_24h": 0.10,
+            "freshness_status": "fresh",
+        },
+        {
+            "id": "benchmark-victim",
+            "coin_id": "benchmark-victim",
+            "symbol": "VICTIM",
+            "return_unit": "fraction",
+            "return_4h": 0.20,
+            "return_24h": 0.20,
+            "volume_zscore_24h": 3.0,
+            "liquidity_usd": 100_000_000.0,
+            "spread_bps": 5.0,
+            "freshness_status": "fresh",
+        },
+    ]
+
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        rows,
+        observed_at="2026-07-21T10:45:00Z",
+    )
+    by_symbol = {row["symbol"]: row for row in snapshots}
+
+    assert by_symbol["VICTIM"]["return_4h"] == 20.0
+    assert by_symbol["VICTIM"]["relative_return_vs_btc_4h"] is None
+    assert "invalid_btc_benchmark_return_unit_metadata" in by_symbol["VICTIM"][
+        "unit_warnings"
+    ]
+    assert anomalies == []
+
+
 def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():
     from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 
