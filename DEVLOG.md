@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Pass the post-hardening local verification checkpoint · Codex
+**Why:** Five focused evidence-integrity commits accumulated after the previous
+broad gate, reaching the repository's risk-based checkpoint cadence. A fresh
+local package/smoke pass was warranted before the next authorized no-send
+observation cycle.
+**Changes:** No production, fixture, threshold, score, route, provider, or
+artifact-authority code changed. This entry records the completed local
+verification evidence for the catalyst URL, derivatives identity, market source
+lineage, empirical replay lineage, and canonical asset control hardening.
+**Verify:** `make verify-fast PYTHON=python3` passed all 3,766 tests in 188.56
+seconds, then passed the Telegram/plain alert render smoke, checked-in fixture
+backtest, and paper scoreboard. The gate ran locally with loopback test support;
+it did not wait for GitHub or call any market/catalyst provider.
+**Notes/risks:** Current paper-scoreboard output is observational local state,
+not Decision-Radar calibration authority; no thresholds or priors were changed.
+Every send, trade, order, paper-trade, normal RSI-write, and Event Alpha
+`TRIGGERED_FADE` safety boundary remains unchanged. Quantitative source-size
+limits remain advisory; security and evidence bounds remain enforced.
+
 ## 2026-07-21 — Close canonical asset boolean coercion · Codex
 **Why:** The canonical asset adapter treated every nonzero numeric as true.
 For example, `is_tradable_asset=2` became a valid boolean before the raw market
