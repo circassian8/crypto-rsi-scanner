@@ -15,6 +15,8 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
+from crypto_rsi_scanner.state_features import liquidity_bucket
+
 from crypto_rsi_scanner.event_alpha.radar.market_history_models import (
     BASELINE_COUNTED,
     BASELINE_DUPLICATE,
@@ -405,6 +407,31 @@ def _point_in_time_universe_claims_invalid(row: Mapping[str, Any]) -> bool:
     size = row.get("point_in_time_universe_size")
     limit = row.get("point_in_time_universe_limit")
     liquidity_tier = row.get("control_liquidity_tier")
+    liquidity_value = _first_number(
+        row,
+        "liquidity_usd",
+        "volume_24h",
+        "total_volume",
+        "spot_volume_24h",
+    )
+    turnover_value = _first_number(
+        row,
+        "turnover_24h",
+        "volume_to_market_cap",
+        "volume_mcap",
+    )
+    if turnover_value is None:
+        volume = _first_number(row, "volume_24h", "total_volume", "spot_volume_24h")
+        market_cap = _first_number(row, "market_cap", "mcap")
+        if volume is not None and market_cap is not None and market_cap > 0:
+            turnover_value = volume / market_cap
+    expected_liquidity_tier = (
+        liquidity_bucket(liquidity_value, turnover_value)
+        if liquidity_value is not None
+        and liquidity_value >= 0
+        and (turnover_value is None or turnover_value >= 0)
+        else None
+    )
     return not (
         row.get("point_in_time_universe_member") is True
         and type(rank) is int
@@ -420,6 +447,7 @@ def _point_in_time_universe_claims_invalid(row: Mapping[str, Any]) -> bool:
         and liquidity_tier in _CONTROL_LIQUIDITY_TIERS
         and row.get("control_liquidity_tier_basis")
         == _CONTROL_LIQUIDITY_TIER_BASIS
+        and liquidity_tier == expected_liquidity_tier
     )
 
 

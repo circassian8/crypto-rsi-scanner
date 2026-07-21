@@ -1130,6 +1130,7 @@ def _point_in_time_universe_context() -> dict:
         {"point_in_time_universe_limit": 0},
         {"point_in_time_universe_policy": "current_top_volume_guess"},
         {"control_liquidity_tier": "HIGH"},
+        {"control_liquidity_tier": "low"},
         {"control_liquidity_tier": {"borrowed": "high"}},
         {"control_liquidity_tier_basis": "inferred_after_outcomes"},
     ),
@@ -1143,7 +1144,7 @@ def test_market_history_rejects_inconsistent_point_in_time_universe_context(
         "invalid-universe-context",
         NOW,
         price=1,
-        volume=10,
+        volume=120_000_000,
         **context,
     )
 

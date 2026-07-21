@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Rederive retained control-liquidity tiers · Codex
+**Why:** The new universe contract required a closed tier label and exact basis,
+but a well-formed false tier could still be retained. Future matched controls
+must be reproducible from point-in-time measurements rather than trusted label
+text.
+**Changes:** Market-history admission now derives the expected control tier with
+the shared `liquidity_bucket` implementation from explicit liquidity (falling
+back to the same observed 24-hour volume) and exact supplied/derived turnover.
+The claimed tier must match that calculation; invalid, negative, structured, or
+contradictory inputs fail the existing point-in-time universe contract. No new
+tier or threshold was introduced.
+**Verify:** A regression proves a valid closed-but-wrong tier is rejected, while
+the existing high-liquidity retention/rebuild path remains green. The market-
+history/cache/campaign/no-send group passed (`129 passed`) and `python3 -m
+compileall -q crypto_rsi_scanner tests` passed.
+**Notes/risks:** This reuses the production helper rather than duplicating its
+thresholds. It does not change selection, route, score, policy, provider
+authorization, or current authority. No provider call, send, trade, order,
+paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Source-size
+metrics remain advisory.
+
 ## 2026-07-21 — Close point-in-time universe retention · Codex
 **Why:** Readiness rejected inconsistent universe context, but rolling-history
 persistence copied each individually well-typed field. Partial claims or an
