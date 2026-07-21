@@ -385,6 +385,9 @@ def _shadow_asset_variation_table(
     ):
         return ""
     input_trace_available = raw.get("input_trace_diagnostics_available") is True
+    return_timing_available = (
+        raw.get("return_sampling_timing_diagnostics_available") is True
+    )
     repeated_rows: list[tuple[float, float, str, str, Mapping[str, Any], Mapping[str, Any]]] = []
     for asset in summaries:
         if not isinstance(asset, Mapping):
@@ -449,6 +452,8 @@ def _shadow_asset_variation_table(
         ]
         if input_trace_available:
             row_values.append(_shadow_input_trace_summary(variation))
+        if return_timing_available:
+            row_values.append(_shadow_return_sampling_timing_summary(variation))
         row_values.extend((
             _shadow_asset_source_basis(asset, feature=feature),
             _shadow_variation_extreme(
@@ -477,6 +482,11 @@ def _shadow_asset_variation_table(
     ]
     if input_trace_available:
         headers.append("Source-repeat / transform / mixed · max run source / derived")
+    if return_timing_available:
+        headers.append(
+            "Reuse observations asset-anchor / benchmark-end / benchmark-anchor "
+            "· max timing error asset / benchmark / alignment (s)"
+        )
     headers.extend((
         "Retained provider · mode · basis",
         "Latest reference set",
@@ -488,12 +498,21 @@ def _shadow_asset_variation_table(
         if input_trace_available
         else ""
     )
+    timing_note = (
+        " Return sampling uses exact observation identities: reuse counts show "
+        "whether an anchor or benchmark endpoint served more than one sample, "
+        "while timing errors show realized distance from the nominal horizon and "
+        "asset/benchmark endpoint alignment. These diagnostics do not change policy."
+        if return_timing_available
+        else ""
+    )
     return (
         '<div class="alert alert-info"><strong>Attribution required.</strong> '
         + escape_html(count_note)
         + " Repetition can reflect legitimate low-motion behavior, provider refresh cadence, "
         "or upstream quantization. This ranking is outcome-blind and applies no exclusion."
         + escape_html(trace_note)
+        + escape_html(timing_note)
         + "</div>"
         + str(data_table(
             tuple(headers),
@@ -522,6 +541,29 @@ def _shadow_input_trace_summary(value: Mapping[str, Any]) -> str:
         value.get("maximum_consecutive_derived_value_count")
     )
     return f"{source} / {transform} / {mixed} · {source_run} / {derived_run}"
+
+
+def _shadow_return_sampling_timing_summary(value: Mapping[str, Any]) -> str:
+    summary = value.get("return_sampling_timing_summary")
+    if not isinstance(summary, Mapping):
+        return UNAVAILABLE
+    reuse = " / ".join(
+        display_count(summary.get(field))
+        for field in (
+            "asset_anchor_reuse_observation_count",
+            "benchmark_endpoint_reuse_observation_count",
+            "benchmark_anchor_reuse_observation_count",
+        )
+    )
+    timing = " / ".join(
+        format_number(summary.get(field), decimals=0)
+        for field in (
+            "maximum_asset_anchor_selection_error_seconds",
+            "maximum_benchmark_anchor_selection_error_seconds",
+            "maximum_benchmark_endpoint_alignment_lag_seconds",
+        )
+    )
+    return f"{reuse} · {timing}"
 
 
 def _shadow_asset_identity(asset_id: str, asset: Mapping[str, Any]) -> HtmlFragment:

@@ -28,6 +28,7 @@ from crypto_rsi_scanner.event_alpha.operations import (
     market_no_send_features,
     market_observation_campaign_episode_frontier,
     market_observation_campaign_regime_audit,
+    market_observation_campaign_render,
     market_observation_campaign_shadow_surprise,
 )
 from tests.event_alpha.test_decision_episode_scorecard import (
@@ -566,10 +567,11 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     ] == 30
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 5
+    assert shadow["schema_version"] == 6
     assert shadow["variation_diagnostics_available"] is True
     assert shadow["asset_variation_diagnostics_available"] is True
     assert shadow["input_trace_diagnostics_available"] is True
+    assert shadow["return_sampling_timing_diagnostics_available"] is True
     assert shadow["evaluated_observation_count"] == 36
     assert shadow["provider_calls"] == shadow["writes"] == 0
     volume_shadow = shadow["feature_coverage"]["volume_24h"]
@@ -616,6 +618,16 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     ] == "source_tuple_repetition"
     assert asset_volume["input_trace_diagnostics_are_policy"] is False
     assert asset_volume["provider_causation_claimed"] is False
+    assert asset_volume["return_sampling_timing_summary"] is None
+    asset_return = asset_a["feature_variation"]["return_1h"]
+    timing = asset_return["return_sampling_timing_summary"]
+    assert timing["observation_count"] > 0
+    assert timing["asset_anchor_reuse_observation_count"] == 0
+    assert timing["maximum_asset_anchor_selection_error_seconds"] == 0.0
+    assert timing["maximum_benchmark_endpoint_alignment_lag_seconds"] is None
+    assert timing["timing_diagnostics_are_policy"] is False
+    assert timing["provider_causation_claimed"] is False
+    assert timing["statistical_independence_claimed"] is False
     assert asset_a["source_context_is_causal_attribution"] is False
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
@@ -847,6 +859,15 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, input_trace_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    timing_drift = deepcopy(_campaign_report())
+    timing_drift["shadow_temporal_surprise_campaign_audit"][
+        "asset_variation_summaries"
+    ][0]["feature_variation"]["return_1h"][
+        "return_sampling_timing_summary"
+    ]["timing_diagnostics_are_policy"] = True
+    _write_report(tmp_path, timing_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     tmp_path: Path,
@@ -856,6 +877,9 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     snapshot = replace(_snapshot(), campaign_operator_actions=projection)
 
     html = render_campaign_page(snapshot, query={})
+    markdown = market_observation_campaign_render.format_campaign_report(
+        _campaign_report()
+    )
 
     assert "Protocol-v2 episode coverage" in html
     assert "Causal 24-hour input history" in html
@@ -873,6 +897,11 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Source-repeat / transform / mixed" in html
     assert "Source repetition means the exact value-only source tuple repeated" in html
     assert "Neither result attributes provider fault" in html
+    assert "Reuse observations asset-anchor / benchmark-end / benchmark-anchor" in html
+    assert "Return sampling uses exact observation identities" in html
+    assert "These diagnostics do not change policy" in html
+    assert "Reuse obs asset-anchor / benchmark-end / benchmark-anchor" in markdown
+    assert "Return timing uses exact observation identity" in markdown
     assert "Retained provider · mode · basis" in html
     assert "This ranking is outcome-blind and applies no exclusion" in html
     assert "Observed history, not a policy input" in html
@@ -885,6 +914,33 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Fundamental-led" in html
     assert "Minimum samples" in html
     assert "remain unsealed" in html
+
+
+def test_campaign_dashboard_keeps_v5_shadow_audit_readable_without_timing(
+    tmp_path: Path,
+) -> None:
+    report = deepcopy(_campaign_report())
+    audit = report["shadow_temporal_surprise_campaign_audit"]
+    audit["schema_version"] = 5
+    audit["shadow_schema_version"] = 4
+    for coverage in audit["feature_coverage"].values():
+        coverage["variation_observation_basis"] = (
+            "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
+        )
+    for asset in audit["asset_variation_summaries"]:
+        for feature in asset["feature_variation"].values():
+            feature.pop("return_sampling_timing_summary")
+    _write_report(tmp_path, report)
+
+    projection = _load(tmp_path)
+    snapshot = replace(_snapshot(), campaign_operator_actions=projection)
+    html = render_campaign_page(snapshot, query={})
+
+    shadow = projection["shadow_temporal_surprise"]
+    assert projection["status"] == "ready"
+    assert shadow["schema_version"] == 5
+    assert shadow["return_sampling_timing_diagnostics_available"] is False
+    assert "Reuse observations asset-anchor / benchmark-end / benchmark-anchor" not in html
 
 
 def test_campaign_dashboard_keeps_v2_shadow_audit_readable_without_variation(

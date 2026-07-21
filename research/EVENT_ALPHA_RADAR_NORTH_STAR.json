@@ -435,7 +435,7 @@
       "sports_fixtures"
     ]
   },
-  "generated_at": "2026-07-21T17:02:11.059650+00:00",
+  "generated_at": "2026-07-21T17:45:49.130073+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1224,7 +1224,8 @@
       1,
       2,
       3,
-      4
+      4,
+      5
     ],
     "campaign_audit_minimum_distinct_baseline_value_count": null,
     "campaign_audit_non_counted_rows": "excluded_with_exact_count",
@@ -1236,8 +1237,12 @@
     "campaign_audit_ready_distribution": "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections",
     "campaign_audit_ready_semantics": "every_modeled_feature_has_some_ready_evidence_not_every_projection_ready",
     "campaign_audit_replay": "each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks",
+    "campaign_audit_return_sampling_statistical_independence_claimed": false,
+    "campaign_audit_return_sampling_timing_diagnostics_are_policy": false,
+    "campaign_audit_return_sampling_timing_exact_maximum_references": true,
+    "campaign_audit_return_sampling_timing_summary": "per_asset_per_return_feature_observation_identity_reuse_realized_horizon_error_and_benchmark_alignment",
     "campaign_audit_schema_id": "decision_radar.shadow_temporal_surprise_campaign_audit",
-    "campaign_audit_schema_version": 5,
+    "campaign_audit_schema_version": 6,
     "campaign_audit_source_bound_digest": "changes_when_exact_history_snapshot_fingerprint_changes",
     "campaign_audit_source_context_is_causal_attribution": false,
     "campaign_audit_statistical_independence_claimed": false,
@@ -1245,7 +1250,7 @@
     "campaign_audit_variation_diagnostics_are_policy": false,
     "campaign_audit_variation_distributions": "per_feature_distinct_count_distinct_ratio_and_maximum_tie_ratio",
     "campaign_audit_variation_extreme_references": "exact_least_distinct_and_highest_tie_ratio_observation_identity",
-    "campaign_audit_variation_observation_basis": "closed_shadow_v4_projection_meeting_existing_minimum_sample_count",
+    "campaign_audit_variation_observation_basis": "closed_shadow_v5_projection_meeting_existing_minimum_sample_count",
     "campaign_audit_variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values",
     "campaign_audit_writes": 0,
     "canonical_history_or_provider_source_mutated": false,
@@ -1290,7 +1295,8 @@
     "legacy_schema_versions_readable": [
       1,
       2,
-      3
+      3,
+      4
     ],
     "location": "median_of_log_baseline",
     "method_references": [
@@ -1315,12 +1321,22 @@
       4,
       24
     ],
+    "return_sampling_timing_diagnostics": [
+      "endpoint_and_anchor_observation_reuse",
+      "maximum_consecutive_endpoint_and_anchor_reuse",
+      "realized_horizon_seconds_minimum_median_maximum",
+      "anchor_selection_error_seconds_minimum_median_maximum",
+      "benchmark_endpoint_alignment_lag_seconds_minimum_median_maximum",
+      "exact_maximum_reuse_error_and_alignment_references"
+    ],
+    "return_sampling_timing_diagnostics_are_policy": false,
+    "return_sampling_trace_identity": "ordered_exact_endpoint_anchor_observation_identity_and_timing",
     "return_tail_ranks_are_p_values": false,
     "routing_eligible": false,
     "same_asset_relative_return_status": "not_applicable",
     "scale": "median_absolute_deviation_times_1.482602218505602",
     "schema_id": "event_alpha.shadow_temporal_surprise",
-    "schema_version": 4,
+    "schema_version": 5,
     "score_adjustment_eligible": false,
     "signed_return_feature_basis": "provider_observed_price_ratio_only",
     "signed_return_features": [

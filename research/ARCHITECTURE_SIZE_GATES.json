@@ -1559,6 +1559,15 @@
     {
       "accepted": true,
       "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
+      "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
+      "source_kind": "production"
+    },
+    {
+      "accepted": true,
+      "limit": 1500,
       "line_count": 1389,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
       "reason": "Pure frozen shadow-policy, recommendation-seal, final-test, and chronological walk-forward evaluation with no production-policy mutation path.",
@@ -1572,15 +1581,6 @@
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
       "reason": "Route-gate decision logic is dense and behavior-critical for no-send notification eligibility.",
       "revisit_condition": "When route-decision/gate snapshots cover every lane and quality-gate cap.",
-      "source_kind": "production"
-    },
-    {
-      "accepted": true,
-      "limit": 1500,
-      "line_count": 1375,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
-      "reason": "Static architecture report aggregator preserving compatibility aliases and existing gate counters.",
-      "revisit_condition": "Split when adding a new architecture report family or when report schema v2 removes historical aliases.",
       "source_kind": "production"
     },
     {
@@ -1827,19 +1827,19 @@
   "files_over_limit": [
     {
       "limit": 1500,
-      "line_count": 1774,
+      "line_count": 2288,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1750,
+      "line_count": 1855,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1566,
+      "line_count": 1608,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
       "source_kind": "production"
     },
@@ -1863,7 +1863,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2769,
+      "line_count": 3485,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
       "source_kind": "production"
     },
@@ -1881,13 +1881,13 @@
     },
     {
       "limit": 1500,
-      "line_count": 1511,
+      "line_count": 1995,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1570,
+      "line_count": 1573,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -1923,7 +1923,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1511,
+      "line_count": 1701,
       "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "source_kind": "test"
     },
@@ -2107,7 +2107,7 @@
     },
     {
       "function_name": "validate_campaign_shadow_surprise_audit",
-      "line_count": 165,
+      "line_count": 166,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": true,
       "qualname": "validate_campaign_shadow_surprise_audit",
@@ -2123,10 +2123,34 @@
     },
     {
       "function_name": "_asset_feature_variation",
-      "line_count": 180,
+      "line_count": 185,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": false,
       "qualname": "_asset_feature_variation",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
+      "function_name": "_return_sampling_timing_summary",
+      "line_count": 252,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_return_sampling_timing_summary",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
+      "function_name": "_validate_asset_feature_variation",
+      "line_count": 152,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_asset_feature_variation",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
+      "function_name": "_validate_return_sampling_timing_summary",
+      "line_count": 156,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_return_sampling_timing_summary",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
     },
     {
@@ -2154,16 +2178,28 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 27,
+  "functions_over_limit_count": 30,
   "gate_status": "pass",
-  "generated_at": "2026-07-21T17:09:55.009363+00:00",
+  "generated_at": "2026-07-21T18:07:30.089927+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
     {
       "limit": 1500,
-      "line_count": 2769,
+      "line_count": 3485,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 2288,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1995,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
     {
@@ -2180,13 +2216,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1774,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1750,
+      "line_count": 1855,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
       "source_kind": "production"
     },
@@ -2204,20 +2234,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1584,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1566,
+      "line_count": 1608,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1511,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+      "line_count": 1584,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "source_kind": "production"
     },
     {
@@ -2282,6 +2306,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1389,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
       "source_kind": "production"
@@ -2296,12 +2326,6 @@
       "limit": 1500,
       "line_count": 1385,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1375,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
     },
     {
@@ -2354,6 +2378,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1273,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1264,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "source_kind": "production"
@@ -2390,12 +2420,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1229,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1222,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
@@ -2422,13 +2446,19 @@
     },
     {
       "limit": 1500,
+      "line_count": 1701,
+      "path": "tests/event_alpha/test_market_shadow_surprise.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1588,
       "path": "tests/event_alpha/test_impact_hypotheses.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1570,
+      "line_count": 1573,
       "path": "tests/cli/test_make_targets.py",
       "source_kind": "test"
     },
@@ -2442,12 +2472,6 @@
       "limit": 1500,
       "line_count": 1527,
       "path": "tests/event_alpha/test_market_history.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1511,
-      "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "source_kind": "test"
     },
     {
@@ -2596,6 +2620,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1144,
+      "path": "tests/event_alpha/test_dashboard_campaign_operator_actions.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
       "line_count": 1138,
       "path": "tests/event_alpha/test_empirical_research_reports.py",
       "source_kind": "test"
@@ -2610,12 +2640,6 @@
       "limit": 1500,
       "line_count": 1096,
       "path": "tests/event_alpha/test_evidence_quality.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1088,
-      "path": "tests/event_alpha/test_dashboard_campaign_operator_actions.py",
       "source_kind": "test"
     },
     {
@@ -4165,6 +4189,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1389,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -4181,13 +4212,6 @@
     {
       "line_count": 1385,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1375,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -4230,13 +4254,13 @@
   ],
   "new_blocking_violation_count": 0,
   "new_blocking_violations": [],
-  "new_measurement_count": 45,
-  "new_violation_count": 45,
+  "new_measurement_count": 48,
+  "new_violation_count": 48,
   "new_violations": [
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1774,
+      "line_count": 2288,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -4245,7 +4269,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1750,
+      "line_count": 1855,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -4254,7 +4278,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1566,
+      "line_count": 1608,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -4290,7 +4314,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2769,
+      "line_count": 3485,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -4317,7 +4341,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1511,
+      "line_count": 1995,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -4326,7 +4350,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1570,
+      "line_count": 1573,
       "path": "tests/cli/test_make_targets.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -4380,7 +4404,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1511,
+      "line_count": 1701,
       "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -4629,7 +4653,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "validate_campaign_shadow_surprise_audit",
-      "line_count": 165,
+      "line_count": 166,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": true,
       "qualname": "validate_campaign_shadow_surprise_audit",
@@ -4651,13 +4675,46 @@
     {
       "category": "function_over_150_lines",
       "function_name": "_asset_feature_variation",
-      "line_count": 180,
+      "line_count": 185,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": false,
       "qualname": "_asset_feature_variation",
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_asset_feature_variation"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_return_sampling_timing_summary",
+      "line_count": 252,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_return_sampling_timing_summary",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_return_sampling_timing_summary"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_validate_asset_feature_variation",
+      "line_count": 152,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_asset_feature_variation",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_validate_asset_feature_variation"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_validate_return_sampling_timing_summary",
+      "line_count": 156,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_return_sampling_timing_summary",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_validate_return_sampling_timing_summary"
     },
     {
       "category": "function_over_150_lines",
@@ -4754,8 +4811,20 @@
   "production_files_over_1200_line_rows": [
     {
       "limit": 1500,
-      "line_count": 2769,
+      "line_count": 3485,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 2288,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1995,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
     {
@@ -4772,13 +4841,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1774,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1750,
+      "line_count": 1855,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
       "source_kind": "production"
     },
@@ -4796,20 +4859,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1584,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1566,
+      "line_count": 1608,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1511,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+      "line_count": 1584,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "source_kind": "production"
     },
     {
@@ -4874,6 +4931,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1392,
+      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1389,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
       "source_kind": "production"
@@ -4888,12 +4951,6 @@
       "limit": 1500,
       "line_count": 1385,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1375,
-      "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
     },
     {
@@ -4946,6 +5003,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1273,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1264,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
       "source_kind": "production"
@@ -4982,12 +5045,6 @@
     },
     {
       "limit": 1500,
-      "line_count": 1229,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
       "line_count": 1222,
       "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
       "source_kind": "production"
@@ -5001,9 +5058,9 @@
   ],
   "production_files_over_1200_lines": 41,
   "production_files_over_1500_lines": 10,
-  "production_files_over_2000_lines": 1,
-  "production_files_over_3000_lines": 0,
-  "production_functions_over_limit": 27,
+  "production_files_over_2000_lines": 2,
+  "production_files_over_3000_lines": 1,
+  "production_functions_over_limit": 30,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -5175,7 +5232,7 @@
     },
     {
       "function_name": "validate_campaign_shadow_surprise_audit",
-      "line_count": 165,
+      "line_count": 166,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": true,
       "qualname": "validate_campaign_shadow_surprise_audit",
@@ -5191,10 +5248,34 @@
     },
     {
       "function_name": "_asset_feature_variation",
-      "line_count": 180,
+      "line_count": 185,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": false,
       "qualname": "_asset_feature_variation",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
+      "function_name": "_return_sampling_timing_summary",
+      "line_count": 252,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_return_sampling_timing_summary",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
+      "function_name": "_validate_asset_feature_variation",
+      "line_count": 152,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_asset_feature_variation",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
+    },
+    {
+      "function_name": "_validate_return_sampling_timing_summary",
+      "line_count": 156,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_return_sampling_timing_summary",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py"
     },
     {
@@ -5410,8 +5491,20 @@
   "unresolved_production_files_over_1200_line_rows": [
     {
       "limit": 1500,
-      "line_count": 2769,
+      "line_count": 3485,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 2288,
+      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1995,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
     {
@@ -5422,13 +5515,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1774,
-      "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1750,
+      "line_count": 1855,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
       "source_kind": "production"
     },
@@ -5440,20 +5527,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1584,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1566,
+      "line_count": 1608,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1511,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+      "line_count": 1584,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "source_kind": "production"
     },
     {
@@ -5482,6 +5563,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1273,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1244,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
       "source_kind": "production"
@@ -5490,12 +5577,6 @@
       "limit": 1500,
       "line_count": 1232,
       "path": "crypto_rsi_scanner/event_fade.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1229,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
       "source_kind": "production"
     },
     {
@@ -5580,7 +5661,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 27,
+      "functions_over_150_lines": 30,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -5596,8 +5677,18 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
-        "line_count": 2769,
+        "line_count": 3485,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 2288,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1995,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
         "threshold": 1200
       },
       {
@@ -5611,12 +5702,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1774,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1750,
+        "line_count": 1855,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
         "threshold": 1200
       },
@@ -5631,18 +5717,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1584,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1566,
+        "line_count": 1608,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
         "threshold": 1200
       },
       {
-        "line_count": 1511,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+        "line_count": 1584,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1200
       },
       {
@@ -5696,6 +5777,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1392,
+        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1389,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_policy_lab.py",
         "threshold": 1200
@@ -5708,11 +5794,6 @@
       {
         "line_count": 1385,
         "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1375,
-        "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
       },
       {
@@ -5756,6 +5837,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1273,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1264,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py",
         "threshold": 1200
@@ -5786,11 +5872,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1229,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1222,
         "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py",
         "threshold": 1200
@@ -5803,8 +5884,18 @@
     ],
     "production_files_over_1500_line_rows": [
       {
-        "line_count": 2769,
+        "line_count": 3485,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+        "threshold": 1500
+      },
+      {
+        "line_count": 2288,
+        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
+        "threshold": 1500
+      },
+      {
+        "line_count": 1995,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
         "threshold": 1500
       },
       {
@@ -5818,12 +5909,7 @@
         "threshold": 1500
       },
       {
-        "line_count": 1774,
-        "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
-        "threshold": 1500
-      },
-      {
-        "line_count": 1750,
+        "line_count": 1855,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
         "threshold": 1500
       },
@@ -5838,18 +5924,13 @@
         "threshold": 1500
       },
       {
-        "line_count": 1584,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
-        "threshold": 1500
-      },
-      {
-        "line_count": 1566,
+        "line_count": 1608,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
         "threshold": 1500
       },
       {
-        "line_count": 1511,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
+        "line_count": 1584,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1500
       }
     ],
@@ -5916,7 +5997,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 27,
+    "functions_over_150_lines": 30,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
@@ -5973,6 +6054,9 @@
     "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py:format_campaign_report",
     "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_asset_feature_variation",
     "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_feature_coverage",
+    "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_return_sampling_timing_summary",
+    "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_validate_asset_feature_variation",
+    "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_validate_return_sampling_timing_summary",
     "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:build_campaign_shadow_surprise_audit",
     "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:validate_campaign_shadow_surprise_audit",
     "function:crypto_rsi_scanner/event_alpha/radar/market_state.py:snapshot_from_market_row",
@@ -5983,7 +6067,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1774,
+      "line_count": 2288,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -5992,7 +6076,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1750,
+      "line_count": 1855,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -6001,7 +6085,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1566,
+      "line_count": 1608,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -6037,7 +6121,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2769,
+      "line_count": 3485,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -6064,7 +6148,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1511,
+      "line_count": 1995,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -6073,7 +6157,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1570,
+      "line_count": 1573,
       "path": "tests/cli/test_make_targets.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -6127,7 +6211,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1511,
+      "line_count": 1701,
       "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -6427,7 +6511,7 @@
     {
       "category": "function_over_150_lines",
       "function_name": "validate_campaign_shadow_surprise_audit",
-      "line_count": 165,
+      "line_count": 166,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": true,
       "qualname": "validate_campaign_shadow_surprise_audit",
@@ -6449,13 +6533,46 @@
     {
       "category": "function_over_150_lines",
       "function_name": "_asset_feature_variation",
-      "line_count": 180,
+      "line_count": 185,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
       "public": false,
       "qualname": "_asset_feature_variation",
       "severity": "advisory",
       "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
       "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_asset_feature_variation"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_return_sampling_timing_summary",
+      "line_count": 252,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_return_sampling_timing_summary",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_return_sampling_timing_summary"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_validate_asset_feature_variation",
+      "line_count": 152,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_asset_feature_variation",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_validate_asset_feature_variation"
+    },
+    {
+      "category": "function_over_150_lines",
+      "function_name": "_validate_return_sampling_timing_summary",
+      "line_count": 156,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise",
+      "public": false,
+      "qualname": "_validate_return_sampling_timing_summary",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_validate_return_sampling_timing_summary"
     },
     {
       "category": "function_over_150_lines",

@@ -1,4 +1,4 @@
-"""Closed nested schema checks for shadow temporal market surprise v1-v4."""
+"""Closed nested schema checks for shadow temporal market surprise v1-v5."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from typing import Any
 
 
 SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SCHEMA_VERSION = 4
-LEGACY_SCHEMA_VERSIONS = frozenset((1, 2, 3))
+SCHEMA_VERSION = 5
+LEGACY_SCHEMA_VERSIONS = frozenset((1, 2, 3, 4))
 FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -216,12 +216,19 @@ _RETURN_METHOD_KEYS_V3 = frozenset(
         "variation_diagnostics_are_policy",
     )
 )
-_RETURN_METHOD_KEYS = frozenset(
+_RETURN_METHOD_KEYS_V4 = frozenset(
     (
         *_RETURN_METHOD_KEYS_V3,
         "source_value_tuple_identity",
         "input_trace_diagnostics_are_policy",
         "provider_causation_claimed",
+    )
+)
+_RETURN_METHOD_KEYS = frozenset(
+    (
+        *_RETURN_METHOD_KEYS_V4,
+        "return_sampling_trace_identity",
+        "return_sampling_timing_diagnostics_are_policy",
     )
 )
 _RETURN_METHOD_VALUES_V2 = {
@@ -255,13 +262,20 @@ _RETURN_METHOD_VALUES_V3 = {
     "minimum_distinct_baseline_value_count": None,
     "variation_diagnostics_are_policy": False,
 }
-_RETURN_METHOD_VALUES = {
+_RETURN_METHOD_VALUES_V4 = {
     **_RETURN_METHOD_VALUES_V3,
     "source_value_tuple_identity": (
         "ordered_value_only_source_price_tuples_formatted_to_17_significant_digits"
     ),
     "input_trace_diagnostics_are_policy": False,
     "provider_causation_claimed": False,
+}
+_RETURN_METHOD_VALUES = {
+    **_RETURN_METHOD_VALUES_V4,
+    "return_sampling_trace_identity": (
+        "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+    ),
+    "return_sampling_timing_diagnostics_are_policy": False,
 }
 _RETURN_FEATURE_KEYS_V2 = frozenset(
     (
@@ -303,11 +317,76 @@ _RETURN_FEATURE_KEYS_V3 = frozenset(
         "nominal_two_sided_tail_rank_floor",
     )
 )
-_RETURN_FEATURE_KEYS = frozenset(
+_RETURN_FEATURE_KEYS_V4 = frozenset(
     (*_RETURN_FEATURE_KEYS_V3, *_INPUT_TRACE_KEYS)
+)
+_RETURN_FEATURE_KEYS = frozenset(
+    (*_RETURN_FEATURE_KEYS_V4, "return_sampling_trace")
 )
 _RETURN_SAMPLE_KEYS = frozenset(
     ("asset_endpoint", "asset_anchor", "benchmark_endpoint", "benchmark_anchor")
+)
+_RETURN_SAMPLING_TRACE_KEYS = frozenset(
+    (
+        "status",
+        "sample_count",
+        "horizon_hours",
+        "nominal_horizon_seconds",
+        "sample_identity_sha256",
+        "asset_leg",
+        "benchmark_leg",
+        "benchmark_endpoint_alignment",
+        "anchor_reuse_detected",
+        "benchmark_endpoint_reuse_detected",
+        "nonzero_anchor_selection_error_detected",
+        "nonzero_benchmark_alignment_lag_detected",
+        "timing_diagnostics_are_policy",
+        "provider_causation_claimed",
+        "statistical_independence_claimed",
+    )
+)
+_RETURN_SAMPLING_LEG_KEYS = frozenset(
+    (
+        "endpoint_observation_count",
+        "distinct_endpoint_observation_count",
+        "endpoint_reuse_excess_count",
+        "maximum_endpoint_reuse_count",
+        "maximum_consecutive_endpoint_reuse_count",
+        "anchor_observation_count",
+        "distinct_anchor_observation_count",
+        "anchor_reuse_excess_count",
+        "maximum_anchor_reuse_count",
+        "maximum_consecutive_anchor_reuse_count",
+        "realized_horizon_seconds",
+        "anchor_selection_error_seconds",
+        "maximum_endpoint_reuse_reference",
+        "maximum_anchor_reuse_reference",
+        "maximum_anchor_selection_error_reference",
+    )
+)
+_RETURN_SAMPLING_RANGE_KEYS = frozenset(("minimum", "median", "maximum"))
+_RETURN_SAMPLING_REUSE_REFERENCE_KEYS = frozenset(
+    (
+        "observation",
+        "reuse_count",
+        "first_asset_endpoint",
+        "last_asset_endpoint",
+    )
+)
+_RETURN_SAMPLING_ERROR_REFERENCE_KEYS = frozenset(
+    (
+        "asset_endpoint",
+        "endpoint",
+        "anchor",
+        "realized_horizon_seconds",
+        "anchor_selection_error_seconds",
+    )
+)
+_RETURN_SAMPLING_ALIGNMENT_KEYS = frozenset(
+    ("sample_count", "lag_seconds", "maximum_lag_reference")
+)
+_RETURN_SAMPLING_ALIGNMENT_REFERENCE_KEYS = frozenset(
+    ("asset_endpoint", "benchmark_endpoint", "lag_seconds")
 )
 _RETURN_FEATURE_STATUSES = frozenset(
     (
@@ -574,14 +653,18 @@ def _validate_return_method(
         return
     expected_keys = (
         _RETURN_METHOD_KEYS
-        if schema_version >= 4
+        if schema_version >= 5
+        else _RETURN_METHOD_KEYS_V4
+        if schema_version == 4
         else _RETURN_METHOD_KEYS_V3
         if schema_version == 3
         else _RETURN_METHOD_KEYS_V2
     )
     expected_values = (
         _RETURN_METHOD_VALUES
-        if schema_version >= 4
+        if schema_version >= 5
+        else _RETURN_METHOD_VALUES_V4
+        if schema_version == 4
         else _RETURN_METHOD_VALUES_V3
         if schema_version == 3
         else _RETURN_METHOD_VALUES_V2
@@ -692,8 +775,6 @@ def _validate_feature(
             ),
             errors=errors,
         )
-
-
 def _validate_return_features(
     value: object,
     *,
@@ -733,7 +814,9 @@ def _validate_return_feature(
         return
     expected_keys = (
         _RETURN_FEATURE_KEYS
-        if schema_version >= 4
+        if schema_version >= 5
+        else _RETURN_FEATURE_KEYS_V4
+        if schema_version == 4
         else _RETURN_FEATURE_KEYS_V3
         if schema_version == 3
         else _RETURN_FEATURE_KEYS_V2
@@ -822,6 +905,15 @@ def _validate_return_feature(
             ),
             errors=errors,
         )
+    if schema_version >= 5:
+        _validate_return_sampling_trace(
+            value.get("return_sampling_trace"),
+            path=f"{path}.return_sampling_trace",
+            horizon_hours=horizon,
+            benchmark=benchmark,
+            feature_sample_count=value.get("sample_count"),
+            errors=errors,
+        )
 
 
 def _validate_return_sample(
@@ -851,6 +943,426 @@ def _validate_return_sample(
                 )
         else:
             _validate_reference(item, f"{path}.{field}", errors)
+
+
+def _validate_return_sampling_trace(
+    value: object,
+    *,
+    path: str,
+    horizon_hours: int,
+    benchmark: str | None,
+    feature_sample_count: object,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(value, _RETURN_SAMPLING_TRACE_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    sample_count = value.get("sample_count")
+    if (
+        isinstance(sample_count, bool)
+        or not isinstance(sample_count, int)
+        or sample_count < 0
+        or sample_count != feature_sample_count
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_count_inconsistent:{path}")
+        return
+    expected_status = "observed" if sample_count else "no_samples"
+    if value.get("status") != expected_status:
+        errors.append(f"shadow_temporal_surprise_sampling_status_inconsistent:{path}")
+    if value.get("horizon_hours") != horizon_hours:
+        errors.append(f"shadow_temporal_surprise_sampling_horizon_inconsistent:{path}")
+    nominal_seconds = horizon_hours * 3600
+    if value.get("nominal_horizon_seconds") != nominal_seconds:
+        errors.append(f"shadow_temporal_surprise_sampling_nominal_inconsistent:{path}")
+    if not _is_sha256(value.get("sample_identity_sha256")):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}.sample_identity_sha256:sha256")
+    for field in (
+        "timing_diagnostics_are_policy",
+        "provider_causation_claimed",
+        "statistical_independence_claimed",
+    ):
+        if value.get(field) is not False:
+            errors.append(f"shadow_temporal_surprise_sampling_safety_inconsistent:{path}.{field}")
+
+    tolerance_seconds = max(
+        RETURN_MIN_ANCHOR_TOLERANCE_SECONDS,
+        nominal_seconds * RETURN_ANCHOR_TOLERANCE_RATIO,
+    )
+    asset_metrics = _validate_return_sampling_leg(
+        value.get("asset_leg"),
+        path=f"{path}.asset_leg",
+        sample_count=sample_count,
+        nominal_horizon_seconds=nominal_seconds,
+        tolerance_seconds=tolerance_seconds,
+        errors=errors,
+    )
+    benchmark_metrics = None
+    alignment_metrics = None
+    if benchmark is None:
+        if value.get("benchmark_leg") is not None:
+            errors.append(f"shadow_temporal_surprise_sampling_benchmark_inconsistent:{path}.benchmark_leg")
+        if value.get("benchmark_endpoint_alignment") is not None:
+            errors.append(f"shadow_temporal_surprise_sampling_benchmark_inconsistent:{path}.benchmark_endpoint_alignment")
+    else:
+        benchmark_metrics = _validate_return_sampling_leg(
+            value.get("benchmark_leg"),
+            path=f"{path}.benchmark_leg",
+            sample_count=sample_count,
+            nominal_horizon_seconds=nominal_seconds,
+            tolerance_seconds=tolerance_seconds,
+            errors=errors,
+        )
+        alignment_metrics = _validate_return_sampling_alignment(
+            value.get("benchmark_endpoint_alignment"),
+            path=f"{path}.benchmark_endpoint_alignment",
+            sample_count=sample_count,
+            errors=errors,
+        )
+    leg_metrics = tuple(
+        item for item in (asset_metrics, benchmark_metrics) if item is not None
+    )
+    expected_anchor_reuse = any(item["anchor_reuse"] for item in leg_metrics)
+    expected_error = any(item["nonzero_error"] for item in leg_metrics)
+    expected_endpoint_reuse = bool(
+        benchmark_metrics and benchmark_metrics["endpoint_reuse"]
+    )
+    expected_alignment_lag = bool(
+        alignment_metrics and alignment_metrics["nonzero_lag"]
+    )
+    for field, expected in (
+        ("anchor_reuse_detected", expected_anchor_reuse),
+        ("benchmark_endpoint_reuse_detected", expected_endpoint_reuse),
+        ("nonzero_anchor_selection_error_detected", expected_error),
+        ("nonzero_benchmark_alignment_lag_detected", expected_alignment_lag),
+    ):
+        if value.get(field) is not expected:
+            errors.append(f"shadow_temporal_surprise_sampling_flag_inconsistent:{path}.{field}")
+
+
+def _validate_return_sampling_leg(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    nominal_horizon_seconds: int,
+    tolerance_seconds: float,
+    errors: list[str],
+) -> dict[str, bool] | None:
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return None
+    key_errors = _closed_keys(value, _RETURN_SAMPLING_LEG_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return None
+    count_fields = (
+        "endpoint_observation_count",
+        "distinct_endpoint_observation_count",
+        "endpoint_reuse_excess_count",
+        "maximum_endpoint_reuse_count",
+        "maximum_consecutive_endpoint_reuse_count",
+        "anchor_observation_count",
+        "distinct_anchor_observation_count",
+        "anchor_reuse_excess_count",
+        "maximum_anchor_reuse_count",
+        "maximum_consecutive_anchor_reuse_count",
+    )
+    counts = {field: value.get(field) for field in count_fields}
+    if any(
+        isinstance(item, bool) or not isinstance(item, int) or item < 0
+        for item in counts.values()
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_counts_invalid:{path}")
+        return None
+    if (
+        counts["endpoint_observation_count"] != sample_count
+        or counts["anchor_observation_count"] != sample_count
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_counts_inconsistent:{path}")
+    _validate_sampling_reuse_counts(
+        sample_count=sample_count,
+        distinct_count=counts["distinct_endpoint_observation_count"],
+        reuse_excess=counts["endpoint_reuse_excess_count"],
+        maximum_reuse=counts["maximum_endpoint_reuse_count"],
+        maximum_consecutive=counts["maximum_consecutive_endpoint_reuse_count"],
+        path=f"{path}.endpoint",
+        errors=errors,
+    )
+    _validate_sampling_reuse_counts(
+        sample_count=sample_count,
+        distinct_count=counts["distinct_anchor_observation_count"],
+        reuse_excess=counts["anchor_reuse_excess_count"],
+        maximum_reuse=counts["maximum_anchor_reuse_count"],
+        maximum_consecutive=counts["maximum_consecutive_anchor_reuse_count"],
+        path=f"{path}.anchor",
+        errors=errors,
+    )
+    realized = _validate_sampling_range(
+        value.get("realized_horizon_seconds"),
+        path=f"{path}.realized_horizon_seconds",
+        sample_count=sample_count,
+        minimum=nominal_horizon_seconds,
+        maximum=nominal_horizon_seconds + tolerance_seconds,
+        errors=errors,
+    )
+    selection_error = _validate_sampling_range(
+        value.get("anchor_selection_error_seconds"),
+        path=f"{path}.anchor_selection_error_seconds",
+        sample_count=sample_count,
+        minimum=0.0,
+        maximum=tolerance_seconds,
+        errors=errors,
+    )
+    if realized and selection_error and any(
+        not math.isclose(
+            realized[field] - nominal_horizon_seconds,
+            selection_error[field],
+            abs_tol=1e-6,
+        )
+        for field in _RETURN_SAMPLING_RANGE_KEYS
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_error_range_inconsistent:{path}")
+    _validate_sampling_reuse_reference(
+        value.get("maximum_endpoint_reuse_reference"),
+        path=f"{path}.maximum_endpoint_reuse_reference",
+        sample_count=sample_count,
+        expected_reuse_count=counts["maximum_endpoint_reuse_count"],
+        errors=errors,
+    )
+    _validate_sampling_reuse_reference(
+        value.get("maximum_anchor_reuse_reference"),
+        path=f"{path}.maximum_anchor_reuse_reference",
+        sample_count=sample_count,
+        expected_reuse_count=counts["maximum_anchor_reuse_count"],
+        errors=errors,
+    )
+    _validate_sampling_error_reference(
+        value.get("maximum_anchor_selection_error_reference"),
+        path=f"{path}.maximum_anchor_selection_error_reference",
+        sample_count=sample_count,
+        nominal_horizon_seconds=nominal_horizon_seconds,
+        expected_maximum=(selection_error or {}).get("maximum"),
+        errors=errors,
+    )
+    return {
+        "endpoint_reuse": counts["endpoint_reuse_excess_count"] > 0,
+        "anchor_reuse": counts["anchor_reuse_excess_count"] > 0,
+        "nonzero_error": bool(
+            selection_error and selection_error["maximum"] > 0
+        ),
+    }
+
+
+def _validate_sampling_reuse_counts(
+    *,
+    sample_count: int,
+    distinct_count: int,
+    reuse_excess: int,
+    maximum_reuse: int,
+    maximum_consecutive: int,
+    path: str,
+    errors: list[str],
+) -> None:
+    if sample_count == 0:
+        if any((distinct_count, reuse_excess, maximum_reuse, maximum_consecutive)):
+            errors.append(f"shadow_temporal_surprise_sampling_empty_counts_invalid:{path}")
+        return
+    if not 1 <= distinct_count <= sample_count:
+        errors.append(f"shadow_temporal_surprise_sampling_distinct_count_invalid:{path}")
+        return
+    if reuse_excess != sample_count - distinct_count:
+        errors.append(f"shadow_temporal_surprise_sampling_reuse_excess_invalid:{path}")
+    if not (
+        math.ceil(sample_count / distinct_count)
+        <= maximum_reuse
+        <= sample_count - distinct_count + 1
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_maximum_reuse_invalid:{path}")
+    if not 1 <= maximum_consecutive <= maximum_reuse:
+        errors.append(f"shadow_temporal_surprise_sampling_consecutive_reuse_invalid:{path}")
+
+
+def _validate_sampling_range(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    minimum: float,
+    maximum: float,
+    errors: list[str],
+) -> dict[str, float] | None:
+    if sample_count == 0:
+        if value is not None:
+            errors.append(f"shadow_temporal_surprise_sampling_empty_range_invalid:{path}")
+        return None
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return None
+    key_errors = _closed_keys(value, _RETURN_SAMPLING_RANGE_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return None
+    values = {field: value.get(field) for field in _RETURN_SAMPLING_RANGE_KEYS}
+    if any(
+        not isinstance(item, (int, float))
+        or isinstance(item, bool)
+        or not math.isfinite(float(item))
+        for item in values.values()
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_range_invalid:{path}")
+        return None
+    result = {field: float(item) for field, item in values.items()}
+    if not (
+        minimum - 1e-6
+        <= result["minimum"]
+        <= result["median"]
+        <= result["maximum"]
+        <= maximum + 1e-6
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_range_out_of_bounds:{path}")
+    return result
+
+
+def _validate_sampling_reuse_reference(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    expected_reuse_count: int,
+    errors: list[str],
+) -> None:
+    if sample_count == 0:
+        if value is not None:
+            errors.append(f"shadow_temporal_surprise_sampling_empty_reference_invalid:{path}")
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(value, _RETURN_SAMPLING_REUSE_REFERENCE_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    for field in ("observation", "first_asset_endpoint", "last_asset_endpoint"):
+        _validate_reference(value.get(field), f"{path}.{field}", errors)
+    if value.get("reuse_count") != expected_reuse_count:
+        errors.append(f"shadow_temporal_surprise_sampling_reuse_reference_count_invalid:{path}")
+    first = _reference_time(value.get("first_asset_endpoint"))
+    last = _reference_time(value.get("last_asset_endpoint"))
+    if first is not None and last is not None and first > last:
+        errors.append(f"shadow_temporal_surprise_sampling_reuse_reference_order_invalid:{path}")
+
+
+def _validate_sampling_error_reference(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    nominal_horizon_seconds: int,
+    expected_maximum: float | None,
+    errors: list[str],
+) -> None:
+    if sample_count == 0:
+        if value is not None:
+            errors.append(f"shadow_temporal_surprise_sampling_empty_reference_invalid:{path}")
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(value, _RETURN_SAMPLING_ERROR_REFERENCE_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    for field in ("asset_endpoint", "endpoint", "anchor"):
+        _validate_reference(value.get(field), f"{path}.{field}", errors)
+    endpoint = _reference_time(value.get("endpoint"))
+    anchor = _reference_time(value.get("anchor"))
+    realized = value.get("realized_horizon_seconds")
+    selection_error = value.get("anchor_selection_error_seconds")
+    if (
+        endpoint is None
+        or anchor is None
+        or not _sampling_number(realized)
+        or not _sampling_number(selection_error)
+    ):
+        return
+    expected_realized = round((endpoint - anchor).total_seconds(), 6)
+    if not math.isclose(float(realized), expected_realized, abs_tol=1e-6):
+        errors.append(f"shadow_temporal_surprise_sampling_reference_realized_invalid:{path}")
+    if not math.isclose(
+        float(selection_error),
+        expected_realized - nominal_horizon_seconds,
+        abs_tol=1e-6,
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_reference_error_invalid:{path}")
+    if expected_maximum is not None and not math.isclose(
+        float(selection_error), expected_maximum, abs_tol=1e-6
+    ):
+        errors.append(f"shadow_temporal_surprise_sampling_reference_not_maximum:{path}")
+
+
+def _validate_return_sampling_alignment(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    errors: list[str],
+) -> dict[str, bool] | None:
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return None
+    key_errors = _closed_keys(value, _RETURN_SAMPLING_ALIGNMENT_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return None
+    if value.get("sample_count") != sample_count:
+        errors.append(f"shadow_temporal_surprise_sampling_alignment_count_invalid:{path}")
+    lag = _validate_sampling_range(
+        value.get("lag_seconds"),
+        path=f"{path}.lag_seconds",
+        sample_count=sample_count,
+        minimum=0.0,
+        maximum=BENCHMARK_ALIGNMENT_TOLERANCE_SECONDS,
+        errors=errors,
+    )
+    reference = value.get("maximum_lag_reference")
+    if sample_count == 0:
+        if reference is not None:
+            errors.append(f"shadow_temporal_surprise_sampling_empty_reference_invalid:{path}.maximum_lag_reference")
+    elif not isinstance(reference, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}.maximum_lag_reference:dict")
+    else:
+        reference_path = f"{path}.maximum_lag_reference"
+        key_errors = _closed_keys(
+            reference,
+            _RETURN_SAMPLING_ALIGNMENT_REFERENCE_KEYS,
+            reference_path,
+        )
+        errors.extend(key_errors)
+        if not key_errors:
+            _validate_reference(reference.get("asset_endpoint"), f"{reference_path}.asset_endpoint", errors)
+            _validate_reference(reference.get("benchmark_endpoint"), f"{reference_path}.benchmark_endpoint", errors)
+            asset_at = _reference_time(reference.get("asset_endpoint"))
+            benchmark_at = _reference_time(reference.get("benchmark_endpoint"))
+            reference_lag = reference.get("lag_seconds")
+            if asset_at is not None and benchmark_at is not None and _sampling_number(reference_lag):
+                expected = round((asset_at - benchmark_at).total_seconds(), 6)
+                if not math.isclose(float(reference_lag), expected, abs_tol=1e-6):
+                    errors.append(f"shadow_temporal_surprise_sampling_alignment_reference_invalid:{reference_path}")
+                if lag and not math.isclose(float(reference_lag), lag["maximum"], abs_tol=1e-6):
+                    errors.append(f"shadow_temporal_surprise_sampling_alignment_reference_not_maximum:{reference_path}")
+    return {"nonzero_lag": bool(lag and lag["maximum"] > 0)}
+
+
+def _sampling_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
 
 
 def _return_feature_spec(feature: str) -> tuple[str, int, str | None]:
@@ -910,7 +1422,9 @@ def _validate_cross_field_consistency(
                     isinstance(feature_value, Mapping)
                     and frozenset(feature_value) == (
                         _RETURN_FEATURE_KEYS
-                        if schema_version >= 4
+                        if schema_version >= 5
+                        else _RETURN_FEATURE_KEYS_V4
+                        if schema_version == 4
                         else _RETURN_FEATURE_KEYS_V3
                         if schema_version == 3
                         else _RETURN_FEATURE_KEYS_V2

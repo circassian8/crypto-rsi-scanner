@@ -222,7 +222,7 @@ def test_shadow_surprise_attaches_only_after_route_and_preserves_authority_bytes
     anomaly = next(row for row in anomalies if row.get("coin_id") == "token-b")
     snapshot = next(row for row in snapshots if row.get("coin_id") == "token-b")
     shadow = anomaly["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 4
+    assert shadow["schema_version"] == 5
     assert shadow["history_artifact"] == market_no_send.HISTORY_FILENAME
     assert shadow["history_artifact_sha256"] == hashlib.sha256(
         history_before
@@ -471,8 +471,8 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert audit["schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert audit["schema_version"] == 5
-    assert audit["shadow_schema_version"] == 4
+    assert audit["schema_version"] == 6
+    assert audit["shadow_schema_version"] == 5
     assert audit["input_row_count"] == 31
     assert audit["excluded_not_baseline_counted_count"] == 1
     assert audit["input_rejected_count"] == 0
@@ -496,7 +496,7 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert volume_distribution["tail_ranks_are_p_values"] is False
     assert volume_distribution["overlapping_samples_are_independent"] is False
     assert volume_distribution["variation_observation_basis"] == (
-        "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
+        "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
     )
     assert volume_distribution["variation_observation_count"] > 0
     assert volume_distribution["minimum_distinct_baseline_value_count"] is None
@@ -612,6 +612,22 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert bitcoin_volume["input_trace_diagnostics_are_policy"] is False
     assert bitcoin_volume["provider_causation_claimed"] is False
     assert len(bitcoin_volume["input_trace_projection_digest"]) == 64
+    assert bitcoin_volume["return_sampling_timing_summary"] is None
+    bitcoin_return = bitcoin_variation["feature_variation"]["return_1h"]
+    timing = bitcoin_return["return_sampling_timing_summary"]
+    assert timing["observation_count"] == 5
+    assert timing["asset_anchor_reuse_observation_count"] == 0
+    assert timing["maximum_asset_anchor_reuse_excess_count"] == 0
+    assert timing["maximum_asset_anchor_reuse_count"] == 1
+    assert timing["maximum_consecutive_asset_anchor_reuse_count"] == 1
+    assert timing["maximum_asset_anchor_selection_error_seconds"] == 0.0
+    assert timing["benchmark_endpoint_reuse_observation_count"] == 0
+    assert timing["maximum_benchmark_endpoint_reuse_observation"] is None
+    assert timing["maximum_benchmark_endpoint_alignment_lag_seconds"] is None
+    assert timing["timing_diagnostics_are_policy"] is False
+    assert timing["provider_causation_claimed"] is False
+    assert timing["statistical_independence_claimed"] is False
+    assert len(timing["projection_digest"]) == 64
     assert (
         market_observation_campaign_shadow_surprise
         .validate_campaign_shadow_surprise_audit(audit)
@@ -850,7 +866,48 @@ def test_campaign_shadow_replay_validator_rejects_input_trace_drift():
     )
 
 
-def test_campaign_shadow_replay_keeps_v1_through_v4_audits_readable():
+def test_campaign_shadow_replay_validator_rejects_return_sampling_timing_drift():
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(_history_rows(_current_market_row())),
+            minimum_sample_count=4,
+        )
+    )
+    tampered = deepcopy(audit)
+    bitcoin = next(
+        row
+        for row in tampered["asset_variation_summaries"]
+        if row["canonical_asset_id"] == "bitcoin"
+    )
+    timing = bitcoin["feature_variation"]["return_1h"][
+        "return_sampling_timing_summary"
+    ]
+    timing["asset_anchor_reuse_observation_count"] = 99
+    timing["maximum_asset_anchor_selection_error_observation"][
+        "source_reference"
+    ]["anchor_selection_error_seconds"] = 60.0
+    timing["timing_diagnostics_are_policy"] = True
+
+    errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(tampered)
+    )
+
+    assert (
+        "asset_variation_bitcoin_return_1h_"
+        "asset_anchor_reuse_observation_count_invalid"
+    ) in errors
+    assert (
+        "asset_variation_bitcoin_return_1h_"
+        "maximum_asset_anchor_error_source_maximum_invalid"
+    ) in errors
+    assert (
+        "asset_variation_bitcoin_return_1h_timing_diagnostics_are_policy_invalid"
+    ) in errors
+
+
+def test_campaign_shadow_replay_keeps_v1_through_v5_audits_readable():
     current = (
         market_observation_campaign_shadow_surprise
         .build_campaign_shadow_surprise_audit(
@@ -858,9 +915,33 @@ def test_campaign_shadow_replay_keeps_v1_through_v4_audits_readable():
             minimum_sample_count=4,
         )
     )
-    legacy_v4 = deepcopy(current)
+    legacy_v5 = deepcopy(current)
+    legacy_v5["schema_version"] = 5
+    legacy_v5["shadow_schema_version"] = 4
+    for coverage in legacy_v5["feature_coverage"].values():
+        coverage["variation_observation_basis"] = (
+            "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
+        )
+    for asset in legacy_v5["asset_variation_summaries"]:
+        for feature in asset["feature_variation"].values():
+            for key in tuple(feature):
+                if key not in (
+                    market_observation_campaign_shadow_surprise
+                    ._ASSET_FEATURE_VARIATION_KEYS_V5  # noqa: SLF001
+                ):
+                    feature.pop(key)
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(legacy_v5)
+    ) == []
+
+    legacy_v4 = deepcopy(legacy_v5)
     legacy_v4["schema_version"] = 4
     legacy_v4["shadow_schema_version"] = 3
+    for coverage in legacy_v4["feature_coverage"].values():
+        coverage["variation_observation_basis"] = (
+            "closed_shadow_v3_projection_meeting_existing_minimum_sample_count"
+        )
     for asset in legacy_v4["asset_variation_summaries"]:
         for feature in asset["feature_variation"].values():
             for key in tuple(feature):

@@ -375,6 +375,10 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
         "input_trace_observation_count" in variation
         for *_, variation in repeated
     )
+    return_timing_available = any(
+        "return_sampling_timing_summary" in variation
+        for *_, variation in repeated
+    )
     limit = 32
     lines = [
         "",
@@ -399,6 +403,13 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
                 if input_trace_available
                 else ""
             )
+            + (
+                " Return timing uses exact observation identity to separate anchor "
+                "or benchmark reuse from value repetition and reports realized "
+                "horizon/alignment error. It does not change policy."
+                if return_timing_available
+                else ""
+            )
         ),
         "",
         (
@@ -409,11 +420,18 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
                 if input_trace_available
                 else ""
             )
+            + (
+                "Reuse obs asset-anchor / benchmark-end / benchmark-anchor; "
+                "max error asset / benchmark / alignment seconds | "
+                if return_timing_available
+                else ""
+            )
             + "Retained provider / mode / basis | Latest reference set |"
         ),
         (
             "|---|---|---:|---:|---:|"
             + ("---:|" if input_trace_available else "")
+            + ("---:|" if return_timing_available else "")
             + "---|---|"
         ),
     ]
@@ -448,6 +466,8 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
             else ""
         )
         trace_cell = f"{_md(trace)} | " if input_trace_available else ""
+        timing = _shadow_return_sampling_timing_text(variation)
+        timing_cell = f"{_md(timing)} | " if return_timing_available else ""
         lines.append(
             f"| {_md(asset_id)} | {_md(feature)} | "
             f"{_int(variation.get('repeated_baseline_value_observation_count'))} / "
@@ -456,9 +476,34 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
             f"{_number(variation.get('distinct_baseline_value_ratio_median'))} | "
             f"{_number(variation.get('maximum_baseline_value_tie_ratio_median'))} / "
             f"{_number(variation.get('maximum_baseline_value_tie_ratio_maximum'))} | "
-            f"{trace_cell}{_md(context)} | {_md(latest_text)} |"
+            f"{trace_cell}{timing_cell}{_md(context)} | {_md(latest_text)} |"
         )
     return lines
+
+
+def _shadow_return_sampling_timing_text(
+    variation: Mapping[str, Any],
+) -> str:
+    timing = _mapping(variation.get("return_sampling_timing_summary"))
+    if not timing:
+        return "n/a"
+    reuse = " / ".join(
+        str(_int(timing.get(field)))
+        for field in (
+            "asset_anchor_reuse_observation_count",
+            "benchmark_endpoint_reuse_observation_count",
+            "benchmark_anchor_reuse_observation_count",
+        )
+    )
+    errors = " / ".join(
+        _number(timing.get(field))
+        for field in (
+            "maximum_asset_anchor_selection_error_seconds",
+            "maximum_benchmark_anchor_selection_error_seconds",
+            "maximum_benchmark_endpoint_alignment_lag_seconds",
+        )
+    )
+    return f"{reuse}; {errors}"
 
 
 def _authority_proven(pointer: Mapping[str, Any]) -> bool:

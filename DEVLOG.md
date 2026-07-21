@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Measure exact return-anchor reuse and timing · Codex
+**Why:** The retained-input trace separated numeric repetition from transform
+collision, but it could not tell whether multiple rolling returns reused one
+causal observation or how far the selected anchors landed from their nominal
+horizons. Those facts are required before making any claim about independent
+information or changing collection/calibration policy.
+**Changes:** Shadow temporal-surprise schema v5 adds a closed observation-
+identity timing trace for every direct and BTC/ETH-relative return sample. It
+preserves existing return values while binding exact endpoint/anchor IDs and
+clocks, realized horizon and anchor-selection error, benchmark alignment,
+observation reuse and consecutive runs, ordered identity digests, and exact
+maximum references. Campaign-audit schema v6 aggregates the trace per canonical
+asset and return feature, keeps activity timing explicitly null, and retains
+shadow v1-v4 plus audit v1-v5 readability. Canonical JSON/Markdown campaign
+truth and the pointer-matched dashboard copy the validated timing summary and
+keep it visually separate from numeric source-tuple repetition. North Star,
+preregistration, research contract, durable decision, roadmap, and generated
+project-health artifacts now agree.
+
+The genuine cycle-59 replay covers 324 return asset-feature pairs and 8,262
+sample-eligible return projections. Asset-anchor reuse occurs in 91 pairs / 2,187
+projections, entirely in 24h families; 1h and 4h reuse is zero. Benchmark
+endpoints have zero reuse and zero alignment lag, while benchmark anchors reuse
+in 58 pairs / 1,424 projections. Maximum asset selection error is 327 / 3,554 /
+20,656 seconds for 1h / 4h / 24h, inside the unchanged 25% tolerance. Only 10
+of 26 return pairs with repeated derived values also reuse an anchor, proving
+the two diagnostics are not interchangeable. A separate architecture-report
+test now accepts an explicit temporary artifact base so cumulative operator
+namespaces cannot make unrelated acceptance evidence non-reproducible; source
+size inventories remain advisory and non-blocking.
+**Verify:** Focused model, schema, campaign, dashboard, empirical-live, and
+North-Star tests passed (167 tests). Final host-level `make verify-fast
+PYTHON=python3` passed 3,835 tests plus alert render, backtest fixture, and paper
+scoreboard in 190 seconds. `python3 -m compileall -q crypto_rsi_scanner tests`,
+`git diff --check`, JSON parsing, and `make architecture-cleanliness-check
+PYTHON=python3` passed. `make radar-market-campaign-report PYTHON=python3`
+regenerated canonical truth with `provider_calls=0`; dashboard smoke, UX smoke,
+and real readiness passed with zero writes and retained exact revision-12
+authority.
+**Notes/risks:** This evidence does not estimate effective sample size, diagnose
+a provider fault, or set a timing/reuse threshold. No provider authorization or
+call, return calculation, history row, status, score, route, exclusion,
+publication, send, trade, order, paper trade, RSI write, or `TRIGGERED_FADE`
+changed. The next descriptive checkpoint is interval-overlap and unique-clock-
+coverage measurement, still without policy authority.
+
 ## 2026-07-21 — Separate retained-input repetition from transform collisions · Codex
 **Why:** Per-asset variation proved that 28 genuine asset-feature reference sets
 contain repeated derived values, but that did not distinguish repetition already

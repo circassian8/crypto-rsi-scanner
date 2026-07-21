@@ -172,9 +172,42 @@ to a provider, estimate effective sample size, classify or exclude an asset, or
 change status, robust z-score, rank, threshold, route, score, publication, or
 Protocol-v2 evidence eligibility.
 
+## Fixed v5 return-sampling timing trace
+
+Schema v5 preserves every v1 activity, v2 signed-return, v3 variation, and v4
+value-only input-trace result byte-for-byte at the feature-calculation level. It
+adds a separate observation-identity trace for return sampling. Historical v1
+through v4 projections remain readable and are never silently reinterpreted.
+
+For each direct-return sample, the trace binds the exact asset endpoint and the
+at-or-before anchor selected for the requested 1h, 4h, or 24h horizon. Relative
+returns also bind the exact benchmark endpoint and benchmark anchor. The closed
+trace records:
+
+- distinct endpoint and anchor observation counts, reuse excess, maximum reuse,
+  and maximum consecutive reuse;
+- realized horizon seconds and nonnegative anchor-selection error as
+  minimum/median/maximum distributions;
+- asset-to-benchmark endpoint-alignment lag for relative returns; and
+- exact observation references for maximum reuse, horizon error, and alignment
+  lag, plus a digest of the ordered sampling identities.
+
+This identity is deliberately separate from the v4 value-only tuple. Two samples
+can reuse one causal anchor while carrying different endpoint prices, and two
+different observations can carry an identical numeric price tuple. Reporting
+both prevents either condition from being mistaken for the other. A zero error
+means the selected anchor landed exactly on the nominal horizon; a positive
+error records the realized at-or-before distance already admitted by the fixed
+anchor tolerance. No negative/future distance is accepted.
+
+These timing fields are descriptive only. They do not estimate independent
+sample size, attribute provider fault, set a reuse or timing threshold, exclude
+an asset, or change a status, robust z-score, rank, route, score, publication,
+or Protocol-v2 eligibility.
+
 ## Campaign-level causal replay
 
-The canonical live campaign report replays this same closed v4 evaluator over
+The canonical live campaign report replays this same closed v5 evaluator over
 the exact retained market-history snapshot it has already read. It does not
 create another model or reinterpret stored rows. Only rows carrying
 `baseline_counted=true` enter the replay; rapid non-counted rows are excluded
@@ -222,6 +255,18 @@ reference and digest. Historical campaign-audit schemas v1 through v4 remain
 readable without manufacturing trace fields. Dashboard and Markdown views show
 the source-repeat and transform counts separately and explicitly make no
 provider-causation claim.
+
+Campaign-audit schema v6 preserves the complete v5 input-lineage projection and
+adds a per-asset/per-return-feature summary of the v5 sampling trace. It counts
+eligible projections with asset-anchor, benchmark-endpoint, or benchmark-anchor
+reuse; counts nonzero horizon error and benchmark-alignment lag; retains maximum
+reuse/run/error values; and preserves the exact maximum observation references
+and source sampling references. Activity features carry an explicit null timing
+summary because they do not use horizon anchors. Historical campaign-audit
+schemas v1 through v5 remain readable without manufacturing timing evidence.
+Dashboard and Markdown views keep numeric value repetition, observation reuse,
+and realized timing error visibly separate. The summary is not policy, provider
+causation, or an independence claim.
 
 These aggregates are reference-set diagnostics, not an effective-sample-size
 estimate. They set no minimum-distinct threshold, do not alter feature status,

@@ -623,9 +623,12 @@ def test_architecture_final_report_generation_writes_size_and_shim_gates():
     root = REPO_ROOT
     with TemporaryDirectory() as tmp:
         out_dir = Path(tmp)
+        isolated_artifact_base = out_dir / "isolated_artifacts"
+        isolated_artifact_base.mkdir()
         paths = architecture_final_report.write_architecture_final_report(
             root=root,
             out_dir=out_dir,
+            artifact_base_dir=isolated_artifact_base,
             pytest_runtime_seconds=12.34,
             standalone_runner_runtime_seconds=56.78,
         )

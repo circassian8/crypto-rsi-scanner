@@ -1,6 +1,6 @@
 {
   "schema_id": "decision_radar.anomaly_methods_preregistration",
-  "schema_version": 4,
+  "schema_version": 5,
   "status": "research_only_rank_1_shadow_implemented_not_calibrated",
   "as_of_date": "2026-07-21",
   "purpose": "Predeclare the order and evidence gates for future anomaly-method experiments without changing production policy.",
@@ -12,11 +12,12 @@
       "turnover_24h"
     ],
     "existing_shadow_method": "natural_log_median_mad_and_descriptive_upper_tail_rank",
-    "shadow_schema_version": 4,
+    "shadow_schema_version": 5,
     "legacy_shadow_schema_versions_readable": [
       1,
       2,
-      3
+      3,
+      4
     ],
     "signed_return_shadow_features": [
       "return_1h",
@@ -32,23 +33,28 @@
     "signed_return_shadow_method": "identity_signed_median_mad_and_descriptive_lower_upper_two_sided_tail_ranks",
     "baseline_variation_diagnostics": "rounded_value_distinct_counts_tie_concentration_current_ties_and_nominal_rank_floors",
     "baseline_input_trace_diagnostics": "exact_value_only_source_tuple_repetition_derived_value_repetition_transform_collision_and_consecutive_runs",
+    "return_sampling_timing_diagnostics": "exact_endpoint_anchor_observation_reuse_realized_horizon_error_and_benchmark_endpoint_alignment",
+    "return_sampling_trace_identity": "ordered_exact_endpoint_anchor_observation_identity_and_timing",
     "source_value_tuple_identity": "feature_specific_exact_retained_numeric_inputs_units_and_bases_excluding_observation_identity",
     "minimum_distinct_baseline_value_count": null,
     "variation_diagnostics_are_policy": false,
     "input_trace_diagnostics_are_policy": false,
+    "return_sampling_timing_diagnostics_are_policy": false,
     "provider_causation_claimed": false,
-    "campaign_audit_schema_version": 5,
+    "campaign_audit_schema_version": 6,
     "legacy_campaign_audit_schema_versions_readable": [
       1,
       2,
       3,
-      4
+      4,
+      5
     ],
-    "campaign_variation_observation_basis": "closed_shadow_v4_projection_meeting_existing_minimum_sample_count",
+    "campaign_variation_observation_basis": "closed_shadow_v5_projection_meeting_existing_minimum_sample_count",
     "campaign_variation_distributions": "distinct_count_distinct_ratio_and_maximum_tie_ratio_with_exact_extremes",
     "campaign_variation_effective_sample_size_claimed": false,
     "campaign_asset_variation_summary": "per_asset_per_feature_repetition_persistence_source_tuple_repetition_transform_collision_consecutive_runs_exact_extremes_and_latest_state",
     "campaign_asset_source_context": "retained_symbol_provider_data_mode_feature_basis_and_exact_value_only_source_tuple_counts_not_causal_attribution",
+    "campaign_return_sampling_timing_summary": "per_asset_per_return_feature_observation_identity_reuse_realized_horizon_error_benchmark_alignment_and_exact_maximum_references",
     "campaign_asset_repetition_is_exclusion_policy": false,
     "existing_shadow_policy_eligible": false,
     "independent_live_samples_established": false

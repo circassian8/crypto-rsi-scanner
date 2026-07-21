@@ -288,6 +288,7 @@ def _project_shadow_surprise_audit(
             _project_shadow_asset_variation(
                 row,
                 input_trace_available=audit_schema_version >= 5,
+                return_sampling_timing_available=audit_schema_version >= 6,
             )
             for row in raw_asset_variation
         )
@@ -321,6 +322,9 @@ def _project_shadow_surprise_audit(
         "variation_diagnostics_available": audit_schema_version >= 3,
         "asset_variation_diagnostics_available": audit_schema_version >= 4,
         "input_trace_diagnostics_available": audit_schema_version >= 5,
+        "return_sampling_timing_diagnostics_available": (
+            audit_schema_version >= 6
+        ),
         "asset_variation_summaries": projected_asset_variation,
         "source_bound_projection_digest": _identity(
             audit.get("source_bound_projection_digest"),
@@ -559,6 +563,7 @@ def _project_shadow_asset_variation(
     value: Any,
     *,
     input_trace_available: bool,
+    return_sampling_timing_available: bool,
 ) -> dict[str, Any]:
     row = _mapping(value, "shadow_asset_variation")
     raw_basis = _mapping(
@@ -618,6 +623,9 @@ def _project_shadow_asset_variation(
                     feature,
                     feature_row,
                     input_trace_available=input_trace_available,
+                    return_sampling_timing_available=(
+                        return_sampling_timing_available
+                    ),
                 )
             )
             for feature, feature_row in sorted(raw_features.items())
@@ -636,6 +644,7 @@ def _project_shadow_asset_feature_variation(
     value: Any,
     *,
     input_trace_available: bool = False,
+    return_sampling_timing_available: bool = False,
 ) -> dict[str, Any]:
     row = _mapping(value, "shadow_asset_feature_variation")
     result = {
@@ -748,6 +757,102 @@ def _project_shadow_asset_feature_variation(
             "input_trace_diagnostics_are_policy": False,
             "provider_causation_claimed": False,
         })
+    result["return_sampling_timing_summary"] = (
+        _project_shadow_return_sampling_timing_summary(
+            row.get("return_sampling_timing_summary"),
+        )
+        if return_sampling_timing_available
+        else None
+    )
+    return result
+
+
+def _project_shadow_return_sampling_timing_summary(
+    value: Any,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    summary = _mapping(value, "shadow_return_sampling_timing_summary")
+    count_fields = (
+        "observation_count",
+        "asset_anchor_reuse_observation_count",
+        "benchmark_endpoint_reuse_observation_count",
+        "benchmark_anchor_reuse_observation_count",
+        "nonzero_anchor_selection_error_observation_count",
+        "nonzero_benchmark_alignment_lag_observation_count",
+        "maximum_asset_anchor_reuse_excess_count",
+        "maximum_asset_anchor_reuse_count",
+        "maximum_consecutive_asset_anchor_reuse_count",
+        "maximum_benchmark_endpoint_reuse_excess_count",
+        "maximum_benchmark_endpoint_reuse_count",
+        "maximum_consecutive_benchmark_endpoint_reuse_count",
+        "maximum_benchmark_anchor_reuse_excess_count",
+        "maximum_benchmark_anchor_reuse_count",
+        "maximum_consecutive_benchmark_anchor_reuse_count",
+    )
+    seconds_fields = (
+        "maximum_asset_anchor_selection_error_seconds",
+        "maximum_benchmark_anchor_selection_error_seconds",
+        "maximum_benchmark_endpoint_alignment_lag_seconds",
+    )
+    reference_fields = (
+        "maximum_asset_anchor_reuse_observation",
+        "maximum_asset_anchor_selection_error_observation",
+        "maximum_benchmark_endpoint_reuse_observation",
+        "maximum_benchmark_anchor_reuse_observation",
+        "maximum_benchmark_anchor_selection_error_observation",
+        "maximum_benchmark_endpoint_alignment_lag_observation",
+    )
+    return {
+        **{
+            field: _count(summary.get(field), f"shadow_sampling_{field}")
+            for field in count_fields
+        },
+        **{
+            field: _optional_finite_number(
+                summary.get(field), f"shadow_sampling_{field}"
+            )
+            for field in seconds_fields
+        },
+        **{
+            field: _project_shadow_sampling_observation(
+                summary.get(field), label=f"shadow_sampling_{field}"
+            )
+            for field in reference_fields
+        },
+        "timing_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
+        "statistical_independence_claimed": False,
+        "projection_digest": _identity(
+            summary.get("projection_digest"),
+            "shadow_sampling_projection_digest",
+        ),
+    }
+
+
+def _project_shadow_sampling_observation(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    reference = _mapping(value, label)
+    result = {
+        **(_project_shadow_reference(reference, label=label) or {}),
+        "sample_count": _count(reference.get("sample_count"), f"{label}_samples"),
+    }
+    for field in (
+        "reuse_excess_count",
+        "maximum_reuse_count",
+        "maximum_consecutive_reuse_count",
+    ):
+        if field in reference:
+            result[field] = _count(reference.get(field), f"{label}_{field}")
+    if "maximum_seconds" in reference:
+        result["maximum_seconds"] = _optional_finite_number(
+            reference.get("maximum_seconds"), f"{label}_maximum_seconds"
+        )
     return result
 
 

@@ -150,7 +150,7 @@ def _complete_return_history(*, current_price: float = 138.0):
     return current, asset_priors, benchmarks
 
 
-def test_v4_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank():
+def test_v5_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank():
     current, priors, benchmarks = _complete_return_history()
 
     result = evaluate_shadow_temporal_surprise(
@@ -160,7 +160,7 @@ def test_v4_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         benchmark_observations=benchmarks,
     )
 
-    assert result["schema_version"] == 4
+    assert result["schema_version"] == 5
     assert result["status"] == "ready"
     assert result["return_status"] == "ready"
     assert tuple(RETURN_HORIZONS_HOURS) == (1, 4, 24)
@@ -196,6 +196,10 @@ def test_v4_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         ),
         "input_trace_diagnostics_are_policy": False,
         "provider_causation_claimed": False,
+        "return_sampling_trace_identity": (
+            "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+        ),
+        "return_sampling_timing_diagnostics_are_policy": False,
     }
     direct = result["return_features"]["return_1h"]
     expected_direct = (current["price"] / priors[-1]["price"] - 1.0) * 100.0
@@ -214,6 +218,22 @@ def test_v4_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         "asset-a-obs-29"
     )
     assert direct["current_sample"]["benchmark_endpoint"] is None
+    direct_trace = direct["return_sampling_trace"]
+    assert direct_trace["status"] == "observed"
+    assert direct_trace["sample_count"] == direct["sample_count"]
+    assert direct_trace["horizon_hours"] == 1
+    assert direct_trace["nominal_horizon_seconds"] == 3600
+    assert direct_trace["asset_leg"]["anchor_reuse_excess_count"] == 0
+    assert direct_trace["asset_leg"]["anchor_selection_error_seconds"] == {
+        "minimum": 0.0,
+        "median": 0.0,
+        "maximum": 0.0,
+    }
+    assert direct_trace["benchmark_leg"] is None
+    assert direct_trace["benchmark_endpoint_alignment"] is None
+    assert direct_trace["timing_diagnostics_are_policy"] is False
+    assert direct_trace["provider_causation_claimed"] is False
+    assert direct_trace["statistical_independence_claimed"] is False
     relative = result["return_features"]["relative_return_vs_btc_24h"]
     expected_asset_24h = (current["price"] / priors[6]["price"] - 1.0) * 100.0
     expected_btc_24h = (
@@ -233,10 +253,19 @@ def test_v4_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         "bitcoin-obs-30"
     )
     assert relative["sample_count"] == 6
+    relative_trace = relative["return_sampling_trace"]
+    assert relative_trace["benchmark_leg"][
+        "distinct_endpoint_observation_count"
+    ] == relative["sample_count"]
+    assert relative_trace["benchmark_endpoint_alignment"]["lag_seconds"] == {
+        "minimum": 0.0,
+        "median": 0.0,
+        "maximum": 0.0,
+    }
     json.dumps(result, sort_keys=True, allow_nan=False)
 
 
-def test_v4_signed_return_tail_preserves_negative_direction():
+def test_v5_signed_return_tail_preserves_negative_direction():
     current, priors, benchmarks = _complete_return_history(current_price=80.0)
 
     result = evaluate_shadow_temporal_surprise(
@@ -254,7 +283,7 @@ def test_v4_signed_return_tail_preserves_negative_direction():
         assert value["lower_tail_rank"] < value["upper_tail_rank"]
 
 
-def test_v4_return_features_fail_closed_on_price_basis_and_missing_benchmark():
+def test_v5_return_features_fail_closed_on_price_basis_and_missing_benchmark():
     current, priors, benchmarks = _complete_return_history()
     current["feature_basis"]["price"] = "cross_sectional_price_proxy"
 
@@ -278,7 +307,7 @@ def test_v4_return_features_fail_closed_on_price_basis_and_missing_benchmark():
     assert result["return_status"] == "unavailable"
 
 
-def test_v4_return_output_is_order_independent_and_sample_digest_binds_prices():
+def test_v5_return_output_is_order_independent_and_sample_digest_binds_prices():
     current, priors, benchmarks = _complete_return_history()
     forward = evaluate_shadow_temporal_surprise(
         current,
@@ -325,7 +354,7 @@ def test_v4_return_output_is_order_independent_and_sample_digest_binds_prices():
     )
 
 
-def test_v4_rejects_wrong_canonical_benchmark_identity():
+def test_v5_rejects_wrong_canonical_benchmark_identity():
     current, priors, benchmarks = _complete_return_history()
     for row in benchmarks["btc"]:
         row["canonical_asset_id"] = "not-bitcoin"
@@ -342,7 +371,7 @@ def test_v4_rejects_wrong_canonical_benchmark_identity():
         )
 
 
-def test_v4_treats_canonical_benchmark_alias_as_self_relative_not_applicable():
+def test_v5_treats_canonical_benchmark_alias_as_self_relative_not_applicable():
     current, priors, _benchmarks = _complete_return_history()
     current["canonical_asset_id"] = "btc"
     for row in priors:
@@ -384,7 +413,7 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
 
     assert SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID == "event_alpha.shadow_temporal_surprise"
     assert result["schema_id"] == SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
-    assert result["schema_version"] == 4
+    assert result["schema_version"] == 5
     assert result["status"] == "partial"
     assert result["return_status"] == "unavailable"
     assert volume["status"] == "ready"
@@ -727,7 +756,7 @@ def test_eligible_sample_digest_binds_identity_value_and_basis_without_copying_s
         }
 
 
-def test_v4_activity_trace_attributes_repeated_source_values_without_policy():
+def test_v5_activity_trace_attributes_repeated_source_values_without_policy():
     priors = [
         _observation(index, volume=100.0, turnover=0.1)
         for index in range(1, 6)
@@ -763,7 +792,7 @@ def test_v4_activity_trace_attributes_repeated_source_values_without_policy():
     assert result["method"]["variation_diagnostics_are_policy"] is False
 
 
-def test_v4_return_trace_separates_transform_collision_without_policy():
+def test_v5_return_trace_separates_transform_collision_without_policy():
     priors = [
         _return_observation(
             index,
@@ -809,6 +838,100 @@ def test_v4_return_trace_separates_transform_collision_without_policy():
     assert direct["provider_causation_claimed"] is False
     assert result["return_method"]["minimum_distinct_baseline_value_count"] is None
     assert result["return_method"]["variation_diagnostics_are_policy"] is False
+
+
+def test_v5_return_sampling_trace_exposes_anchor_reuse_and_realized_timing():
+    asset_times = (
+        datetime(2026, 7, 10, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 7, 10, 1, 10, tzinfo=timezone.utc),
+        datetime(2026, 7, 10, 1, 15, tzinfo=timezone.utc),
+        datetime(2026, 7, 10, 2, 20, tzinfo=timezone.utc),
+    )
+    priors = [
+        _return_observation(index, asset_id="asset-a", price=100.0 + index)
+        for index in range(len(asset_times))
+    ]
+    for row, observed_at in zip(priors, asset_times):
+        row["observed_at"] = observed_at.isoformat()
+    current = _return_observation(4, asset_id="asset-a", price=104.0)
+    current["observed_at"] = datetime(
+        2026, 7, 10, 3, 20, tzinfo=timezone.utc
+    ).isoformat()
+
+    benchmark_times = (
+        datetime(2026, 7, 10, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 7, 10, 1, 10, tzinfo=timezone.utc),
+        datetime(2026, 7, 10, 2, 15, tzinfo=timezone.utc),
+        datetime(2026, 7, 10, 3, 15, tzinfo=timezone.utc),
+    )
+    bitcoin = [
+        _return_observation(index, asset_id="bitcoin", price=1_000.0 + index)
+        for index in range(len(benchmark_times))
+    ]
+    for row, observed_at in zip(bitcoin, benchmark_times):
+        row["observed_at"] = observed_at.isoformat()
+
+    result = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=2,
+        benchmark_observations={"btc": bitcoin},
+    )
+    direct = result["return_features"]["return_1h"]["return_sampling_trace"]
+    asset_leg = direct["asset_leg"]
+
+    assert direct["sample_count"] == 3
+    assert direct["anchor_reuse_detected"] is True
+    assert direct["nonzero_anchor_selection_error_detected"] is True
+    assert asset_leg["distinct_endpoint_observation_count"] == 3
+    assert asset_leg["endpoint_reuse_excess_count"] == 0
+    assert asset_leg["distinct_anchor_observation_count"] == 2
+    assert asset_leg["anchor_reuse_excess_count"] == 1
+    assert asset_leg["maximum_anchor_reuse_count"] == 2
+    assert asset_leg["maximum_consecutive_anchor_reuse_count"] == 2
+    assert asset_leg["realized_horizon_seconds"] == {
+        "minimum": 3900.0,
+        "median": 4200.0,
+        "maximum": 4500.0,
+    }
+    assert asset_leg["anchor_selection_error_seconds"] == {
+        "minimum": 300.0,
+        "median": 600.0,
+        "maximum": 900.0,
+    }
+    anchor_reference = asset_leg["maximum_anchor_reuse_reference"]
+    assert anchor_reference["observation"]["observation_id"] == "asset-a-obs-0"
+    assert anchor_reference["reuse_count"] == 2
+    assert anchor_reference["first_asset_endpoint"]["observation_id"] == (
+        "asset-a-obs-1"
+    )
+    assert anchor_reference["last_asset_endpoint"]["observation_id"] == (
+        "asset-a-obs-2"
+    )
+    error_reference = asset_leg["maximum_anchor_selection_error_reference"]
+    assert error_reference["asset_endpoint"]["observation_id"] == "asset-a-obs-2"
+    assert error_reference["anchor"]["observation_id"] == "asset-a-obs-0"
+    assert error_reference["anchor_selection_error_seconds"] == 900.0
+
+    relative = result["return_features"][
+        "relative_return_vs_btc_1h"
+    ]["return_sampling_trace"]
+    benchmark_leg = relative["benchmark_leg"]
+    assert relative["benchmark_endpoint_reuse_detected"] is True
+    assert benchmark_leg["distinct_endpoint_observation_count"] == 2
+    assert benchmark_leg["endpoint_reuse_excess_count"] == 1
+    assert benchmark_leg["maximum_endpoint_reuse_count"] == 2
+    assert benchmark_leg["anchor_reuse_excess_count"] == 1
+    assert relative["benchmark_endpoint_alignment"]["lag_seconds"] == {
+        "minimum": 0.0,
+        "median": 300.0,
+        "maximum": 300.0,
+    }
+    assert relative["nonzero_benchmark_alignment_lag_detected"] is True
+    assert len(relative["sample_identity_sha256"]) == 64
+    assert relative["timing_diagnostics_are_policy"] is False
+    assert relative["provider_causation_claimed"] is False
+    assert relative["statistical_independence_claimed"] is False
 
 
 def test_derived_turnover_sample_digest_binds_ratio_dependencies():
@@ -907,8 +1030,8 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     policy = payload["shadow_temporal_surprise_policy"]
 
     assert policy["schema_id"] == "event_alpha.shadow_temporal_surprise"
-    assert policy["schema_version"] == 4
-    assert policy["legacy_schema_versions_readable"] == [1, 2, 3]
+    assert policy["schema_version"] == 5
+    assert policy["legacy_schema_versions_readable"] == [1, 2, 3, 4]
     assert policy["features"] == ["volume_24h", "turnover_24h"]
     assert policy["signed_return_features"] == list(SUPPORTED_RETURN_FEATURES)
     assert policy["signed_return_unit"] == "percent_points"
@@ -935,13 +1058,22 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     ]
     assert policy["input_trace_diagnostics_are_policy"] is False
     assert policy["provider_causation_claimed"] is False
+    assert policy["return_sampling_trace_identity"] == (
+        "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+    )
+    assert "realized_horizon_seconds_minimum_median_maximum" in policy[
+        "return_sampling_timing_diagnostics"
+    ]
+    assert policy["return_sampling_timing_diagnostics_are_policy"] is False
     assert policy["campaign_audit_schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert policy["campaign_audit_schema_version"] == 5
-    assert policy["campaign_audit_legacy_schema_versions_readable"] == [1, 2, 3, 4]
+    assert policy["campaign_audit_schema_version"] == 6
+    assert policy["campaign_audit_legacy_schema_versions_readable"] == [
+        1, 2, 3, 4, 5
+    ]
     assert policy["campaign_audit_variation_observation_basis"] == (
-        "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
+        "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
     )
     assert policy["campaign_audit_variation_diagnostics_are_policy"] is False
     assert policy["campaign_audit_effective_sample_size_claimed"] is False
@@ -950,6 +1082,12 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     assert policy["campaign_audit_input_trace_exact_latest_reference"] is True
     assert policy["campaign_audit_input_trace_diagnostics_are_policy"] is False
     assert policy["campaign_audit_provider_causation_claimed"] is False
+    assert policy[
+        "campaign_audit_return_sampling_timing_exact_maximum_references"
+    ] is True
+    assert policy[
+        "campaign_audit_return_sampling_timing_diagnostics_are_policy"
+    ] is False
     assert policy["campaign_audit_ready_distribution"] == (
         "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections"
     )
@@ -1025,10 +1163,26 @@ _V4_FEATURE_FIELDS = (
     "input_trace_diagnostics_are_policy",
     "provider_causation_claimed",
 )
+_V5_RETURN_METHOD_FIELDS = (
+    "return_sampling_trace_identity",
+    "return_sampling_timing_diagnostics_are_policy",
+)
+_V5_RETURN_FEATURE_FIELDS = ("return_sampling_trace",)
+
+
+def _historical_v4_shadow() -> dict:
+    legacy = _valid_schema_shadow()
+    legacy["schema_version"] = 4
+    for field in _V5_RETURN_METHOD_FIELDS:
+        legacy["return_method"].pop(field)
+    for feature in legacy["return_features"].values():
+        for field in _V5_RETURN_FEATURE_FIELDS:
+            feature.pop(field)
+    return legacy
 
 
 def _historical_v3_shadow() -> dict:
-    legacy = _valid_schema_shadow()
+    legacy = _historical_v4_shadow()
     legacy["schema_version"] = 3
     for field in _V4_METHOD_FIELDS:
         legacy["method"].pop(field)
@@ -1165,6 +1319,20 @@ def test_artifact_schema_keeps_historical_v3_shadow_values_readable():
     assert errors == []
 
 
+def test_artifact_schema_keeps_historical_v4_shadow_values_readable():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    errors = schema_v1.validate_row_against_schema(
+        _shadow_artifact_row(
+            "market_state_snapshot_v1",
+            _historical_v4_shadow(),
+        ),
+        "market_state_snapshot_v1",
+    )
+
+    assert errors == []
+
+
 @pytest.mark.parametrize(
     ("mutation", "expected_error"),
     (
@@ -1204,6 +1372,28 @@ def test_artifact_schema_keeps_historical_v3_shadow_values_readable():
         ),
         (
             lambda value: value["return_features"]["return_1h"][
+                "return_sampling_trace"
+            ]["asset_leg"].__setitem__(
+                "distinct_anchor_observation_count", 99
+            ),
+            "shadow_temporal_surprise_sampling_distinct_count_invalid:return_features.return_1h.return_sampling_trace.asset_leg.anchor",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
+                "return_sampling_trace"
+            ].__setitem__("timing_diagnostics_are_policy", True),
+            "shadow_temporal_surprise_sampling_safety_inconsistent:return_features.return_1h.return_sampling_trace.timing_diagnostics_are_policy",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
+                "return_sampling_trace"
+            ]["asset_leg"]["maximum_anchor_selection_error_reference"].__setitem__(
+                "anchor_selection_error_seconds", 1.0
+            ),
+            "shadow_temporal_surprise_sampling_reference_error_invalid:return_features.return_1h.return_sampling_trace.asset_leg.maximum_anchor_selection_error_reference",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
                 "current_sample"
             ]["asset_endpoint"].__setitem__("observation_id", "wrong-current"),
             "shadow_temporal_surprise_reference_inconsistent:return_features.return_1h.asset_endpoint",
@@ -1229,7 +1419,7 @@ def test_artifact_schema_keeps_historical_v3_shadow_values_readable():
         ),
     ),
 )
-def test_artifact_schema_rejects_malformed_v4_return_contract(
+def test_artifact_schema_rejects_malformed_v5_return_contract(
     mutation,
     expected_error,
 ):

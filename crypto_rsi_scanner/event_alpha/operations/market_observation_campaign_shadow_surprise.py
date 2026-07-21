@@ -19,15 +19,21 @@ from ..radar import market_shadow_surprise
 
 
 SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
-SCHEMA_VERSION = 5
-LEGACY_SCHEMA_VERSIONS = (1, 2, 3, 4)
+SCHEMA_VERSION = 6
+LEGACY_SCHEMA_VERSIONS = (1, 2, 3, 4, 5)
 DESCRIPTIVE_QUANTILE_METHOD = "linear_interpolation_sorted_ready_values"
 VARIATION_QUANTILE_METHOD = (
     "linear_interpolation_sorted_sample_eligible_values"
 )
 VARIATION_OBSERVATION_BASIS = (
-    "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
+    "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
 )
+_VARIATION_OBSERVATION_BASIS_BY_SCHEMA = {
+    3: "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+    4: "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+    5: "closed_shadow_v4_projection_meeting_existing_minimum_sample_count",
+    6: VARIATION_OBSERVATION_BASIS,
+}
 _SOURCE_STATUSES = {"missing", "observed_empty", "observed", "unavailable"}
 _AUDIT_STATUSES = {"unavailable", "empty", "warming", "partial", "ready"}
 _INPUT_REJECTION_REASONS = {
@@ -226,7 +232,7 @@ _ASSET_FEATURE_VARIATION_KEYS_V4 = {
     "overlapping_reference_sets_are_independent",
     "projection_digest",
 }
-_ASSET_FEATURE_VARIATION_KEYS = _ASSET_FEATURE_VARIATION_KEYS_V4 | {
+_ASSET_FEATURE_VARIATION_KEYS_V5 = _ASSET_FEATURE_VARIATION_KEYS_V4 | {
     "input_trace_observation_count",
     "input_trace_status_counts",
     "source_tuple_repetition_observation_count",
@@ -241,6 +247,9 @@ _ASSET_FEATURE_VARIATION_KEYS = _ASSET_FEATURE_VARIATION_KEYS_V4 | {
     "input_trace_diagnostics_are_policy",
     "provider_causation_claimed",
     "input_trace_projection_digest",
+}
+_ASSET_FEATURE_VARIATION_KEYS = _ASSET_FEATURE_VARIATION_KEYS_V5 | {
+    "return_sampling_timing_summary",
 }
 _RETAINED_FEATURE_BASIS_KEYS = {
     "price",
@@ -281,6 +290,66 @@ _INPUT_TRACE_STATUSES = {
     "source_tuple_repetition",
     "transform_collision",
     "mixed_source_repetition_and_transform_collision",
+}
+_RETURN_SAMPLING_TIMING_SUMMARY_KEYS = {
+    "observation_count",
+    "asset_anchor_reuse_observation_count",
+    "benchmark_endpoint_reuse_observation_count",
+    "benchmark_anchor_reuse_observation_count",
+    "nonzero_anchor_selection_error_observation_count",
+    "nonzero_benchmark_alignment_lag_observation_count",
+    "maximum_asset_anchor_reuse_excess_count",
+    "maximum_asset_anchor_reuse_count",
+    "maximum_consecutive_asset_anchor_reuse_count",
+    "maximum_asset_anchor_selection_error_seconds",
+    "maximum_benchmark_endpoint_reuse_excess_count",
+    "maximum_benchmark_endpoint_reuse_count",
+    "maximum_consecutive_benchmark_endpoint_reuse_count",
+    "maximum_benchmark_anchor_reuse_excess_count",
+    "maximum_benchmark_anchor_reuse_count",
+    "maximum_consecutive_benchmark_anchor_reuse_count",
+    "maximum_benchmark_anchor_selection_error_seconds",
+    "maximum_benchmark_endpoint_alignment_lag_seconds",
+    "maximum_asset_anchor_reuse_observation",
+    "maximum_asset_anchor_selection_error_observation",
+    "maximum_benchmark_endpoint_reuse_observation",
+    "maximum_benchmark_anchor_reuse_observation",
+    "maximum_benchmark_anchor_selection_error_observation",
+    "maximum_benchmark_endpoint_alignment_lag_observation",
+    "timing_diagnostics_are_policy",
+    "provider_causation_claimed",
+    "statistical_independence_claimed",
+    "projection_digest",
+}
+_SAMPLING_REUSE_OBSERVATION_KEYS = _EXTREME_REFERENCE_KEYS | {
+    "sample_count",
+    "reuse_excess_count",
+    "maximum_reuse_count",
+    "maximum_consecutive_reuse_count",
+    "source_reference",
+}
+_SAMPLING_ERROR_OBSERVATION_KEYS = _EXTREME_REFERENCE_KEYS | {
+    "sample_count",
+    "maximum_seconds",
+    "source_reference",
+}
+_SAMPLING_REUSE_SOURCE_REFERENCE_KEYS = {
+    "observation",
+    "reuse_count",
+    "first_asset_endpoint",
+    "last_asset_endpoint",
+}
+_SAMPLING_ERROR_SOURCE_REFERENCE_KEYS = {
+    "asset_endpoint",
+    "endpoint",
+    "anchor",
+    "realized_horizon_seconds",
+    "anchor_selection_error_seconds",
+}
+_SAMPLING_ALIGNMENT_SOURCE_REFERENCE_KEYS = {
+    "asset_endpoint",
+    "benchmark_endpoint",
+    "lag_seconds",
 }
 _ZERO_FALSE_FIELDS = (
     "statistical_independence_claimed",
@@ -543,6 +612,7 @@ def validate_campaign_shadow_surprise_audit(
         3: {3},
         4: {3},
         5: {4},
+        6: {5},
     }.get(schema_version, set())
     if value.get("shadow_schema_version") not in accepted_shadow_versions:
         errors.append("shadow_schema_version_invalid")
@@ -820,6 +890,11 @@ def _append_feature_records(
             feature_value,
             sample_count=sample_count,
         )
+        return_sampling_trace = _closed_return_sampling_trace_record(
+            feature,
+            feature_value,
+            sample_count=sample_count,
+        )
         record = {
             "reference": reference,
             "canonical_asset_id": str(current["canonical_asset_id"]),
@@ -833,6 +908,7 @@ def _append_feature_records(
             "descriptive_tail_rank": descriptive_tail_rank,
             "projection_sha256": _sha256_json(feature_value),
             **input_trace,
+            "return_sampling_trace": return_sampling_trace,
         }
         feature_records[feature].append(record)
         asset_feature_records[str(current["canonical_asset_id"])][feature].append(
@@ -912,6 +988,59 @@ def _closed_input_trace_record(
         "input_trace_diagnostics_are_policy": False,
         "provider_causation_claimed": False,
     }
+
+
+def _closed_return_sampling_trace_record(
+    feature: str,
+    feature_value: Mapping[str, Any],
+    *,
+    sample_count: int,
+) -> dict[str, Any] | None:
+    raw = feature_value.get("return_sampling_trace")
+    if feature in market_shadow_surprise.SUPPORTED_FEATURES:
+        if raw is not None:
+            raise AssertionError("activity feature unexpectedly carried return timing")
+        return None
+    if not isinstance(raw, Mapping):
+        raise AssertionError("return feature lost its closed sampling trace")
+    if raw.get("sample_count") != sample_count:
+        raise AssertionError("return sampling trace count drifted")
+    horizon = int(feature.rsplit("_", 1)[-1][:-1])
+    if (
+        raw.get("horizon_hours") != horizon
+        or raw.get("nominal_horizon_seconds") != horizon * 3600
+        or not _sha256(raw.get("sample_identity_sha256"))
+    ):
+        raise AssertionError("return sampling trace identity drifted")
+    if raw.get("status") != ("observed" if sample_count else "no_samples"):
+        raise AssertionError("return sampling trace status drifted")
+    for field in (
+        "timing_diagnostics_are_policy",
+        "provider_causation_claimed",
+        "statistical_independence_claimed",
+    ):
+        if raw.get(field) is not False:
+            raise AssertionError("return sampling trace safety claim drifted")
+    asset_leg = raw.get("asset_leg")
+    if not isinstance(asset_leg, Mapping) or (
+        asset_leg.get("endpoint_observation_count") != sample_count
+        or asset_leg.get("anchor_observation_count") != sample_count
+    ):
+        raise AssertionError("return asset sampling leg drifted")
+    benchmark_expected = feature.startswith("relative_return_vs_")
+    benchmark_leg = raw.get("benchmark_leg")
+    alignment = raw.get("benchmark_endpoint_alignment")
+    if benchmark_expected != isinstance(benchmark_leg, Mapping) or (
+        benchmark_expected != isinstance(alignment, Mapping)
+    ):
+        raise AssertionError("return benchmark sampling trace drifted")
+    if benchmark_expected and (
+        benchmark_leg.get("endpoint_observation_count") != sample_count
+        or benchmark_leg.get("anchor_observation_count") != sample_count
+        or alignment.get("sample_count") != sample_count
+    ):
+        raise AssertionError("return benchmark sampling count drifted")
+    return json.loads(_canonical_json(raw))
 
 
 def _compact_projection(
@@ -1366,6 +1495,10 @@ def _asset_feature_variation(
         == "mixed_source_repetition_and_transform_collision"
         for row in variation
     )
+    return_sampling_timing = _return_sampling_timing_summary(
+        feature,
+        variation,
+    )
     return {
         "feature": feature,
         "family": _FEATURE_FAMILIES[feature],
@@ -1475,6 +1608,325 @@ def _asset_feature_variation(
             }
             for row in variation
         ]),
+        "return_sampling_timing_summary": return_sampling_timing,
+    }
+
+
+def _return_sampling_timing_summary(
+    feature: str,
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    if feature in market_shadow_surprise.SUPPORTED_FEATURES:
+        if any(row.get("return_sampling_trace") is not None for row in records):
+            raise AssertionError("activity campaign record carried return timing")
+        return None
+    traces = [
+        row for row in records
+        if isinstance(row.get("return_sampling_trace"), Mapping)
+    ]
+    if len(traces) != len(records):
+        raise AssertionError("return campaign record lost timing trace")
+    benchmark_expected = feature.startswith("relative_return_vs_")
+
+    def leg(row: Mapping[str, Any], name: str) -> Mapping[str, Any] | None:
+        trace = row["return_sampling_trace"]
+        value = trace.get(name)
+        return value if isinstance(value, Mapping) else None
+
+    def range_maximum(row: Mapping[str, Any], leg_name: str) -> float | None:
+        current_leg = leg(row, leg_name)
+        if not current_leg:
+            return None
+        value = current_leg.get("anchor_selection_error_seconds")
+        maximum = value.get("maximum") if isinstance(value, Mapping) else None
+        return (
+            float(maximum)
+            if _finite_float_or_none(maximum) is not None
+            else None
+        )
+
+    def alignment_maximum(row: Mapping[str, Any]) -> float | None:
+        trace = row["return_sampling_trace"]
+        alignment = trace.get("benchmark_endpoint_alignment")
+        lag = alignment.get("lag_seconds") if isinstance(alignment, Mapping) else None
+        maximum = lag.get("maximum") if isinstance(lag, Mapping) else None
+        return (
+            float(maximum)
+            if _finite_float_or_none(maximum) is not None
+            else None
+        )
+
+    asset_reuse_record = _maximum_sampling_record(
+        traces,
+        lambda row: int(leg(row, "asset_leg")["anchor_reuse_excess_count"]),
+    )
+    asset_error_record = _maximum_sampling_record(
+        traces,
+        lambda row: range_maximum(row, "asset_leg") or 0.0,
+    )
+    benchmark_endpoint_record = (
+        _maximum_sampling_record(
+            traces,
+            lambda row: int(
+                leg(row, "benchmark_leg")["endpoint_reuse_excess_count"]
+            ),
+        )
+        if benchmark_expected
+        else None
+    )
+    benchmark_anchor_record = (
+        _maximum_sampling_record(
+            traces,
+            lambda row: int(
+                leg(row, "benchmark_leg")["anchor_reuse_excess_count"]
+            ),
+        )
+        if benchmark_expected
+        else None
+    )
+    benchmark_error_record = (
+        _maximum_sampling_record(
+            traces,
+            lambda row: range_maximum(row, "benchmark_leg") or 0.0,
+        )
+        if benchmark_expected
+        else None
+    )
+    alignment_record = (
+        _maximum_sampling_record(
+            traces,
+            lambda row: alignment_maximum(row) or 0.0,
+        )
+        if benchmark_expected
+        else None
+    )
+    asset_legs = [leg(row, "asset_leg") for row in traces]
+    benchmark_legs = (
+        [leg(row, "benchmark_leg") for row in traces]
+        if benchmark_expected
+        else []
+    )
+    return {
+        "observation_count": len(traces),
+        "asset_anchor_reuse_observation_count": sum(
+            int(current["anchor_reuse_excess_count"]) > 0
+            for current in asset_legs
+        ),
+        "benchmark_endpoint_reuse_observation_count": sum(
+            int(current["endpoint_reuse_excess_count"]) > 0
+            for current in benchmark_legs
+        ),
+        "benchmark_anchor_reuse_observation_count": sum(
+            int(current["anchor_reuse_excess_count"]) > 0
+            for current in benchmark_legs
+        ),
+        "nonzero_anchor_selection_error_observation_count": sum(
+            bool(row["return_sampling_trace"][
+                "nonzero_anchor_selection_error_detected"
+            ])
+            for row in traces
+        ),
+        "nonzero_benchmark_alignment_lag_observation_count": sum(
+            bool(row["return_sampling_trace"][
+                "nonzero_benchmark_alignment_lag_detected"
+            ])
+            for row in traces
+        ),
+        "maximum_asset_anchor_reuse_excess_count": max(
+            (int(current["anchor_reuse_excess_count"]) for current in asset_legs),
+            default=0,
+        ),
+        "maximum_asset_anchor_reuse_count": max(
+            (int(current["maximum_anchor_reuse_count"]) for current in asset_legs),
+            default=0,
+        ),
+        "maximum_consecutive_asset_anchor_reuse_count": max(
+            (
+                int(current["maximum_consecutive_anchor_reuse_count"])
+                for current in asset_legs
+            ),
+            default=0,
+        ),
+        "maximum_asset_anchor_selection_error_seconds": _maximum_optional_float(
+            range_maximum(row, "asset_leg") for row in traces
+        ),
+        "maximum_benchmark_endpoint_reuse_excess_count": max(
+            (
+                int(current["endpoint_reuse_excess_count"])
+                for current in benchmark_legs
+            ),
+            default=0,
+        ),
+        "maximum_benchmark_endpoint_reuse_count": max(
+            (
+                int(current["maximum_endpoint_reuse_count"])
+                for current in benchmark_legs
+            ),
+            default=0,
+        ),
+        "maximum_consecutive_benchmark_endpoint_reuse_count": max(
+            (
+                int(current["maximum_consecutive_endpoint_reuse_count"])
+                for current in benchmark_legs
+            ),
+            default=0,
+        ),
+        "maximum_benchmark_anchor_reuse_excess_count": max(
+            (
+                int(current["anchor_reuse_excess_count"])
+                for current in benchmark_legs
+            ),
+            default=0,
+        ),
+        "maximum_benchmark_anchor_reuse_count": max(
+            (
+                int(current["maximum_anchor_reuse_count"])
+                for current in benchmark_legs
+            ),
+            default=0,
+        ),
+        "maximum_consecutive_benchmark_anchor_reuse_count": max(
+            (
+                int(current["maximum_consecutive_anchor_reuse_count"])
+                for current in benchmark_legs
+            ),
+            default=0,
+        ),
+        "maximum_benchmark_anchor_selection_error_seconds": (
+            _maximum_optional_float(
+                range_maximum(row, "benchmark_leg") for row in traces
+            )
+            if benchmark_expected
+            else None
+        ),
+        "maximum_benchmark_endpoint_alignment_lag_seconds": (
+            _maximum_optional_float(alignment_maximum(row) for row in traces)
+            if benchmark_expected
+            else None
+        ),
+        "maximum_asset_anchor_reuse_observation": (
+            _sampling_reuse_observation(
+                asset_reuse_record,
+                leg_name="asset_leg",
+                component="anchor",
+            )
+            if asset_reuse_record is not None
+            else None
+        ),
+        "maximum_asset_anchor_selection_error_observation": (
+            _sampling_error_observation(
+                asset_error_record,
+                leg_name="asset_leg",
+            )
+            if asset_error_record is not None
+            else None
+        ),
+        "maximum_benchmark_endpoint_reuse_observation": (
+            _sampling_reuse_observation(
+                benchmark_endpoint_record,
+                leg_name="benchmark_leg",
+                component="endpoint",
+            )
+            if benchmark_endpoint_record is not None
+            else None
+        ),
+        "maximum_benchmark_anchor_reuse_observation": (
+            _sampling_reuse_observation(
+                benchmark_anchor_record,
+                leg_name="benchmark_leg",
+                component="anchor",
+            )
+            if benchmark_anchor_record is not None
+            else None
+        ),
+        "maximum_benchmark_anchor_selection_error_observation": (
+            _sampling_error_observation(
+                benchmark_error_record,
+                leg_name="benchmark_leg",
+            )
+            if benchmark_error_record is not None
+            else None
+        ),
+        "maximum_benchmark_endpoint_alignment_lag_observation": (
+            _sampling_alignment_observation(alignment_record)
+            if alignment_record is not None
+            else None
+        ),
+        "timing_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
+        "statistical_independence_claimed": False,
+        "projection_digest": _sha256_json([
+            {
+                "reference": row["reference"],
+                "canonical_asset_id": row["canonical_asset_id"],
+                "return_sampling_trace": row["return_sampling_trace"],
+            }
+            for row in traces
+        ]),
+    }
+
+
+def _maximum_sampling_record(
+    records: Sequence[Mapping[str, Any]],
+    value_for: Any,
+) -> Mapping[str, Any] | None:
+    if not records:
+        return None
+    return min(
+        records,
+        key=lambda row: (-float(value_for(row)), _feature_record_sort_key(row)),
+    )
+
+
+def _maximum_optional_float(values: Any) -> float | None:
+    observed = [float(value) for value in values if value is not None]
+    return max(observed, default=None)
+
+
+def _sampling_reuse_observation(
+    row: Mapping[str, Any],
+    *,
+    leg_name: str,
+    component: str,
+) -> dict[str, Any]:
+    leg = row["return_sampling_trace"][leg_name]
+    return {
+        **_extreme_reference(row),
+        "sample_count": int(row["sample_count"]),
+        "reuse_excess_count": int(leg[f"{component}_reuse_excess_count"]),
+        "maximum_reuse_count": int(leg[f"maximum_{component}_reuse_count"]),
+        "maximum_consecutive_reuse_count": int(
+            leg[f"maximum_consecutive_{component}_reuse_count"]
+        ),
+        "source_reference": leg[f"maximum_{component}_reuse_reference"],
+    }
+
+
+def _sampling_error_observation(
+    row: Mapping[str, Any],
+    *,
+    leg_name: str,
+) -> dict[str, Any]:
+    leg = row["return_sampling_trace"][leg_name]
+    return {
+        **_extreme_reference(row),
+        "sample_count": int(row["sample_count"]),
+        "maximum_seconds": float(
+            leg["anchor_selection_error_seconds"]["maximum"]
+        ),
+        "source_reference": leg[
+            "maximum_anchor_selection_error_reference"
+        ],
+    }
+
+
+def _sampling_alignment_observation(row: Mapping[str, Any]) -> dict[str, Any]:
+    alignment = row["return_sampling_trace"]["benchmark_endpoint_alignment"]
+    return {
+        **_extreme_reference(row),
+        "sample_count": int(row["sample_count"]),
+        "maximum_seconds": float(alignment["lag_seconds"]["maximum"]),
+        "source_reference": alignment["maximum_lag_reference"],
     }
 
 
@@ -1819,6 +2271,7 @@ def _validate_feature_coverage(
         _validate_feature_variation(
             feature,
             coverage,
+            schema_version=schema_version,
             evaluated_count=evaluated_count,
             minimum_sample_count=minimum_sample_count,
             maximum_sample_count=(
@@ -1904,13 +2357,15 @@ def _validate_feature_variation(
     feature: str,
     coverage: Mapping[str, Any],
     *,
+    schema_version: int,
     evaluated_count: int,
     minimum_sample_count: int | None,
     maximum_sample_count: int | None,
     errors: list[str],
 ) -> None:
     prefix = f"feature_coverage_{feature}"
-    if coverage.get("variation_observation_basis") != VARIATION_OBSERVATION_BASIS:
+    expected_basis = _VARIATION_OBSERVATION_BASIS_BY_SCHEMA[schema_version]
+    if coverage.get("variation_observation_basis") != expected_basis:
         errors.append(f"{prefix}_variation_basis_invalid")
     if coverage.get("variation_quantile_method") != VARIATION_QUANTILE_METHOD:
         errors.append(f"{prefix}_variation_quantile_method_invalid")
@@ -2249,7 +2704,9 @@ def _validate_asset_feature_variation(
         summary,
         (
             _ASSET_FEATURE_VARIATION_KEYS
-            if schema_version >= 5
+            if schema_version >= 6
+            else _ASSET_FEATURE_VARIATION_KEYS_V5
+            if schema_version == 5
             else _ASSET_FEATURE_VARIATION_KEYS_V4
         ),
         prefix,
@@ -2371,6 +2828,16 @@ def _validate_asset_feature_variation(
             prefix=prefix,
             errors=errors,
         )
+    if schema_version >= 6:
+        _validate_return_sampling_timing_summary(
+            summary.get("return_sampling_timing_summary"),
+            feature=feature,
+            variation_count=(
+                variation_count if _nonnegative_int(variation_count) else 0
+            ),
+            prefix=prefix,
+            errors=errors,
+        )
 
 
 def _validate_asset_feature_input_trace(
@@ -2481,6 +2948,255 @@ def _validate_asset_feature_input_trace(
         errors.append(f"{prefix}_provider_causation_claim_invalid")
     if not _sha256(summary.get("input_trace_projection_digest")):
         errors.append(f"{prefix}_input_trace_projection_digest_invalid")
+
+
+def _validate_return_sampling_timing_summary(
+    value: Any,
+    *,
+    feature: str,
+    variation_count: int,
+    prefix: str,
+    errors: list[str],
+) -> None:
+    if feature in market_shadow_surprise.SUPPORTED_FEATURES:
+        if value is not None:
+            errors.append(f"{prefix}_activity_return_sampling_must_be_null")
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"{prefix}_return_sampling_summary_invalid")
+        return
+    _exact_keys(
+        value,
+        _RETURN_SAMPLING_TIMING_SUMMARY_KEYS,
+        f"{prefix}_return_sampling",
+        errors,
+    )
+    if value.get("observation_count") != variation_count:
+        errors.append(f"{prefix}_return_sampling_count_invalid")
+    observation_count_fields = (
+        "asset_anchor_reuse_observation_count",
+        "benchmark_endpoint_reuse_observation_count",
+        "benchmark_anchor_reuse_observation_count",
+        "nonzero_anchor_selection_error_observation_count",
+        "nonzero_benchmark_alignment_lag_observation_count",
+    )
+    for field in observation_count_fields:
+        count = value.get(field)
+        if not _nonnegative_int(count) or count > variation_count:
+            errors.append(f"{prefix}_{field}_invalid")
+    maximum_count_fields = (
+        "maximum_asset_anchor_reuse_excess_count",
+        "maximum_asset_anchor_reuse_count",
+        "maximum_consecutive_asset_anchor_reuse_count",
+        "maximum_benchmark_endpoint_reuse_excess_count",
+        "maximum_benchmark_endpoint_reuse_count",
+        "maximum_consecutive_benchmark_endpoint_reuse_count",
+        "maximum_benchmark_anchor_reuse_excess_count",
+        "maximum_benchmark_anchor_reuse_count",
+        "maximum_consecutive_benchmark_anchor_reuse_count",
+    )
+    for field in maximum_count_fields:
+        count = value.get(field)
+        if not _nonnegative_int(count) or (variation_count == 0 and count != 0):
+            errors.append(f"{prefix}_{field}_invalid")
+
+    relative = feature.startswith("relative_return_vs_")
+    seconds_fields = (
+        "maximum_asset_anchor_selection_error_seconds",
+        "maximum_benchmark_anchor_selection_error_seconds",
+        "maximum_benchmark_endpoint_alignment_lag_seconds",
+    )
+    for index, field in enumerate(seconds_fields):
+        seconds = _finite_float_or_none(value.get(field))
+        required = variation_count > 0 and (index == 0 or relative)
+        if required != (seconds is not None) or (
+            seconds is not None and seconds < 0
+        ):
+            errors.append(f"{prefix}_{field}_invalid")
+
+    asset_reuse = value.get("maximum_asset_anchor_reuse_observation")
+    asset_error = value.get(
+        "maximum_asset_anchor_selection_error_observation"
+    )
+    _validate_sampling_reuse_observation(
+        asset_reuse,
+        expected=variation_count > 0,
+        expected_excess=value.get("maximum_asset_anchor_reuse_excess_count"),
+        expected_maximum=value.get("maximum_asset_anchor_reuse_count"),
+        expected_consecutive=value.get(
+            "maximum_consecutive_asset_anchor_reuse_count"
+        ),
+        label=f"{prefix}_maximum_asset_anchor_reuse",
+        errors=errors,
+    )
+    _validate_sampling_error_observation(
+        asset_error,
+        expected=variation_count > 0,
+        expected_maximum=value.get(
+            "maximum_asset_anchor_selection_error_seconds"
+        ),
+        alignment=False,
+        label=f"{prefix}_maximum_asset_anchor_error",
+        errors=errors,
+    )
+    benchmark_expected = variation_count > 0 and relative
+    for field, excess, maximum, consecutive in (
+        (
+            "maximum_benchmark_endpoint_reuse_observation",
+            "maximum_benchmark_endpoint_reuse_excess_count",
+            "maximum_benchmark_endpoint_reuse_count",
+            "maximum_consecutive_benchmark_endpoint_reuse_count",
+        ),
+        (
+            "maximum_benchmark_anchor_reuse_observation",
+            "maximum_benchmark_anchor_reuse_excess_count",
+            "maximum_benchmark_anchor_reuse_count",
+            "maximum_consecutive_benchmark_anchor_reuse_count",
+        ),
+    ):
+        _validate_sampling_reuse_observation(
+            value.get(field),
+            expected=benchmark_expected,
+            expected_excess=value.get(excess),
+            expected_maximum=value.get(maximum),
+            expected_consecutive=value.get(consecutive),
+            label=f"{prefix}_{field}",
+            errors=errors,
+        )
+    _validate_sampling_error_observation(
+        value.get("maximum_benchmark_anchor_selection_error_observation"),
+        expected=benchmark_expected,
+        expected_maximum=value.get(
+            "maximum_benchmark_anchor_selection_error_seconds"
+        ),
+        alignment=False,
+        label=f"{prefix}_maximum_benchmark_anchor_error",
+        errors=errors,
+    )
+    _validate_sampling_error_observation(
+        value.get("maximum_benchmark_endpoint_alignment_lag_observation"),
+        expected=benchmark_expected,
+        expected_maximum=value.get(
+            "maximum_benchmark_endpoint_alignment_lag_seconds"
+        ),
+        alignment=True,
+        label=f"{prefix}_maximum_benchmark_alignment_lag",
+        errors=errors,
+    )
+    if not relative:
+        for field in (
+            "benchmark_endpoint_reuse_observation_count",
+            "benchmark_anchor_reuse_observation_count",
+            "nonzero_benchmark_alignment_lag_observation_count",
+            "maximum_benchmark_endpoint_reuse_excess_count",
+            "maximum_benchmark_endpoint_reuse_count",
+            "maximum_consecutive_benchmark_endpoint_reuse_count",
+            "maximum_benchmark_anchor_reuse_excess_count",
+            "maximum_benchmark_anchor_reuse_count",
+            "maximum_consecutive_benchmark_anchor_reuse_count",
+        ):
+            if value.get(field) != 0:
+                errors.append(f"{prefix}_{field}_direct_must_be_zero")
+    for field in (
+        "timing_diagnostics_are_policy",
+        "provider_causation_claimed",
+        "statistical_independence_claimed",
+    ):
+        if value.get(field) is not False:
+            errors.append(f"{prefix}_{field}_invalid")
+    if not _sha256(value.get("projection_digest")):
+        errors.append(f"{prefix}_return_sampling_projection_digest_invalid")
+
+
+def _validate_sampling_reuse_observation(
+    value: Any,
+    *,
+    expected: bool,
+    expected_excess: Any,
+    expected_maximum: Any,
+    expected_consecutive: Any,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not expected:
+        if value is not None:
+            errors.append(f"{label}_must_be_null")
+        return
+    if not isinstance(value, Mapping) or set(value) != _SAMPLING_REUSE_OBSERVATION_KEYS:
+        errors.append(f"{label}_invalid")
+        return
+    if not _valid_extreme_reference({
+        key: value.get(key) for key in _EXTREME_REFERENCE_KEYS
+    }):
+        errors.append(f"{label}_reference_invalid")
+    for field, expected_value in (
+        ("reuse_excess_count", expected_excess),
+        ("maximum_reuse_count", expected_maximum),
+        ("maximum_consecutive_reuse_count", expected_consecutive),
+    ):
+        if value.get(field) != expected_value:
+            errors.append(f"{label}_{field}_invalid")
+    if not _positive_int(value.get("sample_count")):
+        errors.append(f"{label}_sample_count_invalid")
+    source = value.get("source_reference")
+    if not isinstance(source, Mapping) or set(source) != _SAMPLING_REUSE_SOURCE_REFERENCE_KEYS:
+        errors.append(f"{label}_source_reference_invalid")
+        return
+    for field in ("observation", "first_asset_endpoint", "last_asset_endpoint"):
+        if not _valid_reference(source.get(field)):
+            errors.append(f"{label}_source_{field}_invalid")
+    if source.get("reuse_count") != expected_maximum:
+        errors.append(f"{label}_source_reuse_count_invalid")
+
+
+def _validate_sampling_error_observation(
+    value: Any,
+    *,
+    expected: bool,
+    expected_maximum: Any,
+    alignment: bool,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not expected:
+        if value is not None:
+            errors.append(f"{label}_must_be_null")
+        return
+    if not isinstance(value, Mapping) or set(value) != _SAMPLING_ERROR_OBSERVATION_KEYS:
+        errors.append(f"{label}_invalid")
+        return
+    if not _valid_extreme_reference({
+        key: value.get(key) for key in _EXTREME_REFERENCE_KEYS
+    }):
+        errors.append(f"{label}_reference_invalid")
+    maximum = _finite_float_or_none(value.get("maximum_seconds"))
+    expected_float = _finite_float_or_none(expected_maximum)
+    if maximum is None or expected_float is None or maximum != expected_float:
+        errors.append(f"{label}_maximum_invalid")
+    if not _positive_int(value.get("sample_count")):
+        errors.append(f"{label}_sample_count_invalid")
+    source = value.get("source_reference")
+    expected_keys = (
+        _SAMPLING_ALIGNMENT_SOURCE_REFERENCE_KEYS
+        if alignment
+        else _SAMPLING_ERROR_SOURCE_REFERENCE_KEYS
+    )
+    if not isinstance(source, Mapping) or set(source) != expected_keys:
+        errors.append(f"{label}_source_reference_invalid")
+        return
+    reference_fields = (
+        ("asset_endpoint", "benchmark_endpoint")
+        if alignment
+        else ("asset_endpoint", "endpoint", "anchor")
+    )
+    for field in reference_fields:
+        if not _valid_reference(source.get(field)):
+            errors.append(f"{label}_source_{field}_invalid")
+    source_maximum = _finite_float_or_none(
+        source.get("lag_seconds" if alignment else "anchor_selection_error_seconds")
+    )
+    if maximum is not None and source_maximum != maximum:
+        errors.append(f"{label}_source_maximum_invalid")
 
 
 def _expected_source_value_tuple_kind(feature: str) -> str:

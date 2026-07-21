@@ -243,10 +243,21 @@ def _doctor_api_unregistered_details() -> list[dict[str, str]]:
         },
     ]
 
-def _namespace_inventory(root: Path) -> dict[str, Any]:
+def _namespace_inventory(
+    root: Path,
+    *,
+    artifact_base_dir: Path | None = None,
+) -> dict[str, Any]:
+    artifact_base = (
+        (artifact_base_dir or root / "event_fade_cache").resolve()
+    )
+    try:
+        display_base = artifact_base.relative_to(root).as_posix()
+    except ValueError:
+        display_base = artifact_base.name
     registry = artifact_retention.build_bounded_retention_report(
-        root / "event_fade_cache",
-        display_base_dir="event_fade_cache",
+        artifact_base,
+        display_base_dir=display_base,
     )
     rows = registry.get("namespaces") if isinstance(registry, dict) else []
     if not isinstance(rows, list):
@@ -806,6 +817,7 @@ def _write_v3_release_candidate_report(*, root: Path, output_dir: Path, final_re
 def build_architecture_report(
     *,
     root: Path | None = None,
+    artifact_base_dir: Path | None = None,
     pytest_runtime_seconds: float | None = None,
     standalone_runner_runtime_seconds: float | None = None,
 ) -> dict[str, Any]:
@@ -835,7 +847,10 @@ def build_architecture_report(
     blocked = [row for row in line_gates if row["gate_status"] == "blocked"]
     registry_summary = check_registry.registry_summary()
     scanner_command_bodies = _scanner_command_body_functions(root)
-    namespace_inventory = _namespace_inventory(root)
+    namespace_inventory = _namespace_inventory(
+        root,
+        artifact_base_dir=artifact_base_dir,
+    )
     ci_static_safety = _ci_static_safety(root)
     classification = _remaining_module_classification(root)
     class_ownership = _class_ownership_summary(root)
@@ -1311,12 +1326,14 @@ def write_architecture_report(
     *,
     root: Path | None = None,
     out_dir: Path | None = None,
+    artifact_base_dir: Path | None = None,
     pytest_runtime_seconds: float | None = None,
     standalone_runner_runtime_seconds: float | None = None,
 ) -> dict[str, Path]:
     root = (root or repo_root_from_module()).resolve()
     data = build_architecture_report(
         root=root,
+        artifact_base_dir=artifact_base_dir,
         pytest_runtime_seconds=pytest_runtime_seconds,
         standalone_runner_runtime_seconds=standalone_runner_runtime_seconds,
     )

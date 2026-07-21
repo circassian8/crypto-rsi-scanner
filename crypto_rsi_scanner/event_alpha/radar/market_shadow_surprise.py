@@ -19,7 +19,7 @@ from typing import Any
 
 
 SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 4
+SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 5
 SUPPORTED_FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -97,6 +97,8 @@ _RETURN_METHOD_VALUE_KEYS = frozenset(
         "source_value_tuple_identity",
         "input_trace_diagnostics_are_policy",
         "provider_causation_claimed",
+        "return_sampling_trace_identity",
+        "return_sampling_timing_diagnostics_are_policy",
     )
 )
 _METHOD_VALUE_KEYS = frozenset(
@@ -169,6 +171,7 @@ _RETURN_FEATURE_VALUE_KEYS = frozenset(
         "upper_tail_rank",
         "two_sided_tail_rank",
         "tail_ranks_are_p_values",
+        "return_sampling_trace",
         *_INPUT_TRACE_VALUE_KEYS,
     )
 )
@@ -179,6 +182,68 @@ _RETURN_SAMPLE_VALUE_KEYS = frozenset(
         "benchmark_endpoint",
         "benchmark_anchor",
     )
+)
+_RETURN_SAMPLING_TRACE_KEYS = frozenset(
+    (
+        "status",
+        "sample_count",
+        "horizon_hours",
+        "nominal_horizon_seconds",
+        "sample_identity_sha256",
+        "asset_leg",
+        "benchmark_leg",
+        "benchmark_endpoint_alignment",
+        "anchor_reuse_detected",
+        "benchmark_endpoint_reuse_detected",
+        "nonzero_anchor_selection_error_detected",
+        "nonzero_benchmark_alignment_lag_detected",
+        "timing_diagnostics_are_policy",
+        "provider_causation_claimed",
+        "statistical_independence_claimed",
+    )
+)
+_RETURN_SAMPLING_LEG_KEYS = frozenset(
+    (
+        "endpoint_observation_count",
+        "distinct_endpoint_observation_count",
+        "endpoint_reuse_excess_count",
+        "maximum_endpoint_reuse_count",
+        "maximum_consecutive_endpoint_reuse_count",
+        "anchor_observation_count",
+        "distinct_anchor_observation_count",
+        "anchor_reuse_excess_count",
+        "maximum_anchor_reuse_count",
+        "maximum_consecutive_anchor_reuse_count",
+        "realized_horizon_seconds",
+        "anchor_selection_error_seconds",
+        "maximum_endpoint_reuse_reference",
+        "maximum_anchor_reuse_reference",
+        "maximum_anchor_selection_error_reference",
+    )
+)
+_RETURN_SAMPLING_RANGE_KEYS = frozenset(("minimum", "median", "maximum"))
+_RETURN_SAMPLING_REUSE_REFERENCE_KEYS = frozenset(
+    (
+        "observation",
+        "reuse_count",
+        "first_asset_endpoint",
+        "last_asset_endpoint",
+    )
+)
+_RETURN_SAMPLING_ERROR_REFERENCE_KEYS = frozenset(
+    (
+        "asset_endpoint",
+        "endpoint",
+        "anchor",
+        "realized_horizon_seconds",
+        "anchor_selection_error_seconds",
+    )
+)
+_RETURN_SAMPLING_ALIGNMENT_KEYS = frozenset(
+    ("sample_count", "lag_seconds", "maximum_lag_reference")
+)
+_RETURN_SAMPLING_ALIGNMENT_REFERENCE_KEYS = frozenset(
+    ("asset_endpoint", "benchmark_endpoint", "lag_seconds")
 )
 
 
@@ -240,7 +305,7 @@ def evaluate_shadow_temporal_surprise(
         str, Iterable[Mapping[str, Any]]
     ] | None = None,
 ) -> dict[str, Any]:
-    """Return the closed v4 robust shadow value for activity and return tails.
+    """Return the closed v5 robust shadow value for activity and return tails.
 
     Inputs are only read. Proxy, cross-sectional, missing, and otherwise
     unapproved feature bases are explicitly excluded. Non-positive and
@@ -363,6 +428,10 @@ def evaluate_shadow_temporal_surprise(
             ),
             "input_trace_diagnostics_are_policy": False,
             "provider_causation_claimed": False,
+            "return_sampling_trace_identity": (
+                "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+            ),
+            "return_sampling_timing_diagnostics_are_policy": False,
         },
         "return_features": return_features,
         "routing_eligible": False,
@@ -512,7 +581,7 @@ def _evaluate_return_features(
                 feature_basis=RELATIVE_RETURN_BASIS,
             )
     if frozenset(features) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v4")
+        raise AssertionError("shadow signed-return feature set drifted from v5")
     return features
 
 
@@ -571,6 +640,11 @@ def _evaluate_signed_return_feature(
         source_value_tuples,
         source_value_tuple_kind=_return_source_value_tuple_kind(benchmark),
     ))
+    value["return_sampling_trace"] = _return_sampling_trace(
+        eligible,
+        horizon_hours=horizon_hours,
+        benchmark=benchmark,
+    )
     if current_state == "basis_ineligible":
         value.update(
             status="basis_ineligible",
@@ -671,6 +745,11 @@ def _empty_return_feature_value(
             (),
             (),
             source_value_tuple_kind=_return_source_value_tuple_kind(benchmark),
+        ),
+        "return_sampling_trace": _return_sampling_trace(
+            (),
+            horizon_hours=horizon_hours,
+            benchmark=benchmark,
         ),
         "median": None,
         "mad": None,
@@ -822,6 +901,347 @@ def _return_sample_projection(
         "benchmark_endpoint": _observation_reference(sample.benchmark_endpoint),
         "benchmark_anchor": _observation_reference(sample.benchmark_anchor),
     }
+
+
+def _return_sampling_trace(
+    samples: Iterable[_DirectReturnSample | _RelativeReturnSample],
+    *,
+    horizon_hours: int,
+    benchmark: str | None,
+) -> dict[str, Any]:
+    """Describe exact causal anchor reuse and realized timing without policy."""
+
+    ordered = tuple(samples)
+    nominal_seconds = horizon_hours * 3600
+    asset_rows = tuple(
+        (
+            _return_sample_asset_endpoint(sample),
+            _return_sample_asset_endpoint(sample),
+            _return_sample_asset_anchor(sample),
+        )
+        for sample in ordered
+    )
+    benchmark_rows = (
+        tuple(
+            (
+                sample.asset_endpoint,
+                sample.benchmark_endpoint,
+                sample.benchmark_anchor,
+            )
+            for sample in ordered
+            if isinstance(sample, _RelativeReturnSample)
+        )
+        if benchmark is not None
+        else None
+    )
+    if benchmark is not None and len(benchmark_rows or ()) != len(ordered):
+        raise AssertionError("relative return timing trace lost benchmark samples")
+    asset_leg = _return_sampling_leg_trace(
+        asset_rows,
+        nominal_horizon_seconds=nominal_seconds,
+    )
+    benchmark_leg = (
+        _return_sampling_leg_trace(
+            benchmark_rows or (),
+            nominal_horizon_seconds=nominal_seconds,
+        )
+        if benchmark is not None
+        else None
+    )
+    alignment = (
+        _return_sampling_alignment_trace(ordered)
+        if benchmark is not None
+        else None
+    )
+    legs = (asset_leg,) + ((benchmark_leg,) if benchmark_leg is not None else ())
+    anchor_reuse_detected = any(
+        int(leg["anchor_reuse_excess_count"]) > 0 for leg in legs
+    )
+    nonzero_error_detected = any(
+        _range_maximum(leg.get("anchor_selection_error_seconds")) > 0
+        for leg in legs
+    )
+    return {
+        "status": "observed" if ordered else "no_samples",
+        "sample_count": len(ordered),
+        "horizon_hours": horizon_hours,
+        "nominal_horizon_seconds": nominal_seconds,
+        "sample_identity_sha256": _sha256_json([
+            _return_sampling_sample_identity(
+                sample,
+                nominal_horizon_seconds=nominal_seconds,
+            )
+            for sample in ordered
+        ]),
+        "asset_leg": asset_leg,
+        "benchmark_leg": benchmark_leg,
+        "benchmark_endpoint_alignment": alignment,
+        "anchor_reuse_detected": anchor_reuse_detected,
+        "benchmark_endpoint_reuse_detected": bool(
+            benchmark_leg
+            and int(benchmark_leg["endpoint_reuse_excess_count"]) > 0
+        ),
+        "nonzero_anchor_selection_error_detected": nonzero_error_detected,
+        "nonzero_benchmark_alignment_lag_detected": bool(
+            alignment and _range_maximum(alignment.get("lag_seconds")) > 0
+        ),
+        "timing_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
+        "statistical_independence_claimed": False,
+    }
+
+
+def _return_sampling_leg_trace(
+    rows: Iterable[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]
+    ],
+    *,
+    nominal_horizon_seconds: int,
+) -> dict[str, Any]:
+    ordered = tuple(rows)
+    endpoints = tuple(_observation_identity(row[1]) for row in ordered)
+    anchors = tuple(_observation_identity(row[2]) for row in ordered)
+    realized = tuple(
+        _seconds_between(row[1], row[2]) for row in ordered
+    )
+    errors = tuple(
+        _round_seconds(value - nominal_horizon_seconds)
+        for value in realized
+    )
+    if any(value < 0 for value in errors):
+        raise AssertionError("causal return anchor precedes its allowed target")
+    endpoint_distinct = len(set(endpoints))
+    anchor_distinct = len(set(anchors))
+    return {
+        "endpoint_observation_count": len(ordered),
+        "distinct_endpoint_observation_count": endpoint_distinct,
+        "endpoint_reuse_excess_count": len(ordered) - endpoint_distinct,
+        "maximum_endpoint_reuse_count": _maximum_tie_count(endpoints),
+        "maximum_consecutive_endpoint_reuse_count": (
+            _maximum_consecutive_count(endpoints)
+        ),
+        "anchor_observation_count": len(ordered),
+        "distinct_anchor_observation_count": anchor_distinct,
+        "anchor_reuse_excess_count": len(ordered) - anchor_distinct,
+        "maximum_anchor_reuse_count": _maximum_tie_count(anchors),
+        "maximum_consecutive_anchor_reuse_count": (
+            _maximum_consecutive_count(anchors)
+        ),
+        "realized_horizon_seconds": _seconds_range(realized),
+        "anchor_selection_error_seconds": _seconds_range(errors),
+        "maximum_endpoint_reuse_reference": _maximum_reuse_reference(
+            ordered,
+            component_index=1,
+        ),
+        "maximum_anchor_reuse_reference": _maximum_reuse_reference(
+            ordered,
+            component_index=2,
+        ),
+        "maximum_anchor_selection_error_reference": (
+            _maximum_anchor_error_reference(
+                ordered,
+                nominal_horizon_seconds=nominal_horizon_seconds,
+            )
+        ),
+    }
+
+
+def _return_sampling_alignment_trace(
+    samples: Iterable[_DirectReturnSample | _RelativeReturnSample],
+) -> dict[str, Any]:
+    relative = tuple(
+        sample for sample in samples
+        if isinstance(sample, _RelativeReturnSample)
+    )
+    lags = tuple(
+        _seconds_between(sample.asset_endpoint, sample.benchmark_endpoint)
+        for sample in relative
+    )
+    if any(value < 0 for value in lags):
+        raise AssertionError("benchmark endpoint moved after asset endpoint")
+    maximum_reference = None
+    if relative:
+        sample = min(
+            relative,
+            key=lambda item: (
+                -_seconds_between(item.asset_endpoint, item.benchmark_endpoint),
+                _reference_sort_key(_observation_reference(item.asset_endpoint)),
+            ),
+        )
+        maximum_reference = {
+            "asset_endpoint": _observation_reference(sample.asset_endpoint),
+            "benchmark_endpoint": _observation_reference(
+                sample.benchmark_endpoint
+            ),
+            "lag_seconds": _seconds_between(
+                sample.asset_endpoint,
+                sample.benchmark_endpoint,
+            ),
+        }
+    return {
+        "sample_count": len(relative),
+        "lag_seconds": _seconds_range(lags),
+        "maximum_lag_reference": maximum_reference,
+    }
+
+
+def _return_sampling_sample_identity(
+    sample: _DirectReturnSample | _RelativeReturnSample,
+    *,
+    nominal_horizon_seconds: int,
+) -> dict[str, Any]:
+    asset_endpoint = _return_sample_asset_endpoint(sample)
+    asset_anchor = _return_sample_asset_anchor(sample)
+    identity: dict[str, Any] = {
+        **_return_sample_projection(sample),
+        "asset_realized_horizon_seconds": _seconds_between(
+            asset_endpoint,
+            asset_anchor,
+        ),
+        "asset_anchor_selection_error_seconds": _round_seconds(
+            _seconds_between(asset_endpoint, asset_anchor)
+            - nominal_horizon_seconds
+        ),
+        "benchmark_realized_horizon_seconds": None,
+        "benchmark_anchor_selection_error_seconds": None,
+        "benchmark_endpoint_alignment_lag_seconds": None,
+    }
+    if isinstance(sample, _RelativeReturnSample):
+        benchmark_realized = _seconds_between(
+            sample.benchmark_endpoint,
+            sample.benchmark_anchor,
+        )
+        identity.update({
+            "benchmark_realized_horizon_seconds": benchmark_realized,
+            "benchmark_anchor_selection_error_seconds": _round_seconds(
+                benchmark_realized - nominal_horizon_seconds
+            ),
+            "benchmark_endpoint_alignment_lag_seconds": _seconds_between(
+                sample.asset_endpoint,
+                sample.benchmark_endpoint,
+            ),
+        })
+    return identity
+
+
+def _maximum_reuse_reference(
+    rows: tuple[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], ...
+    ],
+    *,
+    component_index: int,
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    grouped: dict[str, list[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]
+    ]] = {}
+    for row in rows:
+        grouped.setdefault(_observation_identity(row[component_index]), []).append(row)
+    identity, reused = min(
+        grouped.items(),
+        key=lambda item: (-len(item[1]), item[0]),
+    )
+    del identity
+    return {
+        "observation": _observation_reference(reused[0][component_index]),
+        "reuse_count": len(reused),
+        "first_asset_endpoint": _observation_reference(reused[0][0]),
+        "last_asset_endpoint": _observation_reference(reused[-1][0]),
+    }
+
+
+def _maximum_anchor_error_reference(
+    rows: tuple[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], ...
+    ],
+    *,
+    nominal_horizon_seconds: int,
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    row = min(
+        rows,
+        key=lambda item: (
+            -_round_seconds(
+                _seconds_between(item[1], item[2])
+                - nominal_horizon_seconds
+            ),
+            _reference_sort_key(_observation_reference(item[0])),
+        ),
+    )
+    realized = _seconds_between(row[1], row[2])
+    return {
+        "asset_endpoint": _observation_reference(row[0]),
+        "endpoint": _observation_reference(row[1]),
+        "anchor": _observation_reference(row[2]),
+        "realized_horizon_seconds": realized,
+        "anchor_selection_error_seconds": _round_seconds(
+            realized - nominal_horizon_seconds
+        ),
+    }
+
+
+def _return_sample_asset_endpoint(
+    sample: _DirectReturnSample | _RelativeReturnSample,
+) -> Mapping[str, Any]:
+    return (
+        sample.endpoint
+        if isinstance(sample, _DirectReturnSample)
+        else sample.asset_endpoint
+    )
+
+
+def _return_sample_asset_anchor(
+    sample: _DirectReturnSample | _RelativeReturnSample,
+) -> Mapping[str, Any]:
+    return (
+        sample.anchor
+        if isinstance(sample, _DirectReturnSample)
+        else sample.asset_anchor
+    )
+
+
+def _observation_identity(observation: Mapping[str, Any]) -> str:
+    return _canonical_json(_observation_reference(observation))
+
+
+def _seconds_between(
+    later: Mapping[str, Any],
+    earlier: Mapping[str, Any],
+) -> float:
+    return _round_seconds(
+        (
+            _required_aware_time(later.get("observed_at"), "later observed_at")
+            - _required_aware_time(
+                earlier.get("observed_at"),
+                "earlier observed_at",
+            )
+        ).total_seconds()
+    )
+
+
+def _round_seconds(value: float) -> float:
+    rounded = round(float(value), 6)
+    return 0.0 if rounded == 0.0 else rounded
+
+
+def _seconds_range(values: Iterable[float]) -> dict[str, float] | None:
+    ordered = tuple(values)
+    if not ordered:
+        return None
+    return {
+        "minimum": _round_seconds(min(ordered)),
+        "median": _round_seconds(statistics.median(ordered)),
+        "maximum": _round_seconds(max(ordered)),
+    }
+
+
+def _range_maximum(value: object) -> float:
+    if not isinstance(value, Mapping):
+        return 0.0
+    maximum = value.get("maximum")
+    return float(maximum) if isinstance(maximum, Real) else 0.0
 
 
 def _return_sample_identity(
@@ -1484,28 +1904,92 @@ def _required_aware_time(value: object, field_name: str) -> datetime:
 
 def _assert_closed_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _TOP_LEVEL_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise drifted from its closed v4 schema")
+        raise AssertionError("shadow temporal surprise drifted from its closed v5 schema")
     if frozenset(value["method"]) != _METHOD_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise method drifted from its closed v4 schema")
+        raise AssertionError("shadow temporal surprise method drifted from its closed v5 schema")
     if frozenset(value["features"]) != frozenset(SUPPORTED_FEATURES):
-        raise AssertionError("shadow temporal surprise feature set drifted from v4")
+        raise AssertionError("shadow temporal surprise feature set drifted from v5")
     if frozenset(value["return_method"]) != _RETURN_METHOD_VALUE_KEYS:
-        raise AssertionError("shadow signed-return method drifted from its closed v4 schema")
+        raise AssertionError("shadow signed-return method drifted from its closed v5 schema")
     if frozenset(value["return_features"]) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v4")
+        raise AssertionError("shadow signed-return feature set drifted from v5")
     return value
 
 
 def _assert_closed_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow feature value drifted from its closed v4 schema")
+        raise AssertionError("shadow feature value drifted from its closed v5 schema")
     return value
 
 
 def _assert_closed_return_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _RETURN_FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return value drifted from its closed v4 schema")
+        raise AssertionError("shadow signed-return value drifted from its closed v5 schema")
     current_sample = value.get("current_sample")
     if current_sample is not None and frozenset(current_sample) != _RETURN_SAMPLE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return sample drifted from its closed v4 schema")
+        raise AssertionError("shadow signed-return sample drifted from its closed v5 schema")
+    _assert_closed_return_sampling_trace(value.get("return_sampling_trace"))
     return value
+
+
+def _assert_closed_return_sampling_trace(value: object) -> None:
+    if not isinstance(value, Mapping) or frozenset(value) != _RETURN_SAMPLING_TRACE_KEYS:
+        raise AssertionError("shadow return sampling trace drifted from its closed v5 schema")
+    for field in ("asset_leg", "benchmark_leg"):
+        leg = value.get(field)
+        if leg is not None and (
+            not isinstance(leg, Mapping)
+            or frozenset(leg) != _RETURN_SAMPLING_LEG_KEYS
+        ):
+            raise AssertionError("shadow return sampling leg drifted from its closed v5 schema")
+        if isinstance(leg, Mapping):
+            for range_field in (
+                "realized_horizon_seconds",
+                "anchor_selection_error_seconds",
+            ):
+                range_value = leg.get(range_field)
+                if range_value is not None and (
+                    not isinstance(range_value, Mapping)
+                    or frozenset(range_value) != _RETURN_SAMPLING_RANGE_KEYS
+                ):
+                    raise AssertionError("shadow return timing range drifted")
+            for reference_field in (
+                "maximum_endpoint_reuse_reference",
+                "maximum_anchor_reuse_reference",
+            ):
+                reference = leg.get(reference_field)
+                if reference is not None and (
+                    not isinstance(reference, Mapping)
+                    or frozenset(reference)
+                    != _RETURN_SAMPLING_REUSE_REFERENCE_KEYS
+                ):
+                    raise AssertionError("shadow return reuse reference drifted")
+            error_reference = leg.get(
+                "maximum_anchor_selection_error_reference"
+            )
+            if error_reference is not None and (
+                not isinstance(error_reference, Mapping)
+                or frozenset(error_reference)
+                != _RETURN_SAMPLING_ERROR_REFERENCE_KEYS
+            ):
+                raise AssertionError("shadow return timing reference drifted")
+    alignment = value.get("benchmark_endpoint_alignment")
+    if alignment is not None:
+        if (
+            not isinstance(alignment, Mapping)
+            or frozenset(alignment) != _RETURN_SAMPLING_ALIGNMENT_KEYS
+        ):
+            raise AssertionError("shadow benchmark alignment trace drifted")
+        lag_range = alignment.get("lag_seconds")
+        if lag_range is not None and (
+            not isinstance(lag_range, Mapping)
+            or frozenset(lag_range) != _RETURN_SAMPLING_RANGE_KEYS
+        ):
+            raise AssertionError("shadow benchmark alignment range drifted")
+        reference = alignment.get("maximum_lag_reference")
+        if reference is not None and (
+            not isinstance(reference, Mapping)
+            or frozenset(reference)
+            != _RETURN_SAMPLING_ALIGNMENT_REFERENCE_KEYS
+        ):
+            raise AssertionError("shadow benchmark alignment reference drifted")

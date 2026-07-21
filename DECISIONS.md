@@ -16,13 +16,13 @@ decision, rationale, and revisit condition.
 
 ---
 
-## 2026-07-21 - Measure baseline variation before considering a distinctness gate
+## 2026-07-21 - Measure baseline variation and return sampling before policy
 **Status:** accepted as descriptive shadow evidence; no policy authority
-**Decision:** Shadow temporal surprise v4 records distinct baseline-value count,
+**Decision:** Shadow temporal surprise v5 records distinct baseline-value count,
 maximum and current-value tie counts, distinct-value ratio, and nominal finite-
 sample rank floors using the method's existing 12-decimal derived-value
 identity. Preserve every v1 activity and v2 signed-return calculation and keep
-historical v1/v2/v3 artifacts readable. It also binds exact feature-specific
+historical v1/v2/v3/v4 artifacts readable. Its v4 trace also binds exact feature-specific
 value-only source tuples and records source-tuple repetition, derived-value
 repetition, transform-collision loss, and consecutive source/derived runs.
 Observation identity and clocks stay in the causal sample digest but are
@@ -41,6 +41,17 @@ input lineage only: they do not establish that a provider caused a tie,
 distinguish quantization from legitimate low-motion behavior, classify an
 asset, or justify exclusion. Keep exact observation references and overlapping-
 sample caveats visible wherever the grouping is rendered.
+Shadow v5 additionally binds the exact endpoint and anchor observation identity
+and clocks for each return sample, including benchmark endpoints/anchors for
+relative returns. It may report observation reuse, consecutive reuse, realized
+horizon and anchor-selection error, benchmark alignment lag, and exact maximum
+references without changing the v2 return values. Campaign audit v6 may
+aggregate that timing trace per canonical asset and return feature while keeping
+audit v1-v5 readable. Keep numeric source-tuple repetition, observation reuse,
+and timing error separate. Do not infer independent sample count, provider
+fault, a timing defect, or policy from any of them, and do not set a reuse/error
+threshold, exclude an asset, or alter readiness, routes, scores, publication,
+or Protocol-v2 eligibility.
 **Why:** Nominal timestamp count can materially overstate information when a
 provider repeats or quantizes activity values, and overlapping derived returns
 can also tie. Recording that structure makes later calibration auditable
