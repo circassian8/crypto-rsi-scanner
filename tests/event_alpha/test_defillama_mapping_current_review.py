@@ -240,3 +240,53 @@ def test_cli_prints_review_without_writing(
     assert output["provider_calls"] == 0
     assert output["writes"] == 0
     assert tuple(tmp_path.iterdir()) == before
+
+
+def test_cli_summary_is_bounded_and_template_mode_is_exact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    packet = current_review.build_current_mapping_review(_snapshot())
+    monkeypatch.setattr(
+        current_review,
+        "load_current_mapping_review",
+        lambda artifact_base, registry=None: packet,
+    )
+    before = tuple(tmp_path.iterdir())
+
+    assert current_review.main(
+        ["--artifact-base", str(tmp_path), "--output", "summary"]
+    ) == 0
+    summary = capsys.readouterr().out
+    assert "report=decision_radar_defillama_mapping_review" in summary
+    assert "status=operator_action_required" in summary
+    assert "asset_count=2" in summary
+    assert "coverage=mapped:0,not_applicable:0,unreviewed:2" in summary
+    assert "mapping_eligible=false" in summary
+    assert "automatic_identity_inference=false" in summary
+    assert "expected_provider_activity=none" in summary
+    assert "provider_calls=0" in summary
+    assert "writes=0" in summary
+    assert "RADAR_DEFILLAMA_MAPPING_OUTPUT=template" in summary
+    assert "RADAR_DEFILLAMA_MAPPING_OUTPUT=json" in summary
+    assert "operator_registry_template" not in summary
+
+    assert current_review.main(
+        ["--artifact-base", str(tmp_path), "--output", "template"]
+    ) == 0
+    template = json.loads(capsys.readouterr().out)
+    assert template == packet["operator_registry_template"]
+    assert all(row["mapping_status"] == "pending" for row in template["mappings"])
+    assert tuple(tmp_path.iterdir()) == before
+
+
+def test_summary_fails_closed_on_coverage_drift() -> None:
+    packet = current_review.build_current_mapping_review(_snapshot())
+    packet["coverage"]["coverage_counts"]["mapped"] = 1
+
+    with pytest.raises(
+        current_review.DefiLlamaCurrentMappingReviewError,
+        match="coverage_count_mismatch",
+    ):
+        current_review.format_current_mapping_review_summary(packet)

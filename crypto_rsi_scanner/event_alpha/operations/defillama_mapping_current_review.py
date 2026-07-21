@@ -24,6 +24,18 @@ SCHEMA_ID = "decision_radar.defillama_current_mapping_review"
 SCHEMA_VERSION = 1
 MAX_UNIVERSE_ROWS = 100
 MAX_AUDIT_ROWS = 500
+OUTPUT_JSON = "json"
+OUTPUT_SUMMARY = "summary"
+OUTPUT_TEMPLATE = "template"
+OUTPUT_CHOICES = (OUTPUT_JSON, OUTPUT_SUMMARY, OUTPUT_TEMPLATE)
+FULL_JSON_COMMAND = (
+    "make -s radar-fundamentals-defillama-mapping-review "
+    "RADAR_DEFILLAMA_MAPPING_OUTPUT=json PYTHON=.venv/bin/python"
+)
+TEMPLATE_COMMAND = (
+    "make -s radar-fundamentals-defillama-mapping-review "
+    "RADAR_DEFILLAMA_MAPPING_OUTPUT=template PYTHON=.venv/bin/python"
+)
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$")
 
@@ -117,6 +129,109 @@ def load_current_mapping_review(
         resolved.snapshot,
         registry=registry,
         namespace_source=resolved.namespace_source,
+    )
+
+
+def format_current_mapping_review_summary(result: Mapping[str, object]) -> str:
+    """Render one bounded operator summary without duplicating the template."""
+
+    binding = _mapping(result.get("authority_binding"), "authority_binding")
+    coverage = _mapping(result.get("coverage"), "coverage")
+    counts = _mapping(coverage.get("coverage_counts"), "coverage_counts")
+    blockers = _text_sequence(
+        coverage.get("live_capture_mapping_blockers"),
+        "live_capture_mapping_blockers",
+    )
+    status = _text(result.get("status"), "status", 96)
+    namespace = _text(
+        binding.get("artifact_namespace"), "artifact_namespace", 192
+    )
+    revision = _nonnegative_int(binding.get("revision"), "revision")
+    asset_count = _nonnegative_int(coverage.get("asset_count"), "asset_count")
+    mapped = _nonnegative_int(counts.get("mapped"), "mapped")
+    not_applicable = _nonnegative_int(
+        counts.get("not_applicable"), "not_applicable"
+    )
+    unreviewed = _nonnegative_int(counts.get("unreviewed"), "unreviewed")
+    identity_conflict = _nonnegative_int(
+        counts.get("identity_conflict"), "identity_conflict"
+    )
+    if mapped + not_applicable + unreviewed + identity_conflict != asset_count:
+        raise DefiLlamaCurrentMappingReviewError("coverage_count_mismatch")
+    mapping_eligible = _boolean(
+        coverage.get("live_capture_mapping_eligible"),
+        "live_capture_mapping_eligible",
+    )
+    registry_supplied = _boolean(
+        result.get("registry_supplied"), "registry_supplied"
+    )
+    human_required = _boolean(
+        result.get("human_decision_required"), "human_decision_required"
+    )
+    automatic_inference = _boolean(
+        result.get("automatic_identity_inference"),
+        "automatic_identity_inference",
+    )
+    provider_calls = _nonnegative_int(
+        result.get("provider_calls"), "provider_calls"
+    )
+    writes = _nonnegative_int(result.get("writes"), "writes")
+    authorization_granted = _boolean(
+        result.get("mapping_eligibility_grants_provider_authorization"),
+        "mapping_eligibility_grants_provider_authorization",
+    )
+    protocol_eligible = _boolean(
+        result.get("protocol_v2_evidence_eligible"),
+        "protocol_v2_evidence_eligible",
+    )
+    expected_activity = _text(
+        result.get("expected_provider_activity"),
+        "expected_provider_activity",
+        96,
+    )
+    validation_command = _text(
+        result.get("validation_make_command"),
+        "validation_make_command",
+        512,
+    )
+    registry_mode = result.get("registry_mode")
+    if registry_mode is None:
+        registry_mode_text = "missing"
+    else:
+        registry_mode_text = _text(registry_mode, "registry_mode", 96)
+    next_action = (
+        "mapping prerequisite complete; preserve the reviewed registry and "
+        "revalidate it after any universe change"
+        if mapping_eligible
+        else TEMPLATE_COMMAND
+    )
+    return "\n".join(
+        (
+            "report=decision_radar_defillama_mapping_review",
+            f"status={status}",
+            f"authority_namespace={namespace}",
+            f"authority_revision={revision}",
+            f"asset_count={asset_count}",
+            (
+                "coverage="
+                f"mapped:{mapped},not_applicable:{not_applicable},"
+                f"unreviewed:{unreviewed},identity_conflict:{identity_conflict}"
+            ),
+            f"registry_supplied={str(registry_supplied).lower()}",
+            f"registry_mode={registry_mode_text}",
+            f"mapping_eligible={str(mapping_eligible).lower()}",
+            f"blockers={','.join(blockers) if blockers else 'none'}",
+            f"human_decision_required={str(human_required).lower()}",
+            f"automatic_identity_inference={str(automatic_inference).lower()}",
+            f"expected_provider_activity={expected_activity}",
+            f"provider_calls={provider_calls}",
+            f"writes={writes}",
+            f"provider_authorization_granted={str(authorization_granted).lower()}",
+            f"protocol_v2_evidence_eligible={str(protocol_eligible).lower()}",
+            f"next_safe_action={next_action}",
+            f"validation_command={validation_command}",
+            f"full_json_command={FULL_JSON_COMMAND}",
+        )
     )
 
 
@@ -261,6 +376,24 @@ def _text(value: object, field: str, limit: int) -> str:
     return text
 
 
+def _text_sequence(value: object, field: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or len(value) > MAX_UNIVERSE_ROWS:
+        raise DefiLlamaCurrentMappingReviewError(f"{field}_invalid")
+    return tuple(_text(item, field, 192) for item in value)
+
+
+def _nonnegative_int(value: object, field: str) -> int:
+    if type(value) is not int or value < 0:
+        raise DefiLlamaCurrentMappingReviewError(f"{field}_invalid")
+    return value
+
+
+def _boolean(value: object, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise DefiLlamaCurrentMappingReviewError(f"{field}_invalid")
+    return value
+
+
 def _utc(value: object, field: str) -> str:
     text = _text(value, field, 64)
     try:
@@ -285,6 +418,12 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional operator-completed registry to validate against current authority",
     )
+    parser.add_argument(
+        "--output",
+        choices=OUTPUT_CHOICES,
+        default=OUTPUT_JSON,
+        help="json preserves the full packet; summary is concise; template emits only the pending registry",
+    )
     return parser
 
 
@@ -296,7 +435,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.registry.read_bytes()
         )
     result = load_current_mapping_review(args.artifact_base, registry=registry)
-    print(json.dumps(result, indent=2, sort_keys=True))
+    if args.output == OUTPUT_SUMMARY:
+        print(format_current_mapping_review_summary(result))
+    elif args.output == OUTPUT_TEMPLATE:
+        print(
+            json.dumps(
+                result["operator_registry_template"],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
 
@@ -307,6 +457,7 @@ if __name__ == "__main__":  # pragma: no cover
 __all__ = (
     "DefiLlamaCurrentMappingReviewError",
     "build_current_mapping_review",
+    "format_current_mapping_review_summary",
     "load_current_mapping_review",
     "main",
 )

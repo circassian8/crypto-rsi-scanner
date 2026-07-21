@@ -135,6 +135,7 @@ RADAR_REVIEW_EVALUATED_AT_ARG = $(if $(strip $(RADAR_REVIEW_EVALUATED_AT)),--eva
 RADAR_REVIEW_TIMING_OUTPUT ?= summary
 DEFILLAMA_MAPPING_REGISTRY ?=
 DEFILLAMA_MAPPING_REGISTRY_ARG = $(if $(strip $(DEFILLAMA_MAPPING_REGISTRY)),--registry $(DEFILLAMA_MAPPING_REGISTRY),)
+RADAR_DEFILLAMA_MAPPING_OUTPUT ?= summary
 RADAR_RESEARCH_OUTPUT_ROOT ?= event_fade_cache/decision_radar_research_lab
 RADAR_REPLAY_FIXTURE_INPUT_DIR ?= fixtures/backtest_smoke/klines
 RADAR_REPLAY_CACHE_INPUT_DIR ?= backtest_cache/binance_klines
@@ -391,7 +392,7 @@ help:
 	@echo "  make radar-unlock-tokenomist-v5-readiness  Inspect Tokenomist subscription/auth/retention blockers; no call/write"
 	@echo "  make radar-fundamentals-defillama-smoke  Normalize four typed free-API fixture responses; no call/write"
 	@echo "  make radar-fundamentals-defillama-mapping-smoke  Validate explicit mapped/not-applicable fixture decisions; no call/write"
-	@echo "  make radar-fundamentals-defillama-mapping-review  Print current-authority operator mapping template; no call/write"
+	@echo "  make radar-fundamentals-defillama-mapping-review  Concise current-authority mapping readiness; no call/write (RADAR_DEFILLAMA_MAPPING_OUTPUT=json|template for full output)"
 	@echo "  make radar-dex-onchain-evm-v2-smoke  Normalize one exact finalized-block v2 pool fixture; no call/write"
 	@echo "  make radar-dex-onchain-evm-v2-validate-local EVM_POOL_RPC_BUNDLE=...  Validate one operator bundle; no call/write"
 	@echo "  CONFIRM=1 make radar-dex-onchain-evm-v2-import-local EVM_POOL_RPC_BUNDLE=...  Seal one exact local bundle; no call"
@@ -1654,7 +1655,8 @@ radar-fundamentals-defillama-mapping-smoke:
 radar-fundamentals-defillama-mapping-review:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.defillama_mapping_current_review \
 		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-		$(DEFILLAMA_MAPPING_REGISTRY_ARG)
+		$(DEFILLAMA_MAPPING_REGISTRY_ARG) \
+		--output $(RADAR_DEFILLAMA_MAPPING_OUTPUT)
 
 radar-dex-onchain-evm-v2-smoke:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.evm_v2_pool_snapshot \

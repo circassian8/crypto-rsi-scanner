@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Make DefiLlama mapping review concise · Codex
+**Why:** The safe current-authority mapping command printed the entire 30-asset
+universe twice, making its four actual blockers and human next action hard to
+find. This operator friction stood directly in front of authoritative
+fundamental-context preparation.
+**Changes:**
+- Added a strict bounded summary renderer for authority, coverage, registry
+  state, blockers, human action, provider activity, safety, and exact next/full
+  commands. It fails closed if coverage counts do not reconcile.
+- Made the normal Make target use `summary`, retained full JSON through an
+  explicit output variable, and added `template` mode that emits only the
+  intentionally incomplete operator registry. Direct Python CLI usage keeps
+  JSON as its compatibility default.
+- Updated the Make help and collaboration contract. No template file is written
+  and no pending asset is mapped or inferred.
+**Verify:** Compileall and all 11 focused current-mapping tests passed. The real
+current-authority Make target rendered the 30-asset summary; explicit template
+mode emitted exactly 30 pending rows and explicit JSON mode retained
+`operator_action_required`. Every mode reported zero provider calls and writes.
+Architecture cleanliness and diff checks passed; source-size and ownership
+findings remain advisory and non-blocking.
+**Notes/risks:** The operator registry is still missing and all 30 decisions
+remain human-owned. This change does not authorize or implement a DefiLlama
+transport, grant evidence/Protocol-v2 authority, or change any market score,
+route, threshold, outcome, or dashboard authority.
+
 ## 2026-07-21 — Separate structural progress from live campaign truth · Codex
 **Why:** The checked-in Protocol-v2 “current progress” note still repeated old
 campaign counts and missing asset names after the canonical campaign report had

@@ -532,10 +532,12 @@ may be added later when a suitable environment already exists.
   admission. For the live campaign, start with
   `make radar-fundamentals-defillama-mapping-review`: it resolves and strictly
   revalidates only the current dashboard pointer, binds the exact live/no-send
-  CoinGecko universe, and prints a directly fillable but intentionally invalid
-  operator-registry template. It makes no call or write. Every placeholder,
-  `pending` status, empty note, and false confirmation must be replaced by a
-  real human decision. Re-run the same target with
+  CoinGecko universe, and prints a concise readiness summary by default. Use
+  `RADAR_DEFILLAMA_MAPPING_OUTPUT=json` for the full packet or
+  `RADAR_DEFILLAMA_MAPPING_OUTPUT=template` for only the directly fillable but
+  intentionally invalid operator-registry template. All modes make no call or
+  write. Every placeholder, `pending` status, empty note, and false confirmation
+  must be replaced by a real human decision. Re-run the same target with
   `DEFILLAMA_MAPPING_REGISTRY=/absolute/path/operator-registry.json` to validate
   the completed file against whatever universe is current then; membership or
   order drift remains an explicit blocker rather than carrying a prior mapping

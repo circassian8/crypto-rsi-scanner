@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep DefiLlama mapping review concise and explicit
+**Status:** accepted
+**Decision:** The normal
+`radar-fundamentals-defillama-mapping-review` Make target prints a bounded
+summary of exact authority, coverage, blockers, human action, and safety. Full
+packet JSON remains available only through
+`RADAR_DEFILLAMA_MAPPING_OUTPUT=json`; a separate `template` mode emits exactly
+the intentionally invalid operator-registry template. Direct Python CLI usage
+retains JSON as its compatibility default. Every mode remains read-only,
+no-provider, non-inferential, and non-authoritative.
+**Why:** The prior normal command duplicated the complete 30-asset universe in
+both review and template sections, burying four blockers and the next action in
+thousands of tokens. Separating summary, packet, and template views makes the
+human identity-mapping task usable without weakening its exact-universe or
+explicit-decision contract.
+**Revisit when:** A confirmed operator workflow needs an explicit local template
+writer. Any writer must be separately named and confirmation-gated, preserve
+the exact universe digest, and never fill or infer a mapping automatically.
+
 ## 2026-07-21 - Keep changing campaign truth out of structural progress notes
 **Status:** accepted
 **Decision:** The Protocol-v2 current-progress projection and its checked-in
