@@ -96,7 +96,7 @@ def capture_outcome_price_recovery(
     timeout_seconds: float = recovery.DEFAULT_TIMEOUT_SECONDS,
     fixture_dir: str | Path | None | object = ...,
     report_builder: recovery.ReportBuilder = (
-        recovery.market_observation_campaign.build_campaign_report
+        recovery.market_observation_campaign.build_outcome_recovery_projection
     ),
     provider_state_assessor: recovery.ProviderStateAssessor = (
         recovery.market_no_send_campaign_provider.assess_shared_provider_state

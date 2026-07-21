@@ -711,6 +711,75 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
         campaign.format_campaign_report(tampered)
 
 
+def test_outcome_recovery_projection_matches_full_report_without_unrelated_analytics(
+    tmp_path,
+    monkeypatch,
+):
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    _fixture(base)
+    monkeypatch.setattr(
+        campaign.market_no_send_history_cache,
+        "cache_readiness",
+        _readiness,
+    )
+    monkeypatch.setattr(
+        campaign.dashboard_readiness,
+        "resolve_authoritative_dashboard",
+        _dashboard_authority,
+    )
+    full = campaign.build_campaign_report(base, evaluated_at=_EVALUATED)
+
+    def unrelated_analytics_must_not_run(*_args, **_kwargs):
+        raise AssertionError("outcome recovery rebuilt unrelated campaign analytics")
+
+    monkeypatch.setattr(
+        campaign.market_observation_campaign_shadow_surprise,
+        "build_campaign_shadow_surprise_audit",
+        unrelated_analytics_must_not_run,
+    )
+    monkeypatch.setattr(
+        campaign.market_observation_campaign_baseline,
+        "build_baseline_maturity",
+        unrelated_analytics_must_not_run,
+    )
+    monkeypatch.setattr(
+        campaign.market_observation_campaign_episodes,
+        "build_campaign_anomaly_episode_shadow",
+        unrelated_analytics_must_not_run,
+    )
+    monkeypatch.setattr(
+        campaign.decision_review_timing_queue,
+        "build_review_timing_queue",
+        unrelated_analytics_must_not_run,
+    )
+
+    projection = campaign.build_outcome_recovery_projection(
+        base,
+        evaluated_at=_EVALUATED,
+    )
+
+    assert projection["schema_id"] == campaign.OUTCOME_RECOVERY_PROJECTION_SCHEMA
+    assert projection["schema_version"] == (
+        campaign.OUTCOME_RECOVERY_PROJECTION_VERSION
+    )
+    assert projection["projection_scope"] == (
+        "exact_pointer_counted_candidates_outcome_ledger_and_market_history"
+    )
+    assert projection["full_campaign_report_rebuilt"] is False
+    assert projection["generation_count"] == 2
+    assert projection["counted_generation_count"] == 2
+    assert projection["pointer"] == full["pointer"]
+    assert projection["outcomes"] == full["outcomes"]
+    assert projection["safety"] == {
+        "provider_calls": 0,
+        "writes": 0,
+        "history_mutated": False,
+        "outcomes_mutated": False,
+        "research_only": True,
+    }
+
+
 def _ready_regime_market_rows(observed_at: str) -> list[dict[str, object]]:
     rows = _current_regime_market_rows(observed_at)
     for rank, row in enumerate(rows, start=1):

@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.util
+import inspect
 import json
 from pathlib import Path
 import zipfile
@@ -27,6 +28,15 @@ _LATEST = _DUE + timedelta(days=1)
 _REQUESTED = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
 _RECEIVED = _REQUESTED + timedelta(seconds=1)
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_capture_defaults_to_exact_campaign_projection():
+    assert (
+        inspect.signature(capture.capture_outcome_price_recovery)
+        .parameters["report_builder"]
+        .default
+        is recovery.market_observation_campaign.build_outcome_recovery_projection
+    )
 
 
 def _gap() -> dict[str, object]:

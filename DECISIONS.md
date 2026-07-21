@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep outcome recovery independent of full campaign analytics
+**Status:** accepted
+**Decision:** Outcome-price recovery readiness, diagnostic collection, and
+immutable capture default to a closed projection built from the exact current
+pointer, countable candidate snapshots, campaign outcome ledger, and read-once
+market-history snapshot. At an identical evaluation clock, its pointer and
+outcome values must equal the comprehensive campaign report. It must identify
+its bounded scope, report `full_campaign_report_rebuilt=false`, and never invoke
+unrelated baseline, episode, review-queue, or temporal-surprise analytics. The
+comprehensive campaign report remains the canonical whole-campaign surface and
+is neither replaced nor inferred from this projection.
+**Why:** Recovery needs one exact outcome gap and its source bindings, while the
+whole-campaign builder also performs expensive empirical analytics. Rebuilding
+those unrelated layers made the no-call readiness command take roughly 45
+seconds; the exact projection completes in 2.61 seconds without changing its
+request plan, pointer, outcome truth, authorization boundary, or safety state.
+**Revisit when:** Recovery genuinely requires a new campaign field. Extend the
+projection from the same canonical primitive and prove equal-clock equivalence;
+do not restore an implicit whole-report rebuild.
+
 ## 2026-07-21 - Lead static execution readiness with selected-surface truth
 **Status:** accepted
 **Decision:** `radar-execution-quality-readiness` prints the bounded selected-

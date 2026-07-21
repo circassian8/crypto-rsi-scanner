@@ -1095,8 +1095,13 @@ may be added later when a suitable environment already exists.
   return plus its exact receipt. Generic empty sidecar files remain unavailable.
 - **Decision Radar outcome-price recovery:**
   `make radar-outcome-price-recovery-readiness` is read-only and makes no
-  provider call. It derives only exact overdue outcome windows from the
-  canonical campaign report and its read-once market-history snapshot. The
+  provider call. It builds a dedicated exact recovery projection from the
+  authoritative pointer, counted candidate snapshots, outcome ledger, and
+  read-once market-history snapshot. At the same evaluation clock, its pointer
+  and outcome values must equal the comprehensive campaign report, but it must
+  not rebuild unrelated baseline, episode, review-queue, or temporal-surprise
+  analytics. The projection identifies its bounded scope and explicitly reports
+  `full_campaign_report_rebuilt=false`. The
   diagnostic collector requires the existing general CoinGecko authorization,
   the separate `RSI_DECISION_RADAR_OUTCOME_PRICE_RECOVERY_LIVE=1` authorization,
   and `CONFIRM=1`; it may make at most one fixed-host CoinGecko historical-range

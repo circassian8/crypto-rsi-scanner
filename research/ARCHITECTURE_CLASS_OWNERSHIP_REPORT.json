@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11231,
+  "function_count": 11232,
   "function_line_limit": 150,
   "functions_over_150_lines": 33,
   "functions_over_limit": [
@@ -1800,7 +1800,7 @@
     }
   ],
   "functions_over_limit_count": 33,
-  "generated_at": "2026-07-21T21:20:00.435582+00:00",
+  "generated_at": "2026-07-21T21:36:37.195192+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -4215,13 +4215,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1752,
-        "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
+        "line_count": 1788,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
       {
-        "line_count": 1704,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "line_count": 1752,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
         "threshold": 1200
       },
       {
@@ -4422,13 +4422,13 @@
         "threshold": 1500
       },
       {
-        "line_count": 1752,
-        "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
+        "line_count": 1788,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1500
       },
       {
-        "line_count": 1704,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
+        "line_count": 1752,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
         "threshold": 1500
       },
       {

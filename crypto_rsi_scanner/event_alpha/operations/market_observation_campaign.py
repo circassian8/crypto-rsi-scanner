@@ -50,6 +50,10 @@ CAMPAIGN_PROGRAM = "decision_radar_live_observation_campaign_v2"
 CAMPAIGN_REPORT_SCHEMA = "decision_radar_live_observation_campaign_report_v2"
 CAMPAIGN_REPORT_JSON_FILENAME = "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
 CAMPAIGN_REPORT_MD_FILENAME = "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md"
+OUTCOME_RECOVERY_PROJECTION_SCHEMA = (
+    "decision_radar.outcome_recovery_campaign_projection"
+)
+OUTCOME_RECOVERY_PROJECTION_VERSION = 1
 CAMPAIGN_OUTCOMES_FILENAME = "event_decision_radar_campaign_outcomes.jsonl"
 RUN_MANIFEST_FILENAME = "event_market_no_send_generation.json"
 PILOT_AUDIT_FILENAME = "event_market_no_send_pilot_audit.json"
@@ -273,6 +277,77 @@ def build_campaign_report(
         next_observation=next_observation,
         conclusion=conclusion,
     )
+
+
+def build_outcome_recovery_projection(
+    artifact_base_dir: str | Path,
+    *,
+    evaluated_at: datetime | str,
+) -> dict[str, Any]:
+    """Build only the exact pointer/history/outcome slice recovery requires."""
+
+    base = _validated_existing_directory(artifact_base_dir, label="artifact base")
+    evaluated = _require_aware_utc(evaluated_at, field_name="evaluated_at")
+    pointer = _read_json(base / CURRENT_NAMESPACE_POINTER)
+    current_authority, authority_error = _resolve_current_authority(
+        base,
+        evaluated=evaluated,
+    )
+    generations, _attempts, _excluded = _load_generations(
+        base,
+        current_authority=current_authority,
+    )
+    counted_generations = [
+        row for row in generations if row["campaign_counted"] is True
+    ]
+    ledger_snapshot = (
+        market_observation_campaign_snapshots.campaign_outcome_ledger_snapshot(
+            base,
+            history_namespace=market_no_send_history_cache.LIVE_HISTORY_CACHE_NAMESPACE,
+            filename=CAMPAIGN_OUTCOMES_FILENAME,
+        )
+    )
+    outcomes = _campaign_outcomes(
+        base,
+        counted_generations,
+        ledger_snapshot=ledger_snapshot,
+    )
+    history_snapshot = _campaign_market_history_snapshot(base)
+    outcome_metrics = _outcome_metrics(
+        outcomes,
+        history_snapshot=history_snapshot,
+    )
+    pointer_state = _pointer_state(
+        pointer,
+        generations,
+        current_authority=current_authority,
+        authority_error=authority_error,
+    )
+    return {
+        "schema_id": OUTCOME_RECOVERY_PROJECTION_SCHEMA,
+        "schema_version": OUTCOME_RECOVERY_PROJECTION_VERSION,
+        "generated_at": evaluated.isoformat(),
+        "campaign_status": (
+            "outcome_recovery_projection_available"
+            if counted_generations
+            else "not_started"
+        ),
+        "projection_scope": (
+            "exact_pointer_counted_candidates_outcome_ledger_and_market_history"
+        ),
+        "full_campaign_report_rebuilt": False,
+        "generation_count": len(generations),
+        "counted_generation_count": len(counted_generations),
+        "pointer": pointer_state,
+        "outcomes": outcome_metrics,
+        "safety": {
+            "provider_calls": 0,
+            "writes": 0,
+            "history_mutated": False,
+            "outcomes_mutated": False,
+            "research_only": True,
+        },
+    }
 
 
 def _build_review_projections(
@@ -1699,6 +1774,15 @@ def _number(value: Any) -> float | None:
     return number if number == number and abs(number) != float("inf") else None
 
 
-__all__ = ("CAMPAIGN_PROGRAM", "CAMPAIGN_REPORT_JSON_FILENAME", "CAMPAIGN_REPORT_MD_FILENAME",
-           "CAMPAIGN_REPORT_SCHEMA", "build_campaign_report", "format_campaign_report",
-           "write_campaign_report")
+__all__ = (
+    "CAMPAIGN_PROGRAM",
+    "CAMPAIGN_REPORT_JSON_FILENAME",
+    "CAMPAIGN_REPORT_MD_FILENAME",
+    "CAMPAIGN_REPORT_SCHEMA",
+    "OUTCOME_RECOVERY_PROJECTION_SCHEMA",
+    "OUTCOME_RECOVERY_PROJECTION_VERSION",
+    "build_campaign_report",
+    "build_outcome_recovery_projection",
+    "format_campaign_report",
+    "write_campaign_report",
+)

@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Make outcome-recovery readiness fast and exact · Codex
+**Why:** The no-call readiness command rebuilt the entire campaign report even
+though recovery uses only the current pointer, outcome gaps, and exact retained
+price history. A profile of the artifact-heavy campaign showed roughly 122
+seconds and 727 million calls, including about 104 seconds in unrelated shadow-
+surprise analytics; an ordinary unprofiled readiness run took roughly 45
+seconds.
+**Changes:**
+- Added a closed recovery-specific campaign projection built from the exact
+  pointer, countable generation candidates, campaign outcome ledger, and
+  read-once market-history snapshot.
+- Made readiness, diagnostic collection, and immutable capture use that
+  projection by default, and exposed its schema, scope, and explicit
+  `full_campaign_report_rebuilt=false` truth.
+- Added equal-clock pointer/outcome equivalence coverage and regressions proving
+  that baseline, episode, review-queue, and temporal-surprise builders cannot
+  run on the recovery path.
+- Updated the working agreement, roadmap, and durable decision record. Existing
+  quantitative source-size findings remain advisory only.
+**Verify:** Compileall passed. All 89 focused campaign/recovery/capture/
+application tests passed in 1.55 seconds. The real readiness command completed
+in 2.61 seconds,
+made zero provider calls and writes, retained the exact plan digest
+`491e24ed9341a9775e61e0b9f94624f324cbfe1393a6db288952d4940c61b67c`,
+and matched the checked comprehensive campaign report's pointer and outcomes at
+the same evaluation clock. Architecture cleanliness and diff checks passed.
+**Notes/risks:** The one exact DEXE recovery remains blocked only by the absent
+separate recovery authorization. No authorization, request, response, artifact,
+outcome, baseline, candidate, route, score, threshold, or authority was changed.
+
 ## 2026-07-21 — Lead execution readiness with selected-surface truth · Codex
 **Why:** Static execution readiness printed a 169-line venue/cost catalog before
 showing the selected Bybit surface and blockers. Its checked decision package

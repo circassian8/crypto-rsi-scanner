@@ -153,7 +153,9 @@ def build_outcome_price_recovery_readiness(
     environ: Mapping[str, str] | None = None,
     now: datetime | None = None,
     fixture_dir: str | Path | None | object = ...,
-    report_builder: ReportBuilder = market_observation_campaign.build_campaign_report,
+    report_builder: ReportBuilder = (
+        market_observation_campaign.build_outcome_recovery_projection
+    ),
     provider_state_assessor: ProviderStateAssessor = (
         market_no_send_campaign_provider.assess_shared_provider_state
     ),
@@ -224,6 +226,9 @@ def build_outcome_price_recovery_readiness(
         "checked_at": _iso(checked),
         "campaign_status": report.get("campaign_status"),
         "campaign_report_generated_at": report.get("generated_at"),
+        "campaign_projection_schema_id": report.get("schema_id"),
+        "campaign_projection_scope": report.get("projection_scope"),
+        "full_campaign_report_rebuilt": report.get("full_campaign_report_rebuilt"),
         "campaign_pointer": public_pointer,
         "due_missing_price_count": len(gap_rows),
         "ledger_refreshable_count": ledger_refresh_count,
@@ -376,7 +381,9 @@ def collect_outcome_price_recovery(
     environ: Mapping[str, str] | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     fixture_dir: str | Path | None | object = ...,
-    report_builder: ReportBuilder = market_observation_campaign.build_campaign_report,
+    report_builder: ReportBuilder = (
+        market_observation_campaign.build_outcome_recovery_projection
+    ),
     provider_state_assessor: ProviderStateAssessor = (
         market_no_send_campaign_provider.assess_shared_provider_state
     ),
@@ -427,7 +434,9 @@ def collect_outcome_price_recovery_capture_inputs(
     environ: Mapping[str, str] | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     fixture_dir: str | Path | None | object = ...,
-    report_builder: ReportBuilder = market_observation_campaign.build_campaign_report,
+    report_builder: ReportBuilder = (
+        market_observation_campaign.build_outcome_recovery_projection
+    ),
     provider_state_assessor: ProviderStateAssessor = (
         market_no_send_campaign_provider.assess_shared_provider_state
     ),

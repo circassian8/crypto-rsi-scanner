@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+import inspect
 import json
 import math
 from pathlib import Path
@@ -64,8 +65,16 @@ def _outcomes(*, gaps: list[dict[str, object]] | None = None, sha: str = "b" * 6
 
 def _report(*, outcomes: dict[str, object] | None = None) -> dict[str, object]:
     return {
+        "schema_id": recovery.market_observation_campaign.OUTCOME_RECOVERY_PROJECTION_SCHEMA,
+        "schema_version": (
+            recovery.market_observation_campaign.OUTCOME_RECOVERY_PROJECTION_VERSION
+        ),
         "campaign_status": "in_progress_baseline_warming",
         "generated_at": _CHECKED.isoformat(),
+        "projection_scope": (
+            "exact_pointer_counted_candidates_outcome_ledger_and_market_history"
+        ),
+        "full_campaign_report_rebuilt": False,
         "pointer": {
             "status": "authoritative",
             "artifact_namespace": "radar_market_no_send_current",
@@ -274,6 +283,27 @@ def test_readiness_is_no_call_and_requires_both_authorizations(tmp_path):
     assert result["authorization_mutated"] is False
     assert result["writes_performed"] is False
     assert "secret" not in result["campaign_pointer"]
+    assert result["campaign_projection_schema_id"] == (
+        recovery.market_observation_campaign.OUTCOME_RECOVERY_PROJECTION_SCHEMA
+    )
+    assert result["campaign_projection_scope"] == (
+        "exact_pointer_counted_candidates_outcome_ledger_and_market_history"
+    )
+    assert result["full_campaign_report_rebuilt"] is False
+
+
+def test_recovery_surfaces_default_to_exact_campaign_projection():
+    expected = recovery.market_observation_campaign.build_outcome_recovery_projection
+
+    for callable_ in (
+        recovery.build_outcome_price_recovery_readiness,
+        recovery.collect_outcome_price_recovery,
+        recovery.collect_outcome_price_recovery_capture_inputs,
+    ):
+        assert (
+            inspect.signature(callable_).parameters["report_builder"].default
+            is expected
+        )
 
 
 def test_readiness_becomes_ready_without_call_or_write(tmp_path):
