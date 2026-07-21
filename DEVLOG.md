@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Publish the sixty-first no-send market cycle · Codex
+**Why:** The prior timing-publication defect was fixed and the one-hour cadence
+boundary was eligible. The campaign needed another genuine point-in-time
+observation so its temporal baseline, outcomes, and current dashboard authority
+could advance without lowering a threshold or manufacturing an idea.
+**Changes:**
+- Daily Operations made exactly one already-authorized CoinGecko request. It
+  returned HTTP 200 with 80 bounded rows in 1,544 ms and no retry; the cycle
+  retained the selected 30 market observations in
+  `radar_market_no_send_20260721t200917360640z_3af0176a5eb1`.
+- The immutable generation completed strict doctor with zero blockers and zero
+  warnings, published revision 12, restarted the exact owned loopback
+  dashboard, and wrote valid publication and operations receipts. Authority is
+  bound to operator-state SHA-256
+  `6d0c5f37acf7dd915dc88793c1613f129ab98cf3291003de3c1aa266e23e208d`.
+- Regenerated the canonical campaign report after terminal success. Campaign
+  truth is now 61 genuine cycles / 1,830 retained / 1,800 baseline-counted / 30
+  too-close observations. Seven outcomes are matured, three are pending, and
+  one remains `due_missing_price`; 11 historical ideas and zero current ideas
+  remain explicit.
+- The current healthy-empty generation has 30 exact observations, zero
+  anomalies/ideas, 29 warm rows, and one warming HBAR row. Prospective
+  point-in-time universe/liquidity context is now present on 570/1,800 counted
+  rows. Trusted spread, causal market-regime, Protocol-v2 partition, and
+  complete matched-control coverage remain zero rather than being inferred.
+**Verify:** Daily Operations returned `succeeded` / `published_and_restarted`
+after one HTTP 200 provider call. Exact dashboard HEAD returned HTTP 200 with
+the namespace, run, revision, and operator-state digest above. Daily Operations
+status, dashboard readiness, dashboard authority status, and campaign-report
+regeneration passed afterward without another provider call. Campaign JSON
+parsing and diff checks passed.
+**Notes/risks:** The next cadence boundary is
+`2026-07-21T21:09:19.865650+00:00`. Bybit execution quality, intraday bars, and
+derivatives remain separately unauthorized; official macro, exact DEXE outcome
+recovery, genuine context sources, blind labels, partitions/holdout, costs, and
+the Protocol-v2 annex remain unsealed. No Telegram send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-21 — Close strict publication false negatives · Codex
 **Why:** The sixtieth cadence-eligible live/no-send observation made one
 authorized CoinGecko request successfully, but dashboard publication rejected
