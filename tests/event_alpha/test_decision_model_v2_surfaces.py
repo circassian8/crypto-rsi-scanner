@@ -477,6 +477,65 @@ def test_closed_projection_fails_closed_on_tampered_context_or_safety():
         assert decision_model_values(malformed) == {}
 
 
+def test_projection_rejects_non_text_observation_identity_and_lineage():
+    from copy import deepcopy
+
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import (
+        validate_contract,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    projected = decision_model_values(_market_led_candidate())
+    assert projected
+
+    malformed_observation_ids = deepcopy(projected)
+    malformed_observation_ids["observation_ids"] = [{"id": "candidate-v2"}]
+    malformed_lineage_provider = deepcopy(projected)
+    malformed_lineage_provider["source_provider_lineage"]["providers"] = [
+        {"provider": "fixture"}
+    ]
+    malformed_lineage_origin = deepcopy(projected)
+    malformed_lineage_origin["source_provider_lineage"]["origins"] = [
+        ["market_anomaly"]
+    ]
+    malformed_lineage_mode = deepcopy(projected)
+    malformed_lineage_mode["source_provider_lineage"]["data_mode"] = {
+        "mode": "fixture"
+    }
+
+    for malformed in (
+        malformed_observation_ids,
+        malformed_lineage_provider,
+        malformed_lineage_origin,
+        malformed_lineage_mode,
+    ):
+        assert validate_contract(malformed)
+        assert decision_model_values(malformed) == {}
+
+    for malformed_raw in (
+        _market_led_candidate(observation_ids=[{"id": "candidate-v2"}]),
+        _market_led_candidate(candidate_id={"id": "candidate-v2"}),
+        _market_led_candidate(provider={"name": "fixture"}),
+        _market_led_candidate(
+            source_provider_lineage={
+                "data_mode": "fixture",
+                "providers": [{"provider": "fixture"}],
+                "origins": ["market_anomaly"],
+                "source_packs": ["market_anomaly_pack"],
+            }
+        ),
+        _market_led_candidate(
+            market_context_source="fixture",
+            market_context_observed_at="2026-06-15T16:00:00Z",
+            market_context_freshness_status="fresh",
+            market_snapshot_id={"id": "market-snapshot-v2"},
+        ),
+    ):
+        assert decision_model_values(malformed_raw) == {}
+
+
 def test_v2_projection_fails_closed_on_malformed_actionable_route():
     from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
     from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (

@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Preserve typed Decision observation identity and lineage · Codex
+**Why:** The closed Decision projection could stringify object-valued
+observation or market-snapshot IDs and retain object/list/bool members inside
+source-provider lineage. Those values looked like canonical identity and
+provenance even though no real text claim existed.
+**Changes:** Raw and already-projected Decision values now require typed,
+nonblank observation IDs; typed source/provider/origin/pack lineage; typed run
+and generation metadata; and typed market-context identity aliases. The
+independent artifact schema validates the same closed contract. Market snapshot
+binding and catalyst attribution now compare only real text IDs, and candidate
+schedule references no longer stringify malformed candidate identity. Valid
+lineage, market provenance, and candidate/core/outcome propagation are
+unchanged.
+**Verify:** `3` focused raw/projection tamper and idempotence tests passed. The
+`12`-file Decision/schema/merge/calendar suite passed (`204 passed`), and the
+market-provenance, no-send, core-opportunity, and feature-integrity suite passed
+(`69 passed`). `make event-alpha-integrated-radar-smoke PYTHON=python3` passed
+with 15 candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0
+warnings, and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner
+tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated for this bounded projection
+change because the focused model plus live/no-send propagation and integrated
+doctor gates cover the affected paths. No provider call, score, threshold,
+route, send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` changed. Source-file size is advisory; artifact, security,
+provider, and resource bounds remain enforced.
+
 ## 2026-07-21 — Reject malformed Decision calendar evidence · Codex
 **Why:** Calendar IDs, classifications, certainty, importance, lineage, and
 references are part of the canonical trader-facing Decision projection. Object

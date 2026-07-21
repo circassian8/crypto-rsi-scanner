@@ -119,6 +119,43 @@ PREVIEW_LANE_TITLES = {
 
 PREVIEW_LANE_ORDER = tuple(PREVIEW_LANE_TITLES)
 
+_OBSERVATION_ID_SOURCE_FIELDS = (
+    "candidate_id", "integrated_candidate_id", "core_opportunity_id",
+    "market_anomaly_id", "incident_id", "alert_id", "observation_id",
+    "outcome_id", "feedback_id", "delivery_id", "target", "key", "event_id",
+)
+_LINEAGE_LIST_FIELDS = ("providers", "origins", "source_packs")
+_LINEAGE_SCALAR_FIELDS = (
+    "data_mode", "provider_generation_id", "run_id", "profile",
+    "artifact_namespace", "candidate_source_mode", "measurement_program",
+)
+_LINEAGE_SOURCE_SCALAR_FIELDS = (
+    "primary_source_provider", "source_provider", "latest_source", "provider",
+    "provider_generation_id", "run_id", "profile", "artifact_namespace",
+    "candidate_source_mode", "data_acquisition_mode", "data_mode", "run_mode",
+    "source_origin", "source_pack",
+)
+_LINEAGE_SOURCE_LIST_FIELDS = ("source_origins", "source_packs")
+_MARKET_REFERENCE_FIELDS = {
+    "source", "observed_at", "freshness_status", "market_snapshot_id",
+}
+_MARKET_REFERENCE_SOURCE_FIELDS = (
+    "market_context_source", "integrated_market_context_source",
+)
+_MARKET_REFERENCE_TIME_FIELDS = ("market_context_observed_at",)
+_MARKET_REFERENCE_FRESHNESS_FIELDS = (
+    "market_context_freshness_status", "market_data_freshness",
+    "integrated_market_freshness_status",
+)
+_MARKET_REFERENCE_ID_FIELDS = (
+    "market_snapshot_id", "market_history_observation_id",
+)
+_SNAPSHOT_REFERENCE_FIELDS = (
+    "market_data_source", "source_provider", "latest_source", "source",
+    "observed_at", "timestamp", "market_context_freshness_status",
+    "freshness_status", "market_snapshot_id", "market_history_observation_id",
+)
+
 
 def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
     """Return one complete, explicit v2 authority without cross-row merging.
@@ -147,6 +184,8 @@ def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
             if isinstance((components := row.get(components_key)), Mapping)
         )
         for authority in authorities:
+            if _projection_identity_lineage_invalid(authority):
+                return {}
             if not _has_decision_model_marker(authority):
                 continue
             if not decision_model_is_enabled(authority):
@@ -874,21 +913,17 @@ def _rsi_context_references(
 
 
 def _observation_ids(source: Mapping[str, Any]) -> list[str]:
-    existing = _items(source.get("observation_ids"))
+    existing = _typed_text_sequence(source.get("observation_ids")) or []
     if existing:
         return list(dict.fromkeys(existing))
     identifiers = list(dict.fromkeys(
-        str(source.get(field) or "").strip()
-        for field in (
-            "candidate_id", "integrated_candidate_id", "core_opportunity_id", "market_anomaly_id",
-            "incident_id", "alert_id", "observation_id", "outcome_id", "feedback_id",
-            "delivery_id", "target", "key", "event_id",
-        )
-        if str(source.get(field) or "").strip()
+        source[field].strip()
+        for field in _OBSERVATION_ID_SOURCE_FIELDS
+        if isinstance(source.get(field), str) and source[field].strip()
     ))
-    market_snapshot_id = str(
-        market_context_reference(source).get("market_snapshot_id") or ""
-    ).strip()
+    market_snapshot_id = _typed_text(
+        market_context_reference(source).get("market_snapshot_id")
+    )
     if market_snapshot_id and market_snapshot_id not in identifiers:
         identifiers.append(market_snapshot_id)
     return identifiers
@@ -1032,7 +1067,7 @@ def market_context_reference(source: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _optional_text(value: Any) -> str | None:
-    text = str(value or "").strip()
+    text = _typed_text(value)
     return text or None
 
 
@@ -1121,10 +1156,113 @@ def _mapping_rows(value: Any) -> list[Mapping[str, Any]]:
 
 def _candidate_schedule_reference(source: Mapping[str, Any]) -> str:
     for field in ("candidate_id", "integrated_candidate_id", "core_opportunity_id"):
-        value = str(source.get(field) or "").strip()
+        value = _typed_text(source.get(field))
         if value:
             return f"candidate_schedule:{value}"
     return ""
+
+
+def _projection_identity_lineage_invalid(source: Mapping[str, Any]) -> bool:
+    """Reject identity/provenance values that projection would otherwise stringify."""
+
+    observation_ids = source.get("observation_ids")
+    if observation_ids not in (None, "", [], ()) and _typed_text_sequence(
+        observation_ids
+    ) is None:
+        return True
+    if any(
+        field in source
+        and source.get(field) not in (None, "")
+        and not _typed_text(source.get(field))
+        for field in (*_OBSERVATION_ID_SOURCE_FIELDS, *_LINEAGE_SOURCE_SCALAR_FIELDS)
+    ):
+        return True
+    if any(
+        field in source
+        and source.get(field) not in (None, "", [], ())
+        and _typed_text_sequence(source.get(field)) is None
+        for field in _LINEAGE_SOURCE_LIST_FIELDS
+    ):
+        return True
+
+    lineage = source.get("source_provider_lineage")
+    if lineage not in (None, "", {}):
+        if not isinstance(lineage, Mapping):
+            return True
+        if any(
+            field in lineage
+            and lineage.get(field) not in (None, "")
+            and not _typed_text(lineage.get(field))
+            for field in _LINEAGE_SCALAR_FIELDS
+        ) or any(
+            field in lineage
+            and _typed_text_sequence(lineage.get(field)) is None
+            for field in _LINEAGE_LIST_FIELDS
+        ):
+            return True
+
+    reference = source.get("market_context_reference")
+    if reference not in (None, "", {}):
+        if (
+            not isinstance(reference, Mapping)
+            or set(reference) != _MARKET_REFERENCE_FIELDS
+        ):
+            return True
+        if any(
+            value is not None and not _typed_text(value)
+            for value in reference.values()
+        ):
+            return True
+    if any(
+        field in source
+        and source.get(field) not in (None, "")
+        and not _typed_text(source.get(field))
+        for field in (
+            *_MARKET_REFERENCE_SOURCE_FIELDS,
+            *_MARKET_REFERENCE_TIME_FIELDS,
+            *_MARKET_REFERENCE_FRESHNESS_FIELDS,
+            *_MARKET_REFERENCE_ID_FIELDS,
+        )
+    ):
+        return True
+    for field in (
+        "latest_market_snapshot", "market_snapshot", "market_state_snapshot",
+    ):
+        snapshot = source.get(field)
+        if not isinstance(snapshot, Mapping):
+            continue
+        if any(
+            key in snapshot
+            and snapshot.get(key) not in (None, "")
+            and not _typed_text(snapshot.get(key))
+            for key in _SNAPSHOT_REFERENCE_FIELDS
+        ):
+            return True
+        quality = snapshot.get("market_data_quality")
+        if isinstance(quality, Mapping) and any(
+            key in quality
+            and quality.get(key) not in (None, "")
+            and not _typed_text(quality.get(key))
+            for key in ("market_snapshot_id", "baseline_observation_id")
+        ):
+            return True
+    return False
+
+
+def _typed_text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _typed_text_sequence(value: Any) -> list[str] | None:
+    if not isinstance(value, (list, tuple)):
+        return None
+    values: list[str] = []
+    for item in value:
+        text = _typed_text(item)
+        if not text:
+            return None
+        values.append(text)
+    return values
 
 
 def _has_decision_model_marker(source: Mapping[str, Any]) -> bool:

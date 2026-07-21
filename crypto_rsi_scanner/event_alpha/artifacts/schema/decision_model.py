@@ -321,8 +321,18 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
         errors.append("decision_projection_why_now_missing")
     if _aware_timestamp(row.get("decision_evaluated_at")) is None:
         errors.append("decision_projection_evaluation_timestamp_invalid")
-    if _is_sequence(row.get("observation_ids")) and not _items(row.get("observation_ids")):
-        errors.append("decision_projection_observation_ids_empty")
+    observation_ids = row.get("observation_ids")
+    if _is_sequence(observation_ids):
+        observation_id_values = tuple(observation_ids)
+        if not observation_id_values:
+            errors.append("decision_projection_observation_ids_empty")
+        elif any(
+            not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            for value in observation_id_values
+        ):
+            errors.append("decision_projection_observation_ids_invalid")
 
     aliases = {
         "hard_blockers": "decision_hard_blockers",
@@ -345,6 +355,33 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
         for field in ("providers", "origins", "source_packs"):
             if not _is_sequence(lineage.get(field)):
                 errors.append(f"decision_projection_lineage_invalid:{field}")
+            elif any(
+                not isinstance(value, str)
+                or not value.strip()
+                or value != value.strip()
+                for value in lineage.get(field, ())
+            ):
+                errors.append(
+                    f"decision_projection_lineage_value_invalid:{field}"
+                )
+        data_mode = lineage.get("data_mode")
+        if (
+            not isinstance(data_mode, str)
+            or not data_mode.strip()
+            or data_mode != data_mode.strip()
+        ):
+            errors.append("decision_projection_lineage_value_invalid:data_mode")
+        for field in (
+            "provider_generation_id", "run_id", "profile", "artifact_namespace",
+            "candidate_source_mode", "measurement_program",
+        ):
+            value = lineage.get(field)
+            if value is not None and (
+                not isinstance(value, str) or value != value.strip()
+            ):
+                errors.append(
+                    f"decision_projection_lineage_value_invalid:{field}"
+                )
 
     provenance = row.get("market_provenance")
     if provenance is not None:
@@ -444,7 +481,10 @@ def _validate_projection_market_observation_binding(
     if identity_bound is not True:
         return []
     reference = market_reference if isinstance(market_reference, Mapping) else {}
-    snapshot_id = str(reference.get("market_snapshot_id") or "").strip()
+    raw_snapshot_id = reference.get("market_snapshot_id")
+    snapshot_id = (
+        raw_snapshot_id.strip() if isinstance(raw_snapshot_id, str) else ""
+    )
     if not snapshot_id:
         return ["decision_projection_bound_market_snapshot_missing"]
     if snapshot_id not in _items(row.get("observation_ids")):
@@ -556,7 +596,10 @@ def _validate_projection_catalyst_attributions(
         return ["decision_projection_catalyst_attributions_invalid_type"]
     errors: list[str] = []
     digests: list[str] = []
-    explicit_anomaly_id = str(row.get("market_anomaly_id") or "").strip()
+    raw_anomaly_id = row.get("market_anomaly_id")
+    explicit_anomaly_id = (
+        raw_anomaly_id.strip() if isinstance(raw_anomaly_id, str) else ""
+    )
     observation_ids = (
         row.get("observation_ids", ())
         if _is_sequence(row.get("observation_ids"))
@@ -566,9 +609,9 @@ def _validate_projection_catalyst_attributions(
         {explicit_anomaly_id}
         if explicit_anomaly_id
         else {
-            str(value).strip()
+            value.strip()
             for value in observation_ids
-            if str(value or "").strip()
+            if isinstance(value, str) and value.strip()
         }
     )
     for index, value in enumerate(values):
@@ -582,7 +625,12 @@ def _validate_projection_catalyst_attributions(
             f"decision_projection_catalyst_attribution_{index}:{error}"
             for error in contract_errors
         )
-        if not candidate_ids or str(value.get("anomaly_id") or "") not in candidate_ids:
+        anomaly_id = value.get("anomaly_id")
+        if (
+            not candidate_ids
+            or not isinstance(anomaly_id, str)
+            or anomaly_id not in candidate_ids
+        ):
             errors.append(
                 f"decision_projection_catalyst_attribution_{index}:anomaly_binding_mismatch"
             )
