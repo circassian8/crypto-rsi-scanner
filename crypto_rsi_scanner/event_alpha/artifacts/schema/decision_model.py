@@ -50,6 +50,14 @@ _PROJECTION_TEXT_COLLECTION_FIELDS = (
     "missing_information", "main_risks", "what_confirms", "what_invalidates",
     "source_independence_errors",
 )
+_RSI_REFERENCE_FIELDS = {
+    "context_version", "symbol", "coin_id", "setup_type", "rsi_timeframe",
+    "observed_at", "freshness_status", "valid",
+}
+_RSI_REFERENCE_TEXT_FIELDS = (
+    "context_version", "symbol", "coin_id", "setup_type", "rsi_timeframe",
+    "observed_at", "freshness_status",
+)
 
 FIELDS = (
     "decision_model_version", "decision_model_enabled", "thesis_origin",
@@ -761,11 +769,55 @@ def _validate_projection_calendar_and_rsi(row: Mapping[str, Any]) -> list[str]:
 
     rsi_context = row.get("rsi_context")
     rsi_references = row.get("rsi_context_references")
-    if isinstance(rsi_context, Mapping) and rsi_context and not (
-        _is_sequence(rsi_references)
-        and any(isinstance(item, Mapping) for item in rsi_references)
-    ):
+    context = rsi_context if isinstance(rsi_context, Mapping) else {}
+    if context:
+        if not _canonical_text(context.get("context_version")):
+            errors.append("decision_projection_rsi_context_version_invalid")
+        if not isinstance(context.get("valid"), bool):
+            errors.append("decision_projection_rsi_context_valid_invalid")
+        if not _canonical_text(context.get("freshness_status")):
+            errors.append("decision_projection_rsi_context_freshness_invalid")
+        for field in _RSI_REFERENCE_TEXT_FIELDS:
+            value = context.get(field)
+            if value is not None and not _canonical_text(value):
+                errors.append(
+                    f"decision_projection_rsi_context_value_invalid:{field}"
+                )
+        observed_at = context.get("observed_at")
+        if observed_at is not None and _aware_timestamp(observed_at) is None:
+            errors.append("decision_projection_rsi_context_timestamp_invalid")
+
+    reference_rows: list[Mapping[str, Any]] = []
+    if _is_sequence(rsi_references):
+        for item in rsi_references:
+            if not isinstance(item, Mapping):
+                errors.append("decision_projection_rsi_reference_invalid")
+                continue
+            reference_rows.append(item)
+            if set(item) != _RSI_REFERENCE_FIELDS:
+                errors.append("decision_projection_rsi_reference_fields_invalid")
+                continue
+            if not _canonical_text(item.get("context_version")):
+                errors.append("decision_projection_rsi_reference_version_invalid")
+            if not isinstance(item.get("valid"), bool):
+                errors.append("decision_projection_rsi_reference_valid_invalid")
+            if not _canonical_text(item.get("freshness_status")):
+                errors.append("decision_projection_rsi_reference_freshness_invalid")
+            for field in _RSI_REFERENCE_TEXT_FIELDS:
+                value = item.get(field)
+                if value is not None and not _canonical_text(value):
+                    errors.append(
+                        f"decision_projection_rsi_reference_value_invalid:{field}"
+                    )
+            observed_at = item.get("observed_at")
+            if observed_at is not None and _aware_timestamp(observed_at) is None:
+                errors.append("decision_projection_rsi_reference_timestamp_invalid")
+    if context and not reference_rows:
         errors.append("decision_projection_rsi_context_unreferenced")
+    elif context:
+        expected = {field: context.get(field) for field in _RSI_REFERENCE_FIELDS}
+        if not any(dict(reference) == expected for reference in reference_rows):
+            errors.append("decision_projection_rsi_reference_context_mismatch")
     return errors
 
 
@@ -804,6 +856,10 @@ def _validate_scores_and_expiry(
 
 def _is_sequence(value: Any) -> bool:
     return isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping))
+
+
+def _canonical_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and value == value.strip()
 
 
 def _items(value: Any) -> tuple[str, ...]:

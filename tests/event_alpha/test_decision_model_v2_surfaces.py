@@ -582,6 +582,74 @@ def test_projection_rejects_non_text_operator_rationale_collections():
         assert decision_model_values(malformed_raw) == {}
 
 
+def test_projection_keeps_rsi_references_typed_and_bound_to_context():
+    from copy import deepcopy
+
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import (
+        validate_contract,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    context = {
+        "context_version": "rsi_technical_context_v1",
+        "valid": True,
+        "symbol": "V2",
+        "coin_id": "v2-coin",
+        "setup_type": "dip_buy",
+        "rsi_value": 24.0,
+        "rsi_timeframe": "1d",
+        "observed_at": "2026-06-15T15:00:00Z",
+        "freshness_status": "fresh",
+    }
+    projected = decision_model_values(_market_led_candidate(
+        rsi_context_version="rsi_technical_context_v1",
+        rsi_context=context,
+    ))
+    assert projected
+    expected_reference = {
+        "context_version": "rsi_technical_context_v1",
+        "symbol": "V2",
+        "coin_id": "v2-coin",
+        "setup_type": "dip_buy",
+        "rsi_timeframe": "1d",
+        "observed_at": "2026-06-15T15:00:00Z",
+        "freshness_status": "fresh",
+        "valid": True,
+    }
+    assert projected["rsi_context_references"] == [expected_reference]
+
+    non_mapping_reference = deepcopy(projected)
+    non_mapping_reference["rsi_context_references"].append(True)
+    malformed_reference_value = deepcopy(projected)
+    malformed_reference_value["rsi_context_references"][0]["observed_at"] = {
+        "at": "2026-06-15T15:00:00Z"
+    }
+    drifted_reference = deepcopy(projected)
+    drifted_reference["rsi_context_references"][0]["symbol"] = "OTHER"
+    malformed_context = deepcopy(projected)
+    malformed_context["rsi_context"]["setup_type"] = ["dip_buy"]
+
+    for malformed in (
+        non_mapping_reference,
+        malformed_reference_value,
+        drifted_reference,
+        malformed_context,
+    ):
+        assert validate_contract(malformed)
+        assert decision_model_values(malformed) == {}
+
+    assert decision_model_values(_market_led_candidate(
+        rsi_context=context,
+        rsi_context_references=[expected_reference, True],
+    )) == {}
+    assert decision_model_values(_market_led_candidate(
+        rsi_context=context,
+        rsi_context_references=[{**expected_reference, "symbol": "OTHER"}],
+    )) == {}
+
+
 def test_v2_projection_fails_closed_on_malformed_actionable_route():
     from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
     from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (

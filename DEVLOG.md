@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Bind canonical RSI context references · Codex
+**Why:** RSI reference lists accepted mixed members and did not prove that a
+typed reference described the embedded technical context. A malformed row
+could be silently dropped, or symbol/setup/time metadata could drift while the
+projection still validated.
+**Changes:** Non-empty RSI context now requires typed version, validity,
+freshness, identity/setup/timeframe, and timezone-aware observation metadata.
+Every reference must use the exact closed reference shape and typed values, and
+at least one reference must equal the embedded context's canonical identity.
+Raw and already-projected values enforce the same rule, so invalid members are
+rejected rather than filtered during rendering. Empty/no-RSI context remains a
+valid explicit state, and the read-only RSI adapter, score adjustments, and
+no-edge cap are unchanged.
+**Verify:** The focused projection plus RSI-adapter suite passed (`13 passed`).
+The `12`-file Decision/schema/merge/calendar suite passed (`206 passed`).
+`make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the affected RSI
+adapter/projection/schema paths and integrated doctor were exercised directly.
+No provider call, RSI alert or row write, score formula, threshold, route, send,
+trade, order, paper trade, or Event Alpha `TRIGGERED_FADE` changed. Source-file
+size is advisory; artifact, security, provider, and resource bounds remain
+enforced.
+
 ## 2026-07-21 — Reject non-text Decision rationale · Codex
 **Why:** Trader-facing Decision collections accepted arbitrary iterable members.
 Mappings and booleans could therefore become strings such as

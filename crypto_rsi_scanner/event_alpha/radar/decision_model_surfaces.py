@@ -168,6 +168,14 @@ _PROJECTION_TEXT_COLLECTION_FIELDS = (
 _SOURCE_RATIONALE_COLLECTION_FIELDS = (
     "supporting_facts", "supporting_evidence_quotes", "main_risks",
 )
+_RSI_REFERENCE_FIELDS = {
+    "context_version", "symbol", "coin_id", "setup_type", "rsi_timeframe",
+    "observed_at", "freshness_status", "valid",
+}
+_RSI_REFERENCE_TEXT_FIELDS = (
+    "context_version", "symbol", "coin_id", "setup_type", "rsi_timeframe",
+    "observed_at", "freshness_status",
+)
 
 
 def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -200,6 +208,8 @@ def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
             if _projection_identity_lineage_invalid(authority):
                 return {}
             if _projection_text_collections_invalid(authority):
+                return {}
+            if _projection_rsi_context_invalid(authority):
                 return {}
             if not _has_decision_model_marker(authority):
                 continue
@@ -908,9 +918,13 @@ def _rsi_context_references(
     source: Mapping[str, Any],
     context: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    existing = _mapping_rows(source.get("rsi_context_references"))
-    if existing:
-        return [deepcopy(dict(row)) for row in existing]
+    existing = source.get("rsi_context_references")
+    if isinstance(existing, (list, tuple)) and existing:
+        return [
+            deepcopy(dict(row))
+            for row in existing
+            if isinstance(row, Mapping)
+        ]
     if not context:
         return []
     return [{
@@ -1276,6 +1290,69 @@ def _projection_text_collections_invalid(source: Mapping[str, Any]) -> bool:
             *_PROJECTION_TEXT_COLLECTION_FIELDS,
             *_SOURCE_RATIONALE_COLLECTION_FIELDS,
         )
+    )
+
+
+def _projection_rsi_context_invalid(source: Mapping[str, Any]) -> bool:
+    """Keep RSI context and its canonical references typed and bound."""
+
+    raw_context = source.get("rsi_context")
+    if raw_context not in (None, "", {}):
+        if not isinstance(raw_context, Mapping):
+            return True
+        if not _typed_text(raw_context.get("context_version")):
+            return True
+        if not isinstance(raw_context.get("valid"), bool):
+            return True
+        if not _typed_text(raw_context.get("freshness_status")):
+            return True
+        if any(
+            field in raw_context
+            and raw_context.get(field) is not None
+            and not _typed_text(raw_context.get(field))
+            for field in _RSI_REFERENCE_TEXT_FIELDS
+        ):
+            return True
+    context = raw_context if isinstance(raw_context, Mapping) else {}
+    explicit_version = source.get("rsi_context_version")
+    if explicit_version not in (None, ""):
+        if not _typed_text(explicit_version):
+            return True
+        if context and explicit_version.strip() != context.get("context_version"):
+            return True
+
+    raw_references = source.get("rsi_context_references")
+    if raw_references in (None, "", [], ()):
+        return False
+    if not isinstance(raw_references, (list, tuple)) or any(
+        not isinstance(reference, Mapping)
+        or _rsi_reference_invalid(reference)
+        for reference in raw_references
+    ):
+        return True
+    if context:
+        expected = {
+            field: context.get(field)
+            for field in _RSI_REFERENCE_FIELDS
+        }
+        if not any(dict(reference) == expected for reference in raw_references):
+            return True
+    return False
+
+
+def _rsi_reference_invalid(reference: Mapping[str, Any]) -> bool:
+    if set(reference) != _RSI_REFERENCE_FIELDS:
+        return True
+    if not _typed_text(reference.get("context_version")):
+        return True
+    if not _typed_text(reference.get("freshness_status")):
+        return True
+    if not isinstance(reference.get("valid"), bool):
+        return True
+    return any(
+        reference.get(field) is not None
+        and not _typed_text(reference.get(field))
+        for field in _RSI_REFERENCE_TEXT_FIELDS
     )
 
 
