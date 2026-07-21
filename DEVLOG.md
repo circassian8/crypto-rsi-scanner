@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Measure rolling return-window overlap · Codex
+**Why:** Exact endpoint/anchor reuse was already visible, but distinct rolling
+intervals can still share most of the same clock span. The project needed that
+dependence measured before treating nominal observations as independent or
+designing Protocol-v2 calibration.
+**Changes:** Shadow temporal-surprise schema v6 closes each asset and benchmark
+return leg as a half-open anchor-to-endpoint interval and records exact interval
+reuse, adjacent overlap, total duration, unique union clock coverage, overlap
+excess, coverage ratio, and exact extreme references. Campaign-audit schema v7
+aggregates those facts per canonical asset and return feature while preserving
+shadow v1-v5 and audit v1-v6 readability. Campaign Markdown and the pointer-
+matched dashboard render a separate rolling-window dependence table without
+re-evaluation. Closed schema validation, legacy compatibility, tamper tests,
+North Star/preregistration contracts, durable decisions, roadmap state, and
+generated project-health reports now agree.
+
+The genuine 59-cycle replay contains 279 sample-eligible asset/return-feature
+pairs and 8,262 asset reference sets. Adjacent overlap appears in 185 pairs /
+5,214 sets; 122 of 184 benchmark pairs / 3,434 of 5,442 benchmark sets overlap.
+Exact full-interval reuse is zero on both legs. Eligible 1h windows have full
+unique clock coverage and zero overlap, while minimum 4h and 24h coverage ratios
+are `0.456072623081` and `0.126292698333`. This proves that distinct interval
+identity is not evidence of statistical independence.
+**Verify:** Focused schema, campaign, dashboard, empirical-live, and North Star
+tests passed (162 tests), and `python3 -m compileall -q crypto_rsi_scanner tests`
+passed. Dashboard smoke, UX smoke, and real pointer readiness passed with zero
+writes. `make architecture-cleanliness-check PYTHON=python3` passed; source-size
+and ownership counts remain advisory and non-blocking. The sandboxed broad run
+reached 3,839 passes before its expected loopback-bind denial; the host-level
+`make verify-fast PYTHON=python3` then passed all 3,840 tests plus alert render,
+backtest fixture, and paper-scoreboard gates in 191 seconds. JSON validation and
+`git diff --check` passed.
+**Notes/risks:** The overlap fields are descriptive only. They do not estimate
+effective sample size, adjust sample weights, attribute provider fault, or
+change a return, status, threshold, exclusion, score, route, publication, or
+Protocol-v2 rule. No provider call or authorization change, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-21 — Measure exact return-anchor reuse and timing · Codex
 **Why:** The retained-input trace separated numeric repetition from transform
 collision, but it could not tell whether multiple rolling returns reused one

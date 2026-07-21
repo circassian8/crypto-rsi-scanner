@@ -325,6 +325,7 @@ def _shadow_surprise_audit_section(report: Mapping[str, Any]) -> list[str]:
                 f"{_md(least_diverse)} |"
             )
     lines.extend(_shadow_asset_variation_lines(audit))
+    lines.extend(_shadow_interval_overlap_lines(audit))
     lines.extend(["", "### Decision episodes", ""])
     return lines
 
@@ -504,6 +505,118 @@ def _shadow_return_sampling_timing_text(
         )
     )
     return f"{reuse}; {errors}"
+
+
+def _shadow_interval_overlap_lines(audit: Mapping[str, Any]) -> list[str]:
+    raw_summaries = audit.get("asset_variation_summaries")
+    if not isinstance(raw_summaries, list):
+        return []
+    rows: list[
+        tuple[float, str, str, Mapping[str, Any], Mapping[str, Any] | None]
+    ] = []
+    for raw_asset in raw_summaries:
+        asset = _mapping(raw_asset)
+        asset_id = _text(asset.get("canonical_asset_id"))
+        for feature, raw_variation in _mapping(asset.get("feature_variation")).items():
+            variation = _mapping(raw_variation)
+            timing = _mapping(variation.get("return_sampling_timing_summary"))
+            asset_overlap = _mapping(timing.get("asset_interval_overlap_summary"))
+            if not asset_overlap:
+                continue
+            minimum = asset_overlap.get("unique_clock_coverage_ratio_minimum")
+            if not isinstance(minimum, (int, float)) or isinstance(minimum, bool):
+                continue
+            benchmark_overlap = timing.get("benchmark_interval_overlap_summary")
+            rows.append((
+                float(minimum),
+                asset_id,
+                str(feature),
+                asset_overlap,
+                benchmark_overlap if isinstance(benchmark_overlap, Mapping) else None,
+            ))
+    rows.sort(key=lambda row: row[:3])
+    if not rows:
+        return []
+    limit = 48
+    lines = [
+        "",
+        "#### Rolling return-window overlap by asset",
+        "",
+        (
+            f"The campaign contains {len(rows)} sample-eligible asset-return pairs. "
+            + (
+                "All are shown."
+                if len(rows) <= limit
+                else f"The {limit} lowest unique-clock-coverage pairs are shown."
+            )
+            + " Intervals are half-open from anchor through endpoint. Adjacent "
+            "overlap, exact interval reuse, and union clock coverage are descriptive "
+            "only: no effective sample size is estimated, no sample is reweighted or "
+            "excluded, and no threshold, score, route, publication, or Protocol-v2 "
+            "rule changes."
+        ),
+        "",
+        (
+            "| Asset | Return feature | Eligible sets | Asset overlap / exact reuse "
+            "sets | Asset unique-clock ratio min / median / max | Asset max adjacent "
+            "/ total excess seconds | Benchmark overlap / exact reuse sets | "
+            "Benchmark unique-clock ratio min / median / max | Exact minimum asset "
+            "coverage reference |"
+        ),
+        "|---|---|---:|---:|---:|---:|---:|---:|---|",
+    ]
+    for _, asset_id, feature, asset_overlap, benchmark_overlap in rows[:limit]:
+        asset_counts = (
+            f"{_int(asset_overlap.get('adjacent_overlap_observation_count'))} / "
+            f"{_int(asset_overlap.get('interval_reuse_observation_count'))}"
+        )
+        asset_ratios = " / ".join(
+            _number(asset_overlap.get(field))
+            for field in (
+                "unique_clock_coverage_ratio_minimum",
+                "unique_clock_coverage_ratio_median",
+                "unique_clock_coverage_ratio_maximum",
+            )
+        )
+        asset_seconds = (
+            f"{_number(asset_overlap.get('maximum_adjacent_overlap_seconds'))} / "
+            f"{_number(asset_overlap.get('maximum_overlap_excess_seconds'))}"
+        )
+        if benchmark_overlap is not None:
+            benchmark_counts = (
+                f"{_int(benchmark_overlap.get('adjacent_overlap_observation_count'))} / "
+                f"{_int(benchmark_overlap.get('interval_reuse_observation_count'))}"
+            )
+            benchmark_ratios = " / ".join(
+                _number(benchmark_overlap.get(field))
+                for field in (
+                    "unique_clock_coverage_ratio_minimum",
+                    "unique_clock_coverage_ratio_median",
+                    "unique_clock_coverage_ratio_maximum",
+                )
+            )
+        else:
+            benchmark_counts = "n/a"
+            benchmark_ratios = "n/a"
+        reference = _mapping(
+            asset_overlap.get("minimum_unique_clock_coverage_observation")
+        )
+        reference_text = (
+            f"{_number(reference.get('unique_clock_coverage_ratio'))}; "
+            f"{_int(reference.get('interval_count'))} intervals; "
+            f"{_number(reference.get('unique_clock_coverage_seconds'))}/"
+            f"{_number(reference.get('total_interval_seconds'))} unique/total s @ "
+            f"{_text(reference.get('observed_at'))}"
+            if reference
+            else "n/a"
+        )
+        lines.append(
+            f"| {_md(asset_id)} | {_md(feature)} | "
+            f"{_int(asset_overlap.get('observation_count'))} | "
+            f"{asset_counts} | {asset_ratios} | {asset_seconds} | "
+            f"{benchmark_counts} | {benchmark_ratios} | {_md(reference_text)} |"
+        )
+    return lines
 
 
 def _authority_proven(pointer: Mapping[str, Any]) -> bool:

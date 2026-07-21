@@ -160,7 +160,7 @@ def test_v5_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         benchmark_observations=benchmarks,
     )
 
-    assert result["schema_version"] == 5
+    assert result["schema_version"] == 6
     assert result["status"] == "ready"
     assert result["return_status"] == "ready"
     assert tuple(RETURN_HORIZONS_HOURS) == (1, 4, 24)
@@ -197,9 +197,22 @@ def test_v5_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         "input_trace_diagnostics_are_policy": False,
         "provider_causation_claimed": False,
         "return_sampling_trace_identity": (
-            "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+            "ordered_exact_endpoint_anchor_observation_identity_timing_and_"
+            "interval_overlap"
         ),
         "return_sampling_timing_diagnostics_are_policy": False,
+        "return_interval_identity": (
+            "ordered_endpoint_anchor_observation_identity_and_utc_clock"
+        ),
+        "return_interval_boundary": (
+            "half_open_anchor_inclusive_endpoint_exclusive"
+        ),
+        "return_interval_overlap_scope": (
+            "adjacent_endpoint_ordered_pairs_and_full_union_clock_coverage"
+        ),
+        "return_interval_overlap_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "sample_weight_adjustment_applied": False,
     }
     direct = result["return_features"]["return_1h"]
     expected_direct = (current["price"] / priors[-1]["price"] - 1.0) * 100.0
@@ -234,6 +247,9 @@ def test_v5_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
     assert direct_trace["timing_diagnostics_are_policy"] is False
     assert direct_trace["provider_causation_claimed"] is False
     assert direct_trace["statistical_independence_claimed"] is False
+    assert direct_trace["overlap_diagnostics_are_policy"] is False
+    assert direct_trace["effective_sample_size_claimed"] is False
+    assert direct_trace["sample_weight_adjustment_applied"] is False
     relative = result["return_features"]["relative_return_vs_btc_24h"]
     expected_asset_24h = (current["price"] / priors[6]["price"] - 1.0) * 100.0
     expected_btc_24h = (
@@ -413,7 +429,7 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
 
     assert SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID == "event_alpha.shadow_temporal_surprise"
     assert result["schema_id"] == SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
-    assert result["schema_version"] == 5
+    assert result["schema_version"] == 6
     assert result["status"] == "partial"
     assert result["return_status"] == "unavailable"
     assert volume["status"] == "ready"
@@ -912,6 +928,30 @@ def test_v5_return_sampling_trace_exposes_anchor_reuse_and_realized_timing():
     assert error_reference["asset_endpoint"]["observation_id"] == "asset-a-obs-2"
     assert error_reference["anchor"]["observation_id"] == "asset-a-obs-0"
     assert error_reference["anchor_selection_error_seconds"] == 900.0
+    interval_overlap = asset_leg["interval_overlap"]
+    assert interval_overlap["interval_count"] == 3
+    assert interval_overlap["distinct_interval_count"] == 3
+    assert interval_overlap["interval_reuse_excess_count"] == 0
+    assert interval_overlap["adjacent_pair_count"] == 2
+    assert interval_overlap["adjacent_overlapping_pair_count"] == 1
+    assert interval_overlap["adjacent_nonoverlapping_pair_count"] == 1
+    assert interval_overlap["adjacent_overlap_seconds"] == {
+        "minimum": 0.0,
+        "median": 2100.0,
+        "maximum": 4200.0,
+    }
+    assert interval_overlap["total_interval_seconds"] == 12600.0
+    assert interval_overlap["unique_clock_coverage_seconds"] == 8400.0
+    assert interval_overlap["overlap_excess_seconds"] == 4200.0
+    assert interval_overlap["unique_clock_coverage_ratio"] == 0.666666666667
+    assert interval_overlap["maximum_adjacent_overlap_reference"][
+        "overlap_seconds"
+    ] == 4200.0
+    assert interval_overlap["overlap_diagnostics_are_policy"] is False
+    assert interval_overlap["effective_sample_size_claimed"] is False
+    assert interval_overlap["sample_weight_adjustment_applied"] is False
+    assert direct["interval_overlap_detected"] is True
+    assert direct["interval_reuse_detected"] is False
 
     relative = result["return_features"][
         "relative_return_vs_btc_1h"
@@ -922,6 +962,16 @@ def test_v5_return_sampling_trace_exposes_anchor_reuse_and_realized_timing():
     assert benchmark_leg["endpoint_reuse_excess_count"] == 1
     assert benchmark_leg["maximum_endpoint_reuse_count"] == 2
     assert benchmark_leg["anchor_reuse_excess_count"] == 1
+    benchmark_overlap = benchmark_leg["interval_overlap"]
+    assert benchmark_overlap["interval_reuse_excess_count"] == 1
+    assert benchmark_overlap["maximum_interval_reuse_count"] == 2
+    assert benchmark_overlap["maximum_consecutive_interval_reuse_count"] == 2
+    assert benchmark_overlap["unique_clock_coverage_seconds"] == 8100.0
+    assert benchmark_overlap["overlap_excess_seconds"] == 4200.0
+    assert benchmark_overlap["unique_clock_coverage_ratio"] == 0.658536585366
+    assert benchmark_overlap["maximum_interval_reuse_reference"][
+        "reuse_count"
+    ] == 2
     assert relative["benchmark_endpoint_alignment"]["lag_seconds"] == {
         "minimum": 0.0,
         "median": 300.0,
@@ -932,6 +982,8 @@ def test_v5_return_sampling_trace_exposes_anchor_reuse_and_realized_timing():
     assert relative["timing_diagnostics_are_policy"] is False
     assert relative["provider_causation_claimed"] is False
     assert relative["statistical_independence_claimed"] is False
+    assert relative["interval_overlap_detected"] is True
+    assert relative["interval_reuse_detected"] is True
 
 
 def test_derived_turnover_sample_digest_binds_ratio_dependencies():
@@ -1030,8 +1082,8 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     policy = payload["shadow_temporal_surprise_policy"]
 
     assert policy["schema_id"] == "event_alpha.shadow_temporal_surprise"
-    assert policy["schema_version"] == 5
-    assert policy["legacy_schema_versions_readable"] == [1, 2, 3, 4]
+    assert policy["schema_version"] == 6
+    assert policy["legacy_schema_versions_readable"] == [1, 2, 3, 4, 5]
     assert policy["features"] == ["volume_24h", "turnover_24h"]
     assert policy["signed_return_features"] == list(SUPPORTED_RETURN_FEATURES)
     assert policy["signed_return_unit"] == "percent_points"
@@ -1059,21 +1111,31 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     assert policy["input_trace_diagnostics_are_policy"] is False
     assert policy["provider_causation_claimed"] is False
     assert policy["return_sampling_trace_identity"] == (
-        "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+        "ordered_exact_endpoint_anchor_observation_identity_timing_and_"
+        "interval_overlap"
     )
     assert "realized_horizon_seconds_minimum_median_maximum" in policy[
         "return_sampling_timing_diagnostics"
     ]
     assert policy["return_sampling_timing_diagnostics_are_policy"] is False
+    assert policy["return_interval_boundary"] == (
+        "half_open_anchor_inclusive_endpoint_exclusive"
+    )
+    assert "unique_union_clock_coverage_seconds" in policy[
+        "return_interval_overlap_diagnostics"
+    ]
+    assert policy["return_interval_overlap_diagnostics_are_policy"] is False
+    assert policy["return_interval_effective_sample_size_claimed"] is False
+    assert policy["return_interval_sample_weight_adjustment_applied"] is False
     assert policy["campaign_audit_schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert policy["campaign_audit_schema_version"] == 6
+    assert policy["campaign_audit_schema_version"] == 7
     assert policy["campaign_audit_legacy_schema_versions_readable"] == [
-        1, 2, 3, 4, 5
+        1, 2, 3, 4, 5, 6
     ]
     assert policy["campaign_audit_variation_observation_basis"] == (
-        "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
+        "closed_shadow_v6_projection_meeting_existing_minimum_sample_count"
     )
     assert policy["campaign_audit_variation_diagnostics_are_policy"] is False
     assert policy["campaign_audit_effective_sample_size_claimed"] is False
@@ -1087,6 +1149,18 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     ] is True
     assert policy[
         "campaign_audit_return_sampling_timing_diagnostics_are_policy"
+    ] is False
+    assert policy[
+        "campaign_audit_return_interval_overlap_exact_extreme_references"
+    ] is True
+    assert policy[
+        "campaign_audit_return_interval_overlap_diagnostics_are_policy"
+    ] is False
+    assert policy[
+        "campaign_audit_return_interval_effective_sample_size_claimed"
+    ] is False
+    assert policy[
+        "campaign_audit_return_interval_sample_weight_adjustment_applied"
     ] is False
     assert policy["campaign_audit_ready_distribution"] == (
         "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections"
@@ -1168,10 +1242,44 @@ _V5_RETURN_METHOD_FIELDS = (
     "return_sampling_timing_diagnostics_are_policy",
 )
 _V5_RETURN_FEATURE_FIELDS = ("return_sampling_trace",)
+_V6_RETURN_METHOD_FIELDS = (
+    "return_interval_identity",
+    "return_interval_boundary",
+    "return_interval_overlap_scope",
+    "return_interval_overlap_diagnostics_are_policy",
+    "effective_sample_size_claimed",
+    "sample_weight_adjustment_applied",
+)
+_V6_RETURN_SAMPLING_TRACE_FIELDS = (
+    "interval_overlap_detected",
+    "interval_reuse_detected",
+    "overlap_diagnostics_are_policy",
+    "effective_sample_size_claimed",
+    "sample_weight_adjustment_applied",
+)
+
+
+def _historical_v5_shadow() -> dict:
+    legacy = _valid_schema_shadow()
+    legacy["schema_version"] = 5
+    legacy["return_method"]["return_sampling_trace_identity"] = (
+        "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+    )
+    for field in _V6_RETURN_METHOD_FIELDS:
+        legacy["return_method"].pop(field)
+    for feature in legacy["return_features"].values():
+        trace = feature["return_sampling_trace"]
+        for field in _V6_RETURN_SAMPLING_TRACE_FIELDS:
+            trace.pop(field)
+        for leg_name in ("asset_leg", "benchmark_leg"):
+            leg = trace.get(leg_name)
+            if isinstance(leg, dict):
+                leg.pop("interval_overlap")
+    return legacy
 
 
 def _historical_v4_shadow() -> dict:
-    legacy = _valid_schema_shadow()
+    legacy = _historical_v5_shadow()
     legacy["schema_version"] = 4
     for field in _V5_RETURN_METHOD_FIELDS:
         legacy["return_method"].pop(field)
@@ -1333,6 +1441,20 @@ def test_artifact_schema_keeps_historical_v4_shadow_values_readable():
     assert errors == []
 
 
+def test_artifact_schema_keeps_historical_v5_shadow_values_readable():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    errors = schema_v1.validate_row_against_schema(
+        _shadow_artifact_row(
+            "market_state_snapshot_v1",
+            _historical_v5_shadow(),
+        ),
+        "market_state_snapshot_v1",
+    )
+
+    assert errors == []
+
+
 @pytest.mark.parametrize(
     ("mutation", "expected_error"),
     (
@@ -1383,6 +1505,30 @@ def test_artifact_schema_keeps_historical_v4_shadow_values_readable():
                 "return_sampling_trace"
             ].__setitem__("timing_diagnostics_are_policy", True),
             "shadow_temporal_surprise_sampling_safety_inconsistent:return_features.return_1h.return_sampling_trace.timing_diagnostics_are_policy",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
+                "return_sampling_trace"
+            ]["asset_leg"]["interval_overlap"].__setitem__(
+                "effective_sample_size_claimed", True
+            ),
+            "shadow_temporal_surprise_interval_overlap_safety_inconsistent:return_features.return_1h.return_sampling_trace.asset_leg.interval_overlap.effective_sample_size_claimed",
+        ),
+        (
+            lambda value: value["return_features"]["return_1h"][
+                "return_sampling_trace"
+            ]["asset_leg"]["interval_overlap"].__setitem__(
+                "unique_clock_coverage_seconds", 1.0
+            ),
+            "shadow_temporal_surprise_interval_overlap_excess_inconsistent:return_features.return_1h.return_sampling_trace.asset_leg.interval_overlap",
+        ),
+        (
+            lambda value: value["return_features"]["return_24h"][
+                "return_sampling_trace"
+            ]["asset_leg"]["interval_overlap"][
+                "maximum_adjacent_overlap_reference"
+            ].__setitem__("overlap_seconds", 1.0),
+            "shadow_temporal_surprise_interval_overlap_reference_maximum_invalid:return_features.return_24h.return_sampling_trace.asset_leg.interval_overlap.maximum_adjacent_overlap_reference",
         ),
         (
             lambda value: value["return_features"]["return_1h"][

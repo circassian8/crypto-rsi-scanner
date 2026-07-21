@@ -222,7 +222,7 @@ def test_shadow_surprise_attaches_only_after_route_and_preserves_authority_bytes
     anomaly = next(row for row in anomalies if row.get("coin_id") == "token-b")
     snapshot = next(row for row in snapshots if row.get("coin_id") == "token-b")
     shadow = anomaly["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 5
+    assert shadow["schema_version"] == 6
     assert shadow["history_artifact"] == market_no_send.HISTORY_FILENAME
     assert shadow["history_artifact_sha256"] == hashlib.sha256(
         history_before
@@ -471,8 +471,8 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert audit["schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert audit["schema_version"] == 6
-    assert audit["shadow_schema_version"] == 5
+    assert audit["schema_version"] == 7
+    assert audit["shadow_schema_version"] == 6
     assert audit["input_row_count"] == 31
     assert audit["excluded_not_baseline_counted_count"] == 1
     assert audit["input_rejected_count"] == 0
@@ -496,7 +496,7 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert volume_distribution["tail_ranks_are_p_values"] is False
     assert volume_distribution["overlapping_samples_are_independent"] is False
     assert volume_distribution["variation_observation_basis"] == (
-        "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
+        "closed_shadow_v6_projection_meeting_existing_minimum_sample_count"
     )
     assert volume_distribution["variation_observation_count"] > 0
     assert volume_distribution["minimum_distinct_baseline_value_count"] is None
@@ -627,6 +627,28 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert timing["timing_diagnostics_are_policy"] is False
     assert timing["provider_causation_claimed"] is False
     assert timing["statistical_independence_claimed"] is False
+    asset_overlap = timing["asset_interval_overlap_summary"]
+    assert asset_overlap["observation_count"] == 5
+    assert asset_overlap["adjacent_overlap_observation_count"] == 0
+    assert asset_overlap["interval_reuse_observation_count"] == 0
+    assert asset_overlap["unique_clock_coverage_ratio_minimum"] == 1.0
+    assert asset_overlap["unique_clock_coverage_ratio_median"] == 1.0
+    assert asset_overlap["unique_clock_coverage_ratio_maximum"] == 1.0
+    assert asset_overlap["maximum_adjacent_overlap_seconds"] == 0.0
+    assert asset_overlap["maximum_overlap_excess_seconds"] == 0.0
+    minimum_coverage = asset_overlap[
+        "minimum_unique_clock_coverage_observation"
+    ]
+    assert minimum_coverage["interval_count"] == minimum_coverage["sample_count"]
+    assert minimum_coverage["unique_clock_coverage_ratio"] == 1.0
+    assert asset_overlap["overlap_diagnostics_are_policy"] is False
+    assert asset_overlap["effective_sample_size_claimed"] is False
+    assert asset_overlap["sample_weight_adjustment_applied"] is False
+    assert asset_overlap["statistical_independence_claimed"] is False
+    assert timing["benchmark_interval_overlap_summary"] is None
+    assert timing["overlap_diagnostics_are_policy"] is False
+    assert timing["effective_sample_size_claimed"] is False
+    assert timing["sample_weight_adjustment_applied"] is False
     assert len(timing["projection_digest"]) == 64
     assert (
         market_observation_campaign_shadow_surprise
@@ -888,6 +910,12 @@ def test_campaign_shadow_replay_validator_rejects_return_sampling_timing_drift()
         "source_reference"
     ]["anchor_selection_error_seconds"] = 60.0
     timing["timing_diagnostics_are_policy"] = True
+    overlap = timing["asset_interval_overlap_summary"]
+    overlap["adjacent_overlap_observation_count"] = 99
+    overlap["minimum_unique_clock_coverage_observation"][
+        "unique_clock_coverage_ratio"
+    ] = 0.5
+    overlap["effective_sample_size_claimed"] = True
 
     errors = (
         market_observation_campaign_shadow_surprise
@@ -905,9 +933,21 @@ def test_campaign_shadow_replay_validator_rejects_return_sampling_timing_drift()
     assert (
         "asset_variation_bitcoin_return_1h_timing_diagnostics_are_policy_invalid"
     ) in errors
+    assert (
+        "asset_variation_bitcoin_return_1h_asset_interval_overlap_"
+        "adjacent_overlap_observation_count_invalid"
+    ) in errors
+    assert (
+        "asset_variation_bitcoin_return_1h_asset_interval_overlap_"
+        "minimum_unique_clock_coverage_observation_metric_invalid"
+    ) in errors
+    assert (
+        "asset_variation_bitcoin_return_1h_asset_interval_overlap_"
+        "effective_sample_size_claimed_invalid"
+    ) in errors
 
 
-def test_campaign_shadow_replay_keeps_v1_through_v5_audits_readable():
+def test_campaign_shadow_replay_keeps_v1_through_v6_audits_readable():
     current = (
         market_observation_campaign_shadow_surprise
         .build_campaign_shadow_surprise_audit(
@@ -915,7 +955,29 @@ def test_campaign_shadow_replay_keeps_v1_through_v5_audits_readable():
             minimum_sample_count=4,
         )
     )
-    legacy_v5 = deepcopy(current)
+    legacy_v6 = deepcopy(current)
+    legacy_v6["schema_version"] = 6
+    legacy_v6["shadow_schema_version"] = 5
+    for coverage in legacy_v6["feature_coverage"].values():
+        coverage["variation_observation_basis"] = (
+            "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
+        )
+    for asset in legacy_v6["asset_variation_summaries"]:
+        for feature in asset["feature_variation"].values():
+            timing = feature.get("return_sampling_timing_summary")
+            if isinstance(timing, dict):
+                for key in tuple(timing):
+                    if key not in (
+                        market_observation_campaign_shadow_surprise
+                        ._RETURN_SAMPLING_TIMING_SUMMARY_KEYS_V6  # noqa: SLF001
+                    ):
+                        timing.pop(key)
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(legacy_v6)
+    ) == []
+
+    legacy_v5 = deepcopy(legacy_v6)
     legacy_v5["schema_version"] = 5
     legacy_v5["shadow_schema_version"] = 4
     for coverage in legacy_v5["feature_coverage"].values():

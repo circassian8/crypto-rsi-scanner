@@ -694,8 +694,8 @@ observed relative value cannot remain labeled unavailable. An independently
 supplied canonical value and stronger basis remain authoritative, with the
 temporal calculation retained only under its explicit diagnostic field.
 
-The optional `event_alpha.shadow_temporal_surprise` v5 comparison preserves its
-v1 activity contract and keeps historical v1-v4 values readable. Positive finite
+The optional `event_alpha.shadow_temporal_surprise` v6 comparison preserves its
+v1 activity contract and keeps historical v1-v5 values readable. Positive finite
 provider-observed `volume_24h` and provider-observed or exact provider-ratio
 `turnover_24h` use natural log, baseline median, normal-consistent MAD
 (`MAD * 1.482602218505602`), and a descriptive add-one upper-tail rank. V2 adds
@@ -718,10 +718,14 @@ distinguishes source-tuple repetition from distinct tuples collapsing to the
 same rounded derived value. V5 adds an observation-identity timing trace for
 each return sample: exact endpoint/anchor identity, cross-sample reuse, realized
 horizon and anchor-selection error, benchmark endpoint alignment, and exact
-maximum references. This keeps repeated numeric inputs separate from reuse due
-to overlapping cadence or causal at-or-before anchor selection. Neither trace
-attributes provider fault, estimates independent sample size, sets a threshold,
-or changes status, route, score, exclusion, publication, or policy.
+maximum references. V6 closes every asset and benchmark return interval as a
+half-open anchor-to-endpoint clock range, then measures exact interval reuse,
+adjacent overlap seconds, total interval time, unique union clock coverage,
+overlap excess, coverage ratio, and exact maximum references. This keeps
+repeated numeric inputs, exact interval reuse, and overlapping-but-distinct
+rolling windows separate. Neither trace attributes provider fault, estimates
+independent sample size, changes sample weights, sets a threshold, or changes
+status, route, score, exclusion, publication, or policy.
 
 The value is computed from the exact fingerprinted generation-history snapshot
 only after anomaly classification, bucketing, priority, sorting, and truncation,
@@ -737,7 +741,7 @@ matched-control evidence supports a separate sealed out-of-sample decision. The
 detailed method and limitations are recorded in
 `research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
 
-The canonical campaign report now replays that same closed v5 evaluator over
+The canonical campaign report now replays that same closed v6 evaluator over
 its one-read exact retained-history snapshot. Only cadence-counted rows enter;
 each is evaluated against strictly earlier observations for the same canonical
 asset and at-or-before canonical BTC/ETH rows. The report closes excluded,
@@ -749,12 +753,18 @@ evidence, not that every projection is ready. The replay rewrites no history,
 makes no provider call or write, claims no statistical independence, and is
 not eligible for routes, scores, thresholds, publication authority, or
 Protocol-v2 evidence.
-Campaign-audit v6 preserves historical audit v1-v5 readability and aggregates
-the timing trace per canonical asset and return feature. It reports exact
-observation-identity reuse counts, maximum runs, realized horizon error,
-benchmark alignment lag, and exact maximum references. The campaign report and
-dashboard show those separately from value-tuple repetition and retain explicit
-no-policy, no-provider-causation, and no-independence semantics.
+Campaign-audit v7 preserves historical audit v1-v6 readability and aggregates
+both timing and interval-overlap traces per canonical asset and return feature.
+It reports exact observation-identity reuse, maximum runs, realized horizon
+error, benchmark alignment, exact interval reuse, adjacent overlap, unique
+clock coverage, and exact extremes. The campaign report and dashboard show
+these separately from value-tuple repetition and retain explicit no-policy,
+no-provider-causation, no-effective-sample-size, no-weight-adjustment, and
+no-independence semantics. In the current real campaign, all eligible 1-hour
+windows have full unique clock coverage, while overlapping 4-hour and 24-hour
+rolling windows reach minimum unique-coverage ratios of about 0.456 and 0.126;
+no exact asset or benchmark interval reuse was observed. Distinct intervals
+therefore must not be mistaken for statistically independent samples.
 
 Repeated campaign observations of one persistent market move are measured with
 the closed `event_alpha.shadow_anomaly_episodes` v1 contract. It partitions

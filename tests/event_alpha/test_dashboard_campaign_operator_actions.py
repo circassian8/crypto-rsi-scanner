@@ -567,11 +567,12 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     ] == 30
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 6
+    assert shadow["schema_version"] == 7
     assert shadow["variation_diagnostics_available"] is True
     assert shadow["asset_variation_diagnostics_available"] is True
     assert shadow["input_trace_diagnostics_available"] is True
     assert shadow["return_sampling_timing_diagnostics_available"] is True
+    assert shadow["return_sampling_overlap_diagnostics_available"] is True
     assert shadow["evaluated_observation_count"] == 36
     assert shadow["provider_calls"] == shadow["writes"] == 0
     volume_shadow = shadow["feature_coverage"]["volume_24h"]
@@ -628,6 +629,15 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert timing["timing_diagnostics_are_policy"] is False
     assert timing["provider_causation_claimed"] is False
     assert timing["statistical_independence_claimed"] is False
+    overlap = timing["asset_interval_overlap_summary"]
+    assert overlap["observation_count"] > 0
+    assert overlap["unique_clock_coverage_ratio_minimum"] == 1.0
+    assert overlap["maximum_adjacent_overlap_seconds"] == 0.0
+    assert overlap["overlap_diagnostics_are_policy"] is False
+    assert overlap["effective_sample_size_claimed"] is False
+    assert overlap["sample_weight_adjustment_applied"] is False
+    assert overlap["statistical_independence_claimed"] is False
+    assert timing["benchmark_interval_overlap_summary"] is None
     assert asset_a["source_context_is_causal_attribution"] is False
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
@@ -868,6 +878,17 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, timing_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    overlap_drift = deepcopy(_campaign_report())
+    overlap_drift["shadow_temporal_surprise_campaign_audit"][
+        "asset_variation_summaries"
+    ][0]["feature_variation"]["return_1h"][
+        "return_sampling_timing_summary"
+    ]["asset_interval_overlap_summary"][
+        "effective_sample_size_claimed"
+    ] = True
+    _write_report(tmp_path, overlap_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     tmp_path: Path,
@@ -900,6 +921,12 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Reuse observations asset-anchor / benchmark-end / benchmark-anchor" in html
     assert "Return sampling uses exact observation identities" in html
     assert "These diagnostics do not change policy" in html
+    assert "Rolling return-window dependence by canonical asset and family" in html
+    assert "Dependent rolling windows" in html
+    assert "Asset unique clock min / med / max" in html
+    assert "do not estimate effective sample size" in html
+    assert "Rolling return-window overlap by asset" in markdown
+    assert "no effective sample size is estimated" in markdown
     assert "Reuse obs asset-anchor / benchmark-end / benchmark-anchor" in markdown
     assert "Return timing uses exact observation identity" in markdown
     assert "Retained provider · mode · basis" in html
@@ -914,6 +941,41 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Fundamental-led" in html
     assert "Minimum samples" in html
     assert "remain unsealed" in html
+
+
+def test_campaign_dashboard_keeps_v6_shadow_audit_readable_without_overlap(
+    tmp_path: Path,
+) -> None:
+    report = deepcopy(_campaign_report())
+    audit = report["shadow_temporal_surprise_campaign_audit"]
+    audit["schema_version"] = 6
+    audit["shadow_schema_version"] = 5
+    for coverage in audit["feature_coverage"].values():
+        coverage["variation_observation_basis"] = (
+            "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
+        )
+    for asset in audit["asset_variation_summaries"]:
+        for feature in asset["feature_variation"].values():
+            timing = feature.get("return_sampling_timing_summary")
+            if isinstance(timing, dict):
+                for key in tuple(timing):
+                    if key not in (
+                        market_observation_campaign_shadow_surprise
+                        ._RETURN_SAMPLING_TIMING_SUMMARY_KEYS_V6  # noqa: SLF001
+                    ):
+                        timing.pop(key)
+    _write_report(tmp_path, report)
+
+    projection = _load(tmp_path)
+    snapshot = replace(_snapshot(), campaign_operator_actions=projection)
+    html = render_campaign_page(snapshot, query={})
+
+    shadow = projection["shadow_temporal_surprise"]
+    assert projection["status"] == "ready"
+    assert shadow["schema_version"] == 6
+    assert shadow["return_sampling_timing_diagnostics_available"] is True
+    assert shadow["return_sampling_overlap_diagnostics_available"] is False
+    assert "Rolling return-window dependence by canonical asset and family" not in html
 
 
 def test_campaign_dashboard_keeps_v5_shadow_audit_readable_without_timing(

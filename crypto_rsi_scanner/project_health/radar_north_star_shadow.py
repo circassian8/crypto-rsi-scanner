@@ -7,8 +7,8 @@ from typing import Any, Mapping
 
 SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "schema_id": "event_alpha.shadow_temporal_surprise",
-    "schema_version": 5,
-    "legacy_schema_versions_readable": [1, 2, 3, 4],
+    "schema_version": 6,
+    "legacy_schema_versions_readable": [1, 2, 3, 4, 5],
     "features": ["volume_24h", "turnover_24h"],
     "signed_return_features": [
         "return_1h",
@@ -83,7 +83,8 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "return_anchor": "latest_at_or_before_exact_horizon_target",
     "return_anchor_tolerance": "max_300_seconds_or_25_percent_of_horizon",
     "return_sampling_trace_identity": (
-        "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+        "ordered_exact_endpoint_anchor_observation_identity_timing_and_"
+        "interval_overlap"
     ),
     "return_sampling_timing_diagnostics": [
         "endpoint_and_anchor_observation_reuse",
@@ -94,6 +95,27 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
         "exact_maximum_reuse_error_and_alignment_references",
     ],
     "return_sampling_timing_diagnostics_are_policy": False,
+    "return_interval_identity": (
+        "ordered_endpoint_anchor_observation_identity_and_utc_clock"
+    ),
+    "return_interval_boundary": (
+        "half_open_anchor_inclusive_endpoint_exclusive"
+    ),
+    "return_interval_overlap_scope": (
+        "adjacent_endpoint_ordered_pairs_and_full_union_clock_coverage"
+    ),
+    "return_interval_overlap_diagnostics": [
+        "exact_interval_reuse_and_consecutive_reuse",
+        "adjacent_pair_overlap_count_and_seconds_minimum_median_maximum",
+        "total_interval_seconds",
+        "unique_union_clock_coverage_seconds",
+        "overlap_excess_seconds",
+        "unique_clock_coverage_ratio",
+        "exact_maximum_interval_reuse_and_adjacent_overlap_references",
+    ],
+    "return_interval_overlap_diagnostics_are_policy": False,
+    "return_interval_effective_sample_size_claimed": False,
+    "return_interval_sample_weight_adjustment_applied": False,
     "benchmark_identities": ["btc:bitcoin_or_btc", "eth:ethereum_or_eth"],
     "benchmark_endpoint_alignment": "at_or_before_asset_within_300_seconds",
     "descriptive_lower_return_tail": (
@@ -112,8 +134,8 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "campaign_audit_schema_id": (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     ),
-    "campaign_audit_schema_version": 6,
-    "campaign_audit_legacy_schema_versions_readable": [1, 2, 3, 4, 5],
+    "campaign_audit_schema_version": 7,
+    "campaign_audit_legacy_schema_versions_readable": [1, 2, 3, 4, 5, 6],
     "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
     "campaign_audit_replay": (
         "each_counted_row_against_strictly_earlier_same_asset_rows_and_"
@@ -137,7 +159,7 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
         "linear_interpolation_sorted_ready_values"
     ),
     "campaign_audit_variation_observation_basis": (
-        "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
+        "closed_shadow_v6_projection_meeting_existing_minimum_sample_count"
     ),
     "campaign_audit_variation_quantile_method": (
         "linear_interpolation_sorted_sample_eligible_values"
@@ -173,6 +195,14 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "campaign_audit_return_sampling_timing_exact_maximum_references": True,
     "campaign_audit_return_sampling_timing_diagnostics_are_policy": False,
     "campaign_audit_return_sampling_statistical_independence_claimed": False,
+    "campaign_audit_return_interval_overlap_summary": (
+        "per_asset_per_return_feature_asset_and_benchmark_adjacent_overlap_"
+        "exact_interval_reuse_and_unique_union_clock_coverage"
+    ),
+    "campaign_audit_return_interval_overlap_exact_extreme_references": True,
+    "campaign_audit_return_interval_overlap_diagnostics_are_policy": False,
+    "campaign_audit_return_interval_effective_sample_size_claimed": False,
+    "campaign_audit_return_interval_sample_weight_adjustment_applied": False,
     "campaign_audit_tail_ranks_are_p_values": False,
     "campaign_audit_overlapping_samples_are_independent": False,
     "campaign_audit_historical_rows_rewritten": False,

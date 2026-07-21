@@ -1,4 +1,4 @@
-"""Closed nested schema checks for shadow temporal market surprise v1-v5."""
+"""Closed nested schema checks for shadow temporal market surprise v1-v6."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from typing import Any
 
 
 SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SCHEMA_VERSION = 5
-LEGACY_SCHEMA_VERSIONS = frozenset((1, 2, 3, 4))
+SCHEMA_VERSION = 6
+LEGACY_SCHEMA_VERSIONS = frozenset((1, 2, 3, 4, 5))
 FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -224,11 +224,22 @@ _RETURN_METHOD_KEYS_V4 = frozenset(
         "provider_causation_claimed",
     )
 )
-_RETURN_METHOD_KEYS = frozenset(
+_RETURN_METHOD_KEYS_V5 = frozenset(
     (
         *_RETURN_METHOD_KEYS_V4,
         "return_sampling_trace_identity",
         "return_sampling_timing_diagnostics_are_policy",
+    )
+)
+_RETURN_METHOD_KEYS = frozenset(
+    (
+        *_RETURN_METHOD_KEYS_V5,
+        "return_interval_identity",
+        "return_interval_boundary",
+        "return_interval_overlap_scope",
+        "return_interval_overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
     )
 )
 _RETURN_METHOD_VALUES_V2 = {
@@ -270,12 +281,32 @@ _RETURN_METHOD_VALUES_V4 = {
     "input_trace_diagnostics_are_policy": False,
     "provider_causation_claimed": False,
 }
-_RETURN_METHOD_VALUES = {
+_RETURN_METHOD_VALUES_V5 = {
     **_RETURN_METHOD_VALUES_V4,
     "return_sampling_trace_identity": (
         "ordered_exact_endpoint_anchor_observation_identity_and_timing"
     ),
     "return_sampling_timing_diagnostics_are_policy": False,
+}
+_RETURN_METHOD_VALUES = {
+    **_RETURN_METHOD_VALUES_V4,
+    "return_sampling_trace_identity": (
+        "ordered_exact_endpoint_anchor_observation_identity_timing_and_"
+        "interval_overlap"
+    ),
+    "return_sampling_timing_diagnostics_are_policy": False,
+    "return_interval_identity": (
+        "ordered_endpoint_anchor_observation_identity_and_utc_clock"
+    ),
+    "return_interval_boundary": (
+        "half_open_anchor_inclusive_endpoint_exclusive"
+    ),
+    "return_interval_overlap_scope": (
+        "adjacent_endpoint_ordered_pairs_and_full_union_clock_coverage"
+    ),
+    "return_interval_overlap_diagnostics_are_policy": False,
+    "effective_sample_size_claimed": False,
+    "sample_weight_adjustment_applied": False,
 }
 _RETURN_FEATURE_KEYS_V2 = frozenset(
     (
@@ -320,13 +351,14 @@ _RETURN_FEATURE_KEYS_V3 = frozenset(
 _RETURN_FEATURE_KEYS_V4 = frozenset(
     (*_RETURN_FEATURE_KEYS_V3, *_INPUT_TRACE_KEYS)
 )
-_RETURN_FEATURE_KEYS = frozenset(
+_RETURN_FEATURE_KEYS_V5 = frozenset(
     (*_RETURN_FEATURE_KEYS_V4, "return_sampling_trace")
 )
+_RETURN_FEATURE_KEYS = _RETURN_FEATURE_KEYS_V5
 _RETURN_SAMPLE_KEYS = frozenset(
     ("asset_endpoint", "asset_anchor", "benchmark_endpoint", "benchmark_anchor")
 )
-_RETURN_SAMPLING_TRACE_KEYS = frozenset(
+_RETURN_SAMPLING_TRACE_KEYS_V5 = frozenset(
     (
         "status",
         "sample_count",
@@ -345,7 +377,17 @@ _RETURN_SAMPLING_TRACE_KEYS = frozenset(
         "statistical_independence_claimed",
     )
 )
-_RETURN_SAMPLING_LEG_KEYS = frozenset(
+_RETURN_SAMPLING_TRACE_KEYS = frozenset(
+    (
+        *_RETURN_SAMPLING_TRACE_KEYS_V5,
+        "interval_overlap_detected",
+        "interval_reuse_detected",
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
+    )
+)
+_RETURN_SAMPLING_LEG_KEYS_V5 = frozenset(
     (
         "endpoint_observation_count",
         "distinct_endpoint_observation_count",
@@ -363,6 +405,9 @@ _RETURN_SAMPLING_LEG_KEYS = frozenset(
         "maximum_anchor_reuse_reference",
         "maximum_anchor_selection_error_reference",
     )
+)
+_RETURN_SAMPLING_LEG_KEYS = frozenset(
+    (*_RETURN_SAMPLING_LEG_KEYS_V5, "interval_overlap")
 )
 _RETURN_SAMPLING_RANGE_KEYS = frozenset(("minimum", "median", "maximum"))
 _RETURN_SAMPLING_REUSE_REFERENCE_KEYS = frozenset(
@@ -387,6 +432,48 @@ _RETURN_SAMPLING_ALIGNMENT_KEYS = frozenset(
 )
 _RETURN_SAMPLING_ALIGNMENT_REFERENCE_KEYS = frozenset(
     ("asset_endpoint", "benchmark_endpoint", "lag_seconds")
+)
+_RETURN_INTERVAL_OVERLAP_KEYS = frozenset(
+    (
+        "interval_count",
+        "distinct_interval_count",
+        "interval_reuse_excess_count",
+        "maximum_interval_reuse_count",
+        "maximum_consecutive_interval_reuse_count",
+        "interval_identity_sha256",
+        "adjacent_pair_count",
+        "adjacent_overlapping_pair_count",
+        "adjacent_nonoverlapping_pair_count",
+        "adjacent_overlap_seconds",
+        "total_interval_seconds",
+        "unique_clock_coverage_seconds",
+        "overlap_excess_seconds",
+        "unique_clock_coverage_ratio",
+        "maximum_interval_reuse_reference",
+        "maximum_adjacent_overlap_reference",
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
+        "statistical_independence_claimed",
+    )
+)
+_RETURN_INTERVAL_KEYS = frozenset(("endpoint", "anchor"))
+_RETURN_INTERVAL_REUSE_REFERENCE_KEYS = frozenset(
+    (
+        "interval",
+        "reuse_count",
+        "first_asset_endpoint",
+        "last_asset_endpoint",
+    )
+)
+_RETURN_ADJACENT_OVERLAP_REFERENCE_KEYS = frozenset(
+    (
+        "first_asset_endpoint",
+        "second_asset_endpoint",
+        "first_interval",
+        "second_interval",
+        "overlap_seconds",
+    )
 )
 _RETURN_FEATURE_STATUSES = frozenset(
     (
@@ -653,7 +740,9 @@ def _validate_return_method(
         return
     expected_keys = (
         _RETURN_METHOD_KEYS
-        if schema_version >= 5
+        if schema_version >= 6
+        else _RETURN_METHOD_KEYS_V5
+        if schema_version == 5
         else _RETURN_METHOD_KEYS_V4
         if schema_version == 4
         else _RETURN_METHOD_KEYS_V3
@@ -662,7 +751,9 @@ def _validate_return_method(
     )
     expected_values = (
         _RETURN_METHOD_VALUES
-        if schema_version >= 5
+        if schema_version >= 6
+        else _RETURN_METHOD_VALUES_V5
+        if schema_version == 5
         else _RETURN_METHOD_VALUES_V4
         if schema_version == 4
         else _RETURN_METHOD_VALUES_V3
@@ -814,7 +905,9 @@ def _validate_return_feature(
         return
     expected_keys = (
         _RETURN_FEATURE_KEYS
-        if schema_version >= 5
+        if schema_version >= 6
+        else _RETURN_FEATURE_KEYS_V5
+        if schema_version == 5
         else _RETURN_FEATURE_KEYS_V4
         if schema_version == 4
         else _RETURN_FEATURE_KEYS_V3
@@ -912,6 +1005,7 @@ def _validate_return_feature(
             horizon_hours=horizon,
             benchmark=benchmark,
             feature_sample_count=value.get("sample_count"),
+            schema_version=schema_version,
             errors=errors,
         )
 
@@ -952,12 +1046,18 @@ def _validate_return_sampling_trace(
     horizon_hours: int,
     benchmark: str | None,
     feature_sample_count: object,
+    schema_version: int,
     errors: list[str],
 ) -> None:
     if not isinstance(value, Mapping):
         errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
         return
-    key_errors = _closed_keys(value, _RETURN_SAMPLING_TRACE_KEYS, path)
+    expected_keys = (
+        _RETURN_SAMPLING_TRACE_KEYS
+        if schema_version >= 6
+        else _RETURN_SAMPLING_TRACE_KEYS_V5
+    )
+    key_errors = _closed_keys(value, expected_keys, path)
     errors.extend(key_errors)
     if key_errors:
         return
@@ -987,6 +1087,16 @@ def _validate_return_sampling_trace(
     ):
         if value.get(field) is not False:
             errors.append(f"shadow_temporal_surprise_sampling_safety_inconsistent:{path}.{field}")
+    if schema_version >= 6:
+        for field in (
+            "overlap_diagnostics_are_policy",
+            "effective_sample_size_claimed",
+            "sample_weight_adjustment_applied",
+        ):
+            if value.get(field) is not False:
+                errors.append(
+                    f"shadow_temporal_surprise_sampling_safety_inconsistent:{path}.{field}"
+                )
 
     tolerance_seconds = max(
         RETURN_MIN_ANCHOR_TOLERANCE_SECONDS,
@@ -998,6 +1108,7 @@ def _validate_return_sampling_trace(
         sample_count=sample_count,
         nominal_horizon_seconds=nominal_seconds,
         tolerance_seconds=tolerance_seconds,
+        schema_version=schema_version,
         errors=errors,
     )
     benchmark_metrics = None
@@ -1014,6 +1125,7 @@ def _validate_return_sampling_trace(
             sample_count=sample_count,
             nominal_horizon_seconds=nominal_seconds,
             tolerance_seconds=tolerance_seconds,
+            schema_version=schema_version,
             errors=errors,
         )
         alignment_metrics = _validate_return_sampling_alignment(
@@ -1041,6 +1153,19 @@ def _validate_return_sampling_trace(
     ):
         if value.get(field) is not expected:
             errors.append(f"shadow_temporal_surprise_sampling_flag_inconsistent:{path}.{field}")
+    if schema_version >= 6:
+        expected_overlap = any(item["interval_overlap"] for item in leg_metrics)
+        expected_interval_reuse = any(
+            item["interval_reuse"] for item in leg_metrics
+        )
+        for field, expected in (
+            ("interval_overlap_detected", expected_overlap),
+            ("interval_reuse_detected", expected_interval_reuse),
+        ):
+            if value.get(field) is not expected:
+                errors.append(
+                    f"shadow_temporal_surprise_sampling_flag_inconsistent:{path}.{field}"
+                )
 
 
 def _validate_return_sampling_leg(
@@ -1050,12 +1175,18 @@ def _validate_return_sampling_leg(
     sample_count: int,
     nominal_horizon_seconds: int,
     tolerance_seconds: float,
+    schema_version: int,
     errors: list[str],
 ) -> dict[str, bool] | None:
     if not isinstance(value, Mapping):
         errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
         return None
-    key_errors = _closed_keys(value, _RETURN_SAMPLING_LEG_KEYS, path)
+    expected_keys = (
+        _RETURN_SAMPLING_LEG_KEYS
+        if schema_version >= 6
+        else _RETURN_SAMPLING_LEG_KEYS_V5
+    )
+    key_errors = _closed_keys(value, expected_keys, path)
     errors.extend(key_errors)
     if key_errors:
         return None
@@ -1148,12 +1279,191 @@ def _validate_return_sampling_leg(
         expected_maximum=(selection_error or {}).get("maximum"),
         errors=errors,
     )
+    overlap_metrics = None
+    if schema_version >= 6:
+        overlap_metrics = _validate_return_interval_overlap(
+            value.get("interval_overlap"),
+            path=f"{path}.interval_overlap",
+            sample_count=sample_count,
+            errors=errors,
+        )
     return {
         "endpoint_reuse": counts["endpoint_reuse_excess_count"] > 0,
         "anchor_reuse": counts["anchor_reuse_excess_count"] > 0,
         "nonzero_error": bool(
             selection_error and selection_error["maximum"] > 0
         ),
+        "interval_overlap": bool(
+            overlap_metrics and overlap_metrics["interval_overlap"]
+        ),
+        "interval_reuse": bool(
+            overlap_metrics and overlap_metrics["interval_reuse"]
+        ),
+    }
+
+
+def _validate_return_interval_overlap(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    errors: list[str],
+) -> dict[str, bool] | None:
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return None
+    key_errors = _closed_keys(value, _RETURN_INTERVAL_OVERLAP_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return None
+    count_fields = (
+        "interval_count",
+        "distinct_interval_count",
+        "interval_reuse_excess_count",
+        "maximum_interval_reuse_count",
+        "maximum_consecutive_interval_reuse_count",
+        "adjacent_pair_count",
+        "adjacent_overlapping_pair_count",
+        "adjacent_nonoverlapping_pair_count",
+    )
+    counts = {field: value.get(field) for field in count_fields}
+    if any(
+        isinstance(item, bool) or not isinstance(item, int) or item < 0
+        for item in counts.values()
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_interval_overlap_counts_invalid:{path}"
+        )
+        return None
+    if counts["interval_count"] != sample_count:
+        errors.append(
+            f"shadow_temporal_surprise_interval_overlap_count_inconsistent:{path}"
+        )
+    _validate_sampling_reuse_counts(
+        sample_count=sample_count,
+        distinct_count=counts["distinct_interval_count"],
+        reuse_excess=counts["interval_reuse_excess_count"],
+        maximum_reuse=counts["maximum_interval_reuse_count"],
+        maximum_consecutive=counts["maximum_consecutive_interval_reuse_count"],
+        path=f"{path}.interval",
+        errors=errors,
+    )
+    expected_pairs = max(0, sample_count - 1)
+    if (
+        counts["adjacent_pair_count"] != expected_pairs
+        or counts["adjacent_overlapping_pair_count"]
+        + counts["adjacent_nonoverlapping_pair_count"]
+        != expected_pairs
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_interval_overlap_pairs_inconsistent:{path}"
+        )
+    adjacent_range = _validate_sampling_range(
+        value.get("adjacent_overlap_seconds"),
+        path=f"{path}.adjacent_overlap_seconds",
+        sample_count=expected_pairs,
+        minimum=0.0,
+        maximum=float("inf"),
+        errors=errors,
+    )
+    if adjacent_range is not None:
+        if (
+            (adjacent_range["maximum"] > 0)
+            != (counts["adjacent_overlapping_pair_count"] > 0)
+        ):
+            errors.append(
+                f"shadow_temporal_surprise_interval_overlap_range_inconsistent:{path}"
+            )
+        if (
+            (adjacent_range["minimum"] == 0)
+            != (counts["adjacent_nonoverlapping_pair_count"] > 0)
+        ):
+            errors.append(
+                f"shadow_temporal_surprise_interval_nonoverlap_range_inconsistent:{path}"
+            )
+    if not _is_sha256(value.get("interval_identity_sha256")):
+        errors.append(
+            f"shadow_temporal_surprise_invalid_type:{path}.interval_identity_sha256:sha256"
+        )
+    seconds_fields = (
+        "total_interval_seconds",
+        "unique_clock_coverage_seconds",
+        "overlap_excess_seconds",
+    )
+    seconds = {field: value.get(field) for field in seconds_fields}
+    seconds_valid = not any(
+        not _sampling_number(item) or float(item) < 0
+        for item in seconds.values()
+    )
+    if not seconds_valid:
+        errors.append(
+            f"shadow_temporal_surprise_interval_overlap_seconds_invalid:{path}"
+        )
+    else:
+        total = float(seconds["total_interval_seconds"])
+        unique = float(seconds["unique_clock_coverage_seconds"])
+        excess = float(seconds["overlap_excess_seconds"])
+        if sample_count == 0:
+            if any((total, unique, excess)):
+                errors.append(
+                    f"shadow_temporal_surprise_interval_overlap_empty_seconds_invalid:{path}"
+                )
+        elif not (0 < unique <= total):
+            errors.append(
+                f"shadow_temporal_surprise_interval_coverage_out_of_bounds:{path}"
+            )
+        if not math.isclose(total - unique, excess, abs_tol=1e-6):
+            errors.append(
+                f"shadow_temporal_surprise_interval_overlap_excess_inconsistent:{path}"
+            )
+    ratio = value.get("unique_clock_coverage_ratio")
+    if sample_count == 0:
+        if ratio is not None:
+            errors.append(
+                f"shadow_temporal_surprise_interval_coverage_ratio_invalid:{path}"
+            )
+    elif (
+        not _sampling_number(ratio)
+        or not seconds_valid
+        or float(seconds["total_interval_seconds"]) <= 0
+        or not 0 < float(ratio) <= 1.0
+        or not math.isclose(
+            float(ratio),
+            float(seconds["unique_clock_coverage_seconds"])
+            / float(seconds["total_interval_seconds"]),
+            abs_tol=1e-12,
+        )
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_interval_coverage_ratio_invalid:{path}"
+        )
+    _validate_interval_reuse_reference(
+        value.get("maximum_interval_reuse_reference"),
+        path=f"{path}.maximum_interval_reuse_reference",
+        sample_count=sample_count,
+        expected_reuse_count=counts["maximum_interval_reuse_count"],
+        errors=errors,
+    )
+    _validate_adjacent_overlap_reference(
+        value.get("maximum_adjacent_overlap_reference"),
+        path=f"{path}.maximum_adjacent_overlap_reference",
+        adjacent_pair_count=expected_pairs,
+        expected_maximum=(adjacent_range or {}).get("maximum"),
+        errors=errors,
+    )
+    for field in (
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
+        "statistical_independence_claimed",
+    ):
+        if value.get(field) is not False:
+            errors.append(
+                f"shadow_temporal_surprise_interval_overlap_safety_inconsistent:{path}.{field}"
+            )
+    return {
+        "interval_overlap": counts["adjacent_overlapping_pair_count"] > 0,
+        "interval_reuse": counts["interval_reuse_excess_count"] > 0,
     }
 
 
@@ -1254,6 +1564,143 @@ def _validate_sampling_reuse_reference(
     last = _reference_time(value.get("last_asset_endpoint"))
     if first is not None and last is not None and first > last:
         errors.append(f"shadow_temporal_surprise_sampling_reuse_reference_order_invalid:{path}")
+
+
+def _validate_interval_reuse_reference(
+    value: object,
+    *,
+    path: str,
+    sample_count: int,
+    expected_reuse_count: int,
+    errors: list[str],
+) -> None:
+    if sample_count == 0:
+        if value is not None:
+            errors.append(
+                f"shadow_temporal_surprise_interval_overlap_empty_reference_invalid:{path}"
+            )
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(
+        value, _RETURN_INTERVAL_REUSE_REFERENCE_KEYS, path
+    )
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    _validate_return_interval(
+        value.get("interval"), path=f"{path}.interval", errors=errors
+    )
+    for field in ("first_asset_endpoint", "last_asset_endpoint"):
+        _validate_reference(value.get(field), f"{path}.{field}", errors)
+    if value.get("reuse_count") != expected_reuse_count:
+        errors.append(
+            f"shadow_temporal_surprise_interval_reuse_reference_count_invalid:{path}"
+        )
+    first = _reference_time(value.get("first_asset_endpoint"))
+    last = _reference_time(value.get("last_asset_endpoint"))
+    if first is not None and last is not None and first > last:
+        errors.append(
+            f"shadow_temporal_surprise_interval_reuse_reference_order_invalid:{path}"
+        )
+
+
+def _validate_adjacent_overlap_reference(
+    value: object,
+    *,
+    path: str,
+    adjacent_pair_count: int,
+    expected_maximum: float | None,
+    errors: list[str],
+) -> None:
+    if adjacent_pair_count == 0:
+        if value is not None:
+            errors.append(
+                f"shadow_temporal_surprise_interval_overlap_empty_reference_invalid:{path}"
+            )
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(
+        value, _RETURN_ADJACENT_OVERLAP_REFERENCE_KEYS, path
+    )
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    for field in ("first_asset_endpoint", "second_asset_endpoint"):
+        _validate_reference(value.get(field), f"{path}.{field}", errors)
+    _validate_return_interval(
+        value.get("first_interval"),
+        path=f"{path}.first_interval",
+        errors=errors,
+    )
+    _validate_return_interval(
+        value.get("second_interval"),
+        path=f"{path}.second_interval",
+        errors=errors,
+    )
+    overlap = value.get("overlap_seconds")
+    if (
+        not _sampling_number(overlap)
+        or float(overlap) < 0
+        or expected_maximum is None
+        or not math.isclose(float(overlap), expected_maximum, abs_tol=1e-6)
+    ):
+        errors.append(
+            f"shadow_temporal_surprise_interval_overlap_reference_maximum_invalid:{path}"
+        )
+    first_interval = value.get("first_interval")
+    second_interval = value.get("second_interval")
+    if isinstance(first_interval, Mapping) and isinstance(second_interval, Mapping):
+        first_anchor = _reference_time(first_interval.get("anchor"))
+        first_endpoint = _reference_time(first_interval.get("endpoint"))
+        second_anchor = _reference_time(second_interval.get("anchor"))
+        second_endpoint = _reference_time(second_interval.get("endpoint"))
+        if all(
+            item is not None
+            for item in (
+                first_anchor,
+                first_endpoint,
+                second_anchor,
+                second_endpoint,
+            )
+        ) and _sampling_number(overlap):
+            expected = round(max(
+                0.0,
+                (
+                    min(first_endpoint, second_endpoint)
+                    - max(first_anchor, second_anchor)
+                ).total_seconds(),
+            ), 6)
+            if not math.isclose(float(overlap), expected, abs_tol=1e-6):
+                errors.append(
+                    f"shadow_temporal_surprise_interval_overlap_reference_clock_invalid:{path}"
+                )
+
+
+def _validate_return_interval(
+    value: object,
+    *,
+    path: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, Mapping):
+        errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
+        return
+    key_errors = _closed_keys(value, _RETURN_INTERVAL_KEYS, path)
+    errors.extend(key_errors)
+    if key_errors:
+        return
+    _validate_reference(value.get("endpoint"), f"{path}.endpoint", errors)
+    _validate_reference(value.get("anchor"), f"{path}.anchor", errors)
+    endpoint = _reference_time(value.get("endpoint"))
+    anchor = _reference_time(value.get("anchor"))
+    if endpoint is not None and anchor is not None and anchor >= endpoint:
+        errors.append(
+            f"shadow_temporal_surprise_interval_overlap_clock_invalid:{path}"
+        )
 
 
 def _validate_sampling_error_reference(

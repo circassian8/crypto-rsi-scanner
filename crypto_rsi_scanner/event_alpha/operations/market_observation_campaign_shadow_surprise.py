@@ -19,20 +19,21 @@ from ..radar import market_shadow_surprise
 
 
 SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
-SCHEMA_VERSION = 6
-LEGACY_SCHEMA_VERSIONS = (1, 2, 3, 4, 5)
+SCHEMA_VERSION = 7
+LEGACY_SCHEMA_VERSIONS = (1, 2, 3, 4, 5, 6)
 DESCRIPTIVE_QUANTILE_METHOD = "linear_interpolation_sorted_ready_values"
 VARIATION_QUANTILE_METHOD = (
     "linear_interpolation_sorted_sample_eligible_values"
 )
 VARIATION_OBSERVATION_BASIS = (
-    "closed_shadow_v5_projection_meeting_existing_minimum_sample_count"
+    "closed_shadow_v6_projection_meeting_existing_minimum_sample_count"
 )
 _VARIATION_OBSERVATION_BASIS_BY_SCHEMA = {
     3: "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
     4: "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
     5: "closed_shadow_v4_projection_meeting_existing_minimum_sample_count",
-    6: VARIATION_OBSERVATION_BASIS,
+    6: "closed_shadow_v5_projection_meeting_existing_minimum_sample_count",
+    7: VARIATION_OBSERVATION_BASIS,
 }
 _SOURCE_STATUSES = {"missing", "observed_empty", "observed", "unavailable"}
 _AUDIT_STATUSES = {"unavailable", "empty", "warming", "partial", "ready"}
@@ -248,9 +249,10 @@ _ASSET_FEATURE_VARIATION_KEYS_V5 = _ASSET_FEATURE_VARIATION_KEYS_V4 | {
     "provider_causation_claimed",
     "input_trace_projection_digest",
 }
-_ASSET_FEATURE_VARIATION_KEYS = _ASSET_FEATURE_VARIATION_KEYS_V5 | {
+_ASSET_FEATURE_VARIATION_KEYS_V6 = _ASSET_FEATURE_VARIATION_KEYS_V5 | {
     "return_sampling_timing_summary",
 }
+_ASSET_FEATURE_VARIATION_KEYS = _ASSET_FEATURE_VARIATION_KEYS_V6
 _RETAINED_FEATURE_BASIS_KEYS = {
     "price",
     "volume_24h",
@@ -291,7 +293,7 @@ _INPUT_TRACE_STATUSES = {
     "transform_collision",
     "mixed_source_repetition_and_transform_collision",
 }
-_RETURN_SAMPLING_TIMING_SUMMARY_KEYS = {
+_RETURN_SAMPLING_TIMING_SUMMARY_KEYS_V6 = {
     "observation_count",
     "asset_anchor_reuse_observation_count",
     "benchmark_endpoint_reuse_observation_count",
@@ -321,6 +323,16 @@ _RETURN_SAMPLING_TIMING_SUMMARY_KEYS = {
     "statistical_independence_claimed",
     "projection_digest",
 }
+_RETURN_SAMPLING_TIMING_SUMMARY_KEYS = (
+    _RETURN_SAMPLING_TIMING_SUMMARY_KEYS_V6
+    | {
+        "asset_interval_overlap_summary",
+        "benchmark_interval_overlap_summary",
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
+    }
+)
 _SAMPLING_REUSE_OBSERVATION_KEYS = _EXTREME_REFERENCE_KEYS | {
     "sample_count",
     "reuse_excess_count",
@@ -350,6 +362,60 @@ _SAMPLING_ALIGNMENT_SOURCE_REFERENCE_KEYS = {
     "asset_endpoint",
     "benchmark_endpoint",
     "lag_seconds",
+}
+_RETURN_INTERVAL_OVERLAP_SUMMARY_KEYS = {
+    "observation_count",
+    "adjacent_overlap_observation_count",
+    "interval_reuse_observation_count",
+    "unique_clock_coverage_ratio_minimum",
+    "unique_clock_coverage_ratio_median",
+    "unique_clock_coverage_ratio_maximum",
+    "maximum_adjacent_overlap_seconds",
+    "maximum_overlap_excess_seconds",
+    "maximum_interval_reuse_excess_count",
+    "maximum_interval_reuse_count",
+    "maximum_consecutive_interval_reuse_count",
+    "minimum_unique_clock_coverage_observation",
+    "maximum_adjacent_overlap_observation",
+    "maximum_overlap_excess_observation",
+    "maximum_interval_reuse_observation",
+    "overlap_diagnostics_are_policy",
+    "effective_sample_size_claimed",
+    "sample_weight_adjustment_applied",
+    "statistical_independence_claimed",
+    "projection_digest",
+}
+_RETURN_INTERVAL_OVERLAP_OBSERVATION_KEYS = _EXTREME_REFERENCE_KEYS | {
+    "sample_count",
+    "interval_count",
+    "distinct_interval_count",
+    "interval_reuse_excess_count",
+    "maximum_interval_reuse_count",
+    "maximum_consecutive_interval_reuse_count",
+    "interval_identity_sha256",
+    "adjacent_pair_count",
+    "adjacent_overlapping_pair_count",
+    "maximum_adjacent_overlap_seconds",
+    "total_interval_seconds",
+    "unique_clock_coverage_seconds",
+    "overlap_excess_seconds",
+    "unique_clock_coverage_ratio",
+    "maximum_interval_reuse_reference",
+    "maximum_adjacent_overlap_reference",
+}
+_RETURN_INTERVAL_KEYS = {"endpoint", "anchor"}
+_RETURN_INTERVAL_REUSE_SOURCE_REFERENCE_KEYS = {
+    "interval",
+    "reuse_count",
+    "first_asset_endpoint",
+    "last_asset_endpoint",
+}
+_RETURN_ADJACENT_OVERLAP_SOURCE_REFERENCE_KEYS = {
+    "first_asset_endpoint",
+    "second_asset_endpoint",
+    "first_interval",
+    "second_interval",
+    "overlap_seconds",
 }
 _ZERO_FALSE_FIELDS = (
     "statistical_independence_claimed",
@@ -613,6 +679,7 @@ def validate_campaign_shadow_surprise_audit(
         4: {3},
         5: {4},
         6: {5},
+        7: {6},
     }.get(schema_version, set())
     if value.get("shadow_schema_version") not in accepted_shadow_versions:
         errors.append("shadow_schema_version_invalid")
@@ -1016,6 +1083,9 @@ def _closed_return_sampling_trace_record(
         raise AssertionError("return sampling trace status drifted")
     for field in (
         "timing_diagnostics_are_policy",
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
         "provider_causation_claimed",
         "statistical_independence_claimed",
     ):
@@ -1025,6 +1095,8 @@ def _closed_return_sampling_trace_record(
     if not isinstance(asset_leg, Mapping) or (
         asset_leg.get("endpoint_observation_count") != sample_count
         or asset_leg.get("anchor_observation_count") != sample_count
+        or not isinstance(asset_leg.get("interval_overlap"), Mapping)
+        or asset_leg["interval_overlap"].get("interval_count") != sample_count
     ):
         raise AssertionError("return asset sampling leg drifted")
     benchmark_expected = feature.startswith("relative_return_vs_")
@@ -1037,6 +1109,8 @@ def _closed_return_sampling_trace_record(
     if benchmark_expected and (
         benchmark_leg.get("endpoint_observation_count") != sample_count
         or benchmark_leg.get("anchor_observation_count") != sample_count
+        or not isinstance(benchmark_leg.get("interval_overlap"), Mapping)
+        or benchmark_leg["interval_overlap"].get("interval_count") != sample_count
         or alignment.get("sample_count") != sample_count
     ):
         raise AssertionError("return benchmark sampling count drifted")
@@ -1706,6 +1780,18 @@ def _return_sampling_timing_summary(
         if benchmark_expected
         else []
     )
+    asset_interval_overlap = _return_interval_overlap_summary(
+        traces,
+        leg_name="asset_leg",
+    )
+    benchmark_interval_overlap = (
+        _return_interval_overlap_summary(
+            traces,
+            leg_name="benchmark_leg",
+        )
+        if benchmark_expected
+        else None
+    )
     return {
         "observation_count": len(traces),
         "asset_anchor_reuse_observation_count": sum(
@@ -1852,7 +1938,12 @@ def _return_sampling_timing_summary(
             if alignment_record is not None
             else None
         ),
+        "asset_interval_overlap_summary": asset_interval_overlap,
+        "benchmark_interval_overlap_summary": benchmark_interval_overlap,
         "timing_diagnostics_are_policy": False,
+        "overlap_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "sample_weight_adjustment_applied": False,
         "provider_causation_claimed": False,
         "statistical_independence_claimed": False,
         "projection_digest": _sha256_json([
@@ -1863,6 +1954,183 @@ def _return_sampling_timing_summary(
             }
             for row in traces
         ]),
+    }
+
+
+def _return_interval_overlap_summary(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    leg_name: str,
+) -> dict[str, Any]:
+    def overlap(row: Mapping[str, Any]) -> Mapping[str, Any]:
+        leg = row["return_sampling_trace"][leg_name]
+        value = leg.get("interval_overlap") if isinstance(leg, Mapping) else None
+        if not isinstance(value, Mapping):
+            raise AssertionError("return campaign record lost interval overlap")
+        return value
+
+    ratios = [
+        float(overlap(row)["unique_clock_coverage_ratio"])
+        for row in records
+    ]
+    minimum_coverage_record = (
+        min(
+            records,
+            key=lambda row: (
+                float(overlap(row)["unique_clock_coverage_ratio"]),
+                _feature_record_sort_key(row),
+            ),
+        )
+        if records
+        else None
+    )
+    maximum_adjacent_record = _maximum_sampling_record(
+        records,
+        lambda row: _interval_overlap_maximum(overlap(row)),
+    )
+    maximum_excess_record = _maximum_sampling_record(
+        records,
+        lambda row: float(overlap(row)["overlap_excess_seconds"]),
+    )
+    maximum_reuse_record = _maximum_sampling_record(
+        records,
+        lambda row: int(overlap(row)["interval_reuse_excess_count"]),
+    )
+    values = [overlap(row) for row in records]
+    return {
+        "observation_count": len(records),
+        "adjacent_overlap_observation_count": sum(
+            int(value["adjacent_overlapping_pair_count"]) > 0
+            for value in values
+        ),
+        "interval_reuse_observation_count": sum(
+            int(value["interval_reuse_excess_count"]) > 0
+            for value in values
+        ),
+        "unique_clock_coverage_ratio_minimum": _descriptive_quantile(
+            ratios, 0.0
+        ),
+        "unique_clock_coverage_ratio_median": _descriptive_quantile(
+            ratios, 0.5
+        ),
+        "unique_clock_coverage_ratio_maximum": _descriptive_quantile(
+            ratios, 1.0
+        ),
+        "maximum_adjacent_overlap_seconds": _maximum_optional_float(
+            _interval_overlap_maximum(value) for value in values
+        ),
+        "maximum_overlap_excess_seconds": _maximum_optional_float(
+            float(value["overlap_excess_seconds"]) for value in values
+        ),
+        "maximum_interval_reuse_excess_count": max(
+            (int(value["interval_reuse_excess_count"]) for value in values),
+            default=0,
+        ),
+        "maximum_interval_reuse_count": max(
+            (int(value["maximum_interval_reuse_count"]) for value in values),
+            default=0,
+        ),
+        "maximum_consecutive_interval_reuse_count": max(
+            (
+                int(value["maximum_consecutive_interval_reuse_count"])
+                for value in values
+            ),
+            default=0,
+        ),
+        "minimum_unique_clock_coverage_observation": (
+            _sampling_interval_overlap_observation(
+                minimum_coverage_record,
+                leg_name=leg_name,
+            )
+            if minimum_coverage_record is not None
+            else None
+        ),
+        "maximum_adjacent_overlap_observation": (
+            _sampling_interval_overlap_observation(
+                maximum_adjacent_record,
+                leg_name=leg_name,
+            )
+            if maximum_adjacent_record is not None
+            else None
+        ),
+        "maximum_overlap_excess_observation": (
+            _sampling_interval_overlap_observation(
+                maximum_excess_record,
+                leg_name=leg_name,
+            )
+            if maximum_excess_record is not None
+            else None
+        ),
+        "maximum_interval_reuse_observation": (
+            _sampling_interval_overlap_observation(
+                maximum_reuse_record,
+                leg_name=leg_name,
+            )
+            if maximum_reuse_record is not None
+            else None
+        ),
+        "overlap_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "sample_weight_adjustment_applied": False,
+        "statistical_independence_claimed": False,
+        "projection_digest": _sha256_json([
+            {
+                "reference": row["reference"],
+                "canonical_asset_id": row["canonical_asset_id"],
+                "interval_overlap": overlap(row),
+            }
+            for row in records
+        ]),
+    }
+
+
+def _interval_overlap_maximum(value: Mapping[str, Any]) -> float:
+    adjacent = value.get("adjacent_overlap_seconds")
+    maximum = adjacent.get("maximum") if isinstance(adjacent, Mapping) else None
+    return float(maximum) if _finite_float_or_none(maximum) is not None else 0.0
+
+
+def _sampling_interval_overlap_observation(
+    row: Mapping[str, Any],
+    *,
+    leg_name: str,
+) -> dict[str, Any]:
+    leg = row["return_sampling_trace"][leg_name]
+    overlap = leg["interval_overlap"]
+    return {
+        **_extreme_reference(row),
+        "sample_count": int(row["sample_count"]),
+        "interval_count": int(overlap["interval_count"]),
+        "distinct_interval_count": int(overlap["distinct_interval_count"]),
+        "interval_reuse_excess_count": int(
+            overlap["interval_reuse_excess_count"]
+        ),
+        "maximum_interval_reuse_count": int(
+            overlap["maximum_interval_reuse_count"]
+        ),
+        "maximum_consecutive_interval_reuse_count": int(
+            overlap["maximum_consecutive_interval_reuse_count"]
+        ),
+        "interval_identity_sha256": str(overlap["interval_identity_sha256"]),
+        "adjacent_pair_count": int(overlap["adjacent_pair_count"]),
+        "adjacent_overlapping_pair_count": int(
+            overlap["adjacent_overlapping_pair_count"]
+        ),
+        "maximum_adjacent_overlap_seconds": _interval_overlap_maximum(overlap),
+        "total_interval_seconds": float(overlap["total_interval_seconds"]),
+        "unique_clock_coverage_seconds": float(
+            overlap["unique_clock_coverage_seconds"]
+        ),
+        "overlap_excess_seconds": float(overlap["overlap_excess_seconds"]),
+        "unique_clock_coverage_ratio": float(
+            overlap["unique_clock_coverage_ratio"]
+        ),
+        "maximum_interval_reuse_reference": overlap[
+            "maximum_interval_reuse_reference"
+        ],
+        "maximum_adjacent_overlap_reference": overlap[
+            "maximum_adjacent_overlap_reference"
+        ],
     }
 
 
@@ -2835,6 +3103,7 @@ def _validate_asset_feature_variation(
             variation_count=(
                 variation_count if _nonnegative_int(variation_count) else 0
             ),
+            schema_version=schema_version,
             prefix=prefix,
             errors=errors,
         )
@@ -2955,6 +3224,7 @@ def _validate_return_sampling_timing_summary(
     *,
     feature: str,
     variation_count: int,
+    schema_version: int,
     prefix: str,
     errors: list[str],
 ) -> None:
@@ -2967,7 +3237,11 @@ def _validate_return_sampling_timing_summary(
         return
     _exact_keys(
         value,
-        _RETURN_SAMPLING_TIMING_SUMMARY_KEYS,
+        (
+            _RETURN_SAMPLING_TIMING_SUMMARY_KEYS
+            if schema_version >= 7
+            else _RETURN_SAMPLING_TIMING_SUMMARY_KEYS_V6
+        ),
         f"{prefix}_return_sampling",
         errors,
     )
@@ -3106,6 +3380,28 @@ def _validate_return_sampling_timing_summary(
             errors.append(f"{prefix}_{field}_invalid")
     if not _sha256(value.get("projection_digest")):
         errors.append(f"{prefix}_return_sampling_projection_digest_invalid")
+    if schema_version >= 7:
+        _validate_return_interval_overlap_summary(
+            value.get("asset_interval_overlap_summary"),
+            expected=True,
+            variation_count=variation_count,
+            label=f"{prefix}_asset_interval_overlap",
+            errors=errors,
+        )
+        _validate_return_interval_overlap_summary(
+            value.get("benchmark_interval_overlap_summary"),
+            expected=feature.startswith("relative_return_vs_"),
+            variation_count=variation_count,
+            label=f"{prefix}_benchmark_interval_overlap",
+            errors=errors,
+        )
+        for field in (
+            "overlap_diagnostics_are_policy",
+            "effective_sample_size_claimed",
+            "sample_weight_adjustment_applied",
+        ):
+            if value.get(field) is not False:
+                errors.append(f"{prefix}_{field}_invalid")
 
 
 def _validate_sampling_reuse_observation(
@@ -3147,6 +3443,284 @@ def _validate_sampling_reuse_observation(
             errors.append(f"{label}_source_{field}_invalid")
     if source.get("reuse_count") != expected_maximum:
         errors.append(f"{label}_source_reuse_count_invalid")
+
+
+def _validate_return_interval_overlap_summary(
+    value: Any,
+    *,
+    expected: bool,
+    variation_count: int,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not expected:
+        if value is not None:
+            errors.append(f"{label}_must_be_null")
+        return
+    if not isinstance(value, Mapping):
+        errors.append(f"{label}_invalid")
+        return
+    _exact_keys(value, _RETURN_INTERVAL_OVERLAP_SUMMARY_KEYS, label, errors)
+    if value.get("observation_count") != variation_count:
+        errors.append(f"{label}_observation_count_invalid")
+    for field in (
+        "adjacent_overlap_observation_count",
+        "interval_reuse_observation_count",
+    ):
+        count = value.get(field)
+        if not _nonnegative_int(count) or count > variation_count:
+            errors.append(f"{label}_{field}_invalid")
+    ratio_fields = (
+        "unique_clock_coverage_ratio_minimum",
+        "unique_clock_coverage_ratio_median",
+        "unique_clock_coverage_ratio_maximum",
+    )
+    ratios = tuple(_finite_float_or_none(value.get(field)) for field in ratio_fields)
+    if variation_count == 0:
+        if any(item is not None for item in ratios):
+            errors.append(f"{label}_empty_ratio_distribution_invalid")
+    elif (
+        any(item is None for item in ratios)
+        or not 0 < ratios[0] <= ratios[1] <= ratios[2] <= 1.0
+    ):
+        errors.append(f"{label}_ratio_distribution_invalid")
+    seconds_fields = (
+        "maximum_adjacent_overlap_seconds",
+        "maximum_overlap_excess_seconds",
+    )
+    seconds = tuple(
+        _finite_float_or_none(value.get(field)) for field in seconds_fields
+    )
+    if variation_count == 0:
+        if any(item is not None for item in seconds):
+            errors.append(f"{label}_empty_seconds_invalid")
+    elif any(item is None or item < 0 for item in seconds):
+        errors.append(f"{label}_maximum_seconds_invalid")
+    maximum_count_fields = (
+        "maximum_interval_reuse_excess_count",
+        "maximum_interval_reuse_count",
+        "maximum_consecutive_interval_reuse_count",
+    )
+    for field in maximum_count_fields:
+        count = value.get(field)
+        if not _nonnegative_int(count) or (variation_count == 0 and count != 0):
+            errors.append(f"{label}_{field}_invalid")
+    if variation_count > 0 and (
+        not _positive_int(value.get("maximum_interval_reuse_count"))
+        or not _positive_int(
+            value.get("maximum_consecutive_interval_reuse_count")
+        )
+    ):
+        errors.append(f"{label}_maximum_reuse_counts_invalid")
+
+    reference_specs = (
+        (
+            "minimum_unique_clock_coverage_observation",
+            "unique_clock_coverage_ratio",
+            value.get("unique_clock_coverage_ratio_minimum"),
+        ),
+        (
+            "maximum_adjacent_overlap_observation",
+            "maximum_adjacent_overlap_seconds",
+            value.get("maximum_adjacent_overlap_seconds"),
+        ),
+        (
+            "maximum_overlap_excess_observation",
+            "overlap_excess_seconds",
+            value.get("maximum_overlap_excess_seconds"),
+        ),
+        (
+            "maximum_interval_reuse_observation",
+            "interval_reuse_excess_count",
+            value.get("maximum_interval_reuse_excess_count"),
+        ),
+    )
+    for field, metric, expected_metric in reference_specs:
+        reference = value.get(field)
+        _validate_interval_overlap_observation(
+            reference,
+            expected=variation_count > 0,
+            label=f"{label}_{field}",
+            errors=errors,
+        )
+        if (
+            variation_count > 0
+            and isinstance(reference, Mapping)
+            and reference.get(metric) != expected_metric
+        ):
+            errors.append(f"{label}_{field}_metric_invalid")
+    reuse_reference = value.get("maximum_interval_reuse_observation")
+    if isinstance(reuse_reference, Mapping):
+        for field in (
+            "maximum_interval_reuse_count",
+            "maximum_consecutive_interval_reuse_count",
+        ):
+            if reuse_reference.get(field) != value.get(field):
+                errors.append(f"{label}_{field}_reference_invalid")
+    for field in (
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
+        "statistical_independence_claimed",
+    ):
+        if value.get(field) is not False:
+            errors.append(f"{label}_{field}_invalid")
+    if not _sha256(value.get("projection_digest")):
+        errors.append(f"{label}_projection_digest_invalid")
+
+
+def _validate_interval_overlap_observation(
+    value: Any,
+    *,
+    expected: bool,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not expected:
+        if value is not None:
+            errors.append(f"{label}_must_be_null")
+        return
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _RETURN_INTERVAL_OVERLAP_OBSERVATION_KEYS
+    ):
+        errors.append(f"{label}_invalid")
+        return
+    if not _valid_extreme_reference({
+        key: value.get(key) for key in _EXTREME_REFERENCE_KEYS
+    }):
+        errors.append(f"{label}_reference_invalid")
+    sample_count = value.get("sample_count")
+    interval_count = value.get("interval_count")
+    distinct_count = value.get("distinct_interval_count")
+    reuse_excess = value.get("interval_reuse_excess_count")
+    maximum_reuse = value.get("maximum_interval_reuse_count")
+    maximum_consecutive = value.get("maximum_consecutive_interval_reuse_count")
+    adjacent_pairs = value.get("adjacent_pair_count")
+    adjacent_overlapping = value.get("adjacent_overlapping_pair_count")
+    if (
+        not _positive_int(sample_count)
+        or interval_count != sample_count
+        or not _positive_int(distinct_count)
+        or distinct_count > interval_count
+        or reuse_excess != interval_count - distinct_count
+        or not _positive_int(maximum_reuse)
+        or maximum_reuse > interval_count
+        or not _positive_int(maximum_consecutive)
+        or maximum_consecutive > maximum_reuse
+        or adjacent_pairs != max(0, interval_count - 1)
+        or not _nonnegative_int(adjacent_overlapping)
+        or adjacent_overlapping > adjacent_pairs
+    ):
+        errors.append(f"{label}_counts_invalid")
+    if not _sha256(value.get("interval_identity_sha256")):
+        errors.append(f"{label}_identity_invalid")
+    maximum_adjacent = _finite_float_or_none(
+        value.get("maximum_adjacent_overlap_seconds")
+    )
+    total = _finite_float_or_none(value.get("total_interval_seconds"))
+    unique = _finite_float_or_none(value.get("unique_clock_coverage_seconds"))
+    excess = _finite_float_or_none(value.get("overlap_excess_seconds"))
+    ratio = _finite_float_or_none(value.get("unique_clock_coverage_ratio"))
+    if (
+        maximum_adjacent is None
+        or maximum_adjacent < 0
+        or total is None
+        or unique is None
+        or excess is None
+        or ratio is None
+        or not 0 < unique <= total
+        or not math.isclose(total - unique, excess, abs_tol=1e-6)
+        or not 0 < ratio <= 1.0
+        or not math.isclose(ratio, unique / total, abs_tol=1e-12)
+    ):
+        errors.append(f"{label}_clock_coverage_invalid")
+    if (
+        _nonnegative_int(adjacent_overlapping)
+        and maximum_adjacent is not None
+        and (maximum_adjacent > 0) != (adjacent_overlapping > 0)
+    ):
+        errors.append(f"{label}_adjacent_overlap_invalid")
+    _validate_interval_reuse_source_reference(
+        value.get("maximum_interval_reuse_reference"),
+        expected_reuse_count=maximum_reuse,
+        label=f"{label}_maximum_interval_reuse_reference",
+        errors=errors,
+    )
+    _validate_adjacent_overlap_source_reference(
+        value.get("maximum_adjacent_overlap_reference"),
+        expected=adjacent_pairs > 0,
+        expected_maximum=maximum_adjacent,
+        label=f"{label}_maximum_adjacent_overlap_reference",
+        errors=errors,
+    )
+
+
+def _validate_interval_reuse_source_reference(
+    value: Any,
+    *,
+    expected_reuse_count: Any,
+    label: str,
+    errors: list[str],
+) -> None:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _RETURN_INTERVAL_REUSE_SOURCE_REFERENCE_KEYS
+    ):
+        errors.append(f"{label}_invalid")
+        return
+    _validate_campaign_return_interval(
+        value.get("interval"), label=f"{label}_interval", errors=errors
+    )
+    for field in ("first_asset_endpoint", "last_asset_endpoint"):
+        if not _valid_reference(value.get(field)):
+            errors.append(f"{label}_{field}_invalid")
+    if value.get("reuse_count") != expected_reuse_count:
+        errors.append(f"{label}_reuse_count_invalid")
+
+
+def _validate_adjacent_overlap_source_reference(
+    value: Any,
+    *,
+    expected: bool,
+    expected_maximum: Any,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not expected:
+        if value is not None:
+            errors.append(f"{label}_must_be_null")
+        return
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _RETURN_ADJACENT_OVERLAP_SOURCE_REFERENCE_KEYS
+    ):
+        errors.append(f"{label}_invalid")
+        return
+    for field in ("first_asset_endpoint", "second_asset_endpoint"):
+        if not _valid_reference(value.get(field)):
+            errors.append(f"{label}_{field}_invalid")
+    for field in ("first_interval", "second_interval"):
+        _validate_campaign_return_interval(
+            value.get(field), label=f"{label}_{field}", errors=errors
+        )
+    overlap = _finite_float_or_none(value.get("overlap_seconds"))
+    if overlap is None or overlap < 0 or overlap != expected_maximum:
+        errors.append(f"{label}_overlap_seconds_invalid")
+
+
+def _validate_campaign_return_interval(
+    value: Any,
+    *,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, Mapping) or set(value) != _RETURN_INTERVAL_KEYS:
+        errors.append(f"{label}_invalid")
+        return
+    for field in ("endpoint", "anchor"):
+        if not _valid_reference(value.get(field)):
+            errors.append(f"{label}_{field}_invalid")
 
 
 def _validate_sampling_error_observation(

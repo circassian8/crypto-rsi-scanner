@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T17:51:13.216106+00:00` from local artifacts only.
+Generated at `2026-07-21T18:36:52.881573+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -252,15 +252,15 @@ Human review is counted only through explicit confirmed actions; dashboard GET/H
 
 This is a read-only replay of the shadow model over retained, cadence-counted observations. Each projection uses only strictly earlier same-asset history; it does not rewrite historical rows or change routes, scores, thresholds, or authority.
 - Audit status: `ready`
-- Shadow schema: `event_alpha.shadow_temporal_surprise` v`5`
+- Shadow schema: `event_alpha.shadow_temporal_surprise` v`6`
 - Exact history rows: `1770`
 - Baseline-counted rows replayed: `1740`
 - Non-counted rows excluded: `30`
 - Input rejections: `0`
 - Evaluation errors: `0`
 - Assets replayed: `36`
-- Source-bound projection digest: `694d40098f626646874101ad58c2219f01d8623ea5a2b54db34ab5fdca4d2a5b`
-- Causal-value projection digest: `80ddc1a20db5b595b35eeaeb80df15b3c8b9701c202db05ac69427a3a167d0f5`
+- Source-bound projection digest: `10080611fb510e9d055ecd172ff71c1a5e45ee902996658d59c92f14cd517db3`
+- Causal-value projection digest: `8a4e92fc1b589fb3d1f5b5a2d6cb0ad26427a4219446433433c4f86359a2e558`
 - An audit status of `ready` means every modeled feature has some ready evidence; it does not mean every projection is ready. The counts below remain authoritative.
 - Statistical independence claimed: `false`
 - Protocol-v2 evidence eligible: `false`
@@ -330,6 +330,61 @@ The campaign contains 28 exact asset-feature pairs with at least one repeated sa
 | dexe | return_24h | 5 / 6 | 0.888889 / 0.909091 | 0.181818 / 0.222222 | 5 / 0 / 0; 2 / 2 | 5 / 0 / 0; 13961.061527 / — / — | coingecko=36 / live=36 / provider_observed=36 | 10/11 distinct; largest tie 2/11 @ 2026-07-21T11:07:27.472398+00:00 |
 | chainlink | return_4h | 27 / 35 | 0.933333 / 0.96 | 0.086957 / 0.133333 | 27 / 0 / 0; 1 / 1 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=58 / live=58 / provider_observed=58 | 29/30 distinct; largest tie 2/30 @ 2026-07-21T15:14:41.396928+00:00 |
 | dogecoin | return_24h | 5 / 28 | 0.967742 / 1 | 0.057983 / 0.125 | 5 / 0 / 0; 2 / 2 | 27 / 0 / 0; 18958.792735 / — / — | coingecko=58 / live=58 / provider_observed=58 | 34/35 distinct; largest tie 2/35 @ 2026-07-21T15:14:41.396928+00:00 |
+
+#### Rolling return-window overlap by asset
+
+The campaign contains 279 sample-eligible asset-return pairs. The 48 lowest unique-clock-coverage pairs are shown. Intervals are half-open from anchor through endpoint. Adjacent overlap, exact interval reuse, and union clock coverage are descriptive only: no effective sample size is estimated, no sample is reweighted or excluded, and no threshold, score, route, publication, or Protocol-v2 rule changes.
+
+| Asset | Return feature | Eligible sets | Asset overlap / exact reuse sets | Asset unique-clock ratio min / median / max | Asset max adjacent / total excess seconds | Benchmark overlap / exact reuse sets | Benchmark unique-clock ratio min / median / max | Exact minimum asset coverage reference |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| figure-heloc | relative_return_vs_btc_24h | 11 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 89296.541224 / 1413226.280974 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 0.126293; 17 intervals; 192621.336304/1525197.725965 unique/total s @ 2026-07-20T11:34:12.287768+00:00 |
+| figure-heloc | relative_return_vs_eth_24h | 11 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 89296.541224 / 1413226.280974 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 0.126293; 17 intervals; 192621.336304/1525197.725965 unique/total s @ 2026-07-20T11:34:12.287768+00:00 |
+| figure-heloc | return_24h | 11 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 89296.541224 / 1413226.280974 | n/a | n/a | 0.126293; 17 intervals; 192621.336304/1525197.725965 unique/total s @ 2026-07-20T11:34:12.287768+00:00 |
+| ondo-finance | relative_return_vs_btc_24h | 26 | 26 / 0 | 0.132932 / 0.167815 / 0.30285 | 101650.31433 / 2613909.245099 | 26 / 0 | 0.132932 / 0.167815 / 0.30285 | 0.132932; 33 intervals; 400744.853027/3014654.098126 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| ondo-finance | relative_return_vs_eth_24h | 26 | 26 / 0 | 0.132932 / 0.167815 / 0.30285 | 101650.31433 / 2613909.245099 | 26 / 0 | 0.132932 / 0.167815 / 0.30285 | 0.132932; 33 intervals; 400744.853027/3014654.098126 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| ondo-finance | return_24h | 26 | 26 / 0 | 0.132932 / 0.167815 / 0.30285 | 101650.31433 / 2613909.245099 | n/a | n/a | 0.132932; 33 intervals; 400744.853027/3014654.098126 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| aave | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| aave | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| aave | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| aster-2 | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| aster-2 | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| aster-2 | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| avalanche-2 | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| avalanche-2 | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| avalanche-2 | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| binancecoin | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| binancecoin | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| binancecoin | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bitcoin | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bitcoin | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bitcoin-cash | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bitcoin-cash | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bitcoin-cash | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bittensor | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bittensor | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| bittensor | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| cardano | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| cardano | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| cardano | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| chainlink | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| chainlink | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| chainlink | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| dogecoin | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| dogecoin | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| dogecoin | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| ethereum | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| ethereum | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| hyperliquid | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| hyperliquid | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| hyperliquid | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| litecoin | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| litecoin | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| litecoin | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| monero | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| monero | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| monero | return_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | n/a | n/a | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| near | relative_return_vs_btc_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
+| near | relative_return_vs_eth_24h | 28 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 101650.31433 / 2691040.565484 | 28 / 0 | 0.159919 / 0.214426 / 0.43531 | 0.159919; 35 intervals; 512269.992022/3203310.557506 unique/total s @ 2026-07-21T15:14:41.396928+00:00 |
 
 ### Decision episodes
 

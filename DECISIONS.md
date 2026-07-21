@@ -18,12 +18,12 @@ decision, rationale, and revisit condition.
 
 ## 2026-07-21 - Measure baseline variation and return sampling before policy
 **Status:** accepted as descriptive shadow evidence; no policy authority
-**Decision:** Shadow temporal surprise v5 records distinct baseline-value count,
+**Decision:** Shadow temporal surprise v6 records distinct baseline-value count,
 maximum and current-value tie counts, distinct-value ratio, and nominal finite-
 sample rank floors using the method's existing 12-decimal derived-value
 identity. Preserve every v1 activity and v2 signed-return calculation and keep
-historical v1/v2/v3/v4 artifacts readable. Its v4 trace also binds exact feature-specific
-value-only source tuples and records source-tuple repetition, derived-value
+historical v1-v5 artifacts readable. Its v4 trace also binds exact feature-
+specific value-only source tuples and records source-tuple repetition, derived-value
 repetition, transform-collision loss, and consecutive source/derived runs.
 Observation identity and clocks stay in the causal sample digest but are
 excluded from the value-only tuple so distinct timestamps cannot mask repeated
@@ -52,6 +52,18 @@ and timing error separate. Do not infer independent sample count, provider
 fault, a timing defect, or policy from any of them, and do not set a reuse/error
 threshold, exclude an asset, or alter readiness, routes, scores, publication,
 or Protocol-v2 eligibility.
+Shadow v6 may use those same exact endpoint/anchor identities to describe
+half-open return intervals, exact interval reuse, adjacent overlap, summed
+duration, union clock coverage, overlap excess, and coverage ratio. Campaign
+audit v7 may aggregate asset and benchmark legs separately and retain exact
+coverage/overlap extremes while keeping audit v1-v6 readable. These fields do
+not estimate effective sample size, change sample weights, create an exclusion,
+or change a threshold, score, route, publication, or Protocol-v2 rule. In the
+59-cycle replay, 5,214 of 8,262 asset reference sets and 3,434 of 5,442 benchmark
+sets overlap adjacently, while exact full-interval reuse is zero; distinct
+interval identity therefore must not be interpreted as independence. One-hour
+sets have full unique-clock coverage, whereas the minimum observed 4h/24h
+coverage ratios are `0.456072623081` and `0.126292698333` respectively.
 **Why:** Nominal timestamp count can materially overstate information when a
 provider repeats or quantizes activity values, and overlapping derived returns
 can also tie. Recording that structure makes later calibration auditable

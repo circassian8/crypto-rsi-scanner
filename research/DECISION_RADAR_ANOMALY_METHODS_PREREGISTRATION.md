@@ -4,7 +4,7 @@ Status: **research-only design record; rank 1 is implemented as an isolated
 shadow diagnostic but is not calibrated and is not eligible for routing,
 scoring, publication authority, alerts, or Protocol-v2 evidence**.
 
-Contract: `decision_radar.anomaly_methods_preregistration` schema v5.
+Contract: `decision_radar.anomaly_methods_preregistration` schema v6.
 
 ## Purpose
 
@@ -21,7 +21,7 @@ holdout.
   observations and keep the current value out of its own baseline.
 - Production return, relative-return, volatility, volume, and turnover features
   currently use transparent mean/population-standard-deviation z-scores.
-- Shadow schema v5 preserves the v1 natural-log median/MAD activity comparison
+- Shadow schema v6 preserves the v1 natural-log median/MAD activity comparison
   and v2 direct and BTC/ETH-relative 1h/4h/24h signed-return comparison. It adds
   the v3 rounded-value variation fields plus an exact value-only source-tuple
   trace. That trace separates repetition already present in retained numeric
@@ -29,8 +29,10 @@ holdout.
   value, and records consecutive source/derived runs. It also binds exact
   endpoint and anchor observation identities for each return sample and measures
   cross-sample reuse, realized horizon error, and asset/benchmark endpoint
-  alignment without changing the return calculation. Historical v1 through v4
-  values remain readable.
+  alignment without changing the return calculation. It additionally measures
+  exact interval reuse, adjacent rolling-window overlap, and the union of unique
+  anchor-to-endpoint clock coverage without estimating effective sample size.
+  Historical v1 through v5 values remain readable.
 - That shadow value is explicitly barred from routes, priorities, Decision
   scores, thresholds, and automatic application.
 - The canonical campaign report now performs a deterministic causal replay of
@@ -38,9 +40,9 @@ holdout.
   exposes per-feature coverage, degeneracy/status counts, exact input
   rejections, per-asset summaries, source-bound plus causal-value digests, and
   schema-v3 distinct-value/tie distributions over projections meeting the
-  existing nominal sample minimum. Audit schema v6 preserves the v5 input-lineage
-  view and adds per-asset/per-return-feature observation-identity reuse, realized
-  horizon error, benchmark alignment, and exact maximum references. Those counts
+  existing nominal sample minimum. Audit schema v7 preserves the v6 timing view
+  and adds separate asset/benchmark interval-overlap summaries, union-clock
+  coverage distributions, and exact minimum/maximum references. Those counts
   are mathematical sampling diagnostics, not a causal diagnosis of provider
   behavior or an independence estimate. Historical audit schemas remain
   readable. This is measurement plumbing only: it does not rewrite history,
@@ -54,7 +56,7 @@ holdout.
 
 ### 1. Robust signed-return and relative-return tails
 
-Implemented originally in shadow schema v2 and preserved unchanged in v5 for
+Implemented originally in shadow schema v2 and preserved unchanged in v6 for
 direct 1h, 4h, and 24h signed returns and BTC/ETH-relative returns. Each horizon
 and basis remains a separate family.
 The implementation rederives percent-point returns only from provider-observed
@@ -92,6 +94,16 @@ and exact maximum references. This separates repeated numeric price tuples from
 reuse caused by overlapping cadence and causal at-or-before selection. The
 trace is descriptive: it does not establish provider fault, independent sample
 count, a timing threshold, or any status, route, score, or exclusion policy.
+
+Schema v6 closes the time intervals implied by those same endpoint/anchor
+identities. It treats every return window as half-open from anchor through
+endpoint, counts exact interval reuse, measures overlap for adjacent
+endpoint-ordered windows, and reports total interval duration, union clock
+coverage, overlap excess, and the unique-clock-coverage ratio with exact maximum
+reuse/overlap references. Direct, BTC-relative, and ETH-relative families remain
+separate. These values describe dependence; they do not estimate effective
+sample size, reweight or exclude samples, set a threshold, or alter any score,
+route, publication, or Protocol-v2 rule.
 
 This remains rank 1 because it is a small, explainable extension of an already
 closed shadow contract and directly addresses the heavy tails that make

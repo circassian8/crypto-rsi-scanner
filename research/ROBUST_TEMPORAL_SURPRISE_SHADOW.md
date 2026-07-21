@@ -205,9 +205,32 @@ sample size, attribute provider fault, set a reuse or timing threshold, exclude
 an asset, or change a status, robust z-score, rank, route, score, publication,
 or Protocol-v2 eligibility.
 
+## Fixed v6 return-interval overlap trace
+
+Schema v6 preserves every v1-v5 calculation and sampling-timing field, then
+closes the exact time interval implied by each endpoint/anchor pair. Historical
+v1 through v5 projections remain readable without manufactured overlap fields.
+Each direct asset leg and each separate benchmark leg records:
+
+- ordered half-open `[anchor, endpoint)` interval identity and SHA-256;
+- exact interval distinctness, reuse excess, maximum reuse, and consecutive
+  reuse;
+- adjacent endpoint-ordered pair count, overlapping/nonoverlapping counts, and
+  overlap seconds as minimum/median/maximum;
+- summed interval seconds, union clock-coverage seconds, overlap-excess seconds,
+  and union-to-summed-duration ratio; and
+- exact maximum interval-reuse and adjacent-overlap references.
+
+Union coverage measures clock time represented at least once; overlap excess is
+the summed interval duration minus that union. Neither is an estimate of
+independent information. The trace explicitly records that it is not policy,
+does not estimate effective sample size, and does not adjust sample weights.
+Direct, BTC-relative, and ETH-relative families stay separate and no return,
+status, threshold, route, score, publication, or Protocol-v2 rule changes.
+
 ## Campaign-level causal replay
 
-The canonical live campaign report replays this same closed v5 evaluator over
+The canonical live campaign report replays this same closed v6 evaluator over
 the exact retained market-history snapshot it has already read. It does not
 create another model or reinterpret stored rows. Only rows carrying
 `baseline_counted=true` enter the replay; rapid non-counted rows are excluded
@@ -268,6 +291,28 @@ Dashboard and Markdown views keep numeric value repetition, observation reuse,
 and realized timing error visibly separate. The summary is not policy, provider
 causation, or an independence claim.
 
+Campaign-audit schema v7 preserves v6 and adds separate asset-leg and benchmark-
+leg interval summaries for every sample-eligible return family. It reports how
+many reference sets have adjacent overlap or exact interval reuse, distributions
+of unique-clock-coverage ratios, maximum adjacent overlap and aggregate overlap
+excess, exact extreme observations, and a closed projection digest. Historical
+campaign-audit schemas v1 through v6 remain readable without manufacturing
+overlap evidence. The dashboard and Markdown report show this as dependence
+diagnostics, never as an effective-sample-size estimate or sample weight.
+
+The 59-cycle genuine campaign replay contains 279 sample-eligible asset/return-
+feature pairs and 8,262 asset-leg reference sets. Adjacent overlap appears in
+185 pairs and 5,214 reference sets, while exact full-interval reuse is zero.
+The 184 relative-return benchmark pairs contain 5,442 reference sets; 122 pairs
+and 3,434 sets overlap, again with zero exact full-interval reuse. Every eligible
+1h set has union coverage ratio `1.0` and zero adjacent overlap. The 4h families
+reach a minimum ratio of `0.456072623081`; 24h reaches
+`0.126292698333` for `figure-heloc`. The largest observed adjacent overlap is
+`101650.31433` seconds and the largest summed overlap excess is
+`2691040.565484` seconds, both retained with exact `aave` references. Zero exact
+interval reuse therefore does not imply independence: distinct rolling windows
+can still share most of their clock span.
+
 These aggregates are reference-set diagnostics, not an effective-sample-size
 estimate. They set no minimum-distinct threshold, do not alter feature status,
 and are copied into the campaign report and dashboard without re-evaluation.
@@ -317,7 +362,7 @@ authority.
 - An extreme activity upper-tail or return two-sided rank can be a data-quality
   event, wash activity, broad market move, or venue migration.
 
-These limitations are why v4 remains shadow-only.
+These limitations are why v6 remains shadow-only.
 
 ## Evidence required before promotion is even proposed
 

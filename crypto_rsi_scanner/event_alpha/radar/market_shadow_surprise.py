@@ -19,7 +19,7 @@ from typing import Any
 
 
 SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 5
+SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 6
 SUPPORTED_FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -99,6 +99,12 @@ _RETURN_METHOD_VALUE_KEYS = frozenset(
         "provider_causation_claimed",
         "return_sampling_trace_identity",
         "return_sampling_timing_diagnostics_are_policy",
+        "return_interval_identity",
+        "return_interval_boundary",
+        "return_interval_overlap_scope",
+        "return_interval_overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
     )
 )
 _METHOD_VALUE_KEYS = frozenset(
@@ -197,7 +203,12 @@ _RETURN_SAMPLING_TRACE_KEYS = frozenset(
         "benchmark_endpoint_reuse_detected",
         "nonzero_anchor_selection_error_detected",
         "nonzero_benchmark_alignment_lag_detected",
+        "interval_overlap_detected",
+        "interval_reuse_detected",
         "timing_diagnostics_are_policy",
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
         "provider_causation_claimed",
         "statistical_independence_claimed",
     )
@@ -219,6 +230,7 @@ _RETURN_SAMPLING_LEG_KEYS = frozenset(
         "maximum_endpoint_reuse_reference",
         "maximum_anchor_reuse_reference",
         "maximum_anchor_selection_error_reference",
+        "interval_overlap",
     )
 )
 _RETURN_SAMPLING_RANGE_KEYS = frozenset(("minimum", "median", "maximum"))
@@ -244,6 +256,48 @@ _RETURN_SAMPLING_ALIGNMENT_KEYS = frozenset(
 )
 _RETURN_SAMPLING_ALIGNMENT_REFERENCE_KEYS = frozenset(
     ("asset_endpoint", "benchmark_endpoint", "lag_seconds")
+)
+_RETURN_INTERVAL_OVERLAP_KEYS = frozenset(
+    (
+        "interval_count",
+        "distinct_interval_count",
+        "interval_reuse_excess_count",
+        "maximum_interval_reuse_count",
+        "maximum_consecutive_interval_reuse_count",
+        "interval_identity_sha256",
+        "adjacent_pair_count",
+        "adjacent_overlapping_pair_count",
+        "adjacent_nonoverlapping_pair_count",
+        "adjacent_overlap_seconds",
+        "total_interval_seconds",
+        "unique_clock_coverage_seconds",
+        "overlap_excess_seconds",
+        "unique_clock_coverage_ratio",
+        "maximum_interval_reuse_reference",
+        "maximum_adjacent_overlap_reference",
+        "overlap_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "sample_weight_adjustment_applied",
+        "statistical_independence_claimed",
+    )
+)
+_RETURN_INTERVAL_KEYS = frozenset(("endpoint", "anchor"))
+_RETURN_INTERVAL_REUSE_REFERENCE_KEYS = frozenset(
+    (
+        "interval",
+        "reuse_count",
+        "first_asset_endpoint",
+        "last_asset_endpoint",
+    )
+)
+_RETURN_ADJACENT_OVERLAP_REFERENCE_KEYS = frozenset(
+    (
+        "first_asset_endpoint",
+        "second_asset_endpoint",
+        "first_interval",
+        "second_interval",
+        "overlap_seconds",
+    )
 )
 
 
@@ -429,9 +483,22 @@ def evaluate_shadow_temporal_surprise(
             "input_trace_diagnostics_are_policy": False,
             "provider_causation_claimed": False,
             "return_sampling_trace_identity": (
-                "ordered_exact_endpoint_anchor_observation_identity_and_timing"
+                "ordered_exact_endpoint_anchor_observation_identity_timing_and_"
+                "interval_overlap"
             ),
             "return_sampling_timing_diagnostics_are_policy": False,
+            "return_interval_identity": (
+                "ordered_endpoint_anchor_observation_identity_and_utc_clock"
+            ),
+            "return_interval_boundary": (
+                "half_open_anchor_inclusive_endpoint_exclusive"
+            ),
+            "return_interval_overlap_scope": (
+                "adjacent_endpoint_ordered_pairs_and_full_union_clock_coverage"
+            ),
+            "return_interval_overlap_diagnostics_are_policy": False,
+            "effective_sample_size_claimed": False,
+            "sample_weight_adjustment_applied": False,
         },
         "return_features": return_features,
         "routing_eligible": False,
@@ -961,6 +1028,14 @@ def _return_sampling_trace(
         _range_maximum(leg.get("anchor_selection_error_seconds")) > 0
         for leg in legs
     )
+    interval_overlap_detected = any(
+        int(leg["interval_overlap"]["adjacent_overlapping_pair_count"]) > 0
+        for leg in legs
+    )
+    interval_reuse_detected = any(
+        int(leg["interval_overlap"]["interval_reuse_excess_count"]) > 0
+        for leg in legs
+    )
     return {
         "status": "observed" if ordered else "no_samples",
         "sample_count": len(ordered),
@@ -985,7 +1060,12 @@ def _return_sampling_trace(
         "nonzero_benchmark_alignment_lag_detected": bool(
             alignment and _range_maximum(alignment.get("lag_seconds")) > 0
         ),
+        "interval_overlap_detected": interval_overlap_detected,
+        "interval_reuse_detected": interval_reuse_detected,
         "timing_diagnostics_are_policy": False,
+        "overlap_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "sample_weight_adjustment_applied": False,
         "provider_causation_claimed": False,
         "statistical_independence_claimed": False,
     }
@@ -1043,6 +1123,188 @@ def _return_sampling_leg_trace(
                 nominal_horizon_seconds=nominal_horizon_seconds,
             )
         ),
+        "interval_overlap": _return_interval_overlap_trace(ordered),
+    }
+
+
+def _return_interval_overlap_trace(
+    rows: tuple[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], ...
+    ],
+) -> dict[str, Any]:
+    """Describe exact rolling-window overlap without estimating independence."""
+
+    interval_projections = tuple(
+        _return_interval_projection(endpoint=row[1], anchor=row[2])
+        for row in rows
+    )
+    interval_identities = tuple(
+        _canonical_json(interval) for interval in interval_projections
+    )
+    adjacent = tuple(zip(rows, rows[1:]))
+    adjacent_overlaps = tuple(
+        _interval_overlap_seconds(first, second)
+        for first, second in adjacent
+    )
+    total_interval_seconds = _round_seconds(sum(
+        _seconds_between(row[1], row[2]) for row in rows
+    ))
+    unique_clock_coverage_seconds = _unique_interval_coverage_seconds(rows)
+    overlap_excess_seconds = _round_seconds(
+        total_interval_seconds - unique_clock_coverage_seconds
+    )
+    if overlap_excess_seconds < 0:
+        raise AssertionError("return interval union exceeded total duration")
+    distinct_interval_count = len(set(interval_identities))
+    return {
+        "interval_count": len(rows),
+        "distinct_interval_count": distinct_interval_count,
+        "interval_reuse_excess_count": len(rows) - distinct_interval_count,
+        "maximum_interval_reuse_count": _maximum_tie_count(
+            interval_identities
+        ),
+        "maximum_consecutive_interval_reuse_count": (
+            _maximum_consecutive_count(interval_identities)
+        ),
+        "interval_identity_sha256": _sha256_json(interval_projections),
+        "adjacent_pair_count": len(adjacent),
+        "adjacent_overlapping_pair_count": sum(
+            value > 0 for value in adjacent_overlaps
+        ),
+        "adjacent_nonoverlapping_pair_count": sum(
+            value == 0 for value in adjacent_overlaps
+        ),
+        "adjacent_overlap_seconds": _seconds_range(adjacent_overlaps),
+        "total_interval_seconds": total_interval_seconds,
+        "unique_clock_coverage_seconds": unique_clock_coverage_seconds,
+        "overlap_excess_seconds": overlap_excess_seconds,
+        "unique_clock_coverage_ratio": (
+            _round_derived(
+                unique_clock_coverage_seconds / total_interval_seconds
+            )
+            if total_interval_seconds > 0
+            else None
+        ),
+        "maximum_interval_reuse_reference": (
+            _maximum_interval_reuse_reference(rows)
+        ),
+        "maximum_adjacent_overlap_reference": (
+            _maximum_adjacent_overlap_reference(adjacent)
+        ),
+        "overlap_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "sample_weight_adjustment_applied": False,
+        "statistical_independence_claimed": False,
+    }
+
+
+def _return_interval_projection(
+    *,
+    endpoint: Mapping[str, Any],
+    anchor: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "endpoint": _observation_reference(endpoint),
+        "anchor": _observation_reference(anchor),
+    }
+
+
+def _interval_overlap_seconds(
+    first: tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
+    second: tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
+) -> float:
+    started_at = max(
+        _required_aware_time(first[2].get("observed_at"), "first interval anchor"),
+        _required_aware_time(second[2].get("observed_at"), "second interval anchor"),
+    )
+    ended_at = min(
+        _required_aware_time(first[1].get("observed_at"), "first interval endpoint"),
+        _required_aware_time(second[1].get("observed_at"), "second interval endpoint"),
+    )
+    return _round_seconds(max(0.0, (ended_at - started_at).total_seconds()))
+
+
+def _unique_interval_coverage_seconds(
+    rows: tuple[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], ...
+    ],
+) -> float:
+    intervals = sorted(
+        (
+            _required_aware_time(row[2].get("observed_at"), "interval anchor"),
+            _required_aware_time(row[1].get("observed_at"), "interval endpoint"),
+        )
+        for row in rows
+    )
+    if not intervals:
+        return 0.0
+    if any(anchor >= endpoint for anchor, endpoint in intervals):
+        raise AssertionError("return interval must have positive duration")
+    current_start, current_end = intervals[0]
+    total = 0.0
+    for anchor, endpoint in intervals[1:]:
+        if anchor <= current_end:
+            current_end = max(current_end, endpoint)
+            continue
+        total += (current_end - current_start).total_seconds()
+        current_start, current_end = anchor, endpoint
+    total += (current_end - current_start).total_seconds()
+    return _round_seconds(total)
+
+
+def _maximum_interval_reuse_reference(
+    rows: tuple[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], ...
+    ],
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    grouped: dict[str, list[
+        tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]
+    ]] = {}
+    for row in rows:
+        interval = _return_interval_projection(endpoint=row[1], anchor=row[2])
+        grouped.setdefault(_canonical_json(interval), []).append(row)
+    _, reused = min(grouped.items(), key=lambda item: (-len(item[1]), item[0]))
+    return {
+        "interval": _return_interval_projection(
+            endpoint=reused[0][1],
+            anchor=reused[0][2],
+        ),
+        "reuse_count": len(reused),
+        "first_asset_endpoint": _observation_reference(reused[0][0]),
+        "last_asset_endpoint": _observation_reference(reused[-1][0]),
+    }
+
+
+def _maximum_adjacent_overlap_reference(
+    adjacent: tuple[
+        tuple[
+            tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
+            tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]],
+        ], ...
+    ],
+) -> dict[str, Any] | None:
+    if not adjacent:
+        return None
+    first, second = min(
+        adjacent,
+        key=lambda pair: (
+            -_interval_overlap_seconds(*pair),
+            _reference_sort_key(_observation_reference(pair[0][0])),
+            _reference_sort_key(_observation_reference(pair[1][0])),
+        ),
+    )
+    return {
+        "first_asset_endpoint": _observation_reference(first[0]),
+        "second_asset_endpoint": _observation_reference(second[0]),
+        "first_interval": _return_interval_projection(
+            endpoint=first[1], anchor=first[2]
+        ),
+        "second_interval": _return_interval_projection(
+            endpoint=second[1], anchor=second[2]
+        ),
+        "overlap_seconds": _interval_overlap_seconds(first, second),
     }
 
 
@@ -1904,27 +2166,27 @@ def _required_aware_time(value: object, field_name: str) -> datetime:
 
 def _assert_closed_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _TOP_LEVEL_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise drifted from its closed v5 schema")
+        raise AssertionError("shadow temporal surprise drifted from its closed v6 schema")
     if frozenset(value["method"]) != _METHOD_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise method drifted from its closed v5 schema")
+        raise AssertionError("shadow temporal surprise method drifted from its closed v6 schema")
     if frozenset(value["features"]) != frozenset(SUPPORTED_FEATURES):
-        raise AssertionError("shadow temporal surprise feature set drifted from v5")
+        raise AssertionError("shadow temporal surprise feature set drifted from v6")
     if frozenset(value["return_method"]) != _RETURN_METHOD_VALUE_KEYS:
-        raise AssertionError("shadow signed-return method drifted from its closed v5 schema")
+        raise AssertionError("shadow signed-return method drifted from its closed v6 schema")
     if frozenset(value["return_features"]) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v5")
+        raise AssertionError("shadow signed-return feature set drifted from v6")
     return value
 
 
 def _assert_closed_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow feature value drifted from its closed v5 schema")
+        raise AssertionError("shadow feature value drifted from its closed v6 schema")
     return value
 
 
 def _assert_closed_return_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _RETURN_FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return value drifted from its closed v5 schema")
+        raise AssertionError("shadow signed-return value drifted from its closed v6 schema")
     current_sample = value.get("current_sample")
     if current_sample is not None and frozenset(current_sample) != _RETURN_SAMPLE_VALUE_KEYS:
         raise AssertionError("shadow signed-return sample drifted from its closed v5 schema")
@@ -1934,14 +2196,14 @@ def _assert_closed_return_feature_value(value: dict[str, Any]) -> dict[str, Any]
 
 def _assert_closed_return_sampling_trace(value: object) -> None:
     if not isinstance(value, Mapping) or frozenset(value) != _RETURN_SAMPLING_TRACE_KEYS:
-        raise AssertionError("shadow return sampling trace drifted from its closed v5 schema")
+        raise AssertionError("shadow return sampling trace drifted from its closed v6 schema")
     for field in ("asset_leg", "benchmark_leg"):
         leg = value.get(field)
         if leg is not None and (
             not isinstance(leg, Mapping)
             or frozenset(leg) != _RETURN_SAMPLING_LEG_KEYS
         ):
-            raise AssertionError("shadow return sampling leg drifted from its closed v5 schema")
+            raise AssertionError("shadow return sampling leg drifted from its closed v6 schema")
         if isinstance(leg, Mapping):
             for range_field in (
                 "realized_horizon_seconds",
@@ -1973,6 +2235,55 @@ def _assert_closed_return_sampling_trace(value: object) -> None:
                 != _RETURN_SAMPLING_ERROR_REFERENCE_KEYS
             ):
                 raise AssertionError("shadow return timing reference drifted")
+            interval_overlap = leg.get("interval_overlap")
+            if (
+                not isinstance(interval_overlap, Mapping)
+                or frozenset(interval_overlap) != _RETURN_INTERVAL_OVERLAP_KEYS
+            ):
+                raise AssertionError("shadow return interval overlap drifted")
+            adjacent_range = interval_overlap.get("adjacent_overlap_seconds")
+            if adjacent_range is not None and (
+                not isinstance(adjacent_range, Mapping)
+                or frozenset(adjacent_range) != _RETURN_SAMPLING_RANGE_KEYS
+            ):
+                raise AssertionError("shadow return adjacent-overlap range drifted")
+            interval_reuse = interval_overlap.get(
+                "maximum_interval_reuse_reference"
+            )
+            if interval_reuse is not None and (
+                not isinstance(interval_reuse, Mapping)
+                or frozenset(interval_reuse)
+                != _RETURN_INTERVAL_REUSE_REFERENCE_KEYS
+            ):
+                raise AssertionError("shadow return interval-reuse reference drifted")
+            maximum_overlap = interval_overlap.get(
+                "maximum_adjacent_overlap_reference"
+            )
+            if maximum_overlap is not None and (
+                not isinstance(maximum_overlap, Mapping)
+                or frozenset(maximum_overlap)
+                != _RETURN_ADJACENT_OVERLAP_REFERENCE_KEYS
+            ):
+                raise AssertionError("shadow return adjacent-overlap reference drifted")
+            for interval_field in ("interval",):
+                interval = (
+                    interval_reuse.get(interval_field)
+                    if isinstance(interval_reuse, Mapping)
+                    else None
+                )
+                if interval is not None and (
+                    not isinstance(interval, Mapping)
+                    or frozenset(interval) != _RETURN_INTERVAL_KEYS
+                ):
+                    raise AssertionError("shadow return interval reference drifted")
+            if isinstance(maximum_overlap, Mapping):
+                for interval_field in ("first_interval", "second_interval"):
+                    interval = maximum_overlap.get(interval_field)
+                    if (
+                        not isinstance(interval, Mapping)
+                        or frozenset(interval) != _RETURN_INTERVAL_KEYS
+                    ):
+                        raise AssertionError("shadow return overlap interval drifted")
     alignment = value.get("benchmark_endpoint_alignment")
     if alignment is not None:
         if (

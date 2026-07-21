@@ -254,6 +254,7 @@ def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
         ))
         + _shadow_variation_table(feature_coverage, snapshot=snapshot)
         + _shadow_asset_variation_table(raw, snapshot=snapshot)
+        + _shadow_interval_overlap_table(raw, snapshot=snapshot)
     )
     return render_panel(
         "Shadow anomaly distributions",
@@ -541,6 +542,149 @@ def _shadow_input_trace_summary(value: Mapping[str, Any]) -> str:
         value.get("maximum_consecutive_derived_value_count")
     )
     return f"{source} / {transform} / {mixed} · {source_run} / {derived_run}"
+
+
+def _shadow_interval_overlap_table(
+    raw: Mapping[str, Any],
+    *,
+    snapshot: DashboardSnapshot,
+) -> str:
+    summaries = raw.get("asset_variation_summaries")
+    if (
+        raw.get("return_sampling_overlap_diagnostics_available") is not True
+        or not isinstance(summaries, (list, tuple))
+    ):
+        return ""
+    rows: list[
+        tuple[float, str, str, Mapping[str, Any], Mapping[str, Any] | None]
+    ] = []
+    for asset in summaries:
+        if not isinstance(asset, Mapping):
+            continue
+        features = asset.get("feature_variation")
+        if not isinstance(features, Mapping):
+            continue
+        asset_id = str(asset.get("canonical_asset_id") or "")
+        for feature, variation in features.items():
+            if not isinstance(variation, Mapping):
+                continue
+            timing = variation.get("return_sampling_timing_summary")
+            if not isinstance(timing, Mapping):
+                continue
+            asset_overlap = timing.get("asset_interval_overlap_summary")
+            benchmark_overlap = timing.get("benchmark_interval_overlap_summary")
+            if not isinstance(asset_overlap, Mapping):
+                continue
+            minimum = asset_overlap.get("unique_clock_coverage_ratio_minimum")
+            if not isinstance(minimum, (int, float)) or isinstance(minimum, bool):
+                continue
+            rows.append((
+                float(minimum),
+                asset_id,
+                str(feature),
+                asset_overlap,
+                benchmark_overlap if isinstance(benchmark_overlap, Mapping) else None,
+            ))
+    rows.sort(key=lambda row: row[:3])
+    if not rows:
+        return ""
+    limit = 36
+    table_rows = []
+    for _, asset_id, feature, asset_overlap, benchmark_overlap in rows[:limit]:
+        asset_counts = (
+            f"{display_count(asset_overlap.get('adjacent_overlap_observation_count'))} / "
+            f"{display_count(asset_overlap.get('interval_reuse_observation_count'))}"
+        )
+        benchmark_counts = (
+            f"{display_count(benchmark_overlap.get('adjacent_overlap_observation_count'))} / "
+            f"{display_count(benchmark_overlap.get('interval_reuse_observation_count'))}"
+            if benchmark_overlap is not None
+            else UNAVAILABLE
+        )
+        table_rows.append((
+            humanize_enum(asset_id),
+            humanize_enum(feature),
+            display_count(asset_overlap.get("observation_count")),
+            asset_counts,
+            _ratio_distribution_values(
+                asset_overlap,
+                (
+                    "unique_clock_coverage_ratio_minimum",
+                    "unique_clock_coverage_ratio_median",
+                    "unique_clock_coverage_ratio_maximum",
+                ),
+            ),
+            (
+                f"{format_number(asset_overlap.get('maximum_adjacent_overlap_seconds'), decimals=0)} / "
+                f"{format_number(asset_overlap.get('maximum_overlap_excess_seconds'), decimals=0)}"
+            ),
+            benchmark_counts,
+            (
+                _ratio_distribution_values(
+                    benchmark_overlap,
+                    (
+                        "unique_clock_coverage_ratio_minimum",
+                        "unique_clock_coverage_ratio_median",
+                        "unique_clock_coverage_ratio_maximum",
+                    ),
+                )
+                if benchmark_overlap is not None
+                else UNAVAILABLE
+            ),
+            _shadow_interval_overlap_extreme(
+                asset_overlap.get("minimum_unique_clock_coverage_observation"),
+                now=snapshot.generation_authority_checked_at,
+            ),
+        ))
+    count_note = (
+        f"Showing all {len(rows)} sample-eligible asset-return pairs."
+        if len(rows) <= limit
+        else f"Showing the {limit} lowest-coverage of {len(rows)} pairs."
+    )
+    return (
+        '<div class="alert alert-info"><strong>Dependent rolling windows.</strong> '
+        + escape_html(count_note)
+        + " Coverage is the exact union of half-open anchor-to-endpoint intervals. "
+        "Adjacent overlap, exact interval reuse, and unique clock coverage remain "
+        "descriptive: they do not estimate effective sample size, change sample "
+        "weights, exclude assets, or alter routes and scores.</div>"
+        + str(data_table(
+            (
+                "Asset",
+                "Return feature",
+                "Eligible sets",
+                "Asset overlap / exact reuse sets",
+                "Asset unique clock min / med / max",
+                "Asset max adjacent / total excess (s)",
+                "Benchmark overlap / exact reuse sets",
+                "Benchmark unique clock min / med / max",
+                "Lowest asset coverage reference",
+            ),
+            table_rows,
+            caption="Rolling return-window dependence by canonical asset and family",
+            empty="No sample-eligible interval-overlap evidence is available.",
+            compact=True,
+        ))
+    )
+
+
+def _shadow_interval_overlap_extreme(value: Any, *, now: Any) -> HtmlFragment | str:
+    if not isinstance(value, Mapping):
+        return UNAVAILABLE
+    observed_at = value.get("observed_at")
+    interval_count = value.get("interval_count")
+    ratio = value.get("unique_clock_coverage_ratio")
+    unique = value.get("unique_clock_coverage_seconds")
+    total = value.get("total_interval_seconds")
+    if any(item in (None, "") for item in (observed_at, interval_count, ratio, unique, total)):
+        return UNAVAILABLE
+    return HtmlFragment(
+        f"{escape_html(format_percent(ratio, unit='fraction', decimals=1))} · "
+        f"{escape_html(display_count(interval_count))} intervals<br>"
+        f"{escape_html(format_number(unique, decimals=0))}/"
+        f"{escape_html(format_number(total, decimals=0))} unique/total s<br>"
+        f'{time_element(present_time(observed_at, now=now), primary="utc")}'
+    )
 
 
 def _shadow_return_sampling_timing_summary(value: Mapping[str, Any]) -> str:

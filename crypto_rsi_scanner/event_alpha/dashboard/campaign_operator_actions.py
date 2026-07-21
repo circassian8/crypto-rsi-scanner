@@ -289,6 +289,7 @@ def _project_shadow_surprise_audit(
                 row,
                 input_trace_available=audit_schema_version >= 5,
                 return_sampling_timing_available=audit_schema_version >= 6,
+                return_sampling_overlap_available=audit_schema_version >= 7,
             )
             for row in raw_asset_variation
         )
@@ -324,6 +325,9 @@ def _project_shadow_surprise_audit(
         "input_trace_diagnostics_available": audit_schema_version >= 5,
         "return_sampling_timing_diagnostics_available": (
             audit_schema_version >= 6
+        ),
+        "return_sampling_overlap_diagnostics_available": (
+            audit_schema_version >= 7
         ),
         "asset_variation_summaries": projected_asset_variation,
         "source_bound_projection_digest": _identity(
@@ -564,6 +568,7 @@ def _project_shadow_asset_variation(
     *,
     input_trace_available: bool,
     return_sampling_timing_available: bool,
+    return_sampling_overlap_available: bool,
 ) -> dict[str, Any]:
     row = _mapping(value, "shadow_asset_variation")
     raw_basis = _mapping(
@@ -626,6 +631,9 @@ def _project_shadow_asset_variation(
                     return_sampling_timing_available=(
                         return_sampling_timing_available
                     ),
+                    return_sampling_overlap_available=(
+                        return_sampling_overlap_available
+                    ),
                 )
             )
             for feature, feature_row in sorted(raw_features.items())
@@ -645,6 +653,7 @@ def _project_shadow_asset_feature_variation(
     *,
     input_trace_available: bool = False,
     return_sampling_timing_available: bool = False,
+    return_sampling_overlap_available: bool = False,
 ) -> dict[str, Any]:
     row = _mapping(value, "shadow_asset_feature_variation")
     result = {
@@ -760,6 +769,7 @@ def _project_shadow_asset_feature_variation(
     result["return_sampling_timing_summary"] = (
         _project_shadow_return_sampling_timing_summary(
             row.get("return_sampling_timing_summary"),
+            overlap_available=return_sampling_overlap_available,
         )
         if return_sampling_timing_available
         else None
@@ -769,6 +779,8 @@ def _project_shadow_asset_feature_variation(
 
 def _project_shadow_return_sampling_timing_summary(
     value: Any,
+    *,
+    overlap_available: bool,
 ) -> dict[str, Any] | None:
     if value is None:
         return None
@@ -803,7 +815,7 @@ def _project_shadow_return_sampling_timing_summary(
         "maximum_benchmark_anchor_selection_error_observation",
         "maximum_benchmark_endpoint_alignment_lag_observation",
     )
-    return {
+    result = {
         **{
             field: _count(summary.get(field), f"shadow_sampling_{field}")
             for field in count_fields
@@ -826,6 +838,211 @@ def _project_shadow_return_sampling_timing_summary(
         "projection_digest": _identity(
             summary.get("projection_digest"),
             "shadow_sampling_projection_digest",
+        ),
+    }
+    if overlap_available:
+        result.update({
+            "asset_interval_overlap_summary": (
+                _project_shadow_interval_overlap_summary(
+                    summary.get("asset_interval_overlap_summary"),
+                    label="shadow_sampling_asset_interval_overlap",
+                )
+            ),
+            "benchmark_interval_overlap_summary": (
+                _project_shadow_interval_overlap_summary(
+                    summary.get("benchmark_interval_overlap_summary"),
+                    label="shadow_sampling_benchmark_interval_overlap",
+                )
+                if summary.get("benchmark_interval_overlap_summary") is not None
+                else None
+            ),
+            "overlap_diagnostics_are_policy": False,
+            "effective_sample_size_claimed": False,
+            "sample_weight_adjustment_applied": False,
+        })
+    return result
+
+
+def _project_shadow_interval_overlap_summary(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    summary = _mapping(value, label)
+    count_fields = (
+        "observation_count",
+        "adjacent_overlap_observation_count",
+        "interval_reuse_observation_count",
+        "maximum_interval_reuse_excess_count",
+        "maximum_interval_reuse_count",
+        "maximum_consecutive_interval_reuse_count",
+    )
+    number_fields = (
+        "unique_clock_coverage_ratio_minimum",
+        "unique_clock_coverage_ratio_median",
+        "unique_clock_coverage_ratio_maximum",
+        "maximum_adjacent_overlap_seconds",
+        "maximum_overlap_excess_seconds",
+    )
+    reference_fields = (
+        "minimum_unique_clock_coverage_observation",
+        "maximum_adjacent_overlap_observation",
+        "maximum_overlap_excess_observation",
+        "maximum_interval_reuse_observation",
+    )
+    return {
+        **{
+            field: _count(summary.get(field), f"{label}_{field}")
+            for field in count_fields
+        },
+        **{
+            field: _optional_finite_number(
+                summary.get(field), f"{label}_{field}"
+            )
+            for field in number_fields
+        },
+        **{
+            field: _project_shadow_interval_overlap_observation(
+                summary.get(field), label=f"{label}_{field}"
+            )
+            for field in reference_fields
+        },
+        "overlap_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "sample_weight_adjustment_applied": False,
+        "statistical_independence_claimed": False,
+        "projection_digest": _identity(
+            summary.get("projection_digest"), f"{label}_projection_digest"
+        ),
+    }
+
+
+def _project_shadow_interval_overlap_observation(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    row = _mapping(value, label)
+    count_fields = (
+        "sample_count",
+        "interval_count",
+        "distinct_interval_count",
+        "interval_reuse_excess_count",
+        "maximum_interval_reuse_count",
+        "maximum_consecutive_interval_reuse_count",
+        "adjacent_pair_count",
+        "adjacent_overlapping_pair_count",
+    )
+    number_fields = (
+        "maximum_adjacent_overlap_seconds",
+        "total_interval_seconds",
+        "unique_clock_coverage_seconds",
+        "overlap_excess_seconds",
+        "unique_clock_coverage_ratio",
+    )
+    return {
+        **(_project_shadow_reference(row, label=label) or {}),
+        **{
+            field: _count(row.get(field), f"{label}_{field}")
+            for field in count_fields
+        },
+        **{
+            field: _optional_finite_number(
+                row.get(field), f"{label}_{field}"
+            )
+            for field in number_fields
+        },
+        "interval_identity_sha256": _identity(
+            row.get("interval_identity_sha256"), f"{label}_identity"
+        ),
+        "maximum_interval_reuse_reference": (
+            _project_shadow_interval_reuse_reference(
+                row.get("maximum_interval_reuse_reference"),
+                label=f"{label}_maximum_interval_reuse_reference",
+            )
+        ),
+        "maximum_adjacent_overlap_reference": (
+            _project_shadow_adjacent_overlap_reference(
+                row.get("maximum_adjacent_overlap_reference"),
+                label=f"{label}_maximum_adjacent_overlap_reference",
+            )
+        ),
+    }
+
+
+def _project_shadow_interval_reuse_reference(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    row = _mapping(value, label)
+    return {
+        "interval": _project_shadow_return_interval(
+            row.get("interval"), label=f"{label}_interval"
+        ),
+        "reuse_count": _count(row.get("reuse_count"), f"{label}_reuse_count"),
+        "first_asset_endpoint": _project_shadow_observation_reference(
+            row.get("first_asset_endpoint"), label=f"{label}_first_endpoint"
+        ),
+        "last_asset_endpoint": _project_shadow_observation_reference(
+            row.get("last_asset_endpoint"), label=f"{label}_last_endpoint"
+        ),
+    }
+
+
+def _project_shadow_adjacent_overlap_reference(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    row = _mapping(value, label)
+    return {
+        "first_asset_endpoint": _project_shadow_observation_reference(
+            row.get("first_asset_endpoint"), label=f"{label}_first_endpoint"
+        ),
+        "second_asset_endpoint": _project_shadow_observation_reference(
+            row.get("second_asset_endpoint"), label=f"{label}_second_endpoint"
+        ),
+        "first_interval": _project_shadow_return_interval(
+            row.get("first_interval"), label=f"{label}_first_interval"
+        ),
+        "second_interval": _project_shadow_return_interval(
+            row.get("second_interval"), label=f"{label}_second_interval"
+        ),
+        "overlap_seconds": _optional_finite_number(
+            row.get("overlap_seconds"), f"{label}_overlap_seconds"
+        ),
+    }
+
+
+def _project_shadow_return_interval(value: Any, *, label: str) -> dict[str, Any]:
+    row = _mapping(value, label)
+    return {
+        "endpoint": _project_shadow_observation_reference(
+            row.get("endpoint"), label=f"{label}_endpoint"
+        ),
+        "anchor": _project_shadow_observation_reference(
+            row.get("anchor"), label=f"{label}_anchor"
+        ),
+    }
+
+
+def _project_shadow_observation_reference(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    row = _mapping(value, label)
+    return {
+        "observation_id": _identity(
+            row.get("observation_id"), f"{label}_observation_id"
+        ),
+        "observed_at": _timestamp(
+            row.get("observed_at"), f"{label}_observed_at"
         ),
     }
 
