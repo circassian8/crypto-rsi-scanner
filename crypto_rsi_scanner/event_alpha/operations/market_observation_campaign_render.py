@@ -204,9 +204,18 @@ def _shadow_surprise_audit_section(report: Mapping[str, Any]) -> list[str]:
         ),
         "- Statistical independence claimed: `false`",
         "- Protocol-v2 evidence eligible: `false`",
+        (
+            "- Robust-z quantiles and empirical tail ranks describe only ready "
+            "historical projections. Tail ranks are not p-values, and "
+            "overlapping horizon samples are not independent."
+        ),
         "",
-        "| Feature | Family | Ready / evaluated | Status counts | Sample range |",
-        "|---|---|---:|---|---:|",
+        (
+            "| Feature | Family | Ready / evaluated | Status counts | Sample "
+            "range | Robust z p05 / median / p95 | Tail kind | Tail rank min / "
+            "median / p95 | Minimum-tail observation |"
+        ),
+        "|---|---|---:|---|---:|---:|---|---:|---|",
     ]
     for feature in sorted(features):
         coverage = _mapping(features.get(feature))
@@ -217,12 +226,35 @@ def _shadow_surprise_audit_section(report: Mapping[str, Any]) -> list[str]:
             if type(minimum) is int and type(maximum) is int
             else "n/a"
         )
+        robust_distribution = " / ".join(
+            _number(coverage.get(field))
+            for field in ("robust_z_p05", "robust_z_median", "robust_z_p95")
+        )
+        tail_distribution = " / ".join(
+            _number(coverage.get(field))
+            for field in (
+                "descriptive_tail_rank_minimum",
+                "descriptive_tail_rank_median",
+                "descriptive_tail_rank_p95",
+            )
+        )
+        minimum_tail = _mapping(
+            coverage.get("minimum_descriptive_tail_rank_observation")
+        )
+        minimum_tail_observation = (
+            f"{_text(minimum_tail.get('canonical_asset_id'))} @ "
+            f"{_text(minimum_tail.get('observed_at'))}"
+            if minimum_tail
+            else "n/a"
+        )
         lines.append(
             f"| {_md(feature)} | {_md(coverage.get('family'))} | "
             f"{_int(coverage.get('ready_count'))} / "
             f"{_int(coverage.get('evaluated_observation_count'))} | "
             f"{_counts(_mapping(coverage.get('status_counts'))) or 'none'} | "
-            f"{sample_range} |"
+            f"{sample_range} | {robust_distribution} | "
+            f"{_md(coverage.get('descriptive_tail_rank_kind'))} | "
+            f"{tail_distribution} | {_md(minimum_tail_observation)} |"
         )
     lines.extend(["", "### Decision episodes", ""])
     return lines

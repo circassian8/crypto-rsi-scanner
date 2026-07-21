@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-20T11:25:58.170651+00:00`
+- generated_at: `2026-07-21T14:56:51.033347+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -223,7 +223,7 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - same_asset_relative_return_status: `not_applicable`
 - attachment: `top_level_post_scan_snapshot_and_anomaly_metadata_only`
 - campaign_audit_schema_id: `decision_radar.shadow_temporal_surprise_campaign_audit`
-- campaign_audit_schema_version: `1`
+- campaign_audit_schema_version: `2`
 - campaign_audit_input: `one_read_exact_campaign_history_snapshot`
 - campaign_audit_replay: `each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks`
 - campaign_audit_non_counted_rows: `excluded_with_exact_count`
@@ -231,6 +231,10 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - campaign_audit_source_bound_digest: `changes_when_exact_history_snapshot_fingerprint_changes`
 - campaign_audit_causal_digest: `prior_projection_values_stable_when_only_later_rows_are_appended`
 - campaign_audit_ready_semantics: `every_modeled_feature_has_some_ready_evidence_not_every_projection_ready`
+- campaign_audit_ready_distribution: `per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections`
+- campaign_audit_quantile_method: `linear_interpolation_sorted_ready_values`
+- campaign_audit_tail_ranks_are_p_values: `False`
+- campaign_audit_overlapping_samples_are_independent: `False`
 - campaign_audit_historical_rows_rewritten: `False`
 - campaign_audit_provider_calls: `0`
 - campaign_audit_writes: `0`

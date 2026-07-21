@@ -65,7 +65,7 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "campaign_audit_schema_id": (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     ),
-    "campaign_audit_schema_version": 1,
+    "campaign_audit_schema_version": 2,
     "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
     "campaign_audit_replay": (
         "each_counted_row_against_strictly_earlier_same_asset_rows_and_"
@@ -82,6 +82,14 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "campaign_audit_ready_semantics": (
         "every_modeled_feature_has_some_ready_evidence_not_every_projection_ready"
     ),
+    "campaign_audit_ready_distribution": (
+        "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections"
+    ),
+    "campaign_audit_quantile_method": (
+        "linear_interpolation_sorted_ready_values"
+    ),
+    "campaign_audit_tail_ranks_are_p_values": False,
+    "campaign_audit_overlapping_samples_are_independent": False,
     "campaign_audit_historical_rows_rewritten": False,
     "campaign_audit_provider_calls": 0,
     "campaign_audit_writes": 0,

@@ -435,7 +435,7 @@
       "sports_fixtures"
     ]
   },
-  "generated_at": "2026-07-20T11:25:58.170651+00:00",
+  "generated_at": "2026-07-21T14:56:51.033347+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1205,14 +1205,18 @@
     "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
     "campaign_audit_invalid_or_duplicate_rows": "rejected_with_closed_reason_counts",
     "campaign_audit_non_counted_rows": "excluded_with_exact_count",
+    "campaign_audit_overlapping_samples_are_independent": false,
     "campaign_audit_protocol_v2_evidence_eligible": false,
     "campaign_audit_provider_calls": 0,
+    "campaign_audit_quantile_method": "linear_interpolation_sorted_ready_values",
+    "campaign_audit_ready_distribution": "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections",
     "campaign_audit_ready_semantics": "every_modeled_feature_has_some_ready_evidence_not_every_projection_ready",
     "campaign_audit_replay": "each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks",
     "campaign_audit_schema_id": "decision_radar.shadow_temporal_surprise_campaign_audit",
-    "campaign_audit_schema_version": 1,
+    "campaign_audit_schema_version": 2,
     "campaign_audit_source_bound_digest": "changes_when_exact_history_snapshot_fingerprint_changes",
     "campaign_audit_statistical_independence_claimed": false,
+    "campaign_audit_tail_ranks_are_p_values": false,
     "campaign_audit_writes": 0,
     "canonical_history_or_provider_source_mutated": false,
     "copied_to_decision_projection": false,

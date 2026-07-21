@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
@@ -18,7 +19,8 @@ from ..radar import market_shadow_surprise
 
 
 SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+DESCRIPTIVE_QUANTILE_METHOD = "linear_interpolation_sorted_ready_values"
 _SOURCE_STATUSES = {"missing", "observed_empty", "observed", "unavailable"}
 _AUDIT_STATUSES = {"unavailable", "empty", "warming", "partial", "ready"}
 _INPUT_REJECTION_REASONS = {
@@ -111,6 +113,25 @@ _FEATURE_COVERAGE_KEYS = {
     "maximum_eligible_sample_count",
     "first_ready_observation",
     "last_ready_observation",
+    "descriptive_quantile_method",
+    "descriptive_tail_rank_kind",
+    "tail_ranks_are_p_values",
+    "overlapping_samples_are_independent",
+    "distribution_ready_count",
+    "robust_z_minimum",
+    "robust_z_p05",
+    "robust_z_median",
+    "robust_z_p95",
+    "robust_z_maximum",
+    "minimum_robust_z_observation",
+    "maximum_robust_z_observation",
+    "descriptive_tail_rank_minimum",
+    "descriptive_tail_rank_p05",
+    "descriptive_tail_rank_median",
+    "descriptive_tail_rank_p95",
+    "descriptive_tail_rank_maximum",
+    "minimum_descriptive_tail_rank_observation",
+    "maximum_descriptive_tail_rank_observation",
     "projection_digest",
 }
 _ASSET_SUMMARY_KEYS = {
@@ -127,6 +148,11 @@ _ASSET_SUMMARY_KEYS = {
     "causal_projection_digest",
 }
 _REFERENCE_KEYS = {"observation_id", "observed_at"}
+_EXTREME_REFERENCE_KEYS = {
+    "canonical_asset_id",
+    "observation_id",
+    "observed_at",
+}
 _ZERO_FALSE_FIELDS = (
     "statistical_independence_claimed",
     "routing_eligible",
@@ -562,10 +588,34 @@ def _append_feature_records(
         sample_count = feature_value.get("sample_count")
         if type(sample_count) is not int or sample_count < 0:
             raise AssertionError("closed shadow projection has invalid sample count")
+        status = str(feature_value.get("status") or "unavailable")
+        robust_z = _finite_float_or_none(feature_value.get("robust_z"))
+        tail_rank_field = (
+            "upper_tail_rank"
+            if feature in market_shadow_surprise.SUPPORTED_FEATURES
+            else "two_sided_tail_rank"
+        )
+        descriptive_tail_rank = _finite_float_or_none(
+            feature_value.get(tail_rank_field)
+        )
+        if status == "ready" and (
+            robust_z is None
+            or descriptive_tail_rank is None
+            or not 0.0 < descriptive_tail_rank <= 1.0
+        ):
+            raise AssertionError(
+                "ready shadow projection lost robust-z or descriptive-tail truth"
+            )
+        if status != "ready":
+            robust_z = None
+            descriptive_tail_rank = None
         feature_records[feature].append({
             "reference": reference,
-            "status": str(feature_value.get("status") or "unavailable"),
+            "canonical_asset_id": str(current["canonical_asset_id"]),
+            "status": status,
             "sample_count": sample_count,
+            "robust_z": robust_z,
+            "descriptive_tail_rank": descriptive_tail_rank,
             "projection_sha256": _sha256_json(feature_value),
         })
 
@@ -597,6 +647,24 @@ def _feature_coverage(
     status_counts = Counter(str(row["status"]) for row in records)
     ready = [row for row in records if row["status"] == "ready"]
     samples = [int(row["sample_count"]) for row in records]
+    robust_z_values = [float(row["robust_z"]) for row in ready]
+    tail_rank_values = [float(row["descriptive_tail_rank"]) for row in ready]
+    minimum_robust_z_row = (
+        min(ready, key=lambda row: float(row["robust_z"])) if ready else None
+    )
+    maximum_robust_z_row = (
+        max(ready, key=lambda row: float(row["robust_z"])) if ready else None
+    )
+    minimum_tail_rank_row = (
+        min(ready, key=lambda row: float(row["descriptive_tail_rank"]))
+        if ready
+        else None
+    )
+    maximum_tail_rank_row = (
+        max(ready, key=lambda row: float(row["descriptive_tail_rank"]))
+        if ready
+        else None
+    )
     return {
         "feature": feature,
         "family": _FEATURE_FAMILIES[feature],
@@ -612,7 +680,81 @@ def _feature_coverage(
         "last_ready_observation": (
             dict(ready[-1]["reference"]) if ready else None
         ),
+        "descriptive_quantile_method": DESCRIPTIVE_QUANTILE_METHOD,
+        "descriptive_tail_rank_kind": (
+            "upper"
+            if feature in market_shadow_surprise.SUPPORTED_FEATURES
+            else "two_sided"
+        ),
+        "tail_ranks_are_p_values": False,
+        "overlapping_samples_are_independent": False,
+        "distribution_ready_count": len(ready),
+        "robust_z_minimum": _descriptive_quantile(robust_z_values, 0.0),
+        "robust_z_p05": _descriptive_quantile(robust_z_values, 0.05),
+        "robust_z_median": _descriptive_quantile(robust_z_values, 0.5),
+        "robust_z_p95": _descriptive_quantile(robust_z_values, 0.95),
+        "robust_z_maximum": _descriptive_quantile(robust_z_values, 1.0),
+        "minimum_robust_z_observation": (
+            _extreme_reference(minimum_robust_z_row)
+            if minimum_robust_z_row is not None
+            else None
+        ),
+        "maximum_robust_z_observation": (
+            _extreme_reference(maximum_robust_z_row)
+            if maximum_robust_z_row is not None
+            else None
+        ),
+        "descriptive_tail_rank_minimum": _descriptive_quantile(
+            tail_rank_values, 0.0
+        ),
+        "descriptive_tail_rank_p05": _descriptive_quantile(
+            tail_rank_values, 0.05
+        ),
+        "descriptive_tail_rank_median": _descriptive_quantile(
+            tail_rank_values, 0.5
+        ),
+        "descriptive_tail_rank_p95": _descriptive_quantile(
+            tail_rank_values, 0.95
+        ),
+        "descriptive_tail_rank_maximum": _descriptive_quantile(
+            tail_rank_values, 1.0
+        ),
+        "minimum_descriptive_tail_rank_observation": (
+            _extreme_reference(minimum_tail_rank_row)
+            if minimum_tail_rank_row is not None
+            else None
+        ),
+        "maximum_descriptive_tail_rank_observation": (
+            _extreme_reference(maximum_tail_rank_row)
+            if maximum_tail_rank_row is not None
+            else None
+        ),
         "projection_digest": _sha256_json(list(records)),
+    }
+
+
+def _descriptive_quantile(values: Sequence[float], probability: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+    if lower_index == upper_index:
+        value = ordered[lower_index]
+    else:
+        weight = position - lower_index
+        value = ordered[lower_index] + (
+            ordered[upper_index] - ordered[lower_index]
+        ) * weight
+    rounded = round(float(value), 12)
+    return 0.0 if rounded == 0.0 else rounded
+
+
+def _extreme_reference(row: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        "canonical_asset_id": str(row["canonical_asset_id"]),
+        **dict(row["reference"]),
     }
 
 
@@ -866,8 +1008,84 @@ def _validate_feature_coverage(
     for label, reference in (("first", first), ("last", last)):
         if reference is not None and not _valid_reference(reference):
             errors.append(f"feature_coverage_{feature}_{label}_reference_invalid")
+    _validate_feature_distribution(
+        feature,
+        coverage,
+        ready_count=ready_count if _nonnegative_int(ready_count) else 0,
+        errors=errors,
+    )
     if not _sha256(coverage.get("projection_digest")):
         errors.append(f"feature_coverage_{feature}_projection_digest_invalid")
+
+
+def _validate_feature_distribution(
+    feature: str,
+    coverage: Mapping[str, Any],
+    *,
+    ready_count: int,
+    errors: list[str],
+) -> None:
+    prefix = f"feature_coverage_{feature}"
+    expected_tail_kind = (
+        "upper"
+        if feature in market_shadow_surprise.SUPPORTED_FEATURES
+        else "two_sided"
+    )
+    if coverage.get("descriptive_quantile_method") != DESCRIPTIVE_QUANTILE_METHOD:
+        errors.append(f"{prefix}_quantile_method_invalid")
+    if coverage.get("descriptive_tail_rank_kind") != expected_tail_kind:
+        errors.append(f"{prefix}_tail_rank_kind_invalid")
+    if coverage.get("tail_ranks_are_p_values") is not False:
+        errors.append(f"{prefix}_tail_rank_p_value_claim_invalid")
+    if coverage.get("overlapping_samples_are_independent") is not False:
+        errors.append(f"{prefix}_independence_claim_invalid")
+    if coverage.get("distribution_ready_count") != ready_count:
+        errors.append(f"{prefix}_distribution_ready_count_mismatch")
+
+    robust_fields = (
+        "robust_z_minimum",
+        "robust_z_p05",
+        "robust_z_median",
+        "robust_z_p95",
+        "robust_z_maximum",
+    )
+    tail_fields = (
+        "descriptive_tail_rank_minimum",
+        "descriptive_tail_rank_p05",
+        "descriptive_tail_rank_median",
+        "descriptive_tail_rank_p95",
+        "descriptive_tail_rank_maximum",
+    )
+    reference_fields = (
+        "minimum_robust_z_observation",
+        "maximum_robust_z_observation",
+        "minimum_descriptive_tail_rank_observation",
+        "maximum_descriptive_tail_rank_observation",
+    )
+    if ready_count == 0:
+        if any(
+            coverage.get(field) is not None
+            for field in (*robust_fields, *tail_fields, *reference_fields)
+        ):
+            errors.append(f"{prefix}_empty_distribution_not_null")
+        return
+
+    robust_values = [_finite_float_or_none(coverage.get(field)) for field in robust_fields]
+    if any(value is None for value in robust_values):
+        errors.append(f"{prefix}_robust_z_distribution_invalid")
+    elif robust_values != sorted(robust_values):
+        errors.append(f"{prefix}_robust_z_distribution_order_invalid")
+    tail_values = [_finite_float_or_none(coverage.get(field)) for field in tail_fields]
+    if any(
+        value is None or not 0.0 < value <= 1.0
+        for value in tail_values
+    ):
+        errors.append(f"{prefix}_tail_rank_distribution_invalid")
+    elif tail_values != sorted(tail_values):
+        errors.append(f"{prefix}_tail_rank_distribution_order_invalid")
+    for field in reference_fields:
+        if not _valid_extreme_reference(coverage.get(field)):
+            errors.append(f"{prefix}_{field}_invalid")
 
 
 def _validate_asset_summaries(
@@ -954,6 +1172,16 @@ def _valid_reference(value: Any) -> bool:
     )
 
 
+def _valid_extreme_reference(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and set(value) == _EXTREME_REFERENCE_KEYS
+        and bool(_identity(value.get("canonical_asset_id")))
+        and bool(_identity(value.get("observation_id")))
+        and _aware_time_or_none(value.get("observed_at")) is not None
+    )
+
+
 def _parse_aware_utc(value: Any) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise TypeError("timestamp must be a non-empty string")
@@ -980,6 +1208,13 @@ def _positive_int(value: Any) -> bool:
 
 def _nonnegative_int(value: Any) -> bool:
     return type(value) is int and value >= 0
+
+
+def _finite_float_or_none(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    result = float(value)
+    return result if math.isfinite(result) else None
 
 
 def _sha256(value: Any) -> bool:

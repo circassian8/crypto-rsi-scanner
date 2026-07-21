@@ -471,6 +471,7 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert audit["schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
+    assert audit["schema_version"] == 2
     assert audit["shadow_schema_version"] == 2
     assert audit["input_row_count"] == 31
     assert audit["excluded_not_baseline_counted_count"] == 1
@@ -484,6 +485,39 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
         "ready_count"
     ] > 0
     assert audit["feature_coverage"]["return_24h"]["ready_count"] == 0
+    volume_distribution = audit["feature_coverage"]["volume_24h"]
+    assert volume_distribution["distribution_ready_count"] == (
+        volume_distribution["ready_count"]
+    )
+    assert volume_distribution["descriptive_quantile_method"] == (
+        "linear_interpolation_sorted_ready_values"
+    )
+    assert volume_distribution["descriptive_tail_rank_kind"] == "upper"
+    assert volume_distribution["tail_ranks_are_p_values"] is False
+    assert volume_distribution["overlapping_samples_are_independent"] is False
+    assert volume_distribution["robust_z_minimum"] <= (
+        volume_distribution["robust_z_p05"]
+    ) <= volume_distribution["robust_z_median"] <= (
+        volume_distribution["robust_z_p95"]
+    ) <= volume_distribution["robust_z_maximum"]
+    assert 0.0 < volume_distribution["descriptive_tail_rank_minimum"] <= (
+        volume_distribution["descriptive_tail_rank_median"]
+    ) <= volume_distribution["descriptive_tail_rank_p95"] <= (
+        volume_distribution["descriptive_tail_rank_maximum"]
+    ) <= 1.0
+    assert set(volume_distribution["minimum_robust_z_observation"]) == {
+        "canonical_asset_id",
+        "observation_id",
+        "observed_at",
+    }
+    return_distribution = audit["feature_coverage"]["return_1h"]
+    assert return_distribution["descriptive_tail_rank_kind"] == "two_sided"
+    unavailable_distribution = audit["feature_coverage"]["return_24h"]
+    assert unavailable_distribution["distribution_ready_count"] == 0
+    assert unavailable_distribution["robust_z_median"] is None
+    assert unavailable_distribution[
+        "minimum_descriptive_tail_rank_observation"
+    ] is None
     assert audit["all_features_have_ready_evidence"] is False
     assert audit["status"] == "warming"
     assert audit["statistical_independence_claimed"] is False
@@ -593,3 +627,31 @@ def test_campaign_shadow_replay_validator_rejects_policy_and_count_drift():
     assert "routing_eligible_must_be_false" in errors
     assert "evaluation_count_not_closed" in errors
     assert "projection_status_count_total_mismatch" in errors
+
+
+def test_campaign_shadow_replay_validator_rejects_distribution_drift():
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(_history_rows(_current_market_row())),
+            minimum_sample_count=4,
+        )
+    )
+    tampered = deepcopy(audit)
+    volume = tampered["feature_coverage"]["volume_24h"]
+    volume["robust_z_p95"] = volume["robust_z_minimum"] - 1.0
+    volume["tail_ranks_are_p_values"] = True
+
+    errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(tampered)
+    )
+
+    assert (
+        "feature_coverage_volume_24h_robust_z_distribution_order_invalid"
+        in errors
+    )
+    assert (
+        "feature_coverage_volume_24h_tail_rank_p_value_claim_invalid"
+        in errors
+    )

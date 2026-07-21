@@ -10493,7 +10493,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "23b251f3a0fcf903c044da20c42fd414baf258b481cc3c39f0632cb6306c1828",
     "candidate_rows_supplied": 11,
-    "contract_digest": "634fee8cb68aec0d126dfd6715d28f8c332421cda18c896ca47b0f57183e1cc9",
+    "contract_digest": "be414144fa9d8eb393134bb5aadd261d9978ef9565e330912179cbf7bbe9ce0d",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "0d98fea8bce2ba31a8f22e05580e51091581abc621c3802d95952754b2860247",
     "core_rows_supplied": 11,
@@ -10508,7 +10508,7 @@
       "not_evaluated": 1,
       "opposed": 2
     },
-    "evaluated_at": "2026-07-21T14:35:15.456996+00:00",
+    "evaluated_at": "2026-07-21T14:56:51.519362+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -10897,7 +10897,7 @@
         }
       ]
     },
-    "input_binding_digest": "9e725e71d0c0142b8ea6ec6404b7433bb423d36d29bf285c057f4bfa4a76610b",
+    "input_binding_digest": "2ad25467eeaebb394af9ecf63fd29e3b2436d7372d8f3662d7707b8f6463507a",
     "matched_control_available": false,
     "matured_episode_count": 3,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -11594,7 +11594,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "8e602d78a8c47433ebeecadb7d0cba0d6a9c0ec663d16a881cdf50826af5eacd",
+    "source_episode_contract_digest": "80566292afbd1f8fcba0d1065e783c63deae5a61ff5de0fbf1b0ff4769c85568",
     "source_episode_input_binding_digest": "9f978ebcbc94d560bf78f46319deca091b125b61c44bdf42bbd437f00e0f99b0",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -11605,7 +11605,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-21T14:35:15.456996+00:00",
+  "generated_at": "2026-07-21T14:56:51.519362+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -11622,7 +11622,7 @@
     "eligible_idea_count": 9,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-21T14:35:15.456996+00:00",
+    "generated_at": "2026-07-21T14:56:51.519362+00:00",
     "in_review_count": 0,
     "not_viewed_count": 9,
     "operator_action_commands_available_via_queue": true,
@@ -11774,7 +11774,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-21T14:35:15.456996+00:00",
+    "generated_at": "2026-07-21T14:56:51.519362+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -12330,7 +12330,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260721t141358789000z_a1a534027864",
-    "authority_checked_at": "2026-07-21T14:35:15.456996+00:00",
+    "authority_checked_at": "2026-07-21T14:56:51.519362+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -12775,7 +12775,7 @@
   ],
   "protocol_v2_episode_coverage_frontier": {
     "canonical_category_coverage_complete": false,
-    "contract_digest": "17687b5f2d4fa8f4c70043c9151453d7edd262563eb4546e1ed3979f0633779b",
+    "contract_digest": "b46faedbc9b6b5f4cdc5c395739e5e66694e0d6ce20954d50446d940168b9ae4",
     "cross_asset_independence_claim": false,
     "episode_count": 4,
     "episode_independence_status": "fixed_start_declustered_not_statistically_independent",
@@ -12966,9 +12966,9 @@
     "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
     "schema_version": 1,
     "score_changes": 0,
-    "source_scorecard_contract_digest": "634fee8cb68aec0d126dfd6715d28f8c332421cda18c896ca47b0f57183e1cc9",
-    "source_scorecard_evaluated_at": "2026-07-21T14:35:15.456996+00:00",
-    "source_scorecard_input_binding_digest": "9e725e71d0c0142b8ea6ec6404b7433bb423d36d29bf285c057f4bfa4a76610b",
+    "source_scorecard_contract_digest": "be414144fa9d8eb393134bb5aadd261d9978ef9565e330912179cbf7bbe9ce0d",
+    "source_scorecard_evaluated_at": "2026-07-21T14:56:51.519362+00:00",
+    "source_scorecard_input_binding_digest": "2ad25467eeaebb394af9ecf63fd29e3b2436d7372d8f3662d7707b8f6463507a",
     "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
     "source_scorecard_schema_version": 1,
     "statistical_independence_claim": false,
@@ -13196,7 +13196,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "4c1a6c7bf4fd216407dc5ee96230ddf935fa983f543c7080b0b059c40f14b88e",
+    "audit_digest": "ea23b2c88e92ad1868ac766b834c70c7a707a6d965fa77f3fd4c8513da3f89c6",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -13742,7 +13742,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "8e602d78a8c47433ebeecadb7d0cba0d6a9c0ec663d16a881cdf50826af5eacd",
+    "episode_contract_digest": "80566292afbd1f8fcba0d1065e783c63deae5a61ff5de0fbf1b0ff4769c85568",
     "episode_input_binding_digest": "9f978ebcbc94d560bf78f46319deca091b125b61c44bdf42bbd437f00e0f99b0",
     "episode_records_supplied": 11,
     "exact_outcome_join_count": 11,
@@ -13783,7 +13783,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "8e602d78a8c47433ebeecadb7d0cba0d6a9c0ec663d16a881cdf50826af5eacd",
+    "contract_digest": "80566292afbd1f8fcba0d1065e783c63deae5a61ff5de0fbf1b0ff4769c85568",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -14166,7 +14166,7 @@
         "window_end_exclusive_at": "2026-07-22T09:05:58.044865+00:00"
       }
     ],
-    "evaluated_at": "2026-07-21T14:35:15.456996+00:00",
+    "evaluated_at": "2026-07-21T14:56:51.519362+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,
@@ -15053,6 +15053,14 @@
     "excluded_not_baseline_counted_count": 30,
     "feature_coverage": {
       "relative_return_vs_btc_1h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.444444444444,
+        "descriptive_tail_rank_minimum": 0.0625,
+        "descriptive_tail_rank_p05": 0.083333333333,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 669,
         "evaluated_observation_count": 1710,
         "family": "relative_return_btc",
         "feature": "relative_return_vs_btc_1h",
@@ -15064,19 +15072,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "avalanche-2",
+          "observation_id": "mhobs-bf036726c910db9ff4ea0a75",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00"
+        },
         "maximum_eligible_sample_count": 31,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-e05f33c967cc6a881efd4c60",
+          "observed_at": "2026-07-21T11:07:27.472398+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "binancecoin",
+          "observation_id": "mhobs-258e2993fd501f7798f281ae",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-ced58e3dc70931b6e0178685",
+          "observed_at": "2026-07-21T10:06:51.132321+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "584dc555fc58ba47399c4cc91d66f6aa4f1581ab848d1cabd8c11a908cf62d1a",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "b7b2f1d9d7ee127ab8a7285c9f74d762d47616f2c98f1fa2cd77375d880600ed",
         "ready_count": 669,
+        "robust_z_maximum": 18.971386360139,
+        "robust_z_median": 0.125947632363,
+        "robust_z_minimum": -34.843265726371,
+        "robust_z_p05": -2.908473202481,
+        "robust_z_p95": 3.452397996195,
         "status_counts": {
           "current_unavailable": 730,
           "insufficient_history": 254,
           "not_applicable": 57,
           "ready": 669
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "relative_return_vs_btc_24h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.5,
+        "descriptive_tail_rank_minimum": 0.057142857143,
+        "descriptive_tail_rank_p05": 0.084782608695,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 709,
         "evaluated_observation_count": 1710,
         "family": "relative_return_btc",
         "feature": "relative_return_vs_btc_24h",
@@ -15088,19 +15131,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin-cash",
+          "observation_id": "mhobs-deb920bfd1fcfbaa4ebb964c",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00"
+        },
         "maximum_eligible_sample_count": 34,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "bitcoin-cash",
+          "observation_id": "mhobs-02b99fbb55af5d9fd34030bc",
+          "observed_at": "2026-07-21T09:05:58.044865+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "binancecoin",
+          "observation_id": "mhobs-258e2993fd501f7798f281ae",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "worldcoin-wld",
+          "observation_id": "mhobs-7a71d1f7311dc688f133de97",
+          "observed_at": "2026-07-19T23:45:20.832390+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "dbd0814e403285f302cdf9a8e53bfa1dffe00f9bc55c3271e755acd6e30cadda",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "82d5053baaaeea5a797a4ff1244fba7d44b926ed502b98d28f1505fdeb1f66b5",
         "ready_count": 709,
+        "robust_z_maximum": 11.74679497791,
+        "robust_z_median": 0.089358166411,
+        "robust_z_minimum": -6.709722289745,
+        "robust_z_p05": -2.3756868747,
+        "robust_z_p95": 4.342730727559,
         "status_counts": {
           "current_unavailable": 698,
           "insufficient_history": 246,
           "not_applicable": 57,
           "ready": 709
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "relative_return_vs_btc_4h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.470588235294,
+        "descriptive_tail_rank_minimum": 0.066666666667,
+        "descriptive_tail_rank_p05": 0.083333333333,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 604,
         "evaluated_observation_count": 1710,
         "family": "relative_return_btc",
         "feature": "relative_return_vs_btc_4h",
@@ -15112,19 +15190,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "aave",
+          "observation_id": "mhobs-bb8dca9579ce78cd4fcf848c",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00"
+        },
         "maximum_eligible_sample_count": 29,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "solana",
+          "observation_id": "mhobs-77dbad201a8cbf6d25225275",
+          "observed_at": "2026-07-19T02:46:47.948812+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "binancecoin",
+          "observation_id": "mhobs-258e2993fd501f7798f281ae",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "bitcoin-cash",
+          "observation_id": "mhobs-ecb98cb2e08229f08ab8cc34",
+          "observed_at": "2026-07-19T23:45:20.832390+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "b4ea896caa39ff697bcb5f42a4d4d97749343204c9e498b766765b0249ec11bd",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "60964033d14509a1335a42785a00948783df9fb054fbdee525c117c94882c9d1",
         "ready_count": 604,
+        "robust_z_maximum": 22.645564585383,
+        "robust_z_median": 0.171546308918,
+        "robust_z_minimum": -6.606296039933,
+        "robust_z_p05": -2.485871622774,
+        "robust_z_p95": 3.317948175527,
         "status_counts": {
           "current_unavailable": 798,
           "insufficient_history": 251,
           "not_applicable": 57,
           "ready": 604
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "relative_return_vs_eth_1h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.428571428571,
+        "descriptive_tail_rank_minimum": 0.0625,
+        "descriptive_tail_rank_p05": 0.090909090909,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 669,
         "evaluated_observation_count": 1710,
         "family": "relative_return_eth",
         "feature": "relative_return_vs_eth_1h",
@@ -15136,19 +15249,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin",
+          "observation_id": "mhobs-0ab0f70670fa8feb22d5b061",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00"
+        },
         "maximum_eligible_sample_count": 31,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-e05f33c967cc6a881efd4c60",
+          "observed_at": "2026-07-21T11:07:27.472398+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin",
+          "observation_id": "mhobs-8a081f0ca7a03ad8c280e1f0",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-ced58e3dc70931b6e0178685",
+          "observed_at": "2026-07-21T10:06:51.132321+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "6232dfac46ec5056a0766cbc1814c8a2b3b5ae32914114c13a684b3229f8197c",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "c7cb8cb5de0e7d00300628894df661ce0fb94178e7ce797efa290019ed80df74",
         "ready_count": 669,
+        "robust_z_maximum": 19.753644568497,
+        "robust_z_median": -0.030166577568,
+        "robust_z_minimum": -41.541750628047,
+        "robust_z_p05": -2.520208583243,
+        "robust_z_p95": 3.433857722731,
         "status_counts": {
           "current_unavailable": 730,
           "insufficient_history": 254,
           "not_applicable": 57,
           "ready": 669
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "relative_return_vs_eth_24h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.444444444444,
+        "descriptive_tail_rank_minimum": 0.057142857143,
+        "descriptive_tail_rank_p05": 0.090909090909,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 709,
         "evaluated_observation_count": 1710,
         "family": "relative_return_eth",
         "feature": "relative_return_vs_eth_24h",
@@ -15160,19 +15308,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "binancecoin",
+          "observation_id": "mhobs-5f762a78a681b56af87ef70a",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00"
+        },
         "maximum_eligible_sample_count": 34,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "polkadot",
+          "observation_id": "mhobs-dc3c2fbcb483f86cf40d6547",
+          "observed_at": "2026-07-21T10:06:51.132321+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin",
+          "observation_id": "mhobs-8a081f0ca7a03ad8c280e1f0",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "observation_id": "mhobs-e848ce253ab7281eb70d8b9e",
+          "observed_at": "2026-07-20T02:45:18.052686+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "4fb35722751aa4763999e3a4bb2de66ed2f9124cc8ba217a29b91c47e0b24b5f",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "09b30cc8dfb5356b96b98c43087870d5f276a43bd4149fba2981b2dae38a9ffb",
         "ready_count": 709,
+        "robust_z_maximum": 10.333013000364,
+        "robust_z_median": 0.221470756648,
+        "robust_z_minimum": -7.490674508812,
+        "robust_z_p05": -2.630080050393,
+        "robust_z_p95": 3.952977973891,
         "status_counts": {
           "current_unavailable": 698,
           "insufficient_history": 246,
           "not_applicable": 57,
           "ready": 709
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "relative_return_vs_eth_4h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.454545454545,
+        "descriptive_tail_rank_minimum": 0.066666666667,
+        "descriptive_tail_rank_p05": 0.086956521739,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 604,
         "evaluated_observation_count": 1710,
         "family": "relative_return_eth",
         "feature": "relative_return_vs_eth_4h",
@@ -15184,19 +15367,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "monero",
+          "observation_id": "mhobs-2835a8e4c7ca1ae5765de50c",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00"
+        },
         "maximum_eligible_sample_count": 29,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "ripple",
+          "observation_id": "mhobs-46445fd954caaf160d460dca",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin",
+          "observation_id": "mhobs-8a081f0ca7a03ad8c280e1f0",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "dogecoin",
+          "observation_id": "mhobs-6c4804d970426752e7c13227",
+          "observed_at": "2026-07-20T19:41:41.729110+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "d4765973639c6af41c9d5b11950c31bbc01dd87b0be3c0da812cfec84e1348d0",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "efbe3389545e374e585334b3298a23e3a5f1256344290378efad006b2bd36ea1",
         "ready_count": 604,
+        "robust_z_maximum": 8.968545213927,
+        "robust_z_median": -0.109737384643,
+        "robust_z_minimum": -6.087866850332,
+        "robust_z_p05": -2.849330831766,
+        "robust_z_p95": 2.954871733558,
         "status_counts": {
           "current_unavailable": 798,
           "insufficient_history": 251,
           "not_applicable": 57,
           "ready": 604
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "return_1h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.461538461538,
+        "descriptive_tail_rank_minimum": 0.064516129032,
+        "descriptive_tail_rank_p05": 0.086956521739,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 649,
         "evaluated_observation_count": 1710,
         "family": "direct_return",
         "feature": "return_1h",
@@ -15208,19 +15426,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "avalanche-2",
+          "observation_id": "mhobs-bf036726c910db9ff4ea0a75",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00"
+        },
         "maximum_eligible_sample_count": 31,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-e05f33c967cc6a881efd4c60",
+          "observed_at": "2026-07-21T11:07:27.472398+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "stellar",
+          "observation_id": "mhobs-6bb6e4ce02ca0242c6fbb127",
+          "observed_at": "2026-07-21T13:13:25.659555+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-ced58e3dc70931b6e0178685",
+          "observed_at": "2026-07-21T10:06:51.132321+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "fcdf56c8182e220cb04fe08e0d48306e8700ac6c7fdeba882e0ef4d74535520e",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "202d894be82e0c14339d064732534ce2dfc68e5cfa4ee0847c0f16eee7f0e246",
         "ready_count": 649,
+        "robust_z_maximum": 24.901060915435,
+        "robust_z_median": 0.003733253335,
+        "robust_z_minimum": -40.739931457906,
+        "robust_z_p05": -2.833229440341,
+        "robust_z_p95": 3.717723566147,
         "status_counts": {
           "current_unavailable": 755,
           "degenerate_scale": 44,
           "insufficient_history": 262,
           "ready": 649
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "return_24h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.380952380952,
+        "descriptive_tail_rank_minimum": 0.060606060606,
+        "descriptive_tail_rank_p05": 0.1,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 726,
         "evaluated_observation_count": 1710,
         "family": "direct_return",
         "feature": "return_24h",
@@ -15232,19 +15485,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "aave",
+          "observation_id": "mhobs-580343553022a0d11ba7b045",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00"
+        },
         "maximum_eligible_sample_count": 34,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "cardano",
+          "observation_id": "mhobs-a907eb254d9cbe5181a80933",
+          "observed_at": "2026-07-21T09:05:58.044865+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin-cash",
+          "observation_id": "mhobs-0caab902ced21d7976ff874c",
+          "observed_at": "2026-07-21T12:12:41.339533+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "litecoin",
+          "observation_id": "mhobs-d5fbbd6beace015a8804e831",
+          "observed_at": "2026-07-19T19:41:12.054658+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "6a240913de576ae3a464b4a401a367fda54d3598d9b7d5edb148b2b4de721151",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "ca2031bc7f52ba123a480d4074f9509c776f80eb3edf23a8cf4ac4c1b2067ce9",
         "ready_count": 726,
+        "robust_z_maximum": 12.357621186344,
+        "robust_z_median": -0.000289439954,
+        "robust_z_minimum": -9.467272998468,
+        "robust_z_p05": -2.743365427772,
+        "robust_z_p95": 4.452951843653,
         "status_counts": {
           "current_unavailable": 720,
           "degenerate_scale": 10,
           "insufficient_history": 254,
           "ready": 726
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "return_4h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "two_sided",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.48275862069,
+        "descriptive_tail_rank_minimum": 0.066666666667,
+        "descriptive_tail_rank_p05": 0.090909090909,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 612,
         "evaluated_observation_count": 1710,
         "family": "direct_return",
         "feature": "return_4h",
@@ -15256,19 +15544,54 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "bitcoin",
+          "observation_id": "mhobs-61a0691b4dbc11bb57fdec38",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00"
+        },
         "maximum_eligible_sample_count": 29,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "ripple",
+          "observation_id": "mhobs-4360a3c002459e0461b462f0",
+          "observed_at": "2026-07-20T18:40:56.440969+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "near",
+          "observation_id": "mhobs-c8c1065ae5be69ba80a47033",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "ripple",
+          "observation_id": "mhobs-7ea5d39190c9f93d80f22584",
+          "observed_at": "2026-07-20T07:17:19.798117+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "28aee457ac90ff2151594c0fc7fd65babc1f2ca478408e32c739cc51a7abe0a7",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "dbfb66524067d9f54bcea4b81f4874a814205bcfee0378f9b4198f14679b8791",
         "ready_count": 612,
+        "robust_z_maximum": 7.299579827457,
+        "robust_z_median": 0.165008090589,
+        "robust_z_minimum": -10.664296123119,
+        "robust_z_p05": -3.038307294364,
+        "robust_z_p95": 3.061936677525,
         "status_counts": {
           "current_unavailable": 825,
           "degenerate_scale": 14,
           "insufficient_history": 259,
           "ready": 612
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "turnover_24h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "upper",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.590909090909,
+        "descriptive_tail_rank_minimum": 0.017543859649,
+        "descriptive_tail_rank_p05": 0.064583333333,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 1431,
         "evaluated_observation_count": 1710,
         "family": "activity",
         "feature": "turnover_24h",
@@ -15280,18 +15603,53 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "aave",
+          "observation_id": "mhobs-2582676dad1eb8f2af02df63",
+          "observed_at": "2026-07-18T02:47:37.287740+00:00"
+        },
         "maximum_eligible_sample_count": 56,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "dexe",
+          "observation_id": "mhobs-ced58e3dc70931b6e0178685",
+          "observed_at": "2026-07-21T10:06:51.132321+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "cardano",
+          "observation_id": "mhobs-d25ea0686f0619c7a6e9906f",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "observation_id": "mhobs-a386c4f31f7cbb2a71437569",
+          "observed_at": "2026-07-19T02:46:47.948812+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "a644cc8a6f20f6f275d5cc6ba283c28e4e138f16822c4450f2848dcc962e23f5",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "d048b2630b545533a2df81657c125044e660ce82348c4aa288e06523ce9a5498",
         "ready_count": 1431,
+        "robust_z_maximum": 4.967644441823,
+        "robust_z_median": -0.284119197389,
+        "robust_z_minimum": -155.877657345044,
+        "robust_z_p05": -2.546025535215,
+        "robust_z_p95": 1.611447225556,
         "status_counts": {
           "degenerate_scale": 8,
           "insufficient_history": 271,
           "ready": 1431
-        }
+        },
+        "tail_ranks_are_p_values": false
       },
       "volume_24h": {
+        "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
+        "descriptive_tail_rank_kind": "upper",
+        "descriptive_tail_rank_maximum": 1.0,
+        "descriptive_tail_rank_median": 0.6,
+        "descriptive_tail_rank_minimum": 0.017543859649,
+        "descriptive_tail_rank_p05": 0.042083333334,
+        "descriptive_tail_rank_p95": 1.0,
+        "distribution_ready_count": 1424,
         "evaluated_observation_count": 1710,
         "family": "activity",
         "feature": "volume_24h",
@@ -15303,16 +15661,43 @@
           "observation_id": "mhobs-e6974558ed629bfb83f140c5",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "maximum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "aave",
+          "observation_id": "mhobs-2582676dad1eb8f2af02df63",
+          "observed_at": "2026-07-18T02:47:37.287740+00:00"
+        },
         "maximum_eligible_sample_count": 56,
+        "maximum_robust_z_observation": {
+          "canonical_asset_id": "bitcoin-cash",
+          "observation_id": "mhobs-1852290da2e1d8ce85bda39d",
+          "observed_at": "2026-07-20T05:16:14.675298+00:00"
+        },
+        "minimum_descriptive_tail_rank_observation": {
+          "canonical_asset_id": "cardano",
+          "observation_id": "mhobs-d25ea0686f0619c7a6e9906f",
+          "observed_at": "2026-07-21T14:14:01.079240+00:00"
+        },
         "minimum_eligible_sample_count": 0,
+        "minimum_robust_z_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "observation_id": "mhobs-a386c4f31f7cbb2a71437569",
+          "observed_at": "2026-07-19T02:46:47.948812+00:00"
+        },
         "minimum_sample_count": 8,
-        "projection_digest": "15fde16b1c166d0f90731ef8c9944ad838f8895089916f18671a1018dcd6750f",
+        "overlapping_samples_are_independent": false,
+        "projection_digest": "0123c9bcd3c8f09b87e0c273502c7c14c86a99375afe59fcb30e9b06c944b6f7",
         "ready_count": 1424,
+        "robust_z_maximum": 3.526865132096,
+        "robust_z_median": -0.299736574476,
+        "robust_z_minimum": -262.742490879812,
+        "robust_z_p05": -2.418048008,
+        "robust_z_p95": 1.671636053568,
         "status_counts": {
           "degenerate_scale": 15,
           "insufficient_history": 271,
           "ready": 1424
-        }
+        },
+        "tail_ranks_are_p_values": false
       }
     },
     "historical_rows_rewritten": false,
@@ -15337,7 +15722,7 @@
     },
     "routing_eligible": false,
     "schema_id": "decision_radar.shadow_temporal_surprise_campaign_audit",
-    "schema_version": 1,
+    "schema_version": 2,
     "score_adjustment_eligible": false,
     "shadow_schema_id": "event_alpha.shadow_temporal_surprise",
     "shadow_schema_version": 2,

@@ -217,8 +217,13 @@ each accepted row against strictly earlier same-asset history and canonical
 BTC/ETH rows at or before its clock. Publish per-feature coverage, per-asset
 summaries, a source-bound digest that changes with the exact history snapshot,
 and a causal-value digest whose prior values remain stable when only later rows
-are appended. Do not rewrite historical rows, infer statistical independence,
-or grant routing, score, threshold, publication, or Protocol-v2 authority.
+are appended. For every feature, report deterministic min/p05/median/p95/max
+robust-z and family-correct empirical-tail distributions over ready projections,
+plus the exact observations at each extreme. Keep upper activity ranks separate
+from two-sided signed-return ranks. Never interpret robust-z magnitude as a
+calibrated probability, call a rank a p-value, or claim overlapping samples are
+independent. Do not rewrite historical rows or grant routing, score, threshold,
+publication, or Protocol-v2 authority.
 **Why:** The isolated v2 implementation proved mechanics, but it did not show
 how much of the genuine retained campaign can actually evaluate each feature or
 where insufficient and degenerate histories remain. A deterministic causal

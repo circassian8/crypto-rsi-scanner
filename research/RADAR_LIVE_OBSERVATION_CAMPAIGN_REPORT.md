@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T14:35:15.456996+00:00` from local artifacts only.
+Generated at `2026-07-21T14:56:51.519362+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -263,20 +263,21 @@ This is a read-only replay of the shadow model over retained, cadence-counted ob
 - An audit status of `ready` means every modeled feature has some ready evidence; it does not mean every projection is ready. The counts below remain authoritative.
 - Statistical independence claimed: `false`
 - Protocol-v2 evidence eligible: `false`
+- Robust-z quantiles and empirical tail ranks describe only ready historical projections. Tail ranks are not p-values, and overlapping horizon samples are not independent.
 
-| Feature | Family | Ready / evaluated | Status counts | Sample range |
-|---|---|---:|---|---:|
-| relative_return_vs_btc_1h | relative_return_btc | 669 / 1710 | current_unavailable=730, insufficient_history=254, not_applicable=57, ready=669 | 0–31 |
-| relative_return_vs_btc_24h | relative_return_btc | 709 / 1710 | current_unavailable=698, insufficient_history=246, not_applicable=57, ready=709 | 0–34 |
-| relative_return_vs_btc_4h | relative_return_btc | 604 / 1710 | current_unavailable=798, insufficient_history=251, not_applicable=57, ready=604 | 0–29 |
-| relative_return_vs_eth_1h | relative_return_eth | 669 / 1710 | current_unavailable=730, insufficient_history=254, not_applicable=57, ready=669 | 0–31 |
-| relative_return_vs_eth_24h | relative_return_eth | 709 / 1710 | current_unavailable=698, insufficient_history=246, not_applicable=57, ready=709 | 0–34 |
-| relative_return_vs_eth_4h | relative_return_eth | 604 / 1710 | current_unavailable=798, insufficient_history=251, not_applicable=57, ready=604 | 0–29 |
-| return_1h | direct_return | 649 / 1710 | current_unavailable=755, degenerate_scale=44, insufficient_history=262, ready=649 | 0–31 |
-| return_24h | direct_return | 726 / 1710 | current_unavailable=720, degenerate_scale=10, insufficient_history=254, ready=726 | 0–34 |
-| return_4h | direct_return | 612 / 1710 | current_unavailable=825, degenerate_scale=14, insufficient_history=259, ready=612 | 0–29 |
-| turnover_24h | activity | 1431 / 1710 | degenerate_scale=8, insufficient_history=271, ready=1431 | 0–56 |
-| volume_24h | activity | 1424 / 1710 | degenerate_scale=15, insufficient_history=271, ready=1424 | 0–56 |
+| Feature | Family | Ready / evaluated | Status counts | Sample range | Robust z p05 / median / p95 | Tail kind | Tail rank min / median / p95 | Minimum-tail observation |
+|---|---|---:|---|---:|---:|---|---:|---|
+| relative_return_vs_btc_1h | relative_return_btc | 669 / 1710 | current_unavailable=730, insufficient_history=254, not_applicable=57, ready=669 | 0–31 | -2.908473 / 0.125948 / 3.452398 | two_sided | 0.0625 / 0.444444 / 1 | binancecoin @ 2026-07-21T14:14:01.079240+00:00 |
+| relative_return_vs_btc_24h | relative_return_btc | 709 / 1710 | current_unavailable=698, insufficient_history=246, not_applicable=57, ready=709 | 0–34 | -2.375687 / 0.089358 / 4.342731 | two_sided | 0.057143 / 0.5 / 1 | binancecoin @ 2026-07-21T14:14:01.079240+00:00 |
+| relative_return_vs_btc_4h | relative_return_btc | 604 / 1710 | current_unavailable=798, insufficient_history=251, not_applicable=57, ready=604 | 0–29 | -2.485872 / 0.171546 / 3.317948 | two_sided | 0.066667 / 0.470588 / 1 | binancecoin @ 2026-07-21T14:14:01.079240+00:00 |
+| relative_return_vs_eth_1h | relative_return_eth | 669 / 1710 | current_unavailable=730, insufficient_history=254, not_applicable=57, ready=669 | 0–31 | -2.520209 / -0.030167 / 3.433858 | two_sided | 0.0625 / 0.428571 / 1 | bitcoin @ 2026-07-21T14:14:01.079240+00:00 |
+| relative_return_vs_eth_24h | relative_return_eth | 709 / 1710 | current_unavailable=698, insufficient_history=246, not_applicable=57, ready=709 | 0–34 | -2.63008 / 0.221471 / 3.952978 | two_sided | 0.057143 / 0.444444 / 1 | bitcoin @ 2026-07-21T14:14:01.079240+00:00 |
+| relative_return_vs_eth_4h | relative_return_eth | 604 / 1710 | current_unavailable=798, insufficient_history=251, not_applicable=57, ready=604 | 0–29 | -2.849331 / -0.109737 / 2.954872 | two_sided | 0.066667 / 0.454545 / 1 | bitcoin @ 2026-07-21T14:14:01.079240+00:00 |
+| return_1h | direct_return | 649 / 1710 | current_unavailable=755, degenerate_scale=44, insufficient_history=262, ready=649 | 0–31 | -2.833229 / 0.003733 / 3.717724 | two_sided | 0.064516 / 0.461538 / 1 | stellar @ 2026-07-21T13:13:25.659555+00:00 |
+| return_24h | direct_return | 726 / 1710 | current_unavailable=720, degenerate_scale=10, insufficient_history=254, ready=726 | 0–34 | -2.743365 / -0.000289 / 4.452952 | two_sided | 0.060606 / 0.380952 / 1 | bitcoin-cash @ 2026-07-21T12:12:41.339533+00:00 |
+| return_4h | direct_return | 612 / 1710 | current_unavailable=825, degenerate_scale=14, insufficient_history=259, ready=612 | 0–29 | -3.038307 / 0.165008 / 3.061937 | two_sided | 0.066667 / 0.482759 / 1 | near @ 2026-07-21T14:14:01.079240+00:00 |
+| turnover_24h | activity | 1431 / 1710 | degenerate_scale=8, insufficient_history=271, ready=1431 | 0–56 | -2.546026 / -0.284119 / 1.611447 | upper | 0.017544 / 0.590909 / 1 | cardano @ 2026-07-21T14:14:01.079240+00:00 |
+| volume_24h | activity | 1424 / 1710 | degenerate_scale=15, insufficient_history=271, ready=1424 | 0–56 | -2.418048 / -0.299737 / 1.671636 | upper | 0.017544 / 0.6 / 1 | cardano @ 2026-07-21T14:14:01.079240+00:00 |
 
 ### Decision episodes
 

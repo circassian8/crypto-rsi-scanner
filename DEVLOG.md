@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Pair robust-z history with empirical-tail distributions · Codex
+**Why:** The causal shadow replay exposed very large MAD-scaled z-scores, but
+coverage alone did not show whether those values also occupied rare positions
+in their finite same-asset reference sets. Operators and later Protocol-v2
+research need both views to avoid treating a raw robust z-score as calibrated
+probability.
+**Changes:** Advanced the closed campaign shadow-audit to schema v2. Every
+feature now publishes deterministic min/p05/median/p95/max robust-z and the
+correct empirical-tail distribution (`upper` for activity, `two_sided` for
+signed returns), with exact asset/observation/time identities at distribution
+extremes. Validation closes counts, ordering, finite/range constraints,
+quantile method, tail family, and explicit no-p-value/no-independence claims.
+Campaign Markdown and both North Star policy copies explain the distinction.
+The regenerated genuine report replays 1,710 counted rows: volume/turnover have
+1,424/1,431 ready projections, direct 1h/4h/24h returns have 649/612/726, and
+relative-return families have 604–709. Return-1h robust z spans -40.74 to 24.90
+while its minimum observed two-sided rank is 0.0645; volume spans -262.74 to
+3.53 while its minimum upper-tail rank is 0.0175. These are descriptive
+distributions, not comparable p-values or a tuning result.
+**Verify:** Focused shadow/model/campaign/North-Star/empirical tests passed (`126
+passed`); `python3 -m compileall -q crypto_rsi_scanner tests` and `git diff
+--check` passed; `make event-alpha-radar-north-star PYTHON=python3` and `make
+radar-market-campaign-report PYTHON=python3` regenerated validated artifacts
+with zero provider calls. `make radar-dashboard-smoke PYTHON=python3`, `make
+radar-dashboard-ux-smoke PYTHON=python3`, and `make radar-dashboard-readiness
+PYTHON=python3` passed; the exact revision-12 authority remained ready and all
+dashboard smoke writes remained zero.
+**Notes/risks:** No production evaluation, route, score, threshold, history,
+provider boundary, authority, outcome, or Protocol-v2 eligibility changed. No
+send, trade, order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE`
+occurred. Quantitative source-size limits remain advisory; security, artifact,
+provider, request, and resource bounds remain enforced.
+
 ## 2026-07-21 — Surface regime-input history in the dashboard · Codex
 **Why:** The canonical campaign report now explains recurring causal 24-hour
 input gaps, but the dashboard still exposed only the latest 29/30 symptom. The
