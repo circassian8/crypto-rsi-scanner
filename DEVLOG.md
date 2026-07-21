@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Refresh advisory architecture reports · Codex
+**Why:** The architecture-cleanliness check had not been regenerated after the
+latest evidence-integrity changes. Its checked-in reports needed to describe
+the current tree while honoring the operator decision that quantitative source
+size and ownership counts are advisory rather than delivery gates.
+**Changes:** Regenerated the architecture size, class-ownership, transitional
+file, old-import, and project-health naming reports. The reports now explicitly
+record advisory size enforcement; no production code, threshold, score, route,
+provider, or artifact-authority behavior changed.
+**Verify:** `make architecture-cleanliness-check PYTHON=python3` passed the
+transitional-file, naming, old-import, dependency, shim, and compatibility
+checks. The generated size report has zero blocking violations and reports its
+production, test, and API decomposition statuses as advisory. `git diff
+--check` passed.
+**Notes/risks:** Current measurements include 10 files, 3 classes, and 18
+functions above the historical quantitative thresholds. They are visibility
+only and do not mandate mechanical refactoring. Security, artifact, provider,
+request, path, secret, dedupe, and bounded-resource controls remain hard.
+
 ## 2026-07-21 — Reconcile the empirical human-review count · Codex
 **Why:** The canonical read-only review queue now reports nine receipt-backed
 genuine ideas awaiting first view, while one active roadmap row still reported
