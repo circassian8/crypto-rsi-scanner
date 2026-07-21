@@ -427,6 +427,58 @@ def test_market_anomaly_source_knownness_requires_typed_evidence_reference():
         assert anomaly["priority_components"]["source_catalyst_unknownness"] == -4.0
 
 
+def test_market_anomaly_source_plan_requires_typed_pack_names():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "source-plan-token",
+        "symbol": "PLAN",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000.0,
+        "freshness_status": "fresh",
+    }
+
+    _, malformed_anomalies = scanner.scan_market_rows(
+        [{
+            **base,
+            "suggested_source_packs_to_search": [
+                {"borrowed": "official_project"},
+                True,
+            ],
+        }],
+        observed_at="2026-07-21T11:40:00Z",
+    )
+    malformed_queue = scanner.build_catalyst_search_queue(malformed_anomalies)
+    assert malformed_anomalies[0]["suggested_source_packs_to_search"] == []
+    assert malformed_queue[0]["suggested_source_packs"] == []
+    assert malformed_queue[0]["source_plan_status"] == "missing_plan"
+
+    _, valid_anomalies = scanner.scan_market_rows(
+        [{
+            **base,
+            "suggested_source_packs_to_search": (
+                "official_project",
+                " project_blog_rss ",
+            ),
+        }],
+        observed_at="2026-07-21T11:40:00Z",
+    )
+    valid_queue = scanner.build_catalyst_search_queue(valid_anomalies)
+    assert valid_anomalies[0]["suggested_source_packs_to_search"] == [
+        "official_project",
+        "project_blog_rss",
+    ]
+    assert valid_queue[0]["suggested_source_packs"] == [
+        "official_project",
+        "project_blog_rss",
+    ]
+    assert valid_queue[0]["source_plan_status"] == "planned"
+
+
 def test_market_anomaly_queue_parses_false_instead_of_using_string_truthiness():
     import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
 

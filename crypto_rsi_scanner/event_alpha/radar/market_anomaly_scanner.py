@@ -917,9 +917,10 @@ def _what_invalidates(anomaly_type: str) -> list[str]:
 
 
 def _suggested_source_packs(anomaly_type: str, source_row: Mapping[str, Any]) -> list[str]:
-    explicit = source_row.get("suggested_source_packs_to_search")
-    if isinstance(explicit, list) and explicit:
-        return [str(item) for item in explicit if str(item)]
+    if "suggested_source_packs_to_search" in source_row:
+        explicit = source_row.get("suggested_source_packs_to_search")
+        if explicit not in (None, "", [], (), {}):
+            return _string_list(explicit)
     if anomaly_type in {RISK_OFF_SELL_PRESSURE}:
         return ["security_shock_pack", "regulatory_pack", "cryptopanic_tagged"]
     if anomaly_type in {BLOWOFF_CROWDED, POST_EVENT_FADE_SETUP}:
@@ -1260,8 +1261,8 @@ def _string_list(value: object) -> list[str]:
     if isinstance(value, str):
         return [item.strip() for item in value.split(",") if item.strip()]
     if isinstance(value, IterableABC) and not isinstance(value, (str, bytes, Mapping)):
-        return [str(item) for item in value if str(item or "")]
-    return [str(value)]
+        return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return []
 
 
 def _float(value: object) -> float | None:

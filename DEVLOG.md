@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Require typed catalyst source-plan names · Codex
+**Why:** Structured or boolean members in
+`suggested_source_packs_to_search` were stringified into apparent pack names,
+causing the catalyst queue to report `source_plan_status=planned` even though
+it had no executable source plan. The same coercing helper also processed spot
+and perpetual instrument aliases.
+**Changes:** Source-pack and instrument-alias list normalization now retains
+only nonblank strings; mappings, booleans, numbers, and other structured values
+are rejected rather than rendered as identifiers. Valid list/tuple members and
+legacy comma-separated strings remain supported. A non-empty but wholly
+invalid explicit source-pack claim stays empty and produces `missing_plan`
+instead of silently borrowing the default pack set. No provider is called and
+no anomaly threshold, score, route, or pack taxonomy changed.
+**Verify:** The exact structured-pack reproduction changed from a stringified
+pack and `planned` status to empty pack lists and `missing_plan`. Focused pack,
+knownness, and timestamp regressions passed (`9 passed`); the wider market
+surfaces, alias precedence, timestamp, numeric/unit integrity, anomaly report,
+no-send normalization, and Decision-v2 suites passed (`198 passed`). `make
+event-alpha-market-anomaly-smoke PYTHON=python3` retained 8 snapshots and the
+expected 5 fixture anomalies, with zero doctor blockers and only the two
+expected standalone missing source/readiness warnings. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the exact source
+plan, alias, queue, Decision, and matching smoke paths were exercised directly.
+No provider call, authority change, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-file size
+remains advisory; artifact, security, provider, request, source-plan, and
+resource bounds remain enforced.
+
 ## 2026-07-21 — Reject timezone-naive market clocks · Codex
 **Why:** A timezone-naive market observation such as
 `2026-07-21T11:00:00` was silently interpreted as UTC, labeled fresh, allowed
