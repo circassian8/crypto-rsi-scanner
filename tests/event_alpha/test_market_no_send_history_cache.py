@@ -121,6 +121,31 @@ def test_control_context_readiness_rejects_rank_and_basis_drift():
     assert result["field_coverage_counts"]["control_liquidity_tier_basis"] == 0
 
 
+def test_control_context_readiness_cannot_count_bare_partition_claims():
+    observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)
+    row = {
+        **_normalized_rows(observed_at)[0],
+        "observed_at": observed_at.isoformat(),
+        "baseline_counted": True,
+        "protocol_partition": "untouched_holdout",
+        "protocol_partition_basis": "claimed_frozen_protocol_v2",
+    }
+
+    result = (
+        market_no_send_history_cache._point_in_time_control_context_readiness(
+            [row],
+            cache_status="valid",
+        )
+    )
+
+    assert result["status"] == "partial"
+    assert result["field_coverage_counts"]["protocol_partition"] == 0
+    assert result["field_coverage_counts"]["protocol_partition_basis"] == 0
+    assert result["complete_match_context_row_count"] == 0
+    assert result["selection_performed"] is False
+    assert result["protocol_v2_evidence_eligible"] is False
+
+
 @pytest.mark.parametrize(
     ("returns", "expected"),
     [

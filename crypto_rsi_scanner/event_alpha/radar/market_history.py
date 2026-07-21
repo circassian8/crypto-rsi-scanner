@@ -96,6 +96,10 @@ _SCALAR_FEATURE_BASIS_FIELDS = (
     "volume_zscore_24h_basis",
     "turnover_zscore_basis",
 )
+_UNSEALED_PROTOCOL_PARTITION_FIELDS = (
+    "protocol_partition",
+    "protocol_partition_basis",
+)
 
 
 def enrich_market_rows_with_history(
@@ -302,6 +306,11 @@ def _prepare_observation(
         return None, "invalid_lineage_claim"
     if _feature_basis_claims_invalid(row):
         return None, "invalid_feature_basis_claim"
+    if any(
+        field in row and row.get(field) not in (None, "")
+        for field in _UNSEALED_PROTOCOL_PARTITION_FIELDS
+    ):
+        return None, "unsealed_protocol_partition_claim"
     raw_time = row.get("provider_observed_at") or row.get("observed_at") or row.get("timestamp")
     observed_at, time_error = _parse_aware_time(raw_time)
     if observed_at is None:
@@ -1250,13 +1259,13 @@ def _point_in_time_context_value(row: Mapping[str, Any], key: str) -> Any:
             == row.get("point_in_time_universe_policy")
             else None
         )
+    if key in _UNSEALED_PROTOCOL_PARTITION_FIELDS:
+        return None
     if key in {
         "point_in_time_universe_policy",
         "control_liquidity_tier_basis",
         "market_regime",
         "market_regime_basis",
-        "protocol_partition",
-        "protocol_partition_basis",
     }:
         return value if type(value) is str and 0 < len(value.strip()) <= 160 else None
     return None

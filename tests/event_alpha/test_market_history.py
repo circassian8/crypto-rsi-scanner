@@ -1073,6 +1073,39 @@ def test_market_history_accepts_only_exact_observed_control_regime_evidence():
     assert observation["market_regime_evidence"] == evidence
 
 
+@pytest.mark.parametrize(
+    "partition_claim",
+    (
+        {"protocol_partition": "development"},
+        {"protocol_partition_basis": "frozen_protocol_v2"},
+        {
+            "protocol_partition": "untouched_holdout",
+            "protocol_partition_basis": "frozen_protocol_v2",
+        },
+    ),
+)
+def test_market_history_rejects_unsealed_protocol_partition_claims(partition_claim):
+    claimed = _row(
+        "unsealed-partition",
+        NOW,
+        price=1,
+        volume=10,
+        **partition_claim,
+    )
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [claimed],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["market_history_status"] == "rejected"
+    assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+        "unsealed_protocol_partition_claim"
+    )
+    assert result.retained_history == ()
+
+
 def test_retained_market_identity_aliases_do_not_coerce_or_borrow_after_invalid_values():
     current = _row("safe-token", NOW, price=1, volume=10)
     current.update({

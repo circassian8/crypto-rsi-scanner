@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Keep unsealed Protocol-v2 partitions unavailable · Codex
+**Why:** The live-history placeholder accepted any nonblank
+`protocol_partition` and basis strings, while readiness counted those strings
+as coverage. A premature or manually injected claim could therefore make
+Protocol-v2 control coverage look more complete even though partition
+assignment remains explicitly unimplemented.
+**Changes:** Rolling history now rejects any explicit partition or partition-
+basis claim as `unsealed_protocol_partition_claim` until a real frozen contract
+is implemented. Control-context readiness fixes both partition coverage counts
+at zero and refuses those fields in complete-match checks, including for
+manually supplied retained rows. This preserves the existing future field names
+without treating bare labels as evidence.
+**Verify:** Regressions cover each single/paired partition claim at retention
+and a forged retained-row readiness case. The market-history, cache, feature-
+evidence, campaign, no-send, empirical-live, and current Protocol-v2 progress
+group passed (`157 passed`); `python3 -m compileall -q crypto_rsi_scanner tests`
+and `git diff --check` passed.
+**Notes/risks:** A future Protocol-v2 freeze must introduce and validate a real
+partition-evidence contract before these fields can be enabled. No partition,
+holdout, outcome, score, route, threshold, provider authorization, or current
+authority changed. No provider call, send, trade, order, paper trade, RSI write,
+or Event Alpha `TRIGGERED_FADE` occurred. Source-size metrics remain advisory.
+
 ## 2026-07-21 — Close retained control-regime evidence semantics · Codex
 **Why:** The temporal-history retention boundary checked the control-regime
 evidence envelope but did not type-check several IDs, counts, numeric inputs,

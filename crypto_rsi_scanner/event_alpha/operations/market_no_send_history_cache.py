@@ -141,12 +141,10 @@ def _point_in_time_control_context_readiness(
         "market_regime_basis": sum(
             _control_market_regime_valid(row) for row in counted
         ),
-        "protocol_partition": sum(
-            bool(_text(row.get("protocol_partition"))) for row in counted
-        ),
-        "protocol_partition_basis": sum(
-            bool(_text(row.get("protocol_partition_basis"))) for row in counted
-        ),
+        # Protocol-v2 partition assignment is explicitly unimplemented. Bare
+        # strings in a retained or manually supplied row cannot close it.
+        "protocol_partition": 0,
+        "protocol_partition_basis": 0,
     }
     universe_fields = (
         "observation_date",
@@ -230,6 +228,8 @@ def _control_context_field_present(row: Mapping[str, Any], field: str) -> bool:
         return _text(row.get(field)) in {"high", "mid", "low", "unknown"}
     if field in {"market_regime", "market_regime_basis"}:
         return _control_market_regime_valid(row)
+    if field in {"protocol_partition", "protocol_partition_basis"}:
+        return False
     return bool(_text(row.get(field)))
 
 
