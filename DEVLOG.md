@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Make Bybit derivatives readiness concise · Codex
+**Why:** The safe funding/OI/basis/positioning readiness command expanded nested
+execution and derivatives capture packets, hiding its real dependency order and
+context-only safety boundary.
+**Changes:**
+- Added a strict bounded summary that reconciles readiness status/reasons, the
+  exact four-context plan, eligible instruments, current/absolute request bounds,
+  execution-capture identity, capture freshness/state, operator action, 403
+  policy, and every context-only/research-only safety field.
+- Made the normal Make target use the summary, retained the complete JSON packet
+  behind an explicit output variable, and kept direct Python CLI JSON-compatible.
+- Documented the output contract in the working agreement, North Star, venue
+  decision package, roadmap, and durable decisions.
+**Verify:** Compileall and all 28 focused derivatives live/capture/readiness
+tests passed. The real summary reported zero eligible instruments and zero
+current requests against the 120-request ceiling, absent execution capture and
+authorization, no derivatives capture, and zero calls/writes/orders/sends/
+trades/paper/RSI/`TRIGGERED_FADE`; it remained context-only with no directional
+or Decision-policy authority. Explicit JSON mode, North Star JSON validation,
+architecture cleanliness, and diff checks passed; size findings remain advisory.
+**Notes/risks:** No provider call or artifact write occurred. The command remains
+blocked until the upstream execution-quality capture exists and separate
+derivatives authorization is already present. No threshold, score, route,
+outcome, dashboard authority, or Protocol-v2 eligibility changed.
+
 ## 2026-07-21 — Make direct Bybit intraday readiness concise · Codex
 **Why:** The safe readiness command expanded nested execution and intraday
 capture packets, hiding its actual dependency order: first obtain a genuine

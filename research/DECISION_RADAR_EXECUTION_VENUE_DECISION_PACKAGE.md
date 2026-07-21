@@ -452,8 +452,9 @@ make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 All eight commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
 `make radar-execution-quality-readiness PYTHON=.venv/bin/python`. The explicit
-`RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json` override expands the normal bounded
-intraday-readiness summary into its full structured packet. Collection still
+`RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json` and
+`RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT=json` overrides expand their normal
+bounded readiness summaries into full structured packets. Collection still
 requires an already-present
 `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` to permit the
 separate `radar-execution-quality-bybit-capture` target to cross the public

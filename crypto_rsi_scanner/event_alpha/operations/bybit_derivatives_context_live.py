@@ -77,6 +77,13 @@ CAPTURE_COMMAND = (
     "CONFIRM=1 make radar-derivatives-bybit-capture PYTHON=.venv/bin/python"
 )
 STATUS_COMMAND = "make radar-derivatives-bybit-status PYTHON=.venv/bin/python"
+READINESS_OUTPUT_JSON = "json"
+READINESS_OUTPUT_SUMMARY = "summary"
+READINESS_OUTPUT_CHOICES = (READINESS_OUTPUT_JSON, READINESS_OUTPUT_SUMMARY)
+READINESS_FULL_JSON_COMMAND = (
+    "make -s radar-derivatives-bybit-readiness "
+    "RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT=json PYTHON=.venv/bin/python"
+)
 AUTHORIZATION_ACTION = (
     f"set_{LIVE_AUTH_ENV}=1_in_local_gitignored_dotenv_then_rerun_readiness"
 )
@@ -276,6 +283,171 @@ def build_bybit_derivatives_live_readiness(
         ),
         **_SAFETY,
     }
+
+
+def format_bybit_derivatives_readiness_summary(
+    payload: Mapping[str, object],
+) -> str:
+    """Render bounded dependency truth without nested capture/context arrays."""
+
+    status = _readiness_text(payload.get("status"), "status")
+    ready = _readiness_bool(payload.get("ready"), "ready")
+    reasons = _readiness_text_list(payload.get("reasons"), "reasons", limit=32)
+    if status not in {"ready", "blocked"} or ready != (status == "ready"):
+        raise BybitDerivativesContextLiveError("readiness_status_mismatch")
+    if ready == bool(reasons):
+        raise BybitDerivativesContextLiveError("readiness_reasons_mismatch")
+
+    context_fields = _readiness_text_list(
+        payload.get("context_fields"), "context_fields", limit=8
+    )
+    if context_fields != (
+        "ticker_mark_index_basis_current_funding",
+        "settled_funding_history",
+        "open_interest_1h",
+        "long_short_account_ratio_1h",
+    ):
+        raise BybitDerivativesContextLiveError("readiness_context_fields_invalid")
+    instrument_count = _readiness_int(
+        payload.get("eligible_instrument_count"), "eligible_instrument_count"
+    )
+    request_bound = _readiness_int(
+        payload.get("maximum_provider_requests_for_current_capture"),
+        "maximum_provider_requests_for_current_capture",
+    )
+    absolute_bound = _readiness_int(
+        payload.get("absolute_provider_request_bound"),
+        "absolute_provider_request_bound",
+    )
+    if (
+        request_bound != instrument_count * len(context_fields)
+        or request_bound > absolute_bound
+    ):
+        raise BybitDerivativesContextLiveError("readiness_request_bound_mismatch")
+
+    safety_bools = {
+        key: _readiness_bool(payload.get(key), key)
+        for key in (
+            "runtime_provider_authorized",
+            "provider_call_planned",
+            "provider_call_attempted",
+            "writes_performed",
+            "artifact_persisted",
+            "credentials_read",
+            "private_data_read",
+            "orders_available",
+            "context_only",
+            "directional_authority",
+            "decision_policy_applied",
+            "protocol_v2_input_quality_eligible",
+            "protocol_v2_evidence_eligible",
+        )
+    }
+    safety_counts = {
+        key: _readiness_int(payload.get(key), key)
+        for key in (
+            "telegram_sends",
+            "trades_created",
+            "paper_trades_created",
+            "normal_rsi_signal_rows_written",
+            "triggered_fade_created",
+        )
+    }
+    capture_id = _readiness_optional_text(
+        payload.get("source_execution_quality_capture_id"),
+        "source_execution_quality_capture_id",
+        128,
+    )
+    lines = (
+        "report=decision_radar_bybit_derivatives_readiness",
+        f"status={status}",
+        f"ready={str(ready).lower()}",
+        "checked_at=" + _readiness_text(payload.get("checked_at"), "checked_at"),
+        "execution_surface=bybit:usdt_linear_perpetual:USDT",
+        f"runtime_provider_authorized={str(safety_bools['runtime_provider_authorized']).lower()}",
+        f"source_execution_quality_capture_id={capture_id}",
+        f"eligible_instruments={instrument_count}",
+        f"context_fields={','.join(context_fields)}",
+        f"provider_request_bound={request_bound} (absolute={absolute_bound})",
+        "latest_derivatives_capture_status="
+        + _readiness_text(
+            payload.get("latest_derivatives_capture_status"),
+            "latest_derivatives_capture_status",
+        ),
+        "freshness_policy="
+        + _readiness_text(
+            payload.get("derivatives_set_freshness_policy"),
+            "derivatives_set_freshness_policy",
+        ),
+        f"reasons={','.join(reasons) if reasons else 'none'}",
+        "expected_provider_activity="
+        + _readiness_text(
+            payload.get("expected_provider_activity"), "expected_provider_activity"
+        ),
+        "operator_action_required="
+        + _readiness_text(
+            payload.get("operator_action_required"),
+            "operator_action_required",
+            512,
+        ),
+        "next_safe_command="
+        + _readiness_text(payload.get("next_safe_command"), "next_safe_command", 512),
+        "authorization_boundary="
+        + _readiness_text(
+            payload.get("authorization_boundary"), "authorization_boundary", 512
+        ),
+        "rollback_disable_command="
+        + _readiness_text(
+            payload.get("rollback_disable_command"),
+            "rollback_disable_command",
+            256,
+        ),
+        "recorded_403_policy="
+        + _readiness_text(payload.get("recorded_403_policy"), "recorded_403_policy"),
+        "safety_flags="
+        + ",".join(
+            f"{key}:{str(value).lower()}" for key, value in safety_bools.items()
+            if key != "runtime_provider_authorized"
+        ),
+        "safety_counts="
+        + ",".join(f"{key}:{value}" for key, value in safety_counts.items()),
+        f"full_json_command={READINESS_FULL_JSON_COMMAND}",
+    )
+    return "\n".join(lines)
+
+
+def _readiness_text(value: object, label: str, limit: int = 256) -> str:
+    text = value.strip() if isinstance(value, str) else ""
+    if not text or len(text) > limit or any(ord(character) < 32 for character in text):
+        raise BybitDerivativesContextLiveError(f"{label}_invalid")
+    return text
+
+
+def _readiness_optional_text(value: object, label: str, limit: int) -> str:
+    return "unavailable" if value is None else _readiness_text(value, label, limit)
+
+
+def _readiness_int(value: object, label: str) -> int:
+    if type(value) is not int or value < 0:
+        raise BybitDerivativesContextLiveError(f"{label}_invalid")
+    return value
+
+
+def _readiness_bool(value: object, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise BybitDerivativesContextLiveError(f"{label}_invalid")
+    return value
+
+
+def _readiness_text_list(
+    value: object,
+    label: str,
+    *,
+    limit: int,
+) -> tuple[str, ...]:
+    if not isinstance(value, list) or len(value) > limit:
+        raise BybitDerivativesContextLiveError(f"{label}_invalid")
+    return tuple(_readiness_text(item, label, 128) for item in value)
 
 
 def _revalidate_prerequisites(
@@ -657,6 +829,11 @@ def _parser() -> argparse.ArgumentParser:
             "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
         )
         commands.choices[name].add_argument("--confirm", action="store_true")
+    commands.choices["readiness"].add_argument(
+        "--output",
+        choices=READINESS_OUTPUT_CHOICES,
+        default=READINESS_OUTPUT_JSON,
+    )
     return parser
 
 
@@ -666,7 +843,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = build_bybit_derivatives_live_readiness(
             artifact_base_dir=args.artifact_base
         )
-        print(json.dumps(payload, indent=2, sort_keys=True))
+        if args.output == READINESS_OUTPUT_SUMMARY:
+            print(format_bybit_derivatives_readiness_summary(payload))
+        else:
+            print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
     if args.command == "status":
         payload = bybit_derivatives_context_capture_status(args.artifact_base)
@@ -705,10 +885,12 @@ __all__ = (
     "LIVE_AUTH_ENV",
     "MAX_PLANNED_REQUESTS",
     "READINESS_COMMAND",
+    "READINESS_FULL_JSON_COMMAND",
     "STATUS_COMMAND",
     "BybitDerivativesContextLiveError",
     "_collect_authoritative_bybit_derivatives",
     "build_bybit_derivatives_live_readiness",
+    "format_bybit_derivatives_readiness_summary",
     "capture_authoritative_bybit_derivatives",
     "collect_authoritative_bybit_derivatives",
     "main",

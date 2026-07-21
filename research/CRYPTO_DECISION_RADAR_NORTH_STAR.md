@@ -1244,6 +1244,8 @@ HTTP client. A guarded no-write adapter now exists but is inactive: no-call
 `make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python` requires a
 genuine fresh execution-quality capture for exact current authority and the
 separate already-present `RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1` flag.
+The normal target prints a bounded prerequisite summary; use
+`RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT=json` for the full structured packet.
 Confirmed collection performs exactly four public GETs per eligible instrument,
 never retries, preserves request/provider clocks and exact response bytes in
 memory, and revalidates the capture/instrument/authority chain. A closed no-I/O

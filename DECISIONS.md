@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep venue-native Bybit derivatives readiness concise
+**Status:** accepted
+**Decision:** The normal `radar-derivatives-bybit-readiness` Make target prints
+a strict bounded summary of its execution-quality dependency, separate runtime
+authorization, eligible instruments, exact four-context request plan, request
+bounds, capture/freshness state, operator action, and context-only safety. Full
+packet JSON remains available through
+`RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT=json`; direct Python CLI usage retains
+JSON as its compatibility default.
+**Why:** The nested capture, instrument, and context arrays obscured the two
+current blockers and safe dependency order. The concise view exposes them while
+preserving the complete machine-readable packet and non-directional semantics.
+**Revisit when:** A machine consumer needs another structured projection;
+preserve JSON compatibility and fail closed on status, reasons, context-field,
+instrument, or request-bound drift.
+
 ## 2026-07-21 - Keep direct Bybit intraday readiness concise
 **Status:** accepted
 **Decision:** The normal `radar-intraday-bybit-readiness` Make target prints a

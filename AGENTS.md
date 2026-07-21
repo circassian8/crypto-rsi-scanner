@@ -773,7 +773,9 @@ may be added later when a suitable environment already exists.
   implemented but inactive: `make radar-derivatives-bybit-readiness` requires a
   genuine fresh execution-quality capture for exact current authority plus
   separately present `RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1`; readiness
-  makes no call or write. Confirmed collection performs the exact request set,
+  makes no call or write and prints a concise prerequisite summary by default;
+  use `RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT=json` for the full structured
+  packet. Confirmed collection performs the exact request set,
   never retries, retains exact transport responses in memory, and revalidates
   capture/instrument/authority identity afterward. The closed no-I/O capture-
   input contract rederives every normalized context, request timing, lineage,

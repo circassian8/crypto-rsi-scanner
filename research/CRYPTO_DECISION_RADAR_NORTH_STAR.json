@@ -1441,6 +1441,7 @@
     "derivatives_context_protocol_v2_input_quality_eligible": false,
     "derivatives_context_protocol_v2_evidence_eligible": false,
     "derivatives_context_readiness_command": "make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python",
+    "derivatives_context_readiness_default_output": "summary; full structured packet via RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT=json",
     "derivatives_context_status_command": "make radar-derivatives-bybit-status PYTHON=.venv/bin/python",
     "derivatives_context_secondary_cross_check": "Coinalyze may corroborate Catalyst Radar context but cannot substitute for Bybit-native identity, clocks, funding, OI, positioning, or execution evidence",
     "derivatives_context_smoke_command": "make radar-derivatives-bybit-smoke PYTHON=.venv/bin/python",
