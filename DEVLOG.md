@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the fifty-third no-send market cycle · Codex
+**Why:** The hourly campaign cadence was eligible with current explicit
+CoinGecko authorization. One bounded observation advances genuine temporal,
+outcome, episode, and prospective control-context evidence without changing
+Decision policy.
+**Changes:** Daily Operations made exactly one `/coins/markets` request and
+published `radar_market_no_send_20260721t090556140140z_130c50f83412` as the
+strict-clean revision-12 authority. The request returned HTTP 200 with 80
+bounded rows in 2,779 ms and no retry. Campaign truth advanced to 53 cycles,
+1,590 retained / 1,560 baseline-counted / 30 too-close observations, 9 ideas,
+6 matured / 2 pending / 1 `due_missing_price` outcomes, and 330 prospective
+universe/control-liquidity rows. The exact generation has 30 observations and
+one non-actionable DEXE `risk_watch` idea; 29/30 rows have complete causal
+24-hour inputs, with DEXE explicitly unavailable rather than inferred. The
+closed frontier now contains 4 fixed-start episodes, 5 dependent repeats, and
+3 matured episodes; route/origin coverage remains only 2/8 and 1/7, trusted
+spread remains zero, and seven receipt-backed ideas await explicit human view.
+**Verify:** `make radar-daily-ops-status PYTHON=python3` reports the exact
+successful namespace and waits until `2026-07-21T10:05:58.044865+00:00` before
+another call. `make radar-dashboard-authority-status PYTHON=python3` reports
+exact authority with pointer SHA-256
+`0d34325e721ad45ef9ebcfdcfc79729f43621b841cfd483749b0a9b573c95090`.
+`make radar-market-campaign-report PYTHON=python3` reconciled 53 cycles and 9
+candidates with zero provider calls. Loopback `HEAD /` returned HTTP 200 with
+the exact namespace, run, revision, and operator-state SHA-256
+`c979525aeb160ab1c4f236f92c34d6f9f14bfc4873f8375fe20bc6a0024a945d`.
+`jq empty` and `git diff --check` passed.
+**Notes/risks:** This cycle made one already-authorized public market-data call
+and no retry. It sent no Telegram message and created no trade, order, paper
+trade, normal RSI row, or Event Alpha `TRIGGERED_FADE`. Bybit remains separately
+unauthorized/unreachable, and no source, score, threshold, route, partition, or
+Protocol-v2 policy was changed.
+
 ## 2026-07-20 — Bind fixture-stale tolerance to non-live provenance · Codex
 **Why:** `fixture_allowed_stale` is an intentional deterministic-fixture
 exception, but a fixture-like `run_mode` alone did not prove that the surrounding
