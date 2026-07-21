@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Require derivatives evidence for anomaly priority · Codex
+**Why:** A nonblank placeholder in `perp_symbols` or `coinalyze_symbols`, or
+mere eligibility for the derivatives lane, was enough to claim derivatives
+availability and add eight anomaly-priority points without a usable instrument
+or observed derivatives metric.
+**Changes:** Derivatives availability now recognizes only an explicit semantic
+availability claim, a finite observed derivatives metric, or a typed bounded
+venue-style instrument identifier. Boolean/status placeholders, whitespace,
+unsupported characters, structured members, and lane eligibility alone no
+longer count. Registry enrichment applies the same identifier contract before
+materializing `derivatives_available=true`; valid Bybit/Coinalyze-style symbols
+remain compatible.
+**Verify:** The exact `perp_symbols=["false"]` reproduction changed from true to
+false derivatives availability and no longer receives the +8 priority
+component. Lane-only registry eligibility also stays unavailable, while
+`DERIVUSDT` retains the observed-instrument claim. All market-surface tests
+passed (`96 passed`); `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests earlier in this prompt and this is an isolated anomaly-priority evidence
+boundary. No priority weight, anomaly threshold, Decision route, provider call,
+authority, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` changed. Quantitative source-size limits remain advisory.
+
 ## 2026-07-21 — Require absolute source URLs for catalyst knownness · Codex
 **Why:** Any nonblank string in a market row's URL fields was treated as a
 confirming catalyst source. Placeholders such as `false` or `unknown`, relative

@@ -79,6 +79,22 @@ _MARKET_CLASSIFIER_CONTROL_FIELDS = (
     "failed_reclaim",
     "price_below_event_vwap",
 )
+_DERIVATIVES_IDENTIFIER_PLACEHOLDERS = frozenset(
+    {
+        "0",
+        "1",
+        "false",
+        "n/a",
+        "na",
+        "none",
+        "not_available",
+        "null",
+        "true",
+        "unavailable",
+        "unknown",
+    }
+)
+_DERIVATIVES_IDENTIFIER_CHARACTERS = frozenset("._:/-")
 
 
 @dataclass(frozen=True)
@@ -868,7 +884,9 @@ def _merge_asset_metadata(row: dict[str, Any], asset: event_asset_registry.Canon
     row["is_theme_or_sector"] = asset.is_theme_or_sector
     if asset.diagnostics_reason:
         row["diagnostics_reason"] = asset.diagnostics_reason
-    if asset.perp_symbols or asset.coinalyze_symbols or asset.eligible_lanes and "derivatives" in asset.eligible_lanes:
+    if _has_derivatives_identifier_values(
+        asset.perp_symbols,
+    ) or _has_derivatives_identifier_values(asset.coinalyze_symbols):
         row["derivatives_available"] = True
 
 
@@ -1188,7 +1206,7 @@ def _derivatives_available(snapshot: Mapping[str, Any], source_row: Mapping[str,
         return True
     for key in ("perp_symbols", "coinalyze_symbols"):
         value = source_row.get(key) if key in source_row else snapshot.get(key)
-        if _has_identifier_values(value):
+        if _has_derivatives_identifier_values(value):
             return True
     for key in ("open_interest_delta", "funding_level", "funding_zscore"):
         value = source_row.get(key) if key in source_row else snapshot.get(key)
@@ -1239,15 +1257,32 @@ def _is_absolute_evidence_url(value: object) -> bool:
     )
 
 
-def _has_identifier_values(value: object) -> bool:
+def _has_derivatives_identifier_values(value: object) -> bool:
     if isinstance(value, str):
-        return bool(value.strip())
+        return _is_derivatives_identifier(value)
     if isinstance(value, IterableABC) and not isinstance(
         value,
         (str, bytes, Mapping),
     ):
-        return any(isinstance(item, str) and bool(item.strip()) for item in value)
+        return any(_is_derivatives_identifier(item) for item in value)
     return False
+
+
+def _is_derivatives_identifier(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    candidate = value.strip()
+    return bool(
+        candidate
+        and len(candidate) <= 128
+        and candidate.casefold() not in _DERIVATIVES_IDENTIFIER_PLACEHOLDERS
+        and any(character.isalpha() for character in candidate)
+        and all(
+            character.isalnum()
+            or character in _DERIVATIVES_IDENTIFIER_CHARACTERS
+            for character in candidate
+        )
+    )
 
 
 def _search_queries_for_anomaly(

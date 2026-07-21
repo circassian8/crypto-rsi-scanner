@@ -415,6 +415,8 @@ def test_market_anomaly_false_metadata_does_not_add_source_or_derivatives_claims
             "open_interest_delta": False,
             "funding_level": False,
             "funding_zscore": False,
+            "perp_symbols": ["false"],
+            "coinalyze_symbols": ["unknown", "n/a", "BAD SYMBOL"],
             "catalyst_confirmed": "false",
             "accepted_evidence_count": 0,
             "observed_at": "2026-06-15T16:00:00Z",
@@ -430,6 +432,50 @@ def test_market_anomaly_false_metadata_does_not_add_source_or_derivatives_claims
     assert anomalies[0]["derivatives_available"] is False
     assert anomalies[0]["priority_components"]["derivatives_availability"] == 0.0
     assert anomalies[0]["source_catalyst_knownness"] == "unknown"
+
+
+def test_market_anomaly_derivatives_availability_requires_evidence_not_lane_eligibility():
+    import crypto_rsi_scanner.event_alpha.radar.asset_registry as event_asset_registry
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "derivatives-contract-token",
+        "symbol": "DERIV",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000.0,
+        "freshness_status": "fresh",
+    }
+    lane_only = event_asset_registry.CanonicalAsset(
+        canonical_asset_id="derivatives-contract-token",
+        symbol="DERIV",
+        coin_id="derivatives-contract-token",
+        eligible_lanes=("research", "derivatives"),
+    )
+
+    _, lane_only_anomalies = scanner.scan_market_rows(
+        [base],
+        asset_registry=(lane_only,),
+        observed_at="2026-07-21T12:45:00Z",
+    )
+    _, identifier_anomalies = scanner.scan_market_rows(
+        [{**base, "perp_symbols": ["DERIVUSDT"]}],
+        observed_at="2026-07-21T12:45:00Z",
+    )
+
+    assert lane_only_anomalies[0]["derivatives_available"] is False
+    assert (
+        lane_only_anomalies[0]["priority_components"]["derivatives_availability"]
+        == 0.0
+    )
+    assert identifier_anomalies[0]["derivatives_available"] is True
+    assert (
+        identifier_anomalies[0]["priority_components"]["derivatives_availability"]
+        == 8.0
+    )
 
 
 def test_market_anomaly_source_knownness_requires_typed_evidence_reference():
