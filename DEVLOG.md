@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the fifty-eighth no-send market cycle · Codex
+**Why:** The hourly Decision Radar cadence became eligible with the existing
+CoinGecko authorization, so the temporal baseline needed one bounded genuine
+observation without weakening any provider or publication guard.
+**Changes:** Daily Operations made exactly one request, received HTTP 200 with
+80 bounded rows in 1,429 ms and no retry, selected 30 rows, and published
+`radar_market_no_send_20260721t141358789000z_a1a534027864`. Revision-12
+authority now binds operator-state SHA-256
+`1d6b6d4c7cac30f04aae8284a91996fcb26357f02f94f71097f0e4ffad21db91`
+and pointer SHA-256
+`b494d1e30a61adf684b807656cdd96148184fd74febbdd4c7e563d5cbef100f8`.
+Campaign truth advanced to 58 cycles / 1,740 retained / 1,710 baseline-counted
+/ 30 too-close observations and 480 prospective universe/liquidity rows. The
+current generation is healthy-empty with zero anomalies/ideas; exact causal
+24-hour regime input remains 29/30 because HBAR rank 30 still lacks its anchor.
+**Verify:** Daily Operations readiness was `eligible`; the cycle completed as
+`published_and_restarted`; strict `no_key_live` doctor is zero blockers and
+warnings; dashboard readiness is `READY`; authority status revalidated the
+exact pointer; and loopback HEAD returned HTTP 200 with the exact namespace,
+run, revision, and operator digest. The terminal campaign report refreshed and
+next eligibility is `2026-07-21T15:14:01.079240+00:00`.
+**Notes/risks:** The frontier remains 4 fixed-start episodes / 7 dependent
+repeats / 3 matured episodes, with zero trusted spread. No retry, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+No threshold or route changed.
+
 ## 2026-07-21 — Refresh advisory architecture reports after control hardening · Codex
 **Why:** The point-in-time evidence changes moved source and test line locations,
 so the checked-in project-health inventories needed to match the committed
