@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed Decision calendar evidence · Codex
+**Why:** Calendar IDs, classifications, certainty, importance, lineage, and
+references are part of the canonical trader-facing Decision projection. Object
+or sequence values could previously be stringified into plausible-looking
+evidence at one boundary, allowing malformed context to survive projection.
+**Changes:** Decision calendar validation now requires typed scalar metadata,
+closed certainty/importance values, timezone-aware clocks, ordered windows, and
+a resolvable typed event ID or evidence reference for every canonical evidence
+row. Projection refuses malformed raw or already-projected calendar context,
+copies only typed event IDs, and the independent artifact schema rejects drift
+instead of normalizing it. Valid exact, windowed, unified, unlock, nearby, and
+legacy scheduled context retains its existing route and rendering behavior.
+**Verify:** `4` focused malformed/valid calendar and projection-tamper tests
+passed; the `12`-file Decision/schema/merge/calendar suite passed (`203 passed`).
+The wider official-calendar/publication/dashboard suite passed `198` tests in
+the restricted environment; its only denied loopback-bind test passed
+separately with local-socket permission (`1 passed`).
+`make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Verification was fixture/local only and made no provider call.
+No score, threshold, route, source authority, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE` changed. Source-file size is
+advisory; artifact, security, provider, and resource bounds remain enforced.
+
 ## 2026-07-21 — Record the fifty-third no-send market cycle · Codex
 **Why:** The hourly campaign cadence was eligible with current explicit
 CoinGecko authorization. One bounded observation advances genuine temporal,

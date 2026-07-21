@@ -804,6 +804,47 @@ def test_malformed_calendar_context_cannot_bypass_scheduled_risk_review():
         },
         {"calendar_events": {"scheduled_at": "2026-06-15T18:00:00Z"}},
         {"scheduled_at": "not-a-time"},
+        {
+            "unified_calendar_event": {
+                "event_id": {"id": "fomc-window"},
+                "scheduled_at": "2026-06-15T18:00:00Z",
+            }
+        },
+        {
+            "unified_calendar_event": {
+                "event_id": "fomc-window",
+                "event_kind": ["central_bank"],
+                "scheduled_at": "2026-06-15T18:00:00Z",
+            }
+        },
+        {
+            "unified_calendar_event": {
+                "event_id": "fomc-window",
+                "scheduled_at": "2026-06-15T18:00:00Z",
+                "time_certainty": {"value": "exact"},
+            }
+        },
+        {
+            "unified_calendar_event": {
+                "event_id": "fomc-window",
+                "scheduled_at": "2026-06-15T18:00:00Z",
+                "importance": True,
+            }
+        },
+        {
+            "unified_calendar_event": {
+                "event_id": "fomc-window",
+                "scheduled_at": "2026-06-15T18:00:00Z",
+                "source_url": ["https://example.invalid/fomc"],
+            }
+        },
+        {
+            "unified_calendar_event": {
+                "event_id": "fomc-window",
+                "window_start": "2026-06-15T20:00:00Z",
+                "window_end": "2026-06-15T18:00:00Z",
+            }
+        },
     )
 
     for malformed in malformed_contexts:

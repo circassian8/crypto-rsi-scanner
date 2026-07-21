@@ -54,6 +54,7 @@ _CALENDAR_SINGLE_EVENT_FIELDS = (
     "unlock_event",
 )
 _CALENDAR_EVENT_LIST_FIELDS = (
+    "calendar_evidence",
     "unified_calendar_context",
     "nearby_calendar_events",
     "calendar_events",
@@ -65,6 +66,21 @@ _CALENDAR_TIMESTAMP_FIELDS = (
     "window_start",
     "window_end",
 )
+_CALENDAR_TEXT_FIELDS = (
+    "calendar_event_id",
+    "event_id",
+    "evidence_reference",
+    "event_kind",
+    "category",
+    "event_type",
+    "source",
+    "provider",
+    "source_url",
+)
+_CALENDAR_ENUM_FIELDS = {
+    "time_certainty": {"exact", "window", "estimated", "unknown"},
+    "importance": {"low", "medium", "high", "critical", "unknown"},
+}
 _ONCHAIN_CONTEXT_FIELDS = (
     "dex_state_snapshot",
     "onchain_state_snapshot",
@@ -641,7 +657,7 @@ def calendar_context_invalid(data: Mapping[str, Any]) -> bool:
         if field not in data or data.get(field) in (None, "", {}):
             continue
         value = data.get(field)
-        if not isinstance(value, Mapping) or _calendar_event_timestamps_invalid(value):
+        if not isinstance(value, Mapping) or _calendar_event_claims_invalid(value):
             return True
     for field in _CALENDAR_EVENT_LIST_FIELDS:
         if field not in data or data.get(field) in (None, "", [], ()):
@@ -650,15 +666,19 @@ def calendar_context_invalid(data: Mapping[str, Any]) -> bool:
         if not isinstance(value, (list, tuple)) or any(
             not isinstance(item, Mapping)
             or not item
-            or _calendar_event_timestamps_invalid(item)
+            or _calendar_event_claims_invalid(item)
             for item in value
         ):
             return True
-    return (
-        "scheduled_at" in data
-        and data.get("scheduled_at") not in (None, "")
-        and _parse_aware_timestamp(data.get("scheduled_at")) is None
-    )
+        if field == "calendar_evidence" and any(
+            not _typed_text(item.get("calendar_event_id"))
+            and not _typed_text(item.get("evidence_reference"))
+            for item in value
+        ):
+            return True
+    if "scheduled_at" not in data or data.get("scheduled_at") in (None, ""):
+        return False
+    return _calendar_event_claims_invalid(data)
 
 
 def origin_context_invalid(data: Mapping[str, Any]) -> bool:
@@ -776,6 +796,49 @@ def _calendar_event_timestamps_invalid(event: Mapping[str, Any]) -> bool:
         and _parse_aware_timestamp(event.get(field)) is None
         for field in _CALENDAR_TIMESTAMP_FIELDS
     )
+
+
+def _calendar_event_claims_invalid(event: Mapping[str, Any]) -> bool:
+    """Reject calendar metadata that would otherwise stringify into evidence."""
+
+    if any(
+        field in event
+        and event.get(field) not in (None, "")
+        and not _typed_text(event.get(field))
+        for field in _CALENDAR_TEXT_FIELDS
+    ):
+        return True
+    for field, allowed in _CALENDAR_ENUM_FIELDS.items():
+        if field not in event or event.get(field) in (None, ""):
+            continue
+        value = _typed_text(event.get(field)).casefold()
+        if not value or value not in allowed:
+            return True
+    if any(
+        field in event
+        and event.get(field) not in (None, "")
+        and not isinstance(event.get(field), str)
+        for field in _CALENDAR_TIMESTAMP_FIELDS
+    ) or _calendar_event_timestamps_invalid(event):
+        return True
+    scheduled = next(
+        (
+            _parse_aware_timestamp(event.get(field))
+            for field in ("scheduled_at", "event_start_time", "effective_time")
+            if event.get(field) not in (None, "")
+        ),
+        None,
+    )
+    window_start = _parse_aware_timestamp(event.get("window_start"))
+    window_end = _parse_aware_timestamp(event.get("window_end"))
+    if window_start is not None and window_end is not None and window_end < window_start:
+        return True
+    certainty = _typed_text(event.get("time_certainty")).casefold()
+    if certainty == "exact" and scheduled is None:
+        return True
+    if certainty == "window" and (window_start is None or window_end is None):
+        return True
+    return False
 
 
 def timing_state_for_profile(profile: TimingProfile, *, scheduled: bool) -> str:

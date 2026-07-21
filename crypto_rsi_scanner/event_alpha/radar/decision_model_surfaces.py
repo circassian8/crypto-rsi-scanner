@@ -20,6 +20,7 @@ from ..artifacts.schema.decision_model import (
     validate_contract,
 )
 from . import decision_catalyst_policy
+from . import decision_policy
 from . import source_independence as event_source_independence
 from . import source_independence_store as event_source_independence_store
 from .decision_models import actionability_score_cohort
@@ -131,6 +132,8 @@ def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
     for row in rows:
         if not isinstance(row, Mapping):
             continue
+        if decision_policy.calendar_context_invalid(row):
+            return {}
         nested = row.get("decision_projection")
         authorities: list[Mapping[str, Any]] = []
         if isinstance(nested, Mapping) and nested:
@@ -502,9 +505,10 @@ def _closed_projection_values(
         "what_invalidates": invalidates,
         "calendar_evidence": calendar_evidence,
         "calendar_evidence_ids": [
-            str(row.get("calendar_event_id"))
+            row["calendar_event_id"]
             for row in calendar_evidence
-            if str(row.get("calendar_event_id") or "").strip()
+            if isinstance(row.get("calendar_event_id"), str)
+            and row.get("calendar_event_id", "").strip()
         ],
         "rsi_context": rsi_context,
         "rsi_context_references": rsi_references,

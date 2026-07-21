@@ -605,33 +605,83 @@ def _validate_projection_calendar_and_rsi(row: Mapping[str, Any]) -> list[str]:
             if not isinstance(item, Mapping):
                 errors.append("decision_projection_calendar_evidence_invalid")
                 continue
-            event_id = str(item.get("calendar_event_id") or "").strip()
-            reference = str(item.get("evidence_reference") or "").strip()
+            raw_event_id = item.get("calendar_event_id")
+            raw_reference = item.get("evidence_reference")
+            event_id = raw_event_id.strip() if isinstance(raw_event_id, str) else ""
+            reference = raw_reference.strip() if isinstance(raw_reference, str) else ""
+            if raw_event_id not in (None, "") and not event_id:
+                errors.append("decision_projection_calendar_event_id_invalid")
+            if raw_reference not in (None, "") and not reference:
+                errors.append("decision_projection_calendar_reference_invalid")
             if not event_id and not reference:
                 errors.append("decision_projection_calendar_evidence_unresolvable")
             if event_id:
                 evidence_ids.append(event_id)
-            if not str(item.get("category") or item.get("event_kind") or "").strip():
+            category = item.get("category")
+            event_kind = item.get("event_kind")
+            if category not in (None, "") and not (
+                isinstance(category, str) and category.strip()
+            ):
+                errors.append("decision_projection_calendar_category_invalid")
+            if event_kind not in (None, "") and not (
+                isinstance(event_kind, str) and event_kind.strip()
+            ):
+                errors.append("decision_projection_calendar_event_kind_invalid")
+            if not any(
+                isinstance(value, str) and value.strip()
+                for value in (category, event_kind)
+            ):
                 errors.append("decision_projection_calendar_category_missing")
-            if str(item.get("time_certainty") or "") not in {
+            if not isinstance(item.get("time_certainty"), str) or item.get(
+                "time_certainty"
+            ) not in {
                 "exact", "window", "estimated", "unknown",
             }:
                 errors.append("decision_projection_calendar_time_certainty_invalid")
-            if str(item.get("importance") or "") not in {
+            if not isinstance(item.get("importance"), str) or item.get(
+                "importance"
+            ) not in {
                 "low", "medium", "high", "critical", "unknown",
             }:
                 errors.append("decision_projection_calendar_importance_invalid")
+            for field in ("source", "source_url"):
+                value = item.get(field)
+                if value not in (None, "") and not (
+                    isinstance(value, str) and value.strip()
+                ):
+                    errors.append(
+                        f"decision_projection_calendar_{field}_invalid"
+                    )
             timestamps = (
                 item.get("scheduled_at"), item.get("window_start"), item.get("window_end"),
             )
             if not any(value not in (None, "") for value in timestamps):
                 errors.append("decision_projection_calendar_time_missing")
             elif any(
-                value not in (None, "") and _aware_timestamp(value) is None
+                value not in (None, "")
+                and (
+                    not isinstance(value, str)
+                    or _aware_timestamp(value) is None
+                )
                 for value in timestamps
             ):
                 errors.append("decision_projection_calendar_time_invalid")
-    if _items(row.get("calendar_evidence_ids")) != tuple(evidence_ids):
+    raw_evidence_ids = row.get("calendar_evidence_ids")
+    raw_evidence_id_values = (
+        tuple(raw_evidence_ids) if _is_sequence(raw_evidence_ids) else ()
+    )
+    typed_evidence_ids = (
+        tuple(
+            value.strip()
+            for value in raw_evidence_id_values
+            if isinstance(value, str) and value.strip()
+        )
+        if raw_evidence_id_values
+        else ()
+    )
+    if len(typed_evidence_ids) != len(raw_evidence_id_values):
+        errors.append("decision_projection_calendar_ids_invalid")
+    if typed_evidence_ids != tuple(evidence_ids):
         errors.append("decision_projection_calendar_ids_mismatch")
     if str(row.get("radar_route") or "") == "calendar_risk" and not (
         _is_sequence(evidence) and any(isinstance(item, Mapping) for item in evidence)

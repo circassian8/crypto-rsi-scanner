@@ -419,6 +419,9 @@ def test_calendar_preview_keeps_every_canonical_item_and_rejects_false_calendar_
 
 
 def test_closed_projection_fails_closed_on_tampered_context_or_safety():
+    from copy import deepcopy
+
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
     from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import decision_model_values
 
     projected = decision_model_values(_market_led_candidate())
@@ -433,6 +436,45 @@ def test_closed_projection_fails_closed_on_tampered_context_or_safety():
 
     assert decision_model_values(alias_drift) == {}
     assert decision_model_values(unsafe) == {}
+
+    calendar_projection = decision_model_values(_market_led_candidate(
+        directional_bias="risk",
+        confidence_band="exploratory",
+        timing_state="scheduled",
+        radar_route="calendar_risk",
+        radar_route_reason="attached_calendar_or_scheduled_risk_research",
+        radar_actionable=False,
+        preferred_horizon="scheduled_window",
+        unified_calendar_event={
+            "calendar_event_id": "calendar-fomc-v2",
+            "event_kind": "central_bank",
+            "scheduled_at": "2026-06-15T20:00:00Z",
+            "time_certainty": "exact",
+            "importance": "high",
+            "source": "Fixture Calendar",
+            "source_url": "https://example.invalid/calendar/fomc",
+        },
+    ))
+    assert calendar_projection
+    malformed_calendar_rows = []
+    for field, value in (
+        ("calendar_event_id", {"id": "calendar-fomc-v2"}),
+        ("category", ["central_bank"]),
+        ("time_certainty", {"value": "exact"}),
+        ("importance", 3),
+        ("source", {"provider": "fixture"}),
+        ("source_url", ["https://example.invalid/calendar/fomc"]),
+    ):
+        malformed = deepcopy(calendar_projection)
+        malformed["calendar_evidence"][0][field] = value
+        malformed_calendar_rows.append(malformed)
+    malformed_ids = deepcopy(calendar_projection)
+    malformed_ids["calendar_evidence_ids"] = [{"id": "calendar-fomc-v2"}]
+    malformed_calendar_rows.append(malformed_ids)
+
+    for malformed in malformed_calendar_rows:
+        assert validate_contract(malformed)
+        assert decision_model_values(malformed) == {}
 
 
 def test_v2_projection_fails_closed_on_malformed_actionable_route():
