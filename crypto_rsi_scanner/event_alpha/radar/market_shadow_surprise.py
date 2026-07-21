@@ -14,6 +14,7 @@ import statistics
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from numbers import Real
 from typing import Any
 
@@ -2175,11 +2176,18 @@ def _required_aware_time(value: object, field_name: str) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be an aware timestamp")
     try:
-        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        return _parse_aware_timestamp_text(value.strip())
     except ValueError as exc:
         raise ValueError(f"{field_name} must be an aware timestamp") from exc
+
+
+@lru_cache(maxsize=4096)
+def _parse_aware_timestamp_text(value: str) -> datetime:
+    """Parse repeated immutable observation clocks through one bounded cache."""
+
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
-        raise ValueError(f"{field_name} must be an aware timestamp")
+        raise ValueError("timestamp must include timezone information")
     return parsed.astimezone(timezone.utc)
 
 

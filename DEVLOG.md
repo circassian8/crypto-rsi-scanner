@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Cache repeated clocks in causal shadow replay · Codex
+**Why:** A read-only profile of the canonical 1,800-row campaign report recorded
+726.7 million calls in 121.354 profiled seconds. Shadow temporal-surprise replay
+accounted for 104.125 seconds, including roughly 56.7 million repeated parses of
+the same immutable observation clocks.
+**Changes:**
+- Added a bounded 4,096-entry LRU cache for ISO timestamp text parsing in the
+  pure shadow evaluator. The validation wrapper still owns field-specific error
+  messages, and invalid/naive timestamps still fail closed.
+- Cached no projection, sample, feature value, digest, or report result; every
+  causal evaluation and closed-schema check continues to run normally.
+- Added a regression proving a repeated `Z` timestamp produces one miss/one hit,
+  the cache is bounded, UTC normalization is unchanged, and field-specific
+  validation survives.
+**Verify:** All 121 focused shadow-surprise and campaign tests passed in 1.23
+seconds; compileall and diff checks passed. Rebuilding the complete checked
+campaign report at its exact recorded clock produced full value equality and
+completed in 31.861 seconds versus 37.968 seconds on the prior full path.
+**Notes/risks:** No history, route, score, threshold, sample, outcome, artifact,
+provider state, or dashboard authority changed. Source-size measurements remain
+advisory; the cache bound is a runtime resource/safety bound, not a source-size
+guard.
+
 ## 2026-07-22 — Make human-review queue discovery fast and exact · Codex
 **Why:** The read-only review queue rebuilt the comprehensive campaign report
 to obtain a small generation-summary slice, forcing unrelated baseline,

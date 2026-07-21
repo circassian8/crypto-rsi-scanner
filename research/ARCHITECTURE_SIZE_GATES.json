@@ -1881,7 +1881,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2325,
+      "line_count": 2333,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
@@ -1929,7 +1929,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1920,
+      "line_count": 1947,
       "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "source_kind": "test"
     },
@@ -2210,7 +2210,7 @@
   ],
   "functions_over_limit_count": 33,
   "gate_status": "pass",
-  "generated_at": "2026-07-21T21:51:30.488876+00:00",
+  "generated_at": "2026-07-21T22:00:39.145887+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2228,7 +2228,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2325,
+      "line_count": 2333,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
@@ -2470,14 +2470,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1932,
-      "path": "tests/event_alpha/test_market_observation_campaign.py",
+      "line_count": 1947,
+      "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 1920,
-      "path": "tests/event_alpha/test_market_shadow_surprise.py",
+      "line_count": 1932,
+      "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
     {
@@ -4378,7 +4378,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2325,
+      "line_count": 2333,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -4450,7 +4450,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1920,
+      "line_count": 1947,
       "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -4902,7 +4902,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2325,
+      "line_count": 2333,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
@@ -5606,7 +5606,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2325,
+      "line_count": 2333,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "source_kind": "production"
     },
@@ -5790,7 +5790,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 2325,
+        "line_count": 2333,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
         "threshold": 1200
       },
@@ -5997,7 +5997,7 @@
         "threshold": 1500
       },
       {
-        "line_count": 2325,
+        "line_count": 2333,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
         "threshold": 1500
       },
@@ -6255,7 +6255,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2325,
+      "line_count": 2333,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -6327,7 +6327,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1920,
+      "line_count": 1947,
       "path": "tests/event_alpha/test_market_shadow_surprise.py",
       "severity": "advisory",
       "source_kind": "test",

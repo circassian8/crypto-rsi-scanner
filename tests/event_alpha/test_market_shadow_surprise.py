@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from crypto_rsi_scanner.event_alpha.radar import market_shadow_surprise
 from crypto_rsi_scanner.event_alpha.radar.market_shadow_surprise import (
     ELIGIBLE_FEATURE_BASES,
     MAD_NORMAL_CONSISTENCY_FACTOR,
@@ -22,6 +23,32 @@ from crypto_rsi_scanner.event_alpha.radar.market_shadow_surprise import (
 
 _HISTORY_ARTIFACT = "event_market_history.jsonl"
 _HISTORY_SHA256 = "a" * 64
+
+
+def test_repeated_observation_clocks_use_bounded_parse_cache() -> None:
+    market_shadow_surprise._parse_aware_timestamp_text.cache_clear()
+
+    first = market_shadow_surprise._required_aware_time(
+        "2026-07-15T12:34:56Z",
+        "first observed_at",
+    )
+    second = market_shadow_surprise._required_aware_time(
+        "2026-07-15T12:34:56Z",
+        "second observed_at",
+    )
+    cache = market_shadow_surprise._parse_aware_timestamp_text.cache_info()
+
+    assert first == second == datetime(
+        2026, 7, 15, 12, 34, 56, tzinfo=timezone.utc
+    )
+    assert cache.maxsize == 4096
+    assert cache.misses == 1
+    assert cache.hits == 1
+    with pytest.raises(ValueError, match="custom observed_at must be an aware"):
+        market_shadow_surprise._required_aware_time(
+            "2026-07-15T12:34:56",
+            "custom observed_at",
+        )
 
 
 def evaluate_shadow_temporal_surprise(
