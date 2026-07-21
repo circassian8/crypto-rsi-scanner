@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed market asset controls before anomaly creation · Codex
+**Why:** An explicit object, sequence, arbitrary number, or unknown string in
+`is_tradable_asset`, `is_theme_or_sector`, `is_quote_asset`, or
+`quote_asset_excluded` was treated as merely false. A high-momentum row could
+therefore create a raw anomaly and catalyst-enrichment job before downstream
+Decision validation rejected the malformed control.
+**Changes:** Anomaly classification now validates the first explicit asset
+control claim in snapshot/source authority order against the existing semantic
+boolean contract. Missing/null controls and valid booleans, 0/1, and accepted
+true/false strings retain their behavior. Invalid explicit claims add a bounded
+`invalid_market_control:<field>` snapshot warning and return `no_reaction`, so
+they cannot enter the anomaly or catalyst queue. The sector/theme helper keeps
+its narrow classification meaning; validity is enforced separately at the
+classification boundary.
+**Verify:** The exact object-valued `is_tradable_asset` reproduction changed
+from one `confirmed_breakout` with no warning to zero anomalies and an explicit
+warning. Existing semantic controls plus all 16 malformed field/value cases
+passed (`18 passed`). The wider market surfaces, alias/time/numeric/evidence
+integrity, anomaly report/receipt, live/no-send, and Decision-v2 suites passed
+(`244 passed`). `make event-alpha-market-anomaly-smoke PYTHON=python3` retained
+8 snapshots and the expected 5 anomalies, with zero blockers and only the two
+expected standalone missing source/readiness warnings. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests immediately before this isolated classifier change and the complete
+affected market/Decision paths were rerun. No threshold, score, route, provider,
+authority, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` changed. Quantitative source-file size remains advisory;
+evidence and safety contracts remain enforced.
+
 ## 2026-07-21 — Record the fifty-sixth no-send market cycle · Codex
 **Why:** The one-hour cadence became eligible while explicit CoinGecko
 authorization remained present. Continuing genuine point-in-time collection is

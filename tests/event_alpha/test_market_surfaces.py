@@ -6,6 +6,8 @@ import json
 from collections import Counter
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from tests.event_alpha import _api_helpers as _event_alpha_api_helpers
 
 globals().update({
@@ -636,6 +638,47 @@ def test_semantically_untradable_asset_cannot_create_market_anomaly():
         )
         assert len(snapshots) == 1
         assert anomalies == []
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "is_tradable_asset",
+        "is_theme_or_sector",
+        "is_quote_asset",
+        "quote_asset_excluded",
+    ),
+)
+@pytest.mark.parametrize("malformed", ({"value": False}, [False], 2, "maybe"))
+def test_malformed_market_asset_control_cannot_create_anomaly(
+    field: str,
+    malformed: object,
+) -> None:
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "malformed-control-token",
+        "coin_id": "malformed-control-token",
+        "symbol": "BADCTL",
+        "return_unit": "percent_points",
+        "return_4h": 12.0,
+        "return_24h": 18.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 100_000_000.0,
+        "spread_bps": 5.0,
+        "freshness_status": "fresh",
+    }
+
+    snapshots, anomalies = scanner.scan_market_rows(
+        [{**base, field: malformed}],
+        observed_at="2026-07-21T12:20:00Z",
+    )
+
+    assert len(snapshots) == 1
+    assert anomalies == []
+    assert f"invalid_market_control:{field}" in snapshots[0]["warnings"]
+    assert scanner.classify_market_state(snapshots[0], base) == scanner.NO_REACTION
 
 
 def test_market_confirmation_dex_flags_and_numeric_evidence_are_type_safe():

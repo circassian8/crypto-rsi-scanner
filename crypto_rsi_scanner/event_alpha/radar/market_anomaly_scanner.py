@@ -61,6 +61,12 @@ _MARKET_FRESHNESS_STATUSES = frozenset(
         "fixture_allowed_stale",
     }
 )
+_MARKET_CONTROL_FIELDS = (
+    "is_theme_or_sector",
+    "quote_asset_excluded",
+    "is_quote_asset",
+    "is_tradable_asset",
+)
 
 
 @dataclass(frozen=True)
@@ -217,6 +223,15 @@ def scan_market_rows(
                     snapshot_payload[key] = market_cap
                 continue
             snapshot_payload[key] = row.get(key)
+        control_warnings = _market_control_warnings(snapshot_payload, row)
+        if control_warnings:
+            warnings = snapshot_payload.get("warnings")
+            if isinstance(warnings, list):
+                warnings.extend(
+                    warning for warning in control_warnings if warning not in warnings
+                )
+            elif warnings in (None, ""):
+                snapshot_payload["warnings"] = control_warnings
         snapshot_rows.append(snapshot_payload)
         if not _canonical_snapshot_identity(snapshot_payload):
             continue
@@ -275,6 +290,7 @@ def classify_market_state(
     if (
         _unit_contract_blocks_classification(snapshot)
         or _freshness_contract_blocks_classification(snapshot)
+        or _market_control_contract_blocks_classification(snapshot, row)
     ):
         return NO_REACTION
     r4 = _float(snapshot.get("return_4h")) or 0.0
@@ -1397,6 +1413,46 @@ def _freshness_contract_blocks_classification(snapshot: Mapping[str, Any]) -> bo
         }
         for warning in warnings
     )
+
+
+def _market_control_contract_blocks_classification(
+    snapshot: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+) -> bool:
+    return bool(_market_control_warnings(snapshot, source_row))
+
+
+def _market_control_warnings(
+    snapshot: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+) -> list[str]:
+    """Return malformed explicit asset-control claims in authority order."""
+
+    warnings: list[str] = []
+    for field in _MARKET_CONTROL_FIELDS:
+        supplied, value = _selected_market_control_claim(
+            snapshot,
+            source_row,
+            field,
+        )
+        if supplied and _semantic_boolean(value) is None:
+            warnings.append(f"invalid_market_control:{field}")
+    return warnings
+
+
+def _selected_market_control_claim(
+    snapshot: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+    field: str,
+) -> tuple[bool, object]:
+    for source in (snapshot, source_row):
+        if field not in source:
+            continue
+        value = source.get(field)
+        if value is None or value == "":
+            continue
+        return True, value
+    return False, None
 
 
 def _count(value: object) -> int | None:
