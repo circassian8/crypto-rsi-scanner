@@ -285,7 +285,10 @@ def _project_shadow_surprise_audit(
         if not isinstance(raw_asset_variation, list) or len(raw_asset_variation) > 128:
             raise ValueError("campaign_shadow_asset_variation_oversized")
         projected_asset_variation = tuple(
-            _project_shadow_asset_variation(row)
+            _project_shadow_asset_variation(
+                row,
+                input_trace_available=audit_schema_version >= 5,
+            )
             for row in raw_asset_variation
         )
     else:
@@ -317,6 +320,7 @@ def _project_shadow_surprise_audit(
         "distribution_diagnostics_available": audit_schema_version >= 2,
         "variation_diagnostics_available": audit_schema_version >= 3,
         "asset_variation_diagnostics_available": audit_schema_version >= 4,
+        "input_trace_diagnostics_available": audit_schema_version >= 5,
         "asset_variation_summaries": projected_asset_variation,
         "source_bound_projection_digest": _identity(
             audit.get("source_bound_projection_digest"),
@@ -551,7 +555,11 @@ def _project_shadow_variation_reference(
     }
 
 
-def _project_shadow_asset_variation(value: Any) -> dict[str, Any]:
+def _project_shadow_asset_variation(
+    value: Any,
+    *,
+    input_trace_available: bool,
+) -> dict[str, Any]:
     row = _mapping(value, "shadow_asset_variation")
     raw_basis = _mapping(
         row.get("retained_feature_basis_counts"),
@@ -606,7 +614,11 @@ def _project_shadow_asset_variation(value: Any) -> dict[str, Any]:
         ),
         "feature_variation": {
             _identity(feature, "shadow_asset_feature_identity"): (
-                _project_shadow_asset_feature_variation(feature, feature_row)
+                _project_shadow_asset_feature_variation(
+                    feature,
+                    feature_row,
+                    input_trace_available=input_trace_available,
+                )
             )
             for feature, feature_row in sorted(raw_features.items())
         },
@@ -622,9 +634,11 @@ def _project_shadow_asset_variation(value: Any) -> dict[str, Any]:
 def _project_shadow_asset_feature_variation(
     feature: str,
     value: Any,
+    *,
+    input_trace_available: bool = False,
 ) -> dict[str, Any]:
     row = _mapping(value, "shadow_asset_feature_variation")
-    return {
+    result = {
         "feature": _identity(row.get("feature"), "shadow_asset_feature"),
         "family": _identity(row.get("family"), "shadow_asset_feature_family"),
         "evaluated_observation_count": _count(
@@ -680,6 +694,118 @@ def _project_shadow_asset_feature_variation(
         "variation_diagnostics_are_policy": False,
         "effective_sample_size_claimed": False,
         "overlapping_reference_sets_are_independent": False,
+    }
+    if input_trace_available:
+        result.update({
+            "input_trace_observation_count": _count(
+                row.get("input_trace_observation_count"),
+                "shadow_asset_feature_input_trace_count",
+            ),
+            "input_trace_status_counts": _project_status_counts(
+                row.get("input_trace_status_counts"),
+                label="shadow_asset_feature_input_trace_status",
+            ),
+            "source_tuple_repetition_observation_count": _count(
+                row.get("source_tuple_repetition_observation_count"),
+                "shadow_asset_feature_source_repetition_count",
+            ),
+            "transform_collision_observation_count": _count(
+                row.get("transform_collision_observation_count"),
+                "shadow_asset_feature_transform_collision_count",
+            ),
+            "mixed_source_and_transform_observation_count": _count(
+                row.get("mixed_source_and_transform_observation_count"),
+                "shadow_asset_feature_mixed_input_trace_count",
+            ),
+            "source_value_tuple_kind_counts": _project_status_counts(
+                row.get("source_value_tuple_kind_counts"),
+                label="shadow_asset_feature_source_tuple_kind",
+            ),
+            "maximum_source_value_tuple_repeat_excess_count": _count(
+                row.get("maximum_source_value_tuple_repeat_excess_count"),
+                "shadow_asset_feature_max_source_repeat_excess",
+            ),
+            "maximum_transform_collision_distinct_value_loss_count": _count(
+                row.get(
+                    "maximum_transform_collision_distinct_value_loss_count"
+                ),
+                "shadow_asset_feature_max_transform_collision_loss",
+            ),
+            "maximum_consecutive_source_value_tuple_count": _count(
+                row.get("maximum_consecutive_source_value_tuple_count"),
+                "shadow_asset_feature_max_source_run",
+            ),
+            "maximum_consecutive_derived_value_count": _count(
+                row.get("maximum_consecutive_derived_value_count"),
+                "shadow_asset_feature_max_derived_run",
+            ),
+            "latest_input_trace_observation": (
+                _project_shadow_input_trace_reference(
+                    row.get("latest_input_trace_observation"),
+                    label="shadow_asset_feature_latest_input_trace",
+                )
+            ),
+            "input_trace_diagnostics_are_policy": False,
+            "provider_causation_claimed": False,
+        })
+    return result
+
+
+def _project_shadow_input_trace_reference(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    reference = _mapping(value, label)
+    return {
+        **(_project_shadow_reference(reference, label=label) or {}),
+        "sample_count": _count(reference.get("sample_count"), f"{label}_samples"),
+        "source_value_tuple_kind": _identity(
+            reference.get("source_value_tuple_kind"),
+            f"{label}_tuple_kind",
+        ),
+        "source_value_tuple_sha256": _identity(
+            reference.get("source_value_tuple_sha256"),
+            f"{label}_tuple_digest",
+        ),
+        "source_value_tuple_count": _count(
+            reference.get("source_value_tuple_count"),
+            f"{label}_tuple_count",
+        ),
+        "distinct_source_value_tuple_count": _count(
+            reference.get("distinct_source_value_tuple_count"),
+            f"{label}_distinct_tuple_count",
+        ),
+        "maximum_source_value_tuple_tie_count": _count(
+            reference.get("maximum_source_value_tuple_tie_count"),
+            f"{label}_maximum_tuple_tie",
+        ),
+        "source_value_tuple_repeat_excess_count": _count(
+            reference.get("source_value_tuple_repeat_excess_count"),
+            f"{label}_source_repeat_excess",
+        ),
+        "derived_value_repeat_excess_count": _count(
+            reference.get("derived_value_repeat_excess_count"),
+            f"{label}_derived_repeat_excess",
+        ),
+        "transform_collision_distinct_value_loss_count": _count(
+            reference.get("transform_collision_distinct_value_loss_count"),
+            f"{label}_transform_collision_loss",
+        ),
+        "maximum_consecutive_source_value_tuple_count": _count(
+            reference.get("maximum_consecutive_source_value_tuple_count"),
+            f"{label}_maximum_source_run",
+        ),
+        "maximum_consecutive_derived_value_count": _count(
+            reference.get("maximum_consecutive_derived_value_count"),
+            f"{label}_maximum_derived_run",
+        ),
+        "input_trace_status": _identity(
+            reference.get("input_trace_status"),
+            f"{label}_status",
+        ),
     }
 
 

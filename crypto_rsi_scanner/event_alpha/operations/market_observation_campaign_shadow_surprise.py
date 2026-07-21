@@ -19,14 +19,14 @@ from ..radar import market_shadow_surprise
 
 
 SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
-SCHEMA_VERSION = 4
-LEGACY_SCHEMA_VERSIONS = (1, 2, 3)
+SCHEMA_VERSION = 5
+LEGACY_SCHEMA_VERSIONS = (1, 2, 3, 4)
 DESCRIPTIVE_QUANTILE_METHOD = "linear_interpolation_sorted_ready_values"
 VARIATION_QUANTILE_METHOD = (
     "linear_interpolation_sorted_sample_eligible_values"
 )
 VARIATION_OBSERVATION_BASIS = (
-    "closed_shadow_v3_projection_meeting_existing_minimum_sample_count"
+    "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
 )
 _SOURCE_STATUSES = {"missing", "observed_empty", "observed", "unavailable"}
 _AUDIT_STATUSES = {"unavailable", "empty", "warming", "partial", "ready"}
@@ -204,7 +204,7 @@ _ASSET_VARIATION_SUMMARY_KEYS = {
     "protocol_v2_evidence_eligible",
     "research_only",
 }
-_ASSET_FEATURE_VARIATION_KEYS = {
+_ASSET_FEATURE_VARIATION_KEYS_V4 = {
     "feature",
     "family",
     "evaluated_observation_count",
@@ -226,6 +226,22 @@ _ASSET_FEATURE_VARIATION_KEYS = {
     "overlapping_reference_sets_are_independent",
     "projection_digest",
 }
+_ASSET_FEATURE_VARIATION_KEYS = _ASSET_FEATURE_VARIATION_KEYS_V4 | {
+    "input_trace_observation_count",
+    "input_trace_status_counts",
+    "source_tuple_repetition_observation_count",
+    "transform_collision_observation_count",
+    "mixed_source_and_transform_observation_count",
+    "source_value_tuple_kind_counts",
+    "maximum_source_value_tuple_repeat_excess_count",
+    "maximum_transform_collision_distinct_value_loss_count",
+    "maximum_consecutive_source_value_tuple_count",
+    "maximum_consecutive_derived_value_count",
+    "latest_input_trace_observation",
+    "input_trace_diagnostics_are_policy",
+    "provider_causation_claimed",
+    "input_trace_projection_digest",
+}
 _RETAINED_FEATURE_BASIS_KEYS = {
     "price",
     "volume_24h",
@@ -244,6 +260,27 @@ _VARIATION_REFERENCE_KEYS = _EXTREME_REFERENCE_KEYS | {
     "distinct_baseline_value_ratio",
     "maximum_baseline_value_tie_count",
     "maximum_baseline_value_tie_ratio",
+}
+_INPUT_TRACE_REFERENCE_KEYS = _EXTREME_REFERENCE_KEYS | {
+    "sample_count",
+    "source_value_tuple_kind",
+    "source_value_tuple_sha256",
+    "source_value_tuple_count",
+    "distinct_source_value_tuple_count",
+    "maximum_source_value_tuple_tie_count",
+    "source_value_tuple_repeat_excess_count",
+    "derived_value_repeat_excess_count",
+    "transform_collision_distinct_value_loss_count",
+    "maximum_consecutive_source_value_tuple_count",
+    "maximum_consecutive_derived_value_count",
+    "input_trace_status",
+}
+_INPUT_TRACE_STATUSES = {
+    "no_samples",
+    "all_distinct",
+    "source_tuple_repetition",
+    "transform_collision",
+    "mixed_source_repetition_and_transform_collision",
 }
 _ZERO_FALSE_FIELDS = (
     "statistical_independence_claimed",
@@ -482,7 +519,7 @@ def validate_campaign_shadow_surprise_audit(
     raw_schema_version = value.get("schema_version")
     expected_audit_keys = (
         _AUDIT_KEYS
-        if raw_schema_version == SCHEMA_VERSION
+        if type(raw_schema_version) is int and raw_schema_version >= 4
         else _AUDIT_KEYS_V1_TO_V3
     )
     _exact_keys(value, expected_audit_keys, "audit", errors)
@@ -505,6 +542,7 @@ def validate_campaign_shadow_surprise_audit(
         2: {2, 3},
         3: {3},
         4: {3},
+        5: {4},
     }.get(schema_version, set())
     if value.get("shadow_schema_version") not in accepted_shadow_versions:
         errors.append("shadow_schema_version_invalid")
@@ -578,11 +616,12 @@ def validate_campaign_shadow_surprise_audit(
         evaluated_count=evaluated_count,
         errors=errors,
     )
-    if schema_version >= 4:
+    if type(schema_version) is int and schema_version >= 4:
         _validate_asset_variation_summaries(
             value.get("asset_variation_summaries"),
             asset_summaries=asset_summaries,
             minimum_sample_count=(minimum if type(minimum) is int else None),
+            schema_version=schema_version,
             errors=errors,
         )
     if type(value.get("asset_count")) is not int or value.get("asset_count") != len(
@@ -777,6 +816,10 @@ def _append_feature_records(
         if status != "ready":
             robust_z = None
             descriptive_tail_rank = None
+        input_trace = _closed_input_trace_record(
+            feature_value,
+            sample_count=sample_count,
+        )
         record = {
             "reference": reference,
             "canonical_asset_id": str(current["canonical_asset_id"]),
@@ -789,11 +832,86 @@ def _append_feature_records(
             "robust_z": robust_z,
             "descriptive_tail_rank": descriptive_tail_rank,
             "projection_sha256": _sha256_json(feature_value),
+            **input_trace,
         }
         feature_records[feature].append(record)
         asset_feature_records[str(current["canonical_asset_id"])][feature].append(
             record
         )
+
+
+def _closed_input_trace_record(
+    feature_value: Mapping[str, Any],
+    *,
+    sample_count: int,
+) -> dict[str, Any]:
+    count_fields = (
+        "source_value_tuple_count",
+        "distinct_source_value_tuple_count",
+        "maximum_source_value_tuple_tie_count",
+        "source_value_tuple_repeat_excess_count",
+        "derived_value_repeat_excess_count",
+        "transform_collision_distinct_value_loss_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+    )
+    counts = {field: feature_value.get(field) for field in count_fields}
+    if any(type(value) is not int or value < 0 for value in counts.values()):
+        raise AssertionError("closed shadow projection has invalid input trace counts")
+    if counts["source_value_tuple_count"] != sample_count:
+        raise AssertionError("closed shadow input trace sample count drifted")
+    source_distinct = counts["distinct_source_value_tuple_count"]
+    derived_distinct = feature_value.get("distinct_baseline_value_count")
+    if type(derived_distinct) is not int or derived_distinct < 0:
+        raise AssertionError("closed shadow derived distinct count is invalid")
+    if (
+        counts["source_value_tuple_repeat_excess_count"]
+        != sample_count - source_distinct
+        or counts["derived_value_repeat_excess_count"]
+        != sample_count - derived_distinct
+        or counts["transform_collision_distinct_value_loss_count"]
+        != source_distinct - derived_distinct
+    ):
+        raise AssertionError("closed shadow input trace arithmetic drifted")
+    status = feature_value.get("input_trace_status")
+    if status not in _INPUT_TRACE_STATUSES:
+        raise AssertionError("closed shadow input trace status drifted")
+    kind = feature_value.get("source_value_tuple_kind")
+    digest = feature_value.get("source_value_tuple_sha256")
+    if not _identity(kind) or not _sha256(digest):
+        raise AssertionError("closed shadow input trace identity drifted")
+    if (
+        feature_value.get("input_trace_diagnostics_are_policy") is not False
+        or feature_value.get("provider_causation_claimed") is not False
+    ):
+        raise AssertionError("closed shadow input trace safety claim drifted")
+    return {
+        "source_value_tuple_kind": kind,
+        "source_value_tuple_count": counts["source_value_tuple_count"],
+        "distinct_source_value_tuple_count": source_distinct,
+        "maximum_source_value_tuple_tie_count": counts[
+            "maximum_source_value_tuple_tie_count"
+        ],
+        "source_value_tuple_sha256": digest,
+        "source_value_tuple_repeat_excess_count": counts[
+            "source_value_tuple_repeat_excess_count"
+        ],
+        "derived_value_repeat_excess_count": counts[
+            "derived_value_repeat_excess_count"
+        ],
+        "transform_collision_distinct_value_loss_count": counts[
+            "transform_collision_distinct_value_loss_count"
+        ],
+        "maximum_consecutive_source_value_tuple_count": counts[
+            "maximum_consecutive_source_value_tuple_count"
+        ],
+        "maximum_consecutive_derived_value_count": counts[
+            "maximum_consecutive_derived_value_count"
+        ],
+        "input_trace_status": status,
+        "input_trace_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
+    }
 
 
 def _compact_projection(
@@ -1060,6 +1178,38 @@ def _variation_reference(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _input_trace_reference(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        **_extreme_reference(row),
+        "sample_count": int(row["sample_count"]),
+        "source_value_tuple_kind": str(row["source_value_tuple_kind"]),
+        "source_value_tuple_sha256": str(row["source_value_tuple_sha256"]),
+        "source_value_tuple_count": int(row["source_value_tuple_count"]),
+        "distinct_source_value_tuple_count": int(
+            row["distinct_source_value_tuple_count"]
+        ),
+        "maximum_source_value_tuple_tie_count": int(
+            row["maximum_source_value_tuple_tie_count"]
+        ),
+        "source_value_tuple_repeat_excess_count": int(
+            row["source_value_tuple_repeat_excess_count"]
+        ),
+        "derived_value_repeat_excess_count": int(
+            row["derived_value_repeat_excess_count"]
+        ),
+        "transform_collision_distinct_value_loss_count": int(
+            row["transform_collision_distinct_value_loss_count"]
+        ),
+        "maximum_consecutive_source_value_tuple_count": int(
+            row["maximum_consecutive_source_value_tuple_count"]
+        ),
+        "maximum_consecutive_derived_value_count": int(
+            row["maximum_consecutive_derived_value_count"]
+        ),
+        "input_trace_status": str(row["input_trace_status"]),
+    }
+
+
 def _feature_record_sort_key(row: Mapping[str, Any]) -> tuple[str, str, str]:
     reference = row["reference"]
     return (
@@ -1193,6 +1343,29 @@ def _asset_feature_variation(
         if variation
         else None
     )
+    trace_status_counts = Counter(
+        str(row["input_trace_status"])
+        for row in variation
+    )
+    source_repetition_count = sum(
+        row["input_trace_status"] in {
+            "source_tuple_repetition",
+            "mixed_source_repetition_and_transform_collision",
+        }
+        for row in variation
+    )
+    transform_collision_count = sum(
+        row["input_trace_status"] in {
+            "transform_collision",
+            "mixed_source_repetition_and_transform_collision",
+        }
+        for row in variation
+    )
+    mixed_count = sum(
+        row["input_trace_status"]
+        == "mixed_source_repetition_and_transform_collision"
+        for row in variation
+    )
     return {
         "feature": feature,
         "family": _FEATURE_FAMILIES[feature],
@@ -1238,6 +1411,70 @@ def _asset_feature_variation(
         "effective_sample_size_claimed": False,
         "overlapping_reference_sets_are_independent": False,
         "projection_digest": _sha256_json(list(records)),
+        "input_trace_observation_count": len(variation),
+        "input_trace_status_counts": dict(sorted(trace_status_counts.items())),
+        "source_tuple_repetition_observation_count": source_repetition_count,
+        "transform_collision_observation_count": transform_collision_count,
+        "mixed_source_and_transform_observation_count": mixed_count,
+        "source_value_tuple_kind_counts": dict(sorted(Counter(
+            str(row["source_value_tuple_kind"])
+            for row in variation
+        ).items())),
+        "maximum_source_value_tuple_repeat_excess_count": max(
+            (
+                int(row["source_value_tuple_repeat_excess_count"])
+                for row in variation
+            ),
+            default=0,
+        ),
+        "maximum_transform_collision_distinct_value_loss_count": max(
+            (
+                int(row["transform_collision_distinct_value_loss_count"])
+                for row in variation
+            ),
+            default=0,
+        ),
+        "maximum_consecutive_source_value_tuple_count": max(
+            (
+                int(row["maximum_consecutive_source_value_tuple_count"])
+                for row in variation
+            ),
+            default=0,
+        ),
+        "maximum_consecutive_derived_value_count": max(
+            (
+                int(row["maximum_consecutive_derived_value_count"])
+                for row in variation
+            ),
+            default=0,
+        ),
+        "latest_input_trace_observation": (
+            _input_trace_reference(variation[-1]) if variation else None
+        ),
+        "input_trace_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
+        "input_trace_projection_digest": _sha256_json([
+            {
+                key: row[key]
+                for key in (
+                    "reference",
+                    "canonical_asset_id",
+                    "sample_count",
+                    "source_value_tuple_kind",
+                    "source_value_tuple_count",
+                    "distinct_source_value_tuple_count",
+                    "maximum_source_value_tuple_tie_count",
+                    "source_value_tuple_sha256",
+                    "source_value_tuple_repeat_excess_count",
+                    "derived_value_repeat_excess_count",
+                    "transform_collision_distinct_value_loss_count",
+                    "maximum_consecutive_source_value_tuple_count",
+                    "maximum_consecutive_derived_value_count",
+                    "input_trace_status",
+                )
+            }
+            for row in variation
+        ]),
     }
 
 
@@ -1862,6 +2099,7 @@ def _validate_asset_variation_summaries(
     *,
     asset_summaries: Sequence[Any],
     minimum_sample_count: int | None,
+    schema_version: int,
     errors: list[str],
 ) -> None:
     if not isinstance(summaries, list):
@@ -1956,6 +2194,7 @@ def _validate_asset_variation_summaries(
                 feature_summary,
                 evaluated_count=evaluated_count,
                 minimum_sample_count=minimum_sample_count,
+                schema_version=schema_version,
                 errors=errors,
             )
             if (
@@ -1999,13 +2238,23 @@ def _validate_asset_feature_variation(
     *,
     evaluated_count: int,
     minimum_sample_count: int | None,
+    schema_version: int,
     errors: list[str],
 ) -> None:
     prefix = f"asset_variation_{asset_id}_{feature}"
     if not isinstance(summary, Mapping):
         errors.append(f"{prefix}_invalid")
         return
-    _exact_keys(summary, _ASSET_FEATURE_VARIATION_KEYS, prefix, errors)
+    _exact_keys(
+        summary,
+        (
+            _ASSET_FEATURE_VARIATION_KEYS
+            if schema_version >= 5
+            else _ASSET_FEATURE_VARIATION_KEYS_V4
+        ),
+        prefix,
+        errors,
+    )
     if summary.get("feature") != feature:
         errors.append(f"{prefix}_identity_invalid")
     if summary.get("family") != _FEATURE_FAMILIES[feature]:
@@ -2113,6 +2362,137 @@ def _validate_asset_feature_variation(
             errors.append(f"{prefix}_{field}_must_be_false")
     if not _sha256(summary.get("projection_digest")):
         errors.append(f"{prefix}_projection_digest_invalid")
+    if schema_version >= 5:
+        _validate_asset_feature_input_trace(
+            summary,
+            variation_count=(
+                variation_count if _nonnegative_int(variation_count) else 0
+            ),
+            prefix=prefix,
+            errors=errors,
+        )
+
+
+def _validate_asset_feature_input_trace(
+    summary: Mapping[str, Any],
+    *,
+    variation_count: int,
+    prefix: str,
+    errors: list[str],
+) -> None:
+    trace_count = summary.get("input_trace_observation_count")
+    if trace_count != variation_count:
+        errors.append(f"{prefix}_input_trace_count_invalid")
+    status_counts = summary.get("input_trace_status_counts")
+    if (
+        not isinstance(status_counts, Mapping)
+        or not set(status_counts) <= _INPUT_TRACE_STATUSES
+    ):
+        errors.append(f"{prefix}_input_trace_status_counts_invalid")
+        status_counts = {}
+    _validate_status_counts(
+        status_counts,
+        expected_total=variation_count,
+        label=f"{prefix}_input_trace_status",
+        errors=errors,
+    )
+    mixed = status_counts.get(
+        "mixed_source_repetition_and_transform_collision",
+        0,
+    )
+    expected_source_repetition = (
+        status_counts.get("source_tuple_repetition", 0) + mixed
+    )
+    expected_transform_collision = (
+        status_counts.get("transform_collision", 0) + mixed
+    )
+    if (
+        summary.get("source_tuple_repetition_observation_count")
+        != expected_source_repetition
+    ):
+        errors.append(f"{prefix}_source_repetition_count_invalid")
+    if (
+        summary.get("transform_collision_observation_count")
+        != expected_transform_collision
+    ):
+        errors.append(f"{prefix}_transform_collision_count_invalid")
+    if summary.get("mixed_source_and_transform_observation_count") != mixed:
+        errors.append(f"{prefix}_mixed_input_trace_count_invalid")
+
+    feature = str(summary.get("feature") or "")
+    expected_kind = _expected_source_value_tuple_kind(feature)
+    kind_counts = summary.get("source_value_tuple_kind_counts")
+    expected_kind_counts = (
+        {expected_kind: variation_count}
+        if variation_count and expected_kind
+        else {}
+    )
+    if kind_counts != expected_kind_counts:
+        errors.append(f"{prefix}_source_value_tuple_kind_counts_invalid")
+
+    maximum_fields = (
+        "maximum_source_value_tuple_repeat_excess_count",
+        "maximum_transform_collision_distinct_value_loss_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+    )
+    for field in maximum_fields:
+        value = summary.get(field)
+        if not _nonnegative_int(value) or (
+            variation_count == 0 and value != 0
+        ):
+            errors.append(f"{prefix}_{field}_invalid")
+    latest = summary.get("latest_input_trace_observation")
+    if variation_count == 0:
+        if latest is not None:
+            errors.append(f"{prefix}_latest_input_trace_must_be_null")
+    elif not _valid_input_trace_reference(latest):
+        errors.append(f"{prefix}_latest_input_trace_invalid")
+    else:
+        if latest.get("source_value_tuple_kind") != expected_kind:
+            errors.append(f"{prefix}_latest_input_trace_kind_invalid")
+        minimum = summary.get("minimum_sample_count")
+        if _positive_int(minimum) and latest.get("sample_count") < minimum:
+            errors.append(f"{prefix}_latest_input_trace_below_minimum")
+        for summary_field, reference_field in (
+            (
+                "maximum_source_value_tuple_repeat_excess_count",
+                "source_value_tuple_repeat_excess_count",
+            ),
+            (
+                "maximum_transform_collision_distinct_value_loss_count",
+                "transform_collision_distinct_value_loss_count",
+            ),
+            (
+                "maximum_consecutive_source_value_tuple_count",
+                "maximum_consecutive_source_value_tuple_count",
+            ),
+            (
+                "maximum_consecutive_derived_value_count",
+                "maximum_consecutive_derived_value_count",
+            ),
+        ):
+            maximum = summary.get(summary_field)
+            if _nonnegative_int(maximum) and maximum < latest.get(reference_field):
+                errors.append(f"{prefix}_{summary_field}_below_latest")
+    if summary.get("input_trace_diagnostics_are_policy") is not False:
+        errors.append(f"{prefix}_input_trace_policy_claim_invalid")
+    if summary.get("provider_causation_claimed") is not False:
+        errors.append(f"{prefix}_provider_causation_claim_invalid")
+    if not _sha256(summary.get("input_trace_projection_digest")):
+        errors.append(f"{prefix}_input_trace_projection_digest_invalid")
+
+
+def _expected_source_value_tuple_kind(feature: str) -> str:
+    if feature == "volume_24h":
+        return "provider_volume_value"
+    if feature == "turnover_24h":
+        return "turnover_source_component_tuple"
+    if feature.startswith("return_"):
+        return "asset_endpoint_anchor_price_tuple"
+    if feature.startswith("relative_return_vs_"):
+        return "asset_benchmark_endpoint_anchor_price_tuple"
+    return ""
 
 
 def _validate_bounded_context_counts(
@@ -2217,6 +2597,96 @@ def _valid_variation_reference(value: Any) -> bool:
             maximum_tie_count, sample_count
         )
     )
+
+
+def _valid_input_trace_reference(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _INPUT_TRACE_REFERENCE_KEYS
+        or not _valid_extreme_reference({
+            key: value.get(key) for key in _EXTREME_REFERENCE_KEYS
+        })
+        or not _identity(value.get("source_value_tuple_kind"))
+        or not _sha256(value.get("source_value_tuple_sha256"))
+        or value.get("input_trace_status") not in _INPUT_TRACE_STATUSES
+    ):
+        return False
+    count_fields = (
+        "sample_count",
+        "source_value_tuple_count",
+        "distinct_source_value_tuple_count",
+        "maximum_source_value_tuple_tie_count",
+        "source_value_tuple_repeat_excess_count",
+        "derived_value_repeat_excess_count",
+        "transform_collision_distinct_value_loss_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+    )
+    if any(not _positive_int(value.get(field)) for field in (
+        "sample_count",
+        "source_value_tuple_count",
+        "distinct_source_value_tuple_count",
+        "maximum_source_value_tuple_tie_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+    )) or any(not _nonnegative_int(value.get(field)) for field in (
+        "source_value_tuple_repeat_excess_count",
+        "derived_value_repeat_excess_count",
+        "transform_collision_distinct_value_loss_count",
+    )):
+        return False
+    counts = {field: int(value[field]) for field in count_fields}
+    sample_count = counts["sample_count"]
+    if counts["source_value_tuple_count"] != sample_count:
+        return False
+    source_distinct = counts["distinct_source_value_tuple_count"]
+    source_maximum_tie = counts["maximum_source_value_tuple_tie_count"]
+    source_repeat_excess = counts["source_value_tuple_repeat_excess_count"]
+    derived_repeat_excess = counts["derived_value_repeat_excess_count"]
+    collision_loss = counts[
+        "transform_collision_distinct_value_loss_count"
+    ]
+    derived_distinct = sample_count - derived_repeat_excess
+    if (
+        not 1 <= source_distinct <= sample_count
+        or not 1 <= derived_distinct <= source_distinct
+        or source_repeat_excess != sample_count - source_distinct
+        or collision_loss != source_distinct - derived_distinct
+        or not (
+            math.ceil(sample_count / source_distinct)
+            <= source_maximum_tie
+            <= sample_count - source_distinct + 1
+        )
+        or not (
+            1
+            <= counts["maximum_consecutive_source_value_tuple_count"]
+            <= source_maximum_tie
+        )
+        or not (
+            1
+            <= counts["maximum_consecutive_derived_value_count"]
+            <= sample_count
+        )
+    ):
+        return False
+    return value.get("input_trace_status") == _input_trace_status(
+        source_repeat_excess=source_repeat_excess,
+        transform_collision_loss=collision_loss,
+    )
+
+
+def _input_trace_status(
+    *,
+    source_repeat_excess: int,
+    transform_collision_loss: int,
+) -> str:
+    if source_repeat_excess == 0 and transform_collision_loss == 0:
+        return "all_distinct"
+    if source_repeat_excess > 0 and transform_collision_loss == 0:
+        return "source_tuple_repetition"
+    if source_repeat_excess == 0 and transform_collision_loss > 0:
+        return "transform_collision"
+    return "mixed_source_repetition_and_transform_collision"
 
 
 def _parse_aware_utc(value: Any) -> datetime:

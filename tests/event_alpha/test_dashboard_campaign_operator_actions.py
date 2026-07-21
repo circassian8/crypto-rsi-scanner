@@ -566,9 +566,10 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     ] == 30
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 4
+    assert shadow["schema_version"] == 5
     assert shadow["variation_diagnostics_available"] is True
     assert shadow["asset_variation_diagnostics_available"] is True
+    assert shadow["input_trace_diagnostics_available"] is True
     assert shadow["evaluated_observation_count"] == 36
     assert shadow["provider_calls"] == shadow["writes"] == 0
     volume_shadow = shadow["feature_coverage"]["volume_24h"]
@@ -602,6 +603,19 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     asset_volume = asset_a["feature_variation"]["volume_24h"]
     assert asset_volume["repeated_baseline_value_observation_count"] > 0
     assert asset_volume["descriptive_repetition_observation_share"] == 1.0
+    assert asset_volume["source_tuple_repetition_observation_count"] > 0
+    assert asset_volume["transform_collision_observation_count"] == 0
+    assert asset_volume["mixed_source_and_transform_observation_count"] == 0
+    assert asset_volume["source_value_tuple_kind_counts"] == {
+        "provider_volume_value": asset_volume["input_trace_observation_count"]
+    }
+    assert asset_volume["maximum_consecutive_source_value_tuple_count"] > 1
+    assert asset_volume["maximum_consecutive_derived_value_count"] > 1
+    assert asset_volume["latest_input_trace_observation"][
+        "input_trace_status"
+    ] == "source_tuple_repetition"
+    assert asset_volume["input_trace_diagnostics_are_policy"] is False
+    assert asset_volume["provider_causation_claimed"] is False
     assert asset_a["source_context_is_causal_attribution"] is False
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
@@ -824,6 +838,15 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, asset_variation_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    input_trace_drift = deepcopy(_campaign_report())
+    input_trace_drift["shadow_temporal_surprise_campaign_audit"][
+        "asset_variation_summaries"
+    ][0]["feature_variation"]["volume_24h"][
+        "provider_causation_claimed"
+    ] = True
+    _write_report(tmp_path, input_trace_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     tmp_path: Path,
@@ -847,6 +870,9 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "distinct · largest tie" in html
     assert "Repeated reference sets by canonical asset and feature" in html
     assert "Attribution required" in html
+    assert "Source-repeat / transform / mixed" in html
+    assert "Source repetition means the exact value-only source tuple repeated" in html
+    assert "Neither result attributes provider fault" in html
     assert "Retained provider · mode · basis" in html
     assert "This ranking is outcome-blind and applies no exclusion" in html
     assert "Observed history, not a policy input" in html
@@ -867,6 +893,7 @@ def test_campaign_dashboard_keeps_v2_shadow_audit_readable_without_variation(
     report = deepcopy(_campaign_report())
     audit = report["shadow_temporal_surprise_campaign_audit"]
     audit["schema_version"] = 2
+    audit["shadow_schema_version"] = 3
     audit.pop("asset_variation_summaries")
     for coverage in audit["feature_coverage"].values():
         for key in tuple(coverage):

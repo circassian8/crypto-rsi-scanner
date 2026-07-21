@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-21T16:36:01.800407+00:00`
+- generated_at: `2026-07-21T17:09:59.033070+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `25`
+- functions_over_limit_count: `27`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `25`
+- production_functions_over_limit: `27`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `25`
+- functions_over_150_lines: `27`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `84`
@@ -44,11 +44,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 40 | advisory |
-| `production_files_over_1500_lines` | 9 | advisory |
+| `production_files_over_1200_lines` | 41 | advisory |
+| `production_files_over_1500_lines` | 10 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 25 | advisory |
+| `functions_over_150_lines` | 27 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -313,6 +313,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---|---:|---:|
 | `crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model` | `_validate_closed_projection` | 189 | false |
 | `crypto_rsi_scanner.event_alpha.artifacts.schema.market_shadow_surprise` | `_validate_return_feature_consistency` | 183 | false |
+| `crypto_rsi_scanner.event_alpha.artifacts.schema.market_shadow_surprise` | `_validate_input_trace` | 166 | false |
 | `crypto_rsi_scanner.event_alpha.dashboard.campaign_operator_actions` | `_project_shadow_surprise_feature` | 161 | false |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual` | `model_bybit_residual_execution_cost_sensitivity_scenario` | 195 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee` | `model_bybit_visible_book_taker_fee_scenario` | 166 | true |
@@ -331,8 +332,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_render` | `format_campaign_report` | 154 | true |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_render` | `_shadow_surprise_audit_section` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `build_campaign_shadow_surprise_audit` | 209 | true |
-| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `validate_campaign_shadow_surprise_audit` | 163 | true |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `validate_campaign_shadow_surprise_audit` | 165 | true |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `_feature_coverage` | 195 | false |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `_asset_feature_variation` | 180 | false |
 | `crypto_rsi_scanner.event_alpha.radar.market_state` | `snapshot_from_market_row` | 175 | true |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_hypothesis_latest_score_components` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |

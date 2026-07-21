@@ -19,7 +19,7 @@ from typing import Any
 
 
 SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 3
+SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 4
 SUPPORTED_FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -94,6 +94,9 @@ _RETURN_METHOD_VALUE_KEYS = frozenset(
         "baseline_value_identity",
         "minimum_distinct_baseline_value_count",
         "variation_diagnostics_are_policy",
+        "source_value_tuple_identity",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
     )
 )
 _METHOD_VALUE_KEYS = frozenset(
@@ -111,6 +114,26 @@ _METHOD_VALUE_KEYS = frozenset(
         "baseline_value_identity",
         "minimum_distinct_baseline_value_count",
         "variation_diagnostics_are_policy",
+        "source_value_tuple_identity",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
+    )
+)
+_INPUT_TRACE_VALUE_KEYS = frozenset(
+    (
+        "source_value_tuple_kind",
+        "source_value_tuple_count",
+        "distinct_source_value_tuple_count",
+        "maximum_source_value_tuple_tie_count",
+        "source_value_tuple_sha256",
+        "source_value_tuple_repeat_excess_count",
+        "derived_value_repeat_excess_count",
+        "transform_collision_distinct_value_loss_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+        "input_trace_status",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
     )
 )
 _RETURN_FEATURE_VALUE_KEYS = frozenset(
@@ -146,6 +169,7 @@ _RETURN_FEATURE_VALUE_KEYS = frozenset(
         "upper_tail_rank",
         "two_sided_tail_rank",
         "tail_ranks_are_p_values",
+        *_INPUT_TRACE_VALUE_KEYS,
     )
 )
 _RETURN_SAMPLE_VALUE_KEYS = frozenset(
@@ -200,6 +224,7 @@ _FEATURE_VALUE_KEYS = frozenset(
         "robust_z",
         "upper_tail_rank",
         "upper_tail_rank_is_p_value",
+        *_INPUT_TRACE_VALUE_KEYS,
     )
 )
 
@@ -215,7 +240,7 @@ def evaluate_shadow_temporal_surprise(
         str, Iterable[Mapping[str, Any]]
     ] | None = None,
 ) -> dict[str, Any]:
-    """Return the closed v3 robust shadow value for activity and return tails.
+    """Return the closed v4 robust shadow value for activity and return tails.
 
     Inputs are only read. Proxy, cross-sectional, missing, and otherwise
     unapproved feature bases are explicitly excluded. Non-positive and
@@ -296,6 +321,11 @@ def evaluate_shadow_temporal_surprise(
             ),
             "minimum_distinct_baseline_value_count": None,
             "variation_diagnostics_are_policy": False,
+            "source_value_tuple_identity": (
+                "ordered_value_only_source_components_formatted_to_17_significant_digits"
+            ),
+            "input_trace_diagnostics_are_policy": False,
+            "provider_causation_claimed": False,
         },
         "features": features,
         "return_status": return_status,
@@ -328,6 +358,11 @@ def evaluate_shadow_temporal_surprise(
             ),
             "minimum_distinct_baseline_value_count": None,
             "variation_diagnostics_are_policy": False,
+            "source_value_tuple_identity": (
+                "ordered_value_only_source_price_tuples_formatted_to_17_significant_digits"
+            ),
+            "input_trace_diagnostics_are_policy": False,
+            "provider_causation_claimed": False,
         },
         "return_features": return_features,
         "routing_eligible": False,
@@ -477,7 +512,7 @@ def _evaluate_return_features(
                 feature_basis=RELATIVE_RETURN_BASIS,
             )
     if frozenset(features) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v3")
+        raise AssertionError("shadow signed-return feature set drifted from v4")
     return features
 
 
@@ -504,6 +539,10 @@ def _evaluate_signed_return_feature(
         _return_sample_identity(sample, feature=feature, feature_basis=feature_basis)
         for sample in eligible
     ]
+    source_value_tuples = [
+        _return_source_value_tuple(sample)
+        for sample in eligible
+    ]
     references = [_return_sample_endpoint_reference(sample) for sample in eligible]
     current_sample, current_state = current_result
     baseline = [sample.value for sample in eligible]
@@ -526,6 +565,11 @@ def _evaluate_signed_return_feature(
         if current_state == "eligible" and current_sample is not None
         else None,
         include_two_sided=True,
+    ))
+    value.update(_input_trace_diagnostics(
+        baseline,
+        source_value_tuples,
+        source_value_tuple_kind=_return_source_value_tuple_kind(benchmark),
     ))
     if current_state == "basis_ineligible":
         value.update(
@@ -622,6 +666,11 @@ def _empty_return_feature_value(
             (),
             None,
             include_two_sided=True,
+        ),
+        **_input_trace_diagnostics(
+            (),
+            (),
+            source_value_tuple_kind=_return_source_value_tuple_kind(benchmark),
         ),
         "median": None,
         "mad": None,
@@ -819,6 +868,52 @@ def _return_source_price_identity(row: Mapping[str, Any]) -> dict[str, str | Non
     }
 
 
+def _return_source_value_tuple(
+    sample: _DirectReturnSample | _RelativeReturnSample,
+) -> dict[str, Any]:
+    rows = (
+        (sample.endpoint, sample.anchor)
+        if isinstance(sample, _DirectReturnSample)
+        else (
+            sample.asset_endpoint,
+            sample.asset_anchor,
+            sample.benchmark_endpoint,
+            sample.benchmark_anchor,
+        )
+    )
+    return {
+        "prices": [
+            {
+                "canonical_asset_id": _required_identity(
+                    row.get("canonical_asset_id"),
+                    "eligible return source canonical_asset_id",
+                ),
+                "price": format(
+                    _required_positive_source_price(row),
+                    ".17g",
+                ),
+                "price_basis": _feature_basis(row, "price"),
+            }
+            for row in rows
+        ]
+    }
+
+
+def _required_positive_source_price(row: Mapping[str, Any]) -> float:
+    price = _positive_finite_number(row.get("price"))
+    if price is None:
+        raise AssertionError("eligible shadow return sample lost its source price")
+    return price
+
+
+def _return_source_value_tuple_kind(benchmark: str | None) -> str:
+    return (
+        "asset_endpoint_anchor_price_tuple"
+        if benchmark is None
+        else "asset_benchmark_endpoint_anchor_price_tuple"
+    )
+
+
 def _validated_benchmark_observations(
     current: Mapping[str, Any],
     supplied: Mapping[str, Iterable[Mapping[str, Any]]] | None,
@@ -890,7 +985,14 @@ def _evaluate_feature(
 ) -> dict[str, Any]:
     current_value = _positive_finite_number(current.get(feature))
     current_basis = _feature_basis(current, feature)
-    eligible: list[tuple[float, dict[str, str | None], dict[str, str | None]]] = []
+    eligible: list[
+        tuple[
+            float,
+            dict[str, str | None],
+            dict[str, str | None],
+            dict[str, Any],
+        ]
+    ] = []
     basis_ineligible_count = 0
     invalid_value_count = 0
     for observation in priors:
@@ -907,14 +1009,20 @@ def _evaluate_feature(
                 baseline_value,
                 reference,
                 _sample_identity(observation, feature, baseline_value, reference),
+                _activity_source_value_tuple(
+                    observation,
+                    feature=feature,
+                    value=baseline_value,
+                ),
             )
         )
     eligible.sort(key=lambda item: (_reference_sort_key(item[1]), _canonical_json(item[2])))
-    references = [reference for _, reference, _ in eligible]
-    sample_digest = _sha256_json([identity for _, _, identity in eligible])
+    references = [reference for _, reference, _, _ in eligible]
+    sample_digest = _sha256_json([identity for _, _, identity, _ in eligible])
+    source_value_tuples = [source for _, _, _, source in eligible]
     baseline_logs = [
         _round_derived(math.log(item))
-        for item, _, _ in eligible
+        for item, _, _, _ in eligible
     ]
     current_variation_value = (
         _round_derived(math.log(current_value))
@@ -937,6 +1045,11 @@ def _evaluate_feature(
         current_variation_value,
         include_two_sided=False,
     ))
+    value.update(_input_trace_diagnostics(
+        baseline_logs,
+        source_value_tuples,
+        source_value_tuple_kind=_activity_source_value_tuple_kind(feature),
+    ))
     if not _feature_basis_is_eligible(current, feature):
         value.update(status="basis_ineligible", reason="current_feature_basis_not_eligible")
         return _assert_closed_feature_value(value)
@@ -950,7 +1063,7 @@ def _evaluate_feature(
         value.update(status="insufficient_history", reason="minimum_sample_count_not_met")
         return _assert_closed_feature_value(value)
 
-    calculation_logs = [math.log(item) for item, _, _ in eligible]
+    calculation_logs = [math.log(item) for item, _, _, _ in eligible]
     median_log = float(statistics.median(calculation_logs))
     mad_log = float(statistics.median(abs(item - median_log) for item in calculation_logs))
     consistent_mad = float(mad_log * MAD_NORMAL_CONSISTENCY_FACTOR)
@@ -1010,6 +1123,11 @@ def _empty_feature_value(
         "robust_z": None,
         "upper_tail_rank": None,
         "upper_tail_rank_is_p_value": False,
+        **_input_trace_diagnostics(
+            (),
+            (),
+            source_value_tuple_kind=_activity_source_value_tuple_kind(feature),
+        ),
     }
 
 
@@ -1080,6 +1198,41 @@ def _sample_identity(
     return identity
 
 
+def _activity_source_value_tuple(
+    observation: Mapping[str, Any],
+    *,
+    feature: str,
+    value: float,
+) -> dict[str, Any]:
+    source = {
+        "feature": feature,
+        "value": format(value, ".17g"),
+        "feature_basis": _feature_basis(observation, feature),
+    }
+    if feature == "turnover_24h":
+        volume = _positive_finite_number(observation.get("volume_24h"))
+        market_cap = _positive_finite_number(observation.get("market_cap"))
+        if volume is None or market_cap is None:
+            raise AssertionError(
+                "eligible turnover source tuple lost volume or market cap"
+            )
+        source.update({
+            "volume_24h": format(volume, ".17g"),
+            "volume_24h_basis": _feature_basis(observation, "volume_24h"),
+            "market_cap": format(market_cap, ".17g"),
+            "market_cap_basis": _feature_basis(observation, "market_cap"),
+        })
+    return source
+
+
+def _activity_source_value_tuple_kind(feature: str) -> str:
+    if feature == "volume_24h":
+        return "provider_volume_value"
+    if feature == "turnover_24h":
+        return "turnover_source_component_tuple"
+    raise AssertionError("unsupported activity feature source tuple")
+
+
 def _positive_finite_number(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, Real):
         return None
@@ -1137,6 +1290,87 @@ def _baseline_variation_diagnostics(
             else None
         )
     return result
+
+
+def _input_trace_diagnostics(
+    derived_values: Iterable[float],
+    source_value_tuples: Iterable[object],
+    *,
+    source_value_tuple_kind: str,
+) -> dict[str, Any]:
+    """Separate retained source-tuple repetition from transform collisions."""
+
+    canonical_derived = tuple(
+        _round_derived(value) for value in derived_values
+    )
+    raw_sources = tuple(source_value_tuples)
+    canonical_sources = tuple(_canonical_json(value) for value in raw_sources)
+    if len(canonical_derived) != len(canonical_sources):
+        raise AssertionError("shadow input trace source/derived count mismatch")
+    sample_count = len(canonical_derived)
+    distinct_derived = len(set(canonical_derived))
+    distinct_sources = len(set(canonical_sources))
+    if distinct_derived > distinct_sources:
+        raise AssertionError(
+            "shadow deterministic transform gained distinct values"
+        )
+    source_repeat_excess = sample_count - distinct_sources
+    derived_repeat_excess = sample_count - distinct_derived
+    transform_collision_loss = distinct_sources - distinct_derived
+    if sample_count == 0:
+        status = "no_samples"
+    elif source_repeat_excess == 0 and transform_collision_loss == 0:
+        status = "all_distinct"
+    elif source_repeat_excess > 0 and transform_collision_loss == 0:
+        status = "source_tuple_repetition"
+    elif source_repeat_excess == 0 and transform_collision_loss > 0:
+        status = "transform_collision"
+    else:
+        status = "mixed_source_repetition_and_transform_collision"
+    return {
+        "source_value_tuple_kind": source_value_tuple_kind,
+        "source_value_tuple_count": sample_count,
+        "distinct_source_value_tuple_count": distinct_sources,
+        "maximum_source_value_tuple_tie_count": _maximum_tie_count(
+            canonical_sources
+        ),
+        "source_value_tuple_sha256": _sha256_json(raw_sources),
+        "source_value_tuple_repeat_excess_count": source_repeat_excess,
+        "derived_value_repeat_excess_count": derived_repeat_excess,
+        "transform_collision_distinct_value_loss_count": (
+            transform_collision_loss
+        ),
+        "maximum_consecutive_source_value_tuple_count": (
+            _maximum_consecutive_count(canonical_sources)
+        ),
+        "maximum_consecutive_derived_value_count": (
+            _maximum_consecutive_count(canonical_derived)
+        ),
+        "input_trace_status": status,
+        "input_trace_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
+    }
+
+
+def _maximum_tie_count(values: Iterable[object]) -> int:
+    counts: dict[object, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return max(counts.values(), default=0)
+
+
+def _maximum_consecutive_count(values: Iterable[object]) -> int:
+    maximum = 0
+    current = 0
+    previous: object = object()
+    for value in values:
+        if current and value == previous:
+            current += 1
+        else:
+            current = 1
+            previous = value
+        maximum = max(maximum, current)
+    return maximum
 
 
 def _observation_reference(observation: Mapping[str, Any]) -> dict[str, str | None]:
@@ -1250,28 +1484,28 @@ def _required_aware_time(value: object, field_name: str) -> datetime:
 
 def _assert_closed_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _TOP_LEVEL_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise drifted from its closed v3 schema")
+        raise AssertionError("shadow temporal surprise drifted from its closed v4 schema")
     if frozenset(value["method"]) != _METHOD_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise method drifted from its closed v3 schema")
+        raise AssertionError("shadow temporal surprise method drifted from its closed v4 schema")
     if frozenset(value["features"]) != frozenset(SUPPORTED_FEATURES):
-        raise AssertionError("shadow temporal surprise feature set drifted from v3")
+        raise AssertionError("shadow temporal surprise feature set drifted from v4")
     if frozenset(value["return_method"]) != _RETURN_METHOD_VALUE_KEYS:
-        raise AssertionError("shadow signed-return method drifted from its closed v3 schema")
+        raise AssertionError("shadow signed-return method drifted from its closed v4 schema")
     if frozenset(value["return_features"]) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v3")
+        raise AssertionError("shadow signed-return feature set drifted from v4")
     return value
 
 
 def _assert_closed_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow feature value drifted from its closed v3 schema")
+        raise AssertionError("shadow feature value drifted from its closed v4 schema")
     return value
 
 
 def _assert_closed_return_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _RETURN_FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return value drifted from its closed v3 schema")
+        raise AssertionError("shadow signed-return value drifted from its closed v4 schema")
     current_sample = value.get("current_sample")
     if current_sample is not None and frozenset(current_sample) != _RETURN_SAMPLE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return sample drifted from its closed v3 schema")
+        raise AssertionError("shadow signed-return sample drifted from its closed v4 schema")
     return value

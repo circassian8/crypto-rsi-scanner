@@ -371,6 +371,10 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
     repeated.sort(key=lambda row: row[:4])
     if not repeated:
         return []
+    input_trace_available = any(
+        "input_trace_observation_count" in variation
+        for *_, variation in repeated
+    )
     limit = 32
     lines = [
         "",
@@ -388,14 +392,30 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
             "mode, and feature-basis counts are retained context, not causal "
             "attribution; repetition may be legitimate low-motion behavior, source "
             "refresh cadence, or quantization."
+            + (
+                " Source repetition means an exact value-only source tuple repeated; "
+                "transform collision means distinct source tuples produced the same "
+                "rounded derived value. Neither attributes provider fault."
+                if input_trace_available
+                else ""
+            )
         ),
         "",
         (
             "| Asset | Feature | Repeated / eligible | Distinct ratio min / "
-            "median | Largest-tie ratio median / max | Retained provider / mode / "
-            "basis | Latest reference set |"
+            "median | Largest-tie ratio median / max | "
+            + (
+                "Source-repeat / transform / mixed; max run source / derived | "
+                if input_trace_available
+                else ""
+            )
+            + "Retained provider / mode / basis | Latest reference set |"
         ),
-        "|---|---|---:|---:|---:|---|---|",
+        (
+            "|---|---|---:|---:|---:|"
+            + ("---:|" if input_trace_available else "")
+            + "---|---|"
+        ),
     ]
     for _, _, asset_id, feature, asset, variation in repeated[:limit]:
         basis_key = feature if feature in {"volume_24h", "turnover_24h"} else "price"
@@ -418,6 +438,16 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
             if latest
             else "n/a"
         )
+        trace = (
+            f"{_int(variation.get('source_tuple_repetition_observation_count'))} / "
+            f"{_int(variation.get('transform_collision_observation_count'))} / "
+            f"{_int(variation.get('mixed_source_and_transform_observation_count'))}; "
+            f"{_int(variation.get('maximum_consecutive_source_value_tuple_count'))} / "
+            f"{_int(variation.get('maximum_consecutive_derived_value_count'))}"
+            if input_trace_available
+            else ""
+        )
+        trace_cell = f"{_md(trace)} | " if input_trace_available else ""
         lines.append(
             f"| {_md(asset_id)} | {_md(feature)} | "
             f"{_int(variation.get('repeated_baseline_value_observation_count'))} / "
@@ -426,7 +456,7 @@ def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
             f"{_number(variation.get('distinct_baseline_value_ratio_median'))} | "
             f"{_number(variation.get('maximum_baseline_value_tie_ratio_median'))} / "
             f"{_number(variation.get('maximum_baseline_value_tie_ratio_maximum'))} | "
-            f"{_md(context)} | {_md(latest_text)} |"
+            f"{trace_cell}{_md(context)} | {_md(latest_text)} |"
         )
     return lines
 

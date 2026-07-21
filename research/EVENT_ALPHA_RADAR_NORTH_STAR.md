@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-21T16:26:47.206855+00:00`
+- generated_at: `2026-07-21T17:02:11.059650+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -185,8 +185,8 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 ## Shadow Robust Temporal Surprise
 
 - schema_id: `event_alpha.shadow_temporal_surprise`
-- schema_version: `3`
-- legacy_schema_versions_readable: 1, 2
+- schema_version: `4`
+- legacy_schema_versions_readable: 1, 2, 3
 - features: volume_24h, turnover_24h
 - signed_return_features: return_1h, return_4h, return_24h, relative_return_vs_btc_1h, relative_return_vs_btc_4h, relative_return_vs_btc_24h, relative_return_vs_eth_1h, relative_return_vs_eth_4h, relative_return_vs_eth_24h
 - eligible_feature_basis: provider_observed, derived_provider_ratio
@@ -209,6 +209,11 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - baseline_variation_diagnostics: distinct_baseline_value_count, maximum_baseline_value_tie_count, current_value_baseline_tie_count, distinct_baseline_value_ratio, nominal_one_sided_tail_rank_floor, nominal_two_sided_tail_rank_floor_for_returns
 - minimum_distinct_baseline_value_count: `None`
 - variation_diagnostics_are_policy: `False`
+- source_value_tuple_identity: `ordered_value_only_source_components_or_price_tuples_formatted_to_17_significant_digits`
+- input_trace_diagnostics: distinct_source_value_tuple_count, source_value_tuple_repeat_excess_count, derived_value_repeat_excess_count, transform_collision_distinct_value_loss_count, maximum_consecutive_source_value_tuple_count, maximum_consecutive_derived_value_count, input_trace_status
+- input_trace_statuses: no_samples, all_distinct, source_tuple_repetition, transform_collision, mixed_source_repetition_and_transform_collision
+- input_trace_diagnostics_are_policy: `False`
+- provider_causation_claimed: `False`
 - signed_return_unit: `percent_points`
 - signed_return_transform: `identity_preserves_sign`
 - signed_return_feature_basis: `provider_observed_price_ratio_only`
@@ -227,8 +232,8 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - same_asset_relative_return_status: `not_applicable`
 - attachment: `top_level_post_scan_snapshot_and_anomaly_metadata_only`
 - campaign_audit_schema_id: `decision_radar.shadow_temporal_surprise_campaign_audit`
-- campaign_audit_schema_version: `4`
-- campaign_audit_legacy_schema_versions_readable: 1, 2, 3
+- campaign_audit_schema_version: `5`
+- campaign_audit_legacy_schema_versions_readable: 1, 2, 3, 4
 - campaign_audit_input: `one_read_exact_campaign_history_snapshot`
 - campaign_audit_replay: `each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks`
 - campaign_audit_non_counted_rows: `excluded_with_exact_count`
@@ -238,7 +243,7 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - campaign_audit_ready_semantics: `every_modeled_feature_has_some_ready_evidence_not_every_projection_ready`
 - campaign_audit_ready_distribution: `per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections`
 - campaign_audit_quantile_method: `linear_interpolation_sorted_ready_values`
-- campaign_audit_variation_observation_basis: `closed_shadow_v3_projection_meeting_existing_minimum_sample_count`
+- campaign_audit_variation_observation_basis: `closed_shadow_v4_projection_meeting_existing_minimum_sample_count`
 - campaign_audit_variation_quantile_method: `linear_interpolation_sorted_sample_eligible_values`
 - campaign_audit_variation_distributions: `per_feature_distinct_count_distinct_ratio_and_maximum_tie_ratio`
 - campaign_audit_variation_extreme_references: `exact_least_distinct_and_highest_tie_ratio_observation_identity`
@@ -249,6 +254,10 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - campaign_audit_asset_source_context: `retained_symbol_provider_data_mode_and_feature_basis_counts`
 - campaign_audit_source_context_is_causal_attribution: `False`
 - campaign_audit_asset_repetition_is_exclusion_policy: `False`
+- campaign_audit_input_trace_summary: `per_asset_per_feature_source_tuple_repetition_transform_collision_mixed_counts_and_maximum_consecutive_runs`
+- campaign_audit_input_trace_exact_latest_reference: `True`
+- campaign_audit_input_trace_diagnostics_are_policy: `False`
+- campaign_audit_provider_causation_claimed: `False`
 - campaign_audit_tail_ranks_are_p_values: `False`
 - campaign_audit_overlapping_samples_are_independent: `False`
 - campaign_audit_historical_rows_rewritten: `False`

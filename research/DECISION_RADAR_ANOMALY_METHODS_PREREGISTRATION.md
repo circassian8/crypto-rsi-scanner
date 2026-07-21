@@ -4,7 +4,7 @@ Status: **research-only design record; rank 1 is implemented as an isolated
 shadow diagnostic but is not calibrated and is not eligible for routing,
 scoring, publication authority, alerts, or Protocol-v2 evidence**.
 
-Contract: `decision_radar.anomaly_methods_preregistration` schema v3.
+Contract: `decision_radar.anomaly_methods_preregistration` schema v4.
 
 ## Purpose
 
@@ -21,11 +21,13 @@ holdout.
   observations and keep the current value out of its own baseline.
 - Production return, relative-return, volatility, volume, and turnover features
   currently use transparent mean/population-standard-deviation z-scores.
-- Shadow schema v3 preserves the v1 natural-log median/MAD activity comparison
+- Shadow schema v4 preserves the v1 natural-log median/MAD activity comparison
   and v2 direct and BTC/ETH-relative 1h/4h/24h signed-return comparison. It adds
-  exact rounded-value distinct counts, tie concentration, current-value tie
-  counts, and nominal finite-sample rank floors. Historical v1 and v2 values
-  remain readable.
+  the v3 rounded-value variation fields plus an exact value-only source-tuple
+  trace. That trace separates repetition already present in retained numeric
+  inputs from distinct input tuples that collapse to one 12-decimal derived
+  value, and records consecutive source/derived runs. Historical v1 through v3
+  values remain readable.
 - That shadow value is explicitly barred from routes, priorities, Decision
   scores, thresholds, and automatic application.
 - The canonical campaign report now performs a deterministic causal replay of
@@ -33,10 +35,11 @@ holdout.
   exposes per-feature coverage, degeneracy/status counts, exact input
   rejections, per-asset summaries, source-bound plus causal-value digests, and
   schema-v3 distinct-value/tie distributions over projections meeting the
-  existing nominal sample minimum. Audit schema v4 also records repetition
-  persistence by canonical asset and feature beside retained provider/mode/basis
-  counts and the latest exact reference set. Those counts are context, not a
-  causal diagnosis of provider behavior. Historical audit schemas remain
+  existing nominal sample minimum. Audit schema v5 preserves the v4 per-asset
+  persistence view and adds exact source-tuple repetition, transform-collision,
+  and consecutive-run summaries beside retained provider/mode/basis counts and
+  the latest exact reference set. Those counts are mathematical input lineage,
+  not a causal diagnosis of provider behavior. Historical audit schemas remain
   readable. This is measurement plumbing only: it does not rewrite history,
   classify or exclude an asset, impose a distinctness threshold, estimate
   effective sample size, or qualify as independent, calibrated, or Protocol-v2
@@ -48,7 +51,7 @@ holdout.
 
 ### 1. Robust signed-return and relative-return tails
 
-Implemented originally in shadow schema v2 and preserved unchanged in v3 for
+Implemented originally in shadow schema v2 and preserved unchanged in v4 for
 direct 1h, 4h, and 24h signed returns and BTC/ETH-relative returns. Each horizon
 and basis remains a separate family.
 The implementation rederives percent-point returns only from provider-observed
@@ -58,11 +61,24 @@ upper, and two-sided descriptive ranks. Proxy prices, mismatched canonical
 benchmark identities, future clocks, and insufficient or degenerate samples
 fail closed. The dependent rolling ranks are explicitly not p-values.
 
-Schema v3 also records how much nominal baseline count is repeated or quantized
+Schema v3 records how much nominal baseline count is repeated or quantized
 after the method's existing 12-decimal derived-value normalization. These
 variation fields are descriptive only: there is no minimum-distinct threshold,
 and they do not change readiness, degeneracy, ranks, robust z-scores, routes,
 or scores.
+
+Schema v4 adds a value-only trace for every exact retained baseline input. A
+direct-return tuple binds endpoint and anchor prices and bases; a relative-
+return tuple additionally binds the matching benchmark endpoint and anchor; an
+activity tuple binds the raw provider value, and turnover also binds its volume
+and market-cap components. Observation identity and time remain bound by the
+existing causal sample digest but are excluded from this value-only tuple so
+repetition can be measured honestly. The closed accounting is:
+`source repeat excess = sample count - distinct source tuples`,
+`derived repeat excess = sample count - distinct derived values`, and
+`transform collision loss = distinct source tuples - distinct derived values`.
+Neither a source repetition nor a transform collision establishes provider
+fault, effective sample size, or an exclusion rule.
 
 This remains rank 1 because it is a small, explainable extension of an already
 closed shadow contract and directly addresses the heavy tails that make

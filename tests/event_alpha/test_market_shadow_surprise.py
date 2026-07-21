@@ -150,7 +150,7 @@ def _complete_return_history(*, current_price: float = 138.0):
     return current, asset_priors, benchmarks
 
 
-def test_v3_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank():
+def test_v4_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank():
     current, priors, benchmarks = _complete_return_history()
 
     result = evaluate_shadow_temporal_surprise(
@@ -160,7 +160,7 @@ def test_v3_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         benchmark_observations=benchmarks,
     )
 
-    assert result["schema_version"] == 3
+    assert result["schema_version"] == 4
     assert result["status"] == "ready"
     assert result["return_status"] == "ready"
     assert tuple(RETURN_HORIZONS_HOURS) == (1, 4, 24)
@@ -191,6 +191,11 @@ def test_v3_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
         ),
         "minimum_distinct_baseline_value_count": None,
         "variation_diagnostics_are_policy": False,
+        "source_value_tuple_identity": (
+            "ordered_value_only_source_price_tuples_formatted_to_17_significant_digits"
+        ),
+        "input_trace_diagnostics_are_policy": False,
+        "provider_causation_claimed": False,
     }
     direct = result["return_features"]["return_1h"]
     expected_direct = (current["price"] / priors[-1]["price"] - 1.0) * 100.0
@@ -231,7 +236,7 @@ def test_v3_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
     json.dumps(result, sort_keys=True, allow_nan=False)
 
 
-def test_v3_signed_return_tail_preserves_negative_direction():
+def test_v4_signed_return_tail_preserves_negative_direction():
     current, priors, benchmarks = _complete_return_history(current_price=80.0)
 
     result = evaluate_shadow_temporal_surprise(
@@ -249,7 +254,7 @@ def test_v3_signed_return_tail_preserves_negative_direction():
         assert value["lower_tail_rank"] < value["upper_tail_rank"]
 
 
-def test_v3_return_features_fail_closed_on_price_basis_and_missing_benchmark():
+def test_v4_return_features_fail_closed_on_price_basis_and_missing_benchmark():
     current, priors, benchmarks = _complete_return_history()
     current["feature_basis"]["price"] = "cross_sectional_price_proxy"
 
@@ -273,7 +278,7 @@ def test_v3_return_features_fail_closed_on_price_basis_and_missing_benchmark():
     assert result["return_status"] == "unavailable"
 
 
-def test_v3_return_output_is_order_independent_and_sample_digest_binds_prices():
+def test_v4_return_output_is_order_independent_and_sample_digest_binds_prices():
     current, priors, benchmarks = _complete_return_history()
     forward = evaluate_shadow_temporal_surprise(
         current,
@@ -320,7 +325,7 @@ def test_v3_return_output_is_order_independent_and_sample_digest_binds_prices():
     )
 
 
-def test_v3_rejects_wrong_canonical_benchmark_identity():
+def test_v4_rejects_wrong_canonical_benchmark_identity():
     current, priors, benchmarks = _complete_return_history()
     for row in benchmarks["btc"]:
         row["canonical_asset_id"] = "not-bitcoin"
@@ -337,7 +342,7 @@ def test_v3_rejects_wrong_canonical_benchmark_identity():
         )
 
 
-def test_v3_treats_canonical_benchmark_alias_as_self_relative_not_applicable():
+def test_v4_treats_canonical_benchmark_alias_as_self_relative_not_applicable():
     current, priors, _benchmarks = _complete_return_history()
     current["canonical_asset_id"] = "btc"
     for row in priors:
@@ -379,7 +384,7 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
 
     assert SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID == "event_alpha.shadow_temporal_surprise"
     assert result["schema_id"] == SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
-    assert result["schema_version"] == 3
+    assert result["schema_version"] == 4
     assert result["status"] == "partial"
     assert result["return_status"] == "unavailable"
     assert volume["status"] == "ready"
@@ -411,6 +416,9 @@ def test_ready_shadow_value_uses_log_median_mad_and_descriptive_tail_rank():
         "baseline_value_identity",
         "minimum_distinct_baseline_value_count",
         "variation_diagnostics_are_policy",
+        "source_value_tuple_identity",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
     }
     assert set(result) == {
         "schema_id",
@@ -713,12 +721,13 @@ def test_eligible_sample_digest_binds_identity_value_and_basis_without_copying_s
         "mad_log",
         "normal_consistent_mad_log",
         "robust_z",
-        "upper_tail_rank",
-        "upper_tail_rank_is_p_value",
-    }
+            "upper_tail_rank",
+            "upper_tail_rank_is_p_value",
+            *_V4_FEATURE_FIELDS,
+        }
 
 
-def test_v3_activity_variation_diagnostics_expose_repeated_values_without_policy():
+def test_v4_activity_trace_attributes_repeated_source_values_without_policy():
     priors = [
         _observation(index, volume=100.0, turnover=0.1)
         for index in range(1, 6)
@@ -737,11 +746,24 @@ def test_v3_activity_variation_diagnostics_expose_repeated_values_without_policy
     assert volume["current_value_baseline_tie_count"] == 5
     assert volume["distinct_baseline_value_ratio"] == 0.2
     assert volume["nominal_one_sided_tail_rank_floor"] == round(1 / 6, 12)
+    assert volume["source_value_tuple_kind"] == "provider_volume_value"
+    assert volume["source_value_tuple_count"] == 5
+    assert volume["distinct_source_value_tuple_count"] == 1
+    assert volume["maximum_source_value_tuple_tie_count"] == 5
+    assert volume["source_value_tuple_repeat_excess_count"] == 4
+    assert volume["derived_value_repeat_excess_count"] == 4
+    assert volume["transform_collision_distinct_value_loss_count"] == 0
+    assert volume["maximum_consecutive_source_value_tuple_count"] == 5
+    assert volume["maximum_consecutive_derived_value_count"] == 5
+    assert volume["input_trace_status"] == "source_tuple_repetition"
+    assert len(volume["source_value_tuple_sha256"]) == 64
+    assert volume["input_trace_diagnostics_are_policy"] is False
+    assert volume["provider_causation_claimed"] is False
     assert result["method"]["minimum_distinct_baseline_value_count"] is None
     assert result["method"]["variation_diagnostics_are_policy"] is False
 
 
-def test_v3_return_variation_diagnostics_expose_quantized_baseline_without_policy():
+def test_v4_return_trace_separates_transform_collision_without_policy():
     priors = [
         _return_observation(
             index,
@@ -771,6 +793,20 @@ def test_v3_return_variation_diagnostics_expose_quantized_baseline_without_polic
     assert direct["distinct_baseline_value_ratio"] == round(1 / 9, 12)
     assert direct["nominal_one_sided_tail_rank_floor"] == 0.1
     assert direct["nominal_two_sided_tail_rank_floor"] == 0.2
+    assert direct["source_value_tuple_kind"] == (
+        "asset_endpoint_anchor_price_tuple"
+    )
+    assert direct["source_value_tuple_count"] == 9
+    assert direct["distinct_source_value_tuple_count"] == 9
+    assert direct["maximum_source_value_tuple_tie_count"] == 1
+    assert direct["source_value_tuple_repeat_excess_count"] == 0
+    assert direct["derived_value_repeat_excess_count"] == 8
+    assert direct["transform_collision_distinct_value_loss_count"] == 8
+    assert direct["maximum_consecutive_source_value_tuple_count"] == 1
+    assert direct["maximum_consecutive_derived_value_count"] == 9
+    assert direct["input_trace_status"] == "transform_collision"
+    assert direct["input_trace_diagnostics_are_policy"] is False
+    assert direct["provider_causation_claimed"] is False
     assert result["return_method"]["minimum_distinct_baseline_value_count"] is None
     assert result["return_method"]["variation_diagnostics_are_policy"] is False
 
@@ -871,8 +907,8 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     policy = payload["shadow_temporal_surprise_policy"]
 
     assert policy["schema_id"] == "event_alpha.shadow_temporal_surprise"
-    assert policy["schema_version"] == 3
-    assert policy["legacy_schema_versions_readable"] == [1, 2]
+    assert policy["schema_version"] == 4
+    assert policy["legacy_schema_versions_readable"] == [1, 2, 3]
     assert policy["features"] == ["volume_24h", "turnover_24h"]
     assert policy["signed_return_features"] == list(SUPPORTED_RETURN_FEATURES)
     assert policy["signed_return_unit"] == "percent_points"
@@ -890,18 +926,30 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     ]
     assert policy["minimum_distinct_baseline_value_count"] is None
     assert policy["variation_diagnostics_are_policy"] is False
+    assert policy["input_trace_statuses"] == [
+        "no_samples",
+        "all_distinct",
+        "source_tuple_repetition",
+        "transform_collision",
+        "mixed_source_repetition_and_transform_collision",
+    ]
+    assert policy["input_trace_diagnostics_are_policy"] is False
+    assert policy["provider_causation_claimed"] is False
     assert policy["campaign_audit_schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert policy["campaign_audit_schema_version"] == 4
-    assert policy["campaign_audit_legacy_schema_versions_readable"] == [1, 2, 3]
+    assert policy["campaign_audit_schema_version"] == 5
+    assert policy["campaign_audit_legacy_schema_versions_readable"] == [1, 2, 3, 4]
     assert policy["campaign_audit_variation_observation_basis"] == (
-        "closed_shadow_v3_projection_meeting_existing_minimum_sample_count"
+        "closed_shadow_v4_projection_meeting_existing_minimum_sample_count"
     )
     assert policy["campaign_audit_variation_diagnostics_are_policy"] is False
     assert policy["campaign_audit_effective_sample_size_claimed"] is False
     assert policy["campaign_audit_source_context_is_causal_attribution"] is False
     assert policy["campaign_audit_asset_repetition_is_exclusion_policy"] is False
+    assert policy["campaign_audit_input_trace_exact_latest_reference"] is True
+    assert policy["campaign_audit_input_trace_diagnostics_are_policy"] is False
+    assert policy["campaign_audit_provider_causation_claimed"] is False
     assert policy["campaign_audit_ready_distribution"] == (
         "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections"
     )
@@ -957,10 +1005,45 @@ _V3_FEATURE_FIELDS = (
     "distinct_baseline_value_ratio",
     "nominal_one_sided_tail_rank_floor",
 )
+_V4_METHOD_FIELDS = (
+    "source_value_tuple_identity",
+    "input_trace_diagnostics_are_policy",
+    "provider_causation_claimed",
+)
+_V4_FEATURE_FIELDS = (
+    "source_value_tuple_kind",
+    "source_value_tuple_count",
+    "distinct_source_value_tuple_count",
+    "maximum_source_value_tuple_tie_count",
+    "source_value_tuple_sha256",
+    "source_value_tuple_repeat_excess_count",
+    "derived_value_repeat_excess_count",
+    "transform_collision_distinct_value_loss_count",
+    "maximum_consecutive_source_value_tuple_count",
+    "maximum_consecutive_derived_value_count",
+    "input_trace_status",
+    "input_trace_diagnostics_are_policy",
+    "provider_causation_claimed",
+)
+
+
+def _historical_v3_shadow() -> dict:
+    legacy = _valid_schema_shadow()
+    legacy["schema_version"] = 3
+    for field in _V4_METHOD_FIELDS:
+        legacy["method"].pop(field)
+        legacy["return_method"].pop(field)
+    for feature in legacy["features"].values():
+        for field in _V4_FEATURE_FIELDS:
+            feature.pop(field)
+    for feature in legacy["return_features"].values():
+        for field in _V4_FEATURE_FIELDS:
+            feature.pop(field)
+    return legacy
 
 
 def _historical_v2_shadow() -> dict:
-    legacy = _valid_schema_shadow()
+    legacy = _historical_v3_shadow()
     legacy["schema_version"] = 2
     for field in _V3_METHOD_FIELDS:
         legacy["method"].pop(field)
@@ -1068,6 +1151,20 @@ def test_artifact_schema_keeps_historical_v2_shadow_values_readable():
     assert errors == []
 
 
+def test_artifact_schema_keeps_historical_v3_shadow_values_readable():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    errors = schema_v1.validate_row_against_schema(
+        _shadow_artifact_row(
+            "market_state_snapshot_v1",
+            _historical_v3_shadow(),
+        ),
+        "market_state_snapshot_v1",
+    )
+
+    assert errors == []
+
+
 @pytest.mark.parametrize(
     ("mutation", "expected_error"),
     (
@@ -1100,6 +1197,12 @@ def test_artifact_schema_keeps_historical_v2_shadow_values_readable():
             "shadow_temporal_surprise_variation_inconsistent:return_features.return_1h.distinct_baseline_value_ratio",
         ),
         (
+            lambda value: value["return_features"]["return_1h"].__setitem__(
+                "transform_collision_distinct_value_loss_count", 99
+            ),
+            "shadow_temporal_surprise_input_trace_inconsistent:return_features.return_1h.transform_collision_distinct_value_loss_count",
+        ),
+        (
             lambda value: value["return_features"]["return_1h"][
                 "current_sample"
             ]["asset_endpoint"].__setitem__("observation_id", "wrong-current"),
@@ -1126,7 +1229,7 @@ def test_artifact_schema_keeps_historical_v2_shadow_values_readable():
         ),
     ),
 )
-def test_artifact_schema_rejects_malformed_v3_return_contract(
+def test_artifact_schema_rejects_malformed_v4_return_contract(
     mutation,
     expected_error,
 ):
@@ -1233,6 +1336,18 @@ def test_artifact_schema_rejects_malformed_v3_return_contract(
                 "current_value_baseline_tie_count", 99
             ),
             "shadow_temporal_surprise_variation_inconsistent:features.volume_24h.current_value_baseline_tie_count",
+        ),
+        (
+            lambda value: value["features"]["volume_24h"].__setitem__(
+                "source_value_tuple_repeat_excess_count", 99
+            ),
+            "shadow_temporal_surprise_input_trace_inconsistent:features.volume_24h.source_value_tuple_repeat_excess_count",
+        ),
+        (
+            lambda value: value["features"]["volume_24h"].__setitem__(
+                "provider_causation_claimed", True
+            ),
+            "shadow_temporal_surprise_fixed_value_mismatch:features.volume_24h.provider_causation_claimed",
         ),
         (
             lambda value: value.__setitem__("current_observation", []),

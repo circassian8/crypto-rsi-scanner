@@ -17,6 +17,51 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Separate retained-input repetition from transform collisions · Codex
+**Why:** Per-asset variation proved that 28 genuine asset-feature reference sets
+contain repeated derived values, but that did not distinguish repetition already
+present in exact retained inputs from distinct inputs that collapse during the
+return/log transform. That distinction is required before interpreting the
+campaign or designing better point-in-time collection.
+**Changes:** Shadow temporal-surprise schema v4 now binds feature-specific,
+value-only source tuples for activity, direct returns, and benchmark-relative
+returns. It records exact tuple/derived distinctness accounting, ordered tuple
+digests, repeat excess, transform-collision loss, consecutive source/derived
+runs, and a closed status while preserving observation identity and clocks in
+the existing causal sample digest. Campaign-audit schema v5 copies and
+reconciles those diagnostics per asset/feature, retains exact latest trace
+references, and keeps shadow v1-v3 plus audit v1-v4 readable without invented
+fields. Campaign Markdown and the pointer-matched dashboard display source,
+transform, and mixed counts without re-evaluation. North Star,
+preregistration, research contract, durable decision, roadmap, generated
+health reports, and the genuine cycle-59 campaign report now agree.
+
+Across 36 assets, 396 asset-feature rows, and 11,200 sample-eligible traces, the
+28 affected pairs resolve to 27 with source-tuple repetition, 16 with transform
+collision, and 15 with both. The projection counts are 688 source-repeat, 420
+transform-collision, and 379 mixed. SHIB 24h is the sole transform-only pair.
+`figure-heloc` has the longest observed source runs (volume 21, turnover 11,
+24h return 9); PEPE 1h has the largest transform loss at eight distinct input
+tuples. These are mathematical lineage facts, not provider-causation or
+effective-sample-size claims.
+**Verify:** The focused shadow model/integration/dashboard set passed 109 tests.
+The wider campaign, empirical-live, dashboard, and North-Star set passed 121
+effective tests: 120 passed in the restricted run and the one loopback socket
+test passed on its exact socket-permitted rerun. A post-render/North-Star check
+passed 11 tests. `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make radar-market-campaign-report PYTHON=python3` regenerated canonical truth
+with `provider_calls=0`. `make radar-dashboard-smoke radar-dashboard-ux-smoke
+radar-dashboard-readiness PYTHON=python3` passed and kept the revision-12
+cycle-59 namespace authoritative with zero writes. `make
+architecture-cleanliness-check PYTHON=python3` passed; all quantitative size
+rows remain advisory. Every changed JSON document and `git diff --check`
+passed.
+**Notes/risks:** The next descriptive question is exact endpoint/anchor
+observation reuse and realized horizon timing. No provider authorization/call,
+history rewrite, status, threshold, score, route, publication authority, send,
+trade, order, paper trade, RSI write, or `TRIGGERED_FADE` changed. The cohesive
+implementation was not split merely to satisfy advisory file/function counts.
+
 ## 2026-07-21 — Attribute repeated shadow baselines without policy · Codex
 **Why:** Campaign-level variation showed that several nominal reference sets
 contain ties, but one global least-diverse asset could not show whether the

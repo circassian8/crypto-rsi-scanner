@@ -435,7 +435,7 @@
       "sports_fixtures"
     ]
   },
-  "generated_at": "2026-07-21T16:26:47.206855+00:00",
+  "generated_at": "2026-07-21T17:02:11.059650+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1216,23 +1216,28 @@
     "campaign_audit_effective_sample_size_claimed": false,
     "campaign_audit_historical_rows_rewritten": false,
     "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
+    "campaign_audit_input_trace_diagnostics_are_policy": false,
+    "campaign_audit_input_trace_exact_latest_reference": true,
+    "campaign_audit_input_trace_summary": "per_asset_per_feature_source_tuple_repetition_transform_collision_mixed_counts_and_maximum_consecutive_runs",
     "campaign_audit_invalid_or_duplicate_rows": "rejected_with_closed_reason_counts",
     "campaign_audit_legacy_schema_versions_readable": [
       1,
       2,
-      3
+      3,
+      4
     ],
     "campaign_audit_minimum_distinct_baseline_value_count": null,
     "campaign_audit_non_counted_rows": "excluded_with_exact_count",
     "campaign_audit_overlapping_samples_are_independent": false,
     "campaign_audit_protocol_v2_evidence_eligible": false,
     "campaign_audit_provider_calls": 0,
+    "campaign_audit_provider_causation_claimed": false,
     "campaign_audit_quantile_method": "linear_interpolation_sorted_ready_values",
     "campaign_audit_ready_distribution": "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections",
     "campaign_audit_ready_semantics": "every_modeled_feature_has_some_ready_evidence_not_every_projection_ready",
     "campaign_audit_replay": "each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks",
     "campaign_audit_schema_id": "decision_radar.shadow_temporal_surprise_campaign_audit",
-    "campaign_audit_schema_version": 4,
+    "campaign_audit_schema_version": 5,
     "campaign_audit_source_bound_digest": "changes_when_exact_history_snapshot_fingerprint_changes",
     "campaign_audit_source_context_is_causal_attribution": false,
     "campaign_audit_statistical_independence_claimed": false,
@@ -1240,7 +1245,7 @@
     "campaign_audit_variation_diagnostics_are_policy": false,
     "campaign_audit_variation_distributions": "per_feature_distinct_count_distinct_ratio_and_maximum_tie_ratio",
     "campaign_audit_variation_extreme_references": "exact_least_distinct_and_highest_tie_ratio_observation_identity",
-    "campaign_audit_variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+    "campaign_audit_variation_observation_basis": "closed_shadow_v4_projection_meeting_existing_minimum_sample_count",
     "campaign_audit_variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values",
     "campaign_audit_writes": 0,
     "canonical_history_or_provider_source_mutated": false,
@@ -1265,9 +1270,27 @@
     "history_binding": "exact_generation_artifact_basename_and_sha256",
     "history_fingerprint_persisted_in_shadow": true,
     "history_fingerprint_verified_before_parse": true,
+    "input_trace_diagnostics": [
+      "distinct_source_value_tuple_count",
+      "source_value_tuple_repeat_excess_count",
+      "derived_value_repeat_excess_count",
+      "transform_collision_distinct_value_loss_count",
+      "maximum_consecutive_source_value_tuple_count",
+      "maximum_consecutive_derived_value_count",
+      "input_trace_status"
+    ],
+    "input_trace_diagnostics_are_policy": false,
+    "input_trace_statuses": [
+      "no_samples",
+      "all_distinct",
+      "source_tuple_repetition",
+      "transform_collision",
+      "mixed_source_repetition_and_transform_collision"
+    ],
     "legacy_schema_versions_readable": [
       1,
-      2
+      2,
+      3
     ],
     "location": "median_of_log_baseline",
     "method_references": [
@@ -1280,6 +1303,7 @@
     "overlapping_return_samples_are_independent": false,
     "positive_finite_values_only": true,
     "priority_eligible": false,
+    "provider_causation_claimed": false,
     "proxy_or_cross_sectional_basis_eligible": false,
     "relative_return_feature_basis": "provider_observed_asset_return_minus_provider_observed_benchmark_return",
     "research_only": true,
@@ -1296,7 +1320,7 @@
     "same_asset_relative_return_status": "not_applicable",
     "scale": "median_absolute_deviation_times_1.482602218505602",
     "schema_id": "event_alpha.shadow_temporal_surprise",
-    "schema_version": 3,
+    "schema_version": 4,
     "score_adjustment_eligible": false,
     "signed_return_feature_basis": "provider_observed_price_ratio_only",
     "signed_return_features": [
@@ -1312,6 +1336,7 @@
     ],
     "signed_return_transform": "identity_preserves_sign",
     "signed_return_unit": "percent_points",
+    "source_value_tuple_identity": "ordered_value_only_source_components_or_price_tuples_formatted_to_17_significant_digits",
     "transform": "natural_log",
     "variation_diagnostics_are_policy": false
   },

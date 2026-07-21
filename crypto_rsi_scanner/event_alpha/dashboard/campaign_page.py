@@ -384,6 +384,7 @@ def _shadow_asset_variation_table(
         or not isinstance(summaries, (list, tuple))
     ):
         return ""
+    input_trace_available = raw.get("input_trace_diagnostics_available") is True
     repeated_rows: list[tuple[float, float, str, str, Mapping[str, Any], Mapping[str, Any]]] = []
     for asset in summaries:
         if not isinstance(asset, Mapping):
@@ -427,7 +428,7 @@ def _shadow_asset_variation_table(
         repeated_count = variation.get(
             "repeated_baseline_value_observation_count"
         )
-        table_rows.append((
+        row_values = [
             _shadow_asset_identity(asset_id, asset),
             humanize_enum(feature),
             f"{display_count(repeated_count)} / {display_count(variation_count)}",
@@ -445,12 +446,17 @@ def _shadow_asset_variation_table(
                     "maximum_baseline_value_tie_ratio_maximum",
                 ),
             ),
+        ]
+        if input_trace_available:
+            row_values.append(_shadow_input_trace_summary(variation))
+        row_values.extend((
             _shadow_asset_source_basis(asset, feature=feature),
             _shadow_variation_extreme(
                 variation.get("latest_variation_observation"),
                 now=snapshot.generation_authority_checked_at,
             ),
         ))
+        table_rows.append(tuple(row_values))
     if not table_rows:
         return ""
     count_note = (
@@ -462,27 +468,60 @@ def _shadow_asset_variation_table(
             "asset-feature pairs with repeated baseline values."
         )
     )
+    headers = [
+        "Asset",
+        "Feature",
+        "Repeated / eligible",
+        "Distinct share min / med",
+        "Largest-tie share med / max",
+    ]
+    if input_trace_available:
+        headers.append("Source-repeat / transform / mixed · max run source / derived")
+    headers.extend((
+        "Retained provider · mode · basis",
+        "Latest reference set",
+    ))
+    trace_note = (
+        " Source repetition means the exact value-only source tuple repeated; "
+        "transform collision means distinct source tuples produced the same rounded "
+        "derived value. Neither result attributes provider fault."
+        if input_trace_available
+        else ""
+    )
     return (
         '<div class="alert alert-info"><strong>Attribution required.</strong> '
         + escape_html(count_note)
         + " Repetition can reflect legitimate low-motion behavior, provider refresh cadence, "
-        "or upstream quantization. This ranking is outcome-blind and applies no exclusion.</div>"
+        "or upstream quantization. This ranking is outcome-blind and applies no exclusion."
+        + escape_html(trace_note)
+        + "</div>"
         + str(data_table(
-            (
-                "Asset",
-                "Feature",
-                "Repeated / eligible",
-                "Distinct share min / med",
-                "Largest-tie share med / max",
-                "Retained provider · mode · basis",
-                "Latest reference set",
-            ),
+            tuple(headers),
             table_rows,
             caption="Repeated reference sets by canonical asset and feature",
             empty="No repeated sample-eligible reference sets were recorded.",
             compact=True,
         ))
     )
+
+
+def _shadow_input_trace_summary(value: Mapping[str, Any]) -> str:
+    source = display_count(
+        value.get("source_tuple_repetition_observation_count")
+    )
+    transform = display_count(
+        value.get("transform_collision_observation_count")
+    )
+    mixed = display_count(
+        value.get("mixed_source_and_transform_observation_count")
+    )
+    source_run = display_count(
+        value.get("maximum_consecutive_source_value_tuple_count")
+    )
+    derived_run = display_count(
+        value.get("maximum_consecutive_derived_value_count")
+    )
+    return f"{source} / {transform} / {mixed} · {source_run} / {derived_run}"
 
 
 def _shadow_asset_identity(asset_id: str, asset: Mapping[str, Any]) -> HtmlFragment:

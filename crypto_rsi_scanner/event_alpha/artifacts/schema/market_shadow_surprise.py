@@ -1,4 +1,4 @@
-"""Closed nested schema checks for shadow temporal market surprise v1-v3."""
+"""Closed nested schema checks for shadow temporal market surprise v1-v4."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from typing import Any
 
 
 SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SCHEMA_VERSION = 3
-LEGACY_SCHEMA_VERSIONS = frozenset((1, 2))
+SCHEMA_VERSION = 4
+LEGACY_SCHEMA_VERSIONS = frozenset((1, 2, 3))
 FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -71,12 +71,20 @@ _METHOD_KEYS_V1_V2 = frozenset(
         "upper_tail_rank_is_p_value",
     )
 )
-_METHOD_KEYS = frozenset(
+_METHOD_KEYS_V3 = frozenset(
     (
         *_METHOD_KEYS_V1_V2,
         "baseline_value_identity",
         "minimum_distinct_baseline_value_count",
         "variation_diagnostics_are_policy",
+    )
+)
+_METHOD_KEYS = frozenset(
+    (
+        *_METHOD_KEYS_V3,
+        "source_value_tuple_identity",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
     )
 )
 _FEATURE_KEYS_V1_V2 = frozenset(
@@ -102,7 +110,7 @@ _FEATURE_KEYS_V1_V2 = frozenset(
         "upper_tail_rank_is_p_value",
     )
 )
-_FEATURE_KEYS = frozenset(
+_FEATURE_KEYS_V3 = frozenset(
     (
         *_FEATURE_KEYS_V1_V2,
         "distinct_baseline_value_count",
@@ -112,6 +120,24 @@ _FEATURE_KEYS = frozenset(
         "nominal_one_sided_tail_rank_floor",
     )
 )
+_INPUT_TRACE_KEYS = frozenset(
+    (
+        "source_value_tuple_kind",
+        "source_value_tuple_count",
+        "distinct_source_value_tuple_count",
+        "maximum_source_value_tuple_tie_count",
+        "source_value_tuple_sha256",
+        "source_value_tuple_repeat_excess_count",
+        "derived_value_repeat_excess_count",
+        "transform_collision_distinct_value_loss_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+        "input_trace_status",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
+    )
+)
+_FEATURE_KEYS = frozenset((*_FEATURE_KEYS_V3, *_INPUT_TRACE_KEYS))
 _REFERENCE_KEYS = frozenset(("observation_id", "observed_at"))
 _TOP_LEVEL_STATUSES = frozenset(("ready", "partial", "unavailable"))
 _FEATURE_STATUSES = frozenset(
@@ -147,13 +173,21 @@ _METHOD_VALUES_V1_V2 = {
     ),
     "upper_tail_rank_is_p_value": False,
 }
-_METHOD_VALUES = {
+_METHOD_VALUES_V3 = {
     **_METHOD_VALUES_V1_V2,
     "baseline_value_identity": (
         "transformed_values_rounded_to_12_decimal_places"
     ),
     "minimum_distinct_baseline_value_count": None,
     "variation_diagnostics_are_policy": False,
+}
+_METHOD_VALUES = {
+    **_METHOD_VALUES_V3,
+    "source_value_tuple_identity": (
+        "ordered_value_only_source_components_formatted_to_17_significant_digits"
+    ),
+    "input_trace_diagnostics_are_policy": False,
+    "provider_causation_claimed": False,
 }
 _RETURN_METHOD_KEYS_V2 = frozenset(
     (
@@ -174,12 +208,20 @@ _RETURN_METHOD_KEYS_V2 = frozenset(
         "overlapping_samples_are_independent",
     )
 )
-_RETURN_METHOD_KEYS = frozenset(
+_RETURN_METHOD_KEYS_V3 = frozenset(
     (
         *_RETURN_METHOD_KEYS_V2,
         "baseline_value_identity",
         "minimum_distinct_baseline_value_count",
         "variation_diagnostics_are_policy",
+    )
+)
+_RETURN_METHOD_KEYS = frozenset(
+    (
+        *_RETURN_METHOD_KEYS_V3,
+        "source_value_tuple_identity",
+        "input_trace_diagnostics_are_policy",
+        "provider_causation_claimed",
     )
 )
 _RETURN_METHOD_VALUES_V2 = {
@@ -205,13 +247,21 @@ _RETURN_METHOD_VALUES_V2 = {
     "tail_ranks_are_p_values": False,
     "overlapping_samples_are_independent": False,
 }
-_RETURN_METHOD_VALUES = {
+_RETURN_METHOD_VALUES_V3 = {
     **_RETURN_METHOD_VALUES_V2,
     "baseline_value_identity": (
         "derived_return_values_rounded_to_12_decimal_places"
     ),
     "minimum_distinct_baseline_value_count": None,
     "variation_diagnostics_are_policy": False,
+}
+_RETURN_METHOD_VALUES = {
+    **_RETURN_METHOD_VALUES_V3,
+    "source_value_tuple_identity": (
+        "ordered_value_only_source_price_tuples_formatted_to_17_significant_digits"
+    ),
+    "input_trace_diagnostics_are_policy": False,
+    "provider_causation_claimed": False,
 }
 _RETURN_FEATURE_KEYS_V2 = frozenset(
     (
@@ -242,7 +292,7 @@ _RETURN_FEATURE_KEYS_V2 = frozenset(
         "tail_ranks_are_p_values",
     )
 )
-_RETURN_FEATURE_KEYS = frozenset(
+_RETURN_FEATURE_KEYS_V3 = frozenset(
     (
         *_RETURN_FEATURE_KEYS_V2,
         "distinct_baseline_value_count",
@@ -252,6 +302,9 @@ _RETURN_FEATURE_KEYS = frozenset(
         "nominal_one_sided_tail_rank_floor",
         "nominal_two_sided_tail_rank_floor",
     )
+)
+_RETURN_FEATURE_KEYS = frozenset(
+    (*_RETURN_FEATURE_KEYS_V3, *_INPUT_TRACE_KEYS)
 )
 _RETURN_SAMPLE_KEYS = frozenset(
     ("asset_endpoint", "asset_anchor", "benchmark_endpoint", "benchmark_anchor")
@@ -488,10 +541,18 @@ def _validate_method(
     if not isinstance(value, Mapping):
         errors.append("shadow_temporal_surprise_invalid_type:method:dict")
         return
-    expected_keys = _METHOD_KEYS if schema_version == SCHEMA_VERSION else _METHOD_KEYS_V1_V2
+    expected_keys = (
+        _METHOD_KEYS
+        if schema_version >= 4
+        else _METHOD_KEYS_V3
+        if schema_version == 3
+        else _METHOD_KEYS_V1_V2
+    )
     expected_values = (
         _METHOD_VALUES
-        if schema_version == SCHEMA_VERSION
+        if schema_version >= 4
+        else _METHOD_VALUES_V3
+        if schema_version == 3
         else _METHOD_VALUES_V1_V2
     )
     key_errors = _closed_keys(value, expected_keys, "method")
@@ -513,12 +574,16 @@ def _validate_return_method(
         return
     expected_keys = (
         _RETURN_METHOD_KEYS
-        if schema_version == SCHEMA_VERSION
+        if schema_version >= 4
+        else _RETURN_METHOD_KEYS_V3
+        if schema_version == 3
         else _RETURN_METHOD_KEYS_V2
     )
     expected_values = (
         _RETURN_METHOD_VALUES
-        if schema_version == SCHEMA_VERSION
+        if schema_version >= 4
+        else _RETURN_METHOD_VALUES_V3
+        if schema_version == 3
         else _RETURN_METHOD_VALUES_V2
     )
     key_errors = _closed_keys(value, expected_keys, "return_method")
@@ -564,7 +629,9 @@ def _validate_feature(
         return
     expected_keys = (
         _FEATURE_KEYS
-        if schema_version == SCHEMA_VERSION
+        if schema_version >= 4
+        else _FEATURE_KEYS_V3
+        if schema_version == 3
         else _FEATURE_KEYS_V1_V2
     )
     key_errors = _closed_keys(value, expected_keys, path)
@@ -606,12 +673,23 @@ def _validate_feature(
             f"shadow_temporal_surprise_invalid_type:{path}.eligible_sample_sha256:sha256"
         )
     _expect_exact(value, "upper_tail_rank_is_p_value", False, path, errors)
-    if schema_version == SCHEMA_VERSION:
+    if schema_version >= 3:
         _validate_variation_diagnostics(
             value,
             path=path,
             current_value_present=value.get("current_log") is not None,
             include_two_sided=False,
+            errors=errors,
+        )
+    if schema_version >= 4:
+        _validate_input_trace(
+            value,
+            path=path,
+            expected_tuple_kind=(
+                "provider_volume_value"
+                if feature == "volume_24h"
+                else "turnover_source_component_tuple"
+            ),
             errors=errors,
         )
 
@@ -655,7 +733,9 @@ def _validate_return_feature(
         return
     expected_keys = (
         _RETURN_FEATURE_KEYS
-        if schema_version == SCHEMA_VERSION
+        if schema_version >= 4
+        else _RETURN_FEATURE_KEYS_V3
+        if schema_version == 3
         else _RETURN_FEATURE_KEYS_V2
     )
     key_errors = _closed_keys(value, expected_keys, path)
@@ -723,12 +803,23 @@ def _validate_return_feature(
         errors=errors,
     )
     _expect_exact(value, "tail_ranks_are_p_values", False, path, errors)
-    if schema_version == SCHEMA_VERSION:
+    if schema_version >= 3:
         _validate_variation_diagnostics(
             value,
             path=path,
             current_value_present=value.get("current_sample") is not None,
             include_two_sided=True,
+            errors=errors,
+        )
+    if schema_version >= 4:
+        _validate_input_trace(
+            value,
+            path=path,
+            expected_tuple_kind=(
+                "asset_endpoint_anchor_price_tuple"
+                if benchmark is None
+                else "asset_benchmark_endpoint_anchor_price_tuple"
+            ),
             errors=errors,
         )
 
@@ -819,7 +910,9 @@ def _validate_cross_field_consistency(
                     isinstance(feature_value, Mapping)
                     and frozenset(feature_value) == (
                         _RETURN_FEATURE_KEYS
-                        if schema_version == SCHEMA_VERSION
+                        if schema_version >= 4
+                        else _RETURN_FEATURE_KEYS_V3
+                        if schema_version == 3
                         else _RETURN_FEATURE_KEYS_V2
                     )
                 ):
@@ -845,7 +938,9 @@ def _validate_cross_field_consistency(
         feature_value = features.get(feature)
         expected_feature_keys = (
             _FEATURE_KEYS
-            if schema_version == SCHEMA_VERSION
+            if schema_version >= 4
+            else _FEATURE_KEYS_V3
+            if schema_version == 3
             else _FEATURE_KEYS_V1_V2
         )
         if (
@@ -1257,6 +1352,184 @@ def _validate_variation_diagnostics(
             field="nominal_two_sided_tail_rank_floor",
             errors=errors,
         )
+
+
+def _validate_input_trace(
+    value: Mapping[str, Any],
+    *,
+    path: str,
+    expected_tuple_kind: str,
+    errors: list[str],
+) -> None:
+    _expect_exact(
+        value,
+        "source_value_tuple_kind",
+        expected_tuple_kind,
+        path,
+        errors,
+    )
+    count_fields = (
+        "source_value_tuple_count",
+        "distinct_source_value_tuple_count",
+        "maximum_source_value_tuple_tie_count",
+        "source_value_tuple_repeat_excess_count",
+        "derived_value_repeat_excess_count",
+        "transform_collision_distinct_value_loss_count",
+        "maximum_consecutive_source_value_tuple_count",
+        "maximum_consecutive_derived_value_count",
+    )
+    for field in count_fields:
+        _expect_nonnegative_int(value, field, path, errors)
+    if not _is_sha256(value.get("source_value_tuple_sha256")):
+        errors.append(
+            "shadow_temporal_surprise_invalid_type:"
+            f"{path}.source_value_tuple_sha256:sha256"
+        )
+    _expect_enum(
+        value,
+        "input_trace_status",
+        frozenset((
+            "no_samples",
+            "all_distinct",
+            "source_tuple_repetition",
+            "transform_collision",
+            "mixed_source_repetition_and_transform_collision",
+        )),
+        path,
+        errors,
+    )
+    _expect_exact(
+        value,
+        "input_trace_diagnostics_are_policy",
+        False,
+        path,
+        errors,
+    )
+    _expect_exact(
+        value,
+        "provider_causation_claimed",
+        False,
+        path,
+        errors,
+    )
+
+    fields = (
+        "sample_count",
+        "distinct_baseline_value_count",
+        "maximum_baseline_value_tie_count",
+        *count_fields,
+    )
+    if not all(_is_nonnegative_int(value.get(field)) for field in fields):
+        return
+    sample_count = int(value["sample_count"])
+    derived_distinct = int(value["distinct_baseline_value_count"])
+    derived_maximum_tie = int(value["maximum_baseline_value_tie_count"])
+    source_count = int(value["source_value_tuple_count"])
+    source_distinct = int(value["distinct_source_value_tuple_count"])
+    source_maximum_tie = int(value["maximum_source_value_tuple_tie_count"])
+    source_repeat_excess = int(value["source_value_tuple_repeat_excess_count"])
+    derived_repeat_excess = int(value["derived_value_repeat_excess_count"])
+    collision_loss = int(
+        value["transform_collision_distinct_value_loss_count"]
+    )
+    source_consecutive = int(
+        value["maximum_consecutive_source_value_tuple_count"]
+    )
+    derived_consecutive = int(
+        value["maximum_consecutive_derived_value_count"]
+    )
+    if source_count != sample_count:
+        _append_input_trace_error(errors, path, "source_value_tuple_count")
+    if sample_count == 0:
+        if any(
+            count != 0
+            for count in (
+                source_distinct,
+                source_maximum_tie,
+                source_repeat_excess,
+                derived_repeat_excess,
+                collision_loss,
+                source_consecutive,
+                derived_consecutive,
+            )
+        ):
+            _append_input_trace_error(errors, path, "empty_counts")
+        expected_status = "no_samples"
+    else:
+        if not 1 <= source_distinct <= sample_count:
+            _append_input_trace_error(
+                errors,
+                path,
+                "distinct_source_value_tuple_count",
+            )
+        elif not (
+            math.ceil(sample_count / source_distinct)
+            <= source_maximum_tie
+            <= sample_count - source_distinct + 1
+        ):
+            _append_input_trace_error(
+                errors,
+                path,
+                "maximum_source_value_tuple_tie_count",
+            )
+        if not 1 <= source_consecutive <= source_maximum_tie:
+            _append_input_trace_error(
+                errors,
+                path,
+                "maximum_consecutive_source_value_tuple_count",
+            )
+        if not 1 <= derived_consecutive <= derived_maximum_tie:
+            _append_input_trace_error(
+                errors,
+                path,
+                "maximum_consecutive_derived_value_count",
+            )
+        if source_repeat_excess != sample_count - source_distinct:
+            _append_input_trace_error(
+                errors,
+                path,
+                "source_value_tuple_repeat_excess_count",
+            )
+        if derived_repeat_excess != sample_count - derived_distinct:
+            _append_input_trace_error(
+                errors,
+                path,
+                "derived_value_repeat_excess_count",
+            )
+        if collision_loss != source_distinct - derived_distinct:
+            _append_input_trace_error(
+                errors,
+                path,
+                "transform_collision_distinct_value_loss_count",
+            )
+        if derived_distinct > source_distinct:
+            _append_input_trace_error(
+                errors,
+                path,
+                "deterministic_distinctness_order",
+            )
+        if source_repeat_excess == 0 and collision_loss == 0:
+            expected_status = "all_distinct"
+        elif source_repeat_excess > 0 and collision_loss == 0:
+            expected_status = "source_tuple_repetition"
+        elif source_repeat_excess == 0 and collision_loss > 0:
+            expected_status = "transform_collision"
+        else:
+            expected_status = (
+                "mixed_source_repetition_and_transform_collision"
+            )
+    if value.get("input_trace_status") != expected_status:
+        _append_input_trace_error(errors, path, "input_trace_status")
+
+
+def _append_input_trace_error(
+    errors: list[str],
+    path: str,
+    field: str,
+) -> None:
+    errors.append(
+        f"shadow_temporal_surprise_input_trace_inconsistent:{path}.{field}"
+    )
 
 
 def _expect_optional_close(

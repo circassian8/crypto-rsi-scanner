@@ -18,23 +18,29 @@ decision, rationale, and revisit condition.
 
 ## 2026-07-21 - Measure baseline variation before considering a distinctness gate
 **Status:** accepted as descriptive shadow evidence; no policy authority
-**Decision:** Shadow temporal surprise v3 records distinct baseline-value count,
+**Decision:** Shadow temporal surprise v4 records distinct baseline-value count,
 maximum and current-value tie counts, distinct-value ratio, and nominal finite-
 sample rank floors using the method's existing 12-decimal derived-value
 identity. Preserve every v1 activity and v2 signed-return calculation and keep
-historical v1/v2 artifacts readable. Do not infer effective sample size, impose
+historical v1/v2/v3 artifacts readable. It also binds exact feature-specific
+value-only source tuples and records source-tuple repetition, derived-value
+repetition, transform-collision loss, and consecutive source/derived runs.
+Observation identity and clocks stay in the causal sample digest but are
+excluded from the value-only tuple so distinct timestamps cannot mask repeated
+numeric inputs. Do not infer provider fault or effective sample size, impose
 a minimum-distinct threshold, or change readiness, degeneracy, ranks, robust
 z-scores, routes, scores, or authority from these fields. Campaign-level
 distributions may summarize projections meeting the model's existing nominal
 sample minimum and retain exact extremes, but must keep historical campaign
 schemas readable and must not turn a descriptive ratio into an exclusion rule.
-Campaign audit v4 may group those reference-set diagnostics by canonical asset
+Campaign audit v5 may group those reference-set diagnostics by canonical asset
 and retain the observed symbol, provider, data mode, and feature-basis counts.
-Those counts are attribution context only: they do not establish that a
-provider caused a tie, distinguish quantization from legitimate low-motion
-behavior, classify an asset, or justify exclusion. Keep exact observation
-references and overlapping-sample caveats visible wherever the grouping is
-rendered.
+It may separately count source-tuple repetition and transform collision and
+retain the exact latest trace digest/reference. Those fields are mathematical
+input lineage only: they do not establish that a provider caused a tie,
+distinguish quantization from legitimate low-motion behavior, classify an
+asset, or justify exclusion. Keep exact observation references and overlapping-
+sample caveats visible wherever the grouping is rendered.
 **Why:** Nominal timestamp count can materially overstate information when a
 provider repeats or quantizes activity values, and overlapping derived returns
 can also tie. Recording that structure makes later calibration auditable

@@ -136,9 +136,45 @@ publication effect. The nominal rank floor is a finite-sample resolution
 description, not a claim that tied values can attain that floor and not a
 p-value.
 
+## Fixed v4 retained-input trace
+
+Schema v4 leaves every v1 activity, v2 signed-return, and v3 baseline-variation
+calculation unchanged. It adds a value-only trace that distinguishes repetition
+already present in exact retained numeric inputs from distinct input tuples
+that collapse to the same 12-decimal derived evaluation value. Historical v1,
+v2, and v3 values remain readable and are not silently upgraded.
+
+The feature-specific source tuple is deliberately closed:
+
+- volume binds the exact retained provider volume value and basis;
+- turnover binds the derived turnover plus its exact retained volume and market-
+  cap components and bases;
+- a direct return binds the asset endpoint and anchor prices and bases; and
+- a relative return additionally binds benchmark endpoint and anchor prices and
+  bases.
+
+Observation IDs and clocks remain bound by the existing eligible-sample digest,
+but are excluded from this value-only tuple. Otherwise every observation would
+look distinct and the diagnostic could not detect repeated inputs. Each feature
+records tuple count, distinct tuple count, largest tuple tie, a SHA-256 of the
+ordered tuple sequence, source and derived repetition excess, transform-
+collision distinct-value loss, and maximum consecutive source/derived runs.
+The accounting identities are exact:
+
+- source repetition excess = sample count - distinct source tuples;
+- derived repetition excess = sample count - distinct derived values; and
+- transform-collision loss = distinct source tuples - distinct derived values.
+
+The closed status is `all_distinct`, `source_tuple_repetition`,
+`transform_collision`, `mixed_source_repetition_and_transform_collision`, or
+`no_samples`. These labels describe algebra only. They do not attribute a fault
+to a provider, estimate effective sample size, classify or exclude an asset, or
+change status, robust z-score, rank, threshold, route, score, publication, or
+Protocol-v2 evidence eligibility.
+
 ## Campaign-level causal replay
 
-The canonical live campaign report replays this same closed v3 evaluator over
+The canonical live campaign report replays this same closed v4 evaluator over
 the exact retained market-history snapshot it has already read. It does not
 create another model or reinterpret stored rows. Only rows carrying
 `baseline_counted=true` enter the replay; rapid non-counted rows are excluded
@@ -176,6 +212,16 @@ dashboard ranks exact repeated asset-feature pairs only for review, with no
 minimum ratio, classification, exclusion, or outcome use. Historical campaign-
 audit schemas v1 through v3 remain readable without manufacturing fields they
 never recorded.
+
+Campaign-audit schema v5 preserves those v4 distributions and persistence
+records, then aggregates the v4 retained-input trace per asset and feature. It
+reports how many eligible projections contain source-tuple repetition,
+transform collision, or both; source-tuple kinds; maximum repeat/collision
+losses; maximum consecutive source/derived runs; and the latest exact trace
+reference and digest. Historical campaign-audit schemas v1 through v4 remain
+readable without manufacturing trace fields. Dashboard and Markdown views show
+the source-repeat and transform counts separately and explicitly make no
+provider-causation claim.
 
 These aggregates are reference-set diagnostics, not an effective-sample-size
 estimate. They set no minimum-distinct threshold, do not alter feature status,
@@ -226,7 +272,7 @@ authority.
 - An extreme activity upper-tail or return two-sided rank can be a data-quality
   event, wash activity, broad market move, or venue migration.
 
-These limitations are why v3 remains shadow-only.
+These limitations are why v4 remains shadow-only.
 
 ## Evidence required before promotion is even proposed
 
