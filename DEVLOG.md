@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Close retained control-regime evidence semantics · Codex
+**Why:** The temporal-history retention boundary checked the control-regime
+evidence envelope but did not type-check several IDs, counts, numeric inputs,
+digest values, or exact booleans. It also did not independently reconcile the
+claimed regime with the signs of the retained BTC and universe returns.
+**Changes:** Observed control-regime evidence now requires an aware timestamp,
+exact Bitcoin and observation identities, finite return inputs, internally
+consistent positive counts and limit, unique bounded input IDs, a lowercase
+SHA-256 digest, exact causal/safety booleans, and a regime derived from the two
+signed inputs. Schema version and provider-call count reject boolean aliases.
+The history-side validator is parity-tested against the canonical producer
+validator; invalid context remains unavailable and cannot enter retained
+control evidence.
+**Verify:** Regressions cover every newly closed field plus one exact valid
+projection. The market-history/cache/evidence/campaign/no-send group passed
+(`127 passed`), `python3 -m compileall -q crypto_rsi_scanner tests`, and `git
+diff --check` passed.
+**Notes/risks:** No regime formula, route, threshold, provider policy, current
+authority, or historical artifact changed. No provider call, send, trade,
+order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Source-size metrics remain advisory.
+
 ## 2026-07-21 — Reject malformed temporal feature-basis provenance · Codex
 **Why:** Rolling history accepted structured feature-basis claims and coerced
 them to text. A nested object containing `proxy` could therefore authorize a

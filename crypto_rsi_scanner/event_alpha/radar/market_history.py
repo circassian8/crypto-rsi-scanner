@@ -1267,21 +1267,69 @@ def _closed_control_market_regime_evidence(value: object) -> bool:
 
     if not isinstance(value, Mapping) or set(value) != _CONTROL_MARKET_REGIME_EVIDENCE_KEYS:
         return False
+    observed_at = value.get("observed_at")
+    observed_time, _ = _parse_aware_time(observed_at)
+    btc_return = _number(value.get("btc_return_24h_percent_points"))
+    median_return = _number(
+        value.get("universe_median_return_24h_percent_points")
+    )
+    expected_regime = (
+        "risk_on"
+        if btc_return is not None and median_return is not None
+        and btc_return > 0.0 and median_return > 0.0
+        else "risk_off"
+        if btc_return is not None and median_return is not None
+        and btc_return < 0.0 and median_return < 0.0
+        else "mixed"
+    )
+    expected_count = value.get("universe_expected_count")
+    input_count = value.get("universe_input_count")
+    universe_limit = value.get("universe_limit")
+    observation_ids = value.get("input_observation_ids")
+    btc_observation_id = value.get("btc_observation_id")
+    digest = value.get("input_observations_sha256")
     if (
         value.get("schema_id") != "decision_radar.point_in_time_control_market_regime"
+        or type(value.get("schema_version")) is not int
         or value.get("schema_version") != 1
         or value.get("status") != "observed"
         or value.get("reason") is not None
         or value.get("regime") not in _CONTROL_MARKET_REGIMES
+        or value.get("regime") != expected_regime
         or value.get("basis")
         != "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1"
+        or not isinstance(observed_at, str)
+        or observed_time is None
         or value.get("horizon_hours") != 24
         or value.get("return_unit") != "percent_points"
+        or value.get("btc_canonical_asset_id") != "bitcoin"
+        or not _bounded_observation_id(btc_observation_id)
+        or btc_return is None
+        or median_return is None
+        or type(expected_count) is not int
+        or expected_count <= 0
+        or type(input_count) is not int
+        or input_count != expected_count
+        or type(universe_limit) is not int
+        or universe_limit < expected_count
+        or value.get("universe_policy") != "bounded_top_liquid_by_total_volume"
+        or not isinstance(observation_ids, list)
+        or len(observation_ids) != expected_count
+        or not all(_bounded_observation_id(item) for item in observation_ids)
+        or len(set(observation_ids)) != expected_count
+        or btc_observation_id not in observation_ids
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+        or value.get("all_inputs_current_cycle") is not True
+        or value.get("all_inputs_point_in_time_universe_members") is not True
+        or value.get("all_inputs_temporal_return_evidence_ready") is not True
         or value.get("selection_uses_outcomes") is not False
         or value.get("historical_context_backfilled") is not False
         or value.get("routing_eligible") is not False
         or value.get("decision_policy_eligible") is not False
         or value.get("protocol_v2_evidence_eligible") is not False
+        or type(value.get("provider_calls")) is not int
         or value.get("provider_calls") != 0
         or value.get("research_only") is not True
     ):
@@ -1297,6 +1345,10 @@ def _closed_control_market_regime_evidence(value: object) -> bool:
     except (TypeError, ValueError):
         return False
     return len(encoded) <= 8_192
+
+
+def _bounded_observation_id(value: object) -> bool:
+    return isinstance(value, str) and 0 < len(value) <= 160
 
 
 def _rejected_current_row(row: Mapping[str, Any], reason: str) -> dict[str, Any]:

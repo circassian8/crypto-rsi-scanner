@@ -976,6 +976,103 @@ def test_structured_proxy_basis_cannot_authorize_temporal_replacement():
     )
 
 
+def _control_market_regime_evidence() -> dict:
+    return {
+        "schema_id": "decision_radar.point_in_time_control_market_regime",
+        "schema_version": 1,
+        "status": "observed",
+        "reason": None,
+        "regime": "risk_on",
+        "basis": "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1",
+        "observed_at": NOW.isoformat(),
+        "horizon_hours": 24,
+        "return_unit": "percent_points",
+        "btc_canonical_asset_id": "bitcoin",
+        "btc_observation_id": "mhobs-bitcoin",
+        "btc_return_24h_percent_points": 1.0,
+        "universe_input_count": 2,
+        "universe_expected_count": 2,
+        "universe_limit": 30,
+        "universe_policy": "bounded_top_liquid_by_total_volume",
+        "universe_median_return_24h_percent_points": 0.5,
+        "input_observation_ids": ["mhobs-bitcoin", "mhobs-ethereum"],
+        "input_observations_sha256": "a" * 64,
+        "all_inputs_current_cycle": True,
+        "all_inputs_point_in_time_universe_members": True,
+        "all_inputs_temporal_return_evidence_ready": True,
+        "selection_uses_outcomes": False,
+        "historical_context_backfilled": False,
+        "routing_eligible": False,
+        "decision_policy_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "research_only": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "malformed"),
+    (
+        ("schema_version", True),
+        ("observed_at", "2026-07-13T12:00:00"),
+        ("regime", "risk_off"),
+        ("btc_canonical_asset_id", {"borrowed": "bitcoin"}),
+        ("btc_observation_id", ["mhobs-bitcoin"]),
+        ("btc_return_24h_percent_points", True),
+        ("universe_input_count", True),
+        ("universe_expected_count", 3),
+        ("universe_limit", True),
+        ("universe_median_return_24h_percent_points", "unknown"),
+        ("input_observation_ids", ["mhobs-bitcoin", "mhobs-bitcoin"]),
+        ("input_observations_sha256", "g" * 64),
+        ("all_inputs_current_cycle", 1),
+        ("all_inputs_point_in_time_universe_members", "true"),
+        ("all_inputs_temporal_return_evidence_ready", {"value": True}),
+        ("provider_calls", False),
+    ),
+)
+def test_market_history_rejects_malformed_control_regime_evidence_fields(
+    field,
+    malformed,
+):
+    evidence = _control_market_regime_evidence()
+    evidence[field] = malformed
+
+    assert event_market_history._closed_control_market_regime_evidence(evidence) is False
+    assert market_no_send_features.control_market_regime_evidence_valid(evidence) is False
+
+
+def test_market_history_accepts_only_exact_observed_control_regime_evidence():
+    evidence = _control_market_regime_evidence()
+
+    assert event_market_history._closed_control_market_regime_evidence(evidence) is True
+    assert market_no_send_features.control_market_regime_evidence_valid(evidence) is True
+
+    row = _row(
+        "bitcoin",
+        NOW,
+        price=100,
+        volume=1_000,
+        point_in_time_universe_member=True,
+        point_in_time_volume_rank=1,
+        point_in_time_universe_size=2,
+        point_in_time_universe_limit=30,
+        point_in_time_universe_policy="bounded_top_liquid_by_total_volume",
+        market_regime="risk_on",
+        market_regime_basis=(
+            "coingecko_temporal_24h_btc_and_top_liquid_median_sign_v1"
+        ),
+        market_regime_evidence=evidence,
+    )
+    observation = event_market_history._observation_values(
+        row,
+        asset_id="bitcoin",
+        observed_at=NOW,
+    )
+
+    assert observation["market_regime_evidence"] == evidence
+
+
 def test_retained_market_identity_aliases_do_not_coerce_or_borrow_after_invalid_values():
     current = _row("safe-token", NOW, price=1, volume=10)
     current.update({
