@@ -253,6 +253,7 @@ def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
             compact=True,
         ))
         + _shadow_variation_table(feature_coverage, snapshot=snapshot)
+        + _shadow_asset_variation_table(raw, snapshot=snapshot)
     )
     return render_panel(
         "Shadow anomaly distributions",
@@ -334,6 +335,13 @@ def _ratio_distribution_triplet(
     value: Mapping[str, Any],
     fields: tuple[str, str, str],
 ) -> str:
+    return _ratio_distribution_values(value, fields)
+
+
+def _ratio_distribution_values(
+    value: Mapping[str, Any],
+    fields: tuple[str, ...],
+) -> str:
     return " / ".join(
         format_percent(value.get(field), unit="fraction", decimals=1)
         for field in fields
@@ -362,6 +370,151 @@ def _shadow_variation_extreme(value: Any, *, now: Any) -> HtmlFragment | str:
         f"distinct · largest tie {escape_html(display_count(maximum_tie_count))}/"
         f"{escape_html(display_count(sample_count))}<br>"
         f'{time_element(present_time(observed_at, now=now), primary="utc")}'
+    )
+
+
+def _shadow_asset_variation_table(
+    raw: Mapping[str, Any],
+    *,
+    snapshot: DashboardSnapshot,
+) -> str:
+    summaries = raw.get("asset_variation_summaries")
+    if (
+        raw.get("asset_variation_diagnostics_available") is not True
+        or not isinstance(summaries, (list, tuple))
+    ):
+        return ""
+    repeated_rows: list[tuple[float, float, str, str, Mapping[str, Any], Mapping[str, Any]]] = []
+    for asset in summaries:
+        if not isinstance(asset, Mapping):
+            continue
+        features = asset.get("feature_variation")
+        if not isinstance(features, Mapping):
+            continue
+        for feature, variation in features.items():
+            if (
+                not isinstance(variation, Mapping)
+                or not isinstance(
+                    variation.get("repeated_baseline_value_observation_count"),
+                    int,
+                )
+                or variation.get("repeated_baseline_value_observation_count") <= 0
+            ):
+                continue
+            minimum_distinct = variation.get(
+                "distinct_baseline_value_ratio_minimum"
+            )
+            maximum_tie = variation.get(
+                "maximum_baseline_value_tie_ratio_maximum"
+            )
+            if not isinstance(minimum_distinct, (int, float)) or not isinstance(
+                maximum_tie, (int, float)
+            ):
+                continue
+            repeated_rows.append((
+                float(minimum_distinct),
+                -float(maximum_tie),
+                str(asset.get("canonical_asset_id") or ""),
+                str(feature),
+                asset,
+                variation,
+            ))
+    repeated_rows.sort(key=lambda row: row[:4])
+    limit = 24
+    table_rows = []
+    for _, _, asset_id, feature, asset, variation in repeated_rows[:limit]:
+        variation_count = variation.get("variation_observation_count")
+        repeated_count = variation.get(
+            "repeated_baseline_value_observation_count"
+        )
+        table_rows.append((
+            _shadow_asset_identity(asset_id, asset),
+            humanize_enum(feature),
+            f"{display_count(repeated_count)} / {display_count(variation_count)}",
+            _ratio_distribution_values(
+                variation,
+                (
+                    "distinct_baseline_value_ratio_minimum",
+                    "distinct_baseline_value_ratio_median",
+                ),
+            ),
+            _ratio_distribution_values(
+                variation,
+                (
+                    "maximum_baseline_value_tie_ratio_median",
+                    "maximum_baseline_value_tie_ratio_maximum",
+                ),
+            ),
+            _shadow_asset_source_basis(asset, feature=feature),
+            _shadow_variation_extreme(
+                variation.get("latest_variation_observation"),
+                now=snapshot.generation_authority_checked_at,
+            ),
+        ))
+    if not table_rows:
+        return ""
+    count_note = (
+        f"Showing all {len(repeated_rows)} exact asset-feature pairs with at least one "
+        "repeated baseline value."
+        if len(repeated_rows) <= limit
+        else (
+            f"Showing the {limit} least-diverse of {len(repeated_rows)} exact "
+            "asset-feature pairs with repeated baseline values."
+        )
+    )
+    return (
+        '<div class="alert alert-info"><strong>Attribution required.</strong> '
+        + escape_html(count_note)
+        + " Repetition can reflect legitimate low-motion behavior, provider refresh cadence, "
+        "or upstream quantization. This ranking is outcome-blind and applies no exclusion.</div>"
+        + str(data_table(
+            (
+                "Asset",
+                "Feature",
+                "Repeated / eligible",
+                "Distinct share min / med",
+                "Largest-tie share med / max",
+                "Retained provider · mode · basis",
+                "Latest reference set",
+            ),
+            table_rows,
+            caption="Repeated reference sets by canonical asset and feature",
+            empty="No repeated sample-eligible reference sets were recorded.",
+            compact=True,
+        ))
+    )
+
+
+def _shadow_asset_identity(asset_id: str, asset: Mapping[str, Any]) -> HtmlFragment:
+    symbols = asset.get("retained_symbol_counts")
+    symbol_text = _context_counts_label(symbols) if isinstance(symbols, Mapping) else ""
+    suffix = f"<br>{escape_html(symbol_text)}" if symbol_text else ""
+    return HtmlFragment(f"{escape_html(humanize_enum(asset_id))}{suffix}")
+
+
+def _shadow_asset_source_basis(
+    asset: Mapping[str, Any],
+    *,
+    feature: str,
+) -> str:
+    providers = _context_counts_label(asset.get("retained_provider_counts"))
+    modes = _context_counts_label(asset.get("retained_data_mode_counts"))
+    basis_container = asset.get("retained_feature_basis_counts")
+    basis_key = feature if feature in {"volume_24h", "turnover_24h"} else "price"
+    basis = (
+        _context_counts_label(basis_container.get(basis_key))
+        if isinstance(basis_container, Mapping)
+        else ""
+    )
+    return " · ".join(value for value in (providers, modes, basis) if value) or UNAVAILABLE
+
+
+def _context_counts_label(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    return ", ".join(
+        f"{humanize_enum(identity)} {display_count(count)}"
+        for identity, count in sorted(value.items())
     )
 
 

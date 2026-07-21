@@ -28,6 +28,13 @@ z-scores, routes, scores, or authority from these fields. Campaign-level
 distributions may summarize projections meeting the model's existing nominal
 sample minimum and retain exact extremes, but must keep historical campaign
 schemas readable and must not turn a descriptive ratio into an exclusion rule.
+Campaign audit v4 may group those reference-set diagnostics by canonical asset
+and retain the observed symbol, provider, data mode, and feature-basis counts.
+Those counts are attribution context only: they do not establish that a
+provider caused a tie, distinguish quantization from legitimate low-motion
+behavior, classify an asset, or justify exclusion. Keep exact observation
+references and overlapping-sample caveats visible wherever the grouping is
+rendered.
 **Why:** Nominal timestamp count can materially overstate information when a
 provider repeats or quantizes activity values, and overlapping derived returns
 can also tie. Recording that structure makes later calibration auditable

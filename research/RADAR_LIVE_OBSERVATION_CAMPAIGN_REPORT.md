@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T16:09:39.106363+00:00` from local artifacts only.
+Generated at `2026-07-21T16:35:10.175435+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -296,6 +296,41 @@ Reference-set variation below is calculated only for projections meeting the mod
 | turnover_24h | 1469 / 1740 | 1 / 30 / 57 | 0.125 / 1 / 1 | 0.033333 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
 | volume_24h | 1469 / 1740 | 1 / 30 / 57 | 0.125 / 1 / 1 | 0.033333 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
 
+#### Repeated reference sets by asset
+
+The campaign contains 28 exact asset-feature pairs with at least one repeated sample-eligible baseline. All are shown. This ranking is outcome-blind and applies no exclusion. Provider, mode, and feature-basis counts are retained context, not causal attribution; repetition may be legitimate low-motion behavior, source refresh cadence, or quantization.
+
+| Asset | Feature | Repeated / eligible | Distinct ratio min / median | Largest-tie ratio median / max | Retained provider / mode / basis | Latest reference set |
+|---|---|---:|---:|---:|---|---|
+| figure-heloc | return_24h | 11 / 11 | 0.111111 / 0.1875 | 0.692308 / 1 | coingecko=36 / live=36 / provider_observed=36 | 3/18 distinct; largest tie 9/18 @ 2026-07-20T12:34:56.205337+00:00 |
+| figure-heloc | turnover_24h | 28 / 28 | 0.125 / 0.260064 | 0.41886 / 1 | coingecko=36 / live=36 / derived_provider_ratio=36 | 7/35 distinct; largest tie 11/35 @ 2026-07-20T12:34:56.205337+00:00 |
+| figure-heloc | volume_24h | 28 / 28 | 0.125 / 0.245 | 0.525287 / 1 | coingecko=36 / live=36 / provider_observed=36 | 6/35 distinct; largest tie 21/35 @ 2026-07-20T12:34:56.205337+00:00 |
+| figure-heloc | return_1h | 22 / 22 | 0.157895 / 0.2 | 0.866667 / 0.894737 | coingecko=36 / live=36 / provider_observed=36 | 3/19 distinct; largest tie 17/19 @ 2026-07-20T12:34:56.205337+00:00 |
+| pepe | return_1h | 36 / 36 | 0.222222 / 0.421053 | 0.578947 / 0.888889 | coingecko=58 / live=58 / provider_observed=58 | 17/32 distinct; largest tie 14/32 @ 2026-07-21T15:14:41.396928+00:00 |
+| figure-heloc | return_4h | 21 / 21 | 0.227273 / 0.294118 | 0.705882 / 0.772727 | coingecko=36 / live=36 / provider_observed=36 | 5/22 distinct; largest tie 17/22 @ 2026-07-20T12:34:56.205337+00:00 |
+| near | return_1h | 36 / 36 | 0.307692 / 0.416409 | 0.529412 / 0.7 | coingecko=58 / live=58 / provider_observed=58 | 18/32 distinct; largest tie 13/32 @ 2026-07-21T15:14:41.396928+00:00 |
+| shiba-inu | return_1h | 17 / 17 | 0.444444 / 0.545455 | 0.545455 / 0.666667 | coingecko=35 / live=35 / provider_observed=35 | 10/17 distinct; largest tie 8/17 @ 2026-07-20T19:41:41.729110+00:00 |
+| pepe | return_4h | 35 / 35 | 0.454545 / 0.68 | 0.210526 / 0.4 | coingecko=58 / live=58 / provider_observed=58 | 20/30 distinct; largest tie 7/30 @ 2026-07-21T15:14:41.396928+00:00 |
+| near | return_4h | 35 / 35 | 0.52381 / 0.583333 | 0.25 / 0.4 | coingecko=58 / live=58 / provider_observed=58 | 18/30 distinct; largest tie 7/30 @ 2026-07-21T15:14:41.396928+00:00 |
+| ripple | return_1h | 36 / 36 | 0.6 / 0.764706 | 0.29222 / 0.5 | coingecko=58 / live=58 / provider_observed=58 | 23/32 distinct; largest tie 10/32 @ 2026-07-21T15:14:41.396928+00:00 |
+| near | return_24h | 28 / 28 | 0.6 / 0.666667 | 0.232684 / 0.375 | coingecko=58 / live=58 / provider_observed=58 | 24/35 distinct; largest tie 5/35 @ 2026-07-21T15:14:41.396928+00:00 |
+| shiba-inu | return_4h | 12 / 12 | 0.625 / 0.7 | 0.3 / 0.375 | coingecko=35 / live=35 / provider_observed=35 | 10/13 distinct; largest tie 3/13 @ 2026-07-20T19:41:41.729110+00:00 |
+| avalanche-2 | return_1h | 36 / 36 | 0.666667 / 0.733333 | 0.277778 / 0.444444 | coingecko=58 / live=58 / provider_observed=58 | 24/32 distinct; largest tie 5/32 @ 2026-07-21T15:14:41.396928+00:00 |
+| pepe | return_24h | 28 / 28 | 0.678571 / 0.732051 | 0.125 / 0.25 | coingecko=58 / live=58 / provider_observed=58 | 26/35 distinct; largest tie 3/35 @ 2026-07-21T15:14:41.396928+00:00 |
+| ripple | return_4h | 35 / 35 | 0.722222 / 0.782609 | 0.210526 / 0.375 | coingecko=58 / live=58 / provider_observed=58 | 23/30 distinct; largest tie 4/30 @ 2026-07-21T15:14:41.396928+00:00 |
+| uniswap | return_1h | 31 / 36 | 0.727273 / 0.789474 | 0.229021 / 0.294118 | coingecko=58 / live=58 / provider_observed=58 | 25/32 distinct; largest tie 5/32 @ 2026-07-21T15:14:41.396928+00:00 |
+| chainlink | return_1h | 35 / 36 | 0.764706 / 0.811012 | 0.196154 / 0.235294 | coingecko=58 / live=58 / provider_observed=58 | 26/32 distinct; largest tie 5/32 @ 2026-07-21T15:14:41.396928+00:00 |
+| shiba-inu | return_24h | 11 / 11 | 0.777778 / 0.833333 | 0.25 / 0.333333 | coingecko=35 / live=35 / provider_observed=35 | 10/12 distinct; largest tie 3/12 @ 2026-07-20T19:41:41.729110+00:00 |
+| ripple | return_24h | 28 / 28 | 0.78125 / 0.875 | 0.1 / 0.25 | coingecko=58 / live=58 / provider_observed=58 | 28/35 distinct; largest tie 3/35 @ 2026-07-21T15:14:41.396928+00:00 |
+| avalanche-2 | return_4h | 31 / 35 | 0.827586 / 0.916667 | 0.111111 / 0.166667 | coingecko=58 / live=58 / provider_observed=58 | 25/30 distinct; largest tie 4/30 @ 2026-07-21T15:14:41.396928+00:00 |
+| uniswap | return_4h | 28 / 35 | 0.842105 / 0.888889 | 0.090909 / 0.142857 | coingecko=58 / live=58 / provider_observed=58 | 27/30 distinct; largest tie 2/30 @ 2026-07-21T15:14:41.396928+00:00 |
+| avalanche-2 | return_24h | 28 / 28 | 0.875 / 0.934409 | 0.093074 / 0.25 | coingecko=58 / live=58 / provider_observed=58 | 33/35 distinct; largest tie 2/35 @ 2026-07-21T15:14:41.396928+00:00 |
+| chainlink | return_24h | 28 / 28 | 0.875 / 0.915476 | 0.093074 / 0.25 | coingecko=58 / live=58 / provider_observed=58 | 32/35 distinct; largest tie 2/35 @ 2026-07-21T15:14:41.396928+00:00 |
+| uniswap | return_24h | 28 / 28 | 0.875 / 0.933333 | 0.093074 / 0.25 | coingecko=58 / live=58 / provider_observed=58 | 33/35 distinct; largest tie 2/35 @ 2026-07-21T15:14:41.396928+00:00 |
+| dexe | return_24h | 5 / 6 | 0.888889 / 0.909091 | 0.181818 / 0.222222 | coingecko=36 / live=36 / provider_observed=36 | 10/11 distinct; largest tie 2/11 @ 2026-07-21T11:07:27.472398+00:00 |
+| chainlink | return_4h | 27 / 35 | 0.933333 / 0.96 | 0.086957 / 0.133333 | coingecko=58 / live=58 / provider_observed=58 | 29/30 distinct; largest tie 2/30 @ 2026-07-21T15:14:41.396928+00:00 |
+| dogecoin | return_24h | 5 / 28 | 0.967742 / 1 | 0.057983 / 0.125 | coingecko=58 / live=58 / provider_observed=58 | 34/35 distinct; largest tie 2/35 @ 2026-07-21T15:14:41.396928+00:00 |
+
 ### Decision episodes
 
 Repeated observations are grouped into fixed-start descriptive episodes; they are not claimed to be statistically independent.
@@ -422,8 +457,8 @@ This expands the frozen-episode scorecard across every canonical Decision route 
 ## Next observation
 
 - Next eligible time: `2026-07-21T16:14:41.396928+00:00`
-- Eligible at report time: `false`
-- Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
+- Eligible at report time: `true`
+- Exact next safe operator command: `make radar-daily-ops-cycle PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion

@@ -893,13 +893,15 @@ def test_north_star_keeps_robust_surprise_shadow_only_and_threshold_free():
     assert policy["campaign_audit_schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert policy["campaign_audit_schema_version"] == 3
-    assert policy["campaign_audit_legacy_schema_versions_readable"] == [1, 2]
+    assert policy["campaign_audit_schema_version"] == 4
+    assert policy["campaign_audit_legacy_schema_versions_readable"] == [1, 2, 3]
     assert policy["campaign_audit_variation_observation_basis"] == (
         "closed_shadow_v3_projection_meeting_existing_minimum_sample_count"
     )
     assert policy["campaign_audit_variation_diagnostics_are_policy"] is False
     assert policy["campaign_audit_effective_sample_size_claimed"] is False
+    assert policy["campaign_audit_source_context_is_causal_attribution"] is False
+    assert policy["campaign_audit_asset_repetition_is_exclusion_policy"] is False
     assert policy["campaign_audit_ready_distribution"] == (
         "per_feature_robust_z_and_descriptive_tail_quantiles_over_ready_projections"
     )

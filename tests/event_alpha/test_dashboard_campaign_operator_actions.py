@@ -167,13 +167,23 @@ def _shadow_surprise_audit() -> dict[str, object]:
     rows: list[dict[str, object]] = []
     for asset_index, asset_id in enumerate(("asset-a", "bitcoin", "ethereum")):
         for index in range(12):
-            volume = float(
-                1_000_000
-                + asset_index * 200_000
-                + index * 17_000
-                + (index % 3) * 3_000
+            volume = (
+                1_000_000.0
+                if asset_id == "asset-a"
+                else float(
+                    1_000_000
+                    + asset_index * 200_000
+                    + index * 17_000
+                    + (index % 3) * 3_000
+                )
             )
-            market_cap = float(10_000_000 + asset_index * 2_000_000 + index * 9_000)
+            market_cap = (
+                10_000_000.0
+                if asset_id == "asset-a"
+                else float(
+                    10_000_000 + asset_index * 2_000_000 + index * 9_000
+                )
+            )
             rows.append({
                 "observation_id": f"shadow-{asset_id}-{index}",
                 "canonical_asset_id": asset_id,
@@ -556,8 +566,9 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     ] == 30
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 3
+    assert shadow["schema_version"] == 4
     assert shadow["variation_diagnostics_available"] is True
+    assert shadow["asset_variation_diagnostics_available"] is True
     assert shadow["evaluated_observation_count"] == 36
     assert shadow["provider_calls"] == shadow["writes"] == 0
     volume_shadow = shadow["feature_coverage"]["volume_24h"]
@@ -578,6 +589,20 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert volume_shadow["minimum_distinct_ratio_observation"][
         "sample_count"
     ] >= 4
+    assert len(shadow["asset_variation_summaries"]) == 3
+    asset_a = next(
+        row
+        for row in shadow["asset_variation_summaries"]
+        if row["canonical_asset_id"] == "asset-a"
+    )
+    assert asset_a["retained_provider_counts"] == {"unavailable": 12}
+    assert "volume_24h" in asset_a[
+        "features_with_repeated_baseline_values"
+    ]
+    asset_volume = asset_a["feature_variation"]["volume_24h"]
+    assert asset_volume["repeated_baseline_value_observation_count"] > 0
+    assert asset_volume["descriptive_repetition_observation_share"] == 1.0
+    assert asset_a["source_context_is_causal_attribution"] is False
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
     ] == 0
@@ -792,6 +817,13 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, variation_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    asset_variation_drift = deepcopy(_campaign_report())
+    asset_variation_drift["shadow_temporal_surprise_campaign_audit"][
+        "asset_variation_summaries"
+    ][0]["source_context_is_causal_attribution"] = True
+    _write_report(tmp_path, asset_variation_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     tmp_path: Path,
@@ -813,6 +845,10 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Largest-tie share med / p95 / max" in html
     assert "not an effective-sample-size estimate" in html
     assert "distinct · largest tie" in html
+    assert "Repeated reference sets by canonical asset and feature" in html
+    assert "Attribution required" in html
+    assert "Retained provider · mode · basis" in html
+    assert "This ranking is outcome-blind and applies no exclusion" in html
     assert "Observed history, not a policy input" in html
     assert "Verified source envelopes" in html
     assert "Frozen episodes cover 1/8 routes and 1/7 primary origins" in html
@@ -831,6 +867,7 @@ def test_campaign_dashboard_keeps_v2_shadow_audit_readable_without_variation(
     report = deepcopy(_campaign_report())
     audit = report["shadow_temporal_surprise_campaign_audit"]
     audit["schema_version"] = 2
+    audit.pop("asset_variation_summaries")
     for coverage in audit["feature_coverage"].values():
         for key in tuple(coverage):
             if key not in (

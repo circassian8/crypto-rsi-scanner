@@ -33,11 +33,14 @@ holdout.
   exposes per-feature coverage, degeneracy/status counts, exact input
   rejections, per-asset summaries, source-bound plus causal-value digests, and
   schema-v3 distinct-value/tie distributions over projections meeting the
-  existing nominal sample minimum. Exact least-diverse reference sets remain
-  traceable; historical audit schemas remain readable. This is measurement
-  plumbing only: it does not rewrite history, impose a distinctness threshold,
-  estimate effective sample size, or qualify as independent, calibrated, or
-  Protocol-v2 evidence.
+  existing nominal sample minimum. Audit schema v4 also records repetition
+  persistence by canonical asset and feature beside retained provider/mode/basis
+  counts and the latest exact reference set. Those counts are context, not a
+  causal diagnosis of provider behavior. Historical audit schemas remain
+  readable. This is measurement plumbing only: it does not rewrite history,
+  classify or exclude an asset, impose a distinctness threshold, estimate
+  effective sample size, or qualify as independent, calibrated, or Protocol-v2
+  evidence.
 - The present campaign has overlapping observations and sparse matured ideas;
   repeated cycles are not independent samples.
 

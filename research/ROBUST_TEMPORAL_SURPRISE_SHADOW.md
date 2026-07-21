@@ -157,15 +157,25 @@ evaluation accounting, and two complementary digests:
 - the causal-value digest removes only that whole-snapshot hash, so an older
   projection remains byte-comparable when later observations are appended.
 
-Campaign-audit schema v3 also aggregates the closed per-observation variation
+Campaign-audit schema v3 aggregates the closed per-observation variation
 diagnostics for each feature. Its distribution population includes projections
 whose baseline count meets the model's existing nominal sample minimum,
 including degenerate-scale projections; it excludes earlier warm-up rows so a
 one-sample reference set cannot dominate the tie-share maximum. The audit
 reports distinct-count, distinct-ratio, and largest-tie-ratio distributions,
 plus exact observation identities and counts for the least-diverse and
-highest-tie-share reference sets. Historical campaign-audit schemas v1 and v2
-remain readable without manufacturing fields they never recorded.
+highest-tie-share reference sets.
+
+Campaign-audit schema v4 adds bounded per-asset/per-feature persistence without
+changing those distributions. For each evaluated canonical asset, it records
+how many sample-eligible projections contain repeated baseline values, the
+distinct/tie distribution and latest exact reference set, and retained symbol,
+provider, data-mode, and feature-basis counts. Those source fields describe the
+rows in the retained context; they do not prove why a value repeated. The
+dashboard ranks exact repeated asset-feature pairs only for review, with no
+minimum ratio, classification, exclusion, or outcome use. Historical campaign-
+audit schemas v1 through v3 remain readable without manufacturing fields they
+never recorded.
 
 These aggregates are reference-set diagnostics, not an effective-sample-size
 estimate. They set no minimum-distinct threshold, do not alter feature status,

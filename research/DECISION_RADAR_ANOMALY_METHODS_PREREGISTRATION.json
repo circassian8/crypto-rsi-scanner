@@ -32,14 +32,18 @@
     "baseline_variation_diagnostics": "rounded_value_distinct_counts_tie_concentration_current_ties_and_nominal_rank_floors",
     "minimum_distinct_baseline_value_count": null,
     "variation_diagnostics_are_policy": false,
-    "campaign_audit_schema_version": 3,
+    "campaign_audit_schema_version": 4,
     "legacy_campaign_audit_schema_versions_readable": [
       1,
-      2
+      2,
+      3
     ],
     "campaign_variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
     "campaign_variation_distributions": "distinct_count_distinct_ratio_and_maximum_tie_ratio_with_exact_extremes",
     "campaign_variation_effective_sample_size_claimed": false,
+    "campaign_asset_variation_summary": "per_asset_per_feature_repetition_persistence_exact_extremes_and_latest_state",
+    "campaign_asset_source_context": "retained_symbol_provider_data_mode_and_feature_basis_counts_not_causal_attribution",
+    "campaign_asset_repetition_is_exclusion_policy": false,
     "existing_shadow_policy_eligible": false,
     "independent_live_samples_established": false
   },

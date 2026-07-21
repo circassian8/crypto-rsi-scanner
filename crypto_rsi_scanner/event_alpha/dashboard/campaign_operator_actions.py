@@ -280,6 +280,16 @@ def _project_shadow_surprise_audit(
         )
         for feature, row in sorted(feature_coverage.items())
     }
+    raw_asset_variation = audit.get("asset_variation_summaries", [])
+    if audit_schema_version >= 4:
+        if not isinstance(raw_asset_variation, list) or len(raw_asset_variation) > 128:
+            raise ValueError("campaign_shadow_asset_variation_oversized")
+        projected_asset_variation = tuple(
+            _project_shadow_asset_variation(row)
+            for row in raw_asset_variation
+        )
+    else:
+        projected_asset_variation = ()
     projection_status_counts = _project_status_counts(
         audit.get("projection_status_counts"),
         label="shadow_projection_status",
@@ -306,6 +316,8 @@ def _project_shadow_surprise_audit(
         "feature_coverage": projected_features,
         "distribution_diagnostics_available": audit_schema_version >= 2,
         "variation_diagnostics_available": audit_schema_version >= 3,
+        "asset_variation_diagnostics_available": audit_schema_version >= 4,
+        "asset_variation_summaries": projected_asset_variation,
         "source_bound_projection_digest": _identity(
             audit.get("source_bound_projection_digest"),
             "shadow_source_bound_digest",
@@ -536,6 +548,148 @@ def _project_shadow_variation_reference(
             reference.get("maximum_baseline_value_tie_ratio"),
             f"{label}_maximum_tie_ratio",
         ),
+    }
+
+
+def _project_shadow_asset_variation(value: Any) -> dict[str, Any]:
+    row = _mapping(value, "shadow_asset_variation")
+    raw_basis = _mapping(
+        row.get("retained_feature_basis_counts"),
+        "shadow_asset_feature_basis_counts",
+    )
+    raw_features = _mapping(
+        row.get("feature_variation"),
+        "shadow_asset_feature_variation",
+    )
+    if len(raw_features) > 16:
+        raise ValueError("shadow_asset_feature_variation_oversized")
+    return {
+        "canonical_asset_id": _identity(
+            row.get("canonical_asset_id"), "shadow_asset_identity"
+        ),
+        "evaluated_observation_count": _count(
+            row.get("evaluated_observation_count"),
+            "shadow_asset_evaluated_count",
+        ),
+        "retained_context_observation_count": _count(
+            row.get("retained_context_observation_count"),
+            "shadow_asset_context_count",
+        ),
+        "retained_symbol_counts": _project_context_counts(
+            row.get("retained_symbol_counts"),
+            label="shadow_asset_symbol",
+        ),
+        "retained_provider_counts": _project_context_counts(
+            row.get("retained_provider_counts"),
+            label="shadow_asset_provider",
+        ),
+        "retained_data_mode_counts": _project_context_counts(
+            row.get("retained_data_mode_counts"),
+            label="shadow_asset_data_mode",
+        ),
+        "retained_feature_basis_counts": {
+            _identity(feature, "shadow_asset_basis_feature"): (
+                _project_context_counts(
+                    counts,
+                    label="shadow_asset_feature_basis",
+                )
+            )
+            for feature, counts in sorted(raw_basis.items())
+        },
+        "features_with_repeated_baseline_values": tuple(
+            _identity(feature, "shadow_asset_repeated_feature")
+            for feature in row.get("features_with_repeated_baseline_values", [])
+        ),
+        "feature_with_repeated_baseline_value_count": _count(
+            row.get("feature_with_repeated_baseline_value_count"),
+            "shadow_asset_repeated_feature_count",
+        ),
+        "feature_variation": {
+            _identity(feature, "shadow_asset_feature_identity"): (
+                _project_shadow_asset_feature_variation(feature, feature_row)
+            )
+            for feature, feature_row in sorted(raw_features.items())
+        },
+        "source_context_is_causal_attribution": False,
+        "routing_eligible": False,
+        "score_adjustment_eligible": False,
+        "threshold_change_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "research_only": True,
+    }
+
+
+def _project_shadow_asset_feature_variation(
+    feature: str,
+    value: Any,
+) -> dict[str, Any]:
+    row = _mapping(value, "shadow_asset_feature_variation")
+    return {
+        "feature": _identity(row.get("feature"), "shadow_asset_feature"),
+        "family": _identity(row.get("family"), "shadow_asset_feature_family"),
+        "evaluated_observation_count": _count(
+            row.get("evaluated_observation_count"),
+            "shadow_asset_feature_evaluated_count",
+        ),
+        "variation_observation_count": _count(
+            row.get("variation_observation_count"),
+            "shadow_asset_feature_variation_count",
+        ),
+        "repeated_baseline_value_observation_count": _count(
+            row.get("repeated_baseline_value_observation_count"),
+            "shadow_asset_feature_repeated_count",
+        ),
+        "all_distinct_baseline_value_observation_count": _count(
+            row.get("all_distinct_baseline_value_observation_count"),
+            "shadow_asset_feature_distinct_count",
+        ),
+        "descriptive_repetition_observation_share": _optional_finite_number(
+            row.get("descriptive_repetition_observation_share"),
+            "shadow_asset_feature_repetition_share",
+        ),
+        "distinct_baseline_value_ratio_minimum": _optional_finite_number(
+            row.get("distinct_baseline_value_ratio_minimum"),
+            "shadow_asset_feature_distinct_ratio_minimum",
+        ),
+        "distinct_baseline_value_ratio_median": _optional_finite_number(
+            row.get("distinct_baseline_value_ratio_median"),
+            "shadow_asset_feature_distinct_ratio_median",
+        ),
+        "maximum_baseline_value_tie_ratio_median": _optional_finite_number(
+            row.get("maximum_baseline_value_tie_ratio_median"),
+            "shadow_asset_feature_tie_ratio_median",
+        ),
+        "maximum_baseline_value_tie_ratio_maximum": _optional_finite_number(
+            row.get("maximum_baseline_value_tie_ratio_maximum"),
+            "shadow_asset_feature_tie_ratio_maximum",
+        ),
+        "latest_variation_observation": _project_shadow_variation_reference(
+            row.get("latest_variation_observation"),
+            label="shadow_asset_feature_latest_variation",
+        ),
+        "minimum_distinct_ratio_observation": (
+            _project_shadow_variation_reference(
+                row.get("minimum_distinct_baseline_value_ratio_observation"),
+                label="shadow_asset_feature_minimum_distinct",
+            )
+        ),
+        "maximum_tie_ratio_observation": _project_shadow_variation_reference(
+            row.get("maximum_baseline_value_tie_ratio_observation"),
+            label="shadow_asset_feature_maximum_tie",
+        ),
+        "variation_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "overlapping_reference_sets_are_independent": False,
+    }
+
+
+def _project_context_counts(value: Any, *, label: str) -> dict[str, int]:
+    raw = _mapping(value, label)
+    if len(raw) > 64:
+        raise ValueError(f"{label}_oversized")
+    return {
+        _text(identity, 200): _count(count, label)
+        for identity, count in sorted(raw.items())
     }
 
 

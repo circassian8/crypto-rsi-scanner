@@ -324,7 +324,110 @@ def _shadow_surprise_audit_section(report: Mapping[str, Any]) -> list[str]:
                 f"{distinct_counts} | {distinct_ratios} | {tie_ratios} | "
                 f"{_md(least_diverse)} |"
             )
+    lines.extend(_shadow_asset_variation_lines(audit))
     lines.extend(["", "### Decision episodes", ""])
+    return lines
+
+
+def _shadow_asset_variation_lines(audit: Mapping[str, Any]) -> list[str]:
+    raw_summaries = audit.get("asset_variation_summaries")
+    if not isinstance(raw_summaries, list):
+        return []
+    repeated: list[
+        tuple[float, float, str, str, Mapping[str, Any], Mapping[str, Any]]
+    ] = []
+    for raw_asset in raw_summaries:
+        asset = _mapping(raw_asset)
+        asset_id = _text(asset.get("canonical_asset_id"))
+        features = _mapping(asset.get("feature_variation"))
+        for feature, raw_variation in features.items():
+            variation = _mapping(raw_variation)
+            repeated_count = variation.get(
+                "repeated_baseline_value_observation_count"
+            )
+            minimum_distinct = variation.get(
+                "distinct_baseline_value_ratio_minimum"
+            )
+            maximum_tie = variation.get(
+                "maximum_baseline_value_tie_ratio_maximum"
+            )
+            if (
+                type(repeated_count) is not int
+                or repeated_count <= 0
+                or not isinstance(minimum_distinct, (int, float))
+                or isinstance(minimum_distinct, bool)
+                or not isinstance(maximum_tie, (int, float))
+                or isinstance(maximum_tie, bool)
+            ):
+                continue
+            repeated.append((
+                float(minimum_distinct),
+                -float(maximum_tie),
+                asset_id,
+                str(feature),
+                asset,
+                variation,
+            ))
+    repeated.sort(key=lambda row: row[:4])
+    if not repeated:
+        return []
+    limit = 32
+    lines = [
+        "",
+        "#### Repeated reference sets by asset",
+        "",
+        (
+            f"The campaign contains {len(repeated)} exact asset-feature pairs with "
+            "at least one repeated sample-eligible baseline. "
+            + (
+                "All are shown."
+                if len(repeated) <= limit
+                else f"The {limit} least-diverse pairs are shown."
+            )
+            + " This ranking is outcome-blind and applies no exclusion. Provider, "
+            "mode, and feature-basis counts are retained context, not causal "
+            "attribution; repetition may be legitimate low-motion behavior, source "
+            "refresh cadence, or quantization."
+        ),
+        "",
+        (
+            "| Asset | Feature | Repeated / eligible | Distinct ratio min / "
+            "median | Largest-tie ratio median / max | Retained provider / mode / "
+            "basis | Latest reference set |"
+        ),
+        "|---|---|---:|---:|---:|---|---|",
+    ]
+    for _, _, asset_id, feature, asset, variation in repeated[:limit]:
+        basis_key = feature if feature in {"volume_24h", "turnover_24h"} else "price"
+        basis_container = _mapping(asset.get("retained_feature_basis_counts"))
+        context = " / ".join(
+            value
+            for value in (
+                _counts(_mapping(asset.get("retained_provider_counts"))),
+                _counts(_mapping(asset.get("retained_data_mode_counts"))),
+                _counts(_mapping(basis_container.get(basis_key))),
+            )
+            if value
+        ) or "n/a"
+        latest = _mapping(variation.get("latest_variation_observation"))
+        latest_text = (
+            f"{_int(latest.get('distinct_baseline_value_count'))}/"
+            f"{_int(latest.get('sample_count'))} distinct; largest tie "
+            f"{_int(latest.get('maximum_baseline_value_tie_count'))}/"
+            f"{_int(latest.get('sample_count'))} @ {_text(latest.get('observed_at'))}"
+            if latest
+            else "n/a"
+        )
+        lines.append(
+            f"| {_md(asset_id)} | {_md(feature)} | "
+            f"{_int(variation.get('repeated_baseline_value_observation_count'))} / "
+            f"{_int(variation.get('variation_observation_count'))} | "
+            f"{_number(variation.get('distinct_baseline_value_ratio_minimum'))} / "
+            f"{_number(variation.get('distinct_baseline_value_ratio_median'))} | "
+            f"{_number(variation.get('maximum_baseline_value_tie_ratio_median'))} / "
+            f"{_number(variation.get('maximum_baseline_value_tie_ratio_maximum'))} | "
+            f"{_md(context)} | {_md(latest_text)} |"
+        )
     return lines
 
 

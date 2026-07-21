@@ -17,6 +17,47 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Attribute repeated shadow baselines without policy · Codex
+**Why:** Campaign-level variation showed that several nominal reference sets
+contain ties, but one global least-diverse asset could not show whether the
+pattern was isolated, persistent, or associated with a particular retained
+source basis. That attribution must be visible before considering any
+distinctness or effective-information rule.
+**Changes:** Campaign shadow-audit schema v4 adds a closed, bounded summary for
+every canonical asset and modeled feature. It reconciles evaluated and retained
+context counts, repeated versus all-distinct sample-eligible projections,
+distinct/tie distributions, exact latest/minimum-distinct/maximum-tie
+observation references, and retained symbol/provider/data-mode/feature-basis
+counts. Historical audit v1-v3 remain readable without invented fields. The
+canonical campaign Markdown and pointer-matched dashboard copy the validated
+projection and show the least-diverse affected pairs; neither surface
+re-evaluates evidence. North Star/preregistration contracts, policy generation,
+tests, roadmap, decisions, and the real cycle-59 report now bind the schema.
+Across 1,740 genuine counted observations and 36 assets, 28 asset-feature pairs
+have at least one repeated eligible baseline. `figure-heloc` leads the cluster:
+11/11 eligible 24h-return and 28/28 volume/turnover reference sets repeat, with
+minimum distinct shares 0.111/0.125/0.125. Direct-return repetition also appears
+for PEPE, NEAR, SHIB, XRP, AVAX, UNI, LINK, DOGE, and DEXE; no relative-return
+pair appears in the repeated list. Provider/mode/basis counts are explicitly
+context rather than causal attribution, and the audit applies no exclusion or
+policy.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed. The
+shadow model/integration, campaign, empirical projection, dashboard,
+North-Star generation set passed 224 effective focused tests: 223 passed in the
+restricted run, and the single loopback-concurrency test passed on its exact
+socket-permitted rerun. `make radar-market-campaign-report PYTHON=python3`
+regenerated canonical truth with `provider_calls=0`. `make
+radar-dashboard-smoke radar-dashboard-ux-smoke radar-dashboard-readiness
+PYTHON=python3` passed, with the revision-12 cycle-59 namespace still
+authoritative and dashboard writes at zero. `make architecture-cleanliness-check
+PYTHON=python3` passed; its file/function/class counts remain advisory and did
+not trigger a mechanical split. JSON validation and `git diff --check` passed.
+**Notes/risks:** Repetition can arise from legitimate low-motion behavior,
+provider refresh cadence, upstream quantization, or derived-value overlap. This
+checkpoint does not decide among them. No provider authorization/call, history
+rewrite, route, score, status, threshold, publication authority, send, trade,
+order, paper trade, RSI write, or `TRIGGERED_FADE` changed.
+
 ## 2026-07-21 — Aggregate shadow reference-set variation in campaign truth · Codex
 **Why:** Shadow schema v3 made repeated/quantized baseline values visible on one
 observation, but operators still could not tell whether the retained campaign's

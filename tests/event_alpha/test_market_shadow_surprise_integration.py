@@ -471,7 +471,7 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert audit["schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert audit["schema_version"] == 3
+    assert audit["schema_version"] == 4
     assert audit["shadow_schema_version"] == 3
     assert audit["input_row_count"] == 31
     assert audit["excluded_not_baseline_counted_count"] == 1
@@ -566,6 +566,28 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert audit["protocol_v2_evidence_eligible"] is False
     assert audit["historical_rows_rewritten"] is False
     assert audit["provider_calls"] == audit["writes"] == 0
+    assert len(audit["asset_variation_summaries"]) == 3
+    bitcoin_variation = next(
+        row
+        for row in audit["asset_variation_summaries"]
+        if row["canonical_asset_id"] == "bitcoin"
+    )
+    assert bitcoin_variation["source_context_is_causal_attribution"] is False
+    assert bitcoin_variation["retained_provider_counts"] == {"unavailable": 10}
+    assert bitcoin_variation["retained_feature_basis_counts"]["volume_24h"] == {
+        "provider_observed": 10
+    }
+    assert bitcoin_variation["feature_with_repeated_baseline_value_count"] > 0
+    bitcoin_volume = bitcoin_variation["feature_variation"]["volume_24h"]
+    assert bitcoin_volume["variation_observation_count"] == 6
+    assert bitcoin_volume["repeated_baseline_value_observation_count"] == 6
+    assert bitcoin_volume["all_distinct_baseline_value_observation_count"] == 0
+    assert bitcoin_volume["descriptive_repetition_observation_share"] == 1.0
+    assert bitcoin_volume["distinct_baseline_value_ratio_minimum"] == round(1 / 9, 12)
+    assert bitcoin_volume["maximum_baseline_value_tie_ratio_maximum"] == 1.0
+    assert bitcoin_volume["latest_variation_observation"]["sample_count"] == 9
+    assert bitcoin_volume["variation_diagnostics_are_policy"] is False
+    assert bitcoin_volume["effective_sample_size_claimed"] is False
     assert (
         market_observation_campaign_shadow_surprise
         .validate_campaign_shadow_surprise_audit(audit)
@@ -731,7 +753,40 @@ def test_campaign_shadow_replay_validator_rejects_variation_drift():
     )
 
 
-def test_campaign_shadow_replay_keeps_v1_and_v2_audits_readable():
+def test_campaign_shadow_replay_validator_rejects_asset_attribution_drift():
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(_history_rows(_current_market_row())),
+            minimum_sample_count=4,
+        )
+    )
+    tampered = deepcopy(audit)
+    bitcoin = next(
+        row
+        for row in tampered["asset_variation_summaries"]
+        if row["canonical_asset_id"] == "bitcoin"
+    )
+    bitcoin["retained_provider_counts"] = {"coingecko": 9}
+    bitcoin["source_context_is_causal_attribution"] = True
+    bitcoin["feature_variation"]["volume_24h"][
+        "descriptive_repetition_observation_share"
+    ] = 0.5
+
+    errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(tampered)
+    )
+
+    assert "asset_variation_0_retained_provider_counts_count_total_mismatch" in errors
+    assert "asset_variation_0_source_attribution_claim_invalid" in errors
+    assert (
+        "asset_variation_bitcoin_volume_24h_repetition_share_invalid"
+        in errors
+    )
+
+
+def test_campaign_shadow_replay_keeps_v1_v2_and_v3_audits_readable():
     current = (
         market_observation_campaign_shadow_surprise
         .build_campaign_shadow_surprise_audit(
@@ -739,7 +794,15 @@ def test_campaign_shadow_replay_keeps_v1_and_v2_audits_readable():
             minimum_sample_count=4,
         )
     )
-    legacy_v2 = deepcopy(current)
+    legacy_v3 = deepcopy(current)
+    legacy_v3["schema_version"] = 3
+    legacy_v3.pop("asset_variation_summaries")
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(legacy_v3)
+    ) == []
+
+    legacy_v2 = deepcopy(legacy_v3)
     legacy_v2["schema_version"] = 2
     for coverage in legacy_v2["feature_coverage"].values():
         for key in tuple(coverage):

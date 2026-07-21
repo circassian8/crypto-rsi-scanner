@@ -78,8 +78,8 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "campaign_audit_schema_id": (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     ),
-    "campaign_audit_schema_version": 3,
-    "campaign_audit_legacy_schema_versions_readable": [1, 2],
+    "campaign_audit_schema_version": 4,
+    "campaign_audit_legacy_schema_versions_readable": [1, 2, 3],
     "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
     "campaign_audit_replay": (
         "each_counted_row_against_strictly_earlier_same_asset_rows_and_"
@@ -117,6 +117,14 @@ SHADOW_TEMPORAL_SURPRISE_POLICY: dict[str, Any] = {
     "campaign_audit_minimum_distinct_baseline_value_count": None,
     "campaign_audit_variation_diagnostics_are_policy": False,
     "campaign_audit_effective_sample_size_claimed": False,
+    "campaign_audit_asset_variation_summary": (
+        "per_asset_per_feature_repetition_persistence_exact_extremes_and_latest_state"
+    ),
+    "campaign_audit_asset_source_context": (
+        "retained_symbol_provider_data_mode_and_feature_basis_counts"
+    ),
+    "campaign_audit_source_context_is_causal_attribution": False,
+    "campaign_audit_asset_repetition_is_exclusion_policy": False,
     "campaign_audit_tail_ranks_are_p_values": False,
     "campaign_audit_overlapping_samples_are_independent": False,
     "campaign_audit_historical_rows_rewritten": False,

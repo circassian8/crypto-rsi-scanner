@@ -19,8 +19,8 @@ from ..radar import market_shadow_surprise
 
 
 SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
-SCHEMA_VERSION = 3
-LEGACY_SCHEMA_VERSIONS = (1, 2)
+SCHEMA_VERSION = 4
+LEGACY_SCHEMA_VERSIONS = (1, 2, 3)
 DESCRIPTIVE_QUANTILE_METHOD = "linear_interpolation_sorted_ready_values"
 VARIATION_QUANTILE_METHOD = (
     "linear_interpolation_sorted_sample_eligible_values"
@@ -63,7 +63,7 @@ _FEATURE_FAMILIES = {
         for feature in market_shadow_surprise.SUPPORTED_RETURN_FEATURES
     },
 }
-_AUDIT_KEYS = {
+_AUDIT_KEYS_V1_TO_V3 = {
     "schema_id",
     "schema_version",
     "status",
@@ -100,6 +100,9 @@ _AUDIT_KEYS = {
     "provider_calls",
     "writes",
     "research_only",
+}
+_AUDIT_KEYS = _AUDIT_KEYS_V1_TO_V3 | {
+    "asset_variation_summaries",
 }
 _SOURCE_KEYS = {
     "status",
@@ -180,6 +183,55 @@ _ASSET_SUMMARY_KEYS = {
     "source_bound_projection_digest",
     "causal_projection_digest",
 }
+_ASSET_VARIATION_SUMMARY_KEYS = {
+    "canonical_asset_id",
+    "evaluated_observation_count",
+    "retained_context_observation_count",
+    "first_evaluated_observation",
+    "last_evaluated_observation",
+    "retained_symbol_counts",
+    "retained_provider_counts",
+    "retained_data_mode_counts",
+    "retained_feature_basis_counts",
+    "source_context_is_causal_attribution",
+    "features_with_repeated_baseline_values",
+    "feature_with_repeated_baseline_value_count",
+    "feature_variation",
+    "projection_digest",
+    "routing_eligible",
+    "score_adjustment_eligible",
+    "threshold_change_eligible",
+    "protocol_v2_evidence_eligible",
+    "research_only",
+}
+_ASSET_FEATURE_VARIATION_KEYS = {
+    "feature",
+    "family",
+    "evaluated_observation_count",
+    "minimum_sample_count",
+    "variation_observation_count",
+    "repeated_baseline_value_observation_count",
+    "all_distinct_baseline_value_observation_count",
+    "descriptive_repetition_observation_share",
+    "distinct_baseline_value_ratio_minimum",
+    "distinct_baseline_value_ratio_median",
+    "maximum_baseline_value_tie_ratio_median",
+    "maximum_baseline_value_tie_ratio_maximum",
+    "latest_variation_observation",
+    "minimum_distinct_baseline_value_ratio_observation",
+    "maximum_baseline_value_tie_ratio_observation",
+    "minimum_distinct_baseline_value_count",
+    "variation_diagnostics_are_policy",
+    "effective_sample_size_claimed",
+    "overlapping_reference_sets_are_independent",
+    "projection_digest",
+}
+_RETAINED_FEATURE_BASIS_KEYS = {
+    "price",
+    "volume_24h",
+    "market_cap",
+    "turnover_24h",
+}
 _REFERENCE_KEYS = {"observation_id", "observed_at"}
 _EXTREME_REFERENCE_KEYS = {
     "canonical_asset_id",
@@ -254,6 +306,9 @@ def build_campaign_shadow_surprise_audit(
     feature_records: dict[str, list[dict[str, Any]]] = {
         feature: [] for feature in _FEATURES
     }
+    asset_feature_records: dict[str, dict[str, list[dict[str, Any]]]] = (
+        defaultdict(lambda: {feature: [] for feature in _FEATURES})
+    )
     by_asset: dict[str, list[dict[str, Any]]] = defaultdict(list)
     grouped_rows: dict[str, tuple[dict[str, Any], ...]] = {}
     for row in prepared:
@@ -315,6 +370,7 @@ def build_campaign_shadow_surprise_audit(
             current,
             projection,
             feature_records=feature_records,
+            asset_feature_records=asset_feature_records,
         )
 
     feature_coverage = {
@@ -327,6 +383,17 @@ def build_campaign_shadow_surprise_audit(
     }
     asset_summaries = [
         _asset_summary(asset_id, by_asset[asset_id])
+        for asset_id in sorted(by_asset)
+        if by_asset[asset_id]
+    ]
+    asset_variation_summaries = [
+        _asset_variation_summary(
+            asset_id,
+            evaluated_records=by_asset[asset_id],
+            retained_context_rows=grouped_rows[asset_id],
+            feature_records=asset_feature_records[asset_id],
+            minimum_sample_count=minimum_sample_count,
+        )
         for asset_id in sorted(by_asset)
         if by_asset[asset_id]
     ]
@@ -374,6 +441,7 @@ def build_campaign_shadow_surprise_audit(
         "return_status_counts": dict(sorted(return_status_counts.items())),
         "feature_coverage": feature_coverage,
         "asset_projection_summaries": asset_summaries,
+        "asset_variation_summaries": asset_variation_summaries,
         "asset_count": len(asset_summaries),
         "source_bound_projection_digest": _sha256_json(projections),
         "causal_projection_digest": _sha256_json([
@@ -411,7 +479,13 @@ def validate_campaign_shadow_surprise_audit(
     if not isinstance(value, Mapping):
         return ["audit_not_mapping"]
     errors: list[str] = []
-    _exact_keys(value, _AUDIT_KEYS, "audit", errors)
+    raw_schema_version = value.get("schema_version")
+    expected_audit_keys = (
+        _AUDIT_KEYS
+        if raw_schema_version == SCHEMA_VERSION
+        else _AUDIT_KEYS_V1_TO_V3
+    )
+    _exact_keys(value, expected_audit_keys, "audit", errors)
     if value.get("schema_id") != SCHEMA_ID:
         errors.append("schema_id_invalid")
     schema_version = value.get("schema_version")
@@ -430,6 +504,7 @@ def validate_campaign_shadow_surprise_audit(
         1: {2},
         2: {2, 3},
         3: {3},
+        4: {3},
     }.get(schema_version, set())
     if value.get("shadow_schema_version") not in accepted_shadow_versions:
         errors.append("shadow_schema_version_invalid")
@@ -503,6 +578,13 @@ def validate_campaign_shadow_surprise_audit(
         evaluated_count=evaluated_count,
         errors=errors,
     )
+    if schema_version >= 4:
+        _validate_asset_variation_summaries(
+            value.get("asset_variation_summaries"),
+            asset_summaries=asset_summaries,
+            minimum_sample_count=(minimum if type(minimum) is int else None),
+            errors=errors,
+        )
     if type(value.get("asset_count")) is not int or value.get("asset_count") != len(
         asset_summaries
     ):
@@ -619,6 +701,7 @@ def _append_feature_records(
     projection: Mapping[str, Any],
     *,
     feature_records: dict[str, list[dict[str, Any]]],
+    asset_feature_records: dict[str, dict[str, list[dict[str, Any]]]],
 ) -> None:
     reference = _reference(current)
     activity = projection.get("features")
@@ -694,7 +777,7 @@ def _append_feature_records(
         if status != "ready":
             robust_z = None
             descriptive_tail_rank = None
-        feature_records[feature].append({
+        record = {
             "reference": reference,
             "canonical_asset_id": str(current["canonical_asset_id"]),
             "status": status,
@@ -706,7 +789,11 @@ def _append_feature_records(
             "robust_z": robust_z,
             "descriptive_tail_rank": descriptive_tail_rank,
             "projection_sha256": _sha256_json(feature_value),
-        })
+        }
+        feature_records[feature].append(record)
+        asset_feature_records[str(current["canonical_asset_id"])][feature].append(
+            record
+        )
 
 
 def _compact_projection(
@@ -989,6 +1076,242 @@ def _rounded_ratio(numerator: int, denominator: int) -> float:
     return 0.0 if value == 0.0 else value
 
 
+def _asset_variation_summary(
+    asset_id: str,
+    *,
+    evaluated_records: Sequence[Mapping[str, Any]],
+    retained_context_rows: Sequence[Mapping[str, Any]],
+    feature_records: Mapping[str, Sequence[Mapping[str, Any]]],
+    minimum_sample_count: int,
+) -> dict[str, Any]:
+    feature_variation = {
+        feature: _asset_feature_variation(
+            feature,
+            feature_records[feature],
+            minimum_sample_count=minimum_sample_count,
+        )
+        for feature in _FEATURES
+    }
+    repeated_features = sorted(
+        feature
+        for feature, summary in feature_variation.items()
+        if summary["repeated_baseline_value_observation_count"] > 0
+    )
+    retained_feature_basis_counts = {
+        feature: _retained_feature_basis_counts(
+            retained_context_rows,
+            feature=feature,
+        )
+        for feature in sorted(_RETAINED_FEATURE_BASIS_KEYS)
+    }
+    return {
+        "canonical_asset_id": asset_id,
+        "evaluated_observation_count": len(evaluated_records),
+        "retained_context_observation_count": len(retained_context_rows),
+        "first_evaluated_observation": {
+            key: evaluated_records[0][key] for key in _REFERENCE_KEYS
+        },
+        "last_evaluated_observation": {
+            key: evaluated_records[-1][key] for key in _REFERENCE_KEYS
+        },
+        "retained_symbol_counts": _retained_context_counts(
+            retained_context_rows,
+            fields=("symbol",),
+            normalize=False,
+        ),
+        "retained_provider_counts": _retained_context_counts(
+            retained_context_rows,
+            fields=("provider", "market_data_source", "source"),
+            normalize=True,
+        ),
+        "retained_data_mode_counts": _retained_context_counts(
+            retained_context_rows,
+            fields=("data_mode", "data_acquisition_mode"),
+            normalize=True,
+        ),
+        "retained_feature_basis_counts": retained_feature_basis_counts,
+        "source_context_is_causal_attribution": False,
+        "features_with_repeated_baseline_values": repeated_features,
+        "feature_with_repeated_baseline_value_count": len(repeated_features),
+        "feature_variation": feature_variation,
+        "projection_digest": _sha256_json({
+            feature: list(feature_records[feature])
+            for feature in _FEATURES
+        }),
+        "routing_eligible": False,
+        "score_adjustment_eligible": False,
+        "threshold_change_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "research_only": True,
+    }
+
+
+def _asset_feature_variation(
+    feature: str,
+    records: Sequence[Mapping[str, Any]],
+    *,
+    minimum_sample_count: int,
+) -> dict[str, Any]:
+    variation = [
+        row
+        for row in records
+        if int(row["sample_count"]) >= minimum_sample_count
+    ]
+    repeated = [
+        row
+        for row in variation
+        if int(row["distinct_baseline_value_count"])
+        < int(row["sample_count"])
+    ]
+    distinct_ratios = [
+        float(row["distinct_baseline_value_ratio"])
+        for row in variation
+    ]
+    maximum_tie_ratios = [
+        _maximum_baseline_tie_ratio(row)
+        for row in variation
+    ]
+    minimum_distinct_ratio_row = (
+        min(
+            variation,
+            key=lambda row: (
+                float(row["distinct_baseline_value_ratio"]),
+                _feature_record_sort_key(row),
+            ),
+        )
+        if variation
+        else None
+    )
+    maximum_tie_ratio_row = (
+        min(
+            variation,
+            key=lambda row: (
+                -_maximum_baseline_tie_ratio(row),
+                _feature_record_sort_key(row),
+            ),
+        )
+        if variation
+        else None
+    )
+    return {
+        "feature": feature,
+        "family": _FEATURE_FAMILIES[feature],
+        "evaluated_observation_count": len(records),
+        "minimum_sample_count": minimum_sample_count,
+        "variation_observation_count": len(variation),
+        "repeated_baseline_value_observation_count": len(repeated),
+        "all_distinct_baseline_value_observation_count": (
+            len(variation) - len(repeated)
+        ),
+        "descriptive_repetition_observation_share": (
+            _rounded_ratio(len(repeated), len(variation))
+            if variation
+            else None
+        ),
+        "distinct_baseline_value_ratio_minimum": _descriptive_quantile(
+            distinct_ratios, 0.0
+        ),
+        "distinct_baseline_value_ratio_median": _descriptive_quantile(
+            distinct_ratios, 0.5
+        ),
+        "maximum_baseline_value_tie_ratio_median": _descriptive_quantile(
+            maximum_tie_ratios, 0.5
+        ),
+        "maximum_baseline_value_tie_ratio_maximum": _descriptive_quantile(
+            maximum_tie_ratios, 1.0
+        ),
+        "latest_variation_observation": (
+            _variation_reference(variation[-1]) if variation else None
+        ),
+        "minimum_distinct_baseline_value_ratio_observation": (
+            _variation_reference(minimum_distinct_ratio_row)
+            if minimum_distinct_ratio_row is not None
+            else None
+        ),
+        "maximum_baseline_value_tie_ratio_observation": (
+            _variation_reference(maximum_tie_ratio_row)
+            if maximum_tie_ratio_row is not None
+            else None
+        ),
+        "minimum_distinct_baseline_value_count": None,
+        "variation_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "overlapping_reference_sets_are_independent": False,
+        "projection_digest": _sha256_json(list(records)),
+    }
+
+
+def _retained_context_counts(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    fields: tuple[str, ...],
+    normalize: bool,
+) -> dict[str, int]:
+    return dict(sorted(Counter(
+        _retained_context_identity(
+            row,
+            fields=fields,
+            normalize=normalize,
+        )
+        for row in rows
+    ).items()))
+
+
+def _retained_context_identity(
+    row: Mapping[str, Any],
+    *,
+    fields: tuple[str, ...],
+    normalize: bool,
+) -> str:
+    for field in fields:
+        if field not in row:
+            continue
+        value = row.get(field)
+        if (
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value.strip()) > 200
+            or any(ord(character) < 32 for character in value.strip())
+        ):
+            return "invalid"
+        identity = value.strip()
+        return identity.casefold() if normalize else identity
+    return "unavailable"
+
+
+def _retained_feature_basis_counts(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    feature: str,
+) -> dict[str, int]:
+    return dict(sorted(Counter(
+        _retained_feature_basis(row, feature=feature)
+        for row in rows
+    ).items()))
+
+
+def _retained_feature_basis(row: Mapping[str, Any], *, feature: str) -> str:
+    if "feature_basis" in row:
+        container = row.get("feature_basis")
+        if not isinstance(container, Mapping):
+            return "invalid"
+        if feature not in container:
+            return "unavailable"
+        value = container.get(feature)
+    elif f"{feature}_basis" in row:
+        value = row.get(f"{feature}_basis")
+    else:
+        return "unavailable"
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value.strip()) > 200
+        or any(ord(character) < 32 for character in value.strip())
+    ):
+        return "invalid"
+    return value.strip().casefold()
+
+
 def _asset_summary(
     asset_id: str,
     records: Sequence[Mapping[str, Any]],
@@ -1068,6 +1391,7 @@ def _empty_audit(
         "return_status_counts": {},
         "feature_coverage": feature_coverage,
         "asset_projection_summaries": [],
+        "asset_variation_summaries": [],
         "asset_count": 0,
         "source_bound_projection_digest": _sha256_json([]),
         "causal_projection_digest": _sha256_json([]),
@@ -1531,6 +1855,291 @@ def _validate_asset_summaries(
         errors.append("asset_projection_summary_order_or_uniqueness_invalid")
     if total != evaluated_count:
         errors.append("asset_projection_summary_count_mismatch")
+
+
+def _validate_asset_variation_summaries(
+    summaries: Any,
+    *,
+    asset_summaries: Sequence[Any],
+    minimum_sample_count: int | None,
+    errors: list[str],
+) -> None:
+    if not isinstance(summaries, list):
+        errors.append("asset_variation_summaries_invalid")
+        return
+    expected_assets = {
+        str(summary.get("canonical_asset_id")): summary
+        for summary in asset_summaries
+        if isinstance(summary, Mapping)
+        and _identity(summary.get("canonical_asset_id"))
+    }
+    observed_asset_ids: list[str] = []
+    for index, summary in enumerate(summaries):
+        if not isinstance(summary, Mapping):
+            errors.append("asset_variation_summary_invalid")
+            continue
+        prefix = f"asset_variation_{index}"
+        _exact_keys(summary, _ASSET_VARIATION_SUMMARY_KEYS, prefix, errors)
+        asset_id = _identity(summary.get("canonical_asset_id"))
+        if not asset_id:
+            errors.append(f"{prefix}_identity_invalid")
+        else:
+            observed_asset_ids.append(asset_id)
+        expected = expected_assets.get(asset_id)
+        evaluated_count = summary.get("evaluated_observation_count")
+        if (
+            not _positive_int(evaluated_count)
+            or not isinstance(expected, Mapping)
+            or evaluated_count != expected.get("evaluated_observation_count")
+        ):
+            errors.append(f"{prefix}_evaluated_count_invalid")
+            evaluated_count = 0
+        retained_count = summary.get("retained_context_observation_count")
+        if (
+            not _positive_int(retained_count)
+            or retained_count < evaluated_count
+        ):
+            errors.append(f"{prefix}_retained_context_count_invalid")
+            retained_count = 0
+        for field, expected_field in (
+            ("first_evaluated_observation", "first_observation"),
+            ("last_evaluated_observation", "last_observation"),
+        ):
+            reference = summary.get(field)
+            if (
+                not _valid_reference(reference)
+                or not isinstance(expected, Mapping)
+                or reference != expected.get(expected_field)
+            ):
+                errors.append(f"{prefix}_{field}_invalid")
+        for field in (
+            "retained_symbol_counts",
+            "retained_provider_counts",
+            "retained_data_mode_counts",
+        ):
+            _validate_bounded_context_counts(
+                summary.get(field),
+                expected_total=retained_count,
+                label=f"{prefix}_{field}",
+                errors=errors,
+            )
+        basis_counts = summary.get("retained_feature_basis_counts")
+        if (
+            not isinstance(basis_counts, Mapping)
+            or set(basis_counts) != _RETAINED_FEATURE_BASIS_KEYS
+        ):
+            errors.append(f"{prefix}_feature_basis_keys_invalid")
+            basis_counts = {}
+        for feature in sorted(_RETAINED_FEATURE_BASIS_KEYS):
+            _validate_bounded_context_counts(
+                basis_counts.get(feature),
+                expected_total=retained_count,
+                label=f"{prefix}_{feature}_basis",
+                errors=errors,
+            )
+        if summary.get("source_context_is_causal_attribution") is not False:
+            errors.append(f"{prefix}_source_attribution_claim_invalid")
+
+        feature_variation = summary.get("feature_variation")
+        if (
+            not isinstance(feature_variation, Mapping)
+            or set(feature_variation) != set(_FEATURES)
+        ):
+            errors.append(f"{prefix}_feature_variation_keys_invalid")
+            feature_variation = {}
+        repeated_features: list[str] = []
+        for feature in _FEATURES:
+            feature_summary = feature_variation.get(feature)
+            _validate_asset_feature_variation(
+                asset_id,
+                feature,
+                feature_summary,
+                evaluated_count=evaluated_count,
+                minimum_sample_count=minimum_sample_count,
+                errors=errors,
+            )
+            if (
+                isinstance(feature_summary, Mapping)
+                and _positive_int(
+                    feature_summary.get(
+                        "repeated_baseline_value_observation_count"
+                    )
+                )
+            ):
+                repeated_features.append(feature)
+        declared_repeated = summary.get(
+            "features_with_repeated_baseline_values"
+        )
+        if declared_repeated != sorted(repeated_features):
+            errors.append(f"{prefix}_repeated_feature_names_invalid")
+        if summary.get("feature_with_repeated_baseline_value_count") != len(
+            repeated_features
+        ):
+            errors.append(f"{prefix}_repeated_feature_count_invalid")
+        if not _sha256(summary.get("projection_digest")):
+            errors.append(f"{prefix}_projection_digest_invalid")
+        for field in (
+            "routing_eligible",
+            "score_adjustment_eligible",
+            "threshold_change_eligible",
+            "protocol_v2_evidence_eligible",
+        ):
+            if summary.get(field) is not False:
+                errors.append(f"{prefix}_{field}_must_be_false")
+        if summary.get("research_only") is not True:
+            errors.append(f"{prefix}_research_only_must_be_true")
+    if observed_asset_ids != sorted(expected_assets):
+        errors.append("asset_variation_summary_order_or_identity_invalid")
+
+
+def _validate_asset_feature_variation(
+    asset_id: str,
+    feature: str,
+    summary: Any,
+    *,
+    evaluated_count: int,
+    minimum_sample_count: int | None,
+    errors: list[str],
+) -> None:
+    prefix = f"asset_variation_{asset_id}_{feature}"
+    if not isinstance(summary, Mapping):
+        errors.append(f"{prefix}_invalid")
+        return
+    _exact_keys(summary, _ASSET_FEATURE_VARIATION_KEYS, prefix, errors)
+    if summary.get("feature") != feature:
+        errors.append(f"{prefix}_identity_invalid")
+    if summary.get("family") != _FEATURE_FAMILIES[feature]:
+        errors.append(f"{prefix}_family_invalid")
+    if summary.get("evaluated_observation_count") != evaluated_count:
+        errors.append(f"{prefix}_evaluated_count_invalid")
+    if summary.get("minimum_sample_count") != minimum_sample_count:
+        errors.append(f"{prefix}_minimum_sample_count_invalid")
+    variation_count = summary.get("variation_observation_count")
+    repeated_count = summary.get("repeated_baseline_value_observation_count")
+    all_distinct_count = summary.get(
+        "all_distinct_baseline_value_observation_count"
+    )
+    if (
+        not _nonnegative_int(variation_count)
+        or variation_count > evaluated_count
+        or not _nonnegative_int(repeated_count)
+        or not _nonnegative_int(all_distinct_count)
+        or repeated_count + all_distinct_count != variation_count
+    ):
+        errors.append(f"{prefix}_counts_invalid")
+        variation_count = 0
+        repeated_count = 0
+    expected_share = (
+        _rounded_ratio(repeated_count, variation_count)
+        if variation_count
+        else None
+    )
+    if summary.get("descriptive_repetition_observation_share") != expected_share:
+        errors.append(f"{prefix}_repetition_share_invalid")
+
+    distribution_fields = (
+        "distinct_baseline_value_ratio_minimum",
+        "distinct_baseline_value_ratio_median",
+        "maximum_baseline_value_tie_ratio_median",
+        "maximum_baseline_value_tie_ratio_maximum",
+    )
+    reference_fields = (
+        "latest_variation_observation",
+        "minimum_distinct_baseline_value_ratio_observation",
+        "maximum_baseline_value_tie_ratio_observation",
+    )
+    if variation_count == 0:
+        if any(
+            summary.get(field) is not None
+            for field in (*distribution_fields, *reference_fields)
+        ):
+            errors.append(f"{prefix}_empty_distribution_not_null")
+    else:
+        minimum_distinct = _finite_float_or_none(
+            summary.get("distinct_baseline_value_ratio_minimum")
+        )
+        median_distinct = _finite_float_or_none(
+            summary.get("distinct_baseline_value_ratio_median")
+        )
+        median_tie = _finite_float_or_none(
+            summary.get("maximum_baseline_value_tie_ratio_median")
+        )
+        maximum_tie = _finite_float_or_none(
+            summary.get("maximum_baseline_value_tie_ratio_maximum")
+        )
+        if (
+            minimum_distinct is None
+            or median_distinct is None
+            or not 0.0 < minimum_distinct <= median_distinct <= 1.0
+        ):
+            errors.append(f"{prefix}_distinct_distribution_invalid")
+        if (
+            median_tie is None
+            or maximum_tie is None
+            or not 0.0 < median_tie <= maximum_tie <= 1.0
+        ):
+            errors.append(f"{prefix}_tie_distribution_invalid")
+        for field in reference_fields:
+            reference = summary.get(field)
+            if not _valid_variation_reference(reference):
+                errors.append(f"{prefix}_{field}_invalid")
+            elif (
+                minimum_sample_count is not None
+                and reference.get("sample_count") < minimum_sample_count
+            ):
+                errors.append(f"{prefix}_{field}_below_minimum_sample")
+        minimum_reference = summary.get(reference_fields[1])
+        maximum_reference = summary.get(reference_fields[2])
+        if (
+            _valid_variation_reference(minimum_reference)
+            and minimum_reference.get("distinct_baseline_value_ratio")
+            != minimum_distinct
+        ):
+            errors.append(f"{prefix}_minimum_reference_mismatch")
+        if (
+            _valid_variation_reference(maximum_reference)
+            and maximum_reference.get("maximum_baseline_value_tie_ratio")
+            != maximum_tie
+        ):
+            errors.append(f"{prefix}_maximum_reference_mismatch")
+    if summary.get("minimum_distinct_baseline_value_count") is not None:
+        errors.append(f"{prefix}_minimum_distinct_policy_must_be_null")
+    for field in (
+        "variation_diagnostics_are_policy",
+        "effective_sample_size_claimed",
+        "overlapping_reference_sets_are_independent",
+    ):
+        if summary.get(field) is not False:
+            errors.append(f"{prefix}_{field}_must_be_false")
+    if not _sha256(summary.get("projection_digest")):
+        errors.append(f"{prefix}_projection_digest_invalid")
+
+
+def _validate_bounded_context_counts(
+    raw: Any,
+    *,
+    expected_total: int,
+    label: str,
+    errors: list[str],
+) -> None:
+    if (
+        not isinstance(raw, Mapping)
+        or len(raw) > 64
+        or any(
+            not isinstance(key, str)
+            or not key
+            or len(key) > 200
+            or any(ord(character) < 32 for character in key)
+            for key in raw
+        )
+    ):
+        errors.append(f"{label}_bounded_identity_invalid")
+    _validate_status_counts(
+        raw,
+        expected_total=expected_total,
+        label=label,
+        errors=errors,
+    )
 
 
 def _validate_status_counts(

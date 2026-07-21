@@ -2,7 +2,7 @@
 
 Research-only Catalyst Radar architecture and burn-in operating contract. Event Alpha is additive beneath the trader-facing Crypto Decision Radar. This document does not authorize live trading, Event Alpha paper trading, execution/order logic, normal RSI signal writes, Event Alpha-created `TRIGGERED_FADE`, live Telegram sends, live provider calls by default, or secret handling changes.
 
-- generated_at: `2026-07-21T16:09:08.617247+00:00`
+- generated_at: `2026-07-21T16:26:47.206855+00:00`
 - schema_version: `event_alpha_radar_north_star_v1`
 - purpose: Define Event Alpha as the additive Catalyst Radar beneath a canonical trader-facing Crypto Decision Radar while preserving the measurable 30-day no-send burn-in contract.
 - auto_apply_thresholds: `False`
@@ -227,8 +227,8 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - same_asset_relative_return_status: `not_applicable`
 - attachment: `top_level_post_scan_snapshot_and_anomaly_metadata_only`
 - campaign_audit_schema_id: `decision_radar.shadow_temporal_surprise_campaign_audit`
-- campaign_audit_schema_version: `3`
-- campaign_audit_legacy_schema_versions_readable: 1, 2
+- campaign_audit_schema_version: `4`
+- campaign_audit_legacy_schema_versions_readable: 1, 2, 3
 - campaign_audit_input: `one_read_exact_campaign_history_snapshot`
 - campaign_audit_replay: `each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks`
 - campaign_audit_non_counted_rows: `excluded_with_exact_count`
@@ -245,6 +245,10 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - campaign_audit_minimum_distinct_baseline_value_count: `None`
 - campaign_audit_variation_diagnostics_are_policy: `False`
 - campaign_audit_effective_sample_size_claimed: `False`
+- campaign_audit_asset_variation_summary: `per_asset_per_feature_repetition_persistence_exact_extremes_and_latest_state`
+- campaign_audit_asset_source_context: `retained_symbol_provider_data_mode_and_feature_basis_counts`
+- campaign_audit_source_context_is_causal_attribution: `False`
+- campaign_audit_asset_repetition_is_exclusion_policy: `False`
 - campaign_audit_tail_ranks_are_p_values: `False`
 - campaign_audit_overlapping_samples_are_independent: `False`
 - campaign_audit_historical_rows_rewritten: `False`
