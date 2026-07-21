@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject structured market identities before evidence retention · Codex
+**Why:** Rolling market history converted an object-valued canonical asset ID
+into printable text and retained it as a real asset. The same coercion existed
+at shared universe hygiene and prospective control-regime input boundaries,
+allowing malformed identity to occupy a market slot or enter causal evidence.
+**Changes:** Universe hygiene now accepts identity fields only as text and
+reports malformed explicit canonical IDs separately. Live/no-send normalization
+uses bounded, presence-aware text aliases for coin, symbol, name, and canonical
+identity. Rolling history rejects malformed canonical IDs, omits malformed
+coin/symbol aliases without borrowing a lower-precedence value, and the
+control-regime builder now fails closed before calculating a median when any
+asset identity is malformed. No detector threshold, score, route, or source
+policy changed.
+**Verify:** The public reproduction changed from a retained `cold` object-ID
+asset to `rejected:invalid_canonical_asset_id` with zero retained observations.
+Five focused regressions passed. The wider RSI universe, market history,
+history-cache, normalization, state, anomaly-surface, no-send, and campaign-guard
+suite passed (`203 passed`). `make event-alpha-integrated-radar-smoke
+PYTHON=python3` passed with 15 candidates, 12 canonical cores/cards, 14 dashboard
+pages, and strict doctor 0 blockers / 0 warnings. `python3 -m compileall -q
+crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the affected
+ingestion/history/control paths and integrated doctor were exercised directly.
+No provider call, artifact authority change, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Source-file size is
+advisory; artifact, security, provider, identity, and resource bounds remain
+enforced.
+
 ## 2026-07-21 — Reconcile active Protocol-v2 roadmap truth · Codex
 **Why:** The cycle-54 completion entry and campaign report were current, but the
 long-lived active Protocol-v2 and empirical-coverage rows still summarized

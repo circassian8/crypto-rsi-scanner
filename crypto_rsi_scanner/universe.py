@@ -46,9 +46,26 @@ _SUSPICIOUS_KEPT_RE = re.compile(
 
 
 def _clean_text(value: object) -> str:
-    text = unicodedata.normalize("NFKC", str(value or ""))
+    if not isinstance(value, str):
+        return ""
+    text = unicodedata.normalize("NFKC", value)
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
     return text.casefold().strip()
+
+
+def _valid_identity_text(value: object, *, max_length: int) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    return bool(
+        text
+        and len(text) <= max_length
+        and not any(
+            unicodedata.category(character).startswith("C")
+            or unicodedata.category(character) in {"Zl", "Zp"}
+            for character in text
+        )
+    )
 
 
 def _as_float(value: object) -> float | None:
@@ -69,6 +86,10 @@ def candidate_count(target: int) -> int:
 
 def exclusion_reason(market: dict) -> str | None:
     """Return a machine-readable exclusion reason, or None when keepable."""
+    if not _valid_identity_text(market.get("symbol"), max_length=32) or not (
+        _valid_identity_text(market.get("id"), max_length=160)
+    ):
+        return "missing_identity"
     symbol = _clean_text(market.get("symbol"))
     coin_id = _clean_text(market.get("id"))
     name = _clean_text(market.get("name"))
@@ -76,6 +97,14 @@ def exclusion_reason(market: dict) -> str | None:
 
     if not symbol or not coin_id:
         return "missing_identity"
+
+    if "canonical_asset_id" in market:
+        raw_canonical_id = market.get("canonical_asset_id")
+        if raw_canonical_id not in (None, "") and not _valid_identity_text(
+            raw_canonical_id,
+            max_length=160,
+        ):
+            return "invalid_canonical_identity"
 
     if symbol in _STABLE_SYMBOLS:
         return "stable_like"

@@ -788,6 +788,55 @@ def test_rejection_telemetry_covers_naive_future_stale_and_out_of_order_rows():
     assert result.summary["retention"]["pruned_by_age"] == 1
 
 
+def test_market_history_rejects_structured_identity_instead_of_stringifying_it():
+    malformed = _row(
+        "placeholder",
+        NOW,
+        price=1,
+        volume=10,
+    )
+    malformed["canonical_asset_id"] = {"borrowed": "bitcoin"}
+    malformed_history = copy.deepcopy(malformed)
+    malformed_history["observed_at"] = (NOW - timedelta(hours=1)).isoformat()
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [malformed],
+        [malformed_history],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["market_history_status"] == "rejected"
+    assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+        "invalid_canonical_asset_id"
+    )
+    assert result.retained_history == ()
+    assert result.summary["rejection_counts"] == {
+        "invalid_canonical_asset_id": 2,
+    }
+
+
+def test_retained_market_identity_aliases_do_not_coerce_or_borrow_after_invalid_values():
+    current = _row("safe-token", NOW, price=1, volume=10)
+    current.update({
+        "coin_id": {"borrowed": "safe-token"},
+        "id": "borrowed-safe-token",
+        "symbol": ["SAFE"],
+        "ticker": "BORROWED",
+    })
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [current],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["market_history_status"] == "cold"
+    assert result.retained_history[0]["canonical_asset_id"] == "safe-token"
+    assert "coin_id" not in result.retained_history[0]
+    assert "symbol" not in result.retained_history[0]
+
+
 def test_retention_is_bounded_by_age_and_per_asset_limit():
     history = [
         _row("move-token", NOW - timedelta(hours=11), price=89, volume=890),

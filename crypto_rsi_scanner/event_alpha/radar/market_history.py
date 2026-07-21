@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import statistics
+import unicodedata
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
@@ -280,9 +281,9 @@ def _prepare_observation(
     max_age: timedelta,
     future_tolerance: timedelta = timedelta(0),
 ) -> tuple[_PreparedObservation | None, str]:
-    asset_id = _canonical_asset_id(row)
+    asset_id, identity_error = _canonical_asset_identity(row)
     if not asset_id:
-        return None, "missing_canonical_asset_id"
+        return None, identity_error
     raw_time = row.get("provider_observed_at") or row.get("observed_at") or row.get("timestamp")
     observed_at, time_error = _parse_aware_time(raw_time)
     if observed_at is None:
@@ -1098,8 +1099,11 @@ def _observation_values(
         "schema_version": MARKET_HISTORY_SCHEMA_VERSION,
         "observation_id": _observation_id(asset_id, timestamp),
         "canonical_asset_id": asset_id,
-        "coin_id": str(row.get("coin_id") or row.get("id") or "").strip() or None,
-        "symbol": str(row.get("symbol") or row.get("ticker") or "").strip().upper() or None,
+        "coin_id": _first_identity_text(row, "coin_id", "id", max_length=160) or None,
+        "symbol": (
+            _first_identity_text(row, "symbol", "ticker", max_length=32).upper()
+            or None
+        ),
         "observed_at": timestamp,
         "price": price,
         "volume_24h": volume,
@@ -1577,7 +1581,49 @@ def _observation_id(asset_id: str, timestamp: str) -> str:
 
 
 def _canonical_asset_id(row: Mapping[str, Any]) -> str:
-    return str(row.get("canonical_asset_id") or "").strip().casefold()
+    return _canonical_asset_identity(row)[0]
+
+
+def _canonical_asset_identity(row: Mapping[str, Any]) -> tuple[str, str]:
+    raw = row.get("canonical_asset_id")
+    if raw is None or raw == "":
+        return "", "missing_canonical_asset_id"
+    text = _identity_text(raw, max_length=160)
+    if not text:
+        return "", "invalid_canonical_asset_id"
+    return text.casefold(), ""
+
+
+def _identity_text(value: object, *, max_length: int) -> str:
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if (
+        not text
+        or len(text) > max_length
+        or any(
+            unicodedata.category(character).startswith("C")
+            or unicodedata.category(character) in {"Zl", "Zp"}
+            for character in text
+        )
+    ):
+        return ""
+    return text
+
+
+def _first_identity_text(
+    row: Mapping[str, Any],
+    *keys: str,
+    max_length: int,
+) -> str:
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return _identity_text(value, max_length=max_length)
+    return ""
 
 
 def _first_number(row: Mapping[str, Any], *keys: str) -> float | None:

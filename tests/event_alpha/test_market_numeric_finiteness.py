@@ -312,6 +312,46 @@ def test_market_no_send_normalization_closes_invalid_numeric_basis_claims():
     json.dumps({"rows": rows, "audit": audit}, allow_nan=False)
 
 
+def test_market_no_send_normalization_excludes_structured_market_identities():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+
+    observed_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    base = {
+        "name": "Malformed Identity",
+        "current_price": 10,
+        "market_cap": 100_000_000,
+        "total_volume": 1_000_000,
+    }
+    rows, audit = market_no_send_features.normalize_market_rows(
+        [
+            {**base, "id": {"borrowed": "bitcoin"}, "symbol": "BTC"},
+            {**base, "id": "bitcoin", "symbol": ["BTC"]},
+            {
+                **base,
+                "id": "bitcoin",
+                "symbol": "BTC",
+                "canonical_asset_id": {"borrowed": "bitcoin"},
+            },
+        ],
+        top_n=3,
+        observed_at=observed_at,
+        provider="coingecko",
+        data_mode="live",
+        request_cache_artifact="market.json",
+        request_ledger_artifact="ledger.json",
+        candidate_source_mode="live_no_send",
+        decision_radar_campaign_counted=True,
+        burn_in_counted=False,
+        safety_counters={},
+    )
+
+    assert rows == []
+    assert audit["excluded_by_reason"] == {
+        "invalid_canonical_identity": 1,
+        "missing_identity": 2,
+    }
+
+
 def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():
     from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 

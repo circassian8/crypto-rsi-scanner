@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import statistics
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
@@ -256,8 +257,12 @@ def _normalize_market_row(
         if explicit_returns
         else market_enrichment.market_snapshot_from_row(row, now=observed_at)
     )
-    coin_id = str(snapshot.get("coin_id") or row.get("id") or row.get("coin_id") or "").strip()
-    symbol = str(snapshot.get("symbol") or row.get("symbol") or "").upper().strip()
+    coin_id = _first_identity_text(row, "coin_id", "id", max_length=160)
+    symbol = _first_identity_text(row, "symbol", max_length=32).upper()
+    canonical_asset_id = _canonical_asset_identity(
+        row,
+        fallback=coin_id or symbol,
+    )
     quality = _market_quality_inputs(
         row,
         snapshot,
@@ -267,8 +272,8 @@ def _normalize_market_row(
     snapshot.update({
         "coin_id": coin_id,
         "symbol": symbol,
-        "canonical_asset_id": str(row.get("canonical_asset_id") or coin_id or symbol),
-        "name": str(row.get("name") or "") or None,
+        "canonical_asset_id": canonical_asset_id,
+        "name": _first_identity_text(row, "name", max_length=160) or None,
         "observed_at": observed_at.isoformat(),
         "timestamp": observed_at.isoformat(),
         "freshness_status": "fresh",
@@ -725,13 +730,20 @@ def point_in_time_control_market_regime(
             history.get("observation_id") if isinstance(history, Mapping) else None
         )
         value = finite_float(row.get("temporal_return_24h"))
-        asset_id = str(row.get("canonical_asset_id") or "").strip()
+        asset_id = _identity_text(row.get("canonical_asset_id"), max_length=160)
+        if not asset_id:
+            return _unavailable_control_market_regime(
+                "current_cycle_context_invalid",
+                observed_at=observed_at,
+                universe_expected_count=expected,
+                universe_limit=limit,
+                universe_policy=policy,
+            )
         if (
             not isinstance(history, Mapping)
             or history.get("baseline_counted") is not True
             or not isinstance(observation_id, str)
             or not observation_id
-            or not asset_id
             or value is None
             or not isinstance(return_units, Mapping)
             or return_units.get("temporal_return_24h") != "percent_points"
@@ -1335,8 +1347,17 @@ def _normalized_explicit_market_row(row: Mapping[str, Any]) -> dict[str, Any]:
     if price is not None:
         output["price"] = price
     output["return_unit"] = str(row.get("return_unit") or "fraction")
-    output["coin_id"] = str(row.get("coin_id") or row.get("id") or "")
-    output["symbol"] = str(row.get("symbol") or "").upper()
+    output["coin_id"] = _first_identity_text(
+        row,
+        "coin_id",
+        "id",
+        max_length=160,
+    )
+    output["symbol"] = _first_identity_text(
+        row,
+        "symbol",
+        max_length=32,
+    ).upper()
     return output
 
 
@@ -1421,6 +1442,48 @@ def _finite_alias_value(
             return None
         return value
     return None
+
+
+def _identity_text(value: object, *, max_length: int) -> str:
+    """Return bounded identity text without coercing structured evidence."""
+
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if (
+        not text
+        or len(text) > max_length
+        or any(
+            unicodedata.category(character).startswith("C")
+            or unicodedata.category(character) in {"Zl", "Zp"}
+            for character in text
+        )
+    ):
+        return ""
+    return text
+
+
+def _first_identity_text(
+    row: Mapping[str, Any],
+    *keys: str,
+    max_length: int,
+) -> str:
+    """Resolve identity aliases while preserving invalid explicit precedence."""
+
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return _identity_text(value, max_length=max_length)
+    return ""
+
+
+def _canonical_asset_identity(row: Mapping[str, Any], *, fallback: str) -> str:
+    if "canonical_asset_id" not in row or row.get("canonical_asset_id") in (None, ""):
+        return fallback
+    return _identity_text(row.get("canonical_asset_id"), max_length=160)
 
 
 def smoke_rows() -> tuple[dict[str, Any], ...]:

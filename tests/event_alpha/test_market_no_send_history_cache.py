@@ -184,6 +184,25 @@ def test_control_market_regime_fails_closed_on_incomplete_or_tampered_evidence()
     assert unavailable["status"] == "unavailable"
     assert unavailable["reason"] == "current_cycle_context_invalid"
 
+    malformed_identity = _control_regime_rows(observed_at)
+    malformed_identity[-1]["canonical_asset_id"] = {"borrowed": "asset"}
+    unavailable = market_no_send_features.point_in_time_control_market_regime(
+        malformed_identity
+    )
+    assert unavailable["status"] == "unavailable"
+    assert unavailable["reason"] == "current_cycle_context_invalid"
+
+    diagnostic = (
+        market_no_send_features.point_in_time_control_market_regime_input_diagnostic(
+            malformed_identity
+        )
+    )
+    assert diagnostic["status"] == "unavailable"
+    assert diagnostic["missing_input_count"] == 1
+    assert diagnostic["missing_inputs"][0]["reasons"] == [
+        "canonical_asset_identity_missing"
+    ]
+
 
 def test_control_market_regime_input_diagnostic_names_every_incomplete_row():
     observed_at = datetime(2026, 7, 12, 12, tzinfo=timezone.utc)

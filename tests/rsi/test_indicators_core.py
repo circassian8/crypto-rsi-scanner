@@ -614,6 +614,18 @@ def test_universe_filters_stable_wrapped_and_bad_quality():
         (_market(id="bridged-eth", symbol="beth", name="Bridged ETH"), "wrapped_staked_or_synthetic"),
         (_market(id="thin", symbol="thin", name="Thin", total_volume=10.0), "low_liquidity"),
         (_market(id="bad", symbol="bad", name="Bad", price_change_percentage_24h_in_currency=900.0), "suspicious_24h_move"),
+        (_market(id={"borrowed": "bitcoin"}, symbol="btc", name="Malformed Id"), "missing_identity"),
+        (_market(id="bitcoin", symbol=["btc"], name="Malformed Symbol"), "missing_identity"),
+        (_market(id="bit\u200bcoin", symbol="btc", name="Hidden Id"), "missing_identity"),
+        (
+            _market(
+                id="bitcoin",
+                symbol="btc",
+                name="Malformed Canonical Id",
+                canonical_asset_id={"borrowed": "bitcoin"},
+            ),
+            "invalid_canonical_identity",
+        ),
     ]
     for market, reason in cases:
         assert universe.exclusion_reason(market) == reason
