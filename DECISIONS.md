@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Measure baseline variation before considering a distinctness gate
+**Status:** accepted as descriptive shadow evidence; no policy authority
+**Decision:** Shadow temporal surprise v3 records distinct baseline-value count,
+maximum and current-value tie counts, distinct-value ratio, and nominal finite-
+sample rank floors using the method's existing 12-decimal derived-value
+identity. Preserve every v1 activity and v2 signed-return calculation and keep
+historical v1/v2 artifacts readable. Do not infer effective sample size, impose
+a minimum-distinct threshold, or change readiness, degeneracy, ranks, robust
+z-scores, routes, scores, or authority from these fields.
+**Why:** Nominal timestamp count can materially overstate information when a
+provider repeats or quantizes activity values, and overlapping derived returns
+can also tie. Recording that structure makes later calibration auditable
+without opportunistically tuning the sparse live campaign.
+**Revisit when:** Protocol v2 has frozen feature families and partitions plus
+enough independent development episodes to predeclare and evaluate a
+distinctness or effective-information rule without reading the untouched
+holdout.
+
 ## 2026-07-20 - Make the human-review queue actionable without changing evidence
 **Status:** accepted
 **Decision:** Keep review-timing CLI status/queue JSON as the compatibility

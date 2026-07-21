@@ -185,8 +185,8 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 ## Shadow Robust Temporal Surprise
 
 - schema_id: `event_alpha.shadow_temporal_surprise`
-- schema_version: `2`
-- legacy_schema_versions_readable: 1
+- schema_version: `3`
+- legacy_schema_versions_readable: 1, 2
 - features: volume_24h, turnover_24h
 - signed_return_features: return_1h, return_4h, return_24h, relative_return_vs_btc_1h, relative_return_vs_btc_4h, relative_return_vs_btc_24h, relative_return_vs_eth_1h, relative_return_vs_eth_4h, relative_return_vs_eth_24h
 - eligible_feature_basis: provider_observed, derived_provider_ratio
@@ -205,6 +205,10 @@ Research-only Catalyst Radar architecture and burn-in operating contract. Event 
 - degenerate_mad_policy: `mad_le_1e-12_returns_null_without_epsilon_or_std_fallback`
 - descriptive_upper_tail: `(count_baseline_log_ge_current_log+1)/(n+1)`
 - descriptive_tail_is_p_value: `False`
+- baseline_value_identity: `feature_evaluation_values_rounded_to_12_decimal_places`
+- baseline_variation_diagnostics: distinct_baseline_value_count, maximum_baseline_value_tie_count, current_value_baseline_tie_count, distinct_baseline_value_ratio, nominal_one_sided_tail_rank_floor, nominal_two_sided_tail_rank_floor_for_returns
+- minimum_distinct_baseline_value_count: `None`
+- variation_diagnostics_are_policy: `False`
 - signed_return_unit: `percent_points`
 - signed_return_transform: `identity_preserves_sign`
 - signed_return_feature_basis: `provider_observed_price_ratio_only`

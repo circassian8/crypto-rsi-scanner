@@ -19,7 +19,7 @@ from typing import Any
 
 
 SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 2
+SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION = 3
 SUPPORTED_FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -91,6 +91,9 @@ _RETURN_METHOD_VALUE_KEYS = frozenset(
         "two_sided_tail_rank_definition",
         "tail_ranks_are_p_values",
         "overlapping_samples_are_independent",
+        "baseline_value_identity",
+        "minimum_distinct_baseline_value_count",
+        "variation_diagnostics_are_policy",
     )
 )
 _METHOD_VALUE_KEYS = frozenset(
@@ -105,6 +108,9 @@ _METHOD_VALUE_KEYS = frozenset(
         "derived_ratio_abs_tolerance",
         "upper_tail_rank_definition",
         "upper_tail_rank_is_p_value",
+        "baseline_value_identity",
+        "minimum_distinct_baseline_value_count",
+        "variation_diagnostics_are_policy",
     )
 )
 _RETURN_FEATURE_VALUE_KEYS = frozenset(
@@ -126,6 +132,12 @@ _RETURN_FEATURE_VALUE_KEYS = frozenset(
         "eligible_baseline_first_observation",
         "eligible_baseline_last_observation",
         "eligible_sample_sha256",
+        "distinct_baseline_value_count",
+        "maximum_baseline_value_tie_count",
+        "current_value_baseline_tie_count",
+        "distinct_baseline_value_ratio",
+        "nominal_one_sided_tail_rank_floor",
+        "nominal_two_sided_tail_rank_floor",
         "median",
         "mad",
         "normal_consistent_mad",
@@ -177,6 +189,11 @@ _FEATURE_VALUE_KEYS = frozenset(
         "eligible_baseline_first_observation",
         "eligible_baseline_last_observation",
         "eligible_sample_sha256",
+        "distinct_baseline_value_count",
+        "maximum_baseline_value_tie_count",
+        "current_value_baseline_tie_count",
+        "distinct_baseline_value_ratio",
+        "nominal_one_sided_tail_rank_floor",
         "median_log",
         "mad_log",
         "normal_consistent_mad_log",
@@ -198,7 +215,7 @@ def evaluate_shadow_temporal_surprise(
         str, Iterable[Mapping[str, Any]]
     ] | None = None,
 ) -> dict[str, Any]:
-    """Return the closed v2 robust shadow value for activity and return tails.
+    """Return the closed v3 robust shadow value for activity and return tails.
 
     Inputs are only read. Proxy, cross-sectional, missing, and otherwise
     unapproved feature bases are explicitly excluded. Non-positive and
@@ -274,6 +291,11 @@ def evaluate_shadow_temporal_surprise(
                 "(count(baseline_log >= current_log)+1)/(sample_count+1)"
             ),
             "upper_tail_rank_is_p_value": False,
+            "baseline_value_identity": (
+                "transformed_values_rounded_to_12_decimal_places"
+            ),
+            "minimum_distinct_baseline_value_count": None,
+            "variation_diagnostics_are_policy": False,
         },
         "features": features,
         "return_status": return_status,
@@ -301,6 +323,11 @@ def evaluate_shadow_temporal_surprise(
             ),
             "tail_ranks_are_p_values": False,
             "overlapping_samples_are_independent": False,
+            "baseline_value_identity": (
+                "derived_return_values_rounded_to_12_decimal_places"
+            ),
+            "minimum_distinct_baseline_value_count": None,
+            "variation_diagnostics_are_policy": False,
         },
         "return_features": return_features,
         "routing_eligible": False,
@@ -450,7 +477,7 @@ def _evaluate_return_features(
                 feature_basis=RELATIVE_RETURN_BASIS,
             )
     if frozenset(features) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v2")
+        raise AssertionError("shadow signed-return feature set drifted from v3")
     return features
 
 
@@ -479,6 +506,7 @@ def _evaluate_signed_return_feature(
     ]
     references = [_return_sample_endpoint_reference(sample) for sample in eligible]
     current_sample, current_state = current_result
+    baseline = [sample.value for sample in eligible]
     value = _empty_return_feature_value(
         feature=feature,
         family=family,
@@ -492,6 +520,13 @@ def _evaluate_signed_return_feature(
         eligible_baseline_last_observation=references[-1] if references else None,
         eligible_sample_sha256=_sha256_json(identities),
     )
+    value.update(_baseline_variation_diagnostics(
+        baseline,
+        current_sample.value
+        if current_state == "eligible" and current_sample is not None
+        else None,
+        include_two_sided=True,
+    ))
     if current_state == "basis_ineligible":
         value.update(
             status="basis_ineligible",
@@ -516,7 +551,6 @@ def _evaluate_signed_return_feature(
         )
         return _assert_closed_return_feature_value(value)
 
-    baseline = [sample.value for sample in eligible]
     median = float(statistics.median(baseline))
     mad = float(statistics.median(abs(item - median) for item in baseline))
     consistent_mad = float(mad * MAD_NORMAL_CONSISTENCY_FACTOR)
@@ -584,6 +618,11 @@ def _empty_return_feature_value(
         "eligible_baseline_first_observation": eligible_baseline_first_observation,
         "eligible_baseline_last_observation": eligible_baseline_last_observation,
         "eligible_sample_sha256": eligible_sample_sha256 or _sha256_json([]),
+        **_baseline_variation_diagnostics(
+            (),
+            None,
+            include_two_sided=True,
+        ),
         "median": None,
         "mad": None,
         "normal_consistent_mad": None,
@@ -873,6 +912,15 @@ def _evaluate_feature(
     eligible.sort(key=lambda item: (_reference_sort_key(item[1]), _canonical_json(item[2])))
     references = [reference for _, reference, _ in eligible]
     sample_digest = _sha256_json([identity for _, _, identity in eligible])
+    baseline_logs = [
+        _round_derived(math.log(item))
+        for item, _, _ in eligible
+    ]
+    current_variation_value = (
+        _round_derived(math.log(current_value))
+        if current_value is not None and _feature_basis_is_eligible(current, feature)
+        else None
+    )
 
     value = _empty_feature_value(
         feature=feature,
@@ -884,6 +932,11 @@ def _evaluate_feature(
         basis_ineligible_count=basis_ineligible_count,
         invalid_value_count=invalid_value_count,
     )
+    value.update(_baseline_variation_diagnostics(
+        baseline_logs,
+        current_variation_value,
+        include_two_sided=False,
+    ))
     if not _feature_basis_is_eligible(current, feature):
         value.update(status="basis_ineligible", reason="current_feature_basis_not_eligible")
         return _assert_closed_feature_value(value)
@@ -897,13 +950,13 @@ def _evaluate_feature(
         value.update(status="insufficient_history", reason="minimum_sample_count_not_met")
         return _assert_closed_feature_value(value)
 
-    baseline_logs = [math.log(item) for item, _, _ in eligible]
-    median_log = float(statistics.median(baseline_logs))
-    mad_log = float(statistics.median(abs(item - median_log) for item in baseline_logs))
+    calculation_logs = [math.log(item) for item, _, _ in eligible]
+    median_log = float(statistics.median(calculation_logs))
+    mad_log = float(statistics.median(abs(item - median_log) for item in calculation_logs))
     consistent_mad = float(mad_log * MAD_NORMAL_CONSISTENCY_FACTOR)
     tail_rank = (
-        sum(item >= current_log for item in baseline_logs) + 1
-    ) / (len(baseline_logs) + 1)
+        sum(item >= current_log for item in calculation_logs) + 1
+    ) / (len(calculation_logs) + 1)
     value.update(
         median_log=_round_derived(median_log),
         mad_log=_round_derived(mad_log),
@@ -1043,6 +1096,49 @@ def _round_derived(value: float) -> float:
     return 0.0 if rounded == 0 else rounded
 
 
+def _baseline_variation_diagnostics(
+    baseline_values: Iterable[float],
+    current_value: float | None,
+    *,
+    include_two_sided: bool,
+) -> dict[str, int | float | None]:
+    """Describe exact canonical-value repetition without applying policy."""
+
+    canonical_values = tuple(_round_derived(value) for value in baseline_values)
+    tie_counts: dict[float, int] = {}
+    for value in canonical_values:
+        tie_counts[value] = tie_counts.get(value, 0) + 1
+    sample_count = len(canonical_values)
+    distinct_count = len(tie_counts)
+    one_sided_floor = (
+        _round_derived(1.0 / (sample_count + 1))
+        if sample_count
+        else None
+    )
+    result: dict[str, int | float | None] = {
+        "distinct_baseline_value_count": distinct_count,
+        "maximum_baseline_value_tie_count": max(tie_counts.values(), default=0),
+        "current_value_baseline_tie_count": (
+            tie_counts.get(_round_derived(current_value), 0)
+            if current_value is not None
+            else None
+        ),
+        "distinct_baseline_value_ratio": (
+            _round_derived(distinct_count / sample_count)
+            if sample_count
+            else None
+        ),
+        "nominal_one_sided_tail_rank_floor": one_sided_floor,
+    }
+    if include_two_sided:
+        result["nominal_two_sided_tail_rank_floor"] = (
+            _round_derived(min(1.0, 2.0 / (sample_count + 1)))
+            if sample_count
+            else None
+        )
+    return result
+
+
 def _observation_reference(observation: Mapping[str, Any]) -> dict[str, str | None]:
     return {
         "observation_id": _optional_string(observation.get("observation_id")),
@@ -1154,28 +1250,28 @@ def _required_aware_time(value: object, field_name: str) -> datetime:
 
 def _assert_closed_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _TOP_LEVEL_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise drifted from its closed v2 schema")
+        raise AssertionError("shadow temporal surprise drifted from its closed v3 schema")
     if frozenset(value["method"]) != _METHOD_VALUE_KEYS:
-        raise AssertionError("shadow temporal surprise method drifted from its closed v2 schema")
+        raise AssertionError("shadow temporal surprise method drifted from its closed v3 schema")
     if frozenset(value["features"]) != frozenset(SUPPORTED_FEATURES):
-        raise AssertionError("shadow temporal surprise feature set drifted from v2")
+        raise AssertionError("shadow temporal surprise feature set drifted from v3")
     if frozenset(value["return_method"]) != _RETURN_METHOD_VALUE_KEYS:
-        raise AssertionError("shadow signed-return method drifted from its closed v2 schema")
+        raise AssertionError("shadow signed-return method drifted from its closed v3 schema")
     if frozenset(value["return_features"]) != frozenset(SUPPORTED_RETURN_FEATURES):
-        raise AssertionError("shadow signed-return feature set drifted from v2")
+        raise AssertionError("shadow signed-return feature set drifted from v3")
     return value
 
 
 def _assert_closed_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow feature value drifted from its closed v1 schema")
+        raise AssertionError("shadow feature value drifted from its closed v3 schema")
     return value
 
 
 def _assert_closed_return_feature_value(value: dict[str, Any]) -> dict[str, Any]:
     if frozenset(value) != _RETURN_FEATURE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return value drifted from its closed v2 schema")
+        raise AssertionError("shadow signed-return value drifted from its closed v3 schema")
     current_sample = value.get("current_sample")
     if current_sample is not None and frozenset(current_sample) != _RETURN_SAMPLE_VALUE_KEYS:
-        raise AssertionError("shadow signed-return sample drifted from its closed v2 schema")
+        raise AssertionError("shadow signed-return sample drifted from its closed v3 schema")
     return value

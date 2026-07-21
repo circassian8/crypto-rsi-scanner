@@ -21,10 +21,11 @@ holdout.
   observations and keep the current value out of its own baseline.
 - Production return, relative-return, volatility, volume, and turnover features
   currently use transparent mean/population-standard-deviation z-scores.
-- Shadow schema v2 preserves the v1 natural-log median/MAD activity comparison
-  for eligible `volume_24h` and `turnover_24h`, and implements the preregistered
-  rank-1 signed-return comparison for direct and BTC/ETH-relative 1h/4h/24h
-  families. Historical v1 values remain readable.
+- Shadow schema v3 preserves the v1 natural-log median/MAD activity comparison
+  and v2 direct and BTC/ETH-relative 1h/4h/24h signed-return comparison. It adds
+  exact rounded-value distinct counts, tie concentration, current-value tie
+  counts, and nominal finite-sample rank floors. Historical v1 and v2 values
+  remain readable.
 - That shadow value is explicitly barred from routes, priorities, Decision
   scores, thresholds, and automatic application.
 - The canonical campaign report now performs a deterministic causal replay of
@@ -40,14 +41,21 @@ holdout.
 
 ### 1. Robust signed-return and relative-return tails
 
-Implemented as shadow schema v2 for direct 1h, 4h, and 24h signed returns and
-BTC/ETH-relative returns. Each horizon and basis remains a separate family.
+Implemented originally in shadow schema v2 and preserved unchanged in v3 for
+direct 1h, 4h, and 24h signed returns and BTC/ETH-relative returns. Each horizon
+and basis remains a separate family.
 The implementation rederives percent-point returns only from provider-observed
 prices, uses causal at-or-before horizon anchors, keeps BTC/ETH endpoints at or
 before the asset clock, and applies median/MAD plus sign-preserving lower,
 upper, and two-sided descriptive ranks. Proxy prices, mismatched canonical
 benchmark identities, future clocks, and insufficient or degenerate samples
 fail closed. The dependent rolling ranks are explicitly not p-values.
+
+Schema v3 also records how much nominal baseline count is repeated or quantized
+after the method's existing 12-decimal derived-value normalization. These
+variation fields are descriptive only: there is no minimum-distinct threshold,
+and they do not change readiness, degeneracy, ranks, robust z-scores, routes,
+or scores.
 
 This remains rank 1 because it is a small, explainable extension of an already
 closed shadow contract and directly addresses the heavy tails that make

@@ -1,4 +1,4 @@
-"""Closed nested schema checks for shadow temporal market surprise v1/v2."""
+"""Closed nested schema checks for shadow temporal market surprise v1-v3."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from typing import Any
 
 
 SCHEMA_ID = "event_alpha.shadow_temporal_surprise"
-SCHEMA_VERSION = 2
-LEGACY_SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
+LEGACY_SCHEMA_VERSIONS = frozenset((1, 2))
 FEATURES = ("volume_24h", "turnover_24h")
 RETURN_HORIZONS_HOURS = (1, 4, 24)
 RETURN_BENCHMARKS = ("btc", "eth")
@@ -57,7 +57,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "return_features",
     )
 )
-_METHOD_KEYS = frozenset(
+_METHOD_KEYS_V1_V2 = frozenset(
     (
         "transform",
         "location_estimator",
@@ -71,7 +71,15 @@ _METHOD_KEYS = frozenset(
         "upper_tail_rank_is_p_value",
     )
 )
-_FEATURE_KEYS = frozenset(
+_METHOD_KEYS = frozenset(
+    (
+        *_METHOD_KEYS_V1_V2,
+        "baseline_value_identity",
+        "minimum_distinct_baseline_value_count",
+        "variation_diagnostics_are_policy",
+    )
+)
+_FEATURE_KEYS_V1_V2 = frozenset(
     (
         "feature",
         "status",
@@ -92,6 +100,16 @@ _FEATURE_KEYS = frozenset(
         "robust_z",
         "upper_tail_rank",
         "upper_tail_rank_is_p_value",
+    )
+)
+_FEATURE_KEYS = frozenset(
+    (
+        *_FEATURE_KEYS_V1_V2,
+        "distinct_baseline_value_count",
+        "maximum_baseline_value_tie_count",
+        "current_value_baseline_tie_count",
+        "distinct_baseline_value_ratio",
+        "nominal_one_sided_tail_rank_floor",
     )
 )
 _REFERENCE_KEYS = frozenset(("observation_id", "observed_at"))
@@ -115,7 +133,7 @@ _FEATURE_REASONS = frozenset(
         "non_finite_robust_z",
     )
 )
-_METHOD_VALUES = {
+_METHOD_VALUES_V1_V2 = {
     "transform": "natural_log",
     "location_estimator": "median",
     "scale_estimator": "median_absolute_deviation",
@@ -129,7 +147,15 @@ _METHOD_VALUES = {
     ),
     "upper_tail_rank_is_p_value": False,
 }
-_RETURN_METHOD_KEYS = frozenset(
+_METHOD_VALUES = {
+    **_METHOD_VALUES_V1_V2,
+    "baseline_value_identity": (
+        "transformed_values_rounded_to_12_decimal_places"
+    ),
+    "minimum_distinct_baseline_value_count": None,
+    "variation_diagnostics_are_policy": False,
+}
+_RETURN_METHOD_KEYS_V2 = frozenset(
     (
         "transform",
         "return_unit",
@@ -148,7 +174,15 @@ _RETURN_METHOD_KEYS = frozenset(
         "overlapping_samples_are_independent",
     )
 )
-_RETURN_METHOD_VALUES = {
+_RETURN_METHOD_KEYS = frozenset(
+    (
+        *_RETURN_METHOD_KEYS_V2,
+        "baseline_value_identity",
+        "minimum_distinct_baseline_value_count",
+        "variation_diagnostics_are_policy",
+    )
+)
+_RETURN_METHOD_VALUES_V2 = {
     "transform": "identity_signed",
     "return_unit": "percent_points",
     "location_estimator": "median",
@@ -171,7 +205,15 @@ _RETURN_METHOD_VALUES = {
     "tail_ranks_are_p_values": False,
     "overlapping_samples_are_independent": False,
 }
-_RETURN_FEATURE_KEYS = frozenset(
+_RETURN_METHOD_VALUES = {
+    **_RETURN_METHOD_VALUES_V2,
+    "baseline_value_identity": (
+        "derived_return_values_rounded_to_12_decimal_places"
+    ),
+    "minimum_distinct_baseline_value_count": None,
+    "variation_diagnostics_are_policy": False,
+}
+_RETURN_FEATURE_KEYS_V2 = frozenset(
     (
         "feature",
         "family",
@@ -198,6 +240,17 @@ _RETURN_FEATURE_KEYS = frozenset(
         "upper_tail_rank",
         "two_sided_tail_rank",
         "tail_ranks_are_p_values",
+    )
+)
+_RETURN_FEATURE_KEYS = frozenset(
+    (
+        *_RETURN_FEATURE_KEYS_V2,
+        "distinct_baseline_value_count",
+        "maximum_baseline_value_tie_count",
+        "current_value_baseline_tie_count",
+        "distinct_baseline_value_ratio",
+        "nominal_one_sided_tail_rank_floor",
+        "nominal_two_sided_tail_rank_floor",
     )
 )
 _RETURN_SAMPLE_KEYS = frozenset(
@@ -354,14 +407,14 @@ def _validate_value(value: Mapping[str, Any]) -> list[str]:
     if (
         isinstance(schema_version, bool)
         or not isinstance(schema_version, int)
-        or schema_version not in {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}
+        or schema_version not in {*LEGACY_SCHEMA_VERSIONS, SCHEMA_VERSION}
     ):
         return [
             "shadow_temporal_surprise_fixed_value_mismatch:value.schema_version"
         ]
     expected_keys = (
         _TOP_LEVEL_KEYS_V1
-        if schema_version == LEGACY_SCHEMA_VERSION
+        if schema_version == 1
         else _TOP_LEVEL_KEYS
     )
     errors = _closed_keys(value, expected_keys, "value")
@@ -404,12 +457,20 @@ def _validate_value(value: Mapping[str, Any]) -> list[str]:
         "surveyed_prior_last_observation",
         errors,
     )
-    _validate_method(value.get("method"), errors)
-    _validate_features(value.get("features"), errors)
-    if schema_version == SCHEMA_VERSION:
+    _validate_method(value.get("method"), schema_version=schema_version, errors=errors)
+    _validate_features(value.get("features"), schema_version=schema_version, errors=errors)
+    if schema_version >= 2:
         _expect_enum(value, "return_status", _TOP_LEVEL_STATUSES, "value", errors)
-        _validate_return_method(value.get("return_method"), errors)
-        _validate_return_features(value.get("return_features"), errors)
+        _validate_return_method(
+            value.get("return_method"),
+            schema_version=schema_version,
+            errors=errors,
+        )
+        _validate_return_features(
+            value.get("return_features"),
+            schema_version=schema_version,
+            errors=errors,
+        )
     _validate_cross_field_consistency(
         value,
         schema_version=schema_version,
@@ -418,31 +479,62 @@ def _validate_value(value: Mapping[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_method(value: object, errors: list[str]) -> None:
+def _validate_method(
+    value: object,
+    *,
+    schema_version: int,
+    errors: list[str],
+) -> None:
     if not isinstance(value, Mapping):
         errors.append("shadow_temporal_surprise_invalid_type:method:dict")
         return
-    key_errors = _closed_keys(value, _METHOD_KEYS, "method")
+    expected_keys = _METHOD_KEYS if schema_version == SCHEMA_VERSION else _METHOD_KEYS_V1_V2
+    expected_values = (
+        _METHOD_VALUES
+        if schema_version == SCHEMA_VERSION
+        else _METHOD_VALUES_V1_V2
+    )
+    key_errors = _closed_keys(value, expected_keys, "method")
     errors.extend(key_errors)
     if key_errors:
         return
-    for field, expected in _METHOD_VALUES.items():
+    for field, expected in expected_values.items():
         _expect_exact(value, field, expected, "method", errors)
 
 
-def _validate_return_method(value: object, errors: list[str]) -> None:
+def _validate_return_method(
+    value: object,
+    *,
+    schema_version: int,
+    errors: list[str],
+) -> None:
     if not isinstance(value, Mapping):
         errors.append("shadow_temporal_surprise_invalid_type:return_method:dict")
         return
-    key_errors = _closed_keys(value, _RETURN_METHOD_KEYS, "return_method")
+    expected_keys = (
+        _RETURN_METHOD_KEYS
+        if schema_version == SCHEMA_VERSION
+        else _RETURN_METHOD_KEYS_V2
+    )
+    expected_values = (
+        _RETURN_METHOD_VALUES
+        if schema_version == SCHEMA_VERSION
+        else _RETURN_METHOD_VALUES_V2
+    )
+    key_errors = _closed_keys(value, expected_keys, "return_method")
     errors.extend(key_errors)
     if key_errors:
         return
-    for field, expected in _RETURN_METHOD_VALUES.items():
+    for field, expected in expected_values.items():
         _expect_exact(value, field, expected, "return_method", errors)
 
 
-def _validate_features(value: object, errors: list[str]) -> None:
+def _validate_features(
+    value: object,
+    *,
+    schema_version: int,
+    errors: list[str],
+) -> None:
     if not isinstance(value, Mapping):
         errors.append("shadow_temporal_surprise_invalid_type:features:dict")
         return
@@ -451,15 +543,31 @@ def _validate_features(value: object, errors: list[str]) -> None:
     if key_errors:
         return
     for feature in FEATURES:
-        _validate_feature(value.get(feature), feature, errors)
+        _validate_feature(
+            value.get(feature),
+            feature,
+            schema_version=schema_version,
+            errors=errors,
+        )
 
 
-def _validate_feature(value: object, feature: str, errors: list[str]) -> None:
+def _validate_feature(
+    value: object,
+    feature: str,
+    *,
+    schema_version: int,
+    errors: list[str],
+) -> None:
     path = f"features.{feature}"
     if not isinstance(value, Mapping):
         errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
         return
-    key_errors = _closed_keys(value, _FEATURE_KEYS, path)
+    expected_keys = (
+        _FEATURE_KEYS
+        if schema_version == SCHEMA_VERSION
+        else _FEATURE_KEYS_V1_V2
+    )
+    key_errors = _closed_keys(value, expected_keys, path)
     errors.extend(key_errors)
     if key_errors:
         return
@@ -498,9 +606,22 @@ def _validate_feature(value: object, feature: str, errors: list[str]) -> None:
             f"shadow_temporal_surprise_invalid_type:{path}.eligible_sample_sha256:sha256"
         )
     _expect_exact(value, "upper_tail_rank_is_p_value", False, path, errors)
+    if schema_version == SCHEMA_VERSION:
+        _validate_variation_diagnostics(
+            value,
+            path=path,
+            current_value_present=value.get("current_log") is not None,
+            include_two_sided=False,
+            errors=errors,
+        )
 
 
-def _validate_return_features(value: object, errors: list[str]) -> None:
+def _validate_return_features(
+    value: object,
+    *,
+    schema_version: int,
+    errors: list[str],
+) -> None:
     if not isinstance(value, Mapping):
         errors.append("shadow_temporal_surprise_invalid_type:return_features:dict")
         return
@@ -513,19 +634,31 @@ def _validate_return_features(value: object, errors: list[str]) -> None:
     if key_errors:
         return
     for feature in RETURN_FEATURES:
-        _validate_return_feature(value.get(feature), feature, errors)
+        _validate_return_feature(
+            value.get(feature),
+            feature,
+            schema_version=schema_version,
+            errors=errors,
+        )
 
 
 def _validate_return_feature(
     value: object,
     feature: str,
+    *,
+    schema_version: int,
     errors: list[str],
 ) -> None:
     path = f"return_features.{feature}"
     if not isinstance(value, Mapping):
         errors.append(f"shadow_temporal_surprise_invalid_type:{path}:dict")
         return
-    key_errors = _closed_keys(value, _RETURN_FEATURE_KEYS, path)
+    expected_keys = (
+        _RETURN_FEATURE_KEYS
+        if schema_version == SCHEMA_VERSION
+        else _RETURN_FEATURE_KEYS_V2
+    )
+    key_errors = _closed_keys(value, expected_keys, path)
     errors.extend(key_errors)
     if key_errors:
         return
@@ -590,6 +723,14 @@ def _validate_return_feature(
         errors=errors,
     )
     _expect_exact(value, "tail_ranks_are_p_values", False, path, errors)
+    if schema_version == SCHEMA_VERSION:
+        _validate_variation_diagnostics(
+            value,
+            path=path,
+            current_value_present=value.get("current_sample") is not None,
+            include_two_sided=True,
+            errors=errors,
+        )
 
 
 def _validate_return_sample(
@@ -650,7 +791,7 @@ def _validate_cross_field_consistency(
         if isinstance(features.get(feature), Mapping)
     ]
     status_values = list(magnitude_values)
-    if schema_version == SCHEMA_VERSION:
+    if schema_version >= 2:
         return_features = value.get("return_features")
         if (
             isinstance(return_features, Mapping)
@@ -676,7 +817,11 @@ def _validate_cross_field_consistency(
                 feature_value = return_features.get(feature)
                 if (
                     isinstance(feature_value, Mapping)
-                    and frozenset(feature_value) == _RETURN_FEATURE_KEYS
+                    and frozenset(feature_value) == (
+                        _RETURN_FEATURE_KEYS
+                        if schema_version == SCHEMA_VERSION
+                        else _RETURN_FEATURE_KEYS_V2
+                    )
                 ):
                     _validate_return_feature_consistency(
                         feature_value,
@@ -698,7 +843,15 @@ def _validate_cross_field_consistency(
     )
     for feature in FEATURES:
         feature_value = features.get(feature)
-        if not isinstance(feature_value, Mapping) or frozenset(feature_value) != _FEATURE_KEYS:
+        expected_feature_keys = (
+            _FEATURE_KEYS
+            if schema_version == SCHEMA_VERSION
+            else _FEATURE_KEYS_V1_V2
+        )
+        if (
+            not isinstance(feature_value, Mapping)
+            or frozenset(feature_value) != expected_feature_keys
+        ):
             continue
         _validate_feature_consistency(
             feature_value,
@@ -987,6 +1140,162 @@ def _validate_return_feature_consistency(
             current_reference=current_reference,
             errors=errors,
         )
+
+
+def _validate_variation_diagnostics(
+    value: Mapping[str, Any],
+    *,
+    path: str,
+    current_value_present: bool,
+    include_two_sided: bool,
+    errors: list[str],
+) -> None:
+    count_fields = (
+        "distinct_baseline_value_count",
+        "maximum_baseline_value_tie_count",
+    )
+    for field in count_fields:
+        _expect_nonnegative_int(value, field, path, errors)
+
+    current_ties = value.get("current_value_baseline_tie_count")
+    if current_value_present:
+        if not _is_nonnegative_int(current_ties):
+            errors.append(
+                "shadow_temporal_surprise_invalid_type:"
+                f"{path}.current_value_baseline_tie_count:nonnegative_int"
+            )
+    elif current_ties is not None:
+        errors.append(
+            "shadow_temporal_surprise_variation_inconsistent:"
+            f"{path}.current_value_baseline_tie_count"
+        )
+
+    numeric_fields = [
+        "distinct_baseline_value_ratio",
+        "nominal_one_sided_tail_rank_floor",
+    ]
+    if include_two_sided:
+        numeric_fields.append("nominal_two_sided_tail_rank_floor")
+    for field in numeric_fields:
+        if not _is_finite_number_or_none(value.get(field)):
+            errors.append(
+                "shadow_temporal_surprise_invalid_type:"
+                f"{path}.{field}:finite_number_or_null"
+            )
+
+    sample_count = value.get("sample_count")
+    distinct_count = value.get("distinct_baseline_value_count")
+    maximum_ties = value.get("maximum_baseline_value_tie_count")
+    if not all(
+        _is_nonnegative_int(item)
+        for item in (sample_count, distinct_count, maximum_ties)
+    ):
+        return
+
+    expected_ratio: float | None = None
+    expected_one_sided: float | None = None
+    expected_two_sided: float | None = None
+    if sample_count == 0:
+        if distinct_count != 0:
+            _append_variation_error(
+                errors,
+                path,
+                "distinct_baseline_value_count",
+            )
+        if maximum_ties != 0:
+            _append_variation_error(
+                errors,
+                path,
+                "maximum_baseline_value_tie_count",
+            )
+    else:
+        if not 1 <= distinct_count <= sample_count:
+            _append_variation_error(
+                errors,
+                path,
+                "distinct_baseline_value_count",
+            )
+        elif not (
+            math.ceil(sample_count / distinct_count)
+            <= maximum_ties
+            <= sample_count - distinct_count + 1
+        ):
+            _append_variation_error(
+                errors,
+                path,
+                "maximum_baseline_value_tie_count",
+            )
+        expected_ratio = distinct_count / sample_count
+        expected_one_sided = 1.0 / (sample_count + 1)
+        expected_two_sided = min(1.0, 2.0 / (sample_count + 1))
+
+    if _is_nonnegative_int(current_ties) and current_ties > maximum_ties:
+        _append_variation_error(
+            errors,
+            path,
+            "current_value_baseline_tie_count",
+        )
+    _expect_optional_close(
+        value.get("distinct_baseline_value_ratio"),
+        expected_ratio,
+        path=path,
+        field="distinct_baseline_value_ratio",
+        errors=errors,
+    )
+    _expect_optional_close(
+        value.get("nominal_one_sided_tail_rank_floor"),
+        expected_one_sided,
+        path=path,
+        field="nominal_one_sided_tail_rank_floor",
+        errors=errors,
+    )
+    if include_two_sided:
+        _expect_optional_close(
+            value.get("nominal_two_sided_tail_rank_floor"),
+            expected_two_sided,
+            path=path,
+            field="nominal_two_sided_tail_rank_floor",
+            errors=errors,
+        )
+
+
+def _expect_optional_close(
+    actual: object,
+    expected: float | None,
+    *,
+    path: str,
+    field: str,
+    errors: list[str],
+) -> None:
+    if expected is None:
+        if actual is not None:
+            _append_variation_error(errors, path, field)
+        return
+    if (
+        not _is_finite_number_or_none(actual)
+        or actual is None
+        or not math.isclose(
+            float(actual),
+            expected,
+            rel_tol=1e-10,
+            abs_tol=2e-12,
+        )
+    ):
+        _append_variation_error(errors, path, field)
+
+
+def _append_variation_error(
+    errors: list[str],
+    path: str,
+    field: str,
+) -> None:
+    errors.append(
+        f"shadow_temporal_surprise_variation_inconsistent:{path}.{field}"
+    )
+
+
+def _is_nonnegative_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
 def _validate_return_sample_clocks(

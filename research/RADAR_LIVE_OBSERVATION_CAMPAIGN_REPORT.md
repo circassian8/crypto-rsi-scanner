@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T15:14:56.777524+00:00` from local artifacts only.
+Generated at `2026-07-21T15:43:10.354285+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -252,15 +252,15 @@ Human review is counted only through explicit confirmed actions; dashboard GET/H
 
 This is a read-only replay of the shadow model over retained, cadence-counted observations. Each projection uses only strictly earlier same-asset history; it does not rewrite historical rows or change routes, scores, thresholds, or authority.
 - Audit status: `ready`
-- Shadow schema: `event_alpha.shadow_temporal_surprise` v`2`
+- Shadow schema: `event_alpha.shadow_temporal_surprise` v`3`
 - Exact history rows: `1770`
 - Baseline-counted rows replayed: `1740`
 - Non-counted rows excluded: `30`
 - Input rejections: `0`
 - Evaluation errors: `0`
 - Assets replayed: `36`
-- Source-bound projection digest: `ea22967f9921c0d531607d5ba9087bd6e3d537a1827bee7f2733b07af222fce0`
-- Causal-value projection digest: `a9a7278232e85b240879e3c2e6395d8e20d5702c6c0544f52bb202f73e2db191`
+- Source-bound projection digest: `d48acde91e8730d6a722c1c088caf8bac5ab1f98640da23cc09badde5e397322`
+- Causal-value projection digest: `52d16285f549c7dc6d4610123380bd52aee4586b9697eab7cb7df5fdf5fccb5b`
 - An audit status of `ready` means every modeled feature has some ready evidence; it does not mean every projection is ready. The counts below remain authoritative.
 - Statistical independence claimed: `false`
 - Protocol-v2 evidence eligible: `false`

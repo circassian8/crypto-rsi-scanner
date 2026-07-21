@@ -708,6 +708,11 @@ downside sign, while median/MAD robust z-scores and add-one lower, upper, and
 two-sided ranks remain descriptive rather than p-values. Overlapping samples
 are explicitly not independent. Proxy basis, identity drift, future/misaligned
 clocks, insufficient history, and degenerate MAD fail closed without a fallback.
+V3 leaves those calculations unchanged and adds exact rounded-value distinct
+counts, maximum/current tie counts, distinct ratios, and nominal one- and
+two-sided finite-sample rank floors. These fields expose quantized or repeated
+provider baselines but apply no minimum-distinct threshold and change no status,
+route, score, or policy.
 
 The value is computed from the exact fingerprinted generation-history snapshot
 only after anomaly classification, bucketing, priority, sorting, and truncation,
@@ -723,7 +728,7 @@ matched-control evidence supports a separate sealed out-of-sample decision. The
 detailed method and limitations are recorded in
 `research/ROBUST_TEMPORAL_SURPRISE_SHADOW.md`.
 
-The canonical campaign report now replays that same closed v2 evaluator over
+The canonical campaign report now replays that same closed v3 evaluator over
 its one-read exact retained-history snapshot. Only cadence-counted rows enter;
 each is evaluated against strictly earlier observations for the same canonical
 asset and at-or-before canonical BTC/ETH rows. The report closes excluded,

@@ -2,7 +2,7 @@
   "schema_id": "decision_radar.anomaly_methods_preregistration",
   "schema_version": 3,
   "status": "research_only_rank_1_shadow_implemented_not_calibrated",
-  "as_of_date": "2026-07-20",
+  "as_of_date": "2026-07-21",
   "purpose": "Predeclare the order and evidence gates for future anomaly-method experiments without changing production policy.",
   "current_engine": {
     "canonical_temporal_baseline": "strictly_earlier_cadence_counted_same_asset",
@@ -12,9 +12,10 @@
       "turnover_24h"
     ],
     "existing_shadow_method": "natural_log_median_mad_and_descriptive_upper_tail_rank",
-    "shadow_schema_version": 2,
+    "shadow_schema_version": 3,
     "legacy_shadow_schema_versions_readable": [
-      1
+      1,
+      2
     ],
     "signed_return_shadow_features": [
       "return_1h",
@@ -28,6 +29,9 @@
       "relative_return_vs_eth_24h"
     ],
     "signed_return_shadow_method": "identity_signed_median_mad_and_descriptive_lower_upper_two_sided_tail_ranks",
+    "baseline_variation_diagnostics": "rounded_value_distinct_counts_tie_concentration_current_ties_and_nominal_rank_floors",
+    "minimum_distinct_baseline_value_count": null,
+    "variation_diagnostics_are_policy": false,
     "existing_shadow_policy_eligible": false,
     "independent_live_samples_established": false
   },

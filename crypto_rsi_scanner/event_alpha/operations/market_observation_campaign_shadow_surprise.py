@@ -173,7 +173,7 @@ def build_campaign_shadow_surprise_audit(
     *,
     minimum_sample_count: int,
 ) -> dict[str, Any]:
-    """Replay shadow-v2 diagnostics over one already-captured history snapshot."""
+    """Replay the current closed shadow diagnostics over one history snapshot."""
 
     if (
         isinstance(minimum_sample_count, bool)

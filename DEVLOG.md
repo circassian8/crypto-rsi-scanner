@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Expose shadow baseline variation without changing policy · Codex
+**Why:** A temporal baseline can contain many timestamps but few distinct
+provider values, so nominal sample count alone overstates the information in a
+quantized or repeated reference set. That structure needs to be measurable
+before any Protocol-v2 calibration or distinctness rule is considered.
+**Changes:** Shadow temporal surprise schema v3 preserves every v1 activity and
+v2 signed-return calculation while recording exact 12-decimal evaluation-value
+distinct counts, maximum and current-value tie counts, distinct ratios, and
+nominal one-/two-sided finite-sample rank floors. The fields are available even
+during warmup or degenerate scale, but no minimum-distinct threshold is set and
+no existing status is changed. The closed artifact validator reconciles count,
+ratio, tie, and rank-floor relationships while continuing to read historical
+v1 and v2 values. North Star, anomaly preregistration, research-contract, and
+campaign artifacts now describe/bind v3; the exact 59-cycle, 1,740-counted-row
+local replay was regenerated without a provider call. `DECISIONS.md` freezes
+the descriptive-only boundary, and `ROADMAP.md` makes campaign/dashboard
+aggregation the next step.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed. Focused
+shadow/schema/integration/North-Star tests passed (`92 passed`), and the broader
+shadow, campaign, empirical projection, campaign-dashboard, and generation set
+passed (`142 passed`). `make radar-market-campaign-report PYTHON=python3`
+reported `provider_calls=0`; `make radar-dashboard-smoke PYTHON=python3`,
+`make radar-dashboard-ux-smoke PYTHON=python3`, and `make
+radar-dashboard-readiness PYTHON=python3` passed. `make
+architecture-cleanliness-check PYTHON=python3` remained clean; quantitative
+size output is advisory only.
+**Notes/risks:** Distinctness is not effective sample size, nominal rank floors
+are not attainable-rank or p-value claims in tied data, and rolling samples are
+still dependent. No history, route, score, threshold, provider authorization,
+publication authority, send, trade, order, paper trade, RSI write, or Event
+Alpha `TRIGGERED_FADE` changed. Full `make verify` was not run because this
+isolated research schema passed its focused model, artifact, campaign, and
+dashboard gates.
+
 ## 2026-07-21 — Surface canonical shadow distributions in the dashboard · Codex
 **Why:** The campaign report now correctly pairs robust-z history with
 finite-sample empirical ranks, but the live operator dashboard still exposed

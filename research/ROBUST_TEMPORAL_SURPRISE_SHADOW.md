@@ -109,9 +109,36 @@ lower/upper fields. They are not p-values. Rolling horizon samples overlap and
 are explicitly not claimed to be statistically independent. V2 sets no anomaly
 threshold and does not promote any route or score.
 
+## Fixed v3 baseline-variation diagnostics
+
+Schema v3 leaves every v1 activity calculation and v2 signed-return calculation
+unchanged. It adds descriptive reference-set diagnostics so a nominal baseline
+count cannot be confused with the number of distinct observed values. Historical
+v1 and v2 values remain readable and are not silently reinterpreted.
+
+For each activity and return family, v3 records:
+
+- the distinct baseline-value count;
+- the largest exact baseline tie count;
+- the number of baseline values tied with the current value, when a current
+  evaluation value exists;
+- the distinct-count-to-sample-count ratio;
+- the nominal add-one one-sided rank floor `1 / (n + 1)`; and
+- for return families, the nominal two-sided rank floor
+  `min(1, 2 / (n + 1))`.
+
+Tie identity uses the feature evaluation value rounded to the existing 12
+decimal places: log-transformed activity values and derived percent-point
+returns respectively. The robust z-score, MAD, and empirical ranks continue to
+use their existing v1/v2 calculations. There is no minimum-distinct threshold,
+no effective-sample-size claim, and no status, route, score, threshold, or
+publication effect. The nominal rank floor is a finite-sample resolution
+description, not a claim that tied values can attain that floor and not a
+p-value.
+
 ## Campaign-level causal replay
 
-The canonical live campaign report replays this same closed v2 evaluator over
+The canonical live campaign report replays this same closed v3 evaluator over
 the exact retained market-history snapshot it has already read. It does not
 create another model or reinterpret stored rows. Only rows carrying
 `baseline_counted=true` enter the replay; rapid non-counted rows are excluded
@@ -175,7 +202,7 @@ authority.
 - An extreme activity upper-tail or return two-sided rank can be a data-quality
   event, wash activity, broad market move, or venue migration.
 
-These limitations are why v2 remains shadow-only.
+These limitations are why v3 remains shadow-only.
 
 ## Evidence required before promotion is even proposed
 

@@ -1195,6 +1195,15 @@
     "attachment": "top_level_post_scan_snapshot_and_anomaly_metadata_only",
     "auto_apply": false,
     "baseline": "same_asset_strictly_earlier_cadence_counted_observations",
+    "baseline_value_identity": "feature_evaluation_values_rounded_to_12_decimal_places",
+    "baseline_variation_diagnostics": [
+      "distinct_baseline_value_count",
+      "maximum_baseline_value_tie_count",
+      "current_value_baseline_tie_count",
+      "distinct_baseline_value_ratio",
+      "nominal_one_sided_tail_rank_floor",
+      "nominal_two_sided_tail_rank_floor_for_returns"
+    ],
     "benchmark_endpoint_alignment": "at_or_before_asset_within_300_seconds",
     "benchmark_identities": [
       "btc:bitcoin_or_btc",
@@ -1241,7 +1250,8 @@
     "history_fingerprint_persisted_in_shadow": true,
     "history_fingerprint_verified_before_parse": true,
     "legacy_schema_versions_readable": [
-      1
+      1,
+      2
     ],
     "location": "median_of_log_baseline",
     "method_references": [
@@ -1249,6 +1259,7 @@
       "https://doi.org/10.1080/01621459.1993.10476408",
       "https://doi.org/10.1086/341527"
     ],
+    "minimum_distinct_baseline_value_count": null,
     "namespace_binding": "exact_scan_device_inode_and_unchanged_bundle_hashes",
     "overlapping_return_samples_are_independent": false,
     "positive_finite_values_only": true,
@@ -1269,7 +1280,7 @@
     "same_asset_relative_return_status": "not_applicable",
     "scale": "median_absolute_deviation_times_1.482602218505602",
     "schema_id": "event_alpha.shadow_temporal_surprise",
-    "schema_version": 2,
+    "schema_version": 3,
     "score_adjustment_eligible": false,
     "signed_return_feature_basis": "provider_observed_price_ratio_only",
     "signed_return_features": [
@@ -1285,7 +1296,8 @@
     ],
     "signed_return_transform": "identity_preserves_sign",
     "signed_return_unit": "percent_points",
-    "transform": "natural_log"
+    "transform": "natural_log",
+    "variation_diagnostics_are_policy": false
   },
   "source_activation_order": [
     "coinalyze_derivatives_oi_funding",

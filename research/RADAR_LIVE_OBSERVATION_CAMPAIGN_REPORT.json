@@ -10623,7 +10623,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "23b251f3a0fcf903c044da20c42fd414baf258b481cc3c39f0632cb6306c1828",
     "candidate_rows_supplied": 11,
-    "contract_digest": "9ae5a73715cf4c7c650b8b8c7f87083e354fa1d662cb9537e918606b288edca5",
+    "contract_digest": "e82bcf0586e9bd36503824e0e1c697e4a5920e2c02dfd9a1518f67564d47b147",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "0d98fea8bce2ba31a8f22e05580e51091581abc621c3802d95952754b2860247",
     "core_rows_supplied": 11,
@@ -10638,7 +10638,7 @@
       "not_evaluated": 1,
       "opposed": 2
     },
-    "evaluated_at": "2026-07-21T15:14:56.777524+00:00",
+    "evaluated_at": "2026-07-21T15:43:10.354285+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -11027,7 +11027,7 @@
         }
       ]
     },
-    "input_binding_digest": "8fbf0f2eb43ee972a3e0db2a57e211efb4da219f578b02589a38cd6a4e5a77cc",
+    "input_binding_digest": "d3af5e444529d1b35df7ddf8dbcb929e06e7358056782c72fd38ae45ec8e5cec",
     "matched_control_available": false,
     "matured_episode_count": 3,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -11724,7 +11724,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "877e1c76f6ea2f85d9fa6c5865d9d8c2ac3bfac353a7f00bb57f2355ff60d503",
+    "source_episode_contract_digest": "e7216460be7e9b391ba7ff8b65dce2a052a61a726afee08ace42a91b5faf0cd7",
     "source_episode_input_binding_digest": "9f978ebcbc94d560bf78f46319deca091b125b61c44bdf42bbd437f00e0f99b0",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -11735,7 +11735,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-21T15:14:56.777524+00:00",
+  "generated_at": "2026-07-21T15:43:10.354285+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -11752,7 +11752,7 @@
     "eligible_idea_count": 9,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-21T15:14:56.777524+00:00",
+    "generated_at": "2026-07-21T15:43:10.354285+00:00",
     "in_review_count": 0,
     "not_viewed_count": 9,
     "operator_action_commands_available_via_queue": true,
@@ -11904,7 +11904,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-21T15:14:56.777524+00:00",
+    "generated_at": "2026-07-21T15:43:10.354285+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -12460,7 +12460,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260721t151439069082z_4566a576574c",
-    "authority_checked_at": "2026-07-21T15:14:56.777524+00:00",
+    "authority_checked_at": "2026-07-21T15:43:10.354285+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -12913,7 +12913,7 @@
   ],
   "protocol_v2_episode_coverage_frontier": {
     "canonical_category_coverage_complete": false,
-    "contract_digest": "0574648baffc73fd6413ad2e0e5b3ebab90aaef1f68530efc7ca924a2967e005",
+    "contract_digest": "2ba43782c7dc7370d9b90067e24a66fd06c1b54227da4a49f8deadbcc64793d5",
     "cross_asset_independence_claim": false,
     "episode_count": 4,
     "episode_independence_status": "fixed_start_declustered_not_statistically_independent",
@@ -13104,9 +13104,9 @@
     "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
     "schema_version": 1,
     "score_changes": 0,
-    "source_scorecard_contract_digest": "9ae5a73715cf4c7c650b8b8c7f87083e354fa1d662cb9537e918606b288edca5",
-    "source_scorecard_evaluated_at": "2026-07-21T15:14:56.777524+00:00",
-    "source_scorecard_input_binding_digest": "8fbf0f2eb43ee972a3e0db2a57e211efb4da219f578b02589a38cd6a4e5a77cc",
+    "source_scorecard_contract_digest": "e82bcf0586e9bd36503824e0e1c697e4a5920e2c02dfd9a1518f67564d47b147",
+    "source_scorecard_evaluated_at": "2026-07-21T15:43:10.354285+00:00",
+    "source_scorecard_input_binding_digest": "d3af5e444529d1b35df7ddf8dbcb929e06e7358056782c72fd38ae45ec8e5cec",
     "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
     "source_scorecard_schema_version": 1,
     "statistical_independence_claim": false,
@@ -13334,7 +13334,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "4bfcc670c9c5bb4e92792b1bf15c5bae829ded19953cc02daf65c8d6c3937a69",
+    "audit_digest": "7d44405c146f9c831319739274d861f174af32de0c8dc52c521fc2f3246eaf80",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -13889,7 +13889,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "877e1c76f6ea2f85d9fa6c5865d9d8c2ac3bfac353a7f00bb57f2355ff60d503",
+    "episode_contract_digest": "e7216460be7e9b391ba7ff8b65dce2a052a61a726afee08ace42a91b5faf0cd7",
     "episode_input_binding_digest": "9f978ebcbc94d560bf78f46319deca091b125b61c44bdf42bbd437f00e0f99b0",
     "episode_records_supplied": 11,
     "exact_outcome_join_count": 11,
@@ -13930,7 +13930,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "877e1c76f6ea2f85d9fa6c5865d9d8c2ac3bfac353a7f00bb57f2355ff60d503",
+    "contract_digest": "e7216460be7e9b391ba7ff8b65dce2a052a61a726afee08ace42a91b5faf0cd7",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -14313,7 +14313,7 @@
         "window_end_exclusive_at": "2026-07-22T09:05:58.044865+00:00"
       }
     ],
-    "evaluated_at": "2026-07-21T15:14:56.777524+00:00",
+    "evaluated_at": "2026-07-21T15:43:10.354285+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,
@@ -14373,826 +14373,826 @@
     "asset_projection_summaries": [
       {
         "canonical_asset_id": "aave",
-        "causal_projection_digest": "ab096df13bc6da3af4315ac2424c648d0e0bc6387519f45e6e72537ee36e2941",
+        "causal_projection_digest": "b8c03777364ca322717d3c13201568c8bf3302a112ebc8abb06625cd70c12341",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "3d77ecd5f9adc10f32340dc484eadbfb5125d74e561e334116c9c75c2f1c74b9",
+        "first_causal_projection_sha256": "cc8a288af75958bc7913b977b3c9479b86e946319afaf9d750a763b2530d402d",
         "first_observation": {
           "observation_id": "mhobs-0cb812fe8dc141771db85494",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "63a3f051957d13761a822db21e31b589bf95fbadd6574b0a63688f6b94f151da",
-        "last_causal_projection_sha256": "683ce0d1e0a0bb392767f8fa92d508bd3169dc7e844c55fd968956b4ccaf163d",
+        "first_source_bound_projection_sha256": "e7207c3fd99e3cbadfa534fddf1b5c63fbe372e1da82bf18eff17f624e24e3c8",
+        "last_causal_projection_sha256": "054c292e378f2edc606eb61d9ba5889b88b6b6a0cbe5de33318bc749960f64ff",
         "last_observation": {
           "observation_id": "mhobs-6569f2690065432d6b0bc8a2",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "100465ebbc37cbf74fd101649cf0414ec861277a1cd68b17e5183fff202f1547",
+        "last_source_bound_projection_sha256": "867df24c83177db07b6c56cfe0fe1befe084edb2f8139e37f174fcbc67e13db8",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "8143cb28cb60eddd95fc80da56f37b3e1e72ce109d3b88ac93d5b5da8647c587"
+        "source_bound_projection_digest": "5cb509d56e84b73587ea1f48e9457add216c6fab364dc206fe04cdd1efde721e"
       },
       {
         "canonical_asset_id": "aster-2",
-        "causal_projection_digest": "5641c682c9f95e7b41ec27fc5bca73aa87e9597e6d1c92e3674648e4744e8bce",
+        "causal_projection_digest": "76cfd9d053a67ad17cfb8bf308d2f8adef2977adef1ceedf57be1c08575fa421",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "447fc6e8d354eb6aa96f0bc418c063d708980252fdd08d885b963d7ba599a2fc",
+        "first_causal_projection_sha256": "9a6f205c73db90f09198201f443a147642dd050b742360324f83bb10371c45c0",
         "first_observation": {
           "observation_id": "mhobs-5d525c3a40244dc5cf178b87",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "1e4242a6caaeccecf1d12f3628dcabdc16c2510df03461f012c6eb5687570d9a",
-        "last_causal_projection_sha256": "1aa64a56e6b09176f1d6fbf03217106082f9ad625e61654665797cf46adbe7c5",
+        "first_source_bound_projection_sha256": "fc6bda6e1f756784987926cbfca2334840f2e94ce51e76d653e74faf750b1dbe",
+        "last_causal_projection_sha256": "ce13d6a16932ec9eef5272d016cac92cff60447083b8baf0b714f444c8df6711",
         "last_observation": {
           "observation_id": "mhobs-7afbcf830ec41c0d28b064f7",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "a1ebf366de40bd89f81822738fdf27bb0bbb08154deed76627154eabd63e5f97",
+        "last_source_bound_projection_sha256": "e083bd183e34adc85d00b0a9ca8f9bbf6a0bfa9c372f20ab49bc51ac12b9eb2b",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "cddfe9fae483812887f5ea85f84c6d18cf1f0811fbf8bd22a7b802ddbb7a97c7"
+        "source_bound_projection_digest": "52df97822106aa7be35c34046be0b5b6592591d0490b7e7b8640a4a2af3617be"
       },
       {
         "canonical_asset_id": "avalanche-2",
-        "causal_projection_digest": "8596d29eca85c870357ae3ac84c300c94541e33b2eebbf7bcb8d7448e2878335",
+        "causal_projection_digest": "9dd733cd082439f15fe5bcc8e408db0a2134648aa13cd180ab03ac9179c534a3",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "1fece80aea6dffa1554df28dfe99946262e49c4d4c23df08b74cfbf072a0f854",
+        "first_causal_projection_sha256": "ca1aa907f0b592605542621a5dfc028902cf0f817c1d5e9a0173274e13c8220b",
         "first_observation": {
           "observation_id": "mhobs-ed0a485bb2aed603064059cf",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "1794ebb3d6ebccb7f9dbd8396b136beb93dbf323e655f7517738f4366cafced9",
-        "last_causal_projection_sha256": "2c26757f1d1ac6cd7f43e0c2acc6ede8f5772a24ebc5af05f3fcad9c98de947f",
+        "first_source_bound_projection_sha256": "d0b2dba1008bcaebba5d13e73283da37083db2782c32c7d74fe0ce3308945fd9",
+        "last_causal_projection_sha256": "7948801d95f26db87f17181ed556b1d57441d2a8617a17ca644378f0a4030d68",
         "last_observation": {
           "observation_id": "mhobs-2f4e147da15d196215dde127",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "cec14f049a360d15cf7c3ecdf6a116e7863b0c7371923c573b4187df51dc8787",
+        "last_source_bound_projection_sha256": "d1724fb877cfe9373112cb6452c22f8420c62316b1369010bb0531d07100ff8a",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "99470b1fcea748d6c7a3988f460bd408afdda7e19773f3cf0e9c10ae9879ac71"
+        "source_bound_projection_digest": "83aad4cb8a44a4158d1d70808736e4ad8c50bf7c594a4ae36197451e68990b4d"
       },
       {
         "canonical_asset_id": "binancecoin",
-        "causal_projection_digest": "f006c566f60604692f37e06cbb64b1a20502c2b66df9c03c25e1cf81ca296537",
+        "causal_projection_digest": "75e553bdb62da31881b4d842a59e2bef81f6123e42f04ad14a5aa29d27c8ca1b",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "df3bca4e85e1173087be6a506613a19f8623acb29948b410042a167f5b0bf1b6",
+        "first_causal_projection_sha256": "1e54bef596b00454f2dc35e6d2051b2e5c9104eb2eb85ca294dc2d046470680f",
         "first_observation": {
           "observation_id": "mhobs-c444a79984faf00b3f08c91c",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "bc0ddeaca52c3194e66e77aff1cc95e8b546f3478e3be6fd8db50a2b766cfc97",
-        "last_causal_projection_sha256": "b14a0fe99f689fb01a1a8f4ff3bd483a7bf8b5b3a01c8c1746fc2041408d42b9",
+        "first_source_bound_projection_sha256": "8d33600befaf25d522955d6b09ab96d742e75162f9e6c98cf4c59d8d94064729",
+        "last_causal_projection_sha256": "ae3e11efb97db3fd78ee3c11b01a005418eae2ce4ac2d488de1314cfa3389762",
         "last_observation": {
           "observation_id": "mhobs-4b11211334a691357da5387a",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "1e8e1641e5b3faf86810c85770203f73302511268a70fe6111c0784d89b2bbd0",
+        "last_source_bound_projection_sha256": "2e862cf0ff303240db143de4186327c9c39421b0b5db8245633846cb29d89dce",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "2ddd137f00f664c936a8a4783bf351de578304bdc1de9f56019648bf5c7a3238"
+        "source_bound_projection_digest": "0ad67b94a9fcd5db82bb30d74042aba61d288aba797828455e70aa69a18e67e0"
       },
       {
         "canonical_asset_id": "bitcoin",
-        "causal_projection_digest": "a502c2fb04bc126468a6cb0e8725decbef1825f63498f9cc3d56de4da2ebfadd",
+        "causal_projection_digest": "f531091b7d22d08472a756bcb3d5f5dc5962d719451c8d204ea0534842ad00a8",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "01ee552dfac252842fe455f5b78e7b4144867c0bb7b547bd910404a9e9a8a434",
+        "first_causal_projection_sha256": "1101015ca8d782a58e36db9de0a33ee3b14e41456462a61bd969a23c10ef01b4",
         "first_observation": {
           "observation_id": "mhobs-e05a67f090bd47a0994d9281",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "bec65ae6e026f6b169237116b7e2b0127a581d5f5980207f38772f9b7fc85198",
-        "last_causal_projection_sha256": "131bfad277f037bacad7944d67d97165304fb972de8569d27c7dca634bc4d4ab",
+        "first_source_bound_projection_sha256": "bf6209bc7b0726f2cc2d8f53feb6dfa0025753e462a935f9dbdb1b4caf1f71d8",
+        "last_causal_projection_sha256": "d9d58744519193af7bd4e56e3c17701341ff9cb25da92a438b815000447748a4",
         "last_observation": {
           "observation_id": "mhobs-f1c09f37a81dcdf52f54fe3f",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "bc45ed6618c9eaf66d6c94bf5898d7c1c1360ef8bc897bee0a65a66fd07914c5",
+        "last_source_bound_projection_sha256": "3929d8ec847fe18461ec1e28a1abf010286fbb831c5b9f3d5b612448875f2288",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "84a9d95f28ad2a7d8ef3745c948758caad44797e9baf1c0d60ce29b7c1d4af38"
+        "source_bound_projection_digest": "f80cf043e48c793e853dd2a0a92df554ee1efe26158fde4476ad4da702d614a1"
       },
       {
         "canonical_asset_id": "bitcoin-cash",
-        "causal_projection_digest": "62b9c97cd1680148d644722491d1f84d036004d3dcf461c5e03c93b76f1fd5df",
+        "causal_projection_digest": "3c9e57363f0f01ca98efb94b95949a173bdcf5c620da531b429b98714aa49a13",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "fe580306cafdeccbe0bfdaf9e99a72e9ba02563a7b92204ec5b54e0f258cb48e",
+        "first_causal_projection_sha256": "8d32e1db510982fb2bf7cc62257947efcebcf279ae1da44e2c6cbeccb8a4e7ed",
         "first_observation": {
           "observation_id": "mhobs-38de2660ee22950cad509990",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "cebfae01650917894910eb9e4cfe4dfe85fdf2527f7f5ccb646d40d1362e8cee",
-        "last_causal_projection_sha256": "48427bdf956c07d43284d80c515c00e6d2c9c218bb830b96f1234a481cde0312",
+        "first_source_bound_projection_sha256": "d62bf5a5cdd4ec97f678ae5bc865708aa4a2abbe60990bbeec2533d77a79ca9b",
+        "last_causal_projection_sha256": "c81e871d4dc5c55726a52f4f3d0f9f50be116c80998536892538f88145f68503",
         "last_observation": {
           "observation_id": "mhobs-15cd44b1a878ca3b64b3bf71",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "c8f80e3acc3279747868e9f56d1cdf31185d1175f8f8371bf9e727eac6d0134a",
+        "last_source_bound_projection_sha256": "61734e29b2ef4a845007278fe6680f228e05ff9dc4a2d856896e7e8f83db8c87",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "1356e4a99491f31d3e9ed65f0089799aa0b0bff4061410ff186b71f87fe0f185"
+        "source_bound_projection_digest": "b6b5accab8a1f591cc3937318c8dd3230c20b5d3114388120af8a0c7781183f8"
       },
       {
         "canonical_asset_id": "bittensor",
-        "causal_projection_digest": "c2e9ec77741dec63fd298bb1a4aabd8d95ef5cbc1b9505ddaa5a34f2cb78d073",
+        "causal_projection_digest": "61833730594a304f2fbec9862c2d642d777b78ed897128baa47a04a9980d4e42",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "1944ccdfa6a9f8bd6606c3838019571c3f2607b7af218abf8591fa4b3420ad4f",
+        "first_causal_projection_sha256": "8c9272531d3e8bea361b72853dbc41501cb4fa59d7fe43db4127a8004e857556",
         "first_observation": {
           "observation_id": "mhobs-e98b706627e59c53e4279023",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "de7f9059bd9c993b33d6e077267761ae2d6227970081a472ccbeee5d5614d84b",
-        "last_causal_projection_sha256": "1882139b605d0e3ea87707c17b04be2535439b2acc5a72822e788dba3875f826",
+        "first_source_bound_projection_sha256": "5502f3382d2d41da489a109183acfa5d26bf642caaa471898d2efe65e250f2b3",
+        "last_causal_projection_sha256": "e8af3b1b8aebe38615f04d9108cf708a4cf98749f396fd12b157e89fd6a8a524",
         "last_observation": {
           "observation_id": "mhobs-4243ca03156b81b7e468e9ac",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "c633952d9f1e886485f34ebde07178b1d0cd96cf0d671e331240d0083a991bd1",
+        "last_source_bound_projection_sha256": "11f316e34dda88e501028a2b10e35cef851ec666e703eddf792b980b52b95f29",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "709bf1c9aba7b3475e0a7b89b9979e51a553ba5dad236a91307449496e7a87c6"
+        "source_bound_projection_digest": "ba34a115a38e210dc0e97ca414fe0083347e1e6df2071fa8f937fffdf2322697"
       },
       {
         "canonical_asset_id": "cardano",
-        "causal_projection_digest": "4ccb6c2f7de096c86ddb6c3ba05eba79cde963a962218b09da19d85e2248c0b0",
+        "causal_projection_digest": "74122d4a0143cc86a37c078f65233c076d9b12c93838dce1b666888a37da5634",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "01f0ff912302ed2cee67787d00b7d590fb9dd2cbd27254ffb852243c578a13b9",
+        "first_causal_projection_sha256": "4e34633c266235636598b9bcb83482d3cc4dcd531a48cfa1530fb2454e365b0b",
         "first_observation": {
           "observation_id": "mhobs-79a2839923920f6dfba2d828",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "72e7c5011a3e70a7d1c8de0cfdaf79b895e4fd0e0899b6f355959078bdb0f5e4",
-        "last_causal_projection_sha256": "39440893a61262114327af84ed87b780c1edca11e4265104b064c7d2c5a3cdda",
+        "first_source_bound_projection_sha256": "921f241c8bd05ed24e6d577edf0f96e6d84b7e7c91b9f83e798183b75eeeacb4",
+        "last_causal_projection_sha256": "a1cfaf530792e15442a7aa4c99e3bf7c3f1873b1c74e18b38a365ad3b873e5da",
         "last_observation": {
           "observation_id": "mhobs-4346a935c93bf9b8b3728ada",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "4cd7604340efd9bb50100791b9310b55f7c6640bdee55dcba7053aa91eba5dfe",
+        "last_source_bound_projection_sha256": "4cdd383987479a719738f806b7b8936760f5733483993b632b3e805102766ca7",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "d5ed0e164325b3d3e03d84a5d2b52798ef54cde58d5f2dc11fea0fb45b622103"
+        "source_bound_projection_digest": "eb8409f082e996e249db07a7358aaad8d2e51b8c50996fea3a2f9a991a671812"
       },
       {
         "canonical_asset_id": "chainlink",
-        "causal_projection_digest": "f6a1b9639eb6fd34e3930f16e0ffb41f29df0736fd8b311b81443d8aa15040ee",
+        "causal_projection_digest": "97a75fa30d7ff7fde8c3983639c38683079c6cb7384bfadc1655f3563b6adf6b",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "bb2b628a1c919a3092083489ddeb00b18b73974739a1b2bfc718307d90c08709",
+        "first_causal_projection_sha256": "23882eb90f4ad85f6859970bb5530b479233bf8dce6807b5b60f183e6e9dfbd2",
         "first_observation": {
           "observation_id": "mhobs-5358872dbfce4ed6180a771b",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "d8cdfe5e81a8d375f8139ead878ce61d800c37a22170deb6268e011d0644de6d",
-        "last_causal_projection_sha256": "b3581b68b22b4b1ed390710a3ca6df5c904e14ebb3bc847df2b630ea298b0899",
+        "first_source_bound_projection_sha256": "bb888b7c11cb0eff610b041620a56428d764d9c900723c137ca30aa62f1c658e",
+        "last_causal_projection_sha256": "a929412a3bdb7bb7f5af9ad91631ce423aeeea06845dc40afc7de28e9aedd12a",
         "last_observation": {
           "observation_id": "mhobs-e51da5c037a876f3500fd723",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "93219a6ca5f87f0747414d3aab7cd087110e46c144eb2cbc2a8f663934c07163",
+        "last_source_bound_projection_sha256": "7eb4f90cabfb3a3a414e24a702bd11065b3f265c4a75a9c68ad02f7a4e33f194",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "6a4541b6fcded1b6e712e9a02dd7c6f44122ac076cf4e9b4c5cfdcaf5dd26424"
+        "source_bound_projection_digest": "9f18e2022da05268748eb4532446444783c233a9e56a8b010ecfaea2c214d72b"
       },
       {
         "canonical_asset_id": "dexe",
-        "causal_projection_digest": "0384266a512bf3986d499e5cc14d9863ae9622b4230ac0ec6c55381ce4431b2f",
+        "causal_projection_digest": "dec0c3134b231a3363857f75f799eee07dd2f238cb612bc3878f284274e7d0d8",
         "evaluated_observation_count": 36,
-        "first_causal_projection_sha256": "1d312493df3521ad7e6861fe3ea2f9736bd3ccf65f35cd34e5bea84475b47d75",
+        "first_causal_projection_sha256": "c289281b79fa526f430274dafb1b0bd4ce0a8accc2581d8581dd3cc2abbf4f5c",
         "first_observation": {
           "observation_id": "mhobs-7e21c39428eb6176adf20e5e",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "7279033233a2c42f4e1b6def332be7cf5cd65fdaf115cf6f4fb4e23a29a06144",
-        "last_causal_projection_sha256": "983f4e306c72342f873c2779b564fa13790ade4c5cf54a39297241580851638f",
+        "first_source_bound_projection_sha256": "3c19fc686a9a81f639a7e7b2dad9b5e5a490838cb089a010edf5fb905d96ed97",
+        "last_causal_projection_sha256": "98175791b079420c0cec3ff407728e37ee0520eda31ac7e13a59dafeb4caba5f",
         "last_observation": {
           "observation_id": "mhobs-e05f33c967cc6a881efd4c60",
           "observed_at": "2026-07-21T11:07:27.472398+00:00"
         },
-        "last_source_bound_projection_sha256": "6f434da2db6ac0fd2c2a351d1877882da45086d3730003b214273cff4168f125",
+        "last_source_bound_projection_sha256": "701f0484c597aa9862971ae50e0dc79253b2fb6f82e9a4efbef925e66953ccb7",
         "projection_status_counts": {
           "partial": 27,
           "ready": 1,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "b2eded278d69b6f6831463963922b88882c660e69d636cb86df6f97009e645ef"
+        "source_bound_projection_digest": "7c0a68214c4189215c9b5c57e40755dc45381442353fb53ccd7f18ab02286ed9"
       },
       {
         "canonical_asset_id": "dogecoin",
-        "causal_projection_digest": "40421ec28e7b40a8861156c32cd775ee70da1086e6bdf3b621a2a821194b9d58",
+        "causal_projection_digest": "6cdeb63cf5ce15564e19caccb7ab52efa21c56b83fb88746b4a12d1cc0f585ab",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "f28b4410c9a88dd7da0c38d212e29a6824f6a96daca38632e930876428beba7b",
+        "first_causal_projection_sha256": "74889e78c6622d398ccc2ff343370e187a63a70603ed7485956290cb220a811c",
         "first_observation": {
           "observation_id": "mhobs-5d889c5c8e6be822bfc50266",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "c03bb9432d291de56324316627ab07f79de51eed282a2684b48b3f6aed27d77d",
-        "last_causal_projection_sha256": "87fcab15f6176e53e561d27763e39b7b60b53544d0881e69a78a236e365e4c6e",
+        "first_source_bound_projection_sha256": "4e6b163c4af52f858a3b2f310a25e5ad6b1ccbb430795e356e40ee5ab0166a19",
+        "last_causal_projection_sha256": "e26c37b75305d1c2c34da502230b24835335c1b5803e56a70b35d9af35eac321",
         "last_observation": {
           "observation_id": "mhobs-76f88a0900f8c487651c85ea",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "53fbce230a2300e98f3c5008233db0c1c4865e45c68c41004e607235908d6ebd",
+        "last_source_bound_projection_sha256": "f28a5e32ec640daa1de8dba48fb285a40045335a053fc0057a739f829408748d",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "da6840d055abd580352ea385c47ba8e240cf5d00fdeca1f948e35115a52bf13d"
+        "source_bound_projection_digest": "55966a9b9cfda4838a551f2d88c4a1e09a086d579d8481af90d5e80edfb06d7e"
       },
       {
         "canonical_asset_id": "ethena",
-        "causal_projection_digest": "376eb5ac663d3c981b5aa08ea493ade5c20b52634cd61b3de8ca7926eba54976",
+        "causal_projection_digest": "ebb0a79c6e1e870a8f1ac82a034ae6456398c9f829e3905d87176486dcf011e5",
         "evaluated_observation_count": 49,
-        "first_causal_projection_sha256": "819a34842ba50f74fe77358869afabb1ac1bc27a8c78e809792b71c0770e634c",
+        "first_causal_projection_sha256": "313943d06a0b6c1794f4b370f7b232dbf28d342fcfa1e28321f13a4121e4d474",
         "first_observation": {
           "observation_id": "mhobs-ac0ad95f41403a50f2efd9e5",
           "observed_at": "2026-07-14T10:21:23.140944+00:00"
         },
-        "first_source_bound_projection_sha256": "12326f90bbc4ae933988b0625ca242bb499efcec290f9fbeb76fd50f1e7bb8b2",
-        "last_causal_projection_sha256": "4ab9a6d5874c91f20b1a182a09bbefc823c9894ec719dd5b7c792cbe4a613740",
+        "first_source_bound_projection_sha256": "73431eb34a187a7a7386de40daaf60d9ab715f3d24fe8a03d257579a4b19b344",
+        "last_causal_projection_sha256": "da323ff242d34262bf575362e47a802fe8101165fc5f0bce037816c22c5eca19",
         "last_observation": {
           "observation_id": "mhobs-fbb0f75878152ace6e8adf41",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "9b604184e3a003b6f04048adf2b36c536fa5ae405152c9513977eab00b64dda8",
+        "last_source_bound_projection_sha256": "832e2d5dcd697ff736d1494664cf2c8fc078cc5c9385cef25accbc8402721706",
         "projection_status_counts": {
           "partial": 34,
           "ready": 7,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "9b05b1b7c85c59fd2eeade0afb1fe5903ccf70d62497d2f75052020674bee8e4"
+        "source_bound_projection_digest": "dc3fbfaa17319e3037a60ec448a70cfabea16227450aedac53b26d602741871d"
       },
       {
         "canonical_asset_id": "ethereum",
-        "causal_projection_digest": "96bf862fb6525d5b14a73f707ca42175e9968849c700f204aeae3c0497dd3506",
+        "causal_projection_digest": "dee0009f9fb898b731e11532e9d2ae8bf38893104472dba1696e41e50a24a79a",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "4476e891154388e9bfba9be999867275ec8c17d21d52306cd20b7b4d069bbad1",
+        "first_causal_projection_sha256": "f1c4bb07baf975b62410d8a4a4a1aa3276f4650ab2c94833ca2f9a938a5f6ec1",
         "first_observation": {
           "observation_id": "mhobs-04d8a8d3f42ccbd3951c6011",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "d39ce0c81168be98d8dd066d81a12506ba859125794ceb43837ae2ea2565038b",
-        "last_causal_projection_sha256": "a5a07132d7668a296de0c6789bddc8daa2fb042078c55150c774b3325728fe45",
+        "first_source_bound_projection_sha256": "d1474d64b69bcc24d98ee9ed5641de51b80f74c58138b371950b217c82740b57",
+        "last_causal_projection_sha256": "a39fdaba230f8f9645a9a1ba6487fc4ba0172a6b88d64cf9c06581325a005545",
         "last_observation": {
           "observation_id": "mhobs-6d7b3a162ac1a3b7f5648746",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "a3b403aa7552e07ed67128c3d738385d91be5511014e4809a2c09df7e7fdfabd",
+        "last_source_bound_projection_sha256": "ebca3d829fcedcf3f184adc71593e7bd984c64cbc6e96acabf28a9c56d683fec",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "4e8e2c8818948207b0031b3df61b4092eb2c57998b206dedc521513b47516d1a"
+        "source_bound_projection_digest": "4922917b708d4972018da137b7e247a4c96df7c9200b6e3fb67bfb6c06da7235"
       },
       {
         "canonical_asset_id": "figure-heloc",
-        "causal_projection_digest": "67501b0c431f704c38044155e61f309efa9e308b736c4fd474411cf6b32c4787",
+        "causal_projection_digest": "9cf0f9e0412ea1402b45e87f01fc12b5b0f82b07cdd228429dade36f5d70beff",
         "evaluated_observation_count": 36,
-        "first_causal_projection_sha256": "c17fb2b62422977a00e9638fe9d94c923c97d41d520c98662d9f248e4812068c",
+        "first_causal_projection_sha256": "af1dc3a00bfb5e45beeaa05b73e42f6fca289f0e665277dd4d7d5bc73f6419c6",
         "first_observation": {
           "observation_id": "mhobs-cd189bdf650b96b3ef27a8b5",
           "observed_at": "2026-07-18T02:47:37.287740+00:00"
         },
-        "first_source_bound_projection_sha256": "9520578c369230fa2e2ad16c83f9d231efc08318d181a39b8b0716755f653c87",
-        "last_causal_projection_sha256": "7a0c428344d3a8e7b76f4a1a55aa234ccc7cffc2daffed11653c7708c07d4969",
+        "first_source_bound_projection_sha256": "0961643bddcb2a387fad9ff5c71a8a07b219f0923edd3ff5b7fd5d492be1fb31",
+        "last_causal_projection_sha256": "e35f1a878f4157e86ec071c254327d600c1c8c1e39096b822b0cdebfcb5a6537",
         "last_observation": {
           "observation_id": "mhobs-3864add99270741769768601",
           "observed_at": "2026-07-20T12:34:56.205337+00:00"
         },
-        "last_source_bound_projection_sha256": "da4b559321a825cff2b74f7ae7486bd1b89526c5b527ed70c804bd91e1274900",
+        "last_source_bound_projection_sha256": "d56f8bd8ce35fdbf81e947cbbf6bc4a697769399f31ec0be89a9a02baab8bf71",
         "projection_status_counts": {
           "partial": 22,
           "unavailable": 14
         },
-        "source_bound_projection_digest": "a51aa93fa67bdeb04b0fedd36e5d5d6ab8ac93d22b94a261f2bc0854a1e505f1"
+        "source_bound_projection_digest": "2564bf2b7b01853bc24a3d2c17247a4410ca7a242f77c9cb2d043ffd67a1f783"
       },
       {
         "canonical_asset_id": "hedera-hashgraph",
-        "causal_projection_digest": "5b7ad72ae91867b133a4ad9829f02b467e7fecd62ce516d36836201a08ce142c",
+        "causal_projection_digest": "242c5fb0624ce320fe255a16682ac149d0190599d10b64d969c7ccdca157bb75",
         "evaluated_observation_count": 15,
-        "first_causal_projection_sha256": "586ddf1d08ee10dddb009ff194d05a646b4001d33a5784e45c36b58443239086",
+        "first_causal_projection_sha256": "0d5fd158afa24cff50985aac87d23b18337a4d539663626d35745846939a1bbd",
         "first_observation": {
           "observation_id": "mhobs-03c7a86cd8a1b50aef7aada0",
           "observed_at": "2026-07-13T19:07:29.084694+00:00"
         },
-        "first_source_bound_projection_sha256": "58376f705655e54a14fa9b798c34480683571f3019d2d4f5fdc20b37cfae57db",
-        "last_causal_projection_sha256": "875ae8128673e80c2d3af319c57e7daab1bb159c1988638c223ce975050fb6b4",
+        "first_source_bound_projection_sha256": "13a10b8e78a80194ea96129a273b70dc9329e8ff4c5422ab018273dd6fdef9dc",
+        "last_causal_projection_sha256": "bbce065c80182da65be47a0d05b2dfc943d074a4e87e3c99cf62da2ebeb6fe43",
         "last_observation": {
           "observation_id": "mhobs-957ce3249b9002f674a8f3ef",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "b85b66bef32cb0019733cbc51ceab72f67d18cccc6148b6f620a0ab99687f151",
+        "last_source_bound_projection_sha256": "45f9955803f2734fe972425cc86915bc6d78b2ca991061c2b8ef29c65c703f5e",
         "projection_status_counts": {
           "partial": 7,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "379aa154d9069e91920708b86ef96005574a9bdc2f2d5d88ed7c7e7cdab3b745"
+        "source_bound_projection_digest": "c3125e97547d73ad7e7acb66829833f1dae62c0f4e745b6c30916293e37e3b15"
       },
       {
         "canonical_asset_id": "htx-dao",
-        "causal_projection_digest": "d7dccde2b6f38d57503f51c108ce750ff561e28ce9a04082673da6669b89f47f",
+        "causal_projection_digest": "0fc5ef6e8f34acbe18dc20c31197ccfb641b1175923244cf8d7bdf51da60519b",
         "evaluated_observation_count": 2,
-        "first_causal_projection_sha256": "33a617baa3792e6b9978ab8c9dce1f1cce623cf3b5764775956bd9dfc29aa039",
+        "first_causal_projection_sha256": "75d08c2b932d220cb58329017b9b6f69f0d677f2bc9786f1f660afb654d4e217",
         "first_observation": {
           "observation_id": "mhobs-09cda8b8012a5311aee7e34f",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "2025f858e105bc21f4004b997ed56369709bb581c8028da5c65211192a29c87b",
-        "last_causal_projection_sha256": "df3cef3abc44906832944c799dcea70303976facb40bce72fc83a83b82997171",
+        "first_source_bound_projection_sha256": "f6fdef442cd23bc696072ff110aa195181830558acfcba9d9766315f9d4e1b1a",
+        "last_causal_projection_sha256": "3e4e3dd58d0033906a591604cdb2c5264b955900ebe0f908be415cdf73dce806",
         "last_observation": {
           "observation_id": "mhobs-985561eff682691eb4f577bc",
           "observed_at": "2026-07-16T18:49:16.403979+00:00"
         },
-        "last_source_bound_projection_sha256": "6110b2d76bd0b53b3f99ac70f52a1c9aaeb1430db5df94270855698c2177c6f2",
+        "last_source_bound_projection_sha256": "b4df1b2de4bec084944d686430080d38baed7795763fa7d0180111b9e7266ba1",
         "projection_status_counts": {
           "unavailable": 2
         },
-        "source_bound_projection_digest": "027957be8bf82a7b57549f44fb57b42c3505bf2058cc993fd7de0fd13766105a"
+        "source_bound_projection_digest": "ac4cce84e0a243fb8ce84e54ec75fe6f0e6eb7778aa1dfc1391825263880e7c7"
       },
       {
         "canonical_asset_id": "hyperliquid",
-        "causal_projection_digest": "d63135e1f86d7ef572ffd86f95381800cd7a29edda8a17b3efb0ab1c140fba8b",
+        "causal_projection_digest": "3b91974522e98b65d6949affce846a1078aaa0d90f911fb740e658a2bc8cb636",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "f1046f21725c7a5f1daf97a367d6d35532539f977c39a3c99302ce9891ca7c22",
+        "first_causal_projection_sha256": "d7731cb2da3134b34644827d7e8ee3fe872d194d9eadea91009a3dee90c757f3",
         "first_observation": {
           "observation_id": "mhobs-53293d7d2eb065c143466ba7",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "a93c34de1033d041bfeb7eaba1778248b49b7313f608b42b3e7710b8351320d5",
-        "last_causal_projection_sha256": "189c2c2d13be0e0e06862b599617401773d34feea0cfadbc536d3a95e0e315d3",
+        "first_source_bound_projection_sha256": "4bb694a8c31072cd641671b056f36df51cad7e18795af7d1a8ca4dd86366cfdc",
+        "last_causal_projection_sha256": "3e41bfead73cbe21ff6cc45af7ef73ccd3fbabcaf4114ee62765e9215ea152a2",
         "last_observation": {
           "observation_id": "mhobs-b2602e463658085ec61cbb76",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "d996717f32d4fadca6f1de97c0deed7f275fbe40cf243f508cce54a5b0877834",
+        "last_source_bound_projection_sha256": "d2df2dbea97b7c1bf2050c5a1f4bd5b292bcafe715504b061aac045d2b2399ef",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "583eada6babc2bba48865760f398bc446ddafa3cdeec04b4eca6d0e03f6ece45"
+        "source_bound_projection_digest": "db39c1349e30e56bbf4449d9eb7905840b07283b39995bd8849d14557a73a329"
       },
       {
         "canonical_asset_id": "litecoin",
-        "causal_projection_digest": "b386d8e48cbe9264a012770a8fc7683488414c53ca010ca364e5b74b1f93e2da",
+        "causal_projection_digest": "68de5c18351cf54865e28ab7e355ce75f9b1cced89f0b1675afa8d5648f792c2",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "eb3a30b857f93443415599d929419e5df6f1d7589b2b6e8c8cd2e8da40a72836",
+        "first_causal_projection_sha256": "9dd9aba8db2652d8ef617fa7e33743648e2270a99ec31b8e9d0f8c7fcacd2fee",
         "first_observation": {
           "observation_id": "mhobs-57b028c89a34635934e8a648",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "d22e8fc0052727a398387d2fd509426e2fd7807a988f25973ab58a907dfeb979",
-        "last_causal_projection_sha256": "614db9c0fce703ef5cac4897fba4bf4be332ed41a986309eb86aef410aa538a1",
+        "first_source_bound_projection_sha256": "6952ea1be8754a502e1bc3444f38bf01f9fc336599e295bebaa08c33041a4be0",
+        "last_causal_projection_sha256": "99060419e96ac53ac7066a6a1a344c3f2731f3ea5d3efb580c19588aaa37a77c",
         "last_observation": {
           "observation_id": "mhobs-7be0232cddeb67a4bd77b5bd",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "7951fdb71a001e1572e628794ffb8bc3949eedb43284d01c297eee3bbebebc5e",
+        "last_source_bound_projection_sha256": "4eca4d45f0e0f2f41e4c107d9ad690b09d869a9409db6990a015892de298e3b1",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "3cd744e00c5265af9718bcf1131f656c61627b48a706936e14d2493965ddb2ab"
+        "source_bound_projection_digest": "c40c53faa4c465e58c7af92a0dfb2525198c18e864995c73f75d822ea70c87b3"
       },
       {
         "canonical_asset_id": "monero",
-        "causal_projection_digest": "f356decf1155ef60119094828b577b78eb16f2451908e14799307b52e69df146",
+        "causal_projection_digest": "95e26c18cec445358a0fbf398067c2f3ed2cd641c9f596fe2830f3ec913e663c",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "2ee700b89af308ae562f61c747ced53ddb74c022f2417e3805421c4e6c6fa259",
+        "first_causal_projection_sha256": "ef710ce523cc9e270fb20d6aed4712ab01d0f38505145bfbf3fa066f98631e08",
         "first_observation": {
           "observation_id": "mhobs-735a6c17a3d4fa4a65a46c3b",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "eef47f5ac1620cd27bc37737fb31ce45c21dde4d495e5fa0ef85b81fe9031bca",
-        "last_causal_projection_sha256": "317f8ac51692e03340e17745504737aa263dc0789d50daa116be205f3c75436c",
+        "first_source_bound_projection_sha256": "c17fda31dd1d36d5e406af423b12464480eec7333498eb9597cb2ee3b0151538",
+        "last_causal_projection_sha256": "f5e1b619a5585a840c108f3b3381b227487c49b8cd14b95738e3986ae56b49f9",
         "last_observation": {
           "observation_id": "mhobs-6d4fd6eaa775ca6379e41181",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "200bb6dc73859e2f8c62765f7d686068630daa24e764204b1f873458663d12e2",
+        "last_source_bound_projection_sha256": "0ee3cc31b3de12ee3a5d74847e7227b6b5da6f6b5ae8dc5af70841f722c8a4fb",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "13abf37c01a5144ce301796300ffe135d4c88c0f4228ef14b09706a105704b0b"
+        "source_bound_projection_digest": "ad9067e7f3db4c8afd7f1826cfa1383cd9066ee7c5775a9d3fb68703e230a44a"
       },
       {
         "canonical_asset_id": "near",
-        "causal_projection_digest": "0db7a7e886a8e43ff850329698e393a83da2eee70c7cac92e180abdecc1346d1",
+        "causal_projection_digest": "381022032096ef8a590e22d1676b72de151c5ae9a39f6b4f97f805e9525ba04d",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "ff2883c457693c8758acf1c55f3511ef655892a9cd2257f9fd111568e1f53620",
+        "first_causal_projection_sha256": "a8b82ab0f355481c1c572b757c64062151840b23685b91dfb6c4810759718ea1",
         "first_observation": {
           "observation_id": "mhobs-14af9c6f76b387b2e0625372",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "6e6a2bec96391992070b84d1ca7d1d5716018b6ec4bc09fef248904b3a6f3a1a",
-        "last_causal_projection_sha256": "faefc55f270424f3b825bcfdc0462af06266df8163b218444a40a3cb828b6f27",
+        "first_source_bound_projection_sha256": "2b42f388ed7307c16c49664f414e06921b9842ea805644e5a2542cd6aecd2b2a",
+        "last_causal_projection_sha256": "63f1d6c7e5736271a433431ad11dffa8ac20b78eafb3f83f82b1c653c7d905cd",
         "last_observation": {
           "observation_id": "mhobs-f2059a85730e0c892660c6dc",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "074af25e0165e1a86d06290d09c4e5beef9afded7efb6a4ef1bfa741cc5b72db",
+        "last_source_bound_projection_sha256": "308da2e5faa30103b87d0c92d53a45a1e71458602888dc858e903ae42d07f479",
         "projection_status_counts": {
           "partial": 42,
           "ready": 8,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "6f7a0c861182ab0ffad2f81ab7beb559b60bbdb4a6c78b1a197e0ce0c4459601"
+        "source_bound_projection_digest": "57b87e6e0820fc52ffd400470f6765a6df5d6993def83538126b900ff8275c91"
       },
       {
         "canonical_asset_id": "ondo-finance",
-        "causal_projection_digest": "f128e0e1becf03fdc2e4dec706bcbd2e4261fbe81ceed448976f248d94202e14",
+        "causal_projection_digest": "d6327960bb39f7201a888d4e37795254fe3ebbbfc01ddeee0ffc110c55e7c030",
         "evaluated_observation_count": 54,
-        "first_causal_projection_sha256": "621291ea8c300c70eb18c592ec7f093e8d88c3f1032a2ffa5a3eb52b22f91443",
+        "first_causal_projection_sha256": "2277fad643ebf547c97054986ed7efae70eb817fbf25e85588375e2abf715d31",
         "first_observation": {
           "observation_id": "mhobs-57a1656e317d5182093c8b51",
           "observed_at": "2026-07-14T16:33:00.405079+00:00"
         },
-        "first_source_bound_projection_sha256": "374ddaa2eb19048e7610f408803687be948d527618a7032b62c29e5bcbd15c80",
-        "last_causal_projection_sha256": "53adf9202674230596bca2fc8a4e3073561dbb3cc422799cfc1648837f2cbd57",
+        "first_source_bound_projection_sha256": "dd32d0d8af79c7b1c0647b0d612e21df24b2a2cbd1c250f0b8b16b3cf6f624b2",
+        "last_causal_projection_sha256": "5921ecb3a8a9f5c2e130a7a336aca12446d434bf75b45252076bd9295e788ac2",
         "last_observation": {
           "observation_id": "mhobs-3fbdcd48706e73064897dffa",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "9fb1d9ba208f425a29e80f82a86b2e09349c8fb02f58a7202c183c0781ef0740",
+        "last_source_bound_projection_sha256": "2b795f26e6fcdf466c06cb1e4369b0f0099a008e5b8737c062f66f0669fc1e48",
         "projection_status_counts": {
           "partial": 35,
           "ready": 11,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "0111e5cd69dd84fba63156910d4679e653317145cdb57da64a725c721912f82c"
+        "source_bound_projection_digest": "6df9a2bca4e3af558bd0e967f4c65a9b2ea09a22984fc1d03957d4ed6ada3266"
       },
       {
         "canonical_asset_id": "pepe",
-        "causal_projection_digest": "4195640e3f27424990dc69e4bbcffb0f10cd8e3bc501c210e6ee7338178f0030",
+        "causal_projection_digest": "b6ed2b5543e3df2332b0b95d2d0848690c9a70768203aa10999facc0616f5e27",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "9ca0cfa77580d1fed19a21811a74ac4af6ee86173c8ab41310ec3f1317f57b8d",
+        "first_causal_projection_sha256": "c275ade1cbe0970f962c698e9a1c7c548ed9aa9554a8343d518661a11298f219",
         "first_observation": {
           "observation_id": "mhobs-8db57c56c0037ba27ac00181",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "47d50e5e300938ffbcd158b21b2ed38c77a5048d67530c44424d88c004a09486",
-        "last_causal_projection_sha256": "f35d162d21fdb0e507af707781dbf91a0db737a652eb4e8431eeb364d53a7c43",
+        "first_source_bound_projection_sha256": "42a733373ef0f177506ebd178d8656dc4550679e78ba71ddaf6b3544c736bc38",
+        "last_causal_projection_sha256": "f9dcc91a4be194dfd0efe4b1d715d2d35df6911cc4553177638d53464fbfe6c3",
         "last_observation": {
           "observation_id": "mhobs-8c72ce797f0625d53e27c752",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "af1b55365b2f38455e84ebfb789c08996cf02654f14aff2d19b4ad1b9e1995cc",
+        "last_source_bound_projection_sha256": "6e92f1411b8d6852e931e6d91b3690812c48e9b09130c270d62c541deec5445a",
         "projection_status_counts": {
           "partial": 44,
           "ready": 6,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "05abd5bb069789d9828349734b3f35066f7198bca22706683bba6dede07cb664"
+        "source_bound_projection_digest": "2179a4db99e2fcd2debb6fab7e8df6b557f48385f1aa0324d84f16058ac24dcf"
       },
       {
         "canonical_asset_id": "pi-network",
-        "causal_projection_digest": "ec4dd339c41fe4c89695e2d5edd0c9711296beb1ff9d6acd76901f670fb2284e",
+        "causal_projection_digest": "98b4be1142e582baefe6c7d2b9d8a3a4d64d8deb4e2e3d4b85a94a53af19b3d2",
         "evaluated_observation_count": 1,
-        "first_causal_projection_sha256": "d83feb052f24f8d7f1c53c12110c63cb09ce9ca2c46b93258fd473b0587dc9b2",
+        "first_causal_projection_sha256": "1a83a91daa373c9e46ac39da2fe514af869c8f7f1a949b8b18d3948548c952f2",
         "first_observation": {
           "observation_id": "mhobs-6a225f7f7196376d043b56e2",
           "observed_at": "2026-07-19T21:42:35.787641+00:00"
         },
-        "first_source_bound_projection_sha256": "2e316b46d100cc27209be6145174a5557d91a85bc6c2f2dc8f377857b8f05c85",
-        "last_causal_projection_sha256": "d83feb052f24f8d7f1c53c12110c63cb09ce9ca2c46b93258fd473b0587dc9b2",
+        "first_source_bound_projection_sha256": "cdf5ad2ff61a6ead726fa03797f05431789457d62bced9ca1608510eb00f9ecc",
+        "last_causal_projection_sha256": "1a83a91daa373c9e46ac39da2fe514af869c8f7f1a949b8b18d3948548c952f2",
         "last_observation": {
           "observation_id": "mhobs-6a225f7f7196376d043b56e2",
           "observed_at": "2026-07-19T21:42:35.787641+00:00"
         },
-        "last_source_bound_projection_sha256": "2e316b46d100cc27209be6145174a5557d91a85bc6c2f2dc8f377857b8f05c85",
+        "last_source_bound_projection_sha256": "cdf5ad2ff61a6ead726fa03797f05431789457d62bced9ca1608510eb00f9ecc",
         "projection_status_counts": {
           "unavailable": 1
         },
-        "source_bound_projection_digest": "32c6a7e515eb6db09a922eb0efddb4222bfab405bcb2eca7ffb88c764c79213e"
+        "source_bound_projection_digest": "8e3aba68115661151e22bbdda29e206a3287e596b22ee510cdf786f9bd55a931"
       },
       {
         "canonical_asset_id": "polkadot",
-        "causal_projection_digest": "46ad061f6d0c1654d82c3ce3ce6eb494a6680512bb349d6283c0f261d482bcdf",
+        "causal_projection_digest": "054a659946cd02ced7af9ddba4cb8b517cb564b060b9d092908ace40b50eabc7",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "6a123f352e147cf50fefd4b1a0848b37154963c656692c1621b9013e4014d40d",
+        "first_causal_projection_sha256": "0c116abcb39888ea7a673c2c95799ba02102b4438bba05ebbef43388c0af1445",
         "first_observation": {
           "observation_id": "mhobs-4b5ed35664d98824433d8675",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "21d78d0f0ac16cbd67e7da1a12075cff7baa027e23de24057541b3099d8333e4",
-        "last_causal_projection_sha256": "c780421a764681f5104d45a1f87f124151c1bc787d0feed299664b4767533658",
+        "first_source_bound_projection_sha256": "98abfb23b84acba3658b6205adcea709ebc41c2a7b3bfdb86debe1cd3cd5df1a",
+        "last_causal_projection_sha256": "73577ebbfed6269505a0ac8952c430ac2f877ffbff2d93b3d1bede80663c3c21",
         "last_observation": {
           "observation_id": "mhobs-49d6fbdaf32695280a86782e",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "4d086739c4c24c23c48355c07b752de8d2cf01ccdb78671d8dcb1145bffe8714",
+        "last_source_bound_projection_sha256": "a095973d5308660b6810ee944d468cf79ac603c541b17c7674b35d23d5c52c45",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "6cb66ebda031a1a0b0d385772d241c0c43c7f99ddf174cbd9265845e976e9cf0"
+        "source_bound_projection_digest": "0fd6970a149334bacefb3fcd93dd94136ef1cba7bab438d0907174bd2a279d4a"
       },
       {
         "canonical_asset_id": "polygon-ecosystem-token",
-        "causal_projection_digest": "fbde638da0d09097274c6a67e1b2179d3f43d4595d1534381687c8d84158a649",
+        "causal_projection_digest": "4a1ff21c826b4d08a079a3d7d1d48ee9356113110f1b3b54a145a0e6546454e1",
         "evaluated_observation_count": 4,
-        "first_causal_projection_sha256": "c9a1dd01b007ae94cb0a8aa055f1e5b2e606e7104d4a26a8f72ce6bbc93c4f99",
+        "first_causal_projection_sha256": "1d3ecdcbadaf55261cd125e570995f468f66fa1ea236805c2f54dda9642e38f4",
         "first_observation": {
           "observation_id": "mhobs-e6e60d9c8648f32af9332c3f",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "bb0ba93aec09092ccfc339bad4ae8cdcb0fcfdf0841f8a96fe68b97b60b34cb6",
-        "last_causal_projection_sha256": "e6051f86add5c49d66b7e564c5f0e2a89c6232fc3427eb13c2a677b73a28b0b0",
+        "first_source_bound_projection_sha256": "8491c7f155ed4e4ea989fc2362c7122d5d18050dcd1dca4cd5fd35271279d4d2",
+        "last_causal_projection_sha256": "d93c74670cadf22950c67649f03cd45dc7d8c459f220f0db55f3a09cd9ee71b4",
         "last_observation": {
           "observation_id": "mhobs-04f35a435eb590f0d6060eb8",
           "observed_at": "2026-07-14T10:21:23.140944+00:00"
         },
-        "last_source_bound_projection_sha256": "f8c8fa624f79b9615158a01cf673956641bbc59e0dc7c00492cafb99008e139b",
+        "last_source_bound_projection_sha256": "17ec8dcb3a0cd8cbed012d5378046ed9144a074a2846c93a9005cc8d1a50307b",
         "projection_status_counts": {
           "unavailable": 4
         },
-        "source_bound_projection_digest": "e023f9d6d0d03d9ff89609b5b914132cb81f0310e2432d55a1c0c9c570ea1778"
+        "source_bound_projection_digest": "7fd01ab1c175d3f0131f7e9c921d21145f38461d73d65f152e8fddcde91ae325"
       },
       {
         "canonical_asset_id": "pump-fun",
-        "causal_projection_digest": "9c6728be81c66eb6a5159bd0179dc9eb9ad1990f60db01f6b069d7f0580d5006",
+        "causal_projection_digest": "534de55efd5ffb9836f19d220c15abf522709ba244599b56f8010f0e16d1b73e",
         "evaluated_observation_count": 22,
-        "first_causal_projection_sha256": "f46854d4bc6360ec789858941fea7c4edac67f2060c1952435f4b7d39517a637",
+        "first_causal_projection_sha256": "827f5149215781d05095ce1ba19399dae5270d0a3db41e9362589a883366ce84",
         "first_observation": {
           "observation_id": "mhobs-57f6a7c36509136d79647ac3",
           "observed_at": "2026-07-19T23:45:20.832390+00:00"
         },
-        "first_source_bound_projection_sha256": "f87e557fc60623820c04c8606caddc4098ab15bce8a3758203ccef8ab78252c8",
-        "last_causal_projection_sha256": "85d2d13ca606c112ef9adf954f7833fae94485812583f15d849a5c99483be851",
+        "first_source_bound_projection_sha256": "f3c63f5b56ca00ca735d2c22b7f5e8071afa1dbcfd2f38ffa4e0a877aa72cb13",
+        "last_causal_projection_sha256": "8101397024a67747aee4d7ae4f6e8de62105e7dcb0f2352753336ceb8068596b",
         "last_observation": {
           "observation_id": "mhobs-56418a7d4e1ccc6f96d268dd",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "c81b099c1c8132122699bfc7301c08d732ece36b23bcffe8b2ccaa3caf837a87",
+        "last_source_bound_projection_sha256": "43de95d1a5e8af969c35238786383b3c4ba845954c568935cdf45fbe79598efd",
         "projection_status_counts": {
           "partial": 14,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "b13dd2232ac9f1e3ff14b38f88e28c6111f1d6102c0f5e5fab26aa51a687b9d7"
+        "source_bound_projection_digest": "7bc8ab43ee38f8d1382ede4b40ef759cc7534b92ef36eb866b9a23a01be5424c"
       },
       {
         "canonical_asset_id": "ripple",
-        "causal_projection_digest": "23ed21154ced89f482355950146d1dc7dfc993708a379a6dc763115b4765df97",
+        "causal_projection_digest": "c417710622eda6caf7b1c3764d0b4b20066dc067ba6e0a890aae9bdf3e5b08eb",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "80c153e347755ab6a92d8624c1b68b629ddd3f6045e228d74407b475e7e836f1",
+        "first_causal_projection_sha256": "862eeab2673c470cc62b43275673e4e812b15a7ee54471268ee961bb17b5e423",
         "first_observation": {
           "observation_id": "mhobs-bdfce60734b5dba8567b9bb6",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "971ec169eca58e75f4ab621b44a390d06beb99e42a4d34bc2641d4272d41ea27",
-        "last_causal_projection_sha256": "031fea23d20c42248408b3a2210b78d571f5f9ab7c1b3991e8537fd9c25dafee",
+        "first_source_bound_projection_sha256": "a017a3498bc667c8baa77f9dab7c6cc47d19d08c96164714a977eeed379af7df",
+        "last_causal_projection_sha256": "17936ea924bf0ecefde248946cdb2beb6f8ab3d31ca4fee7d68bbaf91059ed5c",
         "last_observation": {
           "observation_id": "mhobs-995b1015afae5d7fdb487043",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "7f8f20dbfefbe4fb95cf770f1f1ef4131d5a3291150b1ecbe2b661a7abb747ba",
+        "last_source_bound_projection_sha256": "c50791087f06ef72e2090f3236bb4afdd146cbee303c37fc6680fb73957c2ed3",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "b7ddf720e4ebe2562239effbead45cbca1239db41a7b54d3ccfb3ea8f9d1c972"
+        "source_bound_projection_digest": "6380e728413864a7fb86863da34a714dadc6e1c9d049f75031b3c0ab48576c7a"
       },
       {
         "canonical_asset_id": "shiba-inu",
-        "causal_projection_digest": "9bccfa027aa03150878606787acc5716000bd27dadd0ef54eefe4d1bb32f7a9e",
+        "causal_projection_digest": "7bbe15ccdd26a5adc53b5c9e4b5b51d6447b0ea9d2ddc035ee19a95915e60177",
         "evaluated_observation_count": 35,
-        "first_causal_projection_sha256": "19840c71cfb18087ac8d1b07f6494fe4d6ab5b1a413b66debd0f7450a5402aae",
+        "first_causal_projection_sha256": "916a51ccc0d2a9ec7b82be9fb8bb595b1343d798a705f86105ec7aefec136b74",
         "first_observation": {
           "observation_id": "mhobs-aa29133af6d0c1bd82cd2153",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "de9d6d049e4988502b226ae123e7934dc154d544c7036de1e840972fd2f29eb2",
-        "last_causal_projection_sha256": "8d1ee57aa2f8d4fbebcff3a149f2ad3dde4f9d8848d20cd9686f868338a99726",
+        "first_source_bound_projection_sha256": "c2111ffaf9b4e7817370d1e1aa779bc38feb9d46b6b2fac676ce0c42a58b5bbe",
+        "last_causal_projection_sha256": "651a2fc7e2c4a2b462f19ea2e183157848536e266249d463180c0f84a3e2988b",
         "last_observation": {
           "observation_id": "mhobs-2758af718466717597c8ce9c",
           "observed_at": "2026-07-20T19:41:41.729110+00:00"
         },
-        "last_source_bound_projection_sha256": "48c5f0143f93eb5680bcaf14e2afacccde7c1ad6a0d7b14b61c20ad16105a69b",
+        "last_source_bound_projection_sha256": "36918455b11bf8e0e8f851b3e11e78711f77da198c94f9ad470e09b5e5f0a607",
         "projection_status_counts": {
           "partial": 26,
           "ready": 1,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "7bcb868c7c64813f803d8aa6834a48f11dc17223e263349651ec1c875b830aa9"
+        "source_bound_projection_digest": "7c126fe710c1c330a40a675d8072a3cb027bd483f2eb480b40281fe8775a5d1b"
       },
       {
         "canonical_asset_id": "solana",
-        "causal_projection_digest": "db681327cc7a82ed79ea33c610e1eb187074afc6c19675bd31fc844a5fc49daf",
+        "causal_projection_digest": "1f8714b31813808e949ba5f6e22f636cf58459f4cf54aaffc2f3c0dbeedaef4b",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "247525426dd661344ef54302af4e622751ed5f9209fa682371af100f14589b5d",
+        "first_causal_projection_sha256": "10387784e02c79aa6a80643152a6b336d30446b85bc255fae26d552ebb80cf74",
         "first_observation": {
           "observation_id": "mhobs-ce47c8c7e551c6de40ca9efa",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "5cf4d032b901b1761fdfc50479eb9fcd4ea0e2f231e63d588baaa02fd484aa45",
-        "last_causal_projection_sha256": "39ee9f3916db0db4fa28ff599bfd9716d71064e8e35f564d1ca249dcd4d3a6f1",
+        "first_source_bound_projection_sha256": "65270b2c4d952ac0328552e1dcf3b02763f518e360b84ff1100ccdddc93ec51a",
+        "last_causal_projection_sha256": "b466205b860b8ef58e48017bc99208cf3f5b43448281ccc0bd9cae54f7d08345",
         "last_observation": {
           "observation_id": "mhobs-7ac3f134b6aa1aad493848f0",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "2542faf6509f094e90bffa4d6f0ffb8fafcb5aa257be34bc87547b5ee70b85aa",
+        "last_source_bound_projection_sha256": "d39e219d07a07113758195a92832a03f1c3750c8fcbd6e048fa12bc3d4d3672e",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "5d3dd2bd6a9e9b4f522d89991fa6534a6f97c559851083078b2e70d20596c1da"
+        "source_bound_projection_digest": "408569da34b6beed9b6cb92b3ec14a7701440c889f46bf020b5245c655e9430f"
       },
       {
         "canonical_asset_id": "stellar",
-        "causal_projection_digest": "da844226ff9a461f848d3f7c6679a4479538ffbb662873e00d2fc7b3dbf514be",
+        "causal_projection_digest": "a306128aeb13c370781af6ed59e62ac98231c4db2d4a20809f3f6db64fc9cc5c",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "7f190979fe582773276168f7097e5d844ce5c8cc36dea911f44beaf42051af80",
+        "first_causal_projection_sha256": "f688a70ee9be8bbd019c7c586b7a44c133b358323cd8271fb85e0ba1b6211f56",
         "first_observation": {
           "observation_id": "mhobs-57b30178c5e7514aab00291b",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "1eac4d66bd45afd6bfd816463846a71cc2b4f275511650edc17c05ec1271d263",
-        "last_causal_projection_sha256": "4c1bec1d40a8efa12a0a8437fa90fb1fcd5b3404d435c5e5bccb54a0a67db654",
+        "first_source_bound_projection_sha256": "6ae4dd777522faefae10dc3f8e57e26ebfa7c71aebe21179997a326c77fb1375",
+        "last_causal_projection_sha256": "9ea1df4518257e012314e30f00c7c15a98d4a3d9dc89f7b933a24be24ace89b2",
         "last_observation": {
           "observation_id": "mhobs-a5aa08258d040113c43e540b",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "f6ed908b10a4dd59a472ba5658556e67e8a689b12dba619945515be5bca4f6da",
+        "last_source_bound_projection_sha256": "81b8d8d6935cedcdf755b29b96343be44d549920ddfd347f107b2131c63a5879",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "da1ed4c6ceca1756a80c54f128b1a28ae49976a8fd967324ba99cbd262282f6d"
+        "source_bound_projection_digest": "101e9969c112760a11004cb13dd33890c6fc75193caf31c9aad52b92243c1dfb"
       },
       {
         "canonical_asset_id": "sui",
-        "causal_projection_digest": "6bd540e04bf37ee30740c103a6b7bf4952c82cc266e8caad95cf37243a507267",
+        "causal_projection_digest": "0c906efc37a909ac1cd96650a107458f74f06c0e4dfd35eedec56d1813982a52",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "0071654750205e03826c89e9173946361b097505a5639e19b8ba24a0caf722fa",
+        "first_causal_projection_sha256": "01df3ec57143cddda5b67df17bb23e8e2fef06699d398a3c5693bb98e3a36e4f",
         "first_observation": {
           "observation_id": "mhobs-7f7c394ae3aa132a2fbd88b3",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "fda23fc70df5ae98ed30665250f521214f51979cb14491683cf0f5554d5bb763",
-        "last_causal_projection_sha256": "b119f96ab1557da2a97b61f72790b3bd49aa4cbe512eb539cd32aa9098010eda",
+        "first_source_bound_projection_sha256": "afddf9910e4914fdf7df4eed050f4e059ad72a317a769aa1ba0509f59bee3840",
+        "last_causal_projection_sha256": "584eb50b7182518647433d659e680835a44679e9113b6086d47a99a87af280c5",
         "last_observation": {
           "observation_id": "mhobs-8079f371fd9939c880a1c387",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "461989a8b9e2af737b1dcd58f868aea2ce8471c75e0893f880f0a2fd9ef922d3",
+        "last_source_bound_projection_sha256": "9f73d973164d6f78b57a5da0e5cdd4a3dbc9845971bae342b52310ef2ca7547b",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "cfcded2fa9b06aa15b7dab4d6421f194b0746fddf51a8e2a477ab9cee6e38e98"
+        "source_bound_projection_digest": "da0f642d211ab1652e737b1905a0d8b7762e95080b9c6b6e3cfb131e91333fe0"
       },
       {
         "canonical_asset_id": "tron",
-        "causal_projection_digest": "85cca5ef20629d26a70b20dd76a7855e15766f5ae4031686224ddce74fcb372e",
+        "causal_projection_digest": "e820b4185a4a5241b13cfbbf9b8925a65fb821f2e972ad602d2510de9ececef4",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "fbb2273720d364f9279712a350400539453241b70787d8bbfa7d8fcf320f334c",
+        "first_causal_projection_sha256": "310e19e69d02439476f138f5250c84dc5c3e599b04a122d4cf15ec2ea8fbe2d5",
         "first_observation": {
           "observation_id": "mhobs-fb9ecc95bfd207c115620293",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "96d26f3796c4742d5b2889d53d60fe26888c24825f9219b7f6a1d77c3e3501ec",
-        "last_causal_projection_sha256": "be49108a07f7d54a573005154bbdd719f6ac61a7f4bf905a60f333bd32622336",
+        "first_source_bound_projection_sha256": "7ab535a04469610628ab0f38f2c27b3391dc8966abf8e904ec448b95e7633511",
+        "last_causal_projection_sha256": "13e79428b78be8c390ca047c962eeaeac3db8622b6de17473da732a05f23231b",
         "last_observation": {
           "observation_id": "mhobs-e1071b1b9d23503b26ac2fed",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "60ba3fcc3e038ac1772baee0edae4013f4dcabe6ccc72f385f445ff4e4c7ee75",
+        "last_source_bound_projection_sha256": "04ebc4e00e787a965811f2bdcf9e1cab81cfaea99fafe759492ad43b016d9043",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "36ab11416c21251c13e70cb9511e2e04711d8b497fc266dd7cc09342dfc63f5b"
+        "source_bound_projection_digest": "c2f8133f7c3438f2da6b700bffb1d7c22d25b9d5979cc57e8922c388edf0ba72"
       },
       {
         "canonical_asset_id": "uniswap",
-        "causal_projection_digest": "6a890eb5c54cd76eef8e4f9bc7f673122c9f07f19e102b75e86c2f28cfa6450d",
+        "causal_projection_digest": "26831d4e9a1267d9606a83fcb0b0d680768912e372e1a7925f2d0ea9fb09c65e",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "d05dd446e14344fac642027e02c84d739507567632857d042e381d7120495957",
+        "first_causal_projection_sha256": "33012ca1a4d673060e17409b89e98bf62c96bd68b2bf7a61e626ef0955650121",
         "first_observation": {
           "observation_id": "mhobs-cec916c68c2b0fbdf96e5d2f",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "1ae09626af1ba776be89fcb7530df54b560fdb6e4282c675dbde1dba983a71d9",
-        "last_causal_projection_sha256": "08ab7928497b930a0992b11e1d9d417cd6bb8ddcfe8f7827f34a5c03de0a1c3e",
+        "first_source_bound_projection_sha256": "7e28073dcfcc4efb867a223fd974f3ee36f3e12f74aa05c1c6e82ed155052213",
+        "last_causal_projection_sha256": "76d1e978c4fd6d75725672917cf5c8f2f61bf5b8b017028894dec45b64d298d1",
         "last_observation": {
           "observation_id": "mhobs-98ce7dde428667aaa2935526",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "834f4f9a7bc20f4b793602f0fa17eac4dbc7cf0f4989394d06dee29d59f2c884",
+        "last_source_bound_projection_sha256": "47a25a3baa9b7773a68876e21807ea94540a100460e06a5fa4b366719e8a9d93",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "dbad0df33ebf42f349253e3316fbca753bebf2a81e2626d3c56c9247db0e9e39"
+        "source_bound_projection_digest": "b4f7b2dc1b242f9d3aea581b97f6c9bcdc80152a757571934849c354603fb294"
       },
       {
         "canonical_asset_id": "whitebit",
-        "causal_projection_digest": "f9419607f021635f439a4e3ab806b44807058beea0c39358db634d6300d37882",
+        "causal_projection_digest": "5895aebd59aa426003a63b7dc6329f69ab0bbde768f4954802b1e41832b0153c",
         "evaluated_observation_count": 36,
-        "first_causal_projection_sha256": "9767e3448dcbbc8fa8635d30f715e58058c8eab0b6503f789d6d198be232ea63",
+        "first_causal_projection_sha256": "90cd99aa204a9a66d658cc468159c750ddc5e7cbbbb9f007ac8499873326cae0",
         "first_observation": {
           "observation_id": "mhobs-b772fdc61228eda4f20a4059",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "999d2fd02b4538d93ba14003d024681c62864eb0acba1009eedbe56d8627766f",
-        "last_causal_projection_sha256": "6b47fd7fd2dddc8e21043fb4a6424093e5f62a2b443368c907b8dacf6e4d4d08",
+        "first_source_bound_projection_sha256": "1df27896151186d67b2e3f33e631885b648da513efa6dcb988b21854ba23b0e5",
+        "last_causal_projection_sha256": "50eff89d2414194c267b222c21764d6263d9eb0bf691b085af559b3e51bda251",
         "last_observation": {
           "observation_id": "mhobs-88036af25b9c65f0894c4c12",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "cb917668d28b27bee2b8039aa86d6fb22b8e22116766c9fb7ba96574a5aa2561",
+        "last_source_bound_projection_sha256": "ceea447f5ef291043ff0cccf9038c67aa7d7f4bd028a2d0fb0e8b95f74dcb745",
         "projection_status_counts": {
           "partial": 26,
           "ready": 2,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "4c9c6a3f6b126d1193d2514a3c6ef8b7ec3a6da24ba05650a60a3aeeceea08eb"
+        "source_bound_projection_digest": "0d075d4d4512d4084032b0d36aa34790eec3edce29ad04b72b08419697f8b9cb"
       },
       {
         "canonical_asset_id": "worldcoin-wld",
-        "causal_projection_digest": "b5cc54e0343fa97a193b1457feae8d896a290fc6768723800a9641c55b0d610d",
+        "causal_projection_digest": "8593cf6dc2011bf402144305bfe1bb12e6f8648ab0d27364744e74c885553c99",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "bc255a60e58a677b353e08a5a25871816d415e3a817024d1139ed2a9d83da359",
+        "first_causal_projection_sha256": "d1163802a080b877ada874040769f5157839a4a459a58509d7b22b0e871191b7",
         "first_observation": {
           "observation_id": "mhobs-223990b31b5081b0652a8dfb",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "3034d1e32cf8d18fbedf2c9810cd1ebc567daf61747c53cbd3eb897600093bd0",
-        "last_causal_projection_sha256": "bc3a91d147082c21268c01442d386cf72436c4a7badc3546a754c67a3ee6fabd",
+        "first_source_bound_projection_sha256": "a17e495cbb510d96c3fd3e1c72093c5df514c55eeb7a98f94dd8ad71552d090d",
+        "last_causal_projection_sha256": "1a962081bb9f781e8eb2e8661d26e204f35ce957c4a1be58f33a58f01a6a700a",
         "last_observation": {
           "observation_id": "mhobs-2cf48c6135232a4cb019e226",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "8503e7fe280dbf5b13df127ca404ef3ee4fd4fd181702964aca607b91acef1e3",
+        "last_source_bound_projection_sha256": "946338dba75ab40020dc8fbf1b8551186e19f2c11dfb80ba2f0c9b66d9b79196",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "579e8a7b6d06b0f946e3903b3b4ddca5e1e5f6945f28e9bd2b0ca50e5de7be13"
+        "source_bound_projection_digest": "b0f10a75d5d28e7b7ad9ff02f5b42866657dc4375711574775f37f2af0903e85"
       },
       {
         "canonical_asset_id": "zcash",
-        "causal_projection_digest": "31be0a7cedcb98ac44faab065c13d897bb9866da3b7c509549da622988392c75",
+        "causal_projection_digest": "c61cd28056b82914f7b7da5ef8266faf5e53a34a7d8c2059983754df8b5958a9",
         "evaluated_observation_count": 58,
-        "first_causal_projection_sha256": "3d77d5e9abb82c732d8f0197ffef1d11b4ff3fb08ad7296438b33ef44f1e6816",
+        "first_causal_projection_sha256": "39fd701c8ad0ee9a5c0ddf4cb1195cf99eaf005f896a915f608e714ee4531fd4",
         "first_observation": {
           "observation_id": "mhobs-b179c2c23314231b734e5e64",
           "observed_at": "2026-07-13T15:17:06.228233+00:00"
         },
-        "first_source_bound_projection_sha256": "f597fa9a1733ca9d8ee5a498c1b80f6b0e4ec324ec87028f509b29185fe3efc0",
-        "last_causal_projection_sha256": "6a17e187f6a91a84633cf9fcd203d7810bb4b6d8dbb619f1843bcc04ecd24e7a",
+        "first_source_bound_projection_sha256": "f628ef87c97db4f51fe0e85b3c3e7f963b3dac86dbf7fe599c5c939b9f6ad984",
+        "last_causal_projection_sha256": "5a7d8e9ec6e4e3d53ee0e0836ee31ad001dc5974d1b63157d375d8eda6a53ed5",
         "last_observation": {
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
-        "last_source_bound_projection_sha256": "7140847bc7f72037e1986afdc5c0c16828666b0fa41d1ac1532488aa189b982f",
+        "last_source_bound_projection_sha256": "da16179597b75b2701c53987ef25f1da5f7a68de2ea2bbb304597851c796f756",
         "projection_status_counts": {
           "partial": 38,
           "ready": 12,
           "unavailable": 8
         },
-        "source_bound_projection_digest": "c8e3122915eb444a071c2ab83a3b26c5f388e064916bc6aa6aad5cd23fa6f5a5"
+        "source_bound_projection_digest": "78a21bb4b15710a9d7015851e89b5497cd2fbcda2129058dde72ac1c8011cda8"
       }
     ],
     "auto_apply": false,
-    "causal_projection_digest": "a9a7278232e85b240879e3c2e6395d8e20d5702c6c0544f52bb202f73e2db191",
+    "causal_projection_digest": "52d16285f549c7dc6d4610123380bd52aee4586b9697eab7cb7df5fdf5fccb5b",
     "decision_score_eligible": false,
     "evaluated_observation_count": 1740,
     "evaluation_error_count": 0,
@@ -15243,7 +15243,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "682058560e5cf0fa0115d8e8a6f5ddcc5049003cea0da26c95add025ee45e233",
+        "projection_digest": "e9396bb7599f92369a41de9412dc6d215af70c611f34fd42a993d99ef0574ebe",
         "ready_count": 697,
         "robust_z_maximum": 18.971386360139,
         "robust_z_median": 0.106595025587,
@@ -15302,7 +15302,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "3acda4d3bcc64712e7ffc4d72b83a80b1c39681662310f1b14b1de39b8428f29",
+        "projection_digest": "46c9577cccae4e340044eb7221a34fe4fddf2e8f1b1c14ad78401e1586a0c7e9",
         "ready_count": 736,
         "robust_z_maximum": 11.74679497791,
         "robust_z_median": 0.085974026244,
@@ -15361,7 +15361,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "554d6cd3cebc8e17159f1f4e6bd7734bd2a757b2658bc76659706629af1bff22",
+        "projection_digest": "75937c3957b13d8e5a8103615717956792cfd7e7e7294b87aefa084b4c6d5f00",
         "ready_count": 632,
         "robust_z_maximum": 22.645564585383,
         "robust_z_median": 0.125068523016,
@@ -15420,7 +15420,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "d1aa304ddecdec68f0d5c73c648c1d8259e7243f3a8cfeeca7e988a90c83faf1",
+        "projection_digest": "b79b38e2b7167d5f5daf5b690427480af74f7101176e1f95cbca8ccdd381fcfa",
         "ready_count": 697,
         "robust_z_maximum": 19.753644568497,
         "robust_z_median": 0.009120235007,
@@ -15479,7 +15479,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "eecd68da922952e201b5768f7ad643b749d99ccc3b9fa8df6e95a88767cac04e",
+        "projection_digest": "0335430adaff116c4697d8e5c2248e6cc8a3e853cfdf8e24ba8d76ceb0a331e2",
         "ready_count": 736,
         "robust_z_maximum": 10.333013000364,
         "robust_z_median": 0.219933512741,
@@ -15538,7 +15538,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "60a34dfa08720e56e8f32615b21d2baa510588fb4498b0da3f7e9edcd0d77b16",
+        "projection_digest": "62555111c819fa6818c33cd0d60d4f4ef139bc287c2c04693e69708ea5fd74e6",
         "ready_count": 632,
         "robust_z_maximum": 14.076919105003,
         "robust_z_median": -0.104378885169,
@@ -15597,7 +15597,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "3e4147f3bcfa87931447697a0eb4310b342315db694c7866d7ea93fd129abd1b",
+        "projection_digest": "30ffcf02861f9fd8b39a2b895913f83edc69b1c178b816a69092529b250db71b",
         "ready_count": 678,
         "robust_z_maximum": 24.901060915435,
         "robust_z_median": 0.0,
@@ -15656,7 +15656,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "21811fcd8747587fcf12b20651c1f3039256f25140cd91797c31c2058351016a",
+        "projection_digest": "39037c247d8a8b738e7205b6294cac8990afbc89078e48b9331cc7f42b8b5022",
         "ready_count": 754,
         "robust_z_maximum": 12.357621186344,
         "robust_z_median": 0.055740392585,
@@ -15715,7 +15715,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "0ebe341de49f5ace5d3e13ff5fff8f0af54b70c42751bc03d812d29e6cb53342",
+        "projection_digest": "4eebe040046190abd736229bca745f1f781956dc59f3085517288cf6b3be1323",
         "ready_count": 641,
         "robust_z_maximum": 7.299579827457,
         "robust_z_median": 0.122629116825,
@@ -15774,7 +15774,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "a1a7e3dd9e48020abe72c5ecc30132ce970e7b7ac3edea8b21f4dea59819cbbe",
+        "projection_digest": "31d65a36741620a39eac898a33eacfd017edec3b49c5d0f13be8a88b6d079047",
         "ready_count": 1461,
         "robust_z_maximum": 4.967644441823,
         "robust_z_median": -0.229038998898,
@@ -15832,7 +15832,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "3f23c085276940af2af7a6ec80d50c1574f03aa6fdf89bc9a6e488a23ada05bd",
+        "projection_digest": "895508f9958de563d5ebf223e78b138353a77429c0752a61e5f10b7947935558",
         "ready_count": 1454,
         "robust_z_maximum": 3.526865132096,
         "robust_z_median": -0.25592087646,
@@ -15872,8 +15872,8 @@
     "schema_version": 2,
     "score_adjustment_eligible": false,
     "shadow_schema_id": "event_alpha.shadow_temporal_surprise",
-    "shadow_schema_version": 2,
-    "source_bound_projection_digest": "ea22967f9921c0d531607d5ba9087bd6e3d537a1827bee7f2733b07af222fce0",
+    "shadow_schema_version": 3,
+    "source_bound_projection_digest": "d48acde91e8730d6a722c1c088caf8bac5ab1f98640da23cc09badde5e397322",
     "source_history": {
       "artifact": "event_market_history.jsonl",
       "binding_source": "campaign_market_history_exact_bytes",

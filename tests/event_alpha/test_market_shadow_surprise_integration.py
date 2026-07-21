@@ -222,7 +222,7 @@ def test_shadow_surprise_attaches_only_after_route_and_preserves_authority_bytes
     anomaly = next(row for row in anomalies if row.get("coin_id") == "token-b")
     snapshot = next(row for row in snapshots if row.get("coin_id") == "token-b")
     shadow = anomaly["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 2
+    assert shadow["schema_version"] == 3
     assert shadow["history_artifact"] == market_no_send.HISTORY_FILENAME
     assert shadow["history_artifact_sha256"] == hashlib.sha256(
         history_before
@@ -472,7 +472,7 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
     assert audit["schema_version"] == 2
-    assert audit["shadow_schema_version"] == 2
+    assert audit["shadow_schema_version"] == 3
     assert audit["input_row_count"] == 31
     assert audit["excluded_not_baseline_counted_count"] == 1
     assert audit["input_rejected_count"] == 0
