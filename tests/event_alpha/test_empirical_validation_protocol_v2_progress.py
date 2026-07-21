@@ -668,9 +668,11 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "event-alpha-source-independence-oos-readiness" in output.out
     assert "provider_calls=0" in output.out
 
-    rendered = []
+    rendered = {}
     for target in (
         "radar-research-protocol-v2-progress",
+        "radar-research-protocol-v2-progress-full",
+        "radar-research-protocol-v2-progress-json",
         "radar-research-protocol-v2-progress-check",
     ):
         completed = subprocess.run(
@@ -680,11 +682,38 @@ def test_progress_human_output_and_make_targets_are_explicit(
             capture_output=True,
             text=True,
         )
-        rendered.append(completed.stdout)
-    assert all("empirical_validation_protocol_v2_progress" in row for row in rendered)
-    assert "--check" not in rendered[0]
-    assert rendered[1].count("--check") == 1
-    assert "provider" not in "\n".join(rendered).casefold()
+        rendered[target] = completed.stdout
+    assert all(
+        "empirical_validation_protocol_v2_progress" in row
+        for row in rendered.values()
+    )
+    assert "--summary" in rendered["radar-research-protocol-v2-progress"]
+    assert "--summary" not in rendered["radar-research-protocol-v2-progress-full"]
+    assert "--json" in rendered["radar-research-protocol-v2-progress-json"]
+    assert rendered["radar-research-protocol-v2-progress-check"].count("--check") == 1
+    assert "--summary" in rendered["radar-research-protocol-v2-progress-check"]
+    assert "provider" not in "\n".join(rendered.values()).casefold()
+
+
+def test_progress_summary_leads_with_exact_operator_boundaries(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert progress.main(["--summary"]) == 0
+    output = capsys.readouterr().out
+
+    assert "view=summary" in output
+    assert "selected_execution_surface=bybit:usdt_linear_perpetual:USDT" in output
+    assert "protocol_frozen=false holdout_accessed=false" in output
+    assert "cost_model_sealed=false eligible_instrument_set_sealed=false" in output
+    assert "current_activation_blocker_count=15" in output
+    assert "genuine_execution_quality_capture_absent" in output
+    assert "next_bybit_readiness=make radar-execution-quality-bybit-readiness" in output
+    assert "next_review_queue=make radar-review-timing-queue" in output
+    assert "changing_measurements_embedded=false" in output
+    assert "full_output_command=make radar-research-protocol-v2-progress-full" in output
+    assert "json_output_command=make radar-research-protocol-v2-progress-json" in output
+    assert "provider_calls=0 environment_reads=0 file_reads=0 file_writes=0" in output
+    assert len(output.splitlines()) <= 22
 
 
 def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:

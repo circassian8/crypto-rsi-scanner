@@ -851,7 +851,13 @@ may be added later when a suitable environment already exists.
   implementation are export-policy fingerprinted and must stay byte-identical;
   do not add current state to either file. Use
   `make radar-research-protocol-v2-progress` and the matching `...-check` target
-  for the separate static current-decision projection. That surface records the
+  for the concise separate static current-decision projection. The concise view
+  leads with the selected surface, freeze/capture state, every exact blocker,
+  highest-priority safe readiness/queue commands, campaign pointer, and zero-I/O
+  safety. Use `radar-research-protocol-v2-progress-full` for the complete static
+  transcript and `radar-research-protocol-v2-progress-json` for the unchanged
+  structured packet; direct Python CLI output remains full-text compatible.
+  That surface records the
   confirmed Bybit USDT-linear perpetual, USDT quote, public-only data boundary,
   and owner research eligibility while keeping exact eligible instrument IDs
   unsealed and permitted reachability unproven after the recorded 403. Current

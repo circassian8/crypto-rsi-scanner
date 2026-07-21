@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Lead Protocol-v2 progress with decisions and blockers
+**Status:** accepted
+**Decision:** The normal `radar-research-protocol-v2-progress` target and the
+current-progress portion of readiness/check use a concise static summary. It must
+show the selected Bybit perpetual surface, protocol/holdout state, genuine-
+capture state, all exact activation blockers, canonical changing-campaign path,
+priority no-call operator commands, and zero-I/O safety. The complete transcript
+and structured packet remain available through explicit `-full` and `-json`
+targets; direct Python CLI output remains full-text compatible.
+**Why:** The complete static packet is valuable audit detail but buried the
+selected venue and actual human/provider boundaries in more than one hundred
+lines. The 21-line summary makes the safe next decisions visible without
+discarding, re-evaluating, or reading dynamic evidence.
+**Revisit when:** A blocker or operator boundary changes. Update the canonical
+structured projection first, derive the summary from it, and retain full/JSON
+compatibility.
+
 ## 2026-07-22 - Cache deterministic shadow primitives, not empirical results
 **Status:** accepted
 **Decision:** Causal shadow replay may reuse parsed immutable ISO timestamp text

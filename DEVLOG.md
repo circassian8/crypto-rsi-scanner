@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Make Protocol-v2 progress concise and actionable · Codex
+**Why:** The static progress target correctly retained the complete execution-
+cost and evidence contract, but its hundred-plus-line transcript obscured the
+confirmed venue, 15 active blockers, and safe next operator actions.
+**Changes:**
+- Added a 21-line summary derived only from the validated static projection. It
+  leads with Bybit USDT-linear perpetuals, protocol/holdout and genuine-capture
+  state, every exact blocker, the canonical changing-campaign pointer, six
+  priority no-call commands, and zero-I/O safety.
+- Made the normal progress target plus readiness/check lead with the summary;
+  added explicit `-full` and `-json` Make targets while retaining direct Python
+  CLI full-text compatibility and the unchanged structured digest.
+- Added regressions for summary truth, output bound, Make dispatch, full/JSON
+  availability, and the existing no-ambient-I/O contract. Updated the working
+  agreement, roadmap, and durable decision record.
+**Verify:** All 9 focused Protocol-v2 progress tests passed in 1.17 seconds;
+compileall and diff checks passed. The real summary rendered 21 lines with all
+15 blockers, exact Bybit surface, prioritized readiness/queue commands, and zero
+provider/environment/file/holdout activity.
+**Notes/risks:** This is rendering and dispatch only. No environment, provider,
+credential, artifact, holdout, protocol, score, route, threshold, or dashboard
+authority changed. Quantitative source-size findings remain advisory.
+
 ## 2026-07-22 — Record the sixty-second no-send market cycle · Codex
 **Why:** The hourly cadence became eligible with CoinGecko authorization already
 present, so the campaign needed one bounded genuine observation rather than a

@@ -1110,11 +1110,99 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
     return "\n".join(lines)
 
 
+def format_current_progress_summary(
+    value: Mapping[str, Any] | None = None,
+) -> str:
+    """Render the selected surface and unresolved operator boundaries first."""
+
+    payload = deepcopy(dict(value) if value is not None else current_progress_values())
+    frozen = payload["frozen_readiness_contract"]
+    decision = payload["confirmed_execution_decision"]
+    liquidation = payload["native_liquidation_contract"]
+    unlock = payload["structured_unlock_contract"]
+    campaign = payload["campaign_truth_surface"]
+    commands = tuple(payload["next_safe_commands"])
+
+    def command_starting_with(prefix: str) -> str:
+        return next(command for command in commands if command.startswith(prefix))
+
+    blockers = tuple(payload["current_activation_blockers"])
+
+    def blocker_state(blocker: str) -> str:
+        return "absent" if blocker in blockers else "present"
+
+    return "\n".join(
+        (
+            "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS",
+            "view=summary",
+            f"status={payload['status']}",
+            f"as_of={payload['as_of']} progress_sha256={progress_sha256(payload)}",
+            (
+                "selected_execution_surface="
+                f"{decision['venue_id']}:{decision['instrument_mode']}:"
+                f"{decision['quote_currency']} data_boundary={decision['data_boundary']}"
+            ),
+            (
+                "protocol_frozen="
+                f"{str(frozen['protocol_frozen']).lower()} holdout_accessed="
+                f"{str(frozen['holdout_accessed']).lower()}"
+            ),
+            (
+                "cost_model_sealed="
+                f"{str(decision['protocol_v2_cost_model_sealed']).lower()} "
+                "eligible_instrument_set_sealed="
+                f"{str(decision['exact_eligible_instrument_set_sealed']).lower()}"
+            ),
+            (
+                "genuine_capture_state="
+                "execution_quality:"
+                f"{blocker_state('genuine_execution_quality_capture_absent')},"
+                "intraday:"
+                f"{blocker_state('genuine_intraday_1h_4h_and_rsi_capture_absent')},"
+                "derivatives:"
+                f"{blocker_state('genuine_bybit_rest_funding_open_interest_positioning_capture_absent')},"
+                "liquidations:"
+                f"{'present' if liquidation['genuine_capture_present'] else 'absent'},"
+                "structured_unlocks:"
+                f"{'present' if unlock['genuine_capture_present'] else 'absent'}"
+            ),
+            (
+                "current_activation_blocker_count="
+                f"{len(blockers)}"
+            ),
+            "current_activation_blockers=" + ",".join(blockers),
+            (
+                "dynamic_campaign_truth="
+                f"{campaign['canonical_json_path']} changing_measurements_embedded="
+                f"{str(campaign['changing_measurements_embedded']).lower()}"
+            ),
+            "next_market_readiness="
+            + command_starting_with("make radar-market-no-send-readiness"),
+            "next_bybit_readiness="
+            + command_starting_with("make radar-execution-quality-bybit-readiness"),
+            "next_review_queue="
+            + command_starting_with("make radar-review-timing-queue"),
+            "next_calendar_readiness="
+            + command_starting_with("make radar-calendar-official-readiness"),
+            "next_outcome_recovery="
+            + command_starting_with("make radar-outcome-price-recovery-readiness"),
+            "next_source_independence="
+            + command_starting_with("make event-alpha-source-independence-oos-readiness"),
+            "provider_calls=0 environment_reads=0 file_reads=0 file_writes=0 holdout_reads=0",
+            "research_only=true no_orders=true no_trading=true",
+            "full_output_command=make radar-research-protocol-v2-progress-full PYTHON=.venv/bin/python",
+            "json_output_command=make radar-research-protocol-v2-progress-json PYTHON=.venv/bin/python",
+        )
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Render current Protocol-v2 progress without changing frozen evidence."
     )
-    parser.add_argument("--json", action="store_true", dest="as_json")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", dest="as_json")
+    output.add_argument("--summary", action="store_true")
     parser.add_argument("--check", action="store_true")
     return parser
 
@@ -1129,6 +1217,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     if args.as_json:
         print(json.dumps(progress, indent=2, sort_keys=True))
+    elif args.summary:
+        print(format_current_progress_summary(progress))
     else:
         print(format_current_progress(progress))
     return 0
@@ -1143,6 +1233,7 @@ __all__ = (
     "canonical_progress_bytes",
     "current_progress_values",
     "format_current_progress",
+    "format_current_progress_summary",
     "main",
     "progress_sha256",
     "validate_current_progress",

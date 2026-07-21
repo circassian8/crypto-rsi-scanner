@@ -285,7 +285,9 @@ help:
 	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
 	@echo "  make radar-research-protocol-v2-readiness  Show current decisions, then immutable Protocol-v2 prerequisites; no reads/calls/writes"
 	@echo "  make radar-research-protocol-v2-check  Validate current decisions plus the static blocked Protocol-v2 contract"
-	@echo "  make radar-research-protocol-v2-progress  Show only the static current-decision projection"
+	@echo "  make radar-research-protocol-v2-progress  Show concise static current-decision progress"
+	@echo "  make radar-research-protocol-v2-progress-full  Show the complete static progress transcript"
+	@echo "  make radar-research-protocol-v2-progress-json  Show the complete structured progress packet"
 	@echo "  make radar-research-protocol-v2-progress-check  Validate only the static current-decision projection"
 	@echo "  make radar-replay-smoke             Run the immutable offline replay fixture chain"
 	@echo "  make radar-replay-medium            Run the top-30 development/validation replay from the local cache"
@@ -989,24 +991,30 @@ event-llm-extract-eval:
 event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.outcomes.eval fixtures/event_discovery/event_alpha_golden_cases.json
 
-.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-research-protocol-v2-progress radar-research-protocol-v2-progress-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-hardening-supplement radar-research-hardening-supplement-check radar-research-feedback-report radar-research-feedback-mark
+.PHONY: radar-research-protocol-check radar-research-protocol-v2-readiness radar-research-protocol-v2-check radar-research-protocol-v2-progress radar-research-protocol-v2-progress-full radar-research-protocol-v2-progress-json radar-research-protocol-v2-progress-check radar-replay-smoke radar-replay-medium radar-replay-full radar-replay-final-test radar-research-reports radar-research-reports-check radar-research-hardening-supplement radar-research-hardening-supplement-check radar-research-feedback-report radar-research-feedback-mark
 
 radar-research-protocol-check:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol --check --project-root .
 
 radar-research-protocol-v2-readiness:
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --summary
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2
 
 radar-research-protocol-v2-check:
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --check
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --check --summary
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 --check
 
 radar-research-protocol-v2-progress:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --summary
+
+radar-research-protocol-v2-progress-full:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress
 
+radar-research-protocol-v2-progress-json:
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --json
+
 radar-research-protocol-v2-progress-check:
-	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --check
+	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress --check --summary
 
 radar-replay-smoke: radar-research-protocol-check
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.empirical_replay_run \

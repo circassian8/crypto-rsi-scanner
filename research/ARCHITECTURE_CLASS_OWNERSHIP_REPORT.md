@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-21T22:14:40.161104+00:00`
+- generated_at: `2026-07-21T22:20:50.642024+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `33`
@@ -44,7 +44,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 41 | advisory |
+| `production_files_over_1200_lines` | 42 | advisory |
 | `production_files_over_1500_lines` | 10 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
