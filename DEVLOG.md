@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the fifty-fifth no-send market cycle · Codex
+**Why:** The hourly cadence became eligible with the existing CoinGecko
+authorization present, so the next bounded observation could extend the
+prospective temporal and control-context campaign without changing policy.
+**Changes:** One already-authorized request returned HTTP 200 with 80 rows in
+2,565 ms and no retry. Daily Operations published
+`radar_market_no_send_20260721t110725439004z_37d9fa0b1853`, wrote immutable
+publication and operations receipts, restarted the exact owned loopback
+dashboard, and refreshed the checked-in campaign report after terminal state.
+The new revision-12 authority binds operator-state SHA-256
+`da4a24298258a3fb9064f4078b0e5906d8d1e0ab53b50654e3949edd70275cf9`;
+strict doctor is 0 blockers / 0 warnings and an exact host-level HEAD returned
+HTTP 200 with matching namespace, run, revision, and operator digest. Campaign
+truth is now 55 cycles, 1,650 retained observations, 1,620 baseline-counted,
+30 too-close, 390 prospectively context-bearing rows, 11 ideas, 6 matured
+outcomes, 4 pending outcomes, and one unresolved `due_missing_price`. The
+current DEXE idea remains a non-actionable market-led `risk_watch`: spread is
+unavailable, the temporal baseline is not warm for DEXE, and the catalyst is
+unknown. Exact causal 24-hour regime inputs remain 28/30, so no regime was
+fabricated.
+**Verify:** `jq empty research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json`,
+`make radar-dashboard-authority-status PYTHON=python3`, and `git diff --check`
+passed. The cycle's strict doctor passed with 0 blockers / 0 warnings; its
+bounded dashboard identity probe and a separate host-level HEAD both returned
+HTTP 200 for the exact new authority.
+**Notes/risks:** This cycle crossed the CoinGecko provider boundary exactly
+once under existing authorization. No retry or Bybit/outcome/calendar provider
+call occurred. Every send, trade, order, paper-trade, normal-RSI-write, and
+Event Alpha `TRIGGERED_FADE` counter remained zero. Next cadence eligibility is
+`2026-07-21T12:07:27.472398+00:00`; the recurring service remains disabled.
+Quantitative source-file size is advisory; artifact, security, provider,
+request, cadence, and resource bounds remain enforced.
+
 ## 2026-07-21 — Block anomaly classification on unit warnings · Codex
 **Why:** A row declaring `10.0` as a fractional return normalized to `1000%`
 and correctly carried seven unit warnings, but the lower-level classifier still
