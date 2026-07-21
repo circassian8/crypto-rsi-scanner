@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Close point-in-time universe retention · Codex
+**Why:** Readiness rejected inconsistent universe context, but rolling-history
+persistence copied each individually well-typed field. Partial claims or an
+impossible rank/size/limit tuple could therefore enter retained campaign data
+and inflate field-level coverage even though complete-match readiness stayed
+false.
+**Changes:** Whenever any point-in-time universe context is asserted, history
+now requires the complete selected-member contract: exact boolean membership,
+positive integer rank/size/limit with `rank <= size <= limit`, the canonical
+top-liquid selection policy, a closed liquidity tier, and its exact outcome-
+blind basis. Invalid or partial claims reject as
+`invalid_point_in_time_universe_claim` before retention. Legacy observations
+that carry none of these newer fields remain compatible.
+**Verify:** Regressions cover partial context, typed and structured malformed
+values, inconsistent cardinalities, wrong policy/tier/basis, and the existing
+valid retention/rebuild path. The market-history/cache/campaign/no-send group
+passed (`128 passed`), with the final hardened history file at `66 passed`.
+**Notes/risks:** This changes only admission of malformed future control
+context; it does not backfill old rows or change universe selection, regime,
+score, threshold, route, provider policy, or current authority. No provider
+call, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred. Source-size metrics remain advisory.
+
 ## 2026-07-21 — Keep unsealed Protocol-v2 partitions unavailable · Codex
 **Why:** The live-history placeholder accepted any nonblank
 `protocol_partition` and basis strings, while readiness counted those strings

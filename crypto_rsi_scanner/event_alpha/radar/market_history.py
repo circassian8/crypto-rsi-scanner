@@ -70,6 +70,19 @@ _POINT_IN_TIME_CONTEXT_FIELDS = (
     "protocol_partition_basis",
 )
 _CONTROL_LIQUIDITY_TIERS = {"high", "mid", "low", "unknown"}
+_POINT_IN_TIME_UNIVERSE_POLICY = "bounded_top_liquid_by_total_volume"
+_CONTROL_LIQUIDITY_TIER_BASIS = (
+    "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h"
+)
+_POINT_IN_TIME_UNIVERSE_FIELDS = (
+    "point_in_time_universe_member",
+    "point_in_time_volume_rank",
+    "point_in_time_universe_size",
+    "point_in_time_universe_limit",
+    "point_in_time_universe_policy",
+    "control_liquidity_tier",
+    "control_liquidity_tier_basis",
+)
 _CONTROL_MARKET_REGIMES = {"risk_on", "risk_off", "mixed"}
 _CONTROL_MARKET_REGIME_EVIDENCE_KEYS = {
     "schema_id", "schema_version", "status", "reason", "regime", "basis",
@@ -306,6 +319,8 @@ def _prepare_observation(
         return None, "invalid_lineage_claim"
     if _feature_basis_claims_invalid(row):
         return None, "invalid_feature_basis_claim"
+    if _point_in_time_universe_claims_invalid(row):
+        return None, "invalid_point_in_time_universe_claim"
     if any(
         field in row and row.get(field) not in (None, "")
         for field in _UNSEALED_PROTOCOL_PARTITION_FIELDS
@@ -376,6 +391,36 @@ def _feature_basis_claims_invalid(row: Mapping[str, Any]) -> bool:
 
 def _nonempty_basis_text(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _point_in_time_universe_claims_invalid(row: Mapping[str, Any]) -> bool:
+    """Require one closed cross-field contract whenever current context is claimed."""
+
+    if not any(
+        field in row and row.get(field) not in (None, "")
+        for field in _POINT_IN_TIME_UNIVERSE_FIELDS
+    ):
+        return False
+    rank = row.get("point_in_time_volume_rank")
+    size = row.get("point_in_time_universe_size")
+    limit = row.get("point_in_time_universe_limit")
+    liquidity_tier = row.get("control_liquidity_tier")
+    return not (
+        row.get("point_in_time_universe_member") is True
+        and type(rank) is int
+        and rank > 0
+        and type(size) is int
+        and size > 0
+        and type(limit) is int
+        and limit > 0
+        and rank <= size <= limit
+        and row.get("point_in_time_universe_policy")
+        == _POINT_IN_TIME_UNIVERSE_POLICY
+        and isinstance(liquidity_tier, str)
+        and liquidity_tier in _CONTROL_LIQUIDITY_TIERS
+        and row.get("control_liquidity_tier_basis")
+        == _CONTROL_LIQUIDITY_TIER_BASIS
+    )
 
 
 def _deduplicate_history(

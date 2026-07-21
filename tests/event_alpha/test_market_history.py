@@ -1106,6 +1106,81 @@ def test_market_history_rejects_unsealed_protocol_partition_claims(partition_cla
     assert result.retained_history == ()
 
 
+def _point_in_time_universe_context() -> dict:
+    return {
+        "point_in_time_universe_member": True,
+        "point_in_time_volume_rank": 1,
+        "point_in_time_universe_size": 30,
+        "point_in_time_universe_limit": 30,
+        "point_in_time_universe_policy": "bounded_top_liquid_by_total_volume",
+        "control_liquidity_tier": "high",
+        "control_liquidity_tier_basis": (
+            "state_features_liquidity_bucket_v1:liquidity_usd_and_turnover_24h"
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    "context_update",
+    (
+        {"point_in_time_universe_member": "true"},
+        {"point_in_time_volume_rank": True},
+        {"point_in_time_volume_rank": 31},
+        {"point_in_time_universe_size": 31},
+        {"point_in_time_universe_limit": 0},
+        {"point_in_time_universe_policy": "current_top_volume_guess"},
+        {"control_liquidity_tier": "HIGH"},
+        {"control_liquidity_tier": {"borrowed": "high"}},
+        {"control_liquidity_tier_basis": "inferred_after_outcomes"},
+    ),
+)
+def test_market_history_rejects_inconsistent_point_in_time_universe_context(
+    context_update,
+):
+    context = _point_in_time_universe_context()
+    context.update(context_update)
+    claimed = _row(
+        "invalid-universe-context",
+        NOW,
+        price=1,
+        volume=10,
+        **context,
+    )
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [claimed],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["market_history_status"] == "rejected"
+    assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+        "invalid_point_in_time_universe_claim"
+    )
+    assert result.retained_history == ()
+
+
+def test_market_history_rejects_partial_point_in_time_universe_context():
+    claimed = _row(
+        "partial-universe-context",
+        NOW,
+        price=1,
+        volume=10,
+        point_in_time_volume_rank=1,
+    )
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [claimed],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+        "invalid_point_in_time_universe_claim"
+    )
+    assert result.retained_history == ()
+
+
 def test_retained_market_identity_aliases_do_not_coerce_or_borrow_after_invalid_values():
     current = _row("safe-token", NOW, price=1, volume=10)
     current.update({
