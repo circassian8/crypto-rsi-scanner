@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed temporal feature-basis provenance · Codex
+**Why:** Rolling history accepted structured feature-basis claims and coerced
+them to text. A nested object containing `proxy` could therefore authorize a
+temporal replacement, while malformed provenance could be retained as a
+plausible-looking basis string.
+**Changes:** Market-history preparation now requires feature-basis containers,
+their members, scalar basis aliases, and nested evidence basis claims to use
+typed nonblank text. Malformed explicit claims reject the observation as
+`invalid_feature_basis_claim` before retention or baseline warming. Temporal
+replacement and retained-basis projection no longer stringify structured
+values; valid provider, proxy, and temporal basis strings remain compatible.
+The active Protocol-v2 roadmap row was reconciled to exact cycle-57 authority.
+**Verify:** The direct reproduction is now rejected instead of replacing the
+canonical z-score or persisting a mapping as text. Regressions cover malformed
+containers, members, scalar aliases, nested evidence, and structured proxy
+claims. The market-history/cache/evidence/campaign/no-send group passed (`110
+passed`) and `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+**Notes/risks:** No feature formula, threshold, route, provider authorization,
+or historical artifact changed. No provider call, send, trade, order, paper
+trade, RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Source-size metrics
+remain advisory.
+
 ## 2026-07-21 — Require typed contract-counting provenance · Codex
 **Why:** The compatibility provenance adapter used truthiness for the explicit
 `contract_counted_candidate` marker and presence checks. The literal string

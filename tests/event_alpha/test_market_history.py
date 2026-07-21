@@ -896,6 +896,86 @@ def test_market_history_rejects_malformed_lineage_before_baseline_retention():
     assert valid_result.retained_history[0]["decision_radar_campaign_counted"] is True
 
 
+@pytest.mark.parametrize(
+    "malformed_claim",
+    (
+        {"feature_basis": []},
+        {"feature_basis": {"volume_24h": {"borrowed": "provider_observed"}}},
+        {"market_feature_basis": {"returns": ["provider_observed"]}},
+        {"volume_zscore_basis": {"borrowed": "cross_sectional_proxy"}},
+        {"turnover_basis": False},
+        {"market_feature_evidence": ["provider_observed"]},
+        {"market_feature_evidence": {"volume_zscore_24h": "cross_sectional_proxy"}},
+        {
+            "market_feature_evidence": {
+                "volume_zscore_24h": {
+                    "basis": {"borrowed": "cross_sectional_proxy"},
+                },
+            },
+        },
+    ),
+)
+def test_market_history_rejects_malformed_feature_basis_before_baseline_retention(
+    malformed_claim,
+):
+    malformed = _row(
+        "malformed-basis",
+        NOW,
+        price=1,
+        volume=10,
+        volume_zscore_24h=99.0,
+        **malformed_claim,
+    )
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [malformed],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["market_history_status"] == "rejected"
+    assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+        "invalid_feature_basis_claim"
+    )
+    assert result.retained_history == ()
+    assert result.summary["rejection_counts"] == {
+        "invalid_feature_basis_claim": 1,
+    }
+
+
+def test_structured_proxy_basis_cannot_authorize_temporal_replacement():
+    malformed = _row(
+        "move-token",
+        NOW,
+        price=120,
+        volume=2_200,
+        volume_zscore_24h=99.0,
+        market_feature_evidence={
+            "volume_zscore_24h": {
+                "basis": {"borrowed": "cross_sectional_proxy"},
+            },
+        },
+    )
+
+    result = event_market_history.enrich_market_rows_with_history(
+        [malformed],
+        [
+            row
+            for row in _three_asset_history()
+            if row["canonical_asset_id"] == "move-token"
+        ],
+        now=NOW,
+        config=_config(),
+    )
+
+    assert result.enriched_rows[0]["volume_zscore_24h"] == 99.0
+    assert result.enriched_rows[0]["market_history_status"] == "rejected"
+    assert result.retained_history
+    assert all(
+        row["observed_at"] != NOW.isoformat() for row in result.retained_history
+    )
+
+
 def test_retained_market_identity_aliases_do_not_coerce_or_borrow_after_invalid_values():
     current = _row("safe-token", NOW, price=1, volume=10)
     current.update({

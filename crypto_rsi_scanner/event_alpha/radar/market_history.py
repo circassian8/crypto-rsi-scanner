@@ -86,6 +86,16 @@ _CONTROL_MARKET_REGIME_EVIDENCE_KEYS = {
     "provider_calls", "research_only",
 }
 _PROXY_BASIS_MARKERS = ("proxy", "cross_sectional", "24h_volume")
+_SCALAR_FEATURE_BASIS_FIELDS = (
+    "price_basis",
+    "volume_24h_basis",
+    "market_cap_basis",
+    "turnover_24h_basis",
+    "turnover_basis",
+    "volume_zscore_basis",
+    "volume_zscore_24h_basis",
+    "turnover_zscore_basis",
+)
 
 
 def enrich_market_rows_with_history(
@@ -290,6 +300,8 @@ def _prepare_observation(
         return None, identity_error
     if _lineage_claims_invalid(row):
         return None, "invalid_lineage_claim"
+    if _feature_basis_claims_invalid(row):
+        return None, "invalid_feature_basis_claim"
     raw_time = row.get("provider_observed_at") or row.get("observed_at") or row.get("timestamp")
     observed_at, time_error = _parse_aware_time(raw_time)
     if observed_at is None:
@@ -317,6 +329,44 @@ def _lineage_claims_invalid(row: Mapping[str, Any]) -> bool:
         and type(row.get(field)) is not bool
         for field in _LINEAGE_BOOL_FIELDS
     )
+
+
+def _feature_basis_claims_invalid(row: Mapping[str, Any]) -> bool:
+    """Reject explicit feature provenance that would otherwise be stringified."""
+
+    for field in ("feature_basis", "market_feature_basis"):
+        if field not in row or row.get(field) in (None, ""):
+            continue
+        value = row.get(field)
+        if not isinstance(value, Mapping) or any(
+            not _nonempty_basis_text(key) or not _nonempty_basis_text(item)
+            for key, item in value.items()
+        ):
+            return True
+
+    for field in _SCALAR_FEATURE_BASIS_FIELDS:
+        if field in row and row.get(field) not in (None, ""):
+            if not _nonempty_basis_text(row.get(field)):
+                return True
+
+    if "market_feature_evidence" not in row or row.get("market_feature_evidence") in (
+        None,
+        "",
+    ):
+        return False
+    evidence = row.get("market_feature_evidence")
+    if not isinstance(evidence, Mapping):
+        return True
+    for feature, details in evidence.items():
+        if not _nonempty_basis_text(feature) or not isinstance(details, Mapping):
+            return True
+        if "basis" in details and not _nonempty_basis_text(details.get("basis")):
+            return True
+    return False
+
+
+def _nonempty_basis_text(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _deduplicate_history(
@@ -1469,14 +1519,18 @@ def _canonical_field_accepts_temporal(
 ) -> bool:
     if row.get(field) in (None, ""):
         return True
-    basis_values = [str(row.get(name) or "").casefold() for name in basis_fields]
+    basis_values = [
+        value.strip().casefold()
+        for name in basis_fields
+        if isinstance((value := row.get(name)), str) and value.strip()
+    ]
     evidence = row.get("market_feature_evidence")
     if isinstance(evidence, Mapping):
         details = evidence.get(field)
         if isinstance(details, Mapping):
-            basis_values.append(str(details.get("basis") or "").casefold())
-        elif details:
-            basis_values.append(str(details).casefold())
+            basis = details.get("basis")
+            if isinstance(basis, str) and basis.strip():
+                basis_values.append(basis.strip().casefold())
     return any(marker in basis for basis in basis_values for marker in _PROXY_BASIS_MARKERS)
 
 
@@ -1502,18 +1556,21 @@ def _copy_evidence(value: object) -> dict[str, Any]:
 
 def _input_feature_basis(row: Mapping[str, Any], feature: str, *, default: str) -> str:
     feature_basis = row.get("feature_basis")
-    if isinstance(feature_basis, Mapping) and feature_basis.get(feature) not in (None, ""):
-        return str(feature_basis[feature])
+    if isinstance(feature_basis, Mapping):
+        direct_basis = feature_basis.get(feature)
+        if isinstance(direct_basis, str) and direct_basis.strip():
+            return direct_basis.strip()
     evidence = row.get("market_feature_evidence")
     if isinstance(evidence, Mapping):
         details = evidence.get(feature)
-        if isinstance(details, Mapping) and details.get("basis"):
-            return str(details["basis"])
-        if isinstance(details, str) and details.strip():
-            return details.strip()
+        if isinstance(details, Mapping):
+            evidence_basis = details.get("basis")
+            if isinstance(evidence_basis, str) and evidence_basis.strip():
+                return evidence_basis.strip()
     for key in (f"{feature}_basis", "turnover_basis" if feature == "turnover_24h" else ""):
-        if key and row.get(key) not in (None, ""):
-            return str(row[key])
+        basis = row.get(key) if key else None
+        if isinstance(basis, str) and basis.strip():
+            return basis.strip()
     return default
 
 
