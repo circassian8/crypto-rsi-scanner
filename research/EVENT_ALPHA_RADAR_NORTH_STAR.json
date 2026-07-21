@@ -435,7 +435,7 @@
       "sports_fixtures"
     ]
   },
-  "generated_at": "2026-07-21T14:56:51.033347+00:00",
+  "generated_at": "2026-07-21T16:09:08.617247+00:00",
   "human_labeling": {
     "labels_answer": [
       "usefulness",
@@ -1210,9 +1210,15 @@
       "eth:ethereum_or_eth"
     ],
     "campaign_audit_causal_digest": "prior_projection_values_stable_when_only_later_rows_are_appended",
+    "campaign_audit_effective_sample_size_claimed": false,
     "campaign_audit_historical_rows_rewritten": false,
     "campaign_audit_input": "one_read_exact_campaign_history_snapshot",
     "campaign_audit_invalid_or_duplicate_rows": "rejected_with_closed_reason_counts",
+    "campaign_audit_legacy_schema_versions_readable": [
+      1,
+      2
+    ],
+    "campaign_audit_minimum_distinct_baseline_value_count": null,
     "campaign_audit_non_counted_rows": "excluded_with_exact_count",
     "campaign_audit_overlapping_samples_are_independent": false,
     "campaign_audit_protocol_v2_evidence_eligible": false,
@@ -1222,10 +1228,15 @@
     "campaign_audit_ready_semantics": "every_modeled_feature_has_some_ready_evidence_not_every_projection_ready",
     "campaign_audit_replay": "each_counted_row_against_strictly_earlier_same_asset_rows_and_at_or_before_benchmarks",
     "campaign_audit_schema_id": "decision_radar.shadow_temporal_surprise_campaign_audit",
-    "campaign_audit_schema_version": 2,
+    "campaign_audit_schema_version": 3,
     "campaign_audit_source_bound_digest": "changes_when_exact_history_snapshot_fingerprint_changes",
     "campaign_audit_statistical_independence_claimed": false,
     "campaign_audit_tail_ranks_are_p_values": false,
+    "campaign_audit_variation_diagnostics_are_policy": false,
+    "campaign_audit_variation_distributions": "per_feature_distinct_count_distinct_ratio_and_maximum_tie_ratio",
+    "campaign_audit_variation_extreme_references": "exact_least_distinct_and_highest_tie_ratio_observation_identity",
+    "campaign_audit_variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+    "campaign_audit_variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values",
     "campaign_audit_writes": 0,
     "canonical_history_or_provider_source_mutated": false,
     "copied_to_decision_projection": false,

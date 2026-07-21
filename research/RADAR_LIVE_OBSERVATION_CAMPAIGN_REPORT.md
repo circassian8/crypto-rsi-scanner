@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T15:43:10.354285+00:00` from local artifacts only.
+Generated at `2026-07-21T16:09:39.106363+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -279,6 +279,22 @@ This is a read-only replay of the shadow model over retained, cadence-counted ob
 | return_4h | direct_return | 641 / 1740 | current_unavailable=826, degenerate_scale=14, insufficient_history=259, ready=641 | 0–30 | -2.986298 / 0.122629 / 3.055891 | two_sided | 0.066667 / 0.48 / 1 | near @ 2026-07-21T14:14:01.079240+00:00 |
 | turnover_24h | activity | 1461 / 1740 | degenerate_scale=8, insufficient_history=271, ready=1461 | 0–57 | -2.540559 / -0.229039 / 1.610835 | upper | 0.017241 / 0.583333 / 1 | cardano @ 2026-07-21T15:14:41.396928+00:00 |
 | volume_24h | activity | 1454 / 1740 | degenerate_scale=15, insufficient_history=271, ready=1454 | 0–57 | -2.414098 / -0.255921 / 1.67864 | upper | 0.017241 / 0.587221 / 1 | cardano @ 2026-07-21T15:14:41.396928+00:00 |
+
+Reference-set variation below is calculated only for projections meeting the model's existing nominal sample minimum. It is not an effective-sample-size estimate and applies no distinctness threshold.
+
+| Feature | Variation rows / evaluated | Distinct count min / median / max | Distinct ratio min / median / p95 | Largest-tie ratio median / p95 / max | Least-diverse reference set |
+|---|---:|---:|---:|---:|---|
+| relative_return_vs_btc_1h | 1004 / 1740 | 8 / 17 / 32 | 1 / 1 / 1 | 0.058824 / 0.111111 / 0.125 | aave @ 2026-07-18T23:44:46.248720+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_btc_24h | 748 / 1740 | 8 / 21 / 35 | 1 / 1 / 1 | 0.047619 / 0.111111 / 0.125 | aave @ 2026-07-19T09:53:48.732731+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_btc_4h | 969 / 1740 | 8 / 19 / 30 | 1 / 1 / 1 | 0.052632 / 0.111111 / 0.125 | aave @ 2026-07-19T00:45:08.517863+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_eth_1h | 1004 / 1740 | 8 / 17 / 32 | 1 / 1 / 1 | 0.058824 / 0.111111 / 0.125 | aave @ 2026-07-18T23:44:46.248720+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_eth_24h | 748 / 1740 | 8 / 21 / 35 | 1 / 1 / 1 | 0.047619 / 0.111111 / 0.125 | aave @ 2026-07-19T09:53:48.732731+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_eth_4h | 969 / 1740 | 8 / 19 / 30 | 1 / 1 / 1 | 0.052632 / 0.111111 / 0.125 | aave @ 2026-07-19T00:45:08.517863+00:00; 8/8 distinct; largest tie 1/8 |
+| return_1h | 1040 / 1740 | 2 / 16 / 32 | 0.157895 / 1 / 1 | 0.066667 / 0.6 / 0.894737 | figure-heloc @ 2026-07-20T11:34:12.287768+00:00; 3/19 distinct; largest tie 17/19 |
+| return_24h | 776 / 1740 | 1 / 20 / 35 | 0.111111 / 1 / 1 | 0.058824 / 0.25 / 1 | figure-heloc @ 2026-07-19T20:41:53.503177+00:00; 1/9 distinct; largest tie 9/9 |
+| return_4h | 1004 / 1740 | 4 / 18 / 30 | 0.227273 / 1 / 1 | 0.058824 / 0.272727 / 0.772727 | figure-heloc @ 2026-07-20T12:34:56.205337+00:00; 5/22 distinct; largest tie 17/22 |
+| turnover_24h | 1469 / 1740 | 1 / 30 / 57 | 0.125 / 1 / 1 | 0.033333 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
+| volume_24h | 1469 / 1740 | 1 / 30 / 57 | 0.125 / 1 / 1 | 0.033333 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
 
 ### Decision episodes
 

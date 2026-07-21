@@ -2,28 +2,28 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-21T14:11:12.437444+00:00`
+- generated_at: `2026-07-21T16:13:03.725058+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
 - baseline_present: `true`
-- files_over_limit_count: `12`
+- files_over_limit_count: `14`
 - v3_gate_status: `pass`
 - v3_auto_accept_ready: `True`
 - v3_blockers: `[]`
-- production_files_over_1200_lines: `35`
+- production_files_over_1200_lines: `40`
 - accepted_production_files_over_1200_lines: `25`
-- unresolved_production_files_over_1200_lines: `10`
+- unresolved_production_files_over_1200_lines: `15`
 - production_size_gate_status: `advisory`
-- production_files_over_1500_lines: `5`
+- production_files_over_1500_lines: `7`
 - production_files_over_2000_lines: `0`
 - production_files_over_3000_lines: `0`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `18`
+- production_functions_over_limit: `24`
 - test_size_gate_status: `advisory`
 - test_files_over_1500_lines: `7`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `18`
+- functions_over_limit_count: `24`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - modules_with_multiple_public_classes_count: `0`
@@ -31,7 +31,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - multi_public_class_modules_count: `84`
 - accepted_model_bundles_count: `83`
 - unresolved_multi_class_modules_count: `0`
-- new_violation_count: `30`
+- new_violation_count: `38`
 - moved_existing_violation_count: `0`
 - api_decomposition_gate_status: `advisory`
 - api_files_over_1500_lines: `0`
@@ -54,9 +54,11 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | category | id | lines/count |
 |---|---|---:|
+| `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py` | 1501 |
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1888 |
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py` | 1584 |
-| `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1684 |
+| `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1704 |
+| `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py` | 1690 |
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1638 |
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1893 |
 | `file_over_1500_lines` | `file:tests/cli/test_make_targets.py` | 1570 |
@@ -64,10 +66,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:tests/event_alpha/test_decision_model_v2.py` | 2173 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_impact_hypotheses.py` | 1588 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_history.py` | 1527 |
-| `file_over_1500_lines` | `file:tests/event_alpha/test_market_observation_campaign.py` | 1644 |
+| `file_over_1500_lines` | `file:tests/event_alpha/test_market_observation_campaign.py` | 1769 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_surfaces.py` | 1984 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/decision_model.py:_validate_closed_projection` | 189 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py:_validate_return_feature_consistency` | 183 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py:_project_shadow_surprise_feature` | 161 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_cost_residual.py:model_bybit_residual_execution_cost_sensitivity_scenario` | 195 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_fee.py:model_bybit_visible_book_taker_fee_scenario` | 166 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_funding.py:model_bybit_funding_settlement_scenario` | 169 |
@@ -79,8 +82,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness` | 168 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:_impact_cost_lines` | 246 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py:point_in_time_control_market_regime` | 170 |
-| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py:build_campaign_report` | 160 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py:build_campaign_report` | 165 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_regime_audit.py:build_control_regime_generation_audit` | 209 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_regime_audit.py:validate_control_regime_generation_audit` | 158 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py:format_campaign_report` | 154 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py:_shadow_surprise_audit_section` | 152 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:build_campaign_shadow_surprise_audit` | 193 |
+| `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py:_feature_coverage` | 195 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/market_state.py:snapshot_from_market_row` | 175 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_hypothesis_latest_score_components` | 153 |
 | `function_over_150_lines` | `function:crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py:_entry_from_row` | 160 |
@@ -95,11 +103,11 @@ Static source inventory only. This report does not call providers, send Telegram
 | `public_compatibility_shims` | 0 | informational |
 | `shim_removal_blockers` | 0 | blocker |
 | `deleted_shims` | 124 | informational |
-| `production_files_over_1200_lines` | 35 | advisory |
-| `production_files_over_1500_lines` | 5 | advisory |
+| `production_files_over_1200_lines` | 40 | advisory |
+| `production_files_over_1500_lines` | 7 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 18 | advisory |
+| `functions_over_150_lines` | 24 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -119,12 +127,15 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1893 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1888 |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1684 |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1704 |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py` | 1690 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1638 |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py` | 1584 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py` | 1501 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 |
+| `crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py` | 1470 |
 | `crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py` | 1466 |
 | `crypto_rsi_scanner/config.py` | 1450 |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 |
@@ -136,6 +147,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/notifications/router.py` | 1387 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1385 |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1375 |
+| `crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py` | 1374 |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 |
 | `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1333 |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1313 |
@@ -144,6 +156,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/cli/parser_event_alpha/event_alpha_args.py` | 1285 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1283 |
 | `crypto_rsi_scanner/event_alpha/radar/derivatives_crowding.py` | 1278 |
+| `crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py` | 1277 |
 | `crypto_rsi_scanner/event_alpha/dashboard/calendar_page.py` | 1264 |
 | `crypto_rsi_scanner/event_alpha/shims.py` | 1263 |
 | `crypto_rsi_scanner/event_alpha/notifications/pipeline_parts/plan_builder.py` | 1261 |
@@ -152,18 +165,13 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_fade.py` | 1232 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1222 |
 | `crypto_rsi_scanner/event_alpha/dashboard/render.py` | 1204 |
-| `crypto_rsi_scanner/event_alpha/dashboard/loader.py` | 1200 |
-| `crypto_rsi_scanner/event_alpha/dashboard/public_access.py` | 1200 |
-| `crypto_rsi_scanner/event_alpha/radar/integrated/pipeline_parts/cycle.py` | 1200 |
-| `crypto_rsi_scanner/cli/services/event_alpha_notifications/preview.py` | 1199 |
-| `crypto_rsi_scanner/event_alpha/dashboard/research_lab_page.py` | 1199 |
 
 ## Accepted Production Files Over 1200 Lines
 
 | path | lines | reason | revisit |
 |---|---:|---|---|
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1893 | Pure temporal baseline evaluator keeps cadence, return anchors, and feature evidence in one closed calculation path. | When adding another baseline family or changing the observation-spacing contract. |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1684 | Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity. | When the campaign report schema changes or another campaign family needs the same aggregation primitives. |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1704 | Canonical campaign aggregation reconciles attempts, generations, outcomes, publication receipts, and current authority without provider activity. | When the campaign report schema changes or another campaign family needs the same aggregation primitives. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_controls.py` | 1498 | Pure outcome-blind control, benchmark, and missed-move selection freezes point-in-time eligibility before joining future outcomes. | Revisit when another control or benchmark family creates a cohesive boundary, with selection-digest parity tests in place. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | Pure partition-bounded episode and path outcome calculation keeps fixed-start grouping, horizons, expiry, and benchmark alignment under one frozen protocol. | Revisit when intraday outcomes, another horizon family, or a schema revision creates a cohesive new boundary. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | Daily Operations is the single fail-closed transaction boundary for readiness, generation, doctor, publication, restart, rollback, and terminal receipts. | Revisit before another scheduler shares the transaction phases or cohesion becomes unclear. |
@@ -193,12 +201,17 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1888 |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py` | 1690 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1638 |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py` | 1584 |
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py` | 1501 |
+| `crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py` | 1470 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model_surfaces.py` | 1449 |
 | `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1402 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1385 |
+| `crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py` | 1374 |
 | `crypto_rsi_scanner/project_health/radar_north_star.py` | 1283 |
+| `crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py` | 1277 |
 | `crypto_rsi_scanner/event_alpha/radar/decision_policy.py` | 1244 |
 | `crypto_rsi_scanner/event_fade.py` | 1232 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality_capture.py` | 1222 |
@@ -209,7 +222,7 @@ Static source inventory only. This report does not call providers, send Telegram
 |---|---:|
 | `tests/event_alpha/test_decision_model_v2.py` | 2173 |
 | `tests/event_alpha/test_market_surfaces.py` | 1984 |
-| `tests/event_alpha/test_market_observation_campaign.py` | 1644 |
+| `tests/event_alpha/test_market_observation_campaign.py` | 1769 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 1588 |
 | `tests/cli/test_make_targets.py` | 1570 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1549 |
@@ -224,6 +237,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_core_opportunities.py` | 1431 |
 | `tests/event_alpha/test_namespace_integrations.py` | 1422 |
 | `tests/event_alpha/test_evidence_acquisition.py` | 1405 |
+| `tests/event_alpha/test_market_shadow_surprise.py` | 1394 |
 | `tests/event_alpha/test_bybit_liquidation_capture.py` | 1369 |
 | `tests/event_alpha/test_watchlist_router.py` | 1361 |
 | `tests/event_alpha/test_fade_review_workflows.py` | 1319 |
@@ -231,7 +245,6 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_burn_in_outcomes.py` | 1289 |
 | `tests/event_alpha/test_catalyst_search.py` | 1270 |
 | `tests/event_alpha/test_tokenomist_v5_capture.py` | 1247 |
-| `tests/event_alpha/test_market_shadow_surprise.py` | 1242 |
 | `tests/event_alpha/test_daily_operations.py` | 1230 |
 | `tests/event_alpha/test_news_providers.py` | 1210 |
 | `tests/event_alpha/test_doctor_provider_conflicts.py` | 1206 |
@@ -252,9 +265,11 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | path | lines |
 |---|---:|
+| `crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py` | 1501 |
 | `crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py` | 1888 |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py` | 1584 |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1684 |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py` | 1704 |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_shadow_surprise.py` | 1690 |
 | `crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py` | 1638 |
 | `crypto_rsi_scanner/event_alpha/radar/market_history.py` | 1893 |
 | `tests/cli/test_make_targets.py` | 1570 |
@@ -262,7 +277,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `tests/event_alpha/test_decision_model_v2.py` | 2173 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 1588 |
 | `tests/event_alpha/test_market_history.py` | 1527 |
-| `tests/event_alpha/test_market_observation_campaign.py` | 1644 |
+| `tests/event_alpha/test_market_observation_campaign.py` | 1769 |
 | `tests/event_alpha/test_market_surfaces.py` | 1984 |
 
 ## Existing Violations

@@ -32,6 +32,14 @@
     "baseline_variation_diagnostics": "rounded_value_distinct_counts_tie_concentration_current_ties_and_nominal_rank_floors",
     "minimum_distinct_baseline_value_count": null,
     "variation_diagnostics_are_policy": false,
+    "campaign_audit_schema_version": 3,
+    "legacy_campaign_audit_schema_versions_readable": [
+      1,
+      2
+    ],
+    "campaign_variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+    "campaign_variation_distributions": "distinct_count_distinct_ratio_and_maximum_tie_ratio_with_exact_extremes",
+    "campaign_variation_effective_sample_size_claimed": false,
     "existing_shadow_policy_eligible": false,
     "independent_live_samples_established": false
   },

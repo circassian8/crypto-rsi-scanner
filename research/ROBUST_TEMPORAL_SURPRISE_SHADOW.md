@@ -157,6 +157,20 @@ evaluation accounting, and two complementary digests:
 - the causal-value digest removes only that whole-snapshot hash, so an older
   projection remains byte-comparable when later observations are appended.
 
+Campaign-audit schema v3 also aggregates the closed per-observation variation
+diagnostics for each feature. Its distribution population includes projections
+whose baseline count meets the model's existing nominal sample minimum,
+including degenerate-scale projections; it excludes earlier warm-up rows so a
+one-sample reference set cannot dominate the tie-share maximum. The audit
+reports distinct-count, distinct-ratio, and largest-tie-ratio distributions,
+plus exact observation identities and counts for the least-diverse and
+highest-tie-share reference sets. Historical campaign-audit schemas v1 and v2
+remain readable without manufacturing fields they never recorded.
+
+These aggregates are reference-set diagnostics, not an effective-sample-size
+estimate. They set no minimum-distinct threshold, do not alter feature status,
+and are copied into the campaign report and dashboard without re-evaluation.
+
 An audit status of `ready` means each modeled feature has at least one ready
 projection. It does not claim that every observation is ready, that rolling
 rows are independent, or that the values qualify as Protocol-v2 evidence. The

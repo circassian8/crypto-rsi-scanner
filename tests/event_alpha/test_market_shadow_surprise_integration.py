@@ -471,7 +471,7 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert audit["schema_id"] == (
         "decision_radar.shadow_temporal_surprise_campaign_audit"
     )
-    assert audit["schema_version"] == 2
+    assert audit["schema_version"] == 3
     assert audit["shadow_schema_version"] == 3
     assert audit["input_row_count"] == 31
     assert audit["excluded_not_baseline_counted_count"] == 1
@@ -495,6 +495,38 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert volume_distribution["descriptive_tail_rank_kind"] == "upper"
     assert volume_distribution["tail_ranks_are_p_values"] is False
     assert volume_distribution["overlapping_samples_are_independent"] is False
+    assert volume_distribution["variation_observation_basis"] == (
+        "closed_shadow_v3_projection_meeting_existing_minimum_sample_count"
+    )
+    assert volume_distribution["variation_observation_count"] > 0
+    assert volume_distribution["minimum_distinct_baseline_value_count"] is None
+    assert volume_distribution["variation_diagnostics_are_policy"] is False
+    assert volume_distribution["effective_sample_size_claimed"] is False
+    assert 0.0 < volume_distribution[
+        "distinct_baseline_value_ratio_minimum"
+    ] <= volume_distribution[
+        "distinct_baseline_value_ratio_median"
+    ] <= volume_distribution[
+        "distinct_baseline_value_ratio_p95"
+    ] <= volume_distribution[
+        "distinct_baseline_value_ratio_maximum"
+    ] <= 1.0
+    assert 0.0 < volume_distribution[
+        "maximum_baseline_value_tie_ratio_minimum"
+    ] <= volume_distribution[
+        "maximum_baseline_value_tie_ratio_median"
+    ] <= volume_distribution[
+        "maximum_baseline_value_tie_ratio_p95"
+    ] <= volume_distribution[
+        "maximum_baseline_value_tie_ratio_maximum"
+    ] <= 1.0
+    minimum_distinct = volume_distribution[
+        "minimum_distinct_baseline_value_ratio_observation"
+    ]
+    assert minimum_distinct["distinct_baseline_value_ratio"] == (
+        volume_distribution["distinct_baseline_value_ratio_minimum"]
+    )
+    assert minimum_distinct["sample_count"] >= 4
     assert volume_distribution["robust_z_minimum"] <= (
         volume_distribution["robust_z_p05"]
     ) <= volume_distribution["robust_z_median"] <= (
@@ -514,6 +546,13 @@ def test_campaign_shadow_replay_accounts_for_exact_history_without_policy_effect
     assert return_distribution["descriptive_tail_rank_kind"] == "two_sided"
     unavailable_distribution = audit["feature_coverage"]["return_24h"]
     assert unavailable_distribution["distribution_ready_count"] == 0
+    assert unavailable_distribution["variation_observation_count"] == 0
+    assert unavailable_distribution[
+        "distinct_baseline_value_ratio_median"
+    ] is None
+    assert unavailable_distribution[
+        "minimum_distinct_baseline_value_ratio_observation"
+    ] is None
     assert unavailable_distribution["robust_z_median"] is None
     assert unavailable_distribution[
         "minimum_descriptive_tail_rank_observation"
@@ -655,3 +694,76 @@ def test_campaign_shadow_replay_validator_rejects_distribution_drift():
         "feature_coverage_volume_24h_tail_rank_p_value_claim_invalid"
         in errors
     )
+
+
+def test_campaign_shadow_replay_validator_rejects_variation_drift():
+    audit = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(_history_rows(_current_market_row())),
+            minimum_sample_count=4,
+        )
+    )
+    tampered = deepcopy(audit)
+    volume = tampered["feature_coverage"]["volume_24h"]
+    volume["distinct_baseline_value_ratio_p05"] = 1.1
+    volume["variation_diagnostics_are_policy"] = True
+    volume["minimum_distinct_baseline_value_ratio_observation"][
+        "distinct_baseline_value_count"
+    ] += 1
+
+    errors = (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(tampered)
+    )
+
+    assert (
+        "feature_coverage_volume_24h_distinct_ratio_distribution_invalid"
+        in errors
+    )
+    assert (
+        "feature_coverage_volume_24h_variation_policy_claim_invalid"
+        in errors
+    )
+    assert (
+        "feature_coverage_volume_24h_minimum_distinct_ratio_reference_invalid"
+        in errors
+    )
+
+
+def test_campaign_shadow_replay_keeps_v1_and_v2_audits_readable():
+    current = (
+        market_observation_campaign_shadow_surprise
+        .build_campaign_shadow_surprise_audit(
+            _campaign_history_snapshot(_history_rows(_current_market_row())),
+            minimum_sample_count=4,
+        )
+    )
+    legacy_v2 = deepcopy(current)
+    legacy_v2["schema_version"] = 2
+    for coverage in legacy_v2["feature_coverage"].values():
+        for key in tuple(coverage):
+            if key not in (
+                market_observation_campaign_shadow_surprise
+                ._FEATURE_COVERAGE_KEYS_V2  # noqa: SLF001
+            ):
+                coverage.pop(key)
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(legacy_v2)
+    ) == []
+
+    legacy_v1 = deepcopy(legacy_v2)
+    legacy_v1["schema_version"] = 1
+    legacy_v1["shadow_schema_version"] = 2
+    for coverage in legacy_v1["feature_coverage"].values():
+        for key in tuple(coverage):
+            if key not in (
+                market_observation_campaign_shadow_surprise
+                ._FEATURE_COVERAGE_KEYS_V1  # noqa: SLF001
+            ):
+                coverage.pop(key)
+    assert (
+        market_observation_campaign_shadow_surprise
+        .validate_campaign_shadow_surprise_audit(legacy_v1)
+    ) == []

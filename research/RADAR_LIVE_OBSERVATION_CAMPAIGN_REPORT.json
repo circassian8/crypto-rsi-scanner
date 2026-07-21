@@ -10623,7 +10623,7 @@
     "calibration_eligible": false,
     "candidate_input_digest": "23b251f3a0fcf903c044da20c42fd414baf258b481cc3c39f0632cb6306c1828",
     "candidate_rows_supplied": 11,
-    "contract_digest": "e82bcf0586e9bd36503824e0e1c697e4a5920e2c02dfd9a1518f67564d47b147",
+    "contract_digest": "b8314135df65aff37ff86142f2c9e7f2f5a7d0326e86138d0ebba84cb74bf871",
     "contract_exclusion_reason_counts": {},
     "core_input_digest": "0d98fea8bce2ba31a8f22e05580e51091581abc621c3802d95952754b2860247",
     "core_rows_supplied": 11,
@@ -10638,7 +10638,7 @@
       "not_evaluated": 1,
       "opposed": 2
     },
-    "evaluated_at": "2026-07-21T15:43:10.354285+00:00",
+    "evaluated_at": "2026-07-21T16:09:39.106363+00:00",
     "exclusive_cohorts": {
       "actionability_score_cohort": [
         {
@@ -11027,7 +11027,7 @@
         }
       ]
     },
-    "input_binding_digest": "d3af5e444529d1b35df7ddf8dbcb929e06e7358056782c72fd38ae45ec8e5cec",
+    "input_binding_digest": "8d6915f58d072bb09d41fef4df00a2d55f26f0c028f9439e3e04fecd10e7b463",
     "matched_control_available": false,
     "matured_episode_count": 3,
     "method": "frozen_primary_episode_representative_outcome_scorecard",
@@ -11724,7 +11724,7 @@
         "source_role": "outcome"
       }
     ],
-    "source_episode_contract_digest": "e7216460be7e9b391ba7ff8b65dce2a052a61a726afee08ace42a91b5faf0cd7",
+    "source_episode_contract_digest": "576695c234cdc55899f50355e312543d4093166b97bdfca270c237d271a8b613",
     "source_episode_input_binding_digest": "9f978ebcbc94d560bf78f46319deca091b125b61c44bdf42bbd437f00e0f99b0",
     "source_episode_schema_id": "event_alpha.shadow_anomaly_episodes",
     "source_episode_schema_version": 1,
@@ -11735,7 +11735,7 @@
     "writes": 0
   },
   "excluded_invalid_generations": [],
-  "generated_at": "2026-07-21T15:43:10.354285+00:00",
+  "generated_at": "2026-07-21T16:09:39.106363+00:00",
   "generation_validation": {
     "excluded_generation_count": 0,
     "exclusion_reason_counts": {},
@@ -11752,7 +11752,7 @@
     "eligible_idea_count": 9,
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
-    "generated_at": "2026-07-21T15:43:10.354285+00:00",
+    "generated_at": "2026-07-21T16:09:39.106363+00:00",
     "in_review_count": 0,
     "not_viewed_count": 9,
     "operator_action_commands_available_via_queue": true,
@@ -11904,7 +11904,7 @@
     "events_after_evaluated_at_count": 0,
     "events_in_window_count": 0,
     "first_view_record_count": 0,
-    "generated_at": "2026-07-21T15:43:10.354285+00:00",
+    "generated_at": "2026-07-21T16:09:39.106363+00:00",
     "human_action_definition": "explicit confirmed command only; dashboard requests and health probes do not count",
     "idea_available_at_definition": "exact owned-dashboard operations receipt recorded_at; conservative provable availability, never inferred from GET or HEAD",
     "idea_record_count": 0,
@@ -12460,7 +12460,7 @@
   },
   "pointer": {
     "artifact_namespace": "radar_market_no_send_20260721t151439069082z_4566a576574c",
-    "authority_checked_at": "2026-07-21T15:43:10.354285+00:00",
+    "authority_checked_at": "2026-07-21T16:09:39.106363+00:00",
     "exact_operator_binding": true,
     "generation_authority_status": "authoritative",
     "readiness_error": null,
@@ -12913,7 +12913,7 @@
   ],
   "protocol_v2_episode_coverage_frontier": {
     "canonical_category_coverage_complete": false,
-    "contract_digest": "2ba43782c7dc7370d9b90067e24a66fd06c1b54227da4a49f8deadbcc64793d5",
+    "contract_digest": "d9ab731a45c1332d0448c26cacea6257649e74a0a8eb134ba75ce467cd019a54",
     "cross_asset_independence_claim": false,
     "episode_count": 4,
     "episode_independence_status": "fixed_start_declustered_not_statistically_independent",
@@ -13104,9 +13104,9 @@
     "schema_id": "decision_radar.protocol_v2_episode_coverage_frontier",
     "schema_version": 1,
     "score_changes": 0,
-    "source_scorecard_contract_digest": "e82bcf0586e9bd36503824e0e1c697e4a5920e2c02dfd9a1518f67564d47b147",
-    "source_scorecard_evaluated_at": "2026-07-21T15:43:10.354285+00:00",
-    "source_scorecard_input_binding_digest": "d3af5e444529d1b35df7ddf8dbcb929e06e7358056782c72fd38ae45ec8e5cec",
+    "source_scorecard_contract_digest": "b8314135df65aff37ff86142f2c9e7f2f5a7d0326e86138d0ebba84cb74bf871",
+    "source_scorecard_evaluated_at": "2026-07-21T16:09:39.106363+00:00",
+    "source_scorecard_input_binding_digest": "8d6915f58d072bb09d41fef4df00a2d55f26f0c028f9439e3e04fecd10e7b463",
     "source_scorecard_schema_id": "event_alpha.decision_v2_episode_outcome_scorecard",
     "source_scorecard_schema_version": 1,
     "statistical_independence_claim": false,
@@ -13334,7 +13334,7 @@
   "schema_version": "decision_radar_live_observation_campaign_report_v2",
   "shadow_anomaly_episode_input_audit": {
     "ambiguous_outcome_join_count": 0,
-    "audit_digest": "7d44405c146f9c831319739274d861f174af32de0c8dc52c521fc2f3246eaf80",
+    "audit_digest": "33d192069ab1d33cb4b4f7fc83353902600607a5d43c37d608f1a7cc04214efa",
     "authority_changes": 0,
     "auto_apply": false,
     "calibration_changes": 0,
@@ -13889,7 +13889,7 @@
     "duplicate_candidate_row_count": 0,
     "duplicate_outcome_identity_group_count": 0,
     "duplicate_outcome_row_count": 0,
-    "episode_contract_digest": "e7216460be7e9b391ba7ff8b65dce2a052a61a726afee08ace42a91b5faf0cd7",
+    "episode_contract_digest": "576695c234cdc55899f50355e312543d4093166b97bdfca270c237d271a8b613",
     "episode_input_binding_digest": "9f978ebcbc94d560bf78f46319deca091b125b61c44bdf42bbd437f00e0f99b0",
     "episode_records_supplied": 11,
     "exact_outcome_join_count": 11,
@@ -13930,7 +13930,7 @@
     "auto_apply": false,
     "boundary_rule": "member_observed_at_lt_episode_start_plus_window",
     "calibration_eligible": false,
-    "contract_digest": "e7216460be7e9b391ba7ff8b65dce2a052a61a726afee08ace42a91b5faf0cd7",
+    "contract_digest": "576695c234cdc55899f50355e312543d4093166b97bdfca270c237d271a8b613",
     "cross_asset_independence_claim": false,
     "decision_score_eligible": false,
     "episodes": [
@@ -14313,7 +14313,7 @@
         "window_end_exclusive_at": "2026-07-22T09:05:58.044865+00:00"
       }
     ],
-    "evaluated_at": "2026-07-21T15:43:10.354285+00:00",
+    "evaluated_at": "2026-07-21T16:09:39.106363+00:00",
     "exclusion_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "exclusion_reason_counts": {},
     "exclusion_ref_count": 0,
@@ -15207,7 +15207,16 @@
         "descriptive_tail_rank_minimum": 0.060606060606,
         "descriptive_tail_rank_p05": 0.083333333333,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 32.0,
+        "distinct_baseline_value_count_median": 17.0,
+        "distinct_baseline_value_count_minimum": 8.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 1.0,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 697,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "relative_return_btc",
         "feature": "relative_return_vs_btc_1h",
@@ -15219,6 +15228,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 1,
+        "maximum_baseline_value_tie_ratio_maximum": 0.125,
+        "maximum_baseline_value_tie_ratio_median": 0.058823529412,
+        "maximum_baseline_value_tie_ratio_minimum": 0.03125,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-c5b67104f7cc930c51b52b15",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "avalanche-2",
           "observation_id": "mhobs-bf036726c910db9ff4ea0a75",
@@ -15235,6 +15260,17 @@
           "observation_id": "mhobs-6569f2690065432d6b0bc8a2",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-c5b67104f7cc930c51b52b15",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "dexe",
@@ -15243,7 +15279,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "e9396bb7599f92369a41de9412dc6d215af70c611f34fd42a993d99ef0574ebe",
+        "projection_digest": "0613c27ec853bffa8f292c185420aeb29de5db914d8dc6a1607cf59510849af2",
         "ready_count": 697,
         "robust_z_maximum": 18.971386360139,
         "robust_z_median": 0.106595025587,
@@ -15256,7 +15292,11 @@
           "not_applicable": 58,
           "ready": 697
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 1004,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "relative_return_vs_btc_24h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15266,7 +15306,16 @@
         "descriptive_tail_rank_minimum": 0.055555555556,
         "descriptive_tail_rank_p05": 0.070812807882,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 35.0,
+        "distinct_baseline_value_count_median": 21.0,
+        "distinct_baseline_value_count_minimum": 8.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 1.0,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 736,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "relative_return_btc",
         "feature": "relative_return_vs_btc_24h",
@@ -15278,6 +15327,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 1,
+        "maximum_baseline_value_tie_ratio_maximum": 0.125,
+        "maximum_baseline_value_tie_ratio_median": 0.047619047619,
+        "maximum_baseline_value_tie_ratio_minimum": 0.028571428571,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-580343553022a0d11ba7b045",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.029411764706,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "bitcoin-cash",
           "observation_id": "mhobs-deb920bfd1fcfbaa4ebb964c",
@@ -15294,6 +15359,17 @@
           "observation_id": "mhobs-6569f2690065432d6b0bc8a2",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-580343553022a0d11ba7b045",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "worldcoin-wld",
@@ -15302,7 +15378,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "46c9577cccae4e340044eb7221a34fe4fddf2e8f1b1c14ad78401e1586a0c7e9",
+        "projection_digest": "9a9c4473abba169fed7069a24ddcaafea629716d8d9cac2298a62ffd4049edf1",
         "ready_count": 736,
         "robust_z_maximum": 11.74679497791,
         "robust_z_median": 0.085974026244,
@@ -15315,7 +15391,11 @@
           "not_applicable": 58,
           "ready": 736
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 748,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "relative_return_vs_btc_4h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15325,7 +15405,16 @@
         "descriptive_tail_rank_minimum": 0.064516129032,
         "descriptive_tail_rank_p05": 0.078615384615,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 30.0,
+        "distinct_baseline_value_count_median": 19.0,
+        "distinct_baseline_value_count_minimum": 8.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 1.0,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 632,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "relative_return_btc",
         "feature": "relative_return_vs_btc_4h",
@@ -15337,6 +15426,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 1,
+        "maximum_baseline_value_tie_ratio_maximum": 0.125,
+        "maximum_baseline_value_tie_ratio_median": 0.052631578947,
+        "maximum_baseline_value_tie_ratio_minimum": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-bb8dca9579ce78cd4fcf848c",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.034482758621,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "aave",
           "observation_id": "mhobs-bb8dca9579ce78cd4fcf848c",
@@ -15353,6 +15458,17 @@
           "observation_id": "mhobs-7afbcf830ec41c0d28b064f7",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-bb8dca9579ce78cd4fcf848c",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "bitcoin-cash",
@@ -15361,7 +15477,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "75937c3957b13d8e5a8103615717956792cfd7e7e7294b87aefa084b4c6d5f00",
+        "projection_digest": "2ac5b8df1cd1028def91d3afe8fdadf520f4f1f0df21600c201f6f2892ef47c3",
         "ready_count": 632,
         "robust_z_maximum": 22.645564585383,
         "robust_z_median": 0.125068523016,
@@ -15374,7 +15490,11 @@
           "not_applicable": 58,
           "ready": 632
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 969,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "relative_return_vs_eth_1h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15384,7 +15504,16 @@
         "descriptive_tail_rank_minimum": 0.060606060606,
         "descriptive_tail_rank_p05": 0.090118577075,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 32.0,
+        "distinct_baseline_value_count_median": 17.0,
+        "distinct_baseline_value_count_minimum": 8.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 1.0,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 697,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "relative_return_eth",
         "feature": "relative_return_vs_eth_1h",
@@ -15396,6 +15525,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 1,
+        "maximum_baseline_value_tie_ratio_maximum": 0.125,
+        "maximum_baseline_value_tie_ratio_median": 0.058823529412,
+        "maximum_baseline_value_tie_ratio_minimum": 0.03125,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-c5b67104f7cc930c51b52b15",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "bitcoin",
           "observation_id": "mhobs-0ab0f70670fa8feb22d5b061",
@@ -15412,6 +15557,17 @@
           "observation_id": "mhobs-6569f2690065432d6b0bc8a2",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-c5b67104f7cc930c51b52b15",
+          "observed_at": "2026-07-18T23:44:46.248720+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "dexe",
@@ -15420,7 +15576,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "b79b38e2b7167d5f5daf5b690427480af74f7101176e1f95cbca8ccdd381fcfa",
+        "projection_digest": "64ae7ccc67d0ddc672a86773a34bf3a7411d0b64a94632d561eaa0e088979f0f",
         "ready_count": 697,
         "robust_z_maximum": 19.753644568497,
         "robust_z_median": 0.009120235007,
@@ -15433,7 +15589,11 @@
           "not_applicable": 58,
           "ready": 697
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 1004,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "relative_return_vs_eth_24h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15443,7 +15603,16 @@
         "descriptive_tail_rank_minimum": 0.055555555556,
         "descriptive_tail_rank_p05": 0.089920948616,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 35.0,
+        "distinct_baseline_value_count_median": 21.0,
+        "distinct_baseline_value_count_minimum": 8.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 1.0,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 736,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "relative_return_eth",
         "feature": "relative_return_vs_eth_24h",
@@ -15455,6 +15624,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 1,
+        "maximum_baseline_value_tie_ratio_maximum": 0.125,
+        "maximum_baseline_value_tie_ratio_median": 0.047619047619,
+        "maximum_baseline_value_tie_ratio_minimum": 0.028571428571,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-580343553022a0d11ba7b045",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.029411764706,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "binancecoin",
           "observation_id": "mhobs-5f762a78a681b56af87ef70a",
@@ -15471,6 +15656,17 @@
           "observation_id": "mhobs-6569f2690065432d6b0bc8a2",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-580343553022a0d11ba7b045",
+          "observed_at": "2026-07-19T09:53:48.732731+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "figure-heloc",
@@ -15479,7 +15675,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "0335430adaff116c4697d8e5c2248e6cc8a3e853cfdf8e24ba8d76ceb0a331e2",
+        "projection_digest": "63900d1c52fda576fc9b6362ef5c9785adb72f1e8742f7bc3c0e1b4cf166b55a",
         "ready_count": 736,
         "robust_z_maximum": 10.333013000364,
         "robust_z_median": 0.219933512741,
@@ -15492,7 +15688,11 @@
           "not_applicable": 58,
           "ready": 736
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 748,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "relative_return_vs_eth_4h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15502,7 +15702,16 @@
         "descriptive_tail_rank_minimum": 0.064516129032,
         "descriptive_tail_rank_p05": 0.085326086956,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 30.0,
+        "distinct_baseline_value_count_median": 19.0,
+        "distinct_baseline_value_count_minimum": 8.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 1.0,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 632,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "relative_return_eth",
         "feature": "relative_return_vs_eth_4h",
@@ -15514,6 +15723,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 1,
+        "maximum_baseline_value_tie_ratio_maximum": 0.125,
+        "maximum_baseline_value_tie_ratio_median": 0.052631578947,
+        "maximum_baseline_value_tie_ratio_minimum": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-bb8dca9579ce78cd4fcf848c",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.034482758621,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "monero",
           "observation_id": "mhobs-2835a8e4c7ca1ae5765de50c",
@@ -15530,6 +15755,17 @@
           "observation_id": "mhobs-8c72ce797f0625d53e27c752",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "aave",
+          "distinct_baseline_value_count": 8,
+          "distinct_baseline_value_ratio": 1.0,
+          "maximum_baseline_value_tie_count": 1,
+          "maximum_baseline_value_tie_ratio": 0.125,
+          "observation_id": "mhobs-bb8dca9579ce78cd4fcf848c",
+          "observed_at": "2026-07-19T00:45:08.517863+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "dogecoin",
@@ -15538,7 +15774,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "62555111c819fa6818c33cd0d60d4f4ef139bc287c2c04693e69708ea5fd74e6",
+        "projection_digest": "41908adbfdf8d03eca5df53b286c0d7df46d6db5792ad590b401bc82c697fefe",
         "ready_count": 632,
         "robust_z_maximum": 14.076919105003,
         "robust_z_median": -0.104378885169,
@@ -15551,7 +15787,11 @@
           "not_applicable": 58,
           "ready": 632
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 969,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "return_1h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15561,7 +15801,16 @@
         "descriptive_tail_rank_minimum": 0.060606060606,
         "descriptive_tail_rank_p05": 0.086956521739,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 32.0,
+        "distinct_baseline_value_count_median": 16.0,
+        "distinct_baseline_value_count_minimum": 2.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 0.157894736842,
+        "distinct_baseline_value_ratio_p05": 0.411764705882,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 678,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "direct_return",
         "feature": "return_1h",
@@ -15573,6 +15822,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 17,
+        "maximum_baseline_value_tie_ratio_maximum": 0.894736842105,
+        "maximum_baseline_value_tie_ratio_median": 0.066666666667,
+        "maximum_baseline_value_tie_ratio_minimum": 0.03125,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 3,
+          "distinct_baseline_value_ratio": 0.157894736842,
+          "maximum_baseline_value_tie_count": 17,
+          "maximum_baseline_value_tie_ratio": 0.894736842105,
+          "observation_id": "mhobs-630ac057f1ee2e407d074c08",
+          "observed_at": "2026-07-20T11:34:12.287768+00:00",
+          "sample_count": 19
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_p95": 0.6,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "avalanche-2",
           "observation_id": "mhobs-bf036726c910db9ff4ea0a75",
@@ -15589,6 +15854,17 @@
           "observation_id": "mhobs-b2602e463658085ec61cbb76",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 3,
+          "distinct_baseline_value_ratio": 0.157894736842,
+          "maximum_baseline_value_tie_count": 17,
+          "maximum_baseline_value_tie_ratio": 0.894736842105,
+          "observation_id": "mhobs-630ac057f1ee2e407d074c08",
+          "observed_at": "2026-07-20T11:34:12.287768+00:00",
+          "sample_count": 19
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "dexe",
@@ -15597,7 +15873,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "30ffcf02861f9fd8b39a2b895913f83edc69b1c178b816a69092529b250db71b",
+        "projection_digest": "eb2441acec89104bc4c82ebd885d8f24e5f329f658350d561144f00918c816f2",
         "ready_count": 678,
         "robust_z_maximum": 24.901060915435,
         "robust_z_median": 0.0,
@@ -15610,7 +15886,11 @@
           "insufficient_history": 263,
           "ready": 678
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 1040,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "return_24h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15620,7 +15900,16 @@
         "descriptive_tail_rank_minimum": 0.055555555556,
         "descriptive_tail_rank_p05": 0.090909090909,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 35.0,
+        "distinct_baseline_value_count_median": 20.0,
+        "distinct_baseline_value_count_minimum": 1.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 0.111111111111,
+        "distinct_baseline_value_ratio_p05": 0.717633928571,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 754,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "direct_return",
         "feature": "return_24h",
@@ -15632,6 +15921,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 9,
+        "maximum_baseline_value_tie_ratio_maximum": 1.0,
+        "maximum_baseline_value_tie_ratio_median": 0.058823529412,
+        "maximum_baseline_value_tie_ratio_minimum": 0.028571428571,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 1,
+          "distinct_baseline_value_ratio": 0.125,
+          "maximum_baseline_value_tie_count": 8,
+          "maximum_baseline_value_tie_ratio": 1.0,
+          "observation_id": "mhobs-c1a76b532135d886f3e45f66",
+          "observed_at": "2026-07-19T19:41:12.054658+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.030303030303,
+        "maximum_baseline_value_tie_ratio_p95": 0.25,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "aave",
           "observation_id": "mhobs-580343553022a0d11ba7b045",
@@ -15648,6 +15953,17 @@
           "observation_id": "mhobs-6569f2690065432d6b0bc8a2",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 1,
+          "distinct_baseline_value_ratio": 0.111111111111,
+          "maximum_baseline_value_tie_count": 9,
+          "maximum_baseline_value_tie_ratio": 1.0,
+          "observation_id": "mhobs-4b3645ad741a4d12967e94a0",
+          "observed_at": "2026-07-19T20:41:53.503177+00:00",
+          "sample_count": 9
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "litecoin",
@@ -15656,7 +15972,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "39037c247d8a8b738e7205b6294cac8990afbc89078e48b9331cc7f42b8b5022",
+        "projection_digest": "5ba13d5718698a7b3584e36100f617ad2880af620a1f39336269d13fb0d7c2a1",
         "ready_count": 754,
         "robust_z_maximum": 12.357621186344,
         "robust_z_median": 0.055740392585,
@@ -15669,7 +15985,11 @@
           "insufficient_history": 255,
           "ready": 754
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 776,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "return_4h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15679,7 +15999,16 @@
         "descriptive_tail_rank_minimum": 0.066666666667,
         "descriptive_tail_rank_p05": 0.090909090909,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 30.0,
+        "distinct_baseline_value_count_median": 18.0,
+        "distinct_baseline_value_count_minimum": 4.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 0.227272727273,
+        "distinct_baseline_value_ratio_p05": 0.588235294118,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 641,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "direct_return",
         "feature": "return_4h",
@@ -15691,6 +16020,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 17,
+        "maximum_baseline_value_tie_ratio_maximum": 0.772727272727,
+        "maximum_baseline_value_tie_ratio_median": 0.058823529412,
+        "maximum_baseline_value_tie_ratio_minimum": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 5,
+          "distinct_baseline_value_ratio": 0.227272727273,
+          "maximum_baseline_value_tie_count": 17,
+          "maximum_baseline_value_tie_ratio": 0.772727272727,
+          "observation_id": "mhobs-3864add99270741769768601",
+          "observed_at": "2026-07-20T12:34:56.205337+00:00",
+          "sample_count": 22
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.035714285714,
+        "maximum_baseline_value_tie_ratio_p95": 0.272727272727,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "bitcoin",
           "observation_id": "mhobs-61a0691b4dbc11bb57fdec38",
@@ -15707,6 +16052,17 @@
           "observation_id": "mhobs-c8c1065ae5be69ba80a47033",
           "observed_at": "2026-07-21T14:14:01.079240+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 5,
+          "distinct_baseline_value_ratio": 0.227272727273,
+          "maximum_baseline_value_tie_count": 17,
+          "maximum_baseline_value_tie_ratio": 0.772727272727,
+          "observation_id": "mhobs-3864add99270741769768601",
+          "observed_at": "2026-07-20T12:34:56.205337+00:00",
+          "sample_count": 22
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "ripple",
@@ -15715,7 +16071,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "4eebe040046190abd736229bca745f1f781956dc59f3085517288cf6b3be1323",
+        "projection_digest": "95ad0ba6df08d747da04a00a3105fc851c2eb1313071549ab5cc4091d1de6e7c",
         "ready_count": 641,
         "robust_z_maximum": 7.299579827457,
         "robust_z_median": 0.122629116825,
@@ -15728,7 +16084,11 @@
           "insufficient_history": 259,
           "ready": 641
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 1004,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "turnover_24h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15738,7 +16098,16 @@
         "descriptive_tail_rank_minimum": 0.01724137931,
         "descriptive_tail_rank_p05": 0.06,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 57.0,
+        "distinct_baseline_value_count_median": 30.0,
+        "distinct_baseline_value_count_minimum": 1.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 0.125,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 1461,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "activity",
         "feature": "turnover_24h",
@@ -15750,6 +16119,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 11,
+        "maximum_baseline_value_tie_ratio_maximum": 1.0,
+        "maximum_baseline_value_tie_ratio_median": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_minimum": 0.017543859649,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 1,
+          "distinct_baseline_value_ratio": 0.125,
+          "maximum_baseline_value_tie_count": 8,
+          "maximum_baseline_value_tie_ratio": 1.0,
+          "observation_id": "mhobs-2de33652eb7e64e3e2f57d18",
+          "observed_at": "2026-07-18T16:12:24.285315+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.018181818182,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "aave",
           "observation_id": "mhobs-2582676dad1eb8f2af02df63",
@@ -15766,6 +16151,17 @@
           "observation_id": "mhobs-4346a935c93bf9b8b3728ada",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 1,
+          "distinct_baseline_value_ratio": 0.125,
+          "maximum_baseline_value_tie_count": 8,
+          "maximum_baseline_value_tie_ratio": 1.0,
+          "observation_id": "mhobs-2de33652eb7e64e3e2f57d18",
+          "observed_at": "2026-07-18T16:12:24.285315+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "figure-heloc",
@@ -15774,7 +16170,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "31d65a36741620a39eac898a33eacfd017edec3b49c5d0f13be8a88b6d079047",
+        "projection_digest": "34cea9bb3c3f6ed4bad5cfd9170d6fed49b7023ec40ab28d8438b4e733bd2d50",
         "ready_count": 1461,
         "robust_z_maximum": 4.967644441823,
         "robust_z_median": -0.229038998898,
@@ -15786,7 +16182,11 @@
           "insufficient_history": 271,
           "ready": 1461
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 1469,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       },
       "volume_24h": {
         "descriptive_quantile_method": "linear_interpolation_sorted_ready_values",
@@ -15796,7 +16196,16 @@
         "descriptive_tail_rank_minimum": 0.01724137931,
         "descriptive_tail_rank_p05": 0.04,
         "descriptive_tail_rank_p95": 1.0,
+        "distinct_baseline_value_count_maximum": 57.0,
+        "distinct_baseline_value_count_median": 30.0,
+        "distinct_baseline_value_count_minimum": 1.0,
+        "distinct_baseline_value_ratio_maximum": 1.0,
+        "distinct_baseline_value_ratio_median": 1.0,
+        "distinct_baseline_value_ratio_minimum": 0.125,
+        "distinct_baseline_value_ratio_p05": 1.0,
+        "distinct_baseline_value_ratio_p95": 1.0,
         "distribution_ready_count": 1454,
+        "effective_sample_size_claimed": false,
         "evaluated_observation_count": 1740,
         "family": "activity",
         "feature": "volume_24h",
@@ -15808,6 +16217,22 @@
           "observation_id": "mhobs-c15163d12abdfa261020af11",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "maximum_baseline_value_tie_count_maximum": 21,
+        "maximum_baseline_value_tie_ratio_maximum": 1.0,
+        "maximum_baseline_value_tie_ratio_median": 0.033333333333,
+        "maximum_baseline_value_tie_ratio_minimum": 0.017543859649,
+        "maximum_baseline_value_tie_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 1,
+          "distinct_baseline_value_ratio": 0.125,
+          "maximum_baseline_value_tie_count": 8,
+          "maximum_baseline_value_tie_ratio": 1.0,
+          "observation_id": "mhobs-2de33652eb7e64e3e2f57d18",
+          "observed_at": "2026-07-18T16:12:24.285315+00:00",
+          "sample_count": 8
+        },
+        "maximum_baseline_value_tie_ratio_p05": 0.018181818182,
+        "maximum_baseline_value_tie_ratio_p95": 0.111111111111,
         "maximum_descriptive_tail_rank_observation": {
           "canonical_asset_id": "aave",
           "observation_id": "mhobs-2582676dad1eb8f2af02df63",
@@ -15824,6 +16249,17 @@
           "observation_id": "mhobs-4346a935c93bf9b8b3728ada",
           "observed_at": "2026-07-21T15:14:41.396928+00:00"
         },
+        "minimum_distinct_baseline_value_count": null,
+        "minimum_distinct_baseline_value_ratio_observation": {
+          "canonical_asset_id": "figure-heloc",
+          "distinct_baseline_value_count": 1,
+          "distinct_baseline_value_ratio": 0.125,
+          "maximum_baseline_value_tie_count": 8,
+          "maximum_baseline_value_tie_ratio": 1.0,
+          "observation_id": "mhobs-2de33652eb7e64e3e2f57d18",
+          "observed_at": "2026-07-18T16:12:24.285315+00:00",
+          "sample_count": 8
+        },
         "minimum_eligible_sample_count": 0,
         "minimum_robust_z_observation": {
           "canonical_asset_id": "figure-heloc",
@@ -15832,7 +16268,7 @@
         },
         "minimum_sample_count": 8,
         "overlapping_samples_are_independent": false,
-        "projection_digest": "895508f9958de563d5ebf223e78b138353a77429c0752a61e5f10b7947935558",
+        "projection_digest": "18e2120237ea38acc35e2ba0e5df587c1515360f7d99fe3c6aa07aa6fdc6466e",
         "ready_count": 1454,
         "robust_z_maximum": 3.526865132096,
         "robust_z_median": -0.25592087646,
@@ -15844,7 +16280,11 @@
           "insufficient_history": 271,
           "ready": 1454
         },
-        "tail_ranks_are_p_values": false
+        "tail_ranks_are_p_values": false,
+        "variation_diagnostics_are_policy": false,
+        "variation_observation_basis": "closed_shadow_v3_projection_meeting_existing_minimum_sample_count",
+        "variation_observation_count": 1469,
+        "variation_quantile_method": "linear_interpolation_sorted_sample_eligible_values"
       }
     },
     "historical_rows_rewritten": false,
@@ -15869,7 +16309,7 @@
     },
     "routing_eligible": false,
     "schema_id": "decision_radar.shadow_temporal_surprise_campaign_audit",
-    "schema_version": 2,
+    "schema_version": 3,
     "score_adjustment_eligible": false,
     "shadow_schema_id": "event_alpha.shadow_temporal_surprise",
     "shadow_schema_version": 3,

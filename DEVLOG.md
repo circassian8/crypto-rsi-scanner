@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Aggregate shadow reference-set variation in campaign truth · Codex
+**Why:** Shadow schema v3 made repeated/quantized baseline values visible on one
+observation, but operators still could not tell whether the retained campaign's
+nominal sample depth came from varied values or long runs of ties. The canonical
+campaign report needed to close that evidence gap before any algorithm or
+distinctness rule is considered.
+**Changes:** Campaign shadow-audit schema v3 now aggregates per-feature distinct
+counts, distinct-value shares, and largest-tie shares across projections meeting
+the model's existing nominal sample minimum, including degenerate-scale rows but
+excluding trivial earlier warmup. Exact least-diverse and highest-tie reference
+sets retain asset, observation, clock, sample, distinct, and tie counts; the
+closed validator reconciles every range/reference and keeps historical audit v1
+and v2 readable without inventing absent fields. The campaign Markdown and
+pointer-matched dashboard copy the canonical values without re-evaluation and
+state that they are neither effective-sample-size estimates nor policy. North
+Star, preregistration, research contract, decisions, roadmap, and the real
+cycle-59 report now bind the contract. Across 1,740 counted observations,
+eligible relative-return reference sets are fully distinct; direct 1h/4h/24h
+minimum distinct shares are 0.158/0.227/0.111 and activity minima are 0.125.
+`figure-heloc` is the exact least-diverse asset in the affected families, so the
+next work attributes that repetition rather than changing a threshold.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed. The
+shadow model/integration, campaign, empirical projection, dashboard, and North
+Star set is green across 224 focused tests; 223 passed in the restricted run and
+the sole localhost concurrency test passed on its exact socket-permitted rerun.
+`make radar-market-campaign-report PYTHON=python3` regenerated the report with
+`provider_calls=0`. `make radar-dashboard-smoke PYTHON=python3`, `make
+radar-dashboard-ux-smoke PYTHON=python3`, and `make radar-dashboard-readiness
+PYTHON=python3` passed; the current revision-12 namespace remains authoritative.
+`make architecture-cleanliness-check PYTHON=python3` passed, with quantitative
+size counts retained as advisory only. JSON validation and `git diff --check`
+passed.
+**Notes/risks:** A low distinct share can be legitimate for a pegged or
+low-motion asset, provider quantization, or bad upstream data; this checkpoint
+does not decide among them. No history, route, score, feature status, threshold,
+provider authorization, publication authority, send, trade, order, paper trade,
+RSI write, or Event Alpha `TRIGGERED_FADE` changed. Full `make verify` was not
+run because the bounded research-only schema and read-only surfaces passed the
+risk-appropriate model, artifact, dashboard, and architecture gates.
+
 ## 2026-07-21 — Expose shadow baseline variation without changing policy · Codex
 **Why:** A temporal baseline can contain many timestamps but few distinct
 provider values, so nominal sample count alone overstates the information in a

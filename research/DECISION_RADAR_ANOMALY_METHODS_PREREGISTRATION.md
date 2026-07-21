@@ -31,9 +31,13 @@ holdout.
 - The canonical campaign report now performs a deterministic causal replay of
   that exact shadow evaluator over its one-read retained-history snapshot. It
   exposes per-feature coverage, degeneracy/status counts, exact input
-  rejections, per-asset summaries, and source-bound plus causal-value digests.
-  This is measurement plumbing only: it does not rewrite history or qualify as
-  independent, calibrated, or Protocol-v2 evidence.
+  rejections, per-asset summaries, source-bound plus causal-value digests, and
+  schema-v3 distinct-value/tie distributions over projections meeting the
+  existing nominal sample minimum. Exact least-diverse reference sets remain
+  traceable; historical audit schemas remain readable. This is measurement
+  plumbing only: it does not rewrite history, impose a distinctness threshold,
+  estimate effective sample size, or qualify as independent, calibrated, or
+  Protocol-v2 evidence.
 - The present campaign has overlapping observations and sparse matured ideas;
   repeated cycles are not independent samples.
 

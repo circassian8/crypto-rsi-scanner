@@ -556,7 +556,8 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     ] == 30
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
-    assert shadow["schema_version"] == 2
+    assert shadow["schema_version"] == 3
+    assert shadow["variation_diagnostics_available"] is True
     assert shadow["evaluated_observation_count"] == 36
     assert shadow["provider_calls"] == shadow["writes"] == 0
     volume_shadow = shadow["feature_coverage"]["volume_24h"]
@@ -564,6 +565,19 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert volume_shadow["robust_z_median"] is not None
     assert volume_shadow["descriptive_tail_rank_kind"] == "upper"
     assert volume_shadow["tail_ranks_are_p_values"] is False
+    assert volume_shadow["variation_available"] is True
+    assert volume_shadow["variation_observation_count"] > 0
+    assert 0.0 < volume_shadow[
+        "distinct_baseline_value_ratio_minimum"
+    ] <= volume_shadow["distinct_baseline_value_ratio_median"] <= 1.0
+    assert 0.0 < volume_shadow[
+        "maximum_baseline_value_tie_ratio_median"
+    ] <= volume_shadow["maximum_baseline_value_tie_ratio_maximum"] <= 1.0
+    assert volume_shadow["variation_diagnostics_are_policy"] is False
+    assert volume_shadow["effective_sample_size_claimed"] is False
+    assert volume_shadow["minimum_distinct_ratio_observation"][
+        "sample_count"
+    ] >= 4
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
     ] == 0
@@ -771,6 +785,13 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, shadow_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    variation_drift = deepcopy(_campaign_report())
+    variation_drift["shadow_temporal_surprise_campaign_audit"][
+        "feature_coverage"
+    ]["volume_24h"]["effective_sample_size_claimed"] = True
+    _write_report(tmp_path, variation_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
 
 def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     tmp_path: Path,
@@ -787,6 +808,11 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Robust z p05 / med / p95" in html
     assert "The ranks are not p-values" in html
     assert "Canonical causal shadow replay distributions" in html
+    assert "Reference-set variation at the existing nominal sample minimum" in html
+    assert "Distinct share min / med / p95" in html
+    assert "Largest-tie share med / p95 / max" in html
+    assert "not an effective-sample-size estimate" in html
+    assert "distinct · largest tie" in html
     assert "Observed history, not a policy input" in html
     assert "Verified source envelopes" in html
     assert "Frozen episodes cover 1/8 routes and 1/7 primary origins" in html
@@ -797,6 +823,34 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     assert "Fundamental-led" in html
     assert "Minimum samples" in html
     assert "remain unsealed" in html
+
+
+def test_campaign_dashboard_keeps_v2_shadow_audit_readable_without_variation(
+    tmp_path: Path,
+) -> None:
+    report = deepcopy(_campaign_report())
+    audit = report["shadow_temporal_surprise_campaign_audit"]
+    audit["schema_version"] = 2
+    for coverage in audit["feature_coverage"].values():
+        for key in tuple(coverage):
+            if key not in (
+                market_observation_campaign_shadow_surprise
+                ._FEATURE_COVERAGE_KEYS_V2  # noqa: SLF001
+            ):
+                coverage.pop(key)
+    _write_report(tmp_path, report)
+
+    projection = _load(tmp_path)
+    snapshot = replace(_snapshot(), campaign_operator_actions=projection)
+    html = render_campaign_page(snapshot, query={})
+
+    assert projection["status"] == "ready"
+    assert projection["shadow_temporal_surprise"]["schema_version"] == 2
+    assert projection["shadow_temporal_surprise"][
+        "variation_diagnostics_available"
+    ] is False
+    assert "Canonical causal shadow replay distributions" in html
+    assert "Reference-set variation at the existing nominal sample minimum" not in html
 
 
 def test_campaign_operator_actions_rejects_oversized_report(tmp_path: Path) -> None:

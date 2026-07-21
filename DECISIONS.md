@@ -24,7 +24,10 @@ sample rank floors using the method's existing 12-decimal derived-value
 identity. Preserve every v1 activity and v2 signed-return calculation and keep
 historical v1/v2 artifacts readable. Do not infer effective sample size, impose
 a minimum-distinct threshold, or change readiness, degeneracy, ranks, robust
-z-scores, routes, scores, or authority from these fields.
+z-scores, routes, scores, or authority from these fields. Campaign-level
+distributions may summarize projections meeting the model's existing nominal
+sample minimum and retain exact extremes, but must keep historical campaign
+schemas readable and must not turn a descriptive ratio into an exclusion rule.
 **Why:** Nominal timestamp count can materially overstate information when a
 provider repeats or quantizes activity values, and overlapping derived returns
 can also tie. Recording that structure makes later calibration auditable

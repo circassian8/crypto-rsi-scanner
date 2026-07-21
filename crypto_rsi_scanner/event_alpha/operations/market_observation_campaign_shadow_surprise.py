@@ -19,8 +19,15 @@ from ..radar import market_shadow_surprise
 
 
 SCHEMA_ID = "decision_radar.shadow_temporal_surprise_campaign_audit"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+LEGACY_SCHEMA_VERSIONS = (1, 2)
 DESCRIPTIVE_QUANTILE_METHOD = "linear_interpolation_sorted_ready_values"
+VARIATION_QUANTILE_METHOD = (
+    "linear_interpolation_sorted_sample_eligible_values"
+)
+VARIATION_OBSERVATION_BASIS = (
+    "closed_shadow_v3_projection_meeting_existing_minimum_sample_count"
+)
 _SOURCE_STATUSES = {"missing", "observed_empty", "observed", "unavailable"}
 _AUDIT_STATUSES = {"unavailable", "empty", "warming", "partial", "ready"}
 _INPUT_REJECTION_REASONS = {
@@ -102,7 +109,7 @@ _SOURCE_KEYS = {
     "row_count",
     "binding_source",
 }
-_FEATURE_COVERAGE_KEYS = {
+_FEATURE_COVERAGE_KEYS_V1 = {
     "feature",
     "family",
     "evaluated_observation_count",
@@ -113,6 +120,9 @@ _FEATURE_COVERAGE_KEYS = {
     "maximum_eligible_sample_count",
     "first_ready_observation",
     "last_ready_observation",
+    "projection_digest",
+}
+_FEATURE_COVERAGE_KEYS_V2 = _FEATURE_COVERAGE_KEYS_V1 | {
     "descriptive_quantile_method",
     "descriptive_tail_rank_kind",
     "tail_ranks_are_p_values",
@@ -132,7 +142,30 @@ _FEATURE_COVERAGE_KEYS = {
     "descriptive_tail_rank_maximum",
     "minimum_descriptive_tail_rank_observation",
     "maximum_descriptive_tail_rank_observation",
-    "projection_digest",
+}
+_FEATURE_COVERAGE_KEYS = _FEATURE_COVERAGE_KEYS_V2 | {
+    "variation_observation_basis",
+    "variation_quantile_method",
+    "variation_observation_count",
+    "minimum_distinct_baseline_value_count",
+    "variation_diagnostics_are_policy",
+    "effective_sample_size_claimed",
+    "distinct_baseline_value_count_minimum",
+    "distinct_baseline_value_count_median",
+    "distinct_baseline_value_count_maximum",
+    "distinct_baseline_value_ratio_minimum",
+    "distinct_baseline_value_ratio_p05",
+    "distinct_baseline_value_ratio_median",
+    "distinct_baseline_value_ratio_p95",
+    "distinct_baseline_value_ratio_maximum",
+    "maximum_baseline_value_tie_count_maximum",
+    "maximum_baseline_value_tie_ratio_minimum",
+    "maximum_baseline_value_tie_ratio_p05",
+    "maximum_baseline_value_tie_ratio_median",
+    "maximum_baseline_value_tie_ratio_p95",
+    "maximum_baseline_value_tie_ratio_maximum",
+    "minimum_distinct_baseline_value_ratio_observation",
+    "maximum_baseline_value_tie_ratio_observation",
 }
 _ASSET_SUMMARY_KEYS = {
     "canonical_asset_id",
@@ -152,6 +185,13 @@ _EXTREME_REFERENCE_KEYS = {
     "canonical_asset_id",
     "observation_id",
     "observed_at",
+}
+_VARIATION_REFERENCE_KEYS = _EXTREME_REFERENCE_KEYS | {
+    "sample_count",
+    "distinct_baseline_value_count",
+    "distinct_baseline_value_ratio",
+    "maximum_baseline_value_tie_count",
+    "maximum_baseline_value_tie_ratio",
 }
 _ZERO_FALSE_FIELDS = (
     "statistical_independence_claimed",
@@ -374,9 +414,11 @@ def validate_campaign_shadow_surprise_audit(
     _exact_keys(value, _AUDIT_KEYS, "audit", errors)
     if value.get("schema_id") != SCHEMA_ID:
         errors.append("schema_id_invalid")
-    if type(value.get("schema_version")) is not int or value.get(
-        "schema_version"
-    ) != SCHEMA_VERSION:
+    schema_version = value.get("schema_version")
+    if type(schema_version) is not int or schema_version not in {
+        *LEGACY_SCHEMA_VERSIONS,
+        SCHEMA_VERSION,
+    }:
         errors.append("schema_version_invalid")
     if value.get("status") not in _AUDIT_STATUSES:
         errors.append("status_invalid")
@@ -384,9 +426,12 @@ def validate_campaign_shadow_surprise_audit(
         market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_ID
     ):
         errors.append("shadow_schema_id_invalid")
-    if value.get("shadow_schema_version") != (
-        market_shadow_surprise.SHADOW_TEMPORAL_SURPRISE_SCHEMA_VERSION
-    ):
+    accepted_shadow_versions = {
+        1: {2},
+        2: {2, 3},
+        3: {3},
+    }.get(schema_version, set())
+    if value.get("shadow_schema_version") not in accepted_shadow_versions:
         errors.append("shadow_schema_version_invalid")
     minimum = value.get("minimum_sample_count")
     if type(minimum) is not int or minimum < 1:
@@ -441,6 +486,9 @@ def validate_campaign_shadow_surprise_audit(
         _validate_feature_coverage(
             feature,
             coverage,
+            schema_version=(
+                schema_version if type(schema_version) is int else SCHEMA_VERSION
+            ),
             evaluated_count=evaluated_count,
             minimum_sample_count=minimum if type(minimum) is int else None,
             errors=errors,
@@ -588,6 +636,43 @@ def _append_feature_records(
         sample_count = feature_value.get("sample_count")
         if type(sample_count) is not int or sample_count < 0:
             raise AssertionError("closed shadow projection has invalid sample count")
+        distinct_count = feature_value.get("distinct_baseline_value_count")
+        maximum_tie_count = feature_value.get(
+            "maximum_baseline_value_tie_count"
+        )
+        current_tie_count = feature_value.get(
+            "current_value_baseline_tie_count"
+        )
+        distinct_ratio = _finite_float_or_none(
+            feature_value.get("distinct_baseline_value_ratio")
+        )
+        if sample_count == 0:
+            if (
+                distinct_count != 0
+                or maximum_tie_count != 0
+                or current_tie_count not in (0, None)
+                or distinct_ratio is not None
+            ):
+                raise AssertionError(
+                    "empty shadow baseline has inconsistent variation diagnostics"
+                )
+        elif (
+            type(distinct_count) is not int
+            or not 1 <= distinct_count <= sample_count
+            or type(maximum_tie_count) is not int
+            or not 1 <= maximum_tie_count <= sample_count
+            or (
+                current_tie_count is not None
+                and (
+                    type(current_tie_count) is not int
+                    or not 0 <= current_tie_count <= sample_count
+                )
+            )
+            or distinct_ratio != _rounded_ratio(distinct_count, sample_count)
+        ):
+            raise AssertionError(
+                "shadow baseline variation diagnostics are inconsistent"
+            )
         status = str(feature_value.get("status") or "unavailable")
         robust_z = _finite_float_or_none(feature_value.get("robust_z"))
         tail_rank_field = (
@@ -614,6 +699,10 @@ def _append_feature_records(
             "canonical_asset_id": str(current["canonical_asset_id"]),
             "status": status,
             "sample_count": sample_count,
+            "distinct_baseline_value_count": distinct_count,
+            "maximum_baseline_value_tie_count": maximum_tie_count,
+            "current_value_baseline_tie_count": current_tie_count,
+            "distinct_baseline_value_ratio": distinct_ratio,
             "robust_z": robust_z,
             "descriptive_tail_rank": descriptive_tail_rank,
             "projection_sha256": _sha256_json(feature_value),
@@ -647,8 +736,25 @@ def _feature_coverage(
     status_counts = Counter(str(row["status"]) for row in records)
     ready = [row for row in records if row["status"] == "ready"]
     samples = [int(row["sample_count"]) for row in records]
+    variation = [
+        row
+        for row in records
+        if int(row["sample_count"]) >= minimum_sample_count
+    ]
     robust_z_values = [float(row["robust_z"]) for row in ready]
     tail_rank_values = [float(row["descriptive_tail_rank"]) for row in ready]
+    distinct_counts = [
+        float(row["distinct_baseline_value_count"])
+        for row in variation
+    ]
+    distinct_ratios = [
+        float(row["distinct_baseline_value_ratio"])
+        for row in variation
+    ]
+    maximum_tie_ratios = [
+        _maximum_baseline_tie_ratio(row)
+        for row in variation
+    ]
     minimum_robust_z_row = (
         min(ready, key=lambda row: float(row["robust_z"])) if ready else None
     )
@@ -663,6 +769,28 @@ def _feature_coverage(
     maximum_tail_rank_row = (
         max(ready, key=lambda row: float(row["descriptive_tail_rank"]))
         if ready
+        else None
+    )
+    minimum_distinct_ratio_row = (
+        min(
+            variation,
+            key=lambda row: (
+                float(row["distinct_baseline_value_ratio"]),
+                _feature_record_sort_key(row),
+            ),
+        )
+        if variation
+        else None
+    )
+    maximum_tie_ratio_row = (
+        min(
+            variation,
+            key=lambda row: (
+                -_maximum_baseline_tie_ratio(row),
+                _feature_record_sort_key(row),
+            ),
+        )
+        if variation
         else None
     )
     return {
@@ -729,6 +857,69 @@ def _feature_coverage(
             if maximum_tail_rank_row is not None
             else None
         ),
+        "variation_observation_basis": VARIATION_OBSERVATION_BASIS,
+        "variation_quantile_method": VARIATION_QUANTILE_METHOD,
+        "variation_observation_count": len(variation),
+        "minimum_distinct_baseline_value_count": None,
+        "variation_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+        "distinct_baseline_value_count_minimum": _descriptive_quantile(
+            distinct_counts, 0.0
+        ),
+        "distinct_baseline_value_count_median": _descriptive_quantile(
+            distinct_counts, 0.5
+        ),
+        "distinct_baseline_value_count_maximum": _descriptive_quantile(
+            distinct_counts, 1.0
+        ),
+        "distinct_baseline_value_ratio_minimum": _descriptive_quantile(
+            distinct_ratios, 0.0
+        ),
+        "distinct_baseline_value_ratio_p05": _descriptive_quantile(
+            distinct_ratios, 0.05
+        ),
+        "distinct_baseline_value_ratio_median": _descriptive_quantile(
+            distinct_ratios, 0.5
+        ),
+        "distinct_baseline_value_ratio_p95": _descriptive_quantile(
+            distinct_ratios, 0.95
+        ),
+        "distinct_baseline_value_ratio_maximum": _descriptive_quantile(
+            distinct_ratios, 1.0
+        ),
+        "maximum_baseline_value_tie_count_maximum": (
+            max(
+                int(row["maximum_baseline_value_tie_count"])
+                for row in variation
+            )
+            if variation
+            else None
+        ),
+        "maximum_baseline_value_tie_ratio_minimum": _descriptive_quantile(
+            maximum_tie_ratios, 0.0
+        ),
+        "maximum_baseline_value_tie_ratio_p05": _descriptive_quantile(
+            maximum_tie_ratios, 0.05
+        ),
+        "maximum_baseline_value_tie_ratio_median": _descriptive_quantile(
+            maximum_tie_ratios, 0.5
+        ),
+        "maximum_baseline_value_tie_ratio_p95": _descriptive_quantile(
+            maximum_tie_ratios, 0.95
+        ),
+        "maximum_baseline_value_tie_ratio_maximum": _descriptive_quantile(
+            maximum_tie_ratios, 1.0
+        ),
+        "minimum_distinct_baseline_value_ratio_observation": (
+            _variation_reference(minimum_distinct_ratio_row)
+            if minimum_distinct_ratio_row is not None
+            else None
+        ),
+        "maximum_baseline_value_tie_ratio_observation": (
+            _variation_reference(maximum_tie_ratio_row)
+            if maximum_tie_ratio_row is not None
+            else None
+        ),
         "projection_digest": _sha256_json(list(records)),
     }
 
@@ -756,6 +947,46 @@ def _extreme_reference(row: Mapping[str, Any]) -> dict[str, str]:
         "canonical_asset_id": str(row["canonical_asset_id"]),
         **dict(row["reference"]),
     }
+
+
+def _maximum_baseline_tie_ratio(row: Mapping[str, Any]) -> float:
+    return _rounded_ratio(
+        int(row["maximum_baseline_value_tie_count"]),
+        int(row["sample_count"]),
+    )
+
+
+def _variation_reference(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        **_extreme_reference(row),
+        "sample_count": int(row["sample_count"]),
+        "distinct_baseline_value_count": int(
+            row["distinct_baseline_value_count"]
+        ),
+        "distinct_baseline_value_ratio": float(
+            row["distinct_baseline_value_ratio"]
+        ),
+        "maximum_baseline_value_tie_count": int(
+            row["maximum_baseline_value_tie_count"]
+        ),
+        "maximum_baseline_value_tie_ratio": _maximum_baseline_tie_ratio(row),
+    }
+
+
+def _feature_record_sort_key(row: Mapping[str, Any]) -> tuple[str, str, str]:
+    reference = row["reference"]
+    return (
+        str(reference["observed_at"]),
+        str(row["canonical_asset_id"]),
+        str(reference["observation_id"]),
+    )
+
+
+def _rounded_ratio(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        raise AssertionError("ratio denominator must be positive")
+    value = round(numerator / denominator, 12)
+    return 0.0 if value == 0.0 else value
 
 
 def _asset_summary(
@@ -960,6 +1191,7 @@ def _validate_feature_coverage(
     feature: str,
     coverage: Any,
     *,
+    schema_version: int,
     evaluated_count: int,
     minimum_sample_count: int | None,
     errors: list[str],
@@ -967,7 +1199,14 @@ def _validate_feature_coverage(
     if not isinstance(coverage, Mapping):
         errors.append(f"feature_coverage_{feature}_invalid")
         return
-    _exact_keys(coverage, _FEATURE_COVERAGE_KEYS, f"feature_{feature}", errors)
+    expected_keys = (
+        _FEATURE_COVERAGE_KEYS_V1
+        if schema_version == 1
+        else _FEATURE_COVERAGE_KEYS_V2
+        if schema_version == 2
+        else _FEATURE_COVERAGE_KEYS
+    )
+    _exact_keys(coverage, expected_keys, f"feature_{feature}", errors)
     if coverage.get("feature") != feature:
         errors.append(f"feature_coverage_{feature}_identity_invalid")
     if coverage.get("family") != _FEATURE_FAMILIES[feature]:
@@ -1008,12 +1247,24 @@ def _validate_feature_coverage(
     for label, reference in (("first", first), ("last", last)):
         if reference is not None and not _valid_reference(reference):
             errors.append(f"feature_coverage_{feature}_{label}_reference_invalid")
-    _validate_feature_distribution(
-        feature,
-        coverage,
-        ready_count=ready_count if _nonnegative_int(ready_count) else 0,
-        errors=errors,
-    )
+    if schema_version >= 2:
+        _validate_feature_distribution(
+            feature,
+            coverage,
+            ready_count=ready_count if _nonnegative_int(ready_count) else 0,
+            errors=errors,
+        )
+    if schema_version >= 3:
+        _validate_feature_variation(
+            feature,
+            coverage,
+            evaluated_count=evaluated_count,
+            minimum_sample_count=minimum_sample_count,
+            maximum_sample_count=(
+                maximum if _nonnegative_int(maximum) else None
+            ),
+            errors=errors,
+        )
     if not _sha256(coverage.get("projection_digest")):
         errors.append(f"feature_coverage_{feature}_projection_digest_invalid")
 
@@ -1086,6 +1337,152 @@ def _validate_feature_distribution(
     for field in reference_fields:
         if not _valid_extreme_reference(coverage.get(field)):
             errors.append(f"{prefix}_{field}_invalid")
+
+
+def _validate_feature_variation(
+    feature: str,
+    coverage: Mapping[str, Any],
+    *,
+    evaluated_count: int,
+    minimum_sample_count: int | None,
+    maximum_sample_count: int | None,
+    errors: list[str],
+) -> None:
+    prefix = f"feature_coverage_{feature}"
+    if coverage.get("variation_observation_basis") != VARIATION_OBSERVATION_BASIS:
+        errors.append(f"{prefix}_variation_basis_invalid")
+    if coverage.get("variation_quantile_method") != VARIATION_QUANTILE_METHOD:
+        errors.append(f"{prefix}_variation_quantile_method_invalid")
+    if coverage.get("minimum_distinct_baseline_value_count") is not None:
+        errors.append(f"{prefix}_minimum_distinct_policy_must_be_null")
+    if coverage.get("variation_diagnostics_are_policy") is not False:
+        errors.append(f"{prefix}_variation_policy_claim_invalid")
+    if coverage.get("effective_sample_size_claimed") is not False:
+        errors.append(f"{prefix}_effective_sample_claim_invalid")
+
+    count = coverage.get("variation_observation_count")
+    if not _nonnegative_int(count) or count > evaluated_count:
+        errors.append(f"{prefix}_variation_observation_count_invalid")
+        count = 0
+    distinct_count_fields = (
+        "distinct_baseline_value_count_minimum",
+        "distinct_baseline_value_count_median",
+        "distinct_baseline_value_count_maximum",
+    )
+    distinct_ratio_fields = (
+        "distinct_baseline_value_ratio_minimum",
+        "distinct_baseline_value_ratio_p05",
+        "distinct_baseline_value_ratio_median",
+        "distinct_baseline_value_ratio_p95",
+        "distinct_baseline_value_ratio_maximum",
+    )
+    maximum_tie_ratio_fields = (
+        "maximum_baseline_value_tie_ratio_minimum",
+        "maximum_baseline_value_tie_ratio_p05",
+        "maximum_baseline_value_tie_ratio_median",
+        "maximum_baseline_value_tie_ratio_p95",
+        "maximum_baseline_value_tie_ratio_maximum",
+    )
+    reference_fields = (
+        "minimum_distinct_baseline_value_ratio_observation",
+        "maximum_baseline_value_tie_ratio_observation",
+    )
+    maximum_tie_count = coverage.get(
+        "maximum_baseline_value_tie_count_maximum"
+    )
+    if count == 0:
+        if any(
+            coverage.get(field) is not None
+            for field in (
+                *distinct_count_fields,
+                *distinct_ratio_fields,
+                *maximum_tie_ratio_fields,
+                *reference_fields,
+                "maximum_baseline_value_tie_count_maximum",
+            )
+        ):
+            errors.append(f"{prefix}_empty_variation_distribution_not_null")
+        return
+
+    distinct_count_values = [
+        _finite_float_or_none(coverage.get(field))
+        for field in distinct_count_fields
+    ]
+    if any(
+        value is None or value < 1.0
+        for value in distinct_count_values
+    ):
+        errors.append(f"{prefix}_distinct_count_distribution_invalid")
+    elif distinct_count_values != sorted(distinct_count_values):
+        errors.append(f"{prefix}_distinct_count_distribution_order_invalid")
+    elif (
+        maximum_sample_count is not None
+        and distinct_count_values[-1] > maximum_sample_count
+    ):
+        errors.append(f"{prefix}_distinct_count_exceeds_sample_count")
+
+    distinct_ratio_values = [
+        _finite_float_or_none(coverage.get(field))
+        for field in distinct_ratio_fields
+    ]
+    if any(
+        value is None or not 0.0 < value <= 1.0
+        for value in distinct_ratio_values
+    ):
+        errors.append(f"{prefix}_distinct_ratio_distribution_invalid")
+    elif distinct_ratio_values != sorted(distinct_ratio_values):
+        errors.append(f"{prefix}_distinct_ratio_distribution_order_invalid")
+
+    maximum_tie_ratio_values = [
+        _finite_float_or_none(coverage.get(field))
+        for field in maximum_tie_ratio_fields
+    ]
+    if any(
+        value is None or not 0.0 < value <= 1.0
+        for value in maximum_tie_ratio_values
+    ):
+        errors.append(f"{prefix}_maximum_tie_ratio_distribution_invalid")
+    elif maximum_tie_ratio_values != sorted(maximum_tie_ratio_values):
+        errors.append(f"{prefix}_maximum_tie_ratio_distribution_order_invalid")
+
+    if (
+        not _positive_int(maximum_tie_count)
+        or (
+            maximum_sample_count is not None
+            and maximum_tie_count > maximum_sample_count
+        )
+    ):
+        errors.append(f"{prefix}_maximum_tie_count_invalid")
+
+    minimum_distinct_reference = coverage.get(reference_fields[0])
+    maximum_tie_reference = coverage.get(reference_fields[1])
+    for label, reference in (
+        ("minimum_distinct_ratio", minimum_distinct_reference),
+        ("maximum_tie_ratio", maximum_tie_reference),
+    ):
+        if not _valid_variation_reference(reference):
+            errors.append(f"{prefix}_{label}_reference_invalid")
+        elif (
+            minimum_sample_count is not None
+            and reference.get("sample_count") < minimum_sample_count
+        ):
+            errors.append(f"{prefix}_{label}_reference_below_minimum_sample")
+    if (
+        _valid_variation_reference(minimum_distinct_reference)
+        and distinct_ratio_values
+        and distinct_ratio_values[0] is not None
+        and minimum_distinct_reference.get("distinct_baseline_value_ratio")
+        != distinct_ratio_values[0]
+    ):
+        errors.append(f"{prefix}_minimum_distinct_ratio_reference_mismatch")
+    if (
+        _valid_variation_reference(maximum_tie_reference)
+        and maximum_tie_ratio_values
+        and maximum_tie_ratio_values[-1] is not None
+        and maximum_tie_reference.get("maximum_baseline_value_tie_ratio")
+        != maximum_tie_ratio_values[-1]
+    ):
+        errors.append(f"{prefix}_maximum_tie_ratio_reference_mismatch")
 
 
 def _validate_asset_summaries(
@@ -1182,6 +1579,37 @@ def _valid_extreme_reference(value: Any) -> bool:
     )
 
 
+def _valid_variation_reference(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _VARIATION_REFERENCE_KEYS
+        or not _valid_extreme_reference({
+            key: value.get(key) for key in _EXTREME_REFERENCE_KEYS
+        })
+    ):
+        return False
+    sample_count = value.get("sample_count")
+    distinct_count = value.get("distinct_baseline_value_count")
+    maximum_tie_count = value.get("maximum_baseline_value_tie_count")
+    distinct_ratio = _finite_float_or_none(
+        value.get("distinct_baseline_value_ratio")
+    )
+    maximum_tie_ratio = _finite_float_or_none(
+        value.get("maximum_baseline_value_tie_ratio")
+    )
+    return bool(
+        _positive_int(sample_count)
+        and _positive_int(distinct_count)
+        and distinct_count <= sample_count
+        and _positive_int(maximum_tie_count)
+        and maximum_tie_count <= sample_count
+        and distinct_ratio == _rounded_ratio(distinct_count, sample_count)
+        and maximum_tie_ratio == _rounded_ratio(
+            maximum_tie_count, sample_count
+        )
+    )
+
+
 def _parse_aware_utc(value: Any) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise TypeError("timestamp must be a non-empty string")
@@ -1252,8 +1680,11 @@ def _assert_valid(value: Mapping[str, Any]) -> None:
 
 
 __all__ = (
+    "LEGACY_SCHEMA_VERSIONS",
     "SCHEMA_ID",
     "SCHEMA_VERSION",
+    "VARIATION_OBSERVATION_BASIS",
+    "VARIATION_QUANTILE_METHOD",
     "build_campaign_shadow_surprise_audit",
     "validate_campaign_shadow_surprise_audit",
 )

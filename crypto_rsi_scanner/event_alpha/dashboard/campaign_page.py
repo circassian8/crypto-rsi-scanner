@@ -20,6 +20,7 @@ from .models import DashboardSnapshot
 from .presentation import (
     UNAVAILABLE,
     format_number,
+    format_percent,
     humanize_enum,
     humanize_reason,
     present_time,
@@ -231,8 +232,9 @@ def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
     body = (
         '<div class="alert alert-info"><strong>Descriptive shadow evidence only.</strong> '
         "Robust-z magnitude and empirical rank answer different questions. The ranks are not "
-        "p-values, overlapping samples are not independent, and none of these values changes "
-        "routes, scores, thresholds, or current authority.</div>"
+        "p-values, overlapping samples are not independent, and reference-set variation is not "
+        "an effective-sample-size estimate. None of these values changes routes, scores, "
+        "thresholds, or current authority.</div>"
         + str(definition_list(values, css_class="definition-grid"))
         + str(data_table(
             (
@@ -250,6 +252,7 @@ def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
             empty="No ready shadow distributions are available.",
             compact=True,
         ))
+        + _shadow_variation_table(feature_coverage, snapshot=snapshot)
     )
     return render_panel(
         "Shadow anomaly distributions",
@@ -268,6 +271,97 @@ def _distribution_triplet(
     return " / ".join(
         format_number(value.get(field), decimals=decimals, signed=signed)
         for field in fields
+    )
+
+
+def _shadow_variation_table(
+    feature_coverage: Mapping[str, Any],
+    *,
+    snapshot: DashboardSnapshot,
+) -> str:
+    rows = []
+    for feature, value in sorted(feature_coverage.items()):
+        if not isinstance(value, Mapping) or value.get("variation_available") is not True:
+            continue
+        rows.append((
+            humanize_enum(feature),
+            (
+                f"{display_count(value.get('variation_observation_count'))} / "
+                f"{display_count(value.get('evaluated_observation_count'))}"
+            ),
+            _ratio_distribution_triplet(
+                value,
+                (
+                    "distinct_baseline_value_ratio_minimum",
+                    "distinct_baseline_value_ratio_median",
+                    "distinct_baseline_value_ratio_p95",
+                ),
+            ),
+            _ratio_distribution_triplet(
+                value,
+                (
+                    "maximum_baseline_value_tie_ratio_median",
+                    "maximum_baseline_value_tie_ratio_p95",
+                    "maximum_baseline_value_tie_ratio_maximum",
+                ),
+            ),
+            _shadow_variation_extreme(
+                value.get("minimum_distinct_ratio_observation"),
+                now=snapshot.generation_authority_checked_at,
+            ),
+        ))
+    if not rows:
+        return ""
+    return str(data_table(
+        (
+            "Feature",
+            "Eligible variation rows / evaluated",
+            "Distinct share min / med / p95",
+            "Largest-tie share med / p95 / max",
+            "Least-diverse reference set",
+        ),
+        rows,
+        caption=(
+            "Reference-set variation at the existing nominal sample minimum; "
+            "descriptive only"
+        ),
+        empty="No sample-eligible variation diagnostics are available.",
+        compact=True,
+    ))
+
+
+def _ratio_distribution_triplet(
+    value: Mapping[str, Any],
+    fields: tuple[str, str, str],
+) -> str:
+    return " / ".join(
+        format_percent(value.get(field), unit="fraction", decimals=1)
+        for field in fields
+    )
+
+
+def _shadow_variation_extreme(value: Any, *, now: Any) -> HtmlFragment | str:
+    if not isinstance(value, Mapping):
+        return UNAVAILABLE
+    asset_id = value.get("canonical_asset_id")
+    observed_at = value.get("observed_at")
+    sample_count = value.get("sample_count")
+    distinct_count = value.get("distinct_baseline_value_count")
+    maximum_tie_count = value.get("maximum_baseline_value_tie_count")
+    if (
+        asset_id in (None, "")
+        or observed_at in (None, "")
+        or sample_count in (None, "")
+        or distinct_count in (None, "")
+        or maximum_tie_count in (None, "")
+    ):
+        return UNAVAILABLE
+    return HtmlFragment(
+        f"{escape_html(humanize_enum(asset_id))}<br>"
+        f"{escape_html(display_count(distinct_count))}/{escape_html(display_count(sample_count))} "
+        f"distinct · largest tie {escape_html(display_count(maximum_tie_count))}/"
+        f"{escape_html(display_count(sample_count))}<br>"
+        f'{time_element(present_time(observed_at, now=now), primary="utc")}'
     )
 
 

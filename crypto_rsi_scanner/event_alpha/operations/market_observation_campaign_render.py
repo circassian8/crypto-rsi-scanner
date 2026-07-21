@@ -256,6 +256,74 @@ def _shadow_surprise_audit_section(report: Mapping[str, Any]) -> list[str]:
             f"{_md(coverage.get('descriptive_tail_rank_kind'))} | "
             f"{tail_distribution} | {_md(minimum_tail_observation)} |"
         )
+    if any(
+        isinstance(value, Mapping)
+        and "variation_observation_count" in value
+        for value in features.values()
+    ):
+        lines.extend([
+            "",
+            (
+                "Reference-set variation below is calculated only for projections "
+                "meeting the model's existing nominal sample minimum. It is not an "
+                "effective-sample-size estimate and applies no distinctness threshold."
+            ),
+            "",
+            (
+                "| Feature | Variation rows / evaluated | Distinct count min / "
+                "median / max | Distinct ratio min / median / p95 | Largest-tie "
+                "ratio median / p95 / max | Least-diverse reference set |"
+            ),
+            "|---|---:|---:|---:|---:|---|",
+        ])
+        for feature in sorted(features):
+            coverage = _mapping(features.get(feature))
+            distinct_counts = " / ".join(
+                _number(coverage.get(field))
+                for field in (
+                    "distinct_baseline_value_count_minimum",
+                    "distinct_baseline_value_count_median",
+                    "distinct_baseline_value_count_maximum",
+                )
+            )
+            distinct_ratios = " / ".join(
+                _number(coverage.get(field))
+                for field in (
+                    "distinct_baseline_value_ratio_minimum",
+                    "distinct_baseline_value_ratio_median",
+                    "distinct_baseline_value_ratio_p95",
+                )
+            )
+            tie_ratios = " / ".join(
+                _number(coverage.get(field))
+                for field in (
+                    "maximum_baseline_value_tie_ratio_median",
+                    "maximum_baseline_value_tie_ratio_p95",
+                    "maximum_baseline_value_tie_ratio_maximum",
+                )
+            )
+            minimum_distinct = _mapping(
+                coverage.get(
+                    "minimum_distinct_baseline_value_ratio_observation"
+                )
+            )
+            least_diverse = (
+                f"{_text(minimum_distinct.get('canonical_asset_id'))} @ "
+                f"{_text(minimum_distinct.get('observed_at'))}; "
+                f"{_int(minimum_distinct.get('distinct_baseline_value_count'))}/"
+                f"{_int(minimum_distinct.get('sample_count'))} distinct; largest "
+                f"tie {_int(minimum_distinct.get('maximum_baseline_value_tie_count'))}/"
+                f"{_int(minimum_distinct.get('sample_count'))}"
+                if minimum_distinct
+                else "n/a"
+            )
+            lines.append(
+                f"| {_md(feature)} | "
+                f"{_int(coverage.get('variation_observation_count'))} / "
+                f"{_int(coverage.get('evaluated_observation_count'))} | "
+                f"{distinct_counts} | {distinct_ratios} | {tie_ratios} | "
+                f"{_md(least_diverse)} |"
+            )
     lines.extend(["", "### Decision episodes", ""])
     return lines
 

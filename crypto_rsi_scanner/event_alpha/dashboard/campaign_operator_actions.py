@@ -266,9 +266,17 @@ def _project_shadow_surprise_audit(
     )
     if len(feature_coverage) > 16:
         raise ValueError("campaign_shadow_temporal_surprise_features_oversized")
+    audit_schema_version = _count(
+        audit.get("schema_version"), "shadow_audit_schema_version"
+    )
     projected_features = {
         _identity(feature, "shadow_feature_identity"): (
-            _project_shadow_surprise_feature(feature, row)
+            _project_shadow_surprise_feature(
+                feature,
+                row,
+                distribution_available=audit_schema_version >= 2,
+                variation_available=audit_schema_version >= 3,
+            )
         )
         for feature, row in sorted(feature_coverage.items())
     }
@@ -284,9 +292,7 @@ def _project_shadow_surprise_audit(
         raise ValueError("campaign_shadow_projection_status_count_mismatch")
     return {
         "schema_id": _identity(audit.get("schema_id"), "shadow_audit_schema_id"),
-        "schema_version": _count(
-            audit.get("schema_version"), "shadow_audit_schema_version"
-        ),
+        "schema_version": audit_schema_version,
         "status": _identity(audit.get("status"), "shadow_audit_status"),
         "shadow_schema_id": _identity(
             audit.get("shadow_schema_id"), "shadow_source_schema_id"
@@ -298,6 +304,8 @@ def _project_shadow_surprise_audit(
         "asset_count": _count(audit.get("asset_count"), "shadow_asset_count"),
         "projection_status_counts": projection_status_counts,
         "feature_coverage": projected_features,
+        "distribution_diagnostics_available": audit_schema_version >= 2,
+        "variation_diagnostics_available": audit_schema_version >= 3,
         "source_bound_projection_digest": _identity(
             audit.get("source_bound_projection_digest"),
             "shadow_source_bound_digest",
@@ -324,23 +332,12 @@ def _project_shadow_surprise_audit(
 def _project_shadow_surprise_feature(
     feature: str,
     value: Any,
+    *,
+    distribution_available: bool,
+    variation_available: bool,
 ) -> dict[str, Any]:
     row = _mapping(value, "shadow_temporal_surprise_feature")
-    reference = row.get("minimum_descriptive_tail_rank_observation")
-    projected_reference = None
-    if isinstance(reference, Mapping):
-        projected_reference = {
-            "canonical_asset_id": _identity(
-                reference.get("canonical_asset_id"), "shadow_extreme_asset"
-            ),
-            "observation_id": _identity(
-                reference.get("observation_id"), "shadow_extreme_observation"
-            ),
-            "observed_at": _timestamp(
-                reference.get("observed_at"), "shadow_extreme_observed_at"
-            ),
-        }
-    return {
+    result = {
         "feature": _identity(row.get("feature"), "shadow_feature"),
         "family": _identity(row.get("family"), "shadow_feature_family"),
         "evaluated_observation_count": _count(
@@ -359,33 +356,186 @@ def _project_shadow_surprise_feature(
             row.get("maximum_eligible_sample_count"),
             "shadow_feature_maximum_sample_count",
         ),
-        "robust_z_p05": _optional_finite_number(
-            row.get("robust_z_p05"), "shadow_feature_robust_z_p05"
-        ),
-        "robust_z_median": _optional_finite_number(
-            row.get("robust_z_median"), "shadow_feature_robust_z_median"
-        ),
-        "robust_z_p95": _optional_finite_number(
-            row.get("robust_z_p95"), "shadow_feature_robust_z_p95"
-        ),
-        "descriptive_tail_rank_kind": _identity(
-            row.get("descriptive_tail_rank_kind"), "shadow_feature_tail_kind"
-        ),
-        "descriptive_tail_rank_minimum": _optional_finite_number(
-            row.get("descriptive_tail_rank_minimum"),
-            "shadow_feature_tail_minimum",
-        ),
-        "descriptive_tail_rank_median": _optional_finite_number(
-            row.get("descriptive_tail_rank_median"),
-            "shadow_feature_tail_median",
-        ),
-        "descriptive_tail_rank_p95": _optional_finite_number(
-            row.get("descriptive_tail_rank_p95"),
-            "shadow_feature_tail_p95",
-        ),
-        "minimum_tail_observation": projected_reference,
+        "distribution_available": distribution_available,
+        "variation_available": variation_available,
+    }
+    if distribution_available:
+        result.update({
+            "robust_z_p05": _optional_finite_number(
+                row.get("robust_z_p05"), "shadow_feature_robust_z_p05"
+            ),
+            "robust_z_median": _optional_finite_number(
+                row.get("robust_z_median"), "shadow_feature_robust_z_median"
+            ),
+            "robust_z_p95": _optional_finite_number(
+                row.get("robust_z_p95"), "shadow_feature_robust_z_p95"
+            ),
+            "descriptive_tail_rank_kind": _identity(
+                row.get("descriptive_tail_rank_kind"), "shadow_feature_tail_kind"
+            ),
+            "descriptive_tail_rank_minimum": _optional_finite_number(
+                row.get("descriptive_tail_rank_minimum"),
+                "shadow_feature_tail_minimum",
+            ),
+            "descriptive_tail_rank_median": _optional_finite_number(
+                row.get("descriptive_tail_rank_median"),
+                "shadow_feature_tail_median",
+            ),
+            "descriptive_tail_rank_p95": _optional_finite_number(
+                row.get("descriptive_tail_rank_p95"),
+                "shadow_feature_tail_p95",
+            ),
+            "minimum_tail_observation": _project_shadow_reference(
+                row.get("minimum_descriptive_tail_rank_observation"),
+                label="shadow_tail_extreme",
+            ),
+        })
+    else:
+        result.update({
+            "robust_z_p05": None,
+            "robust_z_median": None,
+            "robust_z_p95": None,
+            "descriptive_tail_rank_kind": None,
+            "descriptive_tail_rank_minimum": None,
+            "descriptive_tail_rank_median": None,
+            "descriptive_tail_rank_p95": None,
+            "minimum_tail_observation": None,
+        })
+    if variation_available:
+        result.update({
+            "variation_observation_count": _count(
+                row.get("variation_observation_count"),
+                "shadow_feature_variation_observation_count",
+            ),
+            "distinct_baseline_value_count_minimum": _optional_finite_number(
+                row.get("distinct_baseline_value_count_minimum"),
+                "shadow_feature_distinct_count_minimum",
+            ),
+            "distinct_baseline_value_count_median": _optional_finite_number(
+                row.get("distinct_baseline_value_count_median"),
+                "shadow_feature_distinct_count_median",
+            ),
+            "distinct_baseline_value_count_maximum": _optional_finite_number(
+                row.get("distinct_baseline_value_count_maximum"),
+                "shadow_feature_distinct_count_maximum",
+            ),
+            "distinct_baseline_value_ratio_minimum": _optional_finite_number(
+                row.get("distinct_baseline_value_ratio_minimum"),
+                "shadow_feature_distinct_ratio_minimum",
+            ),
+            "distinct_baseline_value_ratio_median": _optional_finite_number(
+                row.get("distinct_baseline_value_ratio_median"),
+                "shadow_feature_distinct_ratio_median",
+            ),
+            "distinct_baseline_value_ratio_p95": _optional_finite_number(
+                row.get("distinct_baseline_value_ratio_p95"),
+                "shadow_feature_distinct_ratio_p95",
+            ),
+            "distinct_baseline_value_ratio_maximum": _optional_finite_number(
+                row.get("distinct_baseline_value_ratio_maximum"),
+                "shadow_feature_distinct_ratio_maximum",
+            ),
+            "maximum_baseline_value_tie_count_maximum": _optional_count(
+                row.get("maximum_baseline_value_tie_count_maximum"),
+                "shadow_feature_maximum_tie_count",
+            ),
+            "maximum_baseline_value_tie_ratio_median": _optional_finite_number(
+                row.get("maximum_baseline_value_tie_ratio_median"),
+                "shadow_feature_maximum_tie_ratio_median",
+            ),
+            "maximum_baseline_value_tie_ratio_p95": _optional_finite_number(
+                row.get("maximum_baseline_value_tie_ratio_p95"),
+                "shadow_feature_maximum_tie_ratio_p95",
+            ),
+            "maximum_baseline_value_tie_ratio_maximum": _optional_finite_number(
+                row.get("maximum_baseline_value_tie_ratio_maximum"),
+                "shadow_feature_maximum_tie_ratio_maximum",
+            ),
+            "minimum_distinct_ratio_observation": (
+                _project_shadow_variation_reference(
+                    row.get(
+                        "minimum_distinct_baseline_value_ratio_observation"
+                    ),
+                    label="shadow_minimum_distinct_ratio",
+                )
+            ),
+            "maximum_tie_ratio_observation": (
+                _project_shadow_variation_reference(
+                    row.get("maximum_baseline_value_tie_ratio_observation"),
+                    label="shadow_maximum_tie_ratio",
+                )
+            ),
+        })
+    else:
+        result.update({
+            "variation_observation_count": 0,
+            "distinct_baseline_value_count_minimum": None,
+            "distinct_baseline_value_count_median": None,
+            "distinct_baseline_value_count_maximum": None,
+            "distinct_baseline_value_ratio_minimum": None,
+            "distinct_baseline_value_ratio_median": None,
+            "distinct_baseline_value_ratio_p95": None,
+            "distinct_baseline_value_ratio_maximum": None,
+            "maximum_baseline_value_tie_count_maximum": None,
+            "maximum_baseline_value_tie_ratio_median": None,
+            "maximum_baseline_value_tie_ratio_p95": None,
+            "maximum_baseline_value_tie_ratio_maximum": None,
+            "minimum_distinct_ratio_observation": None,
+            "maximum_tie_ratio_observation": None,
+        })
+    result.update({
         "tail_ranks_are_p_values": False,
         "overlapping_samples_are_independent": False,
+        "variation_diagnostics_are_policy": False,
+        "effective_sample_size_claimed": False,
+    })
+    return result
+
+
+def _project_shadow_reference(value: Any, *, label: str) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    reference = _mapping(value, label)
+    return {
+        "canonical_asset_id": _identity(
+            reference.get("canonical_asset_id"), f"{label}_asset"
+        ),
+        "observation_id": _identity(
+            reference.get("observation_id"), f"{label}_observation"
+        ),
+        "observed_at": _timestamp(
+            reference.get("observed_at"), f"{label}_observed_at"
+        ),
+    }
+
+
+def _project_shadow_variation_reference(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    reference = _mapping(value, label)
+    return {
+        **(_project_shadow_reference(reference, label=label) or {}),
+        "sample_count": _count(reference.get("sample_count"), f"{label}_samples"),
+        "distinct_baseline_value_count": _count(
+            reference.get("distinct_baseline_value_count"),
+            f"{label}_distinct_count",
+        ),
+        "distinct_baseline_value_ratio": _optional_finite_number(
+            reference.get("distinct_baseline_value_ratio"),
+            f"{label}_distinct_ratio",
+        ),
+        "maximum_baseline_value_tie_count": _count(
+            reference.get("maximum_baseline_value_tie_count"),
+            f"{label}_maximum_tie_count",
+        ),
+        "maximum_baseline_value_tie_ratio": _optional_finite_number(
+            reference.get("maximum_baseline_value_tie_ratio"),
+            f"{label}_maximum_tie_ratio",
+        ),
     }
 
 
