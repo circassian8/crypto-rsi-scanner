@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record the sixty-second no-send market cycle · Codex
+**Why:** The hourly cadence became eligible with CoinGecko authorization already
+present, so the campaign needed one bounded genuine observation rather than a
+fixture, replay, or lowered threshold.
+**Changes:**
+- Daily Operations made one public `/coins/markets` request, received HTTP 200
+  with 80 bounded rows in 1,563 ms and no retry, and published
+  `radar_market_no_send_20260721t221025653895z_24552878d217`.
+- Final publication and owned-dashboard operations receipts bind revision 12
+  and operator-state SHA-256
+  `a010ab84e42ad97265026125f85928092ac6ba8f2a53092db80b98b1ff677747`;
+  campaign truth advanced to 62 cycles / 1,860 retained / 1,830 counted / 30
+  too-close observations and 600 prospective context rows.
+- Preserved the honest healthy-empty result: 30 current observations, zero
+  anomalies/ideas/spread, and 28/30 causal 24-hour inputs. HBAR and GRAM remain
+  unavailable rather than receiving fabricated regime context.
+**Verify:** The cycle returned `succeeded/published_and_restarted`; strict doctor
+is 0 blockers / 0 warnings, dashboard readiness is READY for the exact namespace
+and run, and loopback HEAD returned HTTP 200 with matching namespace, run,
+revision, and operator-state headers. Daily Operations status reports the next
+eligible boundary as `2026-07-21T23:10:28.235042+00:00`.
+**Notes/risks:** Provider failures remain 14; outcomes remain 7 matured / 3
+pending / 1 `due_missing_price`; trusted spread remains zero. No Telegram send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+occurred. Quantitative source-size findings remain advisory.
+
 ## 2026-07-22 — Reuse direct-return work inside each shadow projection · Codex
 **Why:** After timestamp parsing was bounded, causal replay still recomputed the
 same direct asset return for the direct, BTC-relative, and ETH-relative feature
