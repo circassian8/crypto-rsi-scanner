@@ -37,6 +37,7 @@ def build_report_value(
     episode_scorecard: Mapping[str, Any],
     episode_coverage_frontier: Mapping[str, Any],
     shadow_surprise_audit: Mapping[str, Any],
+    control_regime_generation_audit: Mapping[str, Any],
     limitations: Sequence[Mapping[str, Any]],
     next_observation: Mapping[str, Any],
     conclusion: Mapping[str, Any],
@@ -101,6 +102,9 @@ def build_report_value(
         ),
         "shadow_temporal_surprise_campaign_audit": dict(
             shadow_surprise_audit
+        ),
+        "control_market_regime_generation_audit": dict(
+            control_regime_generation_audit
         ),
         "data_quality_limitations": list(limitations),
         "next_observation": dict(next_observation),

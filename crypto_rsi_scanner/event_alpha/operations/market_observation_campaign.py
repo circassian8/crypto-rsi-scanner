@@ -33,6 +33,7 @@ from . import market_observation_campaign_contract
 from . import market_observation_campaign_episodes
 from . import market_observation_campaign_episode_frontier
 from . import market_observation_campaign_outcome_gaps
+from . import market_observation_campaign_regime_audit
 from . import market_observation_campaign_scorecard
 from . import market_observation_campaign_shadow_surprise
 from . import market_observation_campaign_snapshots
@@ -212,6 +213,10 @@ def build_campaign_report(
             minimum_sample_count=_shadow_minimum_sample_count(baseline),
         )
     )
+    control_regime_generation_audit = (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit(counted_generations)
+    )
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
     metrics.update(_review_metric_values(review_timing, review_queue))
     metrics["provider_failed_attempts"] = len(provider_failed)
@@ -263,6 +268,7 @@ def build_campaign_report(
         episode_scorecard=episode_scorecard,
         episode_coverage_frontier=episode_coverage_frontier,
         shadow_surprise_audit=shadow_surprise_audit,
+        control_regime_generation_audit=control_regime_generation_audit,
         limitations=limitations,
         next_observation=next_observation,
         conclusion=conclusion,
@@ -382,6 +388,17 @@ def _validate_shadow_campaign_contracts(report: Mapping[str, Any]) -> None:
         raise MarketNoSendError(
             "shadow temporal-surprise campaign audit invalid: "
             + ";".join(surprise_errors)
+        )
+    regime_audit_errors = (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(
+            report.get("control_market_regime_generation_audit")
+        )
+    )
+    if regime_audit_errors:
+        raise MarketNoSendError(
+            "control market-regime generation audit invalid: "
+            + ";".join(regime_audit_errors)
         )
     _validate_current_control_regime_input_contract(report)
 
@@ -522,19 +539,19 @@ def _generation_row(
     )
     candidates = snapshots["candidate"]["rows"]
     outcomes = snapshots["integrated_outcome"]["rows"]
+    market_source = (
+        market_observation_campaign_snapshots.capture_market_source_snapshot(
+            namespace_dir,
+            manifest=manifest,
+            artifact="event_market_no_send_market_rows.json",
+        )
+    )
     current_regime_input: dict[str, Any] | None = None
     if _current_authority_matches(
         current_authority,
         namespace=namespace_dir.name,
         run_id=run_id,
     ):
-        market_source = (
-            market_observation_campaign_snapshots.capture_market_source_snapshot(
-                namespace_dir,
-                manifest=manifest,
-                artifact="event_market_no_send_market_rows.json",
-            )
-        )
         current_regime_input = _current_control_regime_input(
             current_authority=current_authority,
             market_source_snapshot=market_source,
@@ -607,6 +624,9 @@ def _generation_row(
         },
         **market_observation_campaign_snapshots.private_generation_snapshot_fields(
             snapshots
+        ),
+        **market_observation_campaign_snapshots.private_market_source_snapshot_fields(
+            market_source
         ),
     }
 

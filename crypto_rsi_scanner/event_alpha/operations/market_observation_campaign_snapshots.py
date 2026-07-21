@@ -368,6 +368,27 @@ def private_generation_snapshot_fields(
     return fields
 
 
+def private_market_source_snapshot_fields(
+    snapshot: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project one verified source envelope into private construction fields."""
+
+    rows = snapshot.get("rows")
+    return {
+        "_market_source_snapshot_rows": tuple(
+            dict(row) for row in rows
+        ) if isinstance(rows, (list, tuple)) else (),
+        "_market_source_snapshot_artifact": snapshot.get("artifact"),
+        "_market_source_snapshot_sha256": snapshot.get("sha256"),
+        "_market_source_snapshot_size_bytes": snapshot.get("size_bytes"),
+        "_market_source_snapshot_row_count": snapshot.get("row_count"),
+        "_market_source_snapshot_binding_source": snapshot.get(
+            "binding_source"
+        ),
+        "_market_source_snapshot_verified": snapshot.get("verified") is True,
+    }
+
+
 def public_generation_rows(
     rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -486,5 +507,6 @@ __all__ = (
     "capture_market_source_snapshot",
     "generation_candidate_rows",
     "private_generation_snapshot_fields",
+    "private_market_source_snapshot_fields",
     "public_generation_rows",
 )

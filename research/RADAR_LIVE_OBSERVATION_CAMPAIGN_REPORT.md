@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T14:14:16.062995+00:00` from local artifacts only.
+Generated at `2026-07-21T14:35:15.456996+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -137,6 +137,20 @@ Research and decision support only. This report contains no trade recommendation
   - `hedera-hashgraph (HBAR), rank 30`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
 - Retained history mutated by report: `false`; historical backfill: `false`.
 - Routing/policy/Protocol-v2 evidence eligibility: `false`; provider calls: `0`.
+
+### Exact-generation control-regime history
+
+- Status: `incomplete`
+- Verified immutable generation sources: `58/58`
+- Complete point-in-time universes audited: `16`
+- Causal 24-hour input results: `0 ready / 16 incomplete / 0 complete-but-unavailable`
+- Comparable universe transitions: `15`; membership changed in `4`
+- Incomplete cycles overlapping an observed entry within 24 hours: `12`; incomplete cycles without that overlap: `4`
+- Latest exact cycle: `2026-07-21T14:14:01.079240+00:00` — `29/30` eligible inputs; missing: `hedera-hashgraph`
+- Latest missing assets with a recent observed entry: `hedera-hashgraph`
+- Interpretation: membership overlap is descriptive, not causal attribution. Older anchor gaps and recent entries remain distinct; no universe, cadence, threshold, route, or regime policy changed.
+- Historical backfill/retained-history mutation/provider calls: `false / false / 0`.
+- Routing/policy/Protocol-v2 evidence eligibility: `false`.
 
 Retained-history maturity and latest point-in-time feature availability are separate. Future-observation eligibility is conditional on the same canonical asset remaining in the next universe and does not claim unknown future membership or feature values are already observed. The table below measures only retained sample depth and elapsed coverage for the exact current asset set.
 

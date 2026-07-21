@@ -25,6 +25,9 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
     review_timing = _mapping(report.get("human_review_timing"))
     review_queue = _mapping(report.get("human_review_queue"))
     baseline = _mapping(report.get("baseline_maturity"))
+    regime_generation_audit = _mapping(
+        report.get("control_market_regime_generation_audit")
+    )
     pointer = _mapping(report.get("pointer"))
     next_observation = _mapping(report.get("next_observation"))
     limitations = list(report.get("data_quality_limitations") or ())
@@ -88,6 +91,7 @@ def format_campaign_report(report: Mapping[str, Any]) -> str:
         _baseline_maturity_section(
             baseline,
             current_generation=_current_authoritative_generation(report),
+            regime_generation_audit=regime_generation_audit,
         )
     )
     lines.extend([
@@ -285,6 +289,7 @@ def _baseline_maturity_section(
     baseline: Mapping[str, Any],
     *,
     current_generation: Mapping[str, Any],
+    regime_generation_audit: Mapping[str, Any],
 ) -> list[str]:
     current = _mapping(baseline.get("current_universe_maturity"))
     control_context = _mapping(
@@ -336,6 +341,10 @@ def _baseline_maturity_section(
         "",
         *_current_control_regime_input_lines(current_regime_input),
         "",
+        "### Exact-generation control-regime history",
+        "",
+        *_control_regime_generation_audit_lines(regime_generation_audit),
+        "",
         (
             "Retained-history maturity and latest point-in-time feature availability are "
             "separate. Future-observation eligibility is conditional on the same canonical "
@@ -367,6 +376,65 @@ def _baseline_maturity_section(
         "### Prospective matched-control context",
         "",
         *_point_in_time_control_context_lines(control_context),
+    ]
+    return lines
+
+
+def _control_regime_generation_audit_lines(
+    value: Mapping[str, Any],
+) -> list[str]:
+    if not value:
+        return [
+            "- Status: `unavailable`",
+            "- This compatibility report has no immutable-generation input audit.",
+        ]
+    latest = _mapping(value.get("latest_complete_generation"))
+    expected = _int(latest.get("universe_expected_count"))
+    eligible = _int(latest.get("eligible_input_count"))
+    missing = _joined(latest.get("missing_asset_ids")) or "none"
+    recent = _joined(latest.get("recent_entry_missing_asset_ids")) or "none"
+    lines = [
+        f"- Status: `{_md(value.get('status')) or 'unavailable'}`",
+        (
+            "- Verified immutable generation sources: "
+            f"`{_int(value.get('verified_source_generation_count'))}/"
+            f"{_int(value.get('input_generation_count'))}`"
+        ),
+        (
+            "- Complete point-in-time universes audited: "
+            f"`{_int(value.get('complete_universe_generation_count'))}`"
+        ),
+        (
+            "- Causal 24-hour input results: "
+            f"`{_int(value.get('ready_generation_count'))} ready / "
+            f"{_int(value.get('incomplete_generation_count'))} incomplete / "
+            f"{_int(value.get('complete_but_unavailable_generation_count'))} "
+            "complete-but-unavailable`"
+        ),
+        (
+            "- Comparable universe transitions: "
+            f"`{_int(value.get('transition_count'))}`; membership changed in "
+            f"`{_int(value.get('universe_change_transition_count'))}`"
+        ),
+        (
+            "- Incomplete cycles overlapping an observed entry within 24 hours: "
+            f"`{_int(value.get('incomplete_with_recent_entry_count'))}`; "
+            "incomplete cycles without that overlap: "
+            f"`{_int(value.get('incomplete_without_recent_entry_count'))}`"
+        ),
+        (
+            "- Latest exact cycle: "
+            f"`{_md(latest.get('observed_at')) or 'unavailable'}` — "
+            f"`{eligible}/{expected}` eligible inputs; missing: `{_md(missing)}`"
+        ),
+        f"- Latest missing assets with a recent observed entry: `{_md(recent)}`",
+        (
+            "- Interpretation: membership overlap is descriptive, not causal "
+            "attribution. Older anchor gaps and recent entries remain distinct; "
+            "no universe, cadence, threshold, route, or regime policy changed."
+        ),
+        "- Historical backfill/retained-history mutation/provider calls: `false / false / 0`.",
+        "- Routing/policy/Protocol-v2 evidence eligibility: `false`.",
     ]
     return lines
 

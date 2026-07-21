@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Audit exact-generation control-regime inputs · Codex
+**Why:** The latest top-30 universe was 29/30 ready for a causal 24-hour
+control-regime input, but current-only evidence could not show whether dynamic
+universe membership was the whole cause or merely one contributor.
+**Changes:** Campaign construction now captures each countable generation's
+manifest-bound market-source envelope once and builds a closed, bounded,
+read-only history audit from the temporal evidence that generation actually
+held. The canonical report shows 58/58 verified sources / 1,740 rows, 16 exact
+point-in-time universes, 0 ready and 16 incomplete causal 24-hour input sets,
+15 comparable transitions, and 4 membership changes. Twelve incomplete cycles
+overlap an observed entry within 24 hours while four do not. The latest HBAR
+gap is in the recent-entry subset, but the report explicitly treats overlap as
+descriptive rather than causal attribution. Only the latest 32 complete-cycle
+summaries and at most 256 missing-asset counts render; total counts and the
+full projection digest remain explicit.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed; the
+campaign/dashboard/Daily Operations/publication/empirical group passed (`131
+passed`); `make radar-market-campaign-report PYTHON=python3` regenerated the
+canonical report with zero provider calls; `make radar-dashboard-smoke
+PYTHON=python3`, `make radar-dashboard-readiness PYTHON=python3`, and the
+intended `make event-alpha-integrated-radar-doctor PYTHON=python3` fixture
+doctor passed with zero blockers/warnings.
+**Notes/risks:** One attempted doctor invocation supplied an operational
+namespace to the fixture-only Make target and correctly blocked because that
+fixture namespace had no run; rerunning the target in its declared scope
+passed. No source bytes, retained history, universe, cadence, score, threshold,
+route, regime policy, authority, provider authorization, send, trade, order,
+paper trade, RSI row, or Event Alpha `TRIGGERED_FADE` changed. Full `make
+verify` was not repeated because the focused cross-surface gate covers this
+report-only diagnostic and the previous broad gate remains the current release
+evidence.
+
 ## 2026-07-21 — Record the fifty-eighth no-send market cycle · Codex
 **Why:** The hourly Decision Radar cadence became eligible with the existing
 CoinGecko authorization, so the temporal baseline needed one bounded genuine

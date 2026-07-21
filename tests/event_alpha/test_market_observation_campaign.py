@@ -19,6 +19,9 @@ from crypto_rsi_scanner.event_alpha.operations import market_no_send_audit
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_publication
 from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign as campaign
+from crypto_rsi_scanner.event_alpha.operations import (
+    market_observation_campaign_regime_audit,
+)
 from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign_render
 from crypto_rsi_scanner.event_alpha.operations.market_no_send_models import (
     SAFETY_COUNTERS,
@@ -606,6 +609,17 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert shadow_audit["writes"] == 0
     assert shadow_audit["routing_eligible"] is False
     assert shadow_audit["protocol_v2_evidence_eligible"] is False
+    regime_audit = first["control_market_regime_generation_audit"]
+    assert regime_audit["status"] == "unavailable"
+    assert regime_audit["input_generation_count"] == 2
+    assert regime_audit["verified_source_generation_count"] == 2
+    assert regime_audit["source_row_count"] == 3
+    assert regime_audit["complete_universe_generation_count"] == 0
+    assert regime_audit["ready_generation_count"] == 0
+    assert regime_audit["incomplete_generation_count"] == 0
+    assert regime_audit["latest_complete_generation"] is None
+    assert regime_audit["routing_eligible"] is False
+    assert regime_audit["protocol_v2_evidence_eligible"] is False
     conclusion = first["campaign_v2_conclusion"]
     assert conclusion["baseline_status"] == "warming"
     assert conclusion["baseline_coverage"] == {
@@ -667,6 +681,8 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
     assert "Provider-call eligibility: `not inferred`" in markdown
     assert "Prospective matched-control context" in markdown
     assert "Exact current control-regime input replay" in markdown
+    assert "Exact-generation control-regime history" in markdown
+    assert "membership overlap is descriptive, not causal attribution" in markdown
     assert "Retained history mutated by report: `false`" in markdown
     assert "Complete point-in-time universe rows: `2/8`" in markdown
     assert "Complete matched-control context rows: `0/8`" in markdown
@@ -683,6 +699,115 @@ def test_campaign_report_is_deterministic_and_separates_attempt_classes(
         match="shadow temporal-surprise campaign audit invalid",
     ):
         campaign.format_campaign_report(tampered)
+
+    tampered = json.loads(json.dumps(first))
+    tampered["control_market_regime_generation_audit"][
+        "routing_eligible"
+    ] = True
+    with pytest.raises(
+        campaign.MarketNoSendError,
+        match="control market-regime generation audit invalid",
+    ):
+        campaign.format_campaign_report(tampered)
+
+
+def _ready_regime_market_rows(observed_at: str) -> list[dict[str, object]]:
+    rows = _current_regime_market_rows(observed_at)
+    for rank, row in enumerate(rows, start=1):
+        observation_id = row["market_history"]["observation_id"]
+        anchor_id = f"ready-regime-anchor-{rank}"
+        row["temporal_return_24h"] = float(rank) / 10.0
+        row["return_units"]["temporal_return_24h"] = "percent_points"
+        row["market_feature_evidence"]["temporal_return_24h"] = {
+            "basis": "temporal_baseline",
+            "status": "ready",
+            "calculation": "price_horizon_return",
+            "sample_count": 1,
+            "current_observation_id": observation_id,
+            "baseline_first_observation_id": anchor_id,
+            "baseline_last_observation_id": anchor_id,
+            "baseline_input_observation_count": 1,
+            "baseline_observation_ids_sha256": hashlib.sha256(
+                json.dumps([anchor_id], separators=(",", ":")).encode(
+                    "utf-8"
+                )
+            ).hexdigest(),
+            "providers": ["coingecko"],
+            "data_modes": ["live"],
+            "research_only": True,
+        }
+    return rows
+
+
+def _regime_audit_generation(
+    namespace: str,
+    observed_at: str,
+    rows: list[dict[str, object]],
+) -> dict[str, object]:
+    return {
+        "artifact_namespace": namespace,
+        "run_id": f"{observed_at}|no_key_live",
+        "observed_at": observed_at,
+        "campaign_counted": True,
+        "_market_source_snapshot_rows": rows,
+        "_market_source_snapshot_sha256": hashlib.sha256(
+            namespace.encode("utf-8")
+        ).hexdigest(),
+        "_market_source_snapshot_row_count": len(rows),
+        "_market_source_snapshot_verified": True,
+    }
+
+
+def test_control_regime_generation_audit_separates_recent_entry_overlap():
+    first_at = "2026-07-20T10:00:00+00:00"
+    second_at = "2026-07-20T11:00:00+00:00"
+    third_at = "2026-07-20T12:00:00+00:00"
+    first_rows = _ready_regime_market_rows(first_at)
+    second_rows = _ready_regime_market_rows(second_at)
+    third_rows = _ready_regime_market_rows(third_at)
+    for rows in (second_rows, third_rows):
+        replacement = rows[-1]
+        replacement["canonical_asset_id"] = "new-entry"
+        replacement["symbol"] = "NEW"
+        replacement.pop("temporal_return_24h")
+        replacement["return_units"].pop("temporal_return_24h")
+        replacement["market_feature_evidence"].pop("temporal_return_24h")
+
+    audit = (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit([
+            _regime_audit_generation("generation-a", first_at, first_rows),
+            _regime_audit_generation("generation-b", second_at, second_rows),
+            _regime_audit_generation("generation-c", third_at, third_rows),
+        ])
+    )
+
+    assert audit["status"] == "incomplete"
+    assert audit["complete_universe_generation_count"] == 3
+    assert audit["ready_generation_count"] == 1
+    assert audit["incomplete_generation_count"] == 2
+    assert audit["transition_count"] == 2
+    assert audit["universe_change_transition_count"] == 1
+    assert audit["entered_asset_event_count"] == 1
+    assert audit["exited_asset_event_count"] == 1
+    assert audit["incomplete_with_recent_entry_count"] == 2
+    assert audit["incomplete_without_recent_entry_count"] == 0
+    assert audit["recent_entry_missing_asset_event_count"] == 2
+    assert audit["missing_asset_generation_counts"] == {"new-entry": 2}
+    assert audit["latest_complete_generation"][
+        "recent_entry_missing_asset_ids"
+    ] == ["new-entry"]
+    assert (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(audit)
+    ) == []
+
+    tampered = json.loads(json.dumps(audit))
+    tampered["incomplete_with_recent_entry_count"] = 3
+    assert "incomplete_generation_count_not_closed" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(tampered)
+    )
 
 
 def test_final_receipts_reconcile_attempt_publication_operations_and_current(
