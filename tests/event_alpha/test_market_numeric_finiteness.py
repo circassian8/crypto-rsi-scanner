@@ -6,6 +6,8 @@ import json
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 
 def test_nonfinite_values_cannot_create_market_confirmation():
     from crypto_rsi_scanner.event_alpha.radar import market_confirmation
@@ -350,6 +352,151 @@ def test_market_no_send_normalization_excludes_structured_market_identities():
         "invalid_canonical_identity": 1,
         "missing_identity": 2,
     }
+
+
+def test_market_no_send_rejects_malformed_return_unit_metadata():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+
+    observed_at = datetime(2026, 7, 19, 6, tzinfo=timezone.utc)
+    base = {
+        "id": "unit-contract",
+        "coin_id": "unit-contract",
+        "symbol": "UNIT",
+        "name": "Unit Contract",
+        "current_price": 10,
+        "return_1h": 0.05,
+        "return_4h": 0.10,
+        "return_24h": 0.16,
+        "relative_return_vs_btc_4h": 0.10,
+        "market_cap": 100_000_000,
+        "total_volume": 10_000_000,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000,
+        "spread_bps": 5.0,
+    }
+    invalid_metadata = (
+        {"return_unit": {"borrowed": "fraction"}},
+        {"return_unit": True},
+        {"return_unit": "basis_points"},
+        {"return_unit": "fraction", "source_return_unit": "percent_points"},
+        {"return_units": ["fraction"]},
+        {"return_units": {"return_4h": {"unit": "fraction"}}},
+        {
+            "return_units": {"return_4h": "fraction"},
+            "field_return_units": {"return_4h": "percent_points"},
+        },
+    )
+
+    for metadata in invalid_metadata:
+        with pytest.raises(
+            ValueError,
+            match="^market_row_return_unit_metadata_invalid$",
+        ):
+            market_no_send_features.normalize_market_rows(
+                [{**base, **metadata}],
+                top_n=1,
+                observed_at=observed_at,
+                provider="fixture",
+                data_mode="mock",
+                request_cache_artifact="market.json",
+                request_ledger_artifact="ledger.json",
+                candidate_source_mode="mocked_fixture",
+                decision_radar_campaign_counted=False,
+                burn_in_counted=False,
+                safety_counters={},
+            )
+
+
+def test_market_state_rejects_malformed_unit_metadata_without_anomaly():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    observed_at = "2026-07-20T17:00:00Z"
+    row = {
+        "id": "malformed-units",
+        "coin_id": "malformed-units",
+        "symbol": "BADUNIT",
+        "return_unit": {"borrowed": "fraction"},
+        "return_4h": 0.10,
+        "return_24h": 0.16,
+        "relative_return_vs_btc_4h": 0.10,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 100_000_000.0,
+        "spread_bps": 5.0,
+        "freshness_status": "fresh",
+    }
+
+    snapshot = market_state.snapshot_from_market_row(row, observed_at=observed_at)
+    assert snapshot.source_return_unit == "unknown"
+    assert snapshot.return_4h is None
+    assert snapshot.return_24h is None
+    assert snapshot.relative_return_vs_btc_4h is None
+    assert "invalid_source_return_unit_metadata" in snapshot.unit_warnings
+
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [row],
+        observed_at=observed_at,
+    )
+    assert anomalies == []
+    assert "invalid_source_return_unit_metadata" in snapshots[0]["unit_warnings"]
+
+
+def test_market_no_send_preserves_valid_mixed_return_units():
+    from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    observed_at = datetime(2026, 7, 20, 17, tzinfo=timezone.utc)
+    rows, _audit = market_no_send_features.normalize_market_rows(
+        [{
+            "id": "mixed-units",
+            "coin_id": "mixed-units",
+            "symbol": "MIXED",
+            "name": "Mixed Units",
+            "current_price": 10,
+            "return_unit": "fractions",
+            "return_4h": 0.10,
+            "return_24h": 0.16,
+            "relative_return_vs_btc_4h": 10.0,
+            "return_units": {
+                "relative_return_vs_btc_4h": "percentage",
+            },
+            "market_cap": 100_000_000,
+            "total_volume": 10_000_000,
+            "volume_zscore_24h": 3.0,
+            "liquidity_usd": 100_000_000.0,
+            "spread_bps": 5.0,
+        }],
+        top_n=1,
+        observed_at=observed_at,
+        provider="fixture",
+        data_mode="mock",
+        request_cache_artifact="market.json",
+        request_ledger_artifact="ledger.json",
+        candidate_source_mode="mocked_fixture",
+        decision_radar_campaign_counted=False,
+        burn_in_counted=False,
+        safety_counters={},
+    )
+
+    assert rows[0]["return_unit"] == "fraction"
+    assert rows[0]["return_units"] == {
+        "relative_return_vs_btc_4h": "percent_points",
+    }
+    snapshot = market_state.snapshot_from_market_row(
+        rows[0],
+        observed_at=observed_at,
+    )
+    assert snapshot.return_4h == 10.0
+    assert snapshot.return_24h == 16.0
+    assert snapshot.relative_return_vs_btc_4h == 10.0
+    assert snapshot.unit_warnings == ()
+
+    _snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        rows,
+        observed_at=observed_at,
+    )
+    assert [row["anomaly_type"] for row in anomalies] == ["confirmed_breakout"]
 
 
 def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():

@@ -21,6 +21,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from ... import universe
 from ...state_features import liquidity_bucket
 from ..radar import market_enrichment
+from ..radar import market_units as event_market_units
 from .market_no_send_io import read_jsonl
 from .market_provenance import DECISION_RADAR_MEASUREMENT_PROGRAM
 
@@ -126,6 +127,24 @@ _TEMPORAL_RETURN_EVIDENCE_KEYS = frozenset((
     "data_modes",
     "research_only",
 ))
+_RETURN_UNIT_ALIASES = {
+    "fraction": "fraction",
+    "fractions": "fraction",
+    "decimal": "fraction",
+    "raw_fraction": "fraction",
+    "percent": "percent_points",
+    "percentage": "percent_points",
+    "percent_points": "percent_points",
+    "percentage_points": "percent_points",
+    "pct": "percent_points",
+    "pct_points": "percent_points",
+}
+_RETURN_UNIT_FIELDS = (
+    "return_unit",
+    "source_return_unit",
+    "market_return_unit",
+    "unit",
+)
 
 
 @dataclass(frozen=True)
@@ -252,8 +271,16 @@ def _normalize_market_row(
     safety_counters: Mapping[str, int],
 ) -> dict[str, Any]:
     explicit_returns = _has_explicit_return_fields(row)
+    return_unit_contract = (
+        _explicit_return_unit_contract(row) if explicit_returns else None
+    )
+    if explicit_returns and return_unit_contract is None:
+        raise ValueError("market_row_return_unit_metadata_invalid")
     snapshot = (
-        _normalized_explicit_market_row(row)
+        _normalized_explicit_market_row(
+            row,
+            return_unit_contract=return_unit_contract,
+        )
         if explicit_returns
         else market_enrichment.market_snapshot_from_row(row, now=observed_at)
     )
@@ -1332,7 +1359,11 @@ def _any_finite(row: Mapping[str, Any], *fields: str) -> bool:
     return any(finite_float(row.get(field)) is not None for field in fields)
 
 
-def _normalized_explicit_market_row(row: Mapping[str, Any]) -> dict[str, Any]:
+def _normalized_explicit_market_row(
+    row: Mapping[str, Any],
+    *,
+    return_unit_contract: tuple[str, dict[str, str]],
+) -> dict[str, Any]:
     output = {
         key: value
         for key in (
@@ -1346,7 +1377,10 @@ def _normalized_explicit_market_row(row: Mapping[str, Any]) -> dict[str, Any]:
     price = _finite_alias_value(row, "current_price", "price", minimum=0.0, exclusive=True)
     if price is not None:
         output["price"] = price
-    output["return_unit"] = str(row.get("return_unit") or "fraction")
+    return_unit, return_units = return_unit_contract
+    output["return_unit"] = return_unit
+    if return_units:
+        output["return_units"] = return_units
     output["coin_id"] = _first_identity_text(
         row,
         "coin_id",
@@ -1412,6 +1446,53 @@ def _has_explicit_return_fields(row: Mapping[str, Any]) -> bool:
         finite_float(row.get(key)) is not None
         for key in ("return_1h", "return_4h", "return_24h")
     )
+
+
+def _explicit_return_unit_contract(
+    row: Mapping[str, Any],
+) -> tuple[str, dict[str, str]] | None:
+    """Close common and field-level units before copying explicit returns."""
+
+    declared_common_units: list[str] = []
+    for field in _RETURN_UNIT_FIELDS:
+        if field not in row:
+            continue
+        value = row.get(field)
+        if value is None or value == "":
+            continue
+        canonical = _canonical_return_unit(value)
+        if canonical is None:
+            return None
+        declared_common_units.append(canonical)
+    if len(set(declared_common_units)) > 1:
+        return None
+    common_unit = declared_common_units[0] if declared_common_units else "fraction"
+
+    projections: list[dict[str, str]] = []
+    for metadata_field in event_market_units.RETURN_UNIT_METADATA_KEYS:
+        if metadata_field not in row:
+            continue
+        raw = row.get(metadata_field)
+        if not isinstance(raw, Mapping):
+            return None
+        projection: dict[str, str] = {}
+        for field, unit in raw.items():
+            if not isinstance(field, str) or field not in event_market_units.RETURN_KEYS:
+                return None
+            canonical = _canonical_return_unit(unit)
+            if canonical is None:
+                return None
+            projection[field] = canonical
+        projections.append(dict(sorted(projection.items())))
+    if projections and any(value != projections[0] for value in projections[1:]):
+        return None
+    return common_unit, (projections[0] if projections else {})
+
+
+def _canonical_return_unit(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    return _RETURN_UNIT_ALIASES.get(value.strip().casefold())
 
 
 def _finite_alias_value(

@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed market return-unit metadata · Codex
+**Why:** An object-valued `return_unit` was converted to printable text, then
+heuristically inferred as fractional input. A raw `0.10` move consequently
+became `10%` and produced a false `confirmed_breakout` without a unit warning.
+**Changes:** Live/no-send normalization now closes every supplied common and
+field-level return-unit declaration before retaining explicit returns. Unknown,
+structured, boolean, conflicting, or differently shaped declarations stop the
+generation rather than being guessed; accepted aliases are canonicalized and
+valid mixed field units survive normalization. The generic market-state adapter
+now keeps malformed-unit returns unavailable, emits
+`invalid_source_return_unit_metadata`, and cannot produce an anomaly from them.
+The byte-frozen Protocol-v1 unit helper, detector thresholds, scores, routes,
+and provider policy are unchanged.
+**Verify:** The original public reproduction now raises
+`market_row_return_unit_metadata_invalid` in the no-send path and yields source
+unit `unknown`, unavailable returns, one explicit warning, and zero anomalies in
+the generic scanner. Focused Decision/model/unit/surface tests passed (`150
+passed`); the wider RSI universe, history, no-send, campaign, market-state,
+unit-health, anomaly-surface, and Decision suite passed (`288 passed`). `make
+event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15 candidates, 12
+canonical cores/cards, 14 dashboard pages, and strict doctor 0 blockers / 0
+warnings. `python3 -m compileall -q crypto_rsi_scanner tests` and `git diff
+--check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the affected
+normalization, unit, detector, Decision, and integrated-doctor paths were
+exercised directly. No provider call, authority change, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source-file size remains advisory; artifact, security, provider,
+request, unit, and resource bounds remain enforced.
+
 ## 2026-07-21 — Reject structured market identities before evidence retention · Codex
 **Why:** Rolling market history converted an object-valued canonical asset ID
 into printable text and retained it as a real asset. The same coercion existed

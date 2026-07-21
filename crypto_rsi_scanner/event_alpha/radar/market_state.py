@@ -28,6 +28,40 @@ _COMMON_UNIT_EXTREME_WARNINGS = frozenset(
         "return_4h_extreme_without_unit_context",
     }
 )
+_RETURN_UNIT_ALIASES = {
+    "fraction": event_market_units.RETURN_UNIT_FRACTION,
+    "fractions": event_market_units.RETURN_UNIT_FRACTION,
+    "decimal": event_market_units.RETURN_UNIT_FRACTION,
+    "raw_fraction": event_market_units.RETURN_UNIT_FRACTION,
+    "percent": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+    "percentage": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+    "percent_points": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+    "percentage_points": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+    "pct": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+    "pct_points": event_market_units.RETURN_UNIT_PERCENT_POINTS,
+}
+_RETURN_UNIT_FIELDS = (
+    "return_unit",
+    "source_return_unit",
+    "market_return_unit",
+    "unit",
+)
+_NORMALIZED_RETURN_FIELDS = (
+    "return_5m",
+    "return_15m",
+    "return_1h",
+    "return_4h",
+    "return_24h",
+    "relative_return_vs_btc_1h",
+    "relative_return_vs_btc_4h",
+    "relative_return_vs_btc_24h",
+    "relative_return_vs_eth_1h",
+    "relative_return_vs_eth_4h",
+    "relative_return_vs_eth_24h",
+    "open_interest_delta",
+    "dex_volume_change",
+    "dex_liquidity_change",
+)
 
 
 @dataclass(frozen=True)
@@ -112,12 +146,24 @@ def snapshot_from_market_row(
         canonical_asset_id = coin_id or symbol
     warnings: list[str] = []
     fields: list[str] = []
-    source_unit = event_market_units.infer_return_unit(row, default=event_market_units.RETURN_UNIT_FRACTION)
-    normalized_returns = _normalized_return_values(
-        row,
-        btc_benchmark=btc_benchmark,
-        eth_benchmark=eth_benchmark,
-        source_unit=source_unit,
+    source_unit_contract_valid = _source_return_unit_contract_valid(row)
+    source_unit = (
+        event_market_units.infer_return_unit(
+            row,
+            default=event_market_units.RETURN_UNIT_FRACTION,
+        )
+        if source_unit_contract_valid
+        else event_market_units.RETURN_UNIT_UNKNOWN
+    )
+    normalized_returns = (
+        _normalized_return_values(
+            row,
+            btc_benchmark=btc_benchmark,
+            eth_benchmark=eth_benchmark,
+            source_unit=source_unit,
+        )
+        if source_unit_contract_valid
+        else {field: None for field in _NORMALIZED_RETURN_FIELDS}
     )
 
     def capture(name: str, value: float | None) -> float | None:
@@ -169,6 +215,8 @@ def snapshot_from_market_row(
         },
         row,
     ))
+    if not source_unit_contract_valid:
+        unit_warnings.append("invalid_source_return_unit_metadata")
     if row.get("return_unit") not in (None, "") or any(
         key in row for key in event_market_units.RETURN_UNIT_METADATA_KEYS
     ):
@@ -318,6 +366,56 @@ def _source_unit_warnings(row: Mapping[str, Any]) -> tuple[str, ...]:
         for warning in event_market_units.validate_market_snapshot_units(projected)
         if warning not in _COMMON_UNIT_EXTREME_WARNINGS
     )
+
+
+def _source_return_unit_contract_valid(row: Mapping[str, Any]) -> bool:
+    """Reject malformed explicit unit metadata before normalizing any return."""
+
+    declared_common_units: list[str] = []
+    for field in _RETURN_UNIT_FIELDS:
+        if field not in row:
+            continue
+        value = row.get(field)
+        if value is None or value == "":
+            continue
+        canonical = _canonical_source_return_unit(value)
+        if canonical is None:
+            return False
+        declared_common_units.append(canonical)
+    if len(set(declared_common_units)) > 1:
+        return False
+
+    projections: list[dict[str, str]] = []
+    for metadata_field in event_market_units.RETURN_UNIT_METADATA_KEYS:
+        if metadata_field not in row:
+            continue
+        raw = row.get(metadata_field)
+        if not isinstance(raw, Mapping):
+            return False
+        projection: dict[str, str] = {}
+        for field, unit in raw.items():
+            field_name = str(field) if isinstance(field, str) else ""
+            if (
+                not field_name
+                or (
+                    field_name not in event_market_units.RETURN_KEYS
+                    and _INTERNAL_TEMPORAL_RETURN_UNIT_FIELD.fullmatch(field_name)
+                    is None
+                )
+                or _canonical_source_return_unit(unit) is None
+            ):
+                return False
+            projection[field_name] = _canonical_source_return_unit(unit) or ""
+        projections.append(dict(sorted(projection.items())))
+    return not projections or all(
+        value == projections[0] for value in projections[1:]
+    )
+
+
+def _canonical_source_return_unit(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    return _RETURN_UNIT_ALIASES.get(value.strip().casefold())
 
 
 def _normalized_return_values(
