@@ -321,6 +321,7 @@ def classify_market_state(
     if (
         _unit_contract_blocks_classification(snapshot)
         or _freshness_contract_blocks_classification(snapshot)
+        or _market_source_contract_blocks_classification(snapshot, row)
         or _market_control_contract_blocks_classification(snapshot, row)
         or _market_classifier_control_warnings(snapshot, row)
     ):
@@ -1501,6 +1502,30 @@ def _market_control_contract_blocks_classification(
     source_row: Mapping[str, Any],
 ) -> bool:
     return bool(_market_control_warnings(snapshot, source_row))
+
+
+def _market_source_contract_blocks_classification(
+    snapshot: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+) -> bool:
+    warnings = snapshot.get("warnings")
+    if not isinstance(warnings, (list, tuple)):
+        if warnings not in (None, ""):
+            return True
+    elif "invalid_market_data_source" in warnings:
+        return True
+    if "market_data_source" in snapshot:
+        value = snapshot.get("market_data_source")
+        if value not in (None, "") and not _text(value):
+            return True
+    for key in ("market_data_source", "source"):
+        if key not in source_row:
+            continue
+        value = source_row.get(key)
+        if value is None or value == "":
+            continue
+        return not bool(_text(value))
+    return False
 
 
 def _market_control_warnings(

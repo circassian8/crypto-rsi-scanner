@@ -113,6 +113,57 @@ def test_market_freshness_claims_are_typed_and_presence_aware():
         }) == market_anomaly_scanner.NO_REACTION
 
 
+def test_market_source_aliases_are_typed_and_presence_aware():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    base = {
+        "coin_id": "source-contract",
+        "symbol": "SOURCE",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000.0,
+        "freshness_status": "fresh",
+    }
+    malformed = {
+        **base,
+        "market_data_source": {"borrowed": "coingecko"},
+        "source": "lower-authority-source",
+    }
+
+    snapshot = market_state.snapshot_from_market_row(
+        malformed,
+        observed_at="2026-07-21T12:45:00Z",
+    )
+    assert snapshot.market_data_source == "unknown"
+    assert "invalid_market_data_source" in snapshot.warnings
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [malformed],
+        observed_at="2026-07-21T12:45:00Z",
+    )
+    assert snapshots[0]["market_data_source"] == "unknown"
+    assert anomalies == []
+
+    canonical = market_state.snapshot_from_market_row(
+        {**base, "market_data_source": " coingecko ", "source": "lower"},
+        observed_at="2026-07-21T12:45:00Z",
+    )
+    assert canonical.market_data_source == "coingecko"
+    assert "invalid_market_data_source" not in canonical.warnings
+
+    fixture_default = market_state.snapshot_from_market_row(
+        base,
+        observed_at="2026-07-21T12:45:00Z",
+    )
+    assert fixture_default.market_data_source == "fixture"
+    assert market_anomaly_scanner.classify_market_state(
+        {**base, "market_data_source": {"provider": "coingecko"}},
+    ) == market_anomaly_scanner.NO_REACTION
+
+
 def test_benchmark_selection_rejects_invalid_fallthrough_conflict_and_duplicates():
     from crypto_rsi_scanner.event_alpha.radar import market_state
 

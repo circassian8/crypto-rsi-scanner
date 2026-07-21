@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Preserve typed market-source lineage · Codex
+**Why:** Market-state normalization stringified any truthy value in
+`market_data_source`/`source`. A mapping, sequence, boolean, or number could
+therefore become plausible printable lineage, and a malformed higher-authority
+claim could borrow a lower alias before anomaly classification.
+**Changes:** Market source aliases now use typed, presence-aware precedence.
+Valid text is trimmed, absent metadata retains the existing fixture fallback,
+and an explicit malformed source becomes `unknown` with
+`invalid_market_data_source`; it cannot borrow a lower alias or create a raw
+market anomaly. Direct classifier calls also reject malformed source values.
+**Verify:** The object-valued source reproduction now retains `unknown` plus the
+explicit warning and produces zero anomalies despite a lower valid alias.
+Canonical `coingecko` text and the absent-source fixture fallback remain
+unchanged. The market source/freshness/identity, anomaly-surface, and provenance
+suites passed (`113 passed`); `python3 -m compileall -q crypto_rsi_scanner
+tests` and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests earlier in this prompt and the affected normalization/classification
+paths were rerun. No anomaly threshold, score, route, provider call, authority,
+send, trade, order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE`
+changed. Quantitative source-size limits remain advisory; provenance integrity
+remains fail closed.
+
 ## 2026-07-21 — Require derivatives evidence for anomaly priority · Codex
 **Why:** A nonblank placeholder in `perp_symbols` or `coinalyze_symbols`, or
 mere eligibility for the derivatives lane, was enough to claim derivatives

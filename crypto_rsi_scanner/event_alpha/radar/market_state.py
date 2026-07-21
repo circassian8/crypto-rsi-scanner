@@ -223,7 +223,12 @@ def snapshot_from_market_row(
         freshness = explicit_freshness
     else:
         freshness = "fresh" if _has_valid_row_observation_time(row) else "unknown"
-    source = str(row.get("market_data_source") or row.get("source") or "fixture")
+    source, source_claimed = _market_data_source_claim(row)
+    if source_claimed and not source:
+        warnings.append("invalid_market_data_source")
+        source = "unknown"
+    elif not source:
+        source = "fixture"
     market_history_observation_id = _optional_string(
         row.get("market_history_observation_id"),
         field_name="market_history_observation_id",
@@ -686,6 +691,19 @@ def _first_present_value(row: Mapping[str, Any], *keys: str) -> object:
         if value not in (None, ""):
             return value
     return None
+
+
+def _market_data_source_claim(row: Mapping[str, Any]) -> tuple[str, bool]:
+    """Resolve source aliases without stringifying or borrowing below bad data."""
+
+    for key in ("market_data_source", "source"):
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        return (value.strip() if isinstance(value, str) else ""), True
+    return "", False
 
 
 def _float(value: object) -> float | None:
