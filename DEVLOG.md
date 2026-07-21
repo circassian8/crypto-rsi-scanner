@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed anomaly-type control flags · Codex
+**Why:** Explicit malformed values in catalyst/event-state flags such as
+`negative_catalyst`, `event_passed`, and `failed_reclaim` were interpreted as
+false. A row could consequently be mislabeled as an ordinary breakout instead
+of failing closed when the evidence needed to distinguish fade, selloff, or
+breakout semantics was invalid.
+**Changes:** The anomaly boundary now validates all nine boolean flags that
+select negative-catalyst, post-event, and failure semantics. Missing/null flags
+and valid booleans, 0/1, and accepted true/false strings retain their existing
+meaning. Structured values, sequences, arbitrary numerics, and unknown strings
+add `invalid_market_classifier_control:<field>` to the retained snapshot and
+return `no_reaction`; they cannot choose an anomaly type or enter catalyst
+enrichment. This is separate from the asset tradability/theme/quote contract
+and uses the same first-explicit-claim authority rule.
+**Verify:** The object-valued `event_passed` reproduction changed from one
+`confirmed_breakout` with no warning to zero anomalies and an explicit warning.
+Valid false semantics plus all 36 malformed field/value combinations passed
+(`37 passed`). The wider market surfaces, alias/time/numeric/evidence integrity,
+anomaly report/receipt, live/no-send, and Decision-v2 suites passed (`280
+passed`). `make event-alpha-market-anomaly-smoke PYTHON=python3` retained 8
+snapshots and the expected 5 anomaly types, with zero blockers and only the two
+expected standalone missing source/readiness warnings. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests earlier in this prompt and the complete affected market/Decision paths
+were rerun after this change. No threshold, score, route, provider, authority,
+send, trade, order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE`
+changed. Quantitative source-file size remains advisory; evidence semantics
+remain fail closed.
+
 ## 2026-07-21 — Reject malformed market asset controls before anomaly creation · Codex
 **Why:** An explicit object, sequence, arbitrary number, or unknown string in
 `is_tradable_asset`, `is_theme_or_sector`, `is_quote_asset`, or

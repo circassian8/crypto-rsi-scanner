@@ -346,6 +346,58 @@ def test_market_anomaly_boolean_semantics_cannot_manufacture_risk_or_crowding():
     assert scanner.classify_market_state(boolean_numerics) == scanner.LATE_MOMENTUM
 
 
+@pytest.mark.parametrize(
+    "field",
+    (
+        "negative_catalyst",
+        "risk_off_catalyst",
+        "event_passed",
+        "event_has_passed",
+        "post_event",
+        "post_event_monitoring",
+        "post_event_failure",
+        "failed_reclaim",
+        "price_below_event_vwap",
+    ),
+)
+@pytest.mark.parametrize("malformed", ({"value": True}, [True], 2, "maybe"))
+def test_malformed_market_classifier_control_cannot_select_anomaly_type(
+    field: str,
+    malformed: object,
+) -> None:
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "malformed-classifier-control",
+        "coin_id": "malformed-classifier-control",
+        "symbol": "BADTYPE",
+        "return_unit": "percent_points",
+        "return_4h": 12.0,
+        "return_24h": 18.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 100_000_000.0,
+        "spread_bps": 5.0,
+        "freshness_status": "fresh",
+    }
+
+    snapshots, anomalies = scanner.scan_market_rows(
+        [{**base, field: malformed}],
+        observed_at="2026-07-21T12:30:00Z",
+    )
+
+    assert len(snapshots) == 1
+    assert anomalies == []
+    assert (
+        f"invalid_market_classifier_control:{field}"
+        in snapshots[0]["warnings"]
+    )
+    assert scanner.classify_market_state(
+        snapshots[0],
+        {field: malformed},
+    ) == scanner.NO_REACTION
+
+
 def test_market_anomaly_false_metadata_does_not_add_source_or_derivatives_claims():
     import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
 

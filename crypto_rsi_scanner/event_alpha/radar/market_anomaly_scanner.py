@@ -67,6 +67,17 @@ _MARKET_CONTROL_FIELDS = (
     "is_quote_asset",
     "is_tradable_asset",
 )
+_MARKET_CLASSIFIER_CONTROL_FIELDS = (
+    "negative_catalyst",
+    "risk_off_catalyst",
+    "event_passed",
+    "event_has_passed",
+    "post_event",
+    "post_event_monitoring",
+    "post_event_failure",
+    "failed_reclaim",
+    "price_below_event_vwap",
+)
 
 
 @dataclass(frozen=True)
@@ -223,7 +234,10 @@ def scan_market_rows(
                     snapshot_payload[key] = market_cap
                 continue
             snapshot_payload[key] = row.get(key)
-        control_warnings = _market_control_warnings(snapshot_payload, row)
+        control_warnings = [
+            *_market_control_warnings(snapshot_payload, row),
+            *_market_classifier_control_warnings(snapshot_payload, row),
+        ]
         if control_warnings:
             warnings = snapshot_payload.get("warnings")
             if isinstance(warnings, list):
@@ -291,6 +305,7 @@ def classify_market_state(
         _unit_contract_blocks_classification(snapshot)
         or _freshness_contract_blocks_classification(snapshot)
         or _market_control_contract_blocks_classification(snapshot, row)
+        or _market_classifier_control_warnings(snapshot, row)
     ):
         return NO_REACTION
     r4 = _float(snapshot.get("return_4h")) or 0.0
@@ -1437,6 +1452,24 @@ def _market_control_warnings(
         )
         if supplied and _semantic_boolean(value) is None:
             warnings.append(f"invalid_market_control:{field}")
+    return warnings
+
+
+def _market_classifier_control_warnings(
+    snapshot: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+) -> list[str]:
+    """Return malformed explicit flags that select anomaly semantics."""
+
+    warnings: list[str] = []
+    for field in _MARKET_CLASSIFIER_CONTROL_FIELDS:
+        supplied, value = _selected_market_control_claim(
+            snapshot,
+            source_row,
+            field,
+        )
+        if supplied and _semantic_boolean(value) is None:
+            warnings.append(f"invalid_market_classifier_control:{field}")
     return warnings
 
 
