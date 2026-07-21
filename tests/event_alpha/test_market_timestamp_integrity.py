@@ -82,6 +82,7 @@ def test_invalid_row_clock_cannot_imply_freshness_under_valid_run_clock():
 
 
 def test_naive_row_clock_cannot_retain_claimed_freshness_under_valid_run_clock():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
     from crypto_rsi_scanner.event_alpha.radar import market_state
 
     snapshot = market_state.snapshot_from_market_row(
@@ -97,6 +98,24 @@ def test_naive_row_clock_cannot_retain_claimed_freshness_under_valid_run_clock()
     assert snapshot.observed_at == "2026-07-19T08:05:00+00:00"
     assert snapshot.freshness_status == "unknown"
     assert "invalid_source_observation_time" in snapshot.warnings
+
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [{
+            "symbol": "TEST",
+            "coin_id": "test-token",
+            "observed_at": "2026-07-19T08:00:00",
+            "freshness_status": "fresh",
+            "return_unit": "percent_points",
+            "return_4h": 10.0,
+            "return_24h": 20.0,
+            "relative_return_vs_btc_4h": 10.0,
+            "volume_zscore_24h": 3.0,
+            "liquidity_usd": 10_000_000.0,
+        }],
+        observed_at="2026-07-19T08:05:00Z",
+    )
+    assert "invalid_source_observation_time" in snapshots[0]["warnings"]
+    assert anomalies == []
 
 
 def test_catalyst_queue_rejects_malformed_higher_authority_clock():

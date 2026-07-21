@@ -54,6 +54,65 @@ def test_market_state_identity_aliases_are_typed_and_presence_aware():
     assert anomalies == []
 
 
+def test_market_freshness_claims_are_typed_and_presence_aware():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    base = {
+        "coin_id": "freshness-contract",
+        "symbol": "FRESH",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000.0,
+    }
+
+    malformed = {
+        **base,
+        "market_context_freshness_status": {"status": "fresh"},
+        "freshness_status": "fresh",
+    }
+    snapshot = market_state.snapshot_from_market_row(
+        malformed,
+        observed_at="2026-07-21T11:45:00Z",
+    )
+    assert snapshot.freshness_status == "invalid"
+    assert "invalid_market_freshness_status" in snapshot.warnings
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [malformed],
+        observed_at="2026-07-21T11:45:00Z",
+    )
+    assert snapshots[0]["freshness_status"] == "invalid"
+    assert anomalies == []
+
+    canonical = market_state.snapshot_from_market_row(
+        {**base, "market_context_freshness_status": " FRESH "},
+        observed_at="2026-07-21T11:45:00Z",
+    )
+    assert canonical.freshness_status == "fresh"
+    assert "invalid_market_freshness_status" not in canonical.warnings
+
+    for status in ("unknown", "stale"):
+        _, diagnostic_anomalies = market_anomaly_scanner.scan_market_rows(
+            [{**base, "freshness_status": status}],
+            observed_at="2026-07-21T11:45:00Z",
+        )
+        assert len(diagnostic_anomalies) == 1
+
+    classification_snapshot = {
+        key: value
+        for key, value in base.items()
+        if key not in {"coin_id", "symbol", "return_unit"}
+    }
+    for invalid in (True, {"status": "fresh"}, "banana", "invalid"):
+        assert market_anomaly_scanner.classify_market_state({
+            **classification_snapshot,
+            "freshness_status": invalid,
+        }) == market_anomaly_scanner.NO_REACTION
+
+
 def test_benchmark_selection_rejects_invalid_fallthrough_conflict_and_duplicates():
     from crypto_rsi_scanner.event_alpha.radar import market_state
 

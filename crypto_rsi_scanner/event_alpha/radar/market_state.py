@@ -46,6 +46,23 @@ _RETURN_UNIT_FIELDS = (
     "market_return_unit",
     "unit",
 )
+_FRESHNESS_FIELDS = (
+    "market_context_freshness_status",
+    "freshness_status",
+)
+_ALLOWED_FRESHNESS_STATUSES = frozenset(
+    {
+        "fresh",
+        "stale",
+        "expired",
+        "unknown",
+        "missing",
+        "unavailable",
+        "invalid",
+        "future",
+        "fixture_allowed_stale",
+    }
+)
 _NORMALIZED_RETURN_FIELDS = (
     "return_5m",
     "return_15m",
@@ -194,15 +211,18 @@ def snapshot_from_market_row(
         source_observation_time is not None
         and _parse_observation_time(source_observation_time) is None
     )
+    explicit_freshness, freshness_claim_invalid = _explicit_freshness_status(row)
+    if freshness_claim_invalid:
+        warnings.append("invalid_market_freshness_status")
     if source_observation_time_invalid:
         warnings.append("invalid_source_observation_time")
         freshness = "unknown"
+    elif freshness_claim_invalid:
+        freshness = "invalid"
+    elif explicit_freshness is not None:
+        freshness = explicit_freshness
     else:
-        freshness = str(
-            row.get("market_context_freshness_status")
-            or row.get("freshness_status")
-            or ("fresh" if _has_valid_row_observation_time(row) else "unknown")
-        )
+        freshness = "fresh" if _has_valid_row_observation_time(row) else "unknown"
     source = str(row.get("market_data_source") or row.get("source") or "fixture")
     market_history_observation_id = _optional_string(
         row.get("market_history_observation_id"),
@@ -618,6 +638,24 @@ def _observed_at(row: Mapping[str, Any], observed_at: datetime | str | None) -> 
 def _has_valid_row_observation_time(row: Mapping[str, Any]) -> bool:
     value = _first_present_value(row, "observed_at", "timestamp")
     return value is not None and _parse_observation_time(value) is not None
+
+
+def _explicit_freshness_status(row: Mapping[str, Any]) -> tuple[str | None, bool]:
+    """Return a closed status without falling through invalid higher aliases."""
+
+    for key in _FRESHNESS_FIELDS:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value is None or value == "":
+            continue
+        if not isinstance(value, str):
+            return None, True
+        status = value.strip().casefold()
+        if status not in _ALLOWED_FRESHNESS_STATUSES:
+            return None, True
+        return status, False
+    return None, False
 
 
 def _parse_observation_time(value: object) -> datetime | None:

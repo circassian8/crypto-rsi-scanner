@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Close market freshness claim semantics · Codex
+**Why:** Object-valued or otherwise malformed freshness metadata was converted
+to printable text and still allowed raw anomaly creation. An invalid
+higher-authority `market_context_freshness_status` could also fall through to a
+more optimistic lower `freshness_status` alias.
+**Changes:** Canonical market-state freshness now uses the same closed typed
+status vocabulary as Decision policy, with presence-aware alias precedence and
+lowercase canonicalization. Malformed type or enum claims become `invalid` with
+`invalid_market_freshness_status`; invalid higher-authority evidence cannot
+borrow a lower alias. The anomaly classifier rejects malformed freshness and
+invalid source-clock warnings, including when called directly, while valid
+`unknown` and `stale` snapshots remain available as diagnostic anomalies. No
+freshness-age threshold, anomaly rule, score, route, or provider policy changed.
+**Verify:** The exact structured-freshness reproduction changed from a
+stringified status with no warning and one anomaly to `freshness=invalid`, an
+explicit warning, and zero anomalies. Focused freshness and timestamp
+regressions passed (`8 passed`); the wider market surfaces, alias precedence,
+timestamp, numeric/unit integrity, anomaly report, no-send normalization, and
+Decision-v2 suites passed (`199 passed`). `make
+event-alpha-market-anomaly-smoke PYTHON=python3` retained 8 snapshots and the
+expected 5 fixture anomalies, with zero doctor blockers and only the two
+expected standalone missing source/readiness warnings. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the freshness,
+clock, classifier, Decision, and matched smoke paths were exercised directly.
+No provider call, authority change, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-file size
+remains advisory; artifact, security, provider, request, freshness, and
+resource bounds remain enforced.
+
 ## 2026-07-21 — Require typed catalyst source-plan names · Codex
 **Why:** Structured or boolean members in
 `suggested_source_packs_to_search` were stringified into apparent pack names,

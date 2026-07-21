@@ -48,6 +48,19 @@ HIGH_LIQUIDITY_BREAKOUT = "high_liquidity_breakout"
 LOW_LIQUIDITY_SUSPICIOUS = "low_liquidity_suspicious"
 LATE_MOMENTUM_NEEDS_CROWDING_CHECK = "late_momentum_needs_crowding_check"
 SELLOFF_RISK = "selloff_risk"
+_MARKET_FRESHNESS_STATUSES = frozenset(
+    {
+        "fresh",
+        "stale",
+        "expired",
+        "unknown",
+        "missing",
+        "unavailable",
+        "invalid",
+        "future",
+        "fixture_allowed_stale",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -235,7 +248,10 @@ def classify_market_state(
 ) -> str:
     cfg = cfg or MarketAnomalyScannerConfig()
     row = source_row or {}
-    if _unit_contract_blocks_classification(snapshot):
+    if (
+        _unit_contract_blocks_classification(snapshot)
+        or _freshness_contract_blocks_classification(snapshot)
+    ):
         return NO_REACTION
     r4 = _float(snapshot.get("return_4h")) or 0.0
     r24 = _float(snapshot.get("return_24h")) or 0.0
@@ -1308,6 +1324,29 @@ def _unit_contract_blocks_classification(snapshot: Mapping[str, Any]) -> bool:
     if isinstance(warnings, (list, tuple)):
         return bool(warnings)
     return True
+
+
+def _freshness_contract_blocks_classification(snapshot: Mapping[str, Any]) -> bool:
+    for key in ("freshness_status", "market_context_freshness_status"):
+        if key not in snapshot:
+            continue
+        value = snapshot.get(key)
+        if value is None or value == "":
+            continue
+        status = _text(value).casefold()
+        if status not in _MARKET_FRESHNESS_STATUSES or status == "invalid":
+            return True
+        break
+    warnings = snapshot.get("warnings")
+    if not isinstance(warnings, (list, tuple)):
+        return warnings not in (None, "")
+    return any(
+        warning in {
+            "invalid_market_freshness_status",
+            "invalid_source_observation_time",
+        }
+        for warning in warnings
+    )
 
 
 def _count(value: object) -> int | None:
