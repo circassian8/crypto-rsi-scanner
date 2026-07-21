@@ -1,9 +1,11 @@
 """Current Protocol-v2 evidence progress beside the immutable readiness contract.
 
 The 2026-07-16 readiness implementation is canonical empirical evidence and is
-fingerprinted by the export policy.  This module projects later accepted human
-decisions plus a dated, manually reconciled operator evidence frontier without
-changing that evidence, reading ambient state, or opening the holdout.
+fingerprinted by the export policy. This module projects later accepted human
+decisions plus a dated structural evidence frontier without changing that
+evidence, reading ambient state, or opening the holdout. Changing campaign
+measurements remain owned by the canonical artifact-derived campaign report,
+which this projection references without reading or duplicating its values.
 """
 
 from __future__ import annotations
@@ -52,6 +54,7 @@ from crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2 
 )
 from crypto_rsi_scanner.event_alpha.operations import empirical_live_campaign
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
+from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign
 from crypto_rsi_scanner.event_alpha.operations import (
     market_observation_campaign_episode_frontier,
 )
@@ -72,10 +75,11 @@ from crypto_rsi_scanner.event_providers.tokenomist_v5 import (
 
 
 SCHEMA_ID = "decision_radar.empirical_protocol_v2_current_progress"
-SCHEMA_VERSION = 1
-PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v24"
+SCHEMA_VERSION = 2
+PROGRESS_VERSION = "decision_radar_empirical_protocol_v2_current_progress_v25"
 PROGRESS_SOURCE = (
-    "accepted_decisions_and_verified_operator_state_as_of_2026_07_20_"
+    "accepted_decisions_and_verified_structural_operator_state_as_of_2026_07_21_"
+    "with_canonical_dynamic_campaign_truth_surface_"
     "with_prospective_outcome_blind_point_in_time_control_context_projection_"
     "and_forward_empirical_episode_coverage_frontier_projection_v5_"
     "and_current_cycle_temporal_24h_market_regime_collection_"
@@ -466,6 +470,21 @@ _EXPECTED_EPISODE_COVERAGE_FRONTIER = {
     "writes": 0,
     "research_only": True,
 }
+_EXPECTED_CAMPAIGN_TRUTH_SURFACE = {
+    "report_schema_id": market_observation_campaign.CAMPAIGN_REPORT_SCHEMA,
+    "canonical_json_path": (
+        "research/" + market_observation_campaign.CAMPAIGN_REPORT_JSON_FILENAME
+    ),
+    "canonical_markdown_path": (
+        "research/" + market_observation_campaign.CAMPAIGN_REPORT_MD_FILENAME
+    ),
+    "refresh_command": "make radar-market-campaign-report PYTHON=.venv/bin/python",
+    "changing_measurements_embedded": False,
+    "measurement_authority": "artifact_derived_campaign_report",
+    "progress_projection_file_reads": 0,
+    "progress_projection_writes": 0,
+    "progress_projection_provider_calls": 0,
+}
 
 
 def current_progress_values() -> dict[str, Any]:
@@ -481,7 +500,7 @@ def current_progress_values() -> dict[str, Any]:
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
         "progress_version": PROGRESS_VERSION,
-        "as_of": "2026-07-20",
+        "as_of": "2026-07-21",
         "status": "venue_selected_evidence_collection_blocked",
         "source": PROGRESS_SOURCE,
         "frozen_readiness_contract": {
@@ -596,6 +615,7 @@ def current_progress_values() -> dict[str, Any]:
         "episode_coverage_frontier_contract": deepcopy(
             _EXPECTED_EPISODE_COVERAGE_FRONTIER
         ),
+        "campaign_truth_surface": deepcopy(_EXPECTED_CAMPAIGN_TRUTH_SURFACE),
         "current_activation_blockers": list(_CURRENT_BLOCKERS),
         "next_safe_commands": list(_NEXT_SAFE_COMMANDS),
         "safety": {field: 0 for field in _SAFETY_ZERO_FIELDS},
@@ -620,6 +640,7 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
         "structured_unlock_contract",
         "prospective_control_context_contract",
         "episode_coverage_frontier_contract",
+        "campaign_truth_surface",
         "current_activation_blockers",
         "next_safe_commands",
         "safety",
@@ -628,11 +649,14 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
     if set(value) != expected_top:
         errors.append("top_level_schema_mismatch")
         return errors
-    if value.get("schema_id") != SCHEMA_ID or value.get("schema_version") != 1:
+    if (
+        value.get("schema_id") != SCHEMA_ID
+        or value.get("schema_version") != SCHEMA_VERSION
+    ):
         errors.append("schema_identity_mismatch")
     if value.get("progress_version") != PROGRESS_VERSION:
         errors.append("progress_version_mismatch")
-    if value.get("as_of") != "2026-07-20":
+    if value.get("as_of") != "2026-07-21":
         errors.append("as_of_mismatch")
     if value.get("source") != PROGRESS_SOURCE:
         errors.append("source_mismatch")
@@ -732,6 +756,9 @@ def validate_current_progress(value: Mapping[str, Any]) -> list[str]:
     episode_frontier = value.get("episode_coverage_frontier_contract")
     if episode_frontier != _EXPECTED_EPISODE_COVERAGE_FRONTIER:
         errors.append("episode_coverage_frontier_contract_mismatch")
+    campaign_truth = value.get("campaign_truth_surface")
+    if campaign_truth != _EXPECTED_CAMPAIGN_TRUTH_SURFACE:
+        errors.append("campaign_truth_surface_mismatch")
 
     blockers = value.get("current_activation_blockers")
     if blockers != list(_CURRENT_BLOCKERS):
@@ -770,6 +797,7 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
     unlock = payload["structured_unlock_contract"]
     control_context = payload["prospective_control_context_contract"]
     episode_frontier = payload["episode_coverage_frontier_contract"]
+    campaign_truth = payload["campaign_truth_surface"]
     lines = [
         "DECISION RADAR EMPIRICAL PROTOCOL V2 CURRENT PROGRESS",
         f"status={payload['status']}",
@@ -1054,6 +1082,13 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
             "complete_current_universe_required=true decision_policy_exposure=false"
         ),
         (
+            "dynamic_campaign_truth="
+            f"{campaign_truth['canonical_json_path']} "
+            f"schema={campaign_truth['report_schema_id']} "
+            "changing_measurements_embedded=false"
+        ),
+        f"dynamic_campaign_truth_refresh={campaign_truth['refresh_command']}",
+        (
             "provider_calls=0 credential_reads=0 environment_reads=0 file_reads=0 "
             "file_writes=0 holdout_reads=0"
         ),
@@ -1067,8 +1102,9 @@ def format_current_progress(value: Mapping[str, Any] | None = None) -> str:
         "",
         (
             "The immutable readiness contract still records its freeze-time placeholders. "
-            "This separate projection is current operator truth and does not freeze or "
-            "activate Protocol v2."
+            "This separate projection is current structural operator truth; changing "
+            "campaign measurements remain in the canonical campaign report. It does "
+            "not freeze or activate Protocol v2."
         ),
     ]
     return "\n".join(lines)

@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Separate structural progress from live campaign truth · Codex
+**Why:** The checked-in Protocol-v2 “current progress” note still repeated old
+campaign counts and missing asset names after the canonical campaign report had
+advanced. Both surfaces were individually valid, but together they gave the
+operator contradictory current evidence.
+**Changes:**
+- Bumped the current-progress projection to schema v2 / progress v25 and added
+  one closed `campaign_truth_surface` that names the canonical campaign schema,
+  JSON/Markdown paths, and exact no-provider refresh command.
+- Kept the progress projection deterministic and zero-I/O: it embeds no changing
+  measurement value and performs zero file reads, writes, or provider calls.
+- Removed copied cycle, coverage, route/origin, and missing-asset values from
+  the structural progress note. It now routes operators to the artifact-derived
+  campaign report, which remains the sole owner of those changing values.
+- Recorded the source-of-truth boundary in `DECISIONS.md` and closed the roadmap
+  item without changing Protocol-v2 evidence eligibility.
+**Verify:** Focused current-progress tests, its Make check, compileall, campaign
+report regeneration, JSON parsing, and diff checks passed. The progress CLI
+made zero file/provider reads or writes; campaign regeneration used immutable
+local artifacts and made zero provider calls. Architecture cleanliness passed;
+source-size and ownership findings remain advisory and non-blocking.
+**Notes/risks:** This does not alter campaign evidence, an anomaly, score,
+threshold, route, outcome, provider authorization, or the frozen Protocol-v2
+readiness contract. Protocol v2 remains blocked and unfrozen; the holdout remains
+undefined and unopened.
+
 ## 2026-07-21 — Publish the sixty-first no-send market cycle · Codex
 **Why:** The prior timing-publication defect was fixed and the one-hour cadence
 boundary was eligible. The campaign needed another genuine point-in-time

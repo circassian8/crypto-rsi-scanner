@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep changing campaign truth out of structural progress notes
+**Status:** accepted
+**Decision:** The Protocol-v2 current-progress projection and its checked-in
+note own structural capabilities, accepted decisions, and unresolved activation
+boundaries. They must not copy volatile campaign counts, asset identities,
+outcome totals, or dashboard authority. Instead, the versioned projection
+exposes the canonical campaign JSON/Markdown paths and exact local refresh
+command without reading those files. The artifact-derived
+`RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT` remains the single source for changing
+measurement truth.
+**Why:** Manually copied observations, coverage, episode counts, and missing
+assets became stale after later successful cycles even while the canonical
+campaign report remained correct. Separating stable structure from dynamic
+measurement removes that contradiction and preserves the progress command's
+zero-I/O, zero-provider safety contract.
+**Revisit when:** A future unified status command reads a fingerprinted campaign
+report through an explicit bounded read-only interface; it must still copy the
+canonical values rather than re-evaluate or maintain a second counter set.
+
 ## 2026-07-21 - Keep strict publication schema-valid and global macro context-only
 **Status:** accepted
 **Decision:** Serialize each return leg's anchor-error range by applying the

@@ -31,8 +31,9 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     decision = values["confirmed_execution_decision"]
 
     assert progress.validate_current_progress(values) == []
-    assert values["progress_version"].endswith("_v24")
-    assert values["as_of"] == "2026-07-20"
+    assert values["schema_version"] == 2
+    assert values["progress_version"].endswith("_v25")
+    assert values["as_of"] == "2026-07-21"
     assert values["status"] == "venue_selected_evidence_collection_blocked"
     assert decision["venue_id"] == "bybit"
     assert decision["instrument_mode"] == "usdt_linear_perpetual"
@@ -357,6 +358,24 @@ def test_current_progress_records_confirmed_venue_and_real_blockers() -> None:
     assert frontier["protocol_v2_evidence_eligible"] is False
     assert frontier["provider_calls"] == frontier["file_reads"] == 0
     assert frontier["writes"] == 0
+    campaign_truth = values["campaign_truth_surface"]
+    assert campaign_truth == {
+        "report_schema_id": "decision_radar_live_observation_campaign_report_v2",
+        "canonical_json_path": (
+            "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
+        ),
+        "canonical_markdown_path": (
+            "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md"
+        ),
+        "refresh_command": (
+            "make radar-market-campaign-report PYTHON=.venv/bin/python"
+        ),
+        "changing_measurements_embedded": False,
+        "measurement_authority": "artifact_derived_campaign_report",
+        "progress_projection_file_reads": 0,
+        "progress_projection_writes": 0,
+        "progress_projection_provider_calls": 0,
+    }
     assert "historical_outcome_recovery_incomplete" in values[
         "current_activation_blockers"
     ]
@@ -445,6 +464,10 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
     episode_frontier_drift["episode_coverage_frontier_contract"][
         "minimum_sample_policy_sealed"
     ] = True
+    campaign_truth_drift = progress.current_progress_values()
+    campaign_truth_drift["campaign_truth_surface"][
+        "changing_measurements_embedded"
+    ] = True
 
     for mutation in (
         digest_drift,
@@ -462,6 +485,7 @@ def test_progress_validation_fails_closed_on_audit_or_safety_drift() -> None:
         quantity_drift,
         control_context_drift,
         episode_frontier_drift,
+        campaign_truth_drift,
     ):
         assert progress.validate_current_progress(mutation)
 
@@ -625,6 +649,15 @@ def test_progress_human_output_and_make_targets_are_explicit(
     assert "input=temporal_return_24h:percent_points" in output.out
     assert "decision_policy_exposure=false" in output.out
     assert "protocol_partition_assignment=false protocol_v2_evidence=false" in output.out
+    assert (
+        "dynamic_campaign_truth="
+        "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json" in output.out
+    )
+    assert "changing_measurements_embedded=false" in output.out
+    assert (
+        "dynamic_campaign_truth_refresh=make radar-market-campaign-report"
+        in output.out
+    )
     assert "- prospective_matched_control_context_incomplete" in output.out
     assert "offline/readiness/queue only; no provider calls" in output.out
     assert "radar-derivatives-bybit-liquidation-smoke" in output.out
@@ -672,6 +705,10 @@ def test_checked_in_progress_note_matches_structured_unlock_frontier() -> None:
     assert "v4 remains deprecated and live-ineligible" in note
     assert "make radar-unlock-tokenomist-v5-readiness" in note
     assert "make radar-unlock-tokenomist-v5-capture-smoke" in note
+    assert "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json" in note
+    assert "does not duplicate its changing counts" in note
+    assert "90 of 1,320" not in note
+    assert "PUMP at rank" not in note
 
 
 def test_primary_readiness_target_leads_with_current_progress() -> None:

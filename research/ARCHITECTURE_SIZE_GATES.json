@@ -2040,8 +2040,16 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_core.py"
     },
     {
+      "function_name": "validate_current_progress",
+      "line_count": 153,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "validate_current_progress",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py"
+    },
+    {
       "function_name": "format_current_progress",
-      "line_count": 310,
+      "line_count": 319,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -2200,9 +2208,9 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 32,
+  "functions_over_limit_count": 33,
   "gate_status": "pass",
-  "generated_at": "2026-07-21T20:02:45.527247+00:00",
+  "generated_at": "2026-07-21T20:26:15.921375+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -4283,8 +4291,8 @@
   ],
   "new_blocking_violation_count": 0,
   "new_blocking_violations": [],
-  "new_measurement_count": 51,
-  "new_violation_count": 51,
+  "new_measurement_count": 52,
+  "new_violation_count": 52,
   "new_violations": [
     {
       "category": "file_over_1500_lines",
@@ -4591,8 +4599,19 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "validate_current_progress",
+      "line_count": 153,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "validate_current_progress",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:validate_current_progress"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "format_current_progress",
-      "line_count": 310,
+      "line_count": 319,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -5120,7 +5139,7 @@
   "production_files_over_1500_lines": 10,
   "production_files_over_2000_lines": 4,
   "production_files_over_3000_lines": 1,
-  "production_functions_over_limit": 32,
+  "production_functions_over_limit": 33,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -5219,8 +5238,16 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_core.py"
     },
     {
+      "function_name": "validate_current_progress",
+      "line_count": 153,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "validate_current_progress",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py"
+    },
+    {
       "function_name": "format_current_progress",
-      "line_count": 310,
+      "line_count": 319,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -5737,7 +5764,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 32,
+      "functions_over_150_lines": 33,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -6073,7 +6100,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 32,
+    "functions_over_150_lines": 33,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
@@ -6122,6 +6149,7 @@
     "function:crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py:model_bybit_visible_book_round_trip",
     "function:crypto_rsi_scanner/event_alpha/operations/empirical_replay_core.py:_evaluate_observation",
     "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:format_current_progress",
+    "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:validate_current_progress",
     "function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:_impact_cost_lines",
     "function:crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py:build_execution_quality_readiness",
     "function:crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py:point_in_time_control_market_regime",
@@ -6499,8 +6527,19 @@
     },
     {
       "category": "function_over_150_lines",
+      "function_name": "validate_current_progress",
+      "line_count": 153,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "validate_current_progress",
+      "severity": "advisory",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py",
+      "violation_id": "function:crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py:validate_current_progress"
+    },
+    {
+      "category": "function_over_150_lines",
       "function_name": "format_current_progress",
-      "line_count": 310,
+      "line_count": 319,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",

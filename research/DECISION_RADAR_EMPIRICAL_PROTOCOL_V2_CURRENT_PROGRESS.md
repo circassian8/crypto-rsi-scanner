@@ -9,6 +9,14 @@ readiness contract. It does not replace or rewrite
 implementation. The frozen contract remains byte-identical at readiness
 SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
 
+This note owns structural capabilities and unresolved activation boundaries. It
+does not duplicate its changing counts, current assets, outcomes, or dashboard
+authority. Their single canonical current source is
+`research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json`, with the Markdown report
+as its human-readable rendering. Refresh both from immutable local artifacts
+with `make radar-market-campaign-report PYTHON=.venv/bin/python`; the static
+Protocol-v2 progress command references that surface without reading it.
+
 ## Confirmed
 
 - venue: Bybit;
@@ -62,20 +70,16 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   same-clock top-liquid set with ready causal `temporal_return_24h` evidence.
   It compares BTC with the universe median, binds the input observations by
   digest, and writes `risk_on`, `risk_off`, or `mixed` only to those retained
-  history rows. It does not expose the field to Decision evaluation. The 09:27
-  UTC DNS failure and 10:27 UTC timeout were followed by a strict-clean 11:34
-  UTC success and a second strict-clean 12:34 UTC success. Prospective
-  universe/liquidity context now covers 90 of 1,320 baseline-counted rows.
-  Current-universe volume and turnover baselines are warm for all 30 assets,
-  but PUMP and WBT still lack closed causal 24-hour inputs in the latest
-  complete universe, so market-regime coverage remains honestly zero;
+  history rows. It does not expose the field to Decision evaluation. The
+  canonical campaign report owns the current coverage counts, exact missing
+  asset identities, and latest immutable-generation binding; incomplete input
+  remains unavailable instead of being inferred or backfilled;
 - the canonical campaign report now derives a digest-bound all-category
   episode coverage frontier from the frozen Decision-v2 episode scorecard and
-  copies it into the dashboard without re-evaluation. Current genuine evidence
-  is three fixed-start episodes with four dependent repeats: two
-  `dashboard_watch`, one `risk_watch`, and only `market_led` as the primary
-  origin. The remaining six routes and six primary origins are explicit zero
-  rows. This is descriptive only: minimum samples, statistical/cross-asset
+  copies it into the dashboard without re-evaluation. The report, not this
+  structural note, owns the changing per-route, per-origin, episode, repeat,
+  and matured-outcome counts. Zero categories remain explicit missing evidence.
+  This is descriptive only: minimum samples, statistical/cross-asset
   independence, matched controls, annex binding, and Protocol-v2 evidence
   eligibility all remain false;
 - forward empirical live projection v5 now preserves that exact closed
@@ -127,17 +131,15 @@ SHA-256 `683f03fe74306a80acaebf2556e2652cc67e9c725d97deb6dd083b3b28109603`.
   eligibility; v4 remains deprecated and live-ineligible;
 - sources, partitions and untouched holdout, outcomes, costs, universe, routes,
   episodes, minimum samples, and final human annex approval remain unsealed.
-- six of eight canonical routes and six of seven canonical primary origins
-  still have no genuine fixed-start episode. A zero row means missing evidence,
-  not strength, weakness, safety, or validation;
+- canonical routes or origins with no genuine fixed-start episode remain
+  explicit zero rows in the canonical campaign report. A zero row means
+  missing evidence, not strength, weakness, safety, or validation;
 - prospective matched-control context remains incomplete: the current campaign
-  has no successful post-implementation market-regime row and no sealed
-  Protocol-v2 partition, so no complete match row or matched control is
-  available. The campaign's exact-authority, manifest-digest-bound diagnostic
-  proves the latest top-liquid generation has causal 24-hour regime inputs for
-  28 of 30 rows. It identifies PUMP at rank 15 and WBT at rank 27 as missing the
-  value, percent-point unit, and closed evidence reference; the collector
-  correctly refuses to infer or backfill a regime from that incomplete set.
+  report owns the exact market-regime, partition, complete-match, and matched-
+  control counts plus the missing-input identities. Until one row carries both
+  a collected regime and a sealed Protocol-v2 partition, no complete match or
+  matched control is available. The collector correctly refuses to infer or
+  backfill either field.
 
 No Protocol-v2 replay, selection, or final-test target exists. The holdout is
 undefined and unopened. Missing evidence remains unavailable and cannot be
@@ -148,6 +150,7 @@ proxied.
 ```sh
 make radar-research-protocol-v2-progress PYTHON=.venv/bin/python
 make radar-research-protocol-v2-progress-check PYTHON=.venv/bin/python
+make radar-market-campaign-report PYTHON=.venv/bin/python
 make radar-execution-quality-readiness PYTHON=.venv/bin/python
 make radar-intraday-bybit-readiness PYTHON=.venv/bin/python
 make radar-derivatives-bybit-readiness PYTHON=.venv/bin/python

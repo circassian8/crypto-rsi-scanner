@@ -1532,7 +1532,7 @@
   ],
   "function_count": 11209,
   "function_line_limit": 150,
-  "functions_over_150_lines": 32,
+  "functions_over_150_lines": 33,
   "functions_over_limit": [
     {
       "function_name": "_validate_closed_projection",
@@ -1631,8 +1631,16 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_core.py"
     },
     {
+      "function_name": "validate_current_progress",
+      "line_count": 153,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "validate_current_progress",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py"
+    },
+    {
       "function_name": "format_current_progress",
-      "line_count": 310,
+      "line_count": 319,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -1791,8 +1799,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 32,
-  "generated_at": "2026-07-21T20:02:49.447880+00:00",
+  "functions_over_limit_count": 33,
+  "generated_at": "2026-07-21T20:26:19.816066+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3440,7 +3448,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 32,
+  "production_functions_over_limit": 33,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -3539,8 +3547,16 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_core.py"
     },
     {
+      "function_name": "validate_current_progress",
+      "line_count": 153,
+      "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
+      "public": true,
+      "qualname": "validate_current_progress",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py"
+    },
+    {
       "function_name": "format_current_progress",
-      "line_count": 310,
+      "line_count": 319,
       "module": "crypto_rsi_scanner.event_alpha.operations.empirical_validation_protocol_v2_progress",
       "public": true,
       "qualname": "format_current_progress",
@@ -4153,7 +4169,7 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 32,
+      "functions_over_150_lines": 33,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
@@ -4446,7 +4462,7 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 32,
+    "functions_over_150_lines": 33,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
