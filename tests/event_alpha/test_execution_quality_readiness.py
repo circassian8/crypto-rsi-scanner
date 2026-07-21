@@ -939,6 +939,19 @@ def test_cli_human_output_succeeds_without_activation(capsys: pytest.CaptureFixt
     assert "live_adapter_activated" not in output.out
     assert "trade, order, or execution action is authorized" in output.out
 
+    assert main(["--summary"]) == 0
+    summary = capsys.readouterr()
+    assert summary.err == ""
+    assert "report=crypto_decision_radar_execution_quality_readiness" in summary.out
+    assert "contract_version=crypto_radar_execution_quality_readiness_v22" in summary.out
+    assert "selected_surface=bybit:perpetual:USDT" in summary.out
+    assert "current_live_authorization=not_inspected_by_static_readiness" in summary.out
+    assert "eligible_instrument_set_frozen=false count=0" in summary.out
+    assert "bybit_public_endpoint_reachability_unverified_after_recorded_403" in summary.out
+    assert "provider_attempted:false" in summary.out
+    assert "order_permission:false" in summary.out
+    assert "radar-execution-quality-readiness-full" in summary.out
+
 
 def test_make_targets_are_static_readiness_only() -> None:
     def dry_run(target: str) -> str:
@@ -952,12 +965,15 @@ def test_make_targets_are_static_readiness_only() -> None:
         return completed.stdout
 
     human = dry_run("radar-execution-quality-readiness")
+    full = dry_run("radar-execution-quality-readiness-full")
     structured = dry_run("radar-execution-quality-readiness-json")
 
     assert "operations.execution_quality_readiness" in human
-    assert "--json" not in human
+    assert human.count("--summary") == 1
+    assert "--summary" not in full
+    assert "--json" not in full
     assert structured.count("--json") == 1
-    rendered = f"{human}\n{structured}".casefold()
+    rendered = f"{human}\n{full}\n{structured}".casefold()
     assert "place-order" not in rendered
     assert "execute-order" not in rendered
 
@@ -969,6 +985,8 @@ def test_checked_operator_decision_package_records_selection_and_boundaries() ->
     assert "Bybit" in rendered
     assert "USDT-linear perpetual" in rendered
     assert "public market data only" in rendered
+    assert CONTRACT_VERSION in rendered
+    assert "radar-execution-quality-readiness-full" in rendered
     assert "immutable exact-response\ncapture contract are implemented but inactive" in rendered
     assert "protocol_v2_input_quality_eligible" in rendered
     assert "protocol_v2_evidence_eligible=false" in rendered
@@ -1004,6 +1022,10 @@ def test_north_star_records_selected_inactive_adapter_not_stale_no_selection() -
     decision = payload["operator_decisions"]["execution_venue_and_spread_provider"]
 
     assert readiness["contract_version"] == CONTRACT_VERSION
+    assert "concise summary" in readiness["static_readiness_default_output"]
+    assert "radar-execution-quality-readiness-full" in readiness[
+        "static_readiness_default_output"
+    ]
     assert readiness["primary_cost_currency"] == "USDT"
     assert readiness["primary_cost_currency_policy_sealed"] is True
     assert readiness["usd_equivalence_assumed"] is False

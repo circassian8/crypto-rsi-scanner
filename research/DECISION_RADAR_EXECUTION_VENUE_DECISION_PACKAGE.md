@@ -7,10 +7,13 @@ no credential, private-data access, order path, or trading permission is
 active**.
 
 This is the concise operator view of
-`crypto_radar_execution_quality_readiness_v20`. Run
-`make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the full
-static report or add `-json` to the target name for its closed structured form.
-Both commands read no environment, credentials, files, providers, or holdout
+`crypto_radar_execution_quality_readiness_v22`. Run
+`make radar-execution-quality-readiness PYTHON=.venv/bin/python` for the bounded
+operator summary, `make radar-execution-quality-readiness-full
+PYTHON=.venv/bin/python` for the complete static venue/cost catalog, or `make
+radar-execution-quality-readiness-json PYTHON=.venv/bin/python` for its closed
+structured form. All three commands read no environment,
+credentials, files, providers, or holdout
 data and perform no writes or network calls.
 
 ## Confirmed primary surface

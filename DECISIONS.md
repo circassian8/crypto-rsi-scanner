@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Lead static execution readiness with selected-surface truth
+**Status:** accepted
+**Decision:** `radar-execution-quality-readiness` prints the bounded selected-
+surface summary. `radar-execution-quality-readiness-full` retains the complete
+static venue/cost catalog and `radar-execution-quality-readiness-json` retains
+the closed structured packet. Direct Python CLI usage keeps full text as its
+compatibility default. The summary must explicitly say it does not inspect live
+authorization and must route to the separate current-authority Bybit readiness.
+**Why:** The 169-line catalog buried the already-confirmed execution choice and
+five remaining blockers, and the checked decision package still called its v22
+source contract v20. Separate summary/full/JSON views make operator truth
+readable without discarding feasibility or cost-model detail.
+**Revisit when:** The selected surface changes or another versioned machine view
+is required. Preserve the complete catalog and static/no-environment boundary.
+
 ## 2026-07-21 - Keep venue-native Bybit derivatives readiness concise
 **Status:** accepted
 **Decision:** The normal `radar-derivatives-bybit-readiness` Make target prints

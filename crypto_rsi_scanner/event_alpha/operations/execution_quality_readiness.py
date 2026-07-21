@@ -53,6 +53,13 @@ from .bybit_execution_latency import (
 
 
 CONTRACT_VERSION = "crypto_radar_execution_quality_readiness_v22"
+SUMMARY_COMMAND = "make radar-execution-quality-readiness PYTHON=.venv/bin/python"
+FULL_REPORT_COMMAND = (
+    "make radar-execution-quality-readiness-full PYTHON=.venv/bin/python"
+)
+JSON_REPORT_COMMAND = (
+    "make radar-execution-quality-readiness-json PYTHON=.venv/bin/python"
+)
 EXECUTION_MODES = ("spot", "perpetual", "dex")
 OFFICIAL_PUBLIC_FEE_REFERENCE_URL = (
     "https://www.bybit.com/en/help-center/article/Trading-Fee-Structure"
@@ -1362,11 +1369,84 @@ def format_execution_quality_readiness(result: ExecutionQualityReadiness) -> str
     return "\n".join(lines)
 
 
+def format_execution_quality_readiness_summary(
+    result: ExecutionQualityReadiness,
+) -> str:
+    """Render the selected surface and unresolved gates without the catalog."""
+
+    if (
+        result.selected_venue != result.intended_venue
+        or result.selected_execution_mode != result.intended_instrument_mode
+        or result.selected_venue is None
+        or result.selected_execution_mode is None
+        or result.quote_currency is None
+    ):
+        raise ValueError("execution_quality_selected_surface_mismatch")
+    if result.eligible_instrument_set_frozen != bool(result.eligible_instrument_set):
+        raise ValueError("execution_quality_eligible_set_state_mismatch")
+    if result.protocol_v2_cost_model_sealed == bool(
+        result.remaining_protocol_v2_cost_fields
+    ):
+        raise ValueError("execution_quality_cost_seal_state_mismatch")
+
+    lines = (
+        "report=crypto_decision_radar_execution_quality_readiness",
+        f"contract_version={result.contract_version}",
+        f"status={result.status}",
+        "selected_surface="
+        f"{result.selected_venue}:{result.selected_execution_mode}:{result.quote_currency}",
+        f"operator_decision={result.operator_decision}",
+        "jurisdiction_and_account_eligibility_confirmed="
+        f"{str(result.jurisdiction_and_account_eligibility_confirmed).casefold()} "
+        f"confirmed_at={result.human_decision_confirmed_at}",
+        f"data_boundary={result.expected_public_private_data_boundary}",
+        "current_live_authorization=not_inspected_by_static_readiness",
+        "eligible_instrument_set_frozen="
+        f"{str(result.eligible_instrument_set_frozen).casefold()} "
+        f"count={len(result.eligible_instrument_set)}",
+        f"eligible_instrument_selection_rule={result.eligible_instrument_selection_rule}",
+        f"spread_provider_status={result.spread_provider_status}",
+        "immutable_capture_contract_implemented="
+        f"{str(result.immutable_capture_contract_implemented).casefold()}",
+        "primary_cost_currency="
+        f"{result.primary_cost_currency} policy={result.primary_cost_currency_policy} "
+        f"sealed={str(result.primary_cost_currency_policy_sealed).casefold()}",
+        "protocol_v2_cost_model_sealed="
+        f"{str(result.protocol_v2_cost_model_sealed).casefold()}",
+        "remaining_protocol_v2_cost_fields="
+        + ",".join(result.remaining_protocol_v2_cost_fields),
+        f"fee_rate_authority_status={result.fee_rate_authority_status}",
+        f"selection_blockers={','.join(result.selection_blockers)}",
+        "protocol_v2_annex_bound="
+        f"{str(result.protocol_v2_annex_bound).casefold()} "
+        "protocol_v2_evidence_eligible="
+        f"{str(result.protocol_v2_evidence_eligible).casefold()}",
+        f"next_safe_command={result.next_safe_command}",
+        f"authorization_boundary={result.authorization_boundary}",
+        f"expected_provider_activity={result.expected_provider_activity}",
+        f"rollback_disable_command={result.rollback_disable_command}",
+        "safety="
+        f"provider_planned:{str(result.provider_call_planned).casefold()},"
+        f"provider_attempted:{str(result.provider_call_attempted).casefold()},"
+        f"network_called:{str(result.network_called).casefold()},"
+        f"credentials_read:{str(result.credentials_read).casefold()},"
+        f"writes:{str(result.writes_performed).casefold()},"
+        f"order_permission:{str(result.order_permission_requested).casefold()},"
+        f"trading_permission:{str(result.trading_permission_requested).casefold()},"
+        f"research_only:{str(result.research_only).casefold()}",
+        f"full_report_command={FULL_REPORT_COMMAND}",
+        f"json_report_command={JSON_REPORT_COMMAND}",
+    )
+    return "\n".join(lines)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Report static execution-quality feasibility without provider calls."
     )
-    parser.add_argument("--json", action="store_true", dest="as_json")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", dest="as_json")
+    output.add_argument("--summary", action="store_true", dest="as_summary")
     return parser
 
 
@@ -1375,6 +1455,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     readiness = build_execution_quality_readiness()
     if args.as_json:
         print(json.dumps(readiness.to_dict(), indent=2, sort_keys=True))
+    elif args.as_summary:
+        print(format_execution_quality_readiness_summary(readiness))
     else:
         print(format_execution_quality_readiness(readiness))
     return 0
@@ -1394,6 +1476,7 @@ __all__ = (
     "VENUE_CAPABILITIES",
     "build_execution_quality_readiness",
     "format_execution_quality_readiness",
+    "format_execution_quality_readiness_summary",
     "main",
 )
 

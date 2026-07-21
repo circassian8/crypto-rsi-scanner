@@ -1424,6 +1424,7 @@
     "capture_command": "CONFIRM=1 make radar-execution-quality-bybit-capture PYTHON=.venv/bin/python",
     "capture_status_command": "make radar-execution-quality-bybit-status PYTHON=.venv/bin/python",
     "contract_version": "crypto_radar_execution_quality_readiness_v22",
+    "static_readiness_default_output": "concise summary; full text via radar-execution-quality-readiness-full and structured packet via radar-execution-quality-readiness-json",
     "derivatives_context_contract_version": "crypto_radar_bybit_derivatives_context_v2",
     "derivatives_context_directional_authority": false,
     "derivatives_context_authorization_boundary": "one genuine fresh execution-quality capture for exact current authority plus already-present RSI_DECISION_RADAR_BYBIT_DERIVATIVES_LIVE=1 and CONFIRM=1; never inherited or created",

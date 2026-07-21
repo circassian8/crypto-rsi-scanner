@@ -567,9 +567,12 @@ may be added later when a suitable environment already exists.
 - **Execution-quality readiness:**
   `make radar-execution-quality-readiness` is static/no-network and reports
   the owner-confirmed Bybit USDT-linear perpetual public-data research surface
-  plus feasible inactive alternatives. The concise checked decision package is
+  in a concise operator summary; `radar-execution-quality-readiness-full`
+  retains the full static venue/cost catalog and
+  `radar-execution-quality-readiness-json` retains the closed structured form.
+  Direct Python CLI use keeps the full text compatibility default. The concise checked decision package is
   `research/DECISION_RADAR_EXECUTION_VENUE_DECISION_PACKAGE.md`; the structured
-  form is available from `radar-execution-quality-readiness-json`. The confirmed
+  form is also available from `radar-execution-quality-readiness-json`. The confirmed
   universe rule intersects the top 30 liquidity-ranked Radar assets with exact
   active `LinearPerpetual`, `Trading`, USDT-quoted, USDT-settled, non-prelisting
   contracts and freezes the resulting IDs only in the Protocol-v2 annex. Run

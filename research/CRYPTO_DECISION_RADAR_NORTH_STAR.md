@@ -1361,7 +1361,9 @@ The remaining human decisions stay explicit:
   call each configured Fed/BLS/BEA source at most once and never creates or
   mutates authorization.
 - Execution quality: inspect with `make radar-execution-quality-readiness
-  PYTHON=.venv/bin/python` (static/no-network), then run the checked offline
+  PYTHON=.venv/bin/python` (concise and static/no-network); use the `-full`
+  target for the complete static venue/cost catalog or `-json` for the closed
+  structured packet. Then run the checked offline
   normalizer with `make radar-execution-quality-bybit-smoke
   PYTHON=.venv/bin/python`. The direct completed-bar fixture gate is `make
   radar-intraday-bybit-smoke PYTHON=.venv/bin/python`; its latest immutable

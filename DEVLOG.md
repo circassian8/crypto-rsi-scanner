@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Lead execution readiness with selected-surface truth · Codex
+**Why:** Static execution readiness printed a 169-line venue/cost catalog before
+showing the selected Bybit surface and blockers. Its checked decision package
+also described the current v22 contract as v20.
+**Changes:**
+- Added a bounded summary for the confirmed Bybit USDT-linear perpetual surface,
+  public-only boundary, static-versus-live authorization distinction, exact
+  selection blockers, unsealed cost fields, next safe command, and zero-I/O/
+  no-order/no-trading safety.
+- Made the normal Make target use that summary, added an explicit `-full` target
+  for the unchanged catalog, retained `-json`, and kept direct CLI full-text
+  compatibility.
+- Updated the working agreement, North Star, and venue package; the latter now
+  binds the actual `crypto_radar_execution_quality_readiness_v22` contract.
+**Verify:** Compileall and all 16 focused execution-quality readiness tests
+passed. The real summary rendered 25 lines, full mode rendered 169 lines, and
+JSON mode retained the exact selected surface and zero-call/write fields.
+North Star JSON validation, architecture cleanliness, and diff checks passed;
+size findings remain advisory.
+**Notes/risks:** This static command intentionally does not inspect environment
+authorization. Current authorization and immutable-capture truth remain owned by
+`radar-execution-quality-bybit-readiness`. No provider call, artifact write,
+score, route, threshold, outcome, or Protocol-v2 authority changed.
+
 ## 2026-07-21 — Record the guarded 21:09 provider failure · Codex
 **Why:** The hourly observation boundary became eligible, so the campaign needed
 one honest no-send attempt. The restricted local sandbox could not resolve the
