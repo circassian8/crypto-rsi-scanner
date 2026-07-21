@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the fifty-fourth no-send market cycle · Codex
+**Why:** The persisted hourly cadence became eligible with current explicit
+CoinGecko authorization. One bounded observation advances genuine temporal,
+outcome, episode, and prospective control-context evidence without tuning the
+Decision policy.
+**Changes:** Daily Operations made exactly one `/coins/markets` request and
+published `radar_market_no_send_20260721t100649161448z_fd5a142d1615` as the
+strict-clean revision-12 authority. The request returned HTTP 200 with 80 rows
+in 4,153 ms and no retry. Campaign truth advanced to 54 cycles, 1,620 retained
+/ 1,590 baseline-counted / 30 too-close observations, 10 ideas, 6 matured / 3
+pending / 1 `due_missing_price` outcomes, and 360 prospective point-in-time
+universe/liquidity rows. The exact generation has 30 observations and one DEXE
+`risk_watch` idea (actionability 61.15, evidence 52.45, risk 48); it remains
+non-actionable because spread is unavailable. Its causal 24-hour control input
+is 28/30 complete, with DEXE and ENA explicitly unavailable rather than
+inferred. The closed frontier remains 4 fixed-start episodes and 3 matured
+episodes, with 6 dependent repeats; route/origin coverage remains 2/8 and 1/7,
+and eight genuine ideas await explicit human review.
+**Verify:** The immutable publication receipt records strict doctor `OK`, 0
+blockers / 0 warnings, and doctor digest
+`bb3e7fc904a8fd10a6420a155966e728bb028ac119a53cc16b74c3c89895beee`.
+`make radar-daily-ops-status PYTHON=python3` reconciled the next provider
+boundary as `2026-07-21T11:06:51.132321+00:00`. `make
+radar-dashboard-authority-status PYTHON=python3` reports exact authority with
+pointer SHA-256
+`03b2021ed86f0b41550a8b50ae8ba8de723e14c76a3a006c3aa8d8063b35bdaf`.
+Loopback `HEAD /` returned HTTP 200 with the exact namespace, run, revision, and
+operator-state SHA-256
+`3969c8fa41131f51238448ec54866c283477df964e2a8af97583ca71e4d7b326`.
+`jq empty` and `git diff --check` passed.
+**Notes/risks:** This cycle made one already-authorized public market-data call
+and no retry. It sent no Telegram message and created no trade, order, paper
+trade, normal RSI row, or Event Alpha `TRIGGERED_FADE`. Bybit execution,
+intraday, and derivatives authorization remain absent; outcome recovery remains
+separately unauthorized. No source, score, threshold, route, partition, or
+Protocol-v2 policy changed.
+
 ## 2026-07-21 — Enforce source safety at the Decision projection boundary · Codex
 **Why:** The evaluator already rejected malformed or unsafe side-effect claims,
 secrets, and operator paths, but a manually assembled v2 row could bypass that
