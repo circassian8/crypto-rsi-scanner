@@ -235,6 +235,8 @@ def classify_market_state(
 ) -> str:
     cfg = cfg or MarketAnomalyScannerConfig()
     row = source_row or {}
+    if _unit_contract_blocks_classification(snapshot):
+        return NO_REACTION
     r4 = _float(snapshot.get("return_4h")) or 0.0
     r24 = _float(snapshot.get("return_24h")) or 0.0
     rel_btc_4h = _float(snapshot.get("relative_return_vs_btc_4h")) or 0.0
@@ -1272,6 +1274,17 @@ def _semantic_boolean(value: object) -> bool | None:
         if text in {"0", "false", "no", "n", "off"}:
             return False
     return None
+
+
+def _unit_contract_blocks_classification(snapshot: Mapping[str, Any]) -> bool:
+    if "unit_warnings" not in snapshot:
+        return False
+    warnings = snapshot.get("unit_warnings")
+    if warnings in (None, (), []):
+        return False
+    if isinstance(warnings, (list, tuple)):
+        return bool(warnings)
+    return True
 
 
 def _count(value: object) -> int | None:

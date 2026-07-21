@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Block anomaly classification on unit warnings · Codex
+**Why:** A row declaring `10.0` as a fractional return normalized to `1000%`
+and correctly carried seven unit warnings, but the lower-level classifier still
+emitted `confirmed_breakout` and a catalyst-search item before Decision v2
+blocked it.
+**Changes:** Market-state classification now returns `no_reaction` whenever the
+canonical snapshot has any unit warning or a malformed warning container.
+Clean snapshots remain unchanged. This moves the existing fail-closed unit
+policy ahead of anomaly creation without changing normalization, thresholds,
+scores, or route definitions.
+**Verify:** The exact public reproduction still exposes the invalid normalized
+value and all seven audit warnings but now produces zero anomalies. Focused
+unit/state/surface and Decision tests passed (`154 passed`); the wider market
+surface, report, no-send, unit-health, and Decision suite passed (`179 passed`).
+`make event-alpha-market-anomaly-smoke PYTHON=python3` passed with 8 clean
+snapshots and the expected 5 fixture anomalies; its standalone fixture doctor
+had zero blockers and the two expected missing full-cycle source/readiness
+warnings. `python3 -m compileall -q crypto_rsi_scanner tests` and `git diff
+--check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the classifier,
+normalizer, Decision model, and matched smoke were exercised directly. No
+provider call, authority change, send, trade, order, paper trade, normal RSI
+write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-file size
+remains advisory; artifact, security, provider, request, unit, and resource
+bounds remain enforced.
+
 ## 2026-07-21 — Honor semantic untradable controls in anomaly scanning · Codex
 **Why:** The market scanner excluded only the literal boolean `false`. The same
 explicit untradable claim encoded as `"false"`, `"0"`, `"no"`, or numeric zero

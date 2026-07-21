@@ -540,6 +540,51 @@ def test_malformed_benchmark_units_cannot_create_relative_breakout():
     assert anomalies == []
 
 
+def test_unit_warnings_block_market_anomaly_classification():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    row = {
+        "id": "bad-scale",
+        "coin_id": "bad-scale",
+        "symbol": "SCALE",
+        "return_unit": "fraction",
+        "return_4h": 10.0,
+        "return_24h": 10.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 100_000_000.0,
+        "spread_bps": 5.0,
+        "freshness_status": "fresh",
+    }
+
+    snapshots, anomalies = market_anomaly_scanner.scan_market_rows(
+        [row],
+        observed_at="2026-07-21T10:57:00Z",
+    )
+
+    assert snapshots[0]["return_4h"] == 1000.0
+    assert "implausible_fraction_return:return_4h" in snapshots[0]["unit_warnings"]
+    assert anomalies == []
+    assert market_anomaly_scanner.classify_market_state(
+        {
+            "return_4h": 12.0,
+            "return_24h": 18.0,
+            "relative_return_vs_btc_4h": 10.0,
+            "volume_zscore_24h": 3.0,
+            "unit_warnings": ["invalid_source_return_unit_metadata"],
+        }
+    ) == market_anomaly_scanner.NO_REACTION
+    assert market_anomaly_scanner.classify_market_state(
+        {
+            "return_4h": 12.0,
+            "return_24h": 18.0,
+            "relative_return_vs_btc_4h": 10.0,
+            "volume_zscore_24h": 3.0,
+            "unit_warnings": "malformed-warning-container",
+        }
+    ) == market_anomaly_scanner.NO_REACTION
+
+
 def test_market_no_send_normalization_preserves_canonical_numeric_zeroes():
     from crypto_rsi_scanner.event_alpha.operations import market_no_send_features
 
