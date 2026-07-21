@@ -40,6 +40,16 @@ ALLOWED_RADAR_ROUTES = (
     "dashboard_watch", "actionable_watch", "high_confidence_watch", "rapid_market_anomaly",
     "fade_exhaustion_review", "risk_watch", "calendar_risk", "diagnostic",
 )
+_MODEL_TEXT_COLLECTION_FIELDS = (
+    "thesis_origins", "decision_hard_blockers", "decision_soft_penalties",
+    "decision_missing_data", "decision_warnings", "why_still_worth_reviewing",
+    "radar_what_confirms", "radar_what_invalidates",
+)
+_PROJECTION_TEXT_COLLECTION_FIELDS = (
+    "hard_blockers", "soft_penalties", "warnings", "supporting_facts",
+    "missing_information", "main_risks", "what_confirms", "what_invalidates",
+    "source_independence_errors",
+)
 
 FIELDS = (
     "decision_model_version", "decision_model_enabled", "thesis_origin",
@@ -202,13 +212,18 @@ def _validate_contract(row: Mapping[str, Any]) -> list[str]:
             errors.append("decision_model_duplicate_thesis_origins")
         elif origins[0] != str(row.get("primary_thesis_origin") or ""):
             errors.append("decision_model_primary_thesis_origin_order_mismatch")
-    for field in (
-        "decision_hard_blockers", "decision_soft_penalties", "decision_missing_data",
-        "decision_warnings", "why_still_worth_reviewing", "radar_what_confirms",
-        "radar_what_invalidates",
-    ):
+    for field in _MODEL_TEXT_COLLECTION_FIELDS:
+        if field == "thesis_origins" and not extended_contract:
+            continue
         if not _is_sequence(row.get(field)):
             errors.append(f"decision_model_invalid_type:{field}")
+        elif any(
+            not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            for value in row.get(field, ())
+        ):
+            errors.append(f"decision_model_invalid_collection_value:{field}")
     source_safety_blockers = {
         "decision_source_side_effect_safety_failed": "research_safety_invariant_failed",
         "decision_source_secret_safety_failed": "secret_safety_failed",
@@ -311,6 +326,14 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
     ):
         if field in row and not _is_sequence(row.get(field)):
             errors.append(f"decision_projection_invalid_type:{field}")
+    for field in _PROJECTION_TEXT_COLLECTION_FIELDS:
+        if field in row and _is_sequence(row.get(field)) and any(
+            not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            for value in row.get(field, ())
+        ):
+            errors.append(f"decision_projection_invalid_collection_value:{field}")
     for field in (
         "rsi_context", "source_provider_lineage", "decision_safety_invariants",
         "source_independence",
@@ -523,7 +546,7 @@ def _validate_projection_source_independence(
     raw_errors = row.get("source_independence_errors")
     if not _is_sequence(raw_errors) or any(
         not isinstance(item, str) or not item.strip() or len(item) > 160
-        for item in _items(raw_errors)
+        for item in raw_errors
     ):
         errors.append("decision_projection_source_independence_errors_invalid")
     for field in count_fields:

@@ -536,6 +536,52 @@ def test_projection_rejects_non_text_observation_identity_and_lineage():
         assert decision_model_values(malformed_raw) == {}
 
 
+def test_projection_rejects_non_text_operator_rationale_collections():
+    from copy import deepcopy
+
+    from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import (
+        validate_contract,
+    )
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    projected = decision_model_values(_market_led_candidate())
+    assert projected
+
+    malformed_support = deepcopy(projected)
+    malformed_support["supporting_facts"] = [{"fact": "liquid breakout"}]
+    malformed_aliases = deepcopy(projected)
+    malformed_aliases["decision_warnings"] = [
+        {"warning": "unknown_catalyst"}
+    ]
+    malformed_aliases["warnings"] = [{"warning": "unknown_catalyst"}]
+    malformed_risks = deepcopy(projected)
+    malformed_risks["main_risks"] = [True]
+
+    for malformed in (
+        malformed_support,
+        malformed_aliases,
+        malformed_risks,
+    ):
+        assert validate_contract(malformed)
+        assert decision_model_values(malformed) == {}
+
+    for malformed_raw in (
+        _market_led_candidate(thesis_origins=[{"origin": "market_led"}]),
+        _market_led_candidate(
+            decision_warnings=[{"warning": "unknown_catalyst"}]
+        ),
+        _market_led_candidate(why_still_worth_reviewing=[True]),
+        _market_led_candidate(
+            supporting_facts=[{"fact": "liquid breakout"}]
+        ),
+        _market_led_candidate(supporting_evidence_quotes=[["liquid breakout"]]),
+        _market_led_candidate(main_risks=[1]),
+    ):
+        assert decision_model_values(malformed_raw) == {}
+
+
 def test_v2_projection_fails_closed_on_malformed_actionable_route():
     from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
     from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (

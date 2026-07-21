@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject non-text Decision rationale · Codex
+**Why:** Trader-facing Decision collections accepted arbitrary iterable members.
+Mappings and booleans could therefore become strings such as
+`{'warning': 'unknown_catalyst'}` or `True` and render as if they were canonical
+warnings, facts, risks, or confirmation criteria.
+**Changes:** Model and closed-projection rationale collections now require
+nonblank canonical text members at both the raw projection and independent
+artifact-schema boundaries. This covers origins, blockers, penalties, warnings,
+missing information, review rationale, supporting facts, main risks,
+confirmation/invalidation criteria, and source-independence errors. Valid
+tuple/list text is normalized to JSON-shaped lists; objects, nested sequences,
+booleans, numbers, blank members, and whitespace-drifted closed values fail
+closed instead of being stringified.
+**Verify:** `3` focused rationale/identity/idempotence tests passed. The
+`12`-file Decision/schema/merge/calendar suite passed (`205 passed`), and the
+market-provenance, no-send, core-opportunity, and feature-integrity suite passed
+(`69 passed`). `make event-alpha-integrated-radar-smoke PYTHON=python3` passed
+with 15 candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0
+warnings, and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner
+tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the bounded model,
+propagation, and integrated-doctor gates directly cover this projection-only
+change. No provider call, score, threshold, route, send, trade, order, paper
+trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` changed. Source-file
+size is advisory; artifact, security, provider, and resource bounds remain
+enforced.
+
 ## 2026-07-21 — Preserve typed Decision observation identity and lineage · Codex
 **Why:** The closed Decision projection could stringify object-valued
 observation or market-snapshot IDs and retain object/list/bool members inside

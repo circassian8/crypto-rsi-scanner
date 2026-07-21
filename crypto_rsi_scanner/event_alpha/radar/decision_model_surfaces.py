@@ -155,6 +155,19 @@ _SNAPSHOT_REFERENCE_FIELDS = (
     "observed_at", "timestamp", "market_context_freshness_status",
     "freshness_status", "market_snapshot_id", "market_history_observation_id",
 )
+_DECISION_TEXT_COLLECTION_FIELDS = (
+    "thesis_origins", "decision_hard_blockers", "decision_soft_penalties",
+    "decision_warnings", "decision_missing_data", "why_still_worth_reviewing",
+    "radar_what_confirms", "radar_what_invalidates",
+)
+_PROJECTION_TEXT_COLLECTION_FIELDS = (
+    "hard_blockers", "soft_penalties", "warnings", "supporting_facts",
+    "missing_information", "main_risks", "what_confirms", "what_invalidates",
+    "source_independence_errors",
+)
+_SOURCE_RATIONALE_COLLECTION_FIELDS = (
+    "supporting_facts", "supporting_evidence_quotes", "main_risks",
+)
 
 
 def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -185,6 +198,8 @@ def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
         )
         for authority in authorities:
             if _projection_identity_lineage_invalid(authority):
+                return {}
+            if _projection_text_collections_invalid(authority):
                 return {}
             if not _has_decision_model_marker(authority):
                 continue
@@ -485,7 +500,7 @@ def _normalize_projection_collections(projection: dict[str, Any]) -> None:
         "radar_what_confirms", "radar_what_invalidates",
     ):
         if field in projection:
-            projection[field] = _items(projection.get(field))
+            projection[field] = _typed_text_sequence(projection.get(field)) or []
 
 
 def _closed_projection_values(
@@ -1247,6 +1262,21 @@ def _projection_identity_lineage_invalid(source: Mapping[str, Any]) -> bool:
         ):
             return True
     return False
+
+
+def _projection_text_collections_invalid(source: Mapping[str, Any]) -> bool:
+    """Require operator-facing rationale collections to contain text only."""
+
+    return any(
+        field in source
+        and source.get(field) not in (None, "", [], ())
+        and _typed_text_sequence(source.get(field)) is None
+        for field in (
+            *_DECISION_TEXT_COLLECTION_FIELDS,
+            *_PROJECTION_TEXT_COLLECTION_FIELDS,
+            *_SOURCE_RATIONALE_COLLECTION_FIELDS,
+        )
+    )
 
 
 def _typed_text(value: Any) -> str:
