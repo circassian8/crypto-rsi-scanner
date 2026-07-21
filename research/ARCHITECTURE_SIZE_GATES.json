@@ -2210,7 +2210,7 @@
   ],
   "functions_over_limit_count": 33,
   "gate_status": "pass",
-  "generated_at": "2026-07-21T22:31:55.309166+00:00",
+  "generated_at": "2026-07-21T22:50:15.936676+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2378,6 +2378,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1314,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1313,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "source_kind": "production"
@@ -2446,12 +2452,6 @@
       "limit": 1500,
       "line_count": 1235,
       "path": "crypto_rsi_scanner/event_alpha/artifacts/operator_state.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1232,
-      "path": "crypto_rsi_scanner/event_fade.py",
       "source_kind": "production"
     }
   ],
@@ -4268,6 +4268,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1314,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1313,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -5052,6 +5059,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1314,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1313,
       "path": "crypto_rsi_scanner/event_alpha/radar/source_enrichment.py",
       "source_kind": "production"
@@ -5141,7 +5154,7 @@
       "source_kind": "production"
     }
   ],
-  "production_files_over_1200_lines": 42,
+  "production_files_over_1200_lines": 43,
   "production_files_over_1500_lines": 10,
   "production_files_over_2000_lines": 4,
   "production_files_over_3000_lines": 1,
@@ -5672,6 +5685,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1314,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1283,
       "path": "crypto_rsi_scanner/project_health/radar_north_star.py",
       "source_kind": "production"
@@ -5701,7 +5720,7 @@
       "source_kind": "production"
     }
   ],
-  "unresolved_production_files_over_1200_lines": 17,
+  "unresolved_production_files_over_1200_lines": 18,
   "v3_accepted_exceptions": {
     "class_exceptions_remaining": {
       "count": 3,
@@ -5782,7 +5801,7 @@
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
-      "production_files_over_1200_lines": 42,
+      "production_files_over_1200_lines": 43,
       "production_files_over_1500_lines": 10,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
@@ -5924,6 +5943,11 @@
       {
         "line_count": 1333,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1314,
+        "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
         "threshold": 1200
       },
       {
@@ -6123,7 +6147,7 @@
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
-    "production_files_over_1200_lines": 42,
+    "production_files_over_1200_lines": 43,
     "production_files_over_1500_lines": 10,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,

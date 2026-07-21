@@ -52,6 +52,31 @@ def _binding(**overrides: object) -> dict[str, object]:
     return value
 
 
+def _operator_context(**overrides: object) -> dict[str, object]:
+    value: dict[str, object] = {
+        "schema_id": "decision_radar.idea_review_operator_context",
+        "schema_version": 1,
+        "canonical_asset_id": "exact-asset",
+        "symbol": "EXACT",
+        "anomaly_type": "stealth_accumulation",
+        "catalyst_status": "unknown",
+        "confidence_band": "exploratory",
+        "market_phase": "emerging",
+        "timing_state": "early",
+        "preferred_horizon": "3d_7d",
+        "radar_actionable": False,
+        "actionability_score": 62.5,
+        "evidence_confidence_score": 52.0,
+        "risk_score": 48.0,
+        "urgency_score": 45.0,
+        "candidate_identity_bound_by": "integrated_candidates_sha256",
+        "decision_values_bound_by": "decision_projection_sha256",
+        "presentation_only": True,
+    }
+    value.update(overrides)
+    return value
+
+
 def _base(tmp_path: Path) -> Path:
     base = tmp_path / "artifacts"
     (base / timing.LEDGER_DIRECTORY).mkdir(parents=True)
@@ -294,10 +319,23 @@ def test_load_binding_requires_receipts_canonical_projection_and_genuine_campaig
         "radar_route": "dashboard_watch",
         "primary_thesis_origin": "market_led",
         "directional_bias": "long",
+        "anomaly_type": "stealth_accumulation",
+        "catalyst_status": "unknown",
+        "confidence_band": "exploratory",
+        "market_phase": "emerging",
+        "timing_state": "early",
+        "preferred_horizon": "3d_7d",
+        "radar_actionable": False,
+        "actionability_score": 62.5,
+        "evidence_confidence_score": 52.0,
+        "risk_score": 48.0,
+        "urgency_score": 45.0,
     }
     idea = {
         "integrated_candidate_id": "iar:exact-idea",
         "core_opportunity_id": "agg:exact-idea",
+        "canonical_asset_id": "exact-asset",
+        "symbol": "EXACT",
         "decision_projection": projection,
         "research_only": True,
         "decision_radar_campaign_counted": True,
@@ -327,6 +365,24 @@ def test_load_binding_requires_receipts_canonical_projection_and_genuine_campaig
     assert binding["idea_available_at"] == "2026-07-18T12:00:05+00:00"
     assert binding["pipeline_latency_seconds"] == 5.0
     assert binding["publication_receipt_sha256"] != binding["operations_receipt_sha256"]
+
+    contextual = timing.load_idea_binding(
+        base,
+        namespace,
+        "iar:exact-idea",
+        include_operator_context=True,
+    )
+    assert contextual["operator_review_context"] == _operator_context()
+
+    projection["risk_score"] = 101.0
+    with pytest.raises(timing.DecisionReviewTimingError, match="risk_score_invalid"):
+        timing.load_idea_binding(
+            base,
+            namespace,
+            "iar:exact-idea",
+            include_operator_context=True,
+        )
+    projection["risk_score"] = 48.0
 
     idea["decision_radar_campaign_counted"] = False
     with pytest.raises(timing.DecisionReviewTimingError, match="not_genuine"):
@@ -419,6 +475,7 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
                 "artifact_namespace": "radar_market_no_send_exact",
                 "idea_id": "iar:exact",
                 "core_opportunity_id": "agg:exact",
+                "operator_review_context": _operator_context(),
                 "idea_observed_at": "2026-07-20T11:00:00+00:00",
                 "idea_available_at": "2026-07-20T11:00:08+00:00",
                 "next_action": "record_first_view",
@@ -449,10 +506,17 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
     assert "recurring_idea_id_count=0" in output
     assert "idea_group[1].idea_id=iar:exact" in output
     assert "idea_group[1].core_opportunity_ids=agg:exact" in output
+    assert "idea_group[1].symbols=EXACT" in output
+    assert "idea_group[1].canonical_asset_ids=exact-asset" in output
+    assert "idea_group[1].anomaly_types=stealth_accumulation" in output
+    assert "idea_group[1].actionability_score_range=62.5..62.5" in output
     assert "idea_group[1].generation_count=1" in output
     assert "recurrence_is_presentation_only" in output
     assert "record[1].artifact_namespace=radar_market_no_send_exact" in output
     assert "record[1].idea_id=iar:exact" in output
+    assert "record[1].symbol=EXACT" in output
+    assert "record[1].anomaly_type=stealth_accumulation" in output
+    assert "record[1].risk_score=48.0" in output
     assert "record[1].next_safe_command=CONFIRM=1 make" in output
     assert "commands_require_explicit_confirmation=true" in output
     assert "dashboard_reads_recorded_as_human_actions=false" in output
@@ -469,6 +533,10 @@ def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> 
             "radar_route": "dashboard_watch",
             "review_status": "not_viewed",
             "idea_available_at": "2026-07-18T01:00:00+00:00",
+            "operator_review_context": _operator_context(
+                actionability_score=60.0,
+                risk_score=48.0,
+            ),
         },
         {
             "idea_id": "iar:repeat",
@@ -476,6 +544,11 @@ def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> 
             "radar_route": "risk_watch",
             "review_status": "in_review",
             "idea_available_at": "2026-07-20T01:00:00+00:00",
+            "operator_review_context": _operator_context(
+                anomaly_type="risk_off_sell_pressure",
+                actionability_score=63.0,
+                risk_score=56.0,
+            ),
         },
         {
             "idea_id": "iar:single",
@@ -483,6 +556,13 @@ def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> 
             "radar_route": "diagnostic",
             "review_status": "not_viewed",
             "idea_available_at": "2026-07-19T01:00:00+00:00",
+            "operator_review_context": _operator_context(
+                canonical_asset_id="single-asset",
+                symbol="SINGLE",
+                anomaly_type="confirmed_breakout",
+                actionability_score=42.0,
+                risk_score=70.0,
+            ),
         },
     ]
 
@@ -493,6 +573,11 @@ def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> 
     assert values["recurring_idea_id_count"] == 1
     assert values["idea_group[1].idea_id"] == "iar:repeat"
     assert values["idea_group[1].generation_count"] == 2
+    assert values["idea_group[1].symbols"] == "EXACT"
+    assert values["idea_group[1].canonical_asset_ids"] == "exact-asset"
+    assert values["idea_group[1].anomaly_types"] == (
+        "risk_off_sell_pressure,stealth_accumulation"
+    )
     assert values["idea_group[1].routes"] == "dashboard_watch,risk_watch"
     assert values["idea_group[1].review_statuses"] == "in_review,not_viewed"
     assert values["idea_group[1].first_available_at"] == (
@@ -501,6 +586,8 @@ def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> 
     assert values["idea_group[1].latest_available_at"] == (
         "2026-07-20T01:00:00+00:00"
     )
+    assert values["idea_group[1].actionability_score_range"] == "60..63"
+    assert values["idea_group[1].risk_score_range"] == "48..56"
     assert values["idea_group[2].idea_id"] == "iar:single"
 
 
@@ -596,11 +683,22 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
         )
 
     monkeypatch.setattr(timing_queue, "_receipt_backed_generation_idea_ids", idea_ids)
-    monkeypatch.setattr(
-        timing,
-        "load_idea_binding",
-        lambda _base_dir, namespace, idea_id: dict(bindings[(namespace, idea_id)]),
-    )
+    def load_binding(
+        _base_dir: Path,
+        namespace: str,
+        idea_id: str,
+        *,
+        include_operator_context: bool = False,
+    ) -> dict[str, object]:
+        value = dict(bindings[(namespace, idea_id)])
+        if include_operator_context:
+            value["operator_review_context"] = _operator_context(
+                canonical_asset_id=f"{idea_id}-asset",
+                symbol="FIRST" if idea_id == "iar:first-idea" else "SECOND",
+            )
+        return value
+
+    monkeypatch.setattr(timing, "load_idea_binding", load_binding)
     receipt_backed = {
         "campaign_counted": True,
         "candidate_count": 1,
@@ -640,6 +738,7 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
     )
 
     assert queue["status"] == "action_required"
+    assert queue["schema_version"] == 2
     assert queue["eligible_generation_count"] == 2
     assert queue["eligible_idea_count"] == 2
     assert queue["not_viewed_count"] == 2
@@ -651,6 +750,13 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
     assert queue["writes"] == 0
     assert queue["provider_calls"] == 0
     assert queue["dashboard_reads_recorded_as_human_actions"] is False
+    assert {
+        row["operator_review_context"]["symbol"] for row in queue["records"]
+    } == {"FIRST", "SECOND"}
+    assert all(
+        row["operator_review_context"]["presentation_only"] is True
+        for row in queue["records"]
+    )
     assert all(
         row["next_make_target"] == "radar-review-timing-view"
         and "CONFIRM=1 make radar-review-timing-view" in row["next_safe_command"]
@@ -675,6 +781,15 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
     serialized_projection = json.dumps(campaign_projection, sort_keys=True)
     assert str(base) not in serialized_projection
     assert "next_safe_command" not in serialized_projection
+    assert "operator_review_context" not in serialized_projection
+
+    tampered_queue = json.loads(json.dumps(queue))
+    tampered_queue["records"][0]["operator_review_context"]["risk_score"] = 101.0
+    with pytest.raises(
+        timing.DecisionReviewTimingError,
+        match="operator_context_invalid",
+    ):
+        timing_queue.campaign_queue_projection(tampered_queue)
 
     timing.record_review_timing_event(
         base,

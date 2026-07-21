@@ -20,7 +20,7 @@ from . import decision_review_timing as timing
 
 
 QUEUE_SCHEMA_ID = "decision_radar.idea_review_timing_queue"
-QUEUE_SCHEMA_VERSION = 1
+QUEUE_SCHEMA_VERSION = 2
 MAX_QUEUE_GENERATIONS = 256
 MAX_QUEUE_IDEAS = 512
 CAMPAIGN_QUEUE_SUMMARY_SCHEMA_ID = (
@@ -81,7 +81,12 @@ def build_review_timing_queue(
         )
         for idea_id in idea_ids:
             eligible_bindings.append(
-                timing.load_idea_binding(base, namespace, idea_id)
+                timing.load_idea_binding(
+                    base,
+                    namespace,
+                    idea_id,
+                    include_operator_context=True,
+                )
             )
             if len(eligible_bindings) > MAX_QUEUE_IDEAS:
                 raise timing.DecisionReviewTimingError(
@@ -280,7 +285,10 @@ def _queue_action(
 def campaign_queue_projection(queue: Mapping[str, Any]) -> dict[str, Any]:
     """Return the path-free queue truth safe for the canonical campaign report."""
 
-    if queue.get("schema_id") != QUEUE_SCHEMA_ID:
+    if (
+        queue.get("schema_id") != QUEUE_SCHEMA_ID
+        or queue.get("schema_version") not in {1, QUEUE_SCHEMA_VERSION}
+    ):
         raise timing.DecisionReviewTimingError(
             "review_timing_queue_schema_invalid"
         )
@@ -292,6 +300,15 @@ def campaign_queue_projection(queue: Mapping[str, Any]) -> dict[str, Any]:
             "review_timing_queue_records_invalid"
         )
     records = tuple(timing._mapping(row) for row in raw_records)
+    if queue.get("schema_version") == QUEUE_SCHEMA_VERSION and any(
+        not timing.operator_review_context_valid(
+            row.get("operator_review_context")
+        )
+        for row in records
+    ):
+        raise timing.DecisionReviewTimingError(
+            "review_timing_queue_operator_context_invalid"
+        )
     eligible_count = timing._nonnegative_int(queue.get("eligible_idea_count"))
     if len(records) != eligible_count:
         raise timing.DecisionReviewTimingError(

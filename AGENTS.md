@@ -1068,7 +1068,12 @@ may be added later when a suitable environment already exists.
   values only to expose repeated operator work; every artifact-namespace/idea
   pair remains a separate timing record and retains its exact confirmed
   command. This presentation grouping never deduplicates evidence or writes a
-  review action. A historical snapshot may be reviewed after time
+  review action. Queue schema v2 adds a presentation-only operator context for
+  each record: canonical asset/symbol, anomaly type, catalyst/timing state, and
+  bounded Decision scores. Candidate identity is covered by the exact
+  integrated-candidate digest and Decision values by the canonical projection
+  digest. These fields never enter the append-only timing event or the path-free
+  campaign projection. A historical snapshot may be reviewed after time
   expiry only when
   `generation:stale` and/or `doctor:stale` are its sole authority reasons;
   structural drift still fails closed. Only the explicit confirmed

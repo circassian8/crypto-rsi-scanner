@@ -933,8 +933,12 @@ action view; `RADAR_REVIEW_TIMING_OUTPUT=json` preserves the full machine-
 readable payload from the same evaluation. The human summary groups recurring
 `idea_id` values to make repeated work visible, but every artifact-
 namespace/idea pair remains a separate timing action with its exact confirmed
-command; the grouping is never evidence deduplication. A receipt-backed
-historical generation remains reviewable when ordinary generation/doctor
+command; the grouping is never evidence deduplication. Queue schema v2 adds
+presentation-only canonical asset/symbol, anomaly type, catalyst/timing state,
+and bounded Decision scores. Candidate facts remain bound by the integrated-
+candidate digest and Decision values by the projection digest; the added context
+never enters timing events or the path-free campaign projection. A receipt-
+backed historical generation remains reviewable when ordinary generation/doctor
 staleness is its sole authority defect; any structural authority defect still
 fails closed.
 Dashboard GET/HEAD, phone access, health probes, previews, and notifications
@@ -1417,7 +1421,9 @@ The remaining human decisions stay explicit:
   receipt-backed ideas and their next safe commands. Queue discovery uses its
   exact v1 generation projection and does not rebuild unrelated campaign
   analytics. Its summary groups recurring idea IDs for readability while
-  retaining every generation-specific action and command. Use
+  retaining every generation-specific action and command, and names the exact
+  asset, anomaly type, and Decision score context needed to identify the work.
+  Use
   `RADAR_REVIEW_TIMING_OUTPUT=json` when the complete binding and digest payload
   is needed. Record only a real human action with `CONFIRM=1 make
   radar-review-timing-view

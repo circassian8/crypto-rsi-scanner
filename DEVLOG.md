@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Identify human-review actions with canonical idea context · Codex
+**Why:** The improved queue showed recurrence but still required the operator to
+decode opaque IDs before knowing which asset, anomaly, and score state needed
+review.
+**Changes:**
+- Added queue schema v2 operator context derived from the exact validated
+  candidate and canonical Decision projection: asset/symbol, anomaly type,
+  catalyst/confidence/timing context, and bounded actionability, evidence, risk,
+  and urgency scores.
+- Bound candidate fields to the existing integrated-candidate digest and
+  Decision fields to the projection digest. Presentation context is excluded
+  from append-only timing events and the path-free campaign projection.
+- Enhanced recurring groups with asset/anomaly sets and score ranges, and each
+  generation action with its exact asset, anomaly, and scores; retained every
+  confirmed namespace/idea command and zero-call/zero-write behavior.
+**Verify:** All 15 focused review-timing tests passed in 0.59 seconds; the
+combined review/campaign/North-Star gate passed 40 tests in 0.78 seconds.
+Compileall, JSON validation, architecture cleanliness, and diff checks passed.
+The complete real campaign report accepted queue v2, retained its compatible
+path-free queue-summary v1 with 9/9 actions, and contained no operator-context
+payload. The real queue resolved six DEXE records across stealth accumulation
+and risk-off sell pressure plus three PUMP records across confirmed breakout
+and stealth accumulation, while preserving all nine exact actions and reporting
+zero provider calls and zero writes.
+**Notes/risks:** No view/completion was inferred or written. Timing identity,
+ledger schemas, routes, scores, thresholds, campaign truth, provider state, and
+dashboard authority are unchanged. Quantitative source-size findings remain
+advisory.
+
 ## 2026-07-22 — Expose recurring ideas in the human-review queue · Codex
 **Why:** The exact review queue contained nine receipt-backed actions, but its
 flat rendering concealed that they represented only two recurring idea IDs.

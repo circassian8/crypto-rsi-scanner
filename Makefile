@@ -370,7 +370,7 @@ help:
 	@echo "  make radar-market-no-send-smoke    Prove the market generation offline; never updates the dashboard pointer"
 	@echo "  make radar-market-campaign-report  Rebuild the artifact-derived Decision Radar campaign report; no provider call"
 	@echo "  make radar-review-timing-status  Concise explicit human review timing; no provider call/write (RADAR_REVIEW_TIMING_OUTPUT=json for full JSON)"
-	@echo "  make radar-review-timing-queue  Concise receipt-backed action queue; no provider call/write (RADAR_REVIEW_TIMING_OUTPUT=json for full JSON)"
+	@echo "  make radar-review-timing-queue  Asset-labeled receipt-backed action queue; no provider call/write (RADAR_REVIEW_TIMING_OUTPUT=json for full JSON)"
 	@echo "  CONFIRM=1 make radar-review-timing-view RADAR_REVIEW_NAMESPACE=... RADAR_REVIEW_IDEA_ID=...  Record first human view"
 	@echo "  CONFIRM=1 make radar-review-timing-complete RADAR_REVIEW_NAMESPACE=... RADAR_REVIEW_IDEA_ID=...  Record review completion"
 	@echo "  make radar-daily-ops-readiness     Concise readiness + bounded credential-free status receipt; no provider call (RADAR_DAILY_OPS_OUTPUT=json for full JSON)"

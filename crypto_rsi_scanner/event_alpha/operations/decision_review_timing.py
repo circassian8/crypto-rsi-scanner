@@ -36,6 +36,8 @@ SCHEMA_VERSION = 1
 REPORT_SCHEMA_ID = "decision_radar.idea_review_timing_report"
 REPORT_SCHEMA_VERSION = 1
 REVIEW_QUEUE_COMMAND = "make radar-review-timing-queue PYTHON=.venv/bin/python"
+OPERATOR_CONTEXT_SCHEMA_ID = "decision_radar.idea_review_operator_context"
+OPERATOR_CONTEXT_SCHEMA_VERSION = 1
 LEDGER_FILENAME = "event_decision_radar_review_timing_events.jsonl"
 LEDGER_DIRECTORY = "radar_market_history_cache"
 EVENT_TYPES = frozenset({"first_viewed", "review_completed"})
@@ -122,6 +124,51 @@ _BINDING_FIELDS = tuple(
         "explicit_human_action",
     }
 )
+_SOURCE_BINDING_FIELDS = frozenset(
+    {
+        "artifact_namespace",
+        "run_id",
+        "profile",
+        "revision",
+        "operator_state_sha256",
+        "idea_id",
+        "core_opportunity_id",
+        "decision_projection_sha256",
+        "integrated_candidates_sha256",
+        "core_opportunities_sha256",
+        "publication_receipt_sha256",
+        "operations_receipt_sha256",
+        "idea_observed_at",
+        "idea_available_at",
+        "pipeline_latency_seconds",
+        "radar_route",
+        "primary_thesis_origin",
+        "directional_bias",
+        "decision_radar_campaign_counted",
+    }
+)
+_OPERATOR_CONTEXT_FIELDS = frozenset(
+    {
+        "schema_id",
+        "schema_version",
+        "canonical_asset_id",
+        "symbol",
+        "anomaly_type",
+        "catalyst_status",
+        "confidence_band",
+        "market_phase",
+        "timing_state",
+        "preferred_horizon",
+        "radar_actionable",
+        "actionability_score",
+        "evidence_confidence_score",
+        "risk_score",
+        "urgency_score",
+        "candidate_identity_bound_by",
+        "decision_values_bound_by",
+        "presentation_only",
+    }
+)
 
 
 class DecisionReviewTimingError(RuntimeError):
@@ -139,8 +186,13 @@ def load_idea_binding(
     artifact_base_dir: str | Path,
     artifact_namespace: str,
     idea_id: str,
+    *,
+    include_operator_context: bool = False,
 ) -> dict[str, Any]:
     """Load one genuine canonical idea through its final publication contract."""
+
+    if type(include_operator_context) is not bool:
+        raise ValueError("review_timing_operator_context_flag_invalid")
 
     base = _safe_existing_base(artifact_base_dir)
     namespace = _identity(artifact_namespace, "artifact_namespace")
@@ -218,7 +270,7 @@ def load_idea_binding(
         raise DecisionReviewTimingError("review_timing_final_receipt_bytes_missing")
     projection_sha = _digest_value(projection)
     pipeline_latency = _duration_seconds(observed_time, available_time)
-    return {
+    binding = {
         "artifact_namespace": namespace,
         "run_id": _identity(snapshot.run_id, "run_id"),
         "profile": _identity(snapshot.profile, "profile"),
@@ -245,6 +297,12 @@ def load_idea_binding(
         ),
         "decision_radar_campaign_counted": True,
     }
+    if include_operator_context:
+        binding["operator_review_context"] = _operator_review_context(
+            idea,
+            projection,
+        )
+    return binding
 
 
 def build_review_timing_event(
@@ -703,6 +761,118 @@ def _review_record(
     }
 
 
+def _operator_review_context(
+    idea: Mapping[str, Any],
+    projection: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project digest-bound facts needed to identify a queue item quickly."""
+
+    context = {
+        "schema_id": OPERATOR_CONTEXT_SCHEMA_ID,
+        "schema_version": OPERATOR_CONTEXT_SCHEMA_VERSION,
+        "canonical_asset_id": _identity(
+            idea.get("canonical_asset_id") or idea.get("coin_id"),
+            "canonical_asset_id",
+        ),
+        "symbol": _identity(
+            idea.get("symbol") or idea.get("validated_symbol"),
+            "symbol",
+        ),
+        "anomaly_type": _identity(
+            projection.get("anomaly_type") or idea.get("anomaly_type"),
+            "anomaly_type",
+        ),
+        "catalyst_status": _identity(
+            projection.get("catalyst_status"),
+            "catalyst_status",
+        ),
+        "confidence_band": _identity(
+            projection.get("confidence_band"),
+            "confidence_band",
+        ),
+        "market_phase": _identity(
+            projection.get("market_phase"),
+            "market_phase",
+        ),
+        "timing_state": _identity(
+            projection.get("timing_state"),
+            "timing_state",
+        ),
+        "preferred_horizon": _identity(
+            projection.get("preferred_horizon"),
+            "preferred_horizon",
+        ),
+        "radar_actionable": projection.get("radar_actionable"),
+        "actionability_score": _bounded_score(
+            projection.get("actionability_score"),
+            "actionability_score",
+        ),
+        "evidence_confidence_score": _bounded_score(
+            projection.get("evidence_confidence_score"),
+            "evidence_confidence_score",
+        ),
+        "risk_score": _bounded_score(
+            projection.get("risk_score"),
+            "risk_score",
+        ),
+        "urgency_score": _bounded_score(
+            projection.get("urgency_score"),
+            "urgency_score",
+        ),
+        "candidate_identity_bound_by": "integrated_candidates_sha256",
+        "decision_values_bound_by": "decision_projection_sha256",
+        "presentation_only": True,
+    }
+    if type(context["radar_actionable"]) is not bool:
+        raise DecisionReviewTimingError(
+            "review_timing_operator_context_radar_actionable_invalid"
+        )
+    if not operator_review_context_valid(context):  # pragma: no cover - builder guard
+        raise DecisionReviewTimingError("review_timing_operator_context_invalid")
+    return context
+
+
+def operator_review_context_valid(value: object) -> bool:
+    """Validate the closed presentation-only queue context."""
+
+    if not isinstance(value, Mapping) or set(value) != _OPERATOR_CONTEXT_FIELDS:
+        return False
+    if (
+        value.get("schema_id") != OPERATOR_CONTEXT_SCHEMA_ID
+        or value.get("schema_version") != OPERATOR_CONTEXT_SCHEMA_VERSION
+        or value.get("radar_actionable") not in {True, False}
+        or type(value.get("radar_actionable")) is not bool
+        or value.get("candidate_identity_bound_by")
+        != "integrated_candidates_sha256"
+        or value.get("decision_values_bound_by") != "decision_projection_sha256"
+        or value.get("presentation_only") is not True
+    ):
+        return False
+    for field in (
+        "canonical_asset_id",
+        "symbol",
+        "anomaly_type",
+        "catalyst_status",
+        "confidence_band",
+        "market_phase",
+        "timing_state",
+        "preferred_horizon",
+    ):
+        if not _IDENTITY_RE.fullmatch(str(value.get(field) or "")):
+            return False
+    return all(
+        type(value.get(field)) in (int, float)
+        and math.isfinite(float(value[field]))
+        and 0 <= float(value[field]) <= 100
+        for field in (
+            "actionability_score",
+            "evidence_confidence_score",
+            "risk_score",
+            "urgency_score",
+        )
+    )
+
+
 def _append_event(path: Path, event: Mapping[str, Any]) -> dict[str, Any]:
     payload = canonical_json_bytes(event)
     parent_fd = _open_parent(path.parent)
@@ -893,28 +1063,7 @@ def _write_all(descriptor: int, payload: bytes) -> None:
 
 
 def _validated_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
-    required = {
-        "artifact_namespace",
-        "run_id",
-        "profile",
-        "revision",
-        "operator_state_sha256",
-        "idea_id",
-        "core_opportunity_id",
-        "decision_projection_sha256",
-        "integrated_candidates_sha256",
-        "core_opportunities_sha256",
-        "publication_receipt_sha256",
-        "operations_receipt_sha256",
-        "idea_observed_at",
-        "idea_available_at",
-        "pipeline_latency_seconds",
-        "radar_route",
-        "primary_thesis_origin",
-        "directional_bias",
-        "decision_radar_campaign_counted",
-    }
-    if not isinstance(binding, Mapping) or set(binding) != required:
+    if not isinstance(binding, Mapping) or set(binding) != _SOURCE_BINDING_FIELDS:
         raise ValueError("review_timing_binding_fields_invalid")
     # Round-trip through a synthetic event so all field constraints stay in one
     # validator.  The synthetic metadata is discarded afterward.
@@ -951,7 +1100,17 @@ def _validated_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
 def _require_event_matches_binding(
     event: Mapping[str, Any], binding: Mapping[str, Any]
 ) -> None:
-    if any(event.get(field) != binding.get(field) for field in binding):
+    allowed_fields = _SOURCE_BINDING_FIELDS | {"operator_review_context"}
+    if frozenset(binding) not in {_SOURCE_BINDING_FIELDS, allowed_fields}:
+        raise DecisionReviewTimingError("review_timing_source_binding_fields_invalid")
+    if "operator_review_context" in binding and not operator_review_context_valid(
+        binding.get("operator_review_context")
+    ):
+        raise DecisionReviewTimingError("review_timing_operator_context_invalid")
+    if any(
+        event.get(field) != binding.get(field)
+        for field in _SOURCE_BINDING_FIELDS
+    ):
         raise DecisionReviewTimingError("review_timing_source_binding_drift")
 
 
@@ -993,6 +1152,18 @@ def _positive_int(value: object, field: str) -> int:
 
 def _nonnegative_int(value: object) -> int:
     return value if type(value) is int and value >= 0 else 0
+
+
+def _bounded_score(value: object, field: str) -> int | float:
+    if (
+        type(value) not in (int, float)
+        or not math.isfinite(float(value))
+        or not 0 <= float(value) <= 100
+    ):
+        raise DecisionReviewTimingError(
+            f"review_timing_operator_context_{field}_invalid"
+        )
+    return value
 
 
 def _canonical_timestamp(value: datetime | str | object, *, field: str) -> str:

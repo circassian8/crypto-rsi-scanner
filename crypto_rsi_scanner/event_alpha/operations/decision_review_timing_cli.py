@@ -149,14 +149,27 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
             if not isinstance(raw, Mapping):
                 continue
             prefix = f"record[{index}]"
+            context = raw.get("operator_review_context")
+            if not isinstance(context, Mapping):
+                context = {}
             for field in (
                 "review_status",
                 "radar_route",
                 "artifact_namespace",
                 "idea_id",
-                "next_safe_command",
             ):
                 lines.append((f"{prefix}.{field}", raw.get(field)))
+            for field in (
+                "symbol",
+                "canonical_asset_id",
+                "anomaly_type",
+                "actionability_score",
+                "evidence_confidence_score",
+                "risk_score",
+                "urgency_score",
+            ):
+                lines.append((f"{prefix}.{field}", context.get(field)))
+            lines.append((f"{prefix}.next_safe_command", raw.get("next_safe_command")))
     safety = result.get("safety")
     if isinstance(safety, Mapping):
         for field in (
@@ -199,9 +212,16 @@ def _queue_recurrence_summary(
             idea_id,
             {
                 "core_opportunity_ids": set(),
+                "symbols": set(),
+                "canonical_asset_ids": set(),
+                "anomaly_types": set(),
                 "routes": set(),
                 "review_statuses": set(),
                 "available_at": [],
+                "actionability_scores": [],
+                "evidence_confidence_scores": [],
+                "risk_scores": [],
+                "urgency_scores": [],
                 "occurrence_count": 0,
             },
         )
@@ -216,6 +236,29 @@ def _queue_recurrence_summary(
                 cast_set = group[target]
                 if isinstance(cast_set, set):
                     cast_set.add(_summary_value(value))
+        context = raw.get("operator_review_context")
+        if isinstance(context, Mapping):
+            for field, target in (
+                ("symbol", "symbols"),
+                ("canonical_asset_id", "canonical_asset_ids"),
+                ("anomaly_type", "anomaly_types"),
+            ):
+                value = context.get(field)
+                if value is not None:
+                    cast_set = group[target]
+                    if isinstance(cast_set, set):
+                        cast_set.add(_summary_value(value))
+            for field, target in (
+                ("actionability_score", "actionability_scores"),
+                ("evidence_confidence_score", "evidence_confidence_scores"),
+                ("risk_score", "risk_scores"),
+                ("urgency_score", "urgency_scores"),
+            ):
+                value = context.get(field)
+                if type(value) in (int, float):
+                    cast_values = group[target]
+                    if isinstance(cast_values, list):
+                        cast_values.append(value)
         available_at = raw.get("idea_available_at")
         if available_at is not None:
             cast_times = group["available_at"]
@@ -251,6 +294,15 @@ def _queue_recurrence_summary(
                     f"{prefix}.core_opportunity_ids",
                     ",".join(sorted(group["core_opportunity_ids"])),
                 ),
+                (f"{prefix}.symbols", ",".join(sorted(group["symbols"]))),
+                (
+                    f"{prefix}.canonical_asset_ids",
+                    ",".join(sorted(group["canonical_asset_ids"])),
+                ),
+                (
+                    f"{prefix}.anomaly_types",
+                    ",".join(sorted(group["anomaly_types"])),
+                ),
                 (f"{prefix}.generation_count", group["occurrence_count"]),
                 (f"{prefix}.routes", ",".join(sorted(group["routes"]))),
                 (
@@ -267,7 +319,25 @@ def _queue_recurrence_summary(
                 ),
             )
         )
+        for output_field, storage_field in (
+            ("actionability_score", "actionability_scores"),
+            ("evidence_confidence_score", "evidence_confidence_scores"),
+            ("risk_score", "risk_scores"),
+            ("urgency_score", "urgency_scores"),
+        ):
+            lines.append(
+                (
+                    f"{prefix}.{output_field}_range",
+                    _score_range(group[storage_field]),
+                )
+            )
     return lines
+
+
+def _score_range(values: object) -> str:
+    if not isinstance(values, list) or not values:
+        return "unavailable"
+    return f"{min(values):g}..{max(values):g}"
 
 
 def _summary_value(value: object) -> str:

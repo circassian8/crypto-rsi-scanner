@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Bind queue labels to evidence without extending timing events
+**Status:** accepted
+**Decision:** Human-review queue schema v2 carries a presentation-only operator
+context containing canonical asset/symbol, anomaly type, catalyst/timing state,
+and bounded Decision scores. Candidate identity fields are covered by the exact
+integrated-candidate digest and Decision fields by the canonical projection
+digest already present in the timing binding. The append-only timing-event
+schema and path-free campaign queue projection deliberately omit this context.
+**Why:** Opaque idea IDs made the nine genuine review actions hard to perform:
+they actually represent six DEXE observations and three PUMP observations with
+different anomaly types and score states. Human-readable identity is necessary
+operator context, but it is not a new timing fact and must not silently alter
+the immutable ledger contract.
+**Revisit when:** A sealed Protocol-v2 annex defines additional human-review
+attributes as measurement evidence. Version that event schema explicitly; do
+not promote presentation fields implicitly.
+
 ## 2026-07-22 - Group recurring review ideas without collapsing timing evidence
 **Status:** accepted
 **Decision:** The human-readable review queue groups repeated `idea_id` values
