@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Require typed contract-counting provenance · Codex
+**Why:** The compatibility provenance adapter used truthiness for the explicit
+`contract_counted_candidate` marker and presence checks. The literal string
+`"false"` could therefore become counted, while mappings in ledger,
+generation, or source-artifact fields could satisfy the strict burn-in
+contract after string coercion.
+**Changes:** Contract counting now requires a real boolean marker and typed
+nonblank live/no-send ledger, generation, and source-artifact claims. The
+review-inbox provenance projection uses presence-aware typed aliases, refuses
+to borrow past malformed higher-authority text, and marks malformed explicit
+provenance as non-real/non-counted. Valid legacy rows with an absent marker and
+valid modern live/no-send rows retain their existing treatment.
+**Verify:** The exact reproduction now projects `real_candidate_evidence=false`
+and `contract_counted_candidate=false`; strict counting also returns false.
+Regressions cover the false-like string, structured source mode/ledger/
+generation/source artifact, valid strict provenance, and alias precedence. The
+complete burn-in operations/candidate-mode group passed (`59 passed`),
+`python3 -m compileall -q crypto_rsi_scanner tests`, and `git diff --check`
+passed.
+**Notes/risks:** This closes a legacy evidence-accounting boundary; it does not
+change Decision Radar campaign counts, policy thresholds, routes, provider
+authorization, or historical artifacts. No provider call, send, trade, order,
+paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative
+source-size limits remain advisory.
+
 ## 2026-07-21 — Reject malformed temporal-baseline lineage · Codex
 **Why:** Rolling market history copied explicit lineage fields without a type
 contract. Structured provider metadata and boolean `data_mode`, for example,

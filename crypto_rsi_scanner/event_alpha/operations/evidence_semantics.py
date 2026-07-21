@@ -47,6 +47,43 @@ NON_CONTRACT_NAMESPACE_CATEGORIES = {
     "active_live_rehearsal",
 }
 
+_PROVENANCE_CLASSIFICATION_FIELDS = (
+    "run_mode",
+    "profile",
+    "artifact_namespace",
+    "source_origin",
+    "source_pack",
+    "candidate_source_mode",
+)
+_LIVE_LINEAGE_FIELDS = (
+    "request_ledger_path",
+    "provider_generation_id",
+    "provider_source_artifact",
+)
+
+
+def _typed_text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _first_typed_text(row: Mapping[str, Any], *fields: str) -> str:
+    """Resolve text aliases without borrowing past malformed explicit claims."""
+
+    for field in fields:
+        if field not in row or row.get(field) in (None, ""):
+            continue
+        return _typed_text(row.get(field))
+    return ""
+
+
+def _explicit_text_claim_invalid(row: Mapping[str, Any], fields: tuple[str, ...]) -> bool:
+    return any(
+        field in row
+        and row.get(field) not in (None, "")
+        and not _typed_text(row.get(field))
+        for field in fields
+    )
+
 
 def policy_categories(policy: Mapping[str, Any], namespace: str) -> set[str]:
     for section in ("included_namespace_details", "excluded_namespace_details"):
@@ -289,18 +326,23 @@ def is_contract_counted_candidate(row: Mapping[str, Any], *, namespace_categorie
         return False
     if namespace_categories & NON_CONTRACT_NAMESPACE_CATEGORIES:
         return False
-    if is_diagnostic_row(row) or _is_fixture_row(row):
+    if (
+        is_diagnostic_row(row)
+        or _is_fixture_row(row)
+        or _explicit_text_claim_invalid(row, _PROVENANCE_CLASSIFICATION_FIELDS)
+        or _explicit_text_claim_invalid(row, _LIVE_LINEAGE_FIELDS)
+    ):
         return False
-    source_mode = str(row.get("candidate_source_mode") or "").strip().casefold()
+    source_mode = _typed_text(row.get("candidate_source_mode")).casefold()
     if source_mode in {"mocked_fixture", "fixture", "preflight_only", "readiness_only", "artifact_replay"}:
         return False
     if row.get("contract_counted_candidate") is not True:
         return False
     return bool(
         source_mode == "live_no_send"
-        and str(row.get("request_ledger_path") or "").strip()
-        and str(row.get("provider_generation_id") or "").strip()
-        and str(row.get("provider_source_artifact") or "").strip()
+        and _typed_text(row.get("request_ledger_path"))
+        and _typed_text(row.get("provider_generation_id"))
+        and _typed_text(row.get("provider_source_artifact"))
         and row.get("provider_request_succeeded") is True
     )
 
@@ -313,7 +355,7 @@ def is_diagnostic_row(row: Mapping[str, Any]) -> bool:
 
 
 def row_provenance(row: Mapping[str, Any]) -> dict[str, Any]:
-    source_file = str(row.get("_source_file") or "")
+    source_file = _typed_text(row.get("_source_file"))
     record_type = {
         INTEGRATED_CANDIDATES: "integrated_candidate",
         CORE_OPPORTUNITIES: "core_opportunity",
@@ -324,30 +366,55 @@ def row_provenance(row: Mapping[str, Any]) -> dict[str, Any]:
     fixture_only = _is_fixture_row(row)
     diagnostic_only = is_diagnostic_row(row)
     preflight_only = record_type in {"preflight", "readiness"}
-    source_mode = str(row.get("candidate_source_mode") or "").strip()
+    source_mode = _typed_text(row.get("candidate_source_mode"))
     requested_contract_count = row.get("contract_counted_candidate")
-    real_evidence = record_type == "integrated_candidate" and not fixture_only and not diagnostic_only
-    if requested_contract_count is False:
+    requested_contract_count_invalid = (
+        "contract_counted_candidate" in row
+        and requested_contract_count is not None
+        and type(requested_contract_count) is not bool
+    )
+    provenance_claim_invalid = _explicit_text_claim_invalid(
+        row,
+        (*_PROVENANCE_CLASSIFICATION_FIELDS, *_LIVE_LINEAGE_FIELDS),
+    )
+    real_evidence = (
+        record_type == "integrated_candidate"
+        and not fixture_only
+        and not diagnostic_only
+        and not requested_contract_count_invalid
+        and not provenance_claim_invalid
+    )
+    if requested_contract_count is False or requested_contract_count_invalid:
         real_evidence = False
     if source_mode in {"mocked_fixture", "preflight_only", "readiness_only", "artifact_replay"}:
         real_evidence = False
-    if requested_contract_count is True and source_mode == "live_no_send" and row.get("request_ledger_path"):
-        real_evidence = True
+    if requested_contract_count is True and source_mode == "live_no_send":
+        real_evidence = bool(real_evidence and _typed_text(row.get("request_ledger_path")))
     return {
         "candidate_record_type": record_type,
         "candidate_provenance": record_type,
         "source_artifact": source_file,
-        "source_artifact_row_type": str(row.get("row_type") or record_type),
+        "source_artifact_row_type": _first_typed_text(row, "row_type") or record_type,
         "real_candidate_evidence": real_evidence,
         "diagnostic_only": diagnostic_only,
         "fixture_only": fixture_only,
         "preflight_only": preflight_only,
         "candidate_source_mode": source_mode,
-        "provider": str(row.get("provider") or row.get("source_provider") or row.get("source_origin") or ""),
-        "source_pack": str(row.get("source_pack") or row.get("source_pack_id") or row.get("source_class") or ""),
-        "source_origin": str(row.get("source_origin") or row.get("provider") or row.get("source_provider") or ""),
-        "request_ledger_path": str(row.get("request_ledger_path") or ""),
-        "contract_counted_candidate": bool(real_evidence if requested_contract_count is None else requested_contract_count and real_evidence),
+        "provider": _first_typed_text(
+            row, "provider", "source_provider", "source_origin"
+        ),
+        "source_pack": _first_typed_text(
+            row, "source_pack", "source_pack_id", "source_class"
+        ),
+        "source_origin": _first_typed_text(
+            row, "source_origin", "provider", "source_provider"
+        ),
+        "request_ledger_path": _typed_text(row.get("request_ledger_path")),
+        "contract_counted_candidate": bool(
+            real_evidence
+            if requested_contract_count is None
+            else requested_contract_count is True and real_evidence
+        ),
     }
 
 
@@ -425,7 +492,16 @@ def _current_json_doc(
 
 
 def _is_fixture_row(row: Mapping[str, Any]) -> bool:
-    text = " ".join(str(row.get(field) or "") for field in ("run_mode", "profile", "artifact_namespace", "source_origin", "source_pack")).casefold()
+    text = " ".join(
+        _typed_text(row.get(field))
+        for field in (
+            "run_mode",
+            "profile",
+            "artifact_namespace",
+            "source_origin",
+            "source_pack",
+        )
+    ).casefold()
     return bool(row.get("fixture_only") is True or row.get("test_fixture") is True or "fixture" in text or "smoke" in text)
 
 

@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from crypto_rsi_scanner.event_alpha.artifacts import paths as event_artifact_paths
 from crypto_rsi_scanner.event_alpha.doctor.checks import operations as doctor_operations_checks
-from crypto_rsi_scanner.event_alpha.operations import archive, common, daily_burn_in, feedback_progress, measurement, namespace_policy, review_inbox, scorecard, source_yield
+from crypto_rsi_scanner.event_alpha.operations import archive, common, daily_burn_in, evidence_semantics, feedback_progress, measurement, namespace_policy, review_inbox, scorecard, source_yield
 from crypto_rsi_scanner.project_health import radar_north_star
 
 
@@ -209,6 +209,58 @@ def test_daily_review_inbox_prioritizes_contract_counted_candidates(tmp_path):
     assert "## High-Value Non-Counted Review Candidates" in md
     assert "## Diagnostics / Support" in md
     assert md.index("LIVE / live") < md.index("SUPPORT / support")
+
+
+def test_contract_counting_requires_typed_provenance_claims():
+    strict = {
+        "_source_file": "event_integrated_radar_candidates.jsonl",
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_source_mode": "live_no_send",
+        "contract_counted_candidate": True,
+        "request_ledger_path": "event_request_ledger.json",
+        "provider_generation_id": "provider-generation-1",
+        "provider_source_artifact": "event_provider_rows.json",
+        "provider_request_succeeded": True,
+        "provider": "official_provider",
+    }
+
+    assert evidence_semantics.is_contract_counted_candidate(
+        strict,
+        namespace_categories=set(),
+        has_burn_in_run=True,
+    ) is True
+    assert evidence_semantics.row_provenance(strict)[
+        "contract_counted_candidate"
+    ] is True
+
+    for field in (
+        "candidate_source_mode",
+        "request_ledger_path",
+        "provider_generation_id",
+        "provider_source_artifact",
+    ):
+        malformed = {**strict, field: {"borrowed": "plausible-text"}}
+        assert evidence_semantics.is_contract_counted_candidate(
+            malformed,
+            namespace_categories=set(),
+            has_burn_in_run=True,
+        ) is False
+        provenance = evidence_semantics.row_provenance(malformed)
+        assert provenance["real_candidate_evidence"] is False
+        assert provenance["contract_counted_candidate"] is False
+
+    false_text = {**strict, "contract_counted_candidate": "false"}
+    false_provenance = evidence_semantics.row_provenance(false_text)
+    assert false_provenance["real_candidate_evidence"] is False
+    assert false_provenance["contract_counted_candidate"] is False
+
+    malformed_provider = {
+        **strict,
+        "provider": {"borrowed": "official_provider"},
+        "source_provider": "lower_alias_must_not_be_borrowed",
+    }
+    provider_projection = evidence_semantics.row_provenance(malformed_provider)
+    assert provider_projection["provider"] == ""
 
 
 def test_daily_review_inbox_reports_no_real_candidate_evidence(tmp_path):
