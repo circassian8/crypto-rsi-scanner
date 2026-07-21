@@ -16,18 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
-## 2026-07-22 - Cache timestamp parsing, not empirical shadow results
+## 2026-07-22 - Cache deterministic shadow primitives, not empirical results
 **Status:** accepted
 **Decision:** Causal shadow replay may reuse parsed immutable ISO timestamp text
-through a bounded process-local cache. It must continue to evaluate every
-observation, baseline, return sample, overlap trace, digest, and closed schema
-normally; projections and policy outputs are not cached. Field-specific invalid-
-timestamp errors must remain intact, and equal-clock campaign output must remain
-exactly equal to the uncached path.
+through a bounded process-local cache and may reuse an exact direct-return sample
+inside the single projection evaluation that owns its observation tuple and
+horizon. It must continue to evaluate every observation, baseline, relative-
+return alignment, overlap trace, digest, and closed schema normally; projections
+and policy outputs are not cached. Field-specific invalid-timestamp errors must
+remain intact, per-projection caches must not survive changed evidence, and
+equal-clock campaign output must remain exactly equal to the uncached path.
 **Why:** Profiling the 1,800-row campaign found about 56.7 million repeated ISO
 timestamp parses inside the same deterministic replay. A 4,096-entry parser
 cache removes redundant conversion without changing evidence or hiding stale
 input, reducing the measured full-report path from 37.968 to 31.861 seconds.
+Reusing each exact direct sample across direct/BTC-relative/ETH-relative feature
+construction reduces it again to 30.171 seconds.
 **Revisit when:** Observation clocks stop being immutable strings, the unique-
 clock working set exceeds the bounded cache materially, or an incremental replay
 contract can prove the same closed output more efficiently.

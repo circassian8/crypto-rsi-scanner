@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Reuse direct-return work inside each shadow projection · Codex
+**Why:** After timestamp parsing was bounded, causal replay still recomputed the
+same direct asset return for the direct, BTC-relative, and ETH-relative feature
+families and repeatedly recomputed the same aligned benchmark returns.
+**Changes:**
+- Added a projection-local cache keyed by the exact in-memory observation tuple,
+  endpoint, and horizon. Direct and relative feature construction now share that
+  deterministic primitive only within the evaluation that owns it.
+- Kept relative benchmark alignment, baseline evaluation, statistics, traces,
+  digests, and closed-schema assertions unchanged; no cache survives a changed
+  projection input.
+- Added a regression that instruments direct-return evaluation and proves every
+  exact endpoint/observation-tuple/horizon primitive is computed once.
+**Verify:** All 122 focused shadow-surprise and campaign tests passed in 1.22
+seconds; compileall and diff checks passed. The complete checked campaign report
+rebuilt at its exact recorded clock with full value equality in 30.171 seconds,
+down from 31.861 seconds after timestamp caching and 37.968 seconds before both
+optimizations.
+**Notes/risks:** This is deterministic computation reuse only. No history,
+sample, route, score, threshold, outcome, artifact, provider state, or dashboard
+authority changed; quantitative source-size findings remain advisory.
+
 ## 2026-07-22 — Cache repeated clocks in causal shadow replay · Codex
 **Why:** A read-only profile of the canonical 1,800-row campaign report recorded
 726.7 million calls in 121.354 profiled seconds. Shadow temporal-surprise replay

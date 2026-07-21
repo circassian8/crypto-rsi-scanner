@@ -567,6 +567,10 @@ def _evaluate_return_features(
             _observation_reference(observation)
         ),
     ))
+    direct_return_cache: dict[
+        tuple[int, int, int],
+        tuple[_DirectReturnSample | None, str],
+    ] = {}
     features: dict[str, dict[str, Any]] = {}
     for hours in RETURN_HORIZONS_HOURS:
         feature = f"return_{hours}h"
@@ -575,16 +579,18 @@ def _evaluate_return_features(
             family="direct_return",
             horizon_hours=hours,
             benchmark=None,
-            current_result=_direct_return_sample(
+            current_result=_cached_direct_return_sample(
                 current,
                 asset_observations,
                 horizon_hours=hours,
+                cache=direct_return_cache,
             ),
             baseline_results=tuple(
-                _direct_return_sample(
+                _cached_direct_return_sample(
                     endpoint,
                     asset_observations,
                     horizon_hours=hours,
+                    cache=direct_return_cache,
                 )
                 for endpoint in priors
             ),
@@ -635,6 +641,7 @@ def _evaluate_return_features(
                     asset_observations,
                     benchmark_rows,
                     horizon_hours=hours,
+                    direct_return_cache=direct_return_cache,
                 ),
                 baseline_results=tuple(
                     _relative_return_sample(
@@ -642,6 +649,7 @@ def _evaluate_return_features(
                         asset_observations,
                         benchmark_rows,
                         horizon_hours=hours,
+                        direct_return_cache=direct_return_cache,
                     )
                     for endpoint in priors
                 ),
@@ -880,17 +888,44 @@ def _direct_return_sample(
     ), "eligible"
 
 
+def _cached_direct_return_sample(
+    endpoint: Mapping[str, Any],
+    observations: tuple[Mapping[str, Any], ...],
+    *,
+    horizon_hours: int,
+    cache: dict[
+        tuple[int, int, int],
+        tuple[_DirectReturnSample | None, str],
+    ],
+) -> tuple[_DirectReturnSample | None, str]:
+    """Reuse one direct sample inside a single closed projection evaluation."""
+
+    key = (id(endpoint), id(observations), horizon_hours)
+    if key not in cache:
+        cache[key] = _direct_return_sample(
+            endpoint,
+            observations,
+            horizon_hours=horizon_hours,
+        )
+    return cache[key]
+
+
 def _relative_return_sample(
     asset_endpoint: Mapping[str, Any],
     asset_observations: tuple[Mapping[str, Any], ...],
     benchmark_observations: tuple[Mapping[str, Any], ...],
     *,
     horizon_hours: int,
+    direct_return_cache: dict[
+        tuple[int, int, int],
+        tuple[_DirectReturnSample | None, str],
+    ],
 ) -> tuple[_RelativeReturnSample | None, str]:
-    asset_sample, asset_state = _direct_return_sample(
+    asset_sample, asset_state = _cached_direct_return_sample(
         asset_endpoint,
         asset_observations,
         horizon_hours=horizon_hours,
+        cache=direct_return_cache,
     )
     asset_at = _required_aware_time(
         asset_endpoint.get("observed_at"),
@@ -916,10 +951,11 @@ def _relative_return_sample(
             _observation_reference(observation)
         ),
     )
-    benchmark_sample, benchmark_state = _direct_return_sample(
+    benchmark_sample, benchmark_state = _cached_direct_return_sample(
         benchmark_endpoint,
         benchmark_observations,
         horizon_hours=horizon_hours,
+        cache=direct_return_cache,
     )
     if "basis_ineligible" in {asset_state, benchmark_state}:
         return None, "basis_ineligible"

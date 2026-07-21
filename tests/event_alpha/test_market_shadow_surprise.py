@@ -308,6 +308,39 @@ def test_v5_signed_return_tails_preserve_horizon_basis_sign_and_two_sided_rank()
     json.dumps(result, sort_keys=True, allow_nan=False)
 
 
+def test_return_projection_reuses_each_direct_sample_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current, priors, benchmarks = _complete_return_history()
+    original = market_shadow_surprise._direct_return_sample
+    calls: list[tuple[int, int, int]] = []
+
+    def tracked(endpoint, observations, *, horizon_hours):
+        calls.append((id(endpoint), id(observations), horizon_hours))
+        return original(
+            endpoint,
+            observations,
+            horizon_hours=horizon_hours,
+        )
+
+    monkeypatch.setattr(
+        market_shadow_surprise,
+        "_direct_return_sample",
+        tracked,
+    )
+
+    result = evaluate_shadow_temporal_surprise(
+        current,
+        priors,
+        minimum_sample_count=5,
+        benchmark_observations=benchmarks,
+    )
+
+    assert result["return_status"] == "ready"
+    assert calls
+    assert len(calls) == len(set(calls))
+
+
 def test_v5_signed_return_tail_preserves_negative_direction():
     current, priors, benchmarks = _complete_return_history(current_price=80.0)
 
