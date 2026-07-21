@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the fifty-seventh no-send market cycle · Codex
+**Why:** The hourly Decision Radar observation cadence became eligible while
+the existing CoinGecko authorization remained present. One bounded cycle was
+needed to keep the temporal baseline and campaign truth current.
+**Changes:** Ran exactly one authorized no-send collection and published
+`radar_market_no_send_20260721t131323448090z_779d74f4e8cf` as revision-12
+dashboard authority. The campaign report now records 57 real cycles, 1,710
+retained observations, 1,680 baseline-counted observations, 30 too-close
+observations, 31/36 historically warm assets, and 450 point-in-time
+universe/liquidity rows. The current universe is 28/30 warm; its exact 24-hour
+control input is 29/30 ready, with HBAR rank 30 unavailable, so no regime was
+fabricated. The current generation has 30 observations and zero anomalies or
+Decision ideas.
+**Verify:** Readiness reported `eligible` with existing authorization and zero
+readiness calls. CoinGecko returned HTTP 200 with 80 rows in 1,462 ms and zero
+retries; 30 rows were retained. The exact no-key-live strict doctor passed with
+zero blockers and warnings, dashboard readiness passed, immutable publication
+and operations receipts bind operator-state SHA-256
+`281cc3b1ce73885e73e776e94e34c21c64a140adbb594940d8949c72519763ba`,
+and a host-level `HEAD /` returned HTTP 200 with the exact namespace, run,
+revision, and digest headers.
+**Notes/risks:** The next eligible observation is
+`2026-07-21T14:13:25.659555+00:00`. Spread coverage remains zero because the
+selected Bybit execution-quality boundary is still unauthorized/fail-closed;
+no proxy was invented. The Protocol-v2 frontier remains 4 primary episodes, 7
+dependent repeat members, and 3 matured episodes. Every send, trade, order,
+paper-trade, normal RSI-write, and Event Alpha `TRIGGERED_FADE` counter remains
+zero. Quantitative source-size limits remain advisory.
+
 ## 2026-07-21 — Refresh advisory architecture reports · Codex
 **Why:** The architecture-cleanliness check had not been regenerated after the
 latest evidence-integrity changes. Its checked-in reports needed to describe
