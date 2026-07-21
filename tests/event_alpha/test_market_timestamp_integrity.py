@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 
@@ -41,6 +43,27 @@ def test_market_snapshot_rejects_malformed_selected_observation_clock():
         )
 
 
+def test_market_snapshot_rejects_timezone_naive_selected_clock():
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    with pytest.raises(ValueError, match="observed_at is invalid"):
+        market_state.snapshot_from_market_row({
+            "symbol": "TEST",
+            "coin_id": "test-token",
+            "observed_at": "2026-07-19T08:00:00",
+        })
+
+    with pytest.raises(ValueError, match="observed_at argument is invalid"):
+        market_state.snapshot_from_market_row(
+            {
+                "symbol": "TEST",
+                "coin_id": "test-token",
+                "observed_at": "2026-07-19T08:00:00Z",
+            },
+            observed_at=datetime(2026, 7, 19, 8),
+        )
+
+
 def test_invalid_row_clock_cannot_imply_freshness_under_valid_run_clock():
     from crypto_rsi_scanner.event_alpha.radar import market_state
 
@@ -55,6 +78,25 @@ def test_invalid_row_clock_cannot_imply_freshness_under_valid_run_clock():
 
     assert snapshot.observed_at == "2026-07-19T08:00:00+00:00"
     assert snapshot.freshness_status == "unknown"
+    assert "invalid_source_observation_time" in snapshot.warnings
+
+
+def test_naive_row_clock_cannot_retain_claimed_freshness_under_valid_run_clock():
+    from crypto_rsi_scanner.event_alpha.radar import market_state
+
+    snapshot = market_state.snapshot_from_market_row(
+        {
+            "symbol": "TEST",
+            "coin_id": "test-token",
+            "observed_at": "2026-07-19T08:00:00",
+            "freshness_status": "fresh",
+        },
+        observed_at="2026-07-19T08:05:00Z",
+    )
+
+    assert snapshot.observed_at == "2026-07-19T08:05:00+00:00"
+    assert snapshot.freshness_status == "unknown"
+    assert "invalid_source_observation_time" in snapshot.warnings
 
 
 def test_catalyst_queue_rejects_malformed_higher_authority_clock():
@@ -73,6 +115,20 @@ def test_catalyst_queue_rejects_malformed_higher_authority_clock():
         market_anomaly_scanner.build_catalyst_search_queue(
             [_anomaly(market_state_snapshot={"observed_at": "not-a-time"})],
             observed_at="2026-07-19T08:00:00Z",
+        )
+
+
+def test_catalyst_queue_rejects_timezone_naive_clock():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    with pytest.raises(ValueError, match="anomaly observed_at is invalid"):
+        market_anomaly_scanner.build_catalyst_search_queue(
+            [_anomaly(observed_at="2026-07-19T08:00:00")],
+        )
+
+    with pytest.raises(ValueError, match="snapshot observed_at is invalid"):
+        market_anomaly_scanner.build_catalyst_search_queue(
+            [_anomaly(market_state_snapshot={"observed_at": datetime(2026, 7, 19, 8)})],
         )
 
 

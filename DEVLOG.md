@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject timezone-naive market clocks · Codex
+**Why:** A timezone-naive market observation such as
+`2026-07-21T11:00:00` was silently interpreted as UTC, labeled fresh, allowed
+to create an anomaly, and used to construct a catalyst deadline. This erased
+the source timezone uncertainty and could make stale or shifted data appear
+current.
+**Changes:** Canonical market snapshots now accept only timezone-aware source
+and run observation clocks. A naive or otherwise invalid selected clock fails
+closed. When a separate valid run clock is authoritative, an invalid supplied
+source clock is retained as `invalid_source_observation_time`, and even an
+explicit source `fresh` claim is reduced to `unknown`. Catalyst-queue clocks
+now enforce the same timezone-aware rule instead of attaching UTC to naive
+values. No cadence, age threshold, anomaly rule, score, route, or provider
+policy changed.
+**Verify:** The exact naive-clock reproduction changed from a fresh UTC-labeled
+snapshot, one anomaly, and a constructed deadline to
+`ValueError: market state observed_at is invalid`. Focused timestamp
+regressions passed (`7 passed`); the wider market surfaces, alias precedence,
+numeric/unit integrity, anomaly report, no-send normalization, and Decision-v2
+suites passed (`190 passed`). `make event-alpha-integrated-radar-smoke
+PYTHON=python3` passed with 15 candidates, 12 canonical cores/cards, 14
+dashboard pages, and strict doctor 0 blockers / 0 warnings. `python3 -m
+compileall -q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the exact snapshot,
+queue, Decision, integrated-artifact, doctor, and dashboard paths were exercised
+directly. No provider call, authority change, send, trade, order, paper trade,
+normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred. Quantitative
+source-file size remains advisory; artifact, security, provider, request,
+clock, and resource bounds remain enforced.
+
 ## 2026-07-21 — Prefer direct liquidity evidence over coarse tiers · Codex
 **Why:** A row with directly observed `$10,000` liquidity and a contradictory
 `liquidity_tier=large` was labeled `high_liquidity_breakout` and received a

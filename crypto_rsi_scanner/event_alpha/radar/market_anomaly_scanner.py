@@ -1241,11 +1241,14 @@ def _queue_observed_at(
 
 def _parse_time(value: object, *, field_name: str) -> datetime:
     if isinstance(value, datetime):
-        return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if value.tzinfo is not None and value.utcoffset() is not None:
+            return value.astimezone(timezone.utc)
+        raise ValueError(f"market anomaly catalyst queue {field_name} is invalid")
     if isinstance(value, str) and value.strip():
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+            if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+                return parsed.astimezone(timezone.utc)
         except ValueError:
             pass
     raise ValueError(f"market anomaly catalyst queue {field_name} is invalid")

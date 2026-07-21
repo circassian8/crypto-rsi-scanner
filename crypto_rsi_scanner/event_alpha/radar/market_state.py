@@ -189,11 +189,20 @@ def snapshot_from_market_row(
     if canonical_asset_id_supplied and not canonical_asset_id:
         warnings.append("invalid_canonical_asset_identity")
 
-    freshness = str(
-        row.get("market_context_freshness_status")
-        or row.get("freshness_status")
-        or ("fresh" if _has_valid_row_observation_time(row) else "unknown")
+    source_observation_time = _first_present_value(row, "observed_at", "timestamp")
+    source_observation_time_invalid = (
+        source_observation_time is not None
+        and _parse_observation_time(source_observation_time) is None
     )
+    if source_observation_time_invalid:
+        warnings.append("invalid_source_observation_time")
+        freshness = "unknown"
+    else:
+        freshness = str(
+            row.get("market_context_freshness_status")
+            or row.get("freshness_status")
+            or ("fresh" if _has_valid_row_observation_time(row) else "unknown")
+        )
     source = str(row.get("market_data_source") or row.get("source") or "fixture")
     market_history_observation_id = _optional_string(
         row.get("market_history_observation_id"),
@@ -613,10 +622,11 @@ def _has_valid_row_observation_time(row: Mapping[str, Any]) -> bool:
 
 def _parse_observation_time(value: object) -> datetime | None:
     if isinstance(value, datetime):
-        return _as_utc(value)
+        return _as_utc(value) if _timezone_aware(value) else None
     if isinstance(value, str) and value.strip():
         try:
-            return _as_utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return _as_utc(parsed) if _timezone_aware(parsed) else None
         except ValueError:
             return None
     return None
@@ -653,4 +663,8 @@ def _float(value: object) -> float | None:
 
 
 def _as_utc(dt: datetime) -> datetime:
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _timezone_aware(value: datetime) -> bool:
+    return value.tzinfo is not None and value.utcoffset() is not None
