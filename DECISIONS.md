@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Separate exact card inspection from measured review timing
+**Status:** accepted
+**Decision:** Every human-review queue row states the canonical expiry and its
+expired/unexpired status, then offers a read-only exact-card inspection command
+before the separate confirmation-gated timing action. Inspection must resolve a
+receipt-backed idea/Core pair, retain descriptor-anchored namespace access,
+verify the complete current research-card tree against its operator manifest,
+and bind card lineage to the exact run/profile/namespace/Core identity. It makes
+zero provider calls and writes and never records a first view. Only the explicit
+confirmed `radar-review-timing-view` command creates timing evidence.
+**Why:** All nine genuine queued ideas were expired, but the prior queue led with
+confirmed view commands and no safe exact-card read. Historical inspection is
+necessary for informed labeling; silently turning a read into a timing event
+would fabricate a clock and violate the explicit-action measurement contract.
+**Revisit when:** A sealed Protocol-v2 annex defines an operator-approved UI
+interaction as a measured attention event. Version that event boundary
+explicitly; do not infer it from CLI inspection, dashboard GET/HEAD, probes, or
+previews.
+
 ## 2026-07-22 - Bind queue labels to evidence without extending timing events
 **Status:** accepted
 **Decision:** Human-review queue schema v2 carries a presentation-only operator

@@ -37,7 +37,7 @@ REPORT_SCHEMA_ID = "decision_radar.idea_review_timing_report"
 REPORT_SCHEMA_VERSION = 1
 REVIEW_QUEUE_COMMAND = "make radar-review-timing-queue PYTHON=.venv/bin/python"
 OPERATOR_CONTEXT_SCHEMA_ID = "decision_radar.idea_review_operator_context"
-OPERATOR_CONTEXT_SCHEMA_VERSION = 1
+OPERATOR_CONTEXT_SCHEMA_VERSION = 2
 LEDGER_FILENAME = "event_decision_radar_review_timing_events.jsonl"
 LEDGER_DIRECTORY = "radar_market_history_cache"
 EVENT_TYPES = frozenset({"first_viewed", "review_completed"})
@@ -147,7 +147,7 @@ _SOURCE_BINDING_FIELDS = frozenset(
         "decision_radar_campaign_counted",
     }
 )
-_OPERATOR_CONTEXT_FIELDS = frozenset(
+_OPERATOR_CONTEXT_FIELDS_V1 = frozenset(
     {
         "schema_id",
         "schema_version",
@@ -169,6 +169,7 @@ _OPERATOR_CONTEXT_FIELDS = frozenset(
         "presentation_only",
     }
 )
+_OPERATOR_CONTEXT_FIELDS = _OPERATOR_CONTEXT_FIELDS_V1 | {"expires_at"}
 
 
 class DecisionReviewTimingError(RuntimeError):
@@ -802,6 +803,10 @@ def _operator_review_context(
             projection.get("preferred_horizon"),
             "preferred_horizon",
         ),
+        "expires_at": _canonical_timestamp(
+            projection.get("expires_at"),
+            field="expires_at",
+        ),
         "radar_actionable": projection.get("radar_actionable"),
         "actionability_score": _bounded_score(
             projection.get("actionability_score"),
@@ -835,11 +840,20 @@ def _operator_review_context(
 def operator_review_context_valid(value: object) -> bool:
     """Validate the closed presentation-only queue context."""
 
-    if not isinstance(value, Mapping) or set(value) != _OPERATOR_CONTEXT_FIELDS:
+    if not isinstance(value, Mapping):
+        return False
+    version = value.get("schema_version")
+    expected_fields = (
+        _OPERATOR_CONTEXT_FIELDS
+        if version == OPERATOR_CONTEXT_SCHEMA_VERSION
+        else _OPERATOR_CONTEXT_FIELDS_V1
+        if version == 1
+        else frozenset()
+    )
+    if set(value) != expected_fields:
         return False
     if (
         value.get("schema_id") != OPERATOR_CONTEXT_SCHEMA_ID
-        or value.get("schema_version") != OPERATOR_CONTEXT_SCHEMA_VERSION
         or value.get("radar_actionable") not in {True, False}
         or type(value.get("radar_actionable")) is not bool
         or value.get("candidate_identity_bound_by")
@@ -848,6 +862,15 @@ def operator_review_context_valid(value: object) -> bool:
         or value.get("presentation_only") is not True
     ):
         return False
+    if version == OPERATOR_CONTEXT_SCHEMA_VERSION:
+        try:
+            if _canonical_timestamp(
+                value.get("expires_at"),
+                field="expires_at",
+            ) != value.get("expires_at"):
+                return False
+        except (DecisionReviewTimingError, ValueError):
+            return False
     for field in (
         "canonical_asset_id",
         "symbol",

@@ -13,6 +13,9 @@ from types import SimpleNamespace
 import pytest
 
 from crypto_rsi_scanner.event_alpha.operations import decision_review_timing as timing
+from crypto_rsi_scanner.event_alpha.operations import (
+    decision_review_card_inspection as card_inspection,
+)
 from crypto_rsi_scanner.event_alpha.operations import decision_review_timing_cli
 from crypto_rsi_scanner.event_alpha.operations import (
     decision_review_timing_queue as timing_queue,
@@ -21,6 +24,7 @@ from crypto_rsi_scanner.event_alpha.operations import (
     market_observation_campaign as campaign,
 )
 from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign_render
+from crypto_rsi_scanner.event_alpha.artifacts import fingerprints
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -55,7 +59,7 @@ def _binding(**overrides: object) -> dict[str, object]:
 def _operator_context(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
         "schema_id": "decision_radar.idea_review_operator_context",
-        "schema_version": 1,
+        "schema_version": 2,
         "canonical_asset_id": "exact-asset",
         "symbol": "EXACT",
         "anomaly_type": "stealth_accumulation",
@@ -64,6 +68,7 @@ def _operator_context(**overrides: object) -> dict[str, object]:
         "market_phase": "emerging",
         "timing_state": "early",
         "preferred_horizon": "3d_7d",
+        "expires_at": "2026-07-19T12:00:00+00:00",
         "radar_actionable": False,
         "actionability_score": 62.5,
         "evidence_confidence_score": 52.0,
@@ -325,6 +330,7 @@ def test_load_binding_requires_receipts_canonical_projection_and_genuine_campaig
         "market_phase": "emerging",
         "timing_state": "early",
         "preferred_horizon": "3d_7d",
+        "expires_at": "2026-07-19T12:00:00+00:00",
         "radar_actionable": False,
         "actionability_score": 62.5,
         "evidence_confidence_score": 52.0,
@@ -387,6 +393,140 @@ def test_load_binding_requires_receipts_canonical_projection_and_genuine_campaig
     idea["decision_radar_campaign_counted"] = False
     with pytest.raises(timing.DecisionReviewTimingError, match="not_genuine"):
         timing.load_idea_binding(base, namespace, "iar:exact-idea")
+
+
+def test_exact_card_inspection_is_fingerprint_bound_explicitly_historical_and_read_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = _base(tmp_path)
+    namespace = "radar_market_no_send_exact"
+    namespace_dir = base / namespace
+    cards_dir = namespace_dir / "research_cards"
+    cards_dir.mkdir(parents=True)
+    card = cards_dir / "card_agg_exact_idea.md"
+    card.write_text(
+        "\n".join(
+            (
+                "# EXACT Crypto Decision Radar Card",
+                "- Run ID: 2026-07-18T12:00:00+00:00|no_key_live",
+                "- Profile: no_key_live",
+                f"- Namespace: {namespace}",
+                "- Core opportunity ID: agg:exact-idea",
+                "Research-only / not a trade signal.",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    projection = {
+        "decision_evaluated_at": "2026-07-18T12:00:00+00:00",
+        "radar_route": "dashboard_watch",
+        "primary_thesis_origin": "market_led",
+        "directional_bias": "long",
+        "expires_at": "2026-07-19T12:00:00+00:00",
+    }
+    binding = _binding(
+        decision_projection_sha256=timing._digest_value(projection),
+        operator_review_context=_operator_context(),
+    )
+    card_tree = {
+        **fingerprints.fingerprint_path(cards_dir),
+        "status": "current",
+        "path": "research_cards",
+        "run_id": binding["run_id"],
+    }
+    core = {
+        "integrated_candidate_id": binding["idea_id"],
+        "core_opportunity_id": binding["core_opportunity_id"],
+        "decision_projection": projection,
+        "research_card_path": (
+            f"event_fade_cache/{namespace}/research_cards/{card.name}"
+        ),
+    }
+    snapshot = SimpleNamespace(
+        namespace_dir=namespace_dir,
+        artifact_namespace=namespace,
+        run_id=binding["run_id"],
+        profile=binding["profile"],
+        revision=binding["revision"],
+        operator_state_sha256=binding["operator_state_sha256"],
+        operator_state={
+            "artifacts": {
+                "integrated_candidates": {
+                    "sha256": binding["integrated_candidates_sha256"]
+                },
+                "core_opportunities": {
+                    "sha256": binding["core_opportunities_sha256"]
+                },
+                "research_cards": card_tree,
+            }
+        },
+        current_candidates=(core,),
+    )
+    monkeypatch.setattr(
+        card_inspection.timing,
+        "load_idea_binding",
+        lambda *_args, **_kwargs: dict(binding),
+    )
+    monkeypatch.setattr(
+        card_inspection,
+        "load_dashboard_snapshot",
+        lambda *_args, **_kwargs: snapshot,
+    )
+    monkeypatch.setattr(
+        card_inspection,
+        "decision_model_values",
+        lambda row: dict(row["decision_projection"]),
+    )
+    monkeypatch.setattr(
+        card_inspection.daily_operations_publication,
+        "validate_final_publication_contract",
+        lambda *_args, **_kwargs: SimpleNamespace(valid=False),
+    )
+
+    result = card_inspection.inspect_review_card(
+        base,
+        namespace,
+        binding["idea_id"],
+        evaluated_at="2026-07-20T12:00:00+00:00",
+    )
+
+    assert result["status"] == "verified"
+    assert result["generation_role"] == "historical_published_generation"
+    assert result["idea_temporal_status"] == "expired"
+    assert result["card_markdown"] == card.read_text(encoding="utf-8")
+    assert result["card_sha256"] == hashlib.sha256(card.read_bytes()).hexdigest()
+    assert result["inspection_records_human_timing_event"] is False
+    assert result["provider_calls"] == 0
+    assert result["writes"] == 0
+
+    card.write_text("tampered\n", encoding="utf-8")
+    with pytest.raises(
+        timing.DecisionReviewTimingError,
+        match="review_card_exact_read_invalid:fingerprint_content_mismatch",
+    ):
+        card_inspection.inspect_review_card(
+            base,
+            namespace,
+            binding["idea_id"],
+            evaluated_at="2026-07-20T12:00:00+00:00",
+        )
+
+    card.unlink()
+    outside = tmp_path / "outside-card.md"
+    outside.write_text("outside\n", encoding="utf-8")
+    card.symlink_to(outside)
+    with pytest.raises(
+        timing.DecisionReviewTimingError,
+        match="review_card_exact_read_invalid",
+    ):
+        card_inspection.inspect_review_card(
+            base,
+            namespace,
+            binding["idea_id"],
+            evaluated_at="2026-07-20T12:00:00+00:00",
+        )
 
 
 def test_status_without_ledger_is_clean_no_event_report(tmp_path: Path) -> None:
@@ -460,6 +600,8 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
         "not_viewed_count": 1,
         "in_review_count": 0,
         "complete_count": 0,
+        "expired_idea_count": 1,
+        "unexpired_idea_count": 0,
         "skipped_candidate_count": 2,
         "provider_calls": 0,
         "writes": 0,
@@ -478,6 +620,16 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
                 "operator_review_context": _operator_context(),
                 "idea_observed_at": "2026-07-20T11:00:00+00:00",
                 "idea_available_at": "2026-07-20T11:00:08+00:00",
+                "expires_at": "2026-07-19T12:00:00+00:00",
+                "idea_temporal_status": "expired",
+                "timing_action_warning": (
+                    "historical_expired_idea_inspect_exact_card_before_recording_action"
+                ),
+                "inspection_command": (
+                    "make radar-review-timing-inspect "
+                    "RADAR_REVIEW_NAMESPACE=radar_market_no_send_exact "
+                    "RADAR_REVIEW_IDEA_ID=iar:exact"
+                ),
                 "next_action": "record_first_view",
                 "next_safe_command": (
                     "CONFIRM=1 make radar-review-timing-view "
@@ -517,12 +669,42 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
     assert "record[1].symbol=EXACT" in output
     assert "record[1].anomaly_type=stealth_accumulation" in output
     assert "record[1].risk_score=48.0" in output
+    assert "expired_idea_count=1" in output
+    assert "record[1].idea_temporal_status=expired" in output
+    assert "record[1].inspection_command=make radar-review-timing-inspect" in output
     assert "record[1].next_safe_command=CONFIRM=1 make" in output
     assert "commands_require_explicit_confirmation=true" in output
     assert "dashboard_reads_recorded_as_human_actions=false" in output
     assert "safety.provider_calls=0" in output
     assert "safety.orders=0" in output
     assert "RADAR_REVIEW_TIMING_OUTPUT=json" in output
+
+
+def test_card_inspection_render_leads_with_expiry_and_does_not_claim_a_view() -> None:
+    result = {
+        "status": "verified",
+        "artifact_namespace": "radar_market_no_send_exact",
+        "idea_id": "iar:exact-idea",
+        "generation_role": "historical_published_generation",
+        "idea_temporal_status": "expired",
+        "expires_at": "2026-07-19T12:00:00+00:00",
+        "operator_warning": "historical published generation; idea expired",
+        "card_sha256": "a" * 64,
+        "card_markdown": "# Exact stored card\n\nResearch-only.\n",
+    }
+
+    output = decision_review_timing_cli._render_card_inspection(result)
+
+    assert output.startswith("# Exact Decision Radar Review Card Inspection")
+    assert "Idea temporal status: expired" in output
+    assert "did not record a human timing event" in output
+    assert "# Exact stored card" in output
+
+    summary = decision_review_timing_cli._render_summary("inspect", result)
+    assert "full_json_command=make radar-review-timing-inspect" in summary
+    assert "RADAR_REVIEW_NAMESPACE=radar_market_no_send_exact" in summary
+    assert "RADAR_REVIEW_IDEA_ID=iar:exact-idea" in summary
+    assert "RADAR_REVIEW_INSPECTION_OUTPUT=json" in summary
 
 
 def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> None:
@@ -738,10 +920,12 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
     )
 
     assert queue["status"] == "action_required"
-    assert queue["schema_version"] == 2
+    assert queue["schema_version"] == 3
     assert queue["eligible_generation_count"] == 2
     assert queue["eligible_idea_count"] == 2
     assert queue["not_viewed_count"] == 2
+    assert queue["expired_idea_count"] == 0
+    assert queue["unexpired_idea_count"] == 2
     assert queue["skipped_candidate_count"] == 2
     assert queue["skipped_generation_reason_counts"] == {
         "final_publication_receipt_missing": 1,
@@ -755,6 +939,14 @@ def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(
     } == {"FIRST", "SECOND"}
     assert all(
         row["operator_review_context"]["presentation_only"] is True
+        for row in queue["records"]
+    )
+    assert all(
+        row["idea_temporal_status"] == "unexpired"
+        and row["inspection_make_target"] == "radar-review-timing-inspect"
+        and "make radar-review-timing-inspect" in row["inspection_command"]
+        and row["inspection_requires_confirmation"] is False
+        and row["inspection_records_human_timing_event"] is False
         for row in queue["records"]
     )
     assert all(

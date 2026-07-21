@@ -6,6 +6,7 @@ import argparse
 import json
 from typing import Any, Mapping
 
+from . import decision_review_card_inspection
 from . import decision_review_timing
 from . import decision_review_timing_queue
 
@@ -38,6 +39,21 @@ def _parser() -> argparse.ArgumentParser:
     )
     queue.add_argument("--evaluated-at")
     queue.add_argument("--output", choices=("json", "summary"), default="json")
+    inspect = subparsers.add_parser(
+        "inspect",
+        help=(
+            "Render one exact verified historical card without recording a "
+            "human timing event"
+        ),
+    )
+    inspect.add_argument("--namespace", required=True)
+    inspect.add_argument("--idea-id", required=True)
+    inspect.add_argument("--evaluated-at")
+    inspect.add_argument(
+        "--output",
+        choices=("card", "json", "summary"),
+        default="card",
+    )
 
     for command, help_text in (
         ("view", "Record the first explicit operator view"),
@@ -74,6 +90,13 @@ def main(argv: list[str] | None = None) -> int:
             generations,
             evaluated_at=evaluated_at,
         )
+    elif args.command == "inspect":
+        result = decision_review_card_inspection.inspect_review_card(
+            args.artifact_base,
+            args.namespace,
+            args.idea_id,
+            evaluated_at=args.evaluated_at or _utc_now(),
+        )
     else:
         result = decision_review_timing.record_review_timing_event(
             args.artifact_base,
@@ -86,7 +109,9 @@ def main(argv: list[str] | None = None) -> int:
             confirm=args.confirm,
         )
     output = getattr(args, "output", "json")
-    if output == "summary":
+    if output == "card":
+        print(_render_card_inspection(result))
+    elif output == "summary":
         print(_render_summary(args.command, result))
     else:
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -110,7 +135,28 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
             "not_viewed_count",
             "in_review_count",
             "complete_count",
+            "expired_idea_count",
+            "unexpired_idea_count",
             "skipped_candidate_count",
+        ):
+            lines.append((field, result.get(field)))
+    elif command == "inspect":
+        for field in (
+            "artifact_namespace",
+            "idea_id",
+            "core_opportunity_id",
+            "radar_route",
+            "generation_role",
+            "current_dashboard_authority",
+            "expires_at",
+            "idea_temporal_status",
+            "operator_warning",
+            "card_display_path",
+            "card_sha256",
+            "card_size_bytes",
+            "research_cards_tree_sha256",
+            "inspection_records_human_timing_event",
+            "confirmed_view_still_required_for_timing_evidence",
         ):
             lines.append((field, result.get(field)))
     else:
@@ -157,6 +203,9 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
                 "radar_route",
                 "artifact_namespace",
                 "idea_id",
+                "expires_at",
+                "idea_temporal_status",
+                "timing_action_warning",
             ):
                 lines.append((f"{prefix}.{field}", raw.get(field)))
             for field in (
@@ -169,6 +218,9 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
                 "urgency_score",
             ):
                 lines.append((f"{prefix}.{field}", context.get(field)))
+            lines.append(
+                (f"{prefix}.inspection_command", raw.get("inspection_command"))
+            )
             lines.append((f"{prefix}.next_safe_command", raw.get("next_safe_command")))
     safety = result.get("safety")
     if isinstance(safety, Mapping):
@@ -183,17 +235,46 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
             "production_policy_mutations",
         ):
             lines.append((f"safety.{field}", safety.get(field)))
+    full_json_command = (
+        "make radar-review-timing-inspect "
+        f"RADAR_REVIEW_NAMESPACE={_summary_value(result.get('artifact_namespace'))} "
+        f"RADAR_REVIEW_IDEA_ID={_summary_value(result.get('idea_id'))} "
+        "RADAR_REVIEW_INSPECTION_OUTPUT=json PYTHON=.venv/bin/python"
+        if command == "inspect"
+        else f"make radar-review-timing-{command} "
+        "RADAR_REVIEW_TIMING_OUTPUT=json PYTHON=.venv/bin/python"
+    )
     lines.extend(
         (
             ("research_only", result.get("research_only")),
-            (
-                "full_json_command",
-                f"make radar-review-timing-{command} "
-                "RADAR_REVIEW_TIMING_OUTPUT=json PYTHON=.venv/bin/python",
-            ),
+            ("full_json_command", full_json_command),
         )
     )
     return "\n".join(f"{key}={_summary_value(value)}" for key, value in lines)
+
+
+def _render_card_inspection(result: Mapping[str, Any]) -> str:
+    """Lead exact card bytes with unavoidable historical/timing truth."""
+
+    markdown = result.get("card_markdown")
+    if not isinstance(markdown, str):
+        raise ValueError("review_card_markdown_missing")
+    header = [
+        "# Exact Decision Radar Review Card Inspection",
+        "",
+        f"- Status: {_summary_value(result.get('status'))}",
+        f"- Generation role: {_summary_value(result.get('generation_role'))}",
+        f"- Idea temporal status: {_summary_value(result.get('idea_temporal_status'))}",
+        f"- Expires at: {_summary_value(result.get('expires_at'))}",
+        f"- Warning: {_summary_value(result.get('operator_warning'))}",
+        f"- Exact card SHA-256: {_summary_value(result.get('card_sha256'))}",
+        "- This read-only inspection did not record a human timing event.",
+        "- Run the separate confirmed view command only when you intend to record timing evidence.",
+        "",
+        "---",
+        "",
+    ]
+    return "\n".join(header) + markdown.rstrip("\n")
 
 
 def _queue_recurrence_summary(

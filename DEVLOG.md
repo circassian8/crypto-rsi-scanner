@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Put verified card inspection before review timing actions · Codex
+**Why:** The genuine review queue sent the operator directly to confirmed
+first-view commands even though all nine queued ideas had expired and the exact
+historical cards were not available through a dedicated safe read surface.
+**Changes:**
+- Added queue schema v3 and presentation-context v2 expiry truth. The queue now
+  reports expired/unexpired totals, exact per-item expiry, and an explicit
+  historical warning; the current real queue correctly reports 9 expired and 0
+  unexpired ideas.
+- Added `radar-review-timing-inspect`, which resolves one exact receipt-backed
+  idea and Core card, binds it back to the candidate/Core/projection/operator
+  digests, verifies the complete research-card directory fingerprint while
+  holding descriptor-anchored access, and renders an unavoidable historical and
+  expiry header before the unchanged stored Markdown.
+- Put each no-confirmation inspection command before its separate confirmed
+  view/completion command. Inspection is deliberately read-only and cannot
+  create human-timing evidence; the append-only event schema and path-free
+  campaign projection remain unchanged.
+**Verify:** The final focused review/campaign/protocol/North-Star set passed
+69/69 tests; all 80 dashboard tests also passed with the required temporary
+loopback bind, including changed-tree and symlink rejection. The real nine-item
+queue rendered 9 expired / 0 unexpired items with exact inspection commands,
+zero provider calls, and zero writes. Exact DEXE inspection verified historical
+status, expiry `2026-07-21T02:47:37.287740+00:00`, and card SHA-256
+`c7c4f498fb3e6e60ee4cd135328b4c65e11379d5957564a6f23c47b645ea4bc2`;
+post-inspection timing status remained `no_events` with zero ledger rows. The
+canonical campaign report rebuilt successfully from queue v3, compileall and
+North-Star JSON validation passed, `git diff --check` was clean, and
+`architecture-cleanliness-check` remained green; its source-size measurements
+were advisory.
+**Notes/risks:** Inspecting content is not silently treated as measured human
+attention. The operator must still deliberately run the confirmed first-view
+command to establish a timing clock. No provider, authorization, route, score,
+threshold, outcome, dashboard authority, send, trade, order, paper trade, RSI
+write, or Event Alpha `TRIGGERED_FADE` changed. Quantitative source-size
+findings remain advisory.
+
 ## 2026-07-22 — Record the sixty-third no-send market cycle · Codex
 **Why:** The hourly boundary was eligible and the existing explicit CoinGecko
 authorization was still present, so the campaign needed one genuine

@@ -53,6 +53,24 @@ class AnchoredNamespaceReader:
     ) -> tuple[dict[str, object] | None, str | None]:
         return _fingerprint_relative_directory(self, relative)
 
+    def read_verified_directory_member(
+        self,
+        relative_directory: str | Path,
+        member: str | Path,
+        *,
+        expected_fingerprint: Mapping[str, Any],
+        max_member_bytes: int | None = None,
+    ) -> tuple[bytes | None, str | None]:
+        """Read one member while verifying its exact enclosing tree once."""
+
+        return _read_verified_directory_member(
+            self,
+            relative_directory,
+            member,
+            expected_fingerprint=expected_fingerprint,
+            max_member_bytes=max_member_bytes,
+        )
+
 
 @contextmanager
 def open_anchored_namespace(namespace_dir: Path) -> Iterator[AnchoredNamespaceReader]:
@@ -167,6 +185,88 @@ def _fingerprint_relative_directory(
             os.close(root_fd)
 
 
+def _read_verified_directory_member(
+    reader: AnchoredNamespaceReader,
+    relative_directory: str | Path,
+    member: str | Path,
+    *,
+    expected_fingerprint: Mapping[str, Any],
+    max_member_bytes: int | None,
+) -> tuple[bytes | None, str | None]:
+    """Return exact member bytes only when the held directory matches its manifest."""
+
+    directory_parts, directory_error = _relative_parts(relative_directory)
+    member_parts, member_error = _relative_parts(member)
+    if directory_error or member_error:
+        return None, directory_error or member_error
+    metadata_error = fingerprints.fingerprint_metadata_error(
+        expected_fingerprint,
+        allowed_kinds={fingerprints.DIRECTORY_TREE_KIND},
+    )
+    if metadata_error:
+        return None, metadata_error
+    member_name = PurePosixPath(*member_parts).as_posix()
+    root_fd: int | None = None
+    try:
+        reader.assert_current()
+        root_fd, open_error = _open_relative_directory(
+            reader.namespace_fd,
+            directory_parts,
+        )
+        if open_error or root_fd is None:
+            return None, open_error or "artifact_unreadable"
+        before = _directory_snapshot(root_fd)
+        digest = hashlib.sha256(b"event-alpha-directory-tree-v1\0")
+        total_size = 0
+        file_count = 0
+        selected: bytes | None = None
+        for relative_name, kind, _identity in before:
+            if kind == "directory":
+                continue
+            data, read_error = _read_file_below(
+                root_fd,
+                PurePosixPath(relative_name),
+                max_bytes=(
+                    max_member_bytes if relative_name == member_name else None
+                ),
+            )
+            if read_error or data is None:
+                return None, read_error or "artifact_unreadable"
+            path_bytes = relative_name.encode("utf-8")
+            digest.update(len(path_bytes).to_bytes(8, "big"))
+            digest.update(path_bytes)
+            digest.update(len(data).to_bytes(8, "big"))
+            digest.update(data)
+            total_size += len(data)
+            file_count += 1
+            if relative_name == member_name:
+                selected = data
+        if before != _directory_snapshot(root_fd):
+            return None, "directory_changed_during_fingerprint"
+        actual = {
+            "sha256": digest.hexdigest(),
+            "size_bytes": total_size,
+            "item_count": file_count,
+            "fingerprint_kind": fingerprints.DIRECTORY_TREE_KIND,
+            "fingerprint_contract_version": fingerprints.FINGERPRINT_CONTRACT_VERSION,
+        }
+        valid, fingerprint_error = compare_fingerprint_values(
+            actual,
+            expected_fingerprint,
+        )
+        if not valid:
+            return None, fingerprint_error or "fingerprint_mismatch"
+        if selected is None:
+            return None, "directory_member_missing"
+        reader.assert_current()
+        return selected, None
+    except OSError:
+        return None, "directory_changed_during_fingerprint"
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
+
+
 def verify_run_ledger_bytes(
     data: bytes,
     expected: Mapping[str, Any],
@@ -234,12 +334,18 @@ def _run_identity(value: Mapping[str, Any]) -> dict[str, str]:
 def _read_file_below(
     root_fd: int,
     relative: PurePosixPath,
+    *,
+    max_bytes: int | None = None,
 ) -> tuple[bytes | None, str | None]:
     parent_fd, error = _open_relative_parent(root_fd, relative.parts[:-1])
     if error or parent_fd is None:
         return None, error
     try:
-        return _read_file_at(parent_fd, relative.parts[-1])
+        return _read_file_at(
+            parent_fd,
+            relative.parts[-1],
+            max_bytes=max_bytes,
+        )
     finally:
         os.close(parent_fd)
 

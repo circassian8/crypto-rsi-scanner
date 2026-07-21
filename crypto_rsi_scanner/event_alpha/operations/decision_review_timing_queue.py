@@ -20,7 +20,7 @@ from . import decision_review_timing as timing
 
 
 QUEUE_SCHEMA_ID = "decision_radar.idea_review_timing_queue"
-QUEUE_SCHEMA_VERSION = 2
+QUEUE_SCHEMA_VERSION = 3
 MAX_QUEUE_GENERATIONS = 256
 MAX_QUEUE_IDEAS = 512
 CAMPAIGN_QUEUE_SUMMARY_SCHEMA_ID = (
@@ -119,12 +119,17 @@ def build_review_timing_queue(
         for event in group.values():
             timing._require_event_matches_binding(event, binding)
         record = timing._review_record(binding, group)
+        record.update(_queue_temporal_context(record, evaluated=evaluated))
+        record.update(_queue_inspection(base, record))
         record.update(_queue_action(base, record))
         records.append(record)
 
     not_viewed_count = sum(row["review_status"] == "not_viewed" for row in records)
     in_review_count = sum(row["review_status"] == "in_review" for row in records)
     complete_count = sum(row["review_status"] == "complete" for row in records)
+    expired_idea_count = sum(
+        row["idea_temporal_status"] == "expired" for row in records
+    )
     action_required_count = not_viewed_count + in_review_count
     status = (
         "no_eligible_ideas"
@@ -146,6 +151,8 @@ def build_review_timing_queue(
         "not_viewed_count": not_viewed_count,
         "in_review_count": in_review_count,
         "complete_count": complete_count,
+        "expired_idea_count": expired_idea_count,
+        "unexpired_idea_count": len(records) - expired_idea_count,
         "skipped_candidate_count": skipped_candidate_count,
         "skipped_generation_reason_counts": dict(sorted(skipped_reason_counts.items())),
         "events_in_window_count": len(selected_events),
@@ -158,6 +165,7 @@ def build_review_timing_queue(
         "excluded_legacy_or_unpublished_ideas_create_timing_evidence": False,
         "dashboard_reads_recorded_as_human_actions": False,
         "commands_require_explicit_confirmation": True,
+        "inspection_records_human_timing_event": False,
         "provider_calls": 0,
         "writes": 0,
         "protocol_v2_evidence_eligible": False,
@@ -282,12 +290,58 @@ def _queue_action(
     }
 
 
+def _queue_temporal_context(
+    record: Mapping[str, Any],
+    *,
+    evaluated: datetime,
+) -> dict[str, Any]:
+    context = timing._mapping(record.get("operator_review_context"))
+    expires_at = timing._canonical_timestamp(
+        context.get("expires_at"),
+        field="expires_at",
+    )
+    expired = timing._parse_timestamp(expires_at, field="expires_at") <= evaluated
+    return {
+        "expires_at": expires_at,
+        "idea_temporal_status": "expired" if expired else "unexpired",
+        "timing_action_warning": (
+            "historical_expired_idea_inspect_exact_card_before_recording_action"
+            if expired
+            else "inspect_exact_card_before_recording_action"
+        ),
+    }
+
+
+def _queue_inspection(
+    artifact_base_dir: Path,
+    record: Mapping[str, Any],
+) -> dict[str, Any]:
+    command = " ".join(
+        (
+            "make",
+            "radar-review-timing-inspect",
+            "EVENT_ALPHA_ARTIFACT_BASE_DIR=" + shlex.quote(str(artifact_base_dir)),
+            "RADAR_REVIEW_NAMESPACE="
+            + shlex.quote(str(record["artifact_namespace"])),
+            "RADAR_REVIEW_IDEA_ID=" + shlex.quote(str(record["idea_id"])),
+            "PYTHON=.venv/bin/python",
+        )
+    )
+    return {
+        "inspection_make_target": "radar-review-timing-inspect",
+        "inspection_command": command,
+        "inspection_requires_confirmation": False,
+        "inspection_records_human_timing_event": False,
+        "inspection_recommended_before_timing_action": True,
+    }
+
+
 def campaign_queue_projection(queue: Mapping[str, Any]) -> dict[str, Any]:
     """Return the path-free queue truth safe for the canonical campaign report."""
 
     if (
         queue.get("schema_id") != QUEUE_SCHEMA_ID
-        or queue.get("schema_version") not in {1, QUEUE_SCHEMA_VERSION}
+        or queue.get("schema_version") not in {1, 2, QUEUE_SCHEMA_VERSION}
     ):
         raise timing.DecisionReviewTimingError(
             "review_timing_queue_schema_invalid"

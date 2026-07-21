@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-21T22:50:19.856333+00:00`
+- generated_at: `2026-07-21T23:30:37.277267+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
 - functions_over_limit_count: `33`
@@ -107,8 +107,8 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py` | 1386 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model.py` | 1385 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/cli/services/scanner_parts/config_reports.py` | 1371 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py` | 1337 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/dashboard/system_pages.py` | 1333 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
-| `crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py` | 1314 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/radar/source_enrichment.py` | 1313 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send.py` | 1310 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_review.py` | 1300 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |

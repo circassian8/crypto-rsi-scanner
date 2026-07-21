@@ -1068,13 +1068,17 @@ may be added later when a suitable environment already exists.
   values only to expose repeated operator work; every artifact-namespace/idea
   pair remains a separate timing record and retains its exact confirmed
   command. This presentation grouping never deduplicates evidence or writes a
-  review action. Queue schema v2 adds a presentation-only operator context for
-  each record: canonical asset/symbol, anomaly type, catalyst/timing state, and
-  bounded Decision scores. Candidate identity is covered by the exact
+  review action. Queue schema v3 adds a presentation-only operator context v2
+  for each record: canonical asset/symbol, anomaly type, catalyst/timing state,
+  expiry, and bounded Decision scores. Candidate identity is covered by the exact
   integrated-candidate digest and Decision values by the canonical projection
   digest. These fields never enter the append-only timing event or the path-free
-  campaign projection. A historical snapshot may be reviewed after time
-  expiry only when
+  campaign projection. Every queue row must state whether the idea is expired
+  and show its no-confirmation `radar-review-timing-inspect` command before the
+  separately confirmed timing action. Inspection reads the exact stored card
+  through a descriptor-anchored, manifest-fingerprint-verified directory and
+  records no view, write, provider call, or timing evidence. A historical
+  snapshot may be reviewed after time expiry only when
   `generation:stale` and/or `doctor:stale` are its sole authority reasons;
   structural drift still fails closed. Only the explicit confirmed
   `radar-review-timing-view` and `...-complete` commands may record a human

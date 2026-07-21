@@ -1822,7 +1822,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1183,
+  "file_count": 1184,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -2210,7 +2210,7 @@
   ],
   "functions_over_limit_count": 33,
   "gate_status": "pass",
-  "generated_at": "2026-07-21T22:50:15.936676+00:00",
+  "generated_at": "2026-07-21T23:30:33.328144+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2372,14 +2372,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1333,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "line_count": 1337,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1314,
-      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "source_kind": "production"
     },
     {
@@ -2615,6 +2615,12 @@
     {
       "limit": 1500,
       "line_count": 1210,
+      "path": "tests/event_alpha/test_decision_review_timing.py",
+      "source_kind": "test"
+    },
+    {
+      "limit": 1500,
+      "line_count": 1210,
       "path": "tests/event_alpha/test_news_providers.py",
       "source_kind": "test"
     },
@@ -2688,12 +2694,6 @@
       "limit": 1500,
       "line_count": 1068,
       "path": "tests/event_alpha/test_dashboard_readiness.py",
-      "source_kind": "test"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1064,
-      "path": "tests/event_alpha/test_market_numeric_finiteness.py",
       "source_kind": "test"
     }
   ],
@@ -4261,15 +4261,15 @@
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1333,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "line_count": 1337,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1314,
-      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -5053,14 +5053,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1333,
-      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+      "line_count": 1337,
+      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1314,
-      "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+      "line_count": 1333,
+      "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "source_kind": "production"
     },
     {
@@ -5685,7 +5685,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1314,
+      "line_count": 1337,
       "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
       "source_kind": "production"
     },
@@ -5941,13 +5941,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1333,
-        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
+        "line_count": 1337,
+        "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
         "threshold": 1200
       },
       {
-        "line_count": 1314,
-        "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
+        "line_count": 1333,
+        "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
         "threshold": 1200
       },
       {

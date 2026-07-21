@@ -929,7 +929,13 @@ that revalidation; it does not rebuild baseline, episode, scorecard, or temporal
 surprise campaign analytics. Equal-clock projection and comprehensive-report
 inputs must produce the same queue, and the projection explicitly reports
 `full_campaign_report_rebuilt=false`. The normal Make surfaces render a concise
-action view; `RADAR_REVIEW_TIMING_OUTPUT=json` preserves the full machine-
+action view; queue schema v3 and its presentation context v2 state the exact
+expiry and whether each item is expired. Every row points first to the read-only
+`radar-review-timing-inspect` command, which renders the exact stored card only
+after descriptor-anchored directory-tree fingerprint verification. Inspection
+does not record a view, make a provider call, or write an artifact; the separate
+confirmed command remains the only timing boundary.
+`RADAR_REVIEW_TIMING_OUTPUT=json` preserves the full machine-
 readable payload from the same evaluation. The human summary groups recurring
 `idea_id` values to make repeated work visible, but every artifact-
 namespace/idea pair remains a separate timing action with its exact confirmed
@@ -1422,8 +1428,12 @@ The remaining human decisions stay explicit:
   exact v1 generation projection and does not rebuild unrelated campaign
   analytics. Its summary groups recurring idea IDs for readability while
   retaining every generation-specific action and command, and names the exact
-  asset, anomaly type, and Decision score context needed to identify the work.
-  Use
+  asset, anomaly type, expiry, expired/current state, and Decision score context
+  needed to identify the work. Run the row's `make
+  radar-review-timing-inspect RADAR_REVIEW_NAMESPACE=<exact>
+  RADAR_REVIEW_IDEA_ID=<exact>` command before recording an action; it verifies
+  and renders the exact stored card without a provider call, write, or timing
+  event. Use
   `RADAR_REVIEW_TIMING_OUTPUT=json` when the complete binding and digest payload
   is needed. Record only a real human action with `CONFIRM=1 make
   radar-review-timing-view
