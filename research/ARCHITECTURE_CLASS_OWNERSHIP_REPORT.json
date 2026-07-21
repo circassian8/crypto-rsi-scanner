@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11043,
+  "function_count": 11052,
   "function_line_limit": 150,
   "functions_over_150_lines": 18,
   "functions_over_limit": [
@@ -1680,7 +1680,7 @@
     }
   ],
   "functions_over_limit_count": 18,
-  "generated_at": "2026-07-21T13:07:06.102995+00:00",
+  "generated_at": "2026-07-21T14:11:16.114614+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3938,6 +3938,11 @@
     "nonessential_shim_rows": [],
     "production_files_over_1200_line_rows": [
       {
+        "line_count": 1893,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1888,
         "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
         "threshold": 1200
@@ -3945,11 +3950,6 @@
       {
         "line_count": 1684,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1679,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1200
       },
       {
@@ -4115,6 +4115,11 @@
     ],
     "production_files_over_1500_line_rows": [
       {
+        "line_count": 1893,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
+        "threshold": 1500
+      },
+      {
         "line_count": 1888,
         "path": "crypto_rsi_scanner/event_alpha/operations/bybit_execution_quality.py",
         "threshold": 1500
@@ -4122,11 +4127,6 @@
       {
         "line_count": 1684,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
-        "threshold": 1500
-      },
-      {
-        "line_count": 1679,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_history.py",
         "threshold": 1500
       },
       {

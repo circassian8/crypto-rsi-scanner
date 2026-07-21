@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Refresh advisory architecture reports after control hardening · Codex
+**Why:** The point-in-time evidence changes moved source and test line locations,
+so the checked-in project-health inventories needed to match the committed
+tree. Source-size metrics are explicitly advisory, but stale generated reports
+would still misdescribe the current checkout.
+**Changes:** Regenerated the transitional-name, terminology, old-import,
+source-size, and class/function ownership reports. Non-size architecture checks
+remain clean; the report records the new line locations and counts without
+creating a refactor requirement or release blocker.
+**Verify:** `make architecture-cleanliness-check PYTHON=python3` passed with
+zero transitional files, zero old internal/test/doc import paths, and advisory
+size/ownership status `pass`.
+**Notes/risks:** This is generated project-health evidence only. No runtime,
+provider, score, route, threshold, authority, or safety behavior changed.
+
 ## 2026-07-21 — Rederive retained control-liquidity tiers · Codex
 **Why:** The new universe contract required a closed tier label and exact basis,
 but a well-formed false tier could still be retained. Future matched controls
