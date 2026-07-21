@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Fix standalone mapping parametrization · Codex
+**Why:** The post-checkpoint full release run exposed four errors that pytest did
+not reproduce. The standalone compatibility adapter treated a raw dictionary's
+callable `values` method as pytest parameter metadata and passed that method into
+the test instead of the dictionary.
+**Changes:** The adapter now unwraps only a non-callable pytest
+`ParameterSet.values` payload; raw single-argument mappings remain intact. A
+regression covers both an ordinary mapping and a marked single-argument mapping.
+**Verify:** The regression plus all four previously mis-invoked parametrized
+families passed (28 cases), `python3 -m compileall -q tests/test_indicators.py`
+passed, and the host-level isolated `make test PYTHON=python3` compatibility gate
+passed 1,525/1,525 tests. `make architecture-cleanliness-check PYTHON=python3`
+and `git diff --check` passed, with size findings remaining advisory. The
+preceding host-level `make verify-fast
+PYTHON=python3` had passed all 3,840 pytest tests plus alert render, backtest, and
+paper-scoreboard gates before this test-runner-only change.
+**Notes/risks:** This changes only the local standalone test harness. It does not
+change production logic, authorization, providers, artifacts, dashboard
+authority, sends, trades, orders, paper trades, RSI writes, or
+`TRIGGERED_FADE` behavior.
+
 ## 2026-07-21 — Measure rolling return-window overlap · Codex
 **Why:** Exact endpoint/anchor reuse was already visible, but distinct rolling
 intervals can still share most of the same clock span. The project needed that

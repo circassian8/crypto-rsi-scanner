@@ -900,11 +900,13 @@ def _standalone_param_cases(fn):
         expanded = []
         for existing in cases:
             for raw_values in mark.args[1]:
-                values = getattr(raw_values, "values", raw_values)
-                if len(names) == 1:
-                    values = (values,)
+                marked_values = getattr(raw_values, "values", None)
+                if marked_values is not None and not callable(marked_values):
+                    values = tuple(marked_values)
+                elif len(names) == 1:
+                    values = (raw_values,)
                 else:
-                    values = tuple(values)
+                    values = tuple(raw_values)
                 if len(values) != len(names):
                     raise TypeError(
                         "standalone parametrize value count does not match argument names"
@@ -912,6 +914,25 @@ def _standalone_param_cases(fn):
                 expanded.append({**existing, **dict(zip(names, values, strict=True))})
         cases = expanded
     return tuple(cases) or ({},)
+
+
+def test_standalone_param_cases_preserves_mapping_values():
+    import pytest
+
+    @pytest.mark.parametrize(
+        "payload",
+        (
+            {"feature_basis": []},
+            pytest.param({"protocol_partition": "development"}, id="marked"),
+        ),
+    )
+    def sample(payload):
+        return payload
+
+    assert _standalone_param_cases(sample) == (
+        {"payload": {"feature_basis": []}},
+        {"payload": {"protocol_partition": "development"}},
+    )
 
 
 def _call_standalone_case(fn, provided):
