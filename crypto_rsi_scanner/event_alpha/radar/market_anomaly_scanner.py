@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from urllib.parse import urlsplit
 
 from ..artifacts import schema_v1
 from . import asset_registry as event_asset_registry
@@ -1198,14 +1199,44 @@ def _derivatives_available(snapshot: Mapping[str, Any], source_row: Mapping[str,
 
 def _has_confirming_source(source_row: Mapping[str, Any]) -> bool:
     for key in ("source_url", "official_source_url"):
-        if _text(source_row.get(key)):
+        if _is_absolute_evidence_url(source_row.get(key)):
             return True
-    if _has_identifier_values(source_row.get("source_urls")):
+    if _has_evidence_url_values(source_row.get("source_urls")):
         return True
     if _truthy(source_row.get("catalyst_confirmed")):
         return True
     accepted = _count(source_row.get("accepted_evidence_count"))
     return accepted is not None and accepted > 0
+
+
+def _has_evidence_url_values(value: object) -> bool:
+    if isinstance(value, str):
+        return _is_absolute_evidence_url(value)
+    if isinstance(value, IterableABC) and not isinstance(
+        value,
+        (str, bytes, Mapping),
+    ):
+        return any(_is_absolute_evidence_url(item) for item in value)
+    return False
+
+
+def _is_absolute_evidence_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    candidate = value.strip()
+    if not candidate or any(character.isspace() for character in candidate):
+        return False
+    try:
+        parsed = urlsplit(candidate)
+        hostname = parsed.hostname
+    except ValueError:
+        return False
+    return (
+        parsed.scheme.casefold() in {"http", "https"}
+        and bool(hostname)
+        and parsed.username is None
+        and parsed.password is None
+    )
 
 
 def _has_identifier_values(value: object) -> bool:

@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Require absolute source URLs for catalyst knownness · Codex
+**Why:** Any nonblank string in a market row's URL fields was treated as a
+confirming catalyst source. Placeholders such as `false` or `unknown`, relative
+paths, unsupported schemes, and credential-bearing URLs could therefore remove
+the unknown-catalyst penalty and improve enrichment priority without usable
+source evidence.
+**Changes:** Market-anomaly source knownness now accepts `source_url`,
+`official_source_url`, and members of `source_urls` only when they are absolute
+HTTP(S) URLs with a hostname and no URL user information. Explicit semantic
+confirmation and positive typed accepted-evidence counts retain their existing
+authority. Malformed references do not suppress the anomaly; they leave its
+catalyst unknown so the existing soft penalty and research workflow apply.
+**Verify:** All market-surface tests passed (`95 passed`), including new
+regressions for placeholders, relative references, unsupported schemes,
+hostless URLs, and user-information URLs. `python3 -m compileall -q
+crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests earlier in this prompt and this change is isolated to source-knownness
+classification. No anomaly threshold, score weight, route, provider call,
+authority, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` changed. Source-size limits remain advisory; source identity
+remains evidence-bearing and fail closed.
+
 ## 2026-07-21 — Reject malformed anomaly-type control flags · Codex
 **Why:** Explicit malformed values in catalyst/event-state flags such as
 `negative_catalyst`, `event_passed`, and `failed_reclaim` were interpreted as

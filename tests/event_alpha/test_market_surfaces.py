@@ -463,6 +463,12 @@ def test_market_anomaly_source_knownness_requires_typed_evidence_reference():
         {"official_source_url": ["https://example.test/event"]},
         {"source_urls": {"borrowed": "https://example.test/event"}},
         {"source_urls": ["", {"borrowed": "https://example.test/event"}]},
+        {"source_url": "false"},
+        {"source_url": "unknown"},
+        {"source_url": "/relative/event"},
+        {"official_source_url": "ftp://example.test/event"},
+        {"source_urls": ["not-a-url", "https://"]},
+        {"source_urls": ["https://user@example.test/event"]},
         {"accepted_evidence_count": True},
     ):
         anomaly = anomaly_for(**evidence)
