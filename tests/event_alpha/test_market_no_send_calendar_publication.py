@@ -11,6 +11,7 @@ import pytest
 from crypto_rsi_scanner.event_alpha.operations import market_no_send
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_calendar
 from crypto_rsi_scanner.event_alpha.operations import (
+    market_no_send_calendar_materialization,
     market_no_send_calendar_publication,
 )
 from crypto_rsi_scanner.event_alpha.operations import market_no_send_generation
@@ -20,7 +21,7 @@ from crypto_rsi_scanner.event_alpha.operations import market_no_send_io
 _OBSERVED = "2026-07-12T12:00:00+00:00"
 
 
-def _run_bound_calendar_generation(tmp_path, monkeypatch, *, namespace):
+def _run_bound_calendar_generation(tmp_path, monkeypatch, *, namespace, events=None):
     monkeypatch.setenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", str(tmp_path))
     monkeypatch.delenv(
         market_no_send_calendar.CALENDAR_SNAPSHOT_PATH_ENV,
@@ -35,20 +36,24 @@ def _run_bound_calendar_generation(tmp_path, monkeypatch, *, namespace):
                 "source_mode": "operator_verified_calendar_snapshot",
                 "data_acquisition_mode": "operator_verified_export",
                 "source_provider": "operator_calendar",
-                "events": [
-                    {
-                        "id": "calendar-read-once",
-                        "title": "Calendar read-once boundary",
-                        "event_kind": "protocol",
-                        "scheduled_at": "2026-07-20T12:00:00Z",
-                        "time_certainty": "exact",
-                        "importance": "high",
-                        "affected_assets": ["MKTFLOW"],
-                        "source": "operator_calendar",
-                        "source_url": "https://example.com/calendar/read-once",
-                        "research_only": True,
-                    }
-                ],
+                "events": (
+                    events
+                    if events is not None
+                    else [
+                        {
+                            "id": "calendar-read-once",
+                            "title": "Calendar read-once boundary",
+                            "event_kind": "protocol",
+                            "scheduled_at": "2026-07-20T12:00:00Z",
+                            "time_certainty": "exact",
+                            "importance": "high",
+                            "affected_assets": ["MKTFLOW"],
+                            "source": "operator_calendar",
+                            "source_url": "https://example.com/calendar/read-once",
+                            "research_only": True,
+                        }
+                    ]
+                ),
             }
         ),
         encoding="utf-8",
@@ -68,6 +73,104 @@ def _run_bound_calendar_generation(tmp_path, monkeypatch, *, namespace):
         data_mode="mock",
         allow_non_live=True,
     )
+
+
+def test_calendar_derivation_separates_asset_linked_and_global_context(
+    tmp_path,
+    monkeypatch,
+):
+    asset_event = {
+        "id": "asset-event",
+        "title": "Asset-linked event",
+        "event_kind": "protocol",
+        "scheduled_at": "2026-07-20T12:00:00Z",
+        "time_certainty": "exact",
+        "importance": "high",
+        "affected_assets": [{"coin_id": "market-flow"}, "MKTFLOW"],
+        "source": "operator_calendar",
+        "source_url": "https://example.com/calendar/asset-event",
+        "research_only": True,
+    }
+    global_event = {
+        "id": "global-event",
+        "title": "Global macro event",
+        "event_kind": "macro",
+        "scheduled_at": "2026-07-20T14:00:00Z",
+        "time_certainty": "exact",
+        "importance": "critical",
+        "affected_assets": ["CRYPTO_MARKET"],
+        "source": "operator_calendar",
+        "source_url": "https://example.com/calendar/global-event",
+        "research_only": True,
+    }
+    result = _run_bound_calendar_generation(
+        tmp_path,
+        monkeypatch,
+        namespace="calendar_asset_and_global_context",
+        events=[asset_event, global_event],
+    )
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    metadata = manifest["calendar_snapshot"]
+
+    assert metadata["retained_row_count"] == 2
+    assert metadata["scheduled_catalyst_count"] == 1
+    assert metadata["scheduled_context_only_count"] == 1
+    assert metadata["scheduled_derivation_scope"] == "asset_linked_events_only"
+    scheduled_rows = market_no_send_io.parse_jsonl_bytes(
+        (result.namespace_dir / "event_scheduled_catalysts.jsonl").read_bytes()
+    )
+    unified_rows = market_no_send_io.parse_jsonl_bytes(
+        (result.namespace_dir / "event_unified_calendar_events.jsonl").read_bytes()
+    )
+    assert [row["symbol"] for row in scheduled_rows] == ["MKTFLOW"]
+    assert scheduled_rows[0]["coin_id"] == "market-flow"
+    assert len(unified_rows) == 2
+    market_no_send_calendar_publication.validate_optional_calendar_snapshot(
+        manifest,
+        namespace_dir=result.namespace_dir,
+        run_id=result.run_id,
+        safety_counters=market_no_send._SAFETY_COUNTERS,
+    )
+
+    drifted_manifest = json.loads(json.dumps(manifest))
+    drifted_manifest["calendar_snapshot"]["scheduled_context_only_count"] = 0
+    with pytest.raises(
+        market_no_send.MarketNoSendError,
+        match="campaign_calendar_scheduled_count_mismatch",
+    ):
+        market_no_send_calendar_publication.validate_optional_calendar_snapshot(
+            drifted_manifest,
+            namespace_dir=result.namespace_dir,
+            run_id=result.run_id,
+            safety_counters=market_no_send._SAFETY_COUNTERS,
+        )
+
+
+@pytest.mark.parametrize("symbol", [True, 123, {"ticker": "BTC"}, "CRYPTO_MARKET"])
+def test_calendar_derivation_never_stringifies_non_asset_symbols(symbol):
+    scheduled, unlocks = (
+        market_no_send_calendar_materialization.canonical_calendar_derivation_rows(
+            [
+                {
+                    "id": "global-context",
+                    "title": "Global context",
+                    "event_kind": "macro",
+                    "scheduled_at": "2026-07-20T14:00:00Z",
+                    "symbol": symbol,
+                    "affected_assets": ["CRYPTO_MARKET"],
+                    "source_url": "https://example.com/calendar/global-context",
+                }
+            ],
+            profile="fixture",
+            artifact_namespace="calendar_typed_identity",
+            run_mode="fixture",
+            run_id="calendar-typed-identity-run",
+            observed_at=_OBSERVED,
+        )
+    )
+
+    assert scheduled == ()
+    assert unlocks == ()
 
 
 def test_calendar_source_publication_parses_the_exact_hashed_read_buffer(

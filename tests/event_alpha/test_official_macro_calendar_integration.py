@@ -137,6 +137,11 @@ def test_official_macro_pack_reaches_fingerprinted_live_generation_and_dashboard
     assert metadata["unified_calendar_artifact_row_count"] == metadata[
         "retained_row_count"
     ]
+    assert metadata["scheduled_catalyst_count"] == 0
+    assert metadata["scheduled_context_only_count"] == metadata[
+        "retained_row_count"
+    ]
+    assert metadata["scheduled_derivation_scope"] == "asset_linked_events_only"
 
     source_copy = namespace_dir / metadata["copy_artifact"]
     scheduled = namespace_dir / metadata["scheduled_catalyst_artifact"]
@@ -144,6 +149,7 @@ def test_official_macro_pack_reaches_fingerprinted_live_generation_and_dashboard
     assert metadata["copy_artifact_sha256"] == _sha256(source_copy)
     assert metadata["scheduled_catalyst_artifact_sha256"] == _sha256(scheduled)
     assert metadata["unified_calendar_artifact_sha256"] == _sha256(unified)
+    assert scheduled.read_bytes() == b""
     candidates = tuple(
         json.loads(line)
         for line in (namespace_dir / "event_integrated_radar_candidates.jsonl")
@@ -303,6 +309,11 @@ def test_partial_official_macro_pack_remains_explicit_through_publication(
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     metadata = manifest["calendar_snapshot"]
     assert metadata["snapshot_status"] == "partial"
+    assert metadata["scheduled_catalyst_count"] == 0
+    assert metadata["scheduled_context_only_count"] == metadata[
+        "retained_row_count"
+    ]
+    assert metadata["scheduled_derivation_scope"] == "asset_linked_events_only"
     assert [row["status"] for row in metadata["source_coverage"]] == [
         "rate_limited",
         "observed",

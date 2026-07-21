@@ -986,6 +986,36 @@ def test_v5_return_sampling_trace_exposes_anchor_reuse_and_realized_timing():
     assert relative["interval_reuse_detected"] is True
 
 
+def test_return_sampling_trace_derives_affine_error_range_after_rounding():
+    from crypto_rsi_scanner.event_alpha.radar import market_shadow_surprise
+
+    anchor_a = _return_observation(0, asset_id="asset-a", price=100.0)
+    endpoint_a = _return_observation(1, asset_id="asset-a", price=101.0)
+    anchor_b = _return_observation(2, asset_id="asset-a", price=102.0)
+    endpoint_b = _return_observation(3, asset_id="asset-a", price=103.0)
+    anchor_a["observed_at"] = "2026-07-10T00:00:00+00:00"
+    endpoint_a["observed_at"] = "2026-07-10T01:00:40.883100+00:00"
+    anchor_b["observed_at"] = "2026-07-10T02:00:00+00:00"
+    endpoint_b["observed_at"] = "2026-07-10T03:00:40.883111+00:00"
+
+    trace = market_shadow_surprise._return_sampling_leg_trace(
+        (
+            (endpoint_a, endpoint_a, anchor_a),
+            (endpoint_b, endpoint_b, anchor_b),
+        ),
+        nominal_horizon_seconds=3600,
+    )
+
+    realized = trace["realized_horizon_seconds"]
+    error = trace["anchor_selection_error_seconds"]
+    assert realized["median"] == 3640.883106
+    assert error["median"] == 40.883106
+    assert error == {
+        field: round(seconds - 3600, 6)
+        for field, seconds in realized.items()
+    }
+
+
 def test_derived_turnover_sample_digest_binds_ratio_dependencies():
     current = _observation(9, volume=160, turnover=0.16)
     priors = [
@@ -1344,6 +1374,49 @@ def test_artifact_schema_accepts_closed_shadow_temporal_surprise(schema_id):
     row = _shadow_artifact_row(schema_id, _valid_schema_shadow())
 
     assert schema_v1.validate_row_against_schema(row, schema_id) == []
+
+
+def test_artifact_schema_accepts_only_one_microsecond_affine_rounding_residue():
+    from crypto_rsi_scanner.event_alpha.artifacts import schema_v1
+
+    shadow = _valid_schema_shadow()
+    leg = shadow["return_features"]["return_1h"]["return_sampling_trace"][
+        "asset_leg"
+    ]
+    leg["realized_horizon_seconds"] = {
+        "minimum": 3600.000001,
+        "median": 3600.000001,
+        "maximum": 3600.000001,
+    }
+    leg["anchor_selection_error_seconds"] = {
+        "minimum": 0.0,
+        "median": 0.0,
+        "maximum": 0.0,
+    }
+    row = _shadow_artifact_row("market_state_snapshot_v1", shadow)
+
+    assert schema_v1.validate_row_against_schema(
+        row,
+        "market_state_snapshot_v1",
+    ) == []
+
+    drifted = copy.deepcopy(row)
+    drifted["shadow_temporal_surprise"]["return_features"]["return_1h"][
+        "return_sampling_trace"
+    ]["asset_leg"]["realized_horizon_seconds"] = {
+        "minimum": 3600.000002,
+        "median": 3600.000002,
+        "maximum": 3600.000002,
+    }
+    errors = schema_v1.validate_row_against_schema(
+        drifted,
+        "market_state_snapshot_v1",
+    )
+
+    assert any(
+        error.startswith("shadow_temporal_surprise_sampling_error_range_inconsistent:")
+        for error in errors
+    )
 
 
 def test_artifact_schema_binds_shadow_to_outer_market_history_observation():

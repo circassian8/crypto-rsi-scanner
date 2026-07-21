@@ -746,7 +746,7 @@ def _attach_quality_incident_context(ctx: SimpleNamespace) -> None:
     _merge_context(ctx, locals())
     doctor_outcome_checks.apply_checks(SimpleNamespace(**vars(ctx)), ctx.blockers, ctx.warnings)
     if ctx.schema_result.schema_validation_errors:
-        ctx.warnings.append(
+        (ctx.blockers if ctx.strict else ctx.warnings).append(
             check_registry.format_check_message(
                 "schema.validation_errors",
                 f"schema_validation_errors={ctx.schema_result.schema_validation_errors}",

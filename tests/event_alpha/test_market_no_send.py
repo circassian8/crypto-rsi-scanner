@@ -503,6 +503,10 @@ def test_mock_market_generation_preserves_explicit_calendar_snapshot_end_to_end(
     assert calendar_status["status"] == "healthy_nonempty"
     assert calendar_status["retained_row_count"] == 1
     assert calendar_status["scheduled_catalyst_count"] == 1
+    assert calendar_status["scheduled_context_only_count"] == 0
+    assert calendar_status["scheduled_derivation_scope"] == (
+        "asset_linked_events_only"
+    )
     assert calendar_status["scheduled_catalyst_artifact_sha256"]
     assert calendar_status["unlock_candidate_count"] == 0
     assert calendar_status["unlock_source_status"] == "not_configured"

@@ -401,6 +401,14 @@ def test_event_alpha_artifact_doctor_schema_only_catches_bad_fixture():
         assert "schema_validation_errors=1" in text
         assert "missing_required_fields=1" in text
 
+        full_strict = event_alpha_artifact_doctor.diagnose_artifacts(
+            inspected_alert_store_path=base / "event_alpha_alerts.jsonl",
+            strict=True,
+        )
+        schema_message = "schema.validation_errors: schema_validation_errors=1"
+        assert schema_message in full_strict.blockers
+        assert schema_message not in full_strict.warnings
+
 
 def test_event_alpha_artifact_doctor_skip_api_keeps_schema_phases_only():
     import crypto_rsi_scanner.event_alpha.doctor.artifact_doctor as event_alpha_artifact_doctor

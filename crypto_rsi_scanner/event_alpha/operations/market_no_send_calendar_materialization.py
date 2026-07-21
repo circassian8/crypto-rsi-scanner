@@ -19,6 +19,10 @@ from .market_no_send_models import MarketNoSendError
 
 
 CALENDAR_PROVIDER_NAME = "decision_radar_calendar_snapshot"
+SCHEDULED_DERIVATION_SCOPE = "asset_linked_events_only"
+_GLOBAL_CALENDAR_ASSETS = frozenset(
+    {"ALL", "CRYPTO", "CRYPTO_MARKET", "GLOBAL", "MARKET", "MARKET_WIDE"}
+)
 
 
 def materialize_market_calendar_snapshot(
@@ -89,7 +93,7 @@ def _run_scheduled_scan(
         run_id=run_id,
         observed_at=observed,
         calendar_provider_name=CALENDAR_PROVIDER_NAME,
-        calendar_rows=tuple(_calendar_scheduled_row(row) for row in raw_rows),
+        calendar_rows=_asset_linked_scheduled_rows(raw_rows),
         include_empty_unlock_artifacts=False,
     )
 
@@ -124,11 +128,17 @@ def canonical_calendar_derivation_rows(
     run_mode: str | None,
     run_id: str | None,
     observed_at: datetime | str | None,
+    asset_linked_only: bool = True,
 ) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
     """Recompute schema-stamped scheduled and unlock derivations without writes."""
 
+    adapted_rows = tuple(_calendar_scheduled_row(row) for row in raw_rows)
+    if asset_linked_only:
+        adapted_rows = tuple(
+            row for row in adapted_rows if _has_specific_symbol(row)
+        )
     scheduled, unlocks = scheduled_catalysts.normalize_calendar_catalyst_rows(
-        tuple(_calendar_scheduled_row(row) for row in raw_rows),
+        adapted_rows,
         provider=CALENDAR_PROVIDER_NAME,
         observed_at=observed_at,
         profile=profile,
@@ -180,6 +190,13 @@ def _materialization_metadata(
     if scheduled_bytes is None:
         raise MarketNoSendError("calendar scheduled artifact is unavailable")
     metadata = dict(manifest.get("calendar_snapshot") or {})
+    retained_count = metadata.get("retained_row_count")
+    if (
+        isinstance(retained_count, bool)
+        or not isinstance(retained_count, int)
+        or retained_count < scan.scheduled_count
+    ):
+        raise MarketNoSendError("calendar scheduled derivation count is invalid")
     metadata.update(
         {
             "copy_artifact": copy_path.name,
@@ -189,6 +206,8 @@ def _materialization_metadata(
                 scheduled_bytes
             ).hexdigest(),
             "scheduled_catalyst_count": scan.scheduled_count,
+            "scheduled_context_only_count": retained_count - scan.scheduled_count,
+            "scheduled_derivation_scope": SCHEDULED_DERIVATION_SCOPE,
             "unlock_candidate_count": scan.unlock_count,
             "unlock_source_status": (
                 "healthy_nonempty" if scan.unlock_count else "not_configured"
@@ -255,6 +274,16 @@ def _calendar_scheduled_row(row: Mapping[str, Any]) -> dict[str, Any]:
     """Adapt the closed calendar shape without changing its unified-calendar row."""
 
     adapted = dict(row)
+    specific_symbol = _normalized_specific_symbol(adapted.get("symbol"))
+    if specific_symbol is None:
+        adapted.pop("symbol", None)
+    else:
+        adapted["symbol"] = specific_symbol
+    coin_id = _normalized_asset_text(adapted.get("coin_id"))
+    if coin_id is None:
+        adapted.pop("coin_id", None)
+    else:
+        adapted["coin_id"] = coin_id
     if not adapted.get("event_start_time"):
         adapted["event_start_time"] = _first_nonempty(
             adapted,
@@ -277,11 +306,43 @@ def _calendar_scheduled_row(row: Mapping[str, Any]) -> dict[str, Any]:
     adapted.setdefault("event_type", adapted.get("event_kind"))
     adapted.setdefault("source_class", "structured_calendar")
     affected = adapted.get("affected_assets")
-    if not adapted.get("symbol") and isinstance(affected, Sequence) and not isinstance(
+    if specific_symbol is None and isinstance(affected, Sequence) and not isinstance(
         affected, (str, bytes)
     ):
         _attach_first_affected_asset(adapted, affected)
     return adapted
+
+
+def _asset_linked_scheduled_rows(
+    raw_rows: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Return only events with a real asset symbol for the asset-specific lane."""
+
+    adapted_rows = tuple(_calendar_scheduled_row(row) for row in raw_rows)
+    return tuple(row for row in adapted_rows if _has_specific_symbol(row))
+
+
+def _has_specific_symbol(row: Mapping[str, Any]) -> bool:
+    return _normalized_specific_symbol(row.get("symbol")) is not None
+
+
+def _normalized_specific_symbol(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    symbol = value.strip().upper()
+    if (
+        not re.fullmatch(r"[A-Z0-9]{2,15}", symbol)
+        or symbol in _GLOBAL_CALENDAR_ASSETS
+    ):
+        return None
+    return symbol
+
+
+def _normalized_asset_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
 
 
 def _first_nonempty(row: Mapping[str, Any], keys: Sequence[str]) -> Any:
@@ -294,13 +355,19 @@ def _attach_first_affected_asset(
 ) -> None:
     for asset in affected:
         if isinstance(asset, Mapping):
-            adapted.setdefault("symbol", asset.get("symbol"))
-            adapted.setdefault("coin_id", asset.get("coin_id") or asset.get("id"))
-        elif isinstance(asset, str) and re.fullmatch(
-            r"[A-Za-z0-9]{2,15}", asset.strip()
-        ):
-            adapted.setdefault("symbol", asset.strip().upper())
-        if adapted.get("symbol") or adapted.get("coin_id"):
+            candidate_symbol = _normalized_specific_symbol(asset.get("symbol"))
+            candidate_coin_id = _normalized_asset_text(
+                asset.get("coin_id") or asset.get("id")
+            )
+            if not _has_specific_symbol(adapted) and candidate_symbol is not None:
+                adapted["symbol"] = candidate_symbol
+            if not adapted.get("coin_id") and candidate_coin_id is not None:
+                adapted["coin_id"] = candidate_coin_id
+        else:
+            candidate_symbol = _normalized_specific_symbol(asset)
+            if not _has_specific_symbol(adapted) and candidate_symbol is not None:
+                adapted["symbol"] = candidate_symbol
+        if _has_specific_symbol(adapted):
             break
 
 
@@ -324,6 +391,7 @@ def _stamp_rows(
 
 
 __all__ = (
+    "SCHEDULED_DERIVATION_SCOPE",
     "canonical_calendar_derivation_rows",
     "canonical_scheduled_calendar_rows",
     "canonical_unified_calendar_result",

@@ -318,6 +318,14 @@ def _readiness_summary(
                     closed_state.get("last_provider_attempt_status"),
                 ),
                 (
+                    "last_provider_attempt_reason",
+                    closed_state.get("last_provider_attempt_reason"),
+                ),
+                (
+                    "last_provider_request_succeeded",
+                    closed_state.get("last_provider_request_succeeded"),
+                ),
+                (
                     "last_provider_attempted_at",
                     closed_state.get("last_provider_attempted_at"),
                 ),

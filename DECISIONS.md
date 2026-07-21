@@ -16,6 +16,37 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep strict publication schema-valid and global macro context-only
+**Status:** accepted
+**Decision:** Serialize each return leg's anchor-error range by applying the
+nominal-horizon offset to its already-rounded realized-horizon range. Historical
+shadow v5/v6 values produced by independent six-decimal rounding remain readable
+when the affine identity differs by at most one microsecond plus a narrowly
+defined binary-float epsilon; a two-microsecond difference remains invalid. A
+full strict artifact doctor must promote every schema-validation error to a
+blocker, exactly as schema-only strict mode and dashboard authority already do.
+Non-strict diagnostic doctor runs may continue to report ordinary schema errors
+as warnings. Daily Operations status must show the terminal provider-attempt
+status and reason separately from the boolean provider-request result. A
+calendar event without a specific, non-global token symbol remains in the
+unified calendar as context/risk but must not enter the asset-specific scheduled-
+catalyst artifact. New generations bind
+`scheduled_derivation_scope=asset_linked_events_only` and an exact context-only
+count; publication rederives both. Historical manifests without those fields
+retain their closed legacy all-rows validation path rather than being silently
+reinterpreted.
+**Why:** A genuine CoinGecko cycle was retained but correctly rolled back from
+publication when independently rounded medians differed by one microsecond.
+That representational false negative should not discard valid evidence, while a
+strict doctor must never give schema-invalid bytes a zero-blocker publication
+stamp or make a successful HTTP request look like a provider failure. Assigning
+a fake symbol to an official macro event would turn global risk context into
+false asset-specific evidence and could manufacture directional research.
+**Revisit when:** A future schema stores timing as integer microseconds or uses
+one exact decimal representation end to end; migrate explicitly rather than
+widening the tolerance. A separately versioned global scheduled-risk schema may
+replace the context-only split only if it preserves non-directional semantics.
+
 ## 2026-07-21 - Measure baseline variation and return sampling before policy
 **Status:** accepted as descriptive shadow evidence; no policy authority
 **Decision:** Shadow temporal surprise v6 records distinct baseline-value count,

@@ -1084,6 +1084,7 @@ def _return_sampling_leg_trace(
     realized = tuple(
         _seconds_between(row[1], row[2]) for row in ordered
     )
+    realized_range = _seconds_range(realized)
     errors = tuple(
         _round_seconds(value - nominal_horizon_seconds)
         for value in realized
@@ -1107,8 +1108,14 @@ def _return_sampling_leg_trace(
         "maximum_consecutive_anchor_reuse_count": (
             _maximum_consecutive_count(anchors)
         ),
-        "realized_horizon_seconds": _seconds_range(realized),
-        "anchor_selection_error_seconds": _seconds_range(errors),
+        "realized_horizon_seconds": realized_range,
+        # Median is affine under a constant offset. Derive the serialized error
+        # summary from the already-rounded realized summary so independent
+        # binary-float rounding cannot create a one-microsecond contradiction.
+        "anchor_selection_error_seconds": _offset_seconds_range(
+            realized_range,
+            -nominal_horizon_seconds,
+        ),
         "maximum_endpoint_reuse_reference": _maximum_reuse_reference(
             ordered,
             component_index=1,
@@ -1496,6 +1503,18 @@ def _seconds_range(values: Iterable[float]) -> dict[str, float] | None:
         "minimum": _round_seconds(min(ordered)),
         "median": _round_seconds(statistics.median(ordered)),
         "maximum": _round_seconds(max(ordered)),
+    }
+
+
+def _offset_seconds_range(
+    value: Mapping[str, float] | None,
+    offset_seconds: float,
+) -> dict[str, float] | None:
+    if value is None:
+        return None
+    return {
+        field: _round_seconds(seconds + offset_seconds)
+        for field, seconds in value.items()
     }
 
 

@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11203,
+  "function_count": 11209,
   "function_line_limit": 150,
   "functions_over_150_lines": 32,
   "functions_over_limit": [
@@ -1792,7 +1792,7 @@
     }
   ],
   "functions_over_limit_count": 32,
-  "generated_at": "2026-07-21T19:04:23.033330+00:00",
+  "generated_at": "2026-07-21T20:02:49.447880+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -4174,12 +4174,12 @@
         "threshold": 1200
       },
       {
-        "line_count": 2735,
+        "line_count": 2741,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
         "threshold": 1200
       },
       {
-        "line_count": 2306,
+        "line_count": 2325,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
         "threshold": 1200
       },
@@ -4381,12 +4381,12 @@
         "threshold": 1500
       },
       {
-        "line_count": 2735,
+        "line_count": 2741,
         "path": "crypto_rsi_scanner/event_alpha/artifacts/schema/market_shadow_surprise.py",
         "threshold": 1500
       },
       {
-        "line_count": 2306,
+        "line_count": 2325,
         "path": "crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py",
         "threshold": 1500
       },

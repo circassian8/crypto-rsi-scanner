@@ -17,6 +17,69 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Close strict publication false negatives · Codex
+**Why:** The sixtieth cadence-eligible live/no-send observation made one
+authorized CoinGecko request successfully, but dashboard publication rejected
+one honest ENA timing summary. Independent six-decimal rounding made a realized
+horizon median minus its nominal horizon differ from the serialized anchor-error
+median by one microsecond. Rollback kept the prior authority safe, but the full
+strict doctor had incorrectly treated those schema errors as a warning. Once
+that parity defect was closed, the broad gate exposed a second latent issue:
+global official macro rows were being copied into an asset-specific catalyst
+schema without a real token symbol.
+**Changes:**
+- Return sampling now derives its serialized anchor-error range from the one
+  rounded realized-horizon range, eliminating future affine rounding drift.
+- Closed shadow v5/v6 validation accepts only the historical one-microsecond
+  serialization residue (plus binary representation epsilon); a two-
+  microsecond discrepancy still fails.
+- Full strict artifact-doctor runs now block all schema-validation errors,
+  matching schema-only strict mode and dashboard authority. Non-strict doctor
+  behavior remains diagnostic.
+- Daily Operations summary output now prints the last provider-attempt reason
+  and `last_provider_request_succeeded`, so a successful HTTP request followed
+  by publication failure is unambiguous.
+- Accepted calendar rows now derive asset-specific scheduled catalysts only
+  when they carry a real, non-global token symbol. Global macro rows remain in
+  the unified calendar as context/risk, and the manifest binds the exact
+  asset-linked derivation scope plus context-only count. Publication rederives
+  and checks those counts and semantics while retaining the legacy all-rows
+  validation contract for historical manifests. Symbol and coin-ID adaptation
+  is typed: booleans, numbers, structures, and global sentinels cannot be
+  stringified into token identity, while a later real symbol may complete an
+  earlier coin-ID-only affected-asset reference.
+- The immutable failed namespace remains historical and non-authoritative. The
+  campaign report records 60 genuine cycles, 1,800 retained observations, 1,770
+  baseline-counted observations, and 30 too-close observations; cycle 59 remains
+  the exact dashboard authority.
+**Verify:** Focused timing/schema/doctor coverage passed 106 tests. Market-no-
+send, artifact-schema, Daily Operations publication/current-status, and
+dashboard coverage passed 232 tests; the one sandbox-denied loopback concurrency
+case passed separately on the host. The fixture market/no-send smoke completed
+with 47 schema rows, zero schema errors, strict doctor `OK`, and all safety
+counters zero. The immutable failed generation's 30 market snapshots now
+validate with zero errors without rewriting them. Current dashboard readiness
+remains `READY`; Daily Operations status made no provider call, correctly reports
+cadence waiting until `2026-07-21T20:08:49.150592+00:00`, and shows request
+success separately from terminal publication failure. Compileall and diff checks
+passed. The final official-macro/calendar publication suite passed 120 tests,
+including complete, partial, mixed asset/global, fingerprint, strict-doctor,
+and dashboard composition paths. Host-level `make verify-fast PYTHON=python3`
+then passed all 3,844 tests plus alert render, fixture backtest, and paper-
+scoreboard gates in 191 seconds. Architecture cleanliness passed; source-size
+and ownership findings remain advisory. The final host-level `make verify
+PYTHON=python3` release gate passed the isolated standalone runner 1,525/1,525,
+pytest 3,848/3,848, and the same alert/backtest/scoreboard gates. Campaign,
+Daily Operations status, dashboard readiness, calendar readiness, and
+execution-quality readiness made
+zero provider calls; the expected calendar-readiness nonzero result reports
+missing authorization/contact rather than attempting acquisition.
+**Notes/risks:** This does not republish or reconcile the failed terminal cycle,
+retry a provider, alter an anomaly/score/route/threshold, or change authorization.
+It does not manufacture a token identity or directional idea from a macro event.
+No Telegram send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` occurred. Source-size findings remain advisory and non-blocking.
+
 ## 2026-07-21 — Fix standalone mapping parametrization · Codex
 **Why:** The post-checkpoint full release run exposed four errors that pytest did
 not reproduce. The standalone compatibility adapter treated a raw dictionary's

@@ -131,6 +131,8 @@ def _validate_no_derivation(
     derived_fields = (
         "copy_artifact",
         "scheduled_catalyst_artifact",
+        "scheduled_context_only_count",
+        "scheduled_derivation_scope",
         "unlock_candidate_artifact",
         "unified_calendar_artifact",
     )
@@ -263,8 +265,11 @@ def _validate_derivation_chain(
     )
     scheduled_count = len(scheduled_rows)
     retained_count = len(events)
-    if scheduled_count != retained_count:
-        raise MarketNoSendError("campaign_calendar_scheduled_count_mismatch")
+    scoped_derivation = _validate_scheduled_derivation_counts(
+        metadata,
+        scheduled_count=scheduled_count,
+        retained_count=retained_count,
+    )
     expected_scheduled, expected_unlocks = (
         market_no_send_calendar_materialization.canonical_calendar_derivation_rows(
             events,
@@ -273,8 +278,11 @@ def _validate_derivation_chain(
             run_mode=_optional_text(manifest.get("run_mode")),
             run_id=run_id,
             observed_at=_optional_text(manifest.get("observed_at")),
+            asset_linked_only=scoped_derivation,
         )
     )
+    if len(expected_scheduled) != scheduled_count:
+        raise MarketNoSendError("campaign_calendar_scheduled_count_mismatch")
     if _canonical_rows_sha256(scheduled_rows) != _canonical_rows_sha256(
         expected_scheduled
     ):
@@ -321,6 +329,34 @@ def _validate_derivation_chain(
         metadata,
         telemetry=expected_unified.telemetry.to_dict(),
     )
+
+
+def _validate_scheduled_derivation_counts(
+    metadata: Mapping[str, Any],
+    *,
+    scheduled_count: int,
+    retained_count: int,
+) -> bool:
+    scope_present = "scheduled_derivation_scope" in metadata
+    context_count_present = "scheduled_context_only_count" in metadata
+    if scope_present is not context_count_present:
+        raise MarketNoSendError("campaign_calendar_scheduled_scope_incomplete")
+    if not scope_present:
+        if scheduled_count != retained_count:
+            raise MarketNoSendError("campaign_calendar_scheduled_count_mismatch")
+        return False
+    if (
+        metadata.get("scheduled_derivation_scope")
+        != market_no_send_calendar_materialization.SCHEDULED_DERIVATION_SCOPE
+    ):
+        raise MarketNoSendError("campaign_calendar_scheduled_scope_invalid")
+    context_only_count = _nonnegative_count(
+        metadata.get("scheduled_context_only_count"),
+        field="scheduled_context_only_count",
+    )
+    if scheduled_count + context_only_count != retained_count:
+        raise MarketNoSendError("campaign_calendar_scheduled_count_mismatch")
+    return True
 
 
 def _validate_unlock_binding(

@@ -26,6 +26,11 @@ RETURN_FEATURES = (
 RETURN_ANCHOR_TOLERANCE_RATIO = 0.25
 RETURN_MIN_ANCHOR_TOLERANCE_SECONDS = 300
 BENCHMARK_ALIGNMENT_TOLERANCE_SECONDS = 300
+# Timing summaries are serialized to six decimal places. Historical v5/v6
+# producers independently rounded an affine value and its offset, so an honest
+# pair can differ by exactly one decimal unit plus binary-float representation.
+# Keep that representational allowance narrow: a two-microsecond drift fails.
+_SERIALIZED_SECONDS_AFFINE_ABS_TOLERANCE = 1.000001e-6
 
 _TOP_LEVEL_KEYS_V1 = frozenset(
     (
@@ -1252,7 +1257,8 @@ def _validate_return_sampling_leg(
         not math.isclose(
             realized[field] - nominal_horizon_seconds,
             selection_error[field],
-            abs_tol=1e-6,
+            rel_tol=0.0,
+            abs_tol=_SERIALIZED_SECONDS_AFFINE_ABS_TOLERANCE,
         )
         for field in _RETURN_SAMPLING_RANGE_KEYS
     ):

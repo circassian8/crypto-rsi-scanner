@@ -180,7 +180,9 @@ def test_status_cli_summary_preserves_latest_invocation_and_provider_attempt(
         "last_cycle_status": "skipped",
         "last_cycle_reason": "observation_cadence_waiting",
         "last_cycle_namespace": "radar_market_no_send_previous",
-        "last_provider_attempt_status": "succeeded",
+        "last_provider_attempt_status": "failed",
+        "last_provider_attempt_reason": "publication_failed",
+        "last_provider_request_succeeded": True,
         "last_provider_attempted_at": "2026-07-15T10:00:00+00:00",
     }
     (tmp_path / "event_radar_daily_operations_state.json").write_text(
@@ -207,7 +209,9 @@ def test_status_cli_summary_preserves_latest_invocation_and_provider_attempt(
     assert "command=status" in output.out
     assert "last_cycle_status=skipped" in output.out
     assert "last_cycle_reason=observation_cadence_waiting" in output.out
-    assert "last_provider_attempt_status=succeeded" in output.out
+    assert "last_provider_attempt_status=failed" in output.out
+    assert "last_provider_attempt_reason=publication_failed" in output.out
+    assert "last_provider_request_succeeded=true" in output.out
     assert "last_provider_attempted_at=2026-07-15T10:00:00+00:00" in output.out
     assert "readiness_provider_calls=0" in output.out
     assert "run" not in boundaries.events
