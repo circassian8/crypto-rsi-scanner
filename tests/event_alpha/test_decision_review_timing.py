@@ -17,6 +17,9 @@ from crypto_rsi_scanner.event_alpha.operations import decision_review_timing_cli
 from crypto_rsi_scanner.event_alpha.operations import (
     decision_review_timing_queue as timing_queue,
 )
+from crypto_rsi_scanner.event_alpha.operations import (
+    market_observation_campaign as campaign,
+)
 from crypto_rsi_scanner.event_alpha.operations import market_observation_campaign_render
 
 
@@ -449,6 +452,62 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
     assert "safety.provider_calls=0" in output
     assert "safety.orders=0" in output
     assert "RADAR_REVIEW_TIMING_OUTPUT=json" in output
+
+
+def test_queue_cli_uses_exact_generation_projection_not_full_campaign(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    base = _base(tmp_path)
+    evaluated_at = "2026-07-18T12:01:00+00:00"
+    projection = {
+        "schema_id": campaign.REVIEW_TIMING_GENERATION_PROJECTION_SCHEMA,
+        "generation_summaries": [],
+    }
+    calls: list[object] = []
+
+    monkeypatch.setattr(
+        campaign,
+        "build_campaign_report",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("queue must not build the comprehensive campaign report")
+        ),
+    )
+
+    def build_projection(base_dir, *, evaluated_at):
+        calls.extend((Path(base_dir), evaluated_at))
+        return projection
+
+    monkeypatch.setattr(
+        campaign,
+        "build_review_timing_generation_projection",
+        build_projection,
+    )
+    monkeypatch.setattr(
+        timing_queue,
+        "build_review_timing_queue",
+        lambda base_dir, rows, *, evaluated_at: {
+            "status": "no_eligible_ideas",
+            "base": str(base_dir),
+            "row_count": len(tuple(rows)),
+            "evaluated_at": evaluated_at,
+        },
+    )
+
+    assert decision_review_timing_cli.main([
+        "--artifact-base",
+        str(base),
+        "queue",
+        "--evaluated-at",
+        evaluated_at,
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+
+    assert calls == [base, evaluated_at]
+    assert output["status"] == "no_eligible_ideas"
+    assert output["row_count"] == 0
+    assert output["evaluated_at"] == evaluated_at
 
 
 def test_read_only_queue_discovers_receipt_backed_ideas_and_excludes_legacy(

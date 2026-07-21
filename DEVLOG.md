@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Make human-review queue discovery fast and exact · Codex
+**Why:** The read-only review queue rebuilt the comprehensive campaign report
+to obtain a small generation-summary slice, forcing unrelated baseline,
+episode, scorecard, and temporal-surprise analytics into a routine operator
+command.
+**Changes:**
+- Added a closed v1 review-timing generation projection that derives exact
+  namespace, campaign-counting, candidate-count, and final publication/
+  operations receipt fields from the canonical generation loader.
+- Switched only queue discovery to that projection; status and confirmed human
+  view/completion mutations are unchanged, and the queue builder still
+  revalidates each exact source generation before exposing an action.
+- Added regressions for comprehensive-report input equivalence, explicit
+  exclusion of unrelated analytics, CLI dispatch, projection scope, and zero-
+  side-effect truth. Updated the working agreement, North Star, roadmap, and
+  durable decision record.
+**Verify:** Compileall passed. All 39 focused campaign/review-timing/North-Star
+tests passed in 0.78 seconds. At one fixed clock, the real projection path produced
+the exact same nine-action queue as the comprehensive-report path while falling
+from 37.968 seconds to 3.174 seconds; the ordinary real command completed in
+3.61 seconds with zero provider calls and writes. Architecture cleanliness,
+North Star JSON validation, and diff checks passed; size findings were advisory.
+**Notes/risks:** This does not record a human view, alter review eligibility,
+change any campaign artifact, or mutate dashboard authority. Quantitative
+source-size findings remain advisory only; security, provider, schema, path,
+secret, and bounded artifact/response protections remain enforced.
+
 ## 2026-07-21 — Make outcome-recovery readiness fast and exact · Codex
 **Why:** The no-call readiness command rebuilt the entire campaign report even
 though recovery uses only the current pointer, outcome gaps, and exact retained

@@ -780,6 +780,100 @@ def test_outcome_recovery_projection_matches_full_report_without_unrelated_analy
     }
 
 
+def test_review_timing_projection_matches_full_generation_truth_without_analytics(
+    tmp_path,
+    monkeypatch,
+):
+    base = tmp_path / "artifacts"
+    base.mkdir()
+    _fixture(base)
+    monkeypatch.setattr(
+        campaign.market_no_send_history_cache,
+        "cache_readiness",
+        _readiness,
+    )
+    monkeypatch.setattr(
+        campaign.dashboard_readiness,
+        "resolve_authoritative_dashboard",
+        _dashboard_authority,
+    )
+    full = campaign.build_campaign_report(base, evaluated_at=_EVALUATED)
+    full_generations = (
+        *full["authoritative_generations"],
+        *full["non_authoritative_complete_generations"],
+    )
+
+    def unrelated_analytics_must_not_run(*_args, **_kwargs):
+        raise AssertionError("review queue rebuilt unrelated campaign analytics")
+
+    for owner, field in (
+        (
+            campaign.market_observation_campaign_shadow_surprise,
+            "build_campaign_shadow_surprise_audit",
+        ),
+        (
+            campaign.market_observation_campaign_baseline,
+            "build_baseline_maturity",
+        ),
+        (
+            campaign.market_observation_campaign_episodes,
+            "build_campaign_anomaly_episode_shadow",
+        ),
+        (
+            campaign.market_observation_campaign_scorecard,
+            "build_campaign_decision_episode_scorecard",
+        ),
+    ):
+        monkeypatch.setattr(owner, field, unrelated_analytics_must_not_run)
+
+    projection = campaign.build_review_timing_generation_projection(
+        base,
+        evaluated_at=_EVALUATED,
+    )
+    expected = sorted(
+        (
+            {
+                "artifact_namespace": row["artifact_namespace"],
+                "campaign_counted": row["campaign_counted"],
+                "candidate_count": row["candidate_count"],
+                "publication": {
+                    field: row["publication"][field]
+                    for field in (
+                        "ever_authoritative",
+                        "final_publication_receipt_valid",
+                        "operations_receipt_valid",
+                    )
+                },
+            }
+            for row in full_generations
+        ),
+        key=lambda row: row["artifact_namespace"],
+    )
+
+    assert projection["schema_id"] == (
+        campaign.REVIEW_TIMING_GENERATION_PROJECTION_SCHEMA
+    )
+    assert projection["schema_version"] == (
+        campaign.REVIEW_TIMING_GENERATION_PROJECTION_VERSION
+    )
+    assert projection["projection_scope"] == (
+        "exact_complete_generation_counting_and_final_receipt_state"
+    )
+    assert projection["full_campaign_report_rebuilt"] is False
+    assert projection["generation_count"] == len(full_generations) == 2
+    assert sorted(
+        projection["generation_summaries"],
+        key=lambda row: row["artifact_namespace"],
+    ) == expected
+    assert projection["safety"] == {
+        "provider_calls": 0,
+        "writes": 0,
+        "review_events_created": 0,
+        "dashboard_authority_mutated": False,
+        "research_only": True,
+    }
+
+
 def _ready_regime_market_rows(observed_at: str) -> list[dict[str, object]]:
     rows = _current_regime_market_rows(observed_at)
     for rank, row in enumerate(rows, start=1):

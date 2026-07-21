@@ -1303,8 +1303,11 @@
       "protocol_v2_evidence_eligible": false,
       "queue_command": "make radar-review-timing-queue PYTHON=.venv/bin/python",
       "queue_eligibility": "campaign-counted idea with valid final publication and owned-dashboard operations receipts plus exact source-generation revalidation",
+      "queue_generation_projection": "decision_radar.review_timing_generation_projection v1",
+      "queue_generation_projection_scope": "exact complete-generation counting and final-receipt fields only",
       "queue_historical_time_expiry": "generation:stale and doctor:stale may be accepted only after final receipt validation; every structural authority defect blocks",
       "queue_legacy_or_unpublished_behavior": "excluded counts only; never timing evidence",
+      "queue_rebuilds_full_campaign_report": false,
       "source_bindings": [
         "artifact namespace run revision and operator-state digest",
         "canonical Decision projection digest",

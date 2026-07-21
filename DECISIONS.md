@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Keep human-review discovery independent of full campaign analytics
+**Status:** accepted
+**Decision:** `radar-review-timing-queue` obtains its generation inputs from a
+closed v1 projection containing only canonical namespace, campaign-counting,
+candidate-count, and final publication/operations receipt truth. The existing
+queue builder remains responsible for exact source-generation revalidation and
+action construction. At one evaluation clock, projection inputs and the final
+queue must equal the comprehensive campaign-report path. The projection must
+state `full_campaign_report_rebuilt=false` and must not invoke baseline,
+episode, scorecard, or temporal-surprise analytics.
+**Why:** Queue discovery needs receipt-backed idea identity, not the entire
+empirical campaign analysis. On the current artifact-heavy store, the exact
+projection reduced the path from 37.968 seconds to 3.174 seconds while
+preserving all nine actions and zero-call/zero-write safety.
+**Revisit when:** Queue eligibility or action construction genuinely needs a
+new generation field. Extend the canonical projection and prove equal-clock
+equivalence; do not restore an implicit comprehensive-report rebuild.
+
 ## 2026-07-21 - Keep outcome recovery independent of full campaign analytics
 **Status:** accepted
 **Decision:** Outcome-price recovery readiness, diagnostic collection, and

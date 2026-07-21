@@ -62,14 +62,13 @@ def main(argv: list[str] | None = None) -> int:
         from . import market_observation_campaign
 
         evaluated_at = args.evaluated_at or _utc_now()
-        campaign = market_observation_campaign.build_campaign_report(
-            args.artifact_base,
-            evaluated_at=evaluated_at,
+        projection = (
+            market_observation_campaign.build_review_timing_generation_projection(
+                args.artifact_base,
+                evaluated_at=evaluated_at,
+            )
         )
-        generations = (
-            *campaign.get("authoritative_generations", ()),
-            *campaign.get("non_authoritative_complete_generations", ()),
-        )
+        generations = projection["generation_summaries"]
         result = decision_review_timing_queue.build_review_timing_queue(
             args.artifact_base,
             generations,

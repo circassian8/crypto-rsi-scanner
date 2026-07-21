@@ -1051,8 +1051,15 @@ may be added later when a suitable environment already exists.
   radar-review-timing-queue` is likewise read-only/no-network and discovers
   every campaign-counted idea with valid final publication plus owned-dashboard
   operations receipts, revalidates its exact source generation, and prints the
-  next confirmed command. Legacy/unpublished ideas remain explicit excluded
-  counts. A historical snapshot may be reviewed after time expiry only when
+  next confirmed command. Queue discovery obtains only the canonical complete-
+  generation counting and final-receipt fields through
+  `decision_radar.review_timing_generation_projection` v1; it must not rebuild
+  baseline, episode, scorecard, or temporal-surprise campaign analytics. At one
+  evaluation clock, those projected inputs and the resulting queue must equal
+  the comprehensive campaign report path, and the projection must state
+  `full_campaign_report_rebuilt=false`. Legacy/unpublished ideas remain
+  explicit excluded counts. A historical snapshot may be reviewed after time
+  expiry only when
   `generation:stale` and/or `doctor:stale` are its sole authority reasons;
   structural drift still fails closed. Only the explicit confirmed
   `radar-review-timing-view` and `...-complete` commands may record a human

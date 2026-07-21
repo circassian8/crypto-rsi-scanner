@@ -54,6 +54,10 @@ OUTCOME_RECOVERY_PROJECTION_SCHEMA = (
     "decision_radar.outcome_recovery_campaign_projection"
 )
 OUTCOME_RECOVERY_PROJECTION_VERSION = 1
+REVIEW_TIMING_GENERATION_PROJECTION_SCHEMA = (
+    "decision_radar.review_timing_generation_projection"
+)
+REVIEW_TIMING_GENERATION_PROJECTION_VERSION = 1
 CAMPAIGN_OUTCOMES_FILENAME = "event_decision_radar_campaign_outcomes.jsonl"
 RUN_MANIFEST_FILENAME = "event_market_no_send_generation.json"
 PILOT_AUDIT_FILENAME = "event_market_no_send_pilot_audit.json"
@@ -346,6 +350,68 @@ def build_outcome_recovery_projection(
             "history_mutated": False,
             "outcomes_mutated": False,
             "research_only": True,
+        },
+    }
+
+
+def build_review_timing_generation_projection(
+    artifact_base_dir: str | Path,
+    *,
+    evaluated_at: datetime | str,
+) -> dict[str, Any]:
+    """Build only the exact generation summaries required by the review queue."""
+
+    base = _validated_existing_directory(artifact_base_dir, label="artifact base")
+    evaluated = _require_aware_utc(evaluated_at, field_name="evaluated_at")
+    current_authority, authority_error = _resolve_current_authority(
+        base,
+        evaluated=evaluated,
+    )
+    generations, attempts, excluded = _load_generations(
+        base,
+        current_authority=current_authority,
+    )
+    summaries = [_review_timing_generation_summary(row) for row in generations]
+    return {
+        "schema_id": REVIEW_TIMING_GENERATION_PROJECTION_SCHEMA,
+        "schema_version": REVIEW_TIMING_GENERATION_PROJECTION_VERSION,
+        "generated_at": evaluated.isoformat(),
+        "projection_scope": (
+            "exact_complete_generation_counting_and_final_receipt_state"
+        ),
+        "full_campaign_report_rebuilt": False,
+        "current_authority_resolved": bool(current_authority),
+        "current_authority_error": authority_error,
+        "generation_count": len(summaries),
+        "attempt_count": len(attempts),
+        "excluded_generation_count": len(excluded),
+        "generation_summaries": summaries,
+        "safety": {
+            "provider_calls": 0,
+            "writes": 0,
+            "review_events_created": 0,
+            "dashboard_authority_mutated": False,
+            "research_only": True,
+        },
+    }
+
+
+def _review_timing_generation_summary(
+    generation: Mapping[str, Any],
+) -> dict[str, Any]:
+    publication = _mapping(generation.get("publication"))
+    return {
+        "artifact_namespace": generation.get("artifact_namespace"),
+        "campaign_counted": generation.get("campaign_counted"),
+        "candidate_count": generation.get("candidate_count"),
+        "publication": {
+            "ever_authoritative": publication.get("ever_authoritative"),
+            "final_publication_receipt_valid": publication.get(
+                "final_publication_receipt_valid"
+            ),
+            "operations_receipt_valid": publication.get(
+                "operations_receipt_valid"
+            ),
         },
     }
 
@@ -1781,8 +1847,11 @@ __all__ = (
     "CAMPAIGN_REPORT_SCHEMA",
     "OUTCOME_RECOVERY_PROJECTION_SCHEMA",
     "OUTCOME_RECOVERY_PROJECTION_VERSION",
+    "REVIEW_TIMING_GENERATION_PROJECTION_SCHEMA",
+    "REVIEW_TIMING_GENERATION_PROJECTION_VERSION",
     "build_campaign_report",
     "build_outcome_recovery_projection",
+    "build_review_timing_generation_projection",
     "format_campaign_report",
     "write_campaign_report",
 )
