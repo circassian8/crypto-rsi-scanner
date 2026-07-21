@@ -1489,7 +1489,13 @@ history remain unchanged. Rows stay pending until the declared canonical
 primary horizon is due and sufficient observed prices exist, then mature with
 exact price lineage; a due primary horizon without sufficient price lineage is
 `due_missing_price`. Secondary-horizon maturity never promotes the primary
-state. A refresh makes no provider call.
+state. A refresh makes no provider call. The default
+`radar-outcome-price-recovery-readiness` operator view is concise and leads with
+the exact gap, both current authorization states, request/window identity,
+provider-call eligibility, expected activity, next safe command, and rollback
+disable command; full closed JSON remains available through
+`RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json`. Readiness itself always makes
+zero provider calls and writes.
 
 Each outcome's origins, route, directional bias, actionability cohort,
 evidence-confidence cohort, risk cohort, catalyst status, timing, and phase are

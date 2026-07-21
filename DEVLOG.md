@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Make outcome recovery readiness decision-first · Codex
+**Why:** The current campaign has one exact recoverable DEXE outcome gap, but
+the default readiness command buried its sole blocker and safe action inside a
+large JSON payload.
+**Changes:**
+- Added a bounded summary that leads with authority, the exact DEXE 24h
+  request/window, separate general and recovery authorization, current provider
+  eligibility, expected activity, reasons, next safe command, authorization
+  boundary, and rollback-disable command.
+- Kept direct Python output and an explicit Make override as full JSON. Added
+  typed readiness fields rather than deriving operator claims outside the
+  canonical result.
+**Verify:** The focused recovery/readiness/capture/application and North-Star
+set passed 68/68 tests. The real readiness surface reports one DEXE request,
+general CoinGecko authorization present, dedicated recovery authorization absent, zero calls,
+zero writes, and the exact JSON fallback command.
+**Notes/risks:** No authorization was created, no provider was called, and no
+capture, outcome, baseline history, calibration, route, score, threshold,
+dashboard authority, Protocol-v2 evidence, send, trade, order, paper trade, RSI
+row, or Event Alpha `TRIGGERED_FADE` changed. Source-size counts remain outside
+the development and release gate.
+
 ## 2026-07-22 — Put verified card inspection before review timing actions · Codex
 **Why:** The genuine review queue sent the operator directly to confirmed
 first-view commands even though all nine queued ideas had expired and the exact

@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Lead outcome recovery readiness with the exact gap
+**Status:** accepted
+**Decision:** The normal `radar-outcome-price-recovery-readiness` Make surface
+is a bounded operator summary. It must show the authoritative namespace, exact
+missing outcome request/window, separate general and recovery authorization,
+provider-call eligibility, expected activity, reason, next safe command,
+authorization boundary, and disable command. The complete unchanged machine
+payload remains available through
+`RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json`; direct Python CLI usage remains
+JSON by default for compatibility.
+**Why:** One genuine DEXE outcome gap is recoverable, but the former large JSON
+view buried the only blocker—the absent dedicated recovery authorization—and
+made a read-only readiness check look more complicated than the guarded action.
+**Revisit when:** More than the bounded request list can be presented safely in
+the summary. Preserve the closed JSON and no-call/no-write readiness boundary.
+
 ## 2026-07-22 - Separate exact card inspection from measured review timing
 **Status:** accepted
 **Decision:** Every human-review queue row states the canonical expiry and its

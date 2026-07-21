@@ -1915,6 +1915,10 @@
     "human_feedback_is_optional_preference_data": true,
     "immutable_origin_namespaces_rewritten": false,
     "maturation_policy": "declared canonical primary horizon only; pending until due and sufficient observed price lineage exists, due_missing_price when due without sufficient lineage, then mature deterministically",
+    "outcome_recovery_readiness_default_view": "bounded summary of exact gap current general and recovery authorization request window provider-call eligibility expected activity next safe command and disable command",
+    "outcome_recovery_readiness_full_json": "RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json",
+    "outcome_recovery_readiness_provider_calls": 0,
+    "outcome_recovery_readiness_writes": 0,
     "secondary_horizon_may_promote_primary": false,
     "episode_scorecard_outcome_states": [
       "matured",

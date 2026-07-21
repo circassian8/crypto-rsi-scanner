@@ -55,6 +55,10 @@ COLLECT_COMMAND = (
 CAPTURE_COMMAND = (
     "CONFIRM=1 make radar-outcome-price-recovery-capture PYTHON=.venv/bin/python"
 )
+READINESS_JSON_COMMAND = (
+    "make radar-outcome-price-recovery-readiness "
+    "RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json PYTHON=.venv/bin/python"
+)
 MAX_RECOVERY_REQUESTS = 20
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 MAX_PRICE_POINTS = 10_000
@@ -218,10 +222,17 @@ def build_outcome_price_recovery_readiness(
     only_recovery_auth_missing = reasons == [
         "outcome_price_recovery_authorization_absent"
     ]
+    status = (
+        "ready"
+        if ready
+        else "no_work"
+        if reasons == ["no_due_missing_price_outcomes"]
+        else "blocked"
+    )
     return {
         "contract_version": CONTRACT_VERSION,
         "row_type": "decision_radar_outcome_price_recovery_readiness",
-        "status": "ready" if ready else "no_work" if reasons == ["no_due_missing_price_outcomes"] else "blocked",
+        "status": status,
         "ready": ready,
         "checked_at": _iso(checked),
         "campaign_status": report.get("campaign_status"),
@@ -271,8 +282,99 @@ def build_outcome_price_recovery_readiness(
             if reasons
             else "none"
         ),
+        "current_provider_call_eligibility": (
+            "eligible" if ready else "no_work" if status == "no_work" else "blocked"
+        ),
+        "expected_provider_activity": "none_readiness_only",
+        "expected_activity_if_authorized_and_confirmed": (
+            f"collect_at_most_{len(requests)}_public_GETs_no_retries"
+        ),
+        "authorization_boundary": (
+            "collection_requires_already_present_"
+            f"{GENERAL_COINGECKO_AUTH_ENV}=1_and_{LIVE_AUTH_ENV}=1_plus_CONFIRM=1;"
+            "readiness_never_creates_or_mutates_authorization"
+        ),
+        "rollback_disable_command": f"unset {LIVE_AUTH_ENV}",
         **_safety(writes_performed=False),
     }
+
+
+def format_outcome_price_recovery_summary(result: Mapping[str, Any]) -> str:
+    """Render bounded operator truth from one already-built readiness result."""
+
+    pointer = _mapping(result.get("campaign_pointer"))
+    provider_state = _mapping(result.get("shared_provider_state"))
+    lines: list[tuple[str, object]] = [
+        ("report", "decision_radar_outcome_price_recovery_readiness"),
+        ("status", result.get("status")),
+        ("ready", result.get("ready")),
+        ("checked_at", result.get("checked_at")),
+        ("authority_namespace", pointer.get("artifact_namespace")),
+        ("authority_revision", pointer.get("revision")),
+        ("due_missing_price_count", result.get("due_missing_price_count")),
+        ("ledger_refreshable_count", result.get("ledger_refreshable_count")),
+        (
+            "historical_recovery_request_count",
+            result.get("historical_recovery_request_count"),
+        ),
+        ("plan_digest", result.get("plan_digest")),
+        (
+            "general_provider_authorized",
+            result.get("general_provider_authorized"),
+        ),
+        (
+            "recovery_provider_authorized",
+            result.get("recovery_provider_authorized"),
+        ),
+        (
+            "current_provider_call_eligibility",
+            result.get("current_provider_call_eligibility"),
+        ),
+        ("shared_provider_allowed", provider_state.get("allowed")),
+        ("shared_provider_reason", provider_state.get("reason")),
+        ("reasons", result.get("reasons")),
+    ]
+    requests = result.get("historical_recovery_requests")
+    if isinstance(requests, list):
+        for index, raw in enumerate(requests, start=1):
+            if not isinstance(raw, Mapping):
+                continue
+            prefix = f"request[{index}]"
+            for field in (
+                "symbol",
+                "coin_id",
+                "candidate_id",
+                "primary_horizon",
+                "due_at",
+                "allowed_latest_price_at",
+                "endpoint_path",
+                "maximum_provider_requests",
+            ):
+                lines.append((f"{prefix}.{field}", raw.get(field)))
+    lines.extend(
+        (
+            ("expected_provider_activity", result.get("expected_provider_activity")),
+            (
+                "expected_activity_if_authorized_and_confirmed",
+                result.get("expected_activity_if_authorized_and_confirmed"),
+            ),
+            ("operator_action_required", result.get("operator_action_required")),
+            ("next_safe_command", result.get("next_safe_command")),
+            ("authorization_boundary", result.get("authorization_boundary")),
+            ("rollback_disable_command", result.get("rollback_disable_command")),
+            ("provider_call_planned", result.get("provider_call_planned")),
+            ("provider_call_attempted", result.get("provider_call_attempted")),
+            ("provider_requests_made", result.get("provider_requests_made")),
+            ("writes_performed", result.get("writes_performed")),
+            ("protocol_v2_evidence_eligible", result.get("protocol_v2_evidence_eligible")),
+            ("research_only", result.get("research_only")),
+            ("full_json_command", READINESS_JSON_COMMAND),
+        )
+    )
+    return "\n".join(
+        f"{key}={_summary_value(value)}"
+        for key, value in lines
+    )
 
 
 def normalize_captured_recovery_response(
@@ -826,6 +928,19 @@ def _safe_code(value: object) -> str:
     return cleaned[:96] or "unknown"
 
 
+def _summary_value(value: object) -> str:
+    if value is None:
+        return "none"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (list, tuple)):
+        return ",".join(_summary_value(item) for item in value) or "none"
+    text = str(value).replace("\r", " ").replace("\n", " ").strip()
+    return text or "none"
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("readiness", "collect"))
@@ -835,6 +950,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--confirm", action="store_true")
+    parser.add_argument("--output", choices=("json", "summary"), default="json")
     return parser
 
 
@@ -860,7 +976,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             **_safety(writes_performed=False),
         }, indent=2, sort_keys=True))
         return 2
-    print(json.dumps(result, indent=2, sort_keys=True))
+    if args.output == "summary":
+        print(format_outcome_price_recovery_summary(result))
+    else:
+        print(json.dumps(result, indent=2, sort_keys=True))
     if args.command == "readiness":
         return 0
     return 0 if result.get("status") == "complete" else 2
@@ -879,6 +998,7 @@ __all__ = (
     "build_recovery_requests",
     "collect_outcome_price_recovery",
     "collect_outcome_price_recovery_capture_inputs",
+    "format_outcome_price_recovery_summary",
     "normalize_captured_recovery_response",
     "recovery_request_from_values",
     "recovery_request_values",

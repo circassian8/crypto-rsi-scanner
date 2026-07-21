@@ -115,6 +115,7 @@ RADAR_DAILY_OPS_OUTPUT ?= summary
 RADAR_BYBIT_EXECUTION_READINESS_OUTPUT ?= summary
 RADAR_BYBIT_INTRADAY_READINESS_OUTPUT ?= summary
 RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT ?= summary
+RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT ?= summary
 OFFICIAL_MACRO_OUTPUT_BASE ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/official_macro_calendar
 FED_FOMC_HTML ?=
 BLS_CALENDAR_ICS ?=
@@ -361,7 +362,7 @@ help:
 	@echo "  CONFIRM=1 make radar-dashboard-public-disable Stop only the owned temporary public link"
 	@echo "  CONFIRM=1 make radar-dashboard-public-guard   Stop the owned public link if expired or unhealthy"
 	@echo "  make radar-market-no-send-readiness  Lower-level CoinGecko/cadence diagnostic; no provider call"
-	@echo "  make radar-outcome-price-recovery-readiness  Plan exact historical outcome-price recovery; no call/write"
+	@echo "  make radar-outcome-price-recovery-readiness  Concise exact historical outcome-price recovery plan; no call/write (RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json for full JSON)"
 	@echo "  CONFIRM=1 make radar-outcome-price-recovery-collect  Diagnostic exact-response recovery; no retry/write"
 	@echo "  CONFIRM=1 make radar-outcome-price-recovery-capture  Seal exact historical responses; no outcome/baseline write"
 	@echo "  make radar-outcome-price-recovery-status  Validate the latest immutable recovery capture; no call/write"
@@ -1499,7 +1500,8 @@ radar-market-campaign-report:
 
 radar-outcome-price-recovery-readiness:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.outcome_price_recovery readiness \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR)
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--output $(RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT)
 
 radar-outcome-price-recovery-collect:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.outcome_price_recovery collect \

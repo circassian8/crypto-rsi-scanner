@@ -1121,7 +1121,12 @@ may be added later when a suitable environment already exists.
   return plus its exact receipt. Generic empty sidecar files remain unavailable.
 - **Decision Radar outcome-price recovery:**
   `make radar-outcome-price-recovery-readiness` is read-only and makes no
-  provider call. It builds a dedicated exact recovery projection from the
+  provider call. Its normal Make output is a bounded summary that leads with
+  the exact gap, current general/recovery authorization states, provider-call
+  eligibility, request identity/window, expected activity, next safe command,
+  and disable command; use
+  `RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json` for the complete closed
+  payload. It builds a dedicated exact recovery projection from the
   authoritative pointer, counted candidate snapshots, outcome ledger, and
   read-once market-history snapshot. At the same evaluation clock, its pointer
   and outcome values must equal the comprehensive campaign report, but it must

@@ -290,6 +290,39 @@ def test_readiness_is_no_call_and_requires_both_authorizations(tmp_path):
         "exact_pointer_counted_candidates_outcome_ledger_and_market_history"
     )
     assert result["full_campaign_report_rebuilt"] is False
+    assert result["current_provider_call_eligibility"] == "blocked"
+    assert result["expected_provider_activity"] == "none_readiness_only"
+    assert result["authorization_boundary"].startswith(
+        "collection_requires_already_present_"
+    )
+    assert result["rollback_disable_command"] == (
+        f"unset {recovery.LIVE_AUTH_ENV}"
+    )
+
+
+def test_readiness_summary_leads_with_gap_authorization_and_exact_request() -> None:
+    result = recovery.build_outcome_price_recovery_readiness(
+        artifact_base_dir=".",
+        environ={recovery.GENERAL_COINGECKO_AUTH_ENV: "1"},
+        now=_CHECKED,
+        fixture_dir=None,
+        report_builder=_builder(_report()),
+        provider_state_assessor=_provider_allowed,
+    )
+
+    summary = recovery.format_outcome_price_recovery_summary(result)
+
+    assert summary.startswith(
+        "report=decision_radar_outcome_price_recovery_readiness\n"
+    )
+    assert "status=blocked" in summary
+    assert "due_missing_price_count=1" in summary
+    assert "recovery_provider_authorized=false" in summary
+    assert "request[1].symbol=DEXE" in summary
+    assert "request[1].primary_horizon=24h" in summary
+    assert "expected_provider_activity=none_readiness_only" in summary
+    assert f"rollback_disable_command=unset {recovery.LIVE_AUTH_ENV}" in summary
+    assert "RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT=json" in summary
 
 
 def test_recovery_surfaces_default_to_exact_campaign_projection():
@@ -356,6 +389,7 @@ def test_readiness_reports_no_work_when_no_gap_exists(tmp_path):
     assert result["status"] == "no_work"
     assert result["historical_recovery_request_count"] == 0
     assert result["provider_call_planned"] is False
+    assert result["current_provider_call_eligibility"] == "no_work"
 
 
 def test_collect_requires_confirmation_before_fetch(tmp_path):
@@ -531,6 +565,7 @@ def test_make_targets_keep_readiness_separate_from_confirmed_collection():
 
     assert "outcome_price_recovery readiness" in readiness
     assert "outcome_price_recovery collect" not in readiness
+    assert "--output summary" in readiness
     assert "outcome_price_recovery collect" in collection
     assert "--confirm" not in collection
     assert confirmed.count("--confirm") == 1
