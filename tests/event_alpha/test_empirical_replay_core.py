@@ -82,6 +82,56 @@ def test_replay_uses_canonical_production_projection_and_explicit_missing_spread
     assert result.trace_summary["dashboard_authority_mutations"] == 0
 
 
+@pytest.mark.parametrize(
+    ("overrides", "failure_stage"),
+    (
+        ({"symbol": {"borrowed": "MOVE"}}, "identity_failure"),
+        (
+            {"canonical_asset_id": {"borrowed": "move"}},
+            "identity_failure",
+        ),
+        (
+            {"market_data_source": {"borrowed": "binance"}},
+            "source_lineage_failure",
+        ),
+        ({"market_data_source": True}, "source_lineage_failure"),
+    ),
+)
+def test_replay_rejects_malformed_identity_and_provider_lineage(
+    overrides: dict[str, object],
+    failure_stage: str,
+) -> None:
+    result = run_replay_kernel(
+        [_observation(**overrides)],
+        mode="medium",
+        artifact_namespace="typed-replay-input",
+        allowed_partitions=("validation",),
+    )
+
+    assert result.ideas == ()
+    assert result.trace_rows[0]["failure_stage"] == failure_stage
+
+
+def test_replay_keeps_absent_identity_and_provider_fallbacks() -> None:
+    row = _observation()
+    del row["canonical_asset_id"]
+    del row["market_data_source"]
+
+    result = run_replay_kernel(
+        [row],
+        mode="medium",
+        artifact_namespace="replay-fallbacks",
+        allowed_partitions=("validation",),
+    )
+
+    assert result.ideas[0]["canonical_asset_id"] == "move"
+    assert result.ideas[0]["provider"] == "binance_historical_ohlcv"
+    assert (
+        result.ideas[0]["market_snapshot"]["market_data_source"]
+        == "binance_historical_ohlcv"
+    )
+
+
 def test_daily_rsi_observation_survives_projection_without_decision_authority() -> None:
     reference = {
         "context_type": "daily_rsi_observation",

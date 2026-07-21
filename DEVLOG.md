@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed empirical replay identity and lineage · Codex
+**Why:** The point-in-time replay kernel stringified asset identity and
+`market_data_source` values. Structured or boolean inputs could become
+printable canonical IDs/providers and enter empirical Decision projections
+instead of being recorded as unusable evidence.
+**Changes:** Replay now derives one typed, presence-aware symbol/canonical-ID
+pair and one typed provider claim before snapshot/candidate construction, then
+copies those exact values throughout the idea. A malformed explicit identity
+is rejected as `identity_failure`; malformed explicit provider lineage is
+rejected as `source_lineage_failure`. An absent canonical ID still derives from
+the typed symbol, and an absent provider still uses the documented
+`binance_historical_ohlcv` fallback. No future/outcome field is consulted.
+**Verify:** Four structured/boolean identity and provider regressions fail
+closed with the exact trace stage, while both absence fallbacks still produce a
+canonical idea. The focused replay kernel passed (`14 passed`) and the complete
+empirical replay/live-campaign group passed (`129 passed`). `python3 -m
+compileall -q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because it passed all 3,706
+tests earlier in this prompt and the complete empirical replay family was
+rerun. No replay partition, anomaly threshold, Decision score/route, provider
+call, authority, holdout, send, trade, order, paper trade, RSI write, or Event
+Alpha `TRIGGERED_FADE` changed. Quantitative source-size limits remain advisory;
+empirical evidence identity remains fail closed.
+
 ## 2026-07-21 — Preserve typed market-source lineage · Codex
 **Why:** Market-state normalization stringified any truthy value in
 `market_data_source`/`source`. A mapping, sequence, boolean, or number could

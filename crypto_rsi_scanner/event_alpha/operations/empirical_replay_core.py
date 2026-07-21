@@ -155,8 +155,7 @@ def _evaluate_observation(
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     observed_at = _required_utc(row.get("observed_at"))
     partition = "fixture" if mode == "fixture" else partition_for_timestamp(observed_at, protocol)
-    symbol = str(row.get("symbol") or "").strip().upper()
-    canonical = str(row.get("canonical_asset_id") or symbol).strip().casefold()
+    symbol, canonical = _observation_identity(row)
     base = {
         "schema_id": "decision_radar.empirical_replay_trace",
         "schema_version": 1,
@@ -187,7 +186,20 @@ def _evaluate_observation(
     if str(row.get("baseline_status") or "") != "warm":
         return {**base, "trace_status": "rejected", "failure_stage": "insufficient_history"}, None
 
-    snapshot = _market_snapshot(row, observed_at=observed_at)
+    provider, provider_claimed = _market_data_source(row)
+    if provider_claimed and not provider:
+        return {
+            **base,
+            "trace_status": "rejected",
+            "failure_stage": "source_lineage_failure",
+        }, None
+    snapshot = _market_snapshot(
+        row,
+        observed_at=observed_at,
+        symbol=symbol,
+        canonical=canonical,
+        provider=provider,
+    )
     anomaly_type = market_anomaly_scanner.classify_market_state(snapshot, row)
     anomaly_bucket = _anomaly_bucket(anomaly_type, row)
     if anomaly_type == market_anomaly_scanner.NO_REACTION:
@@ -209,6 +221,9 @@ def _evaluate_observation(
         artifact_namespace=artifact_namespace,
         protocol=protocol,
         observed_at=observed_at,
+        symbol=symbol,
+        canonical=canonical,
+        provider=provider,
     )
     evaluated = {
         **candidate,
@@ -285,7 +300,14 @@ def _evaluate_observation(
     return trace, idea
 
 
-def _market_snapshot(row: Mapping[str, Any], *, observed_at: datetime) -> dict[str, Any]:
+def _market_snapshot(
+    row: Mapping[str, Any],
+    *,
+    observed_at: datetime,
+    symbol: str,
+    canonical: str,
+    provider: str,
+) -> dict[str, Any]:
     return_fields = (
         "return_24h",
         "return_72h",
@@ -310,9 +332,9 @@ def _market_snapshot(row: Mapping[str, Any], *, observed_at: datetime) -> dict[s
         "research_only": True,
     }
     snapshot = {
-        "symbol": str(row.get("symbol") or "").upper(),
-        "coin_id": str(row.get("canonical_asset_id") or row.get("symbol") or "").casefold(),
-        "canonical_asset_id": str(row.get("canonical_asset_id") or row.get("symbol") or "").casefold(),
+        "symbol": symbol,
+        "coin_id": canonical,
+        "canonical_asset_id": canonical,
         "observed_at": observed_at.isoformat(),
         "price": _finite(row.get("close")),
         **values,
@@ -328,7 +350,7 @@ def _market_snapshot(row: Mapping[str, Any], *, observed_at: datetime) -> dict[s
         "spread_status": "unavailable",
         "freshness_status": "fresh",
         "market_context_freshness_status": "fresh",
-        "market_data_source": str(row.get("market_data_source") or "binance_historical_ohlcv"),
+        "market_data_source": provider,
         "market_data_quality": quality,
         "data_quality": quality,
         "unit_warnings": [],
@@ -347,15 +369,15 @@ def _candidate(
     artifact_namespace: str,
     protocol: Mapping[str, Any],
     observed_at: datetime,
+    symbol: str,
+    canonical: str,
+    provider: str,
 ) -> dict[str, Any]:
-    symbol = str(row["symbol"]).upper()
-    canonical = str(row.get("canonical_asset_id") or symbol).casefold()
     digest = hashlib.sha256(
         f"{protocol['protocol_version']}|{mode}|{canonical}|{observed_at.isoformat()}|{anomaly_type}".encode()
     ).hexdigest()[:20]
     candidate_id = f"empirical:{digest}"
     run_id = f"{protocol['protocol_version']}|{mode}|{partition}"
-    provider = str(row.get("market_data_source") or "binance_historical_ohlcv")
     candidate = {
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
@@ -477,10 +499,8 @@ def _canonical_replay_rsi_context_references(
             continue
         projected.append({
             "context_version": reference["context_version"],
-            "symbol": str(row.get("symbol") or "").strip().upper() or None,
-            "coin_id": str(
-                row.get("canonical_asset_id") or row.get("symbol") or ""
-            ).strip().casefold() or None,
+            "symbol": _observation_identity(row)[0] or None,
+            "coin_id": _observation_identity(row)[1] or None,
             "setup_type": None,
             "rsi_timeframe": reference["rsi_timeframe"],
             "observed_at": reference["observed_at"],
@@ -488,6 +508,31 @@ def _canonical_replay_rsi_context_references(
             "valid": True,
         })
     return projected
+
+
+def _observation_identity(row: Mapping[str, Any]) -> tuple[str, str]:
+    symbol = _typed_text(row.get("symbol")).upper()
+    if "canonical_asset_id" in row and row.get("canonical_asset_id") not in (
+        None,
+        "",
+    ):
+        canonical = _typed_text(row.get("canonical_asset_id")).casefold()
+    else:
+        canonical = symbol.casefold()
+    return symbol, canonical
+
+
+def _market_data_source(row: Mapping[str, Any]) -> tuple[str, bool]:
+    if "market_data_source" not in row or row.get("market_data_source") in (
+        None,
+        "",
+    ):
+        return "binance_historical_ohlcv", False
+    return _typed_text(row.get("market_data_source")), True
+
+
+def _typed_text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _empirical_rsi_observation_reference_valid(
