@@ -243,17 +243,31 @@ def _is_sector_or_theme(snapshot: Mapping[str, Any]) -> bool:
         or _semantic_true(snapshot.get("is_quote_asset"))
     ):
         return True
-    if snapshot.get("is_tradable_asset") is False:
+    if _semantic_boolean(snapshot.get("is_tradable_asset")) is False:
         return True
     return symbol == "SECTOR" or coin_id.startswith("sector:") or coin_id.endswith("_proxy")
 
 
 def _semantic_true(value: object) -> bool:
+    return _semantic_boolean(value) is True
+
+
+def _semantic_boolean(value: object) -> bool | None:
     if isinstance(value, bool):
         return value
-    if value is None:
-        return False
-    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        if float(value) == 1.0:
+            return True
+        if float(value) == 0.0:
+            return False
+        return None
+    if isinstance(value, str):
+        text = value.strip().casefold()
+        if text in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "no", "n", "off"}:
+            return False
+    return None
 
 
 def _string_list(value: object) -> list[str]:

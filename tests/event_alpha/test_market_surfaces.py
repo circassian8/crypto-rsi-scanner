@@ -439,6 +439,22 @@ def test_market_anomaly_sector_controls_require_explicit_semantic_truth():
             }
         ) is True
 
+    for untradable_value in (False, "false", "0", "no", "n", "off", 0, 0.0):
+        assert scanner._is_sector_or_theme(  # noqa: SLF001
+            {
+                "symbol": "MOVE",
+                "coin_id": "move-token",
+                "is_tradable_asset": untradable_value,
+            }
+        ) is True
+        assert report._is_sector_or_theme(  # noqa: SLF001
+            {
+                "symbol": "MOVE",
+                "coin_id": "move-token",
+                "is_tradable_asset": untradable_value,
+            }
+        ) is True
+
     text = report.format_market_anomaly_report(
         [
             {
@@ -450,6 +466,32 @@ def test_market_anomaly_sector_controls_require_explicit_semantic_truth():
         cfg=scanner.MarketAnomalyScannerConfig(),
     )
     assert "catalyst_required=false" in text
+
+
+def test_semantically_untradable_asset_cannot_create_market_anomaly():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "blocked-token",
+        "coin_id": "blocked-token",
+        "symbol": "BLOCK",
+        "return_unit": "percent_points",
+        "return_4h": 12.0,
+        "return_24h": 18.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 100_000_000.0,
+        "spread_bps": 5.0,
+        "freshness_status": "fresh",
+    }
+
+    for untradable_value in (False, "false", "0", "no", "n", "off", 0, 0.0):
+        snapshots, anomalies = scanner.scan_market_rows(
+            [{**base, "is_tradable_asset": untradable_value}],
+            observed_at="2026-07-21T10:50:00Z",
+        )
+        assert len(snapshots) == 1
+        assert anomalies == []
 
 
 def test_market_confirmation_dex_flags_and_numeric_evidence_are_type_safe():

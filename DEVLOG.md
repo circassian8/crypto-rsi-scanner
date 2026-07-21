@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Honor semantic untradable controls in anomaly scanning · Codex
+**Why:** The market scanner excluded only the literal boolean `false`. The same
+explicit untradable claim encoded as `"false"`, `"0"`, `"no"`, or numeric zero
+could still produce `confirmed_breakout`, even though downstream Decision
+validation would eventually reject the contradiction.
+**Changes:** Scanner and report controls now share typed semantic-boolean
+parsing. Explicit false-like `is_tradable_asset` values suppress market-anomaly
+classification and display consistently; true-like theme/quote flags retain
+their existing behavior, missing and invalid claims retain the existing
+downstream diagnostic handling, and no classifier threshold changed.
+**Verify:** The public reproduction changed from one `confirmed_breakout` to
+zero anomalies. Focused market-surface, report, state, unit, no-send, and
+Decision tests passed (`178 passed`). `make event-alpha-market-anomaly-smoke
+PYTHON=python3` passed with 8 snapshots and the expected 5 fixture anomalies;
+its standalone fixture doctor had zero blockers and the two expected missing
+full-cycle source/readiness warnings. `python3 -m compileall -q
+crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the scanner,
+renderer, model, and matching smoke path were exercised directly. No provider
+call, authority change, send, trade, order, paper trade, normal RSI write, or
+Event Alpha `TRIGGERED_FADE` occurred. Quantitative source-file size remains
+advisory; artifact, security, provider, request, and resource bounds remain
+enforced.
+
 ## 2026-07-21 — Fail closed on malformed benchmark evidence · Codex
 **Why:** Source-row unit validation did not cover the separate BTC/ETH rows used
 to derive relative returns. A BTC object-valued unit could therefore make a
