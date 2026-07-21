@@ -21,6 +21,7 @@ from ..artifacts.schema.decision_model import (
 )
 from . import decision_catalyst_policy
 from . import decision_policy
+from . import decision_safety
 from . import source_independence as event_source_independence
 from . import source_independence_store as event_source_independence_store
 from .decision_models import actionability_score_cohort
@@ -213,6 +214,8 @@ def decision_model_values(*rows: Mapping[str, Any] | None) -> dict[str, Any]:
                 return {}
             if not _has_decision_model_marker(authority):
                 continue
+            if _projection_source_safety_invalid(authority):
+                return {}
             if not decision_model_is_enabled(authority):
                 return {}
             if (
@@ -1338,6 +1341,16 @@ def _projection_rsi_context_invalid(source: Mapping[str, Any]) -> bool:
         if not any(dict(reference) == expected for reference in raw_references):
             return True
     return False
+
+
+def _projection_source_safety_invalid(source: Mapping[str, Any]) -> bool:
+    """Reject unsafe raw claims before deriving canonical safety invariants."""
+
+    return (
+        decision_safety.has_unsafe_side_effect(source)
+        or decision_safety.has_unredacted_secret(source)
+        or decision_safety.has_unsafe_operator_path(source)
+    )
 
 
 def _rsi_reference_invalid(reference: Mapping[str, Any]) -> bool:

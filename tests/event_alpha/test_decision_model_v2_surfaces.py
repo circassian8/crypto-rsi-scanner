@@ -233,6 +233,38 @@ def test_v2_projection_preserves_source_safety_attestations_and_diagnostic_aggre
     assert rows[0]["include_in_main_aggregate"] is False
 
 
+def test_v2_projection_does_not_launder_unsafe_source_claims():
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    malformed_or_unsafe = (
+        _market_led_candidate(notification_send_enabled="false"),
+        _market_led_candidate(telegram_sends={"count": 0}),
+        _market_led_candidate(trade_created=[]),
+        _market_led_candidate(paper_trade_created="false"),
+        _market_led_candidate(normal_rsi_signal_written={}),
+        _market_led_candidate(triggered_fade_created="0"),
+        _market_led_candidate(provider_api_key="fixture-secret"),
+        _market_led_candidate(operator_report_path="/tmp/unsafe-report.md"),
+        _market_led_candidate(source_context={"research_only": "false"}),
+    )
+
+    for row in malformed_or_unsafe:
+        assert decision_model_values(row) == {}
+
+    safe = decision_model_values(_market_led_candidate(
+        notification_send_enabled=False,
+        telegram_sends=0,
+        trades_created=0.0,
+        paper_trades_created=0,
+        normal_rsi_signal_rows_written=0,
+        strict_alerts_created=0,
+    ))
+    assert safe
+    assert all(safe["decision_safety_invariants"].values())
+
+
 def test_closed_decision_projection_is_idempotent_and_preserves_calendar_rsi_and_lineage():
     from crypto_rsi_scanner.event_alpha.artifacts.schema.decision_model import validate_contract
     from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (

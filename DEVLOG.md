@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Enforce source safety at the Decision projection boundary · Codex
+**Why:** The evaluator already rejected malformed or unsafe side-effect claims,
+secrets, and operator paths, but a manually assembled v2 row could bypass that
+stage. Projection then interpreted false-like strings or object counters as
+safe and emitted all-green canonical safety invariants.
+**Changes:** Decision projection now runs the existing recursive side-effect,
+secret, and path predicates before deriving its closed safety value. Malformed
+`false`/`0` claims, non-scalar counters, enabled effects, unredacted secrets,
+absolute operator paths, and nested unsafe context fail closed. Canonical
+diagnostic rows that carry only explicit boolean safety attestations remain
+renderable, and exact false/finite-zero source claims retain existing behavior.
+**Verify:** `5` focused evaluator/projection/source-safety regressions passed.
+The `12`-file Decision/schema/merge/calendar suite passed (`207 passed`).
+`make event-alpha-integrated-radar-smoke PYTHON=python3` passed with 15
+candidates, 12 canonical cores/cards, strict doctor 0 blockers / 0 warnings,
+and 14 dashboard pages. `python3 -m compileall -q crypto_rsi_scanner tests` and
+`git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the existing shared
+safety predicates, affected projection path, and integrated doctor were tested
+directly. No provider call, secret disclosure, score, threshold, route, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+occurred. Source-file size is advisory; artifact, security, provider, and
+resource bounds remain enforced.
+
 ## 2026-07-21 — Bind canonical RSI context references · Codex
 **Why:** RSI reference lists accepted mixed members and did not prove that a
 typed reference described the embedded technical context. A malformed row
