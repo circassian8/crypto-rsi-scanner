@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reconcile the empirical human-review count · Codex
+**Why:** The canonical read-only review queue now reports nine receipt-backed
+genuine ideas awaiting first view, while one active roadmap row still reported
+eight. That stale count made the two operator surfaces disagree.
+**Changes:** Updated the active empirical-coverage roadmap row to nine, matching
+the queue and the main Protocol-v2 program row. The two excluded
+legacy/unpublished candidates remain excluded, and no view/review event was
+recorded.
+**Verify:** `make radar-review-timing-status PYTHON=python3` reported zero
+recorded human events; `make radar-review-timing-queue PYTHON=python3` reported
+9 eligible/action-required/not-viewed ideas and 2 skipped candidates, with zero
+provider calls and writes. `git diff --check` passed.
+**Notes/risks:** This is operator-truth documentation only. First-view and
+completion actions still require explicit confirmation plus a human reviewer
+alias; dashboard reads remain non-events. No evidence, route, score, threshold,
+provider, authority, or safety state changed.
+
 ## 2026-07-21 — Pass the post-hardening local verification checkpoint · Codex
 **Why:** Five focused evidence-integrity commits accumulated after the previous
 broad gate, reaching the repository's risk-based checkpoint cadence. A fresh
