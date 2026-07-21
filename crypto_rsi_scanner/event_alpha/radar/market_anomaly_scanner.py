@@ -1082,13 +1082,15 @@ def _derivatives_available(snapshot: Mapping[str, Any], source_row: Mapping[str,
 
 
 def _has_confirming_source(source_row: Mapping[str, Any]) -> bool:
-    for key in ("source_url", "official_source_url", "published_at", "event_time"):
-        if source_row.get(key):
+    for key in ("source_url", "official_source_url"):
+        if _text(source_row.get(key)):
             return True
+    if _has_identifier_values(source_row.get("source_urls")):
+        return True
     if _truthy(source_row.get("catalyst_confirmed")):
         return True
     accepted = _count(source_row.get("accepted_evidence_count"))
-    return bool((accepted is not None and accepted > 0) or source_row.get("source_urls"))
+    return accepted is not None and accepted > 0
 
 
 def _has_identifier_values(value: object) -> bool:

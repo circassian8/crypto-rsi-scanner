@@ -378,6 +378,55 @@ def test_market_anomaly_false_metadata_does_not_add_source_or_derivatives_claims
     assert anomalies[0]["source_catalyst_knownness"] == "unknown"
 
 
+def test_market_anomaly_source_knownness_requires_typed_evidence_reference():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "source-contract-token",
+        "symbol": "SOURCE",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000.0,
+        "freshness_status": "fresh",
+        "observed_at": "2026-07-21T11:30:00Z",
+    }
+
+    def anomaly_for(**evidence):
+        _, anomalies = scanner.scan_market_rows(
+            [{**base, **evidence}],
+            observed_at="2026-07-21T11:30:00Z",
+        )
+        assert len(anomalies) == 1
+        return anomalies[0]
+
+    for evidence in (
+        {"published_at": "2026-07-21T11:00:00Z"},
+        {"event_time": "2026-07-21T12:00:00Z"},
+        {"source_url": {"borrowed": "https://example.test/event"}},
+        {"official_source_url": ["https://example.test/event"]},
+        {"source_urls": {"borrowed": "https://example.test/event"}},
+        {"source_urls": ["", {"borrowed": "https://example.test/event"}]},
+        {"accepted_evidence_count": True},
+    ):
+        anomaly = anomaly_for(**evidence)
+        assert anomaly["source_catalyst_knownness"] == "unknown"
+        assert anomaly["priority_components"]["source_catalyst_unknownness"] == 7.0
+
+    for evidence in (
+        {"source_url": "https://example.test/event"},
+        {"official_source_url": "https://example.test/official"},
+        {"source_urls": ["https://example.test/event"]},
+        {"accepted_evidence_count": 1},
+        {"catalyst_confirmed": "true"},
+    ):
+        anomaly = anomaly_for(**evidence)
+        assert anomaly["source_catalyst_knownness"] == "known"
+        assert anomaly["priority_components"]["source_catalyst_unknownness"] == -4.0
+
+
 def test_market_anomaly_queue_parses_false_instead_of_using_string_truthiness():
     import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
 

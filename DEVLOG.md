@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Require typed evidence for catalyst knownness · Codex
+**Why:** The market-anomaly scanner treated `published_at` or `event_time`
+alone as a known catalyst and accepted any truthy structured `source_url(s)`.
+A timestamp-only row therefore lost the unknown-catalyst component and moved
+11 priority points despite having no source evidence, which could misorder the
+bounded catalyst-enrichment queue.
+**Changes:** Catalyst knownness now requires a nonblank typed singular source
+reference, at least one nonblank typed member in `source_urls`, an explicit
+semantic-true catalyst confirmation, or a positive typed accepted-evidence
+count. Timestamps remain timing evidence only; mappings, sequences in singular
+URL fields, booleans, and structured-only URL collections cannot masquerade as
+a confirming source. No anomaly threshold, Decision score, route, or source
+quality rule changed.
+**Verify:** The exact reproduction changed from `known` / `-4` to `unknown` /
+`+7` for the source-catalyst component. Focused source-contract regressions
+passed (`2 passed`); the wider market surfaces, alias precedence, numeric/unit
+integrity, anomaly report, no-send normalization, and Decision-v2 suites passed
+(`189 passed`). `make event-alpha-market-anomaly-smoke PYTHON=python3` retained
+8 snapshots and the expected 5 fixture anomalies, with zero doctor blockers
+and only the two expected standalone missing source/readiness warnings.
+`python3 -m compileall -q crypto_rsi_scanner tests` and `git diff --check`
+passed.
+**Notes/risks:** Full `make verify` was not repeated because the source
+knownness, priority, queue, normalization, Decision, and matching smoke paths
+were exercised directly. No provider call, authority change, send, trade,
+order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source-file size remains advisory; artifact, security, provider,
+request, evidence, and resource bounds remain enforced.
+
 ## 2026-07-21 — Record the fifty-fifth no-send market cycle · Codex
 **Why:** The hourly cadence became eligible with the existing CoinGecko
 authorization present, so the next bounded observation could extend the
