@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Make market anomaly dedupe fail closed · Codex
+**Why:** Repeating one identical market row produced duplicate snapshots,
+duplicate anomaly IDs, and duplicate catalyst-enrichment jobs. Conflicting
+same-asset/hour rows could likewise occupy multiple positions in the bounded
+anomaly and queue surfaces, crowding out unique ideas.
+**Changes:** Enriched market inputs now remove only exact deterministic row
+duplicates before benchmark selection and classification, making exact replay
+idempotent. If distinct rows still produce the same canonical anomaly ID, both
+snapshots remain for audit with `conflicting_market_anomaly_identity`, but the
+ambiguous anomaly is suppressed. Catalyst-queue construction independently
+requires a unique anomaly ID, so duplicate externally supplied anomaly rows
+also fail closed. Different anomaly types or observation-hour identities remain
+independent. No score, threshold, route, provider, or max-assets setting
+changed.
+**Verify:** The exact duplicate reproduction changed from 2 snapshots / 2
+identical anomalies / 2 queue rows to 1 / 1 / 1. Focused exact-duplicate,
+conflict, fixture, and benchmark regressions passed (`3 passed`); the wider
+market surfaces, alias precedence, timestamp, numeric/unit integrity, anomaly
+report, no-send normalization, and Decision-v2 suites passed (`200 passed`).
+`make event-alpha-market-anomaly-smoke PYTHON=python3` retained 8 snapshots and
+the expected 5 fixture anomalies, with zero doctor blockers and only the two
+expected standalone missing source/readiness warnings. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the exact input,
+benchmark, anomaly identity, queue, Decision, and matched smoke paths were
+exercised directly. No provider call, authority change, send, trade, order,
+paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE` occurred.
+Quantitative source-file size remains advisory; artifact, security, provider,
+request, dedupe, and resource bounds remain enforced.
+
 ## 2026-07-21 — Close market freshness claim semantics · Codex
 **Why:** Object-valued or otherwise malformed freshness metadata was converted
 to printable text and still allowed raw anomaly creation. An invalid

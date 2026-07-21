@@ -171,6 +171,7 @@ def scan_market_rows(
     btc, eth = event_market_state.benchmark_rows(rows)
     snapshot_rows: list[dict[str, Any]] = []
     anomalies: list[dict[str, Any]] = []
+    anomaly_snapshots: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         snapshot = event_market_state.snapshot_from_market_row(
             row,
@@ -224,7 +225,7 @@ def scan_market_rows(
         anomaly_type = classify_market_state(snapshot_payload, row, cfg=cfg)
         if anomaly_type == NO_REACTION:
             continue
-        anomalies.append(_anomaly_row(
+        anomaly = _anomaly_row(
             snapshot_payload,
             row,
             anomaly_type,
@@ -233,7 +234,30 @@ def scan_market_rows(
             artifact_namespace=artifact_namespace,
             run_mode=run_mode,
             run_id=run_id,
-        ))
+        )
+        anomalies.append(anomaly)
+        anomaly_snapshots.setdefault(anomaly["market_anomaly_id"], []).append(
+            snapshot_payload
+        )
+    conflicting_ids = {
+        anomaly_id
+        for anomaly_id, snapshots in anomaly_snapshots.items()
+        if len(snapshots) > 1
+    }
+    if conflicting_ids:
+        for anomaly_id in conflicting_ids:
+            for snapshot in anomaly_snapshots[anomaly_id]:
+                warnings = snapshot.get("warnings")
+                if not isinstance(warnings, list):
+                    warnings = []
+                    snapshot["warnings"] = warnings
+                if "conflicting_market_anomaly_identity" not in warnings:
+                    warnings.append("conflicting_market_anomaly_identity")
+        anomalies = [
+            anomaly
+            for anomaly in anomalies
+            if anomaly["market_anomaly_id"] not in conflicting_ids
+        ]
     anomalies.sort(key=lambda item: float(item.get("priority") or 0.0), reverse=True)
     if cfg.max_assets > 0:
         anomalies = anomalies[: cfg.max_assets]
@@ -529,7 +553,8 @@ def build_catalyst_search_queue(
 ) -> list[dict[str, Any]]:
     """Build deterministic catalyst-search queue rows from anomaly rows."""
     cfg = cfg or MarketAnomalyScannerConfig()
-    queue: list[dict[str, Any]] = []
+    eligible: list[tuple[Mapping[str, Any], str, str]] = []
+    anomaly_id_counts: dict[str, int] = {}
     for anomaly in anomalies:
         if not isinstance(anomaly, Mapping) or not _truthy(
             anomaly.get("needs_catalyst_search")
@@ -547,6 +572,13 @@ def build_catalyst_search_queue(
             "symbol",
         )
         if not anomaly_id or not canonical_asset_id:
+            continue
+        eligible.append((anomaly, anomaly_id, canonical_asset_id))
+        anomaly_id_counts[anomaly_id] = anomaly_id_counts.get(anomaly_id, 0) + 1
+
+    queue: list[dict[str, Any]] = []
+    for anomaly, anomaly_id, canonical_asset_id in eligible:
+        if anomaly_id_counts[anomaly_id] != 1:
             continue
         symbol = _text(anomaly.get("symbol")).upper()
         coin_id = _text(anomaly.get("coin_id"))
@@ -618,6 +650,7 @@ def _enriched_market_rows(
     ]
     asset_index = _asset_index(assets)
     enriched_rows: list[dict[str, Any]] = []
+    seen_exact_rows: set[str] = set()
     for row in base_rows:
         enriched = dict(row)
         universe_row = _lookup_mapping(universe_index, _row_key_variants(enriched))
@@ -628,8 +661,25 @@ def _enriched_market_rows(
             _merge_asset_metadata(enriched, asset)
         if not enriched.get("liquidity_tier"):
             enriched["liquidity_tier"] = _liquidity_tier_from_row(enriched)
+        signature = _exact_row_signature(enriched)
+        if signature is not None:
+            if signature in seen_exact_rows:
+                continue
+            seen_exact_rows.add(signature)
         enriched_rows.append(enriched)
     return enriched_rows
+
+
+def _exact_row_signature(row: Mapping[str, Any]) -> str | None:
+    try:
+        return json.dumps(
+            row,
+            sort_keys=True,
+            default=str,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 def _asset_rows(

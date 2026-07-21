@@ -479,6 +479,49 @@ def test_market_anomaly_source_plan_requires_typed_pack_names():
     assert valid_queue[0]["source_plan_status"] == "planned"
 
 
+def test_market_anomaly_exact_duplicates_are_idempotent_and_conflicts_fail_closed():
+    import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
+
+    base = {
+        "id": "duplicate-token",
+        "symbol": "DUP",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "liquidity_usd": 10_000_000.0,
+        "freshness_status": "fresh",
+    }
+
+    snapshots, anomalies = scanner.scan_market_rows(
+        [base, dict(base)],
+        observed_at="2026-07-21T11:50:00Z",
+    )
+    queue = scanner.build_catalyst_search_queue(anomalies)
+    assert len(snapshots) == 1
+    assert len(anomalies) == 1
+    assert len(queue) == 1
+    assert scanner.build_catalyst_search_queue(
+        [anomalies[0], dict(anomalies[0])]
+    ) == []
+
+    conflicting_snapshots, conflicting_anomalies = scanner.scan_market_rows(
+        [
+            {**base, "source_url": "https://alpha.example.test/event"},
+            {**base, "source_url": "https://beta.example.test/event"},
+        ],
+        observed_at="2026-07-21T11:50:00Z",
+    )
+    assert len(conflicting_snapshots) == 2
+    assert conflicting_anomalies == []
+    assert all(
+        "conflicting_market_anomaly_identity" in row["warnings"]
+        for row in conflicting_snapshots
+    )
+    assert scanner.build_catalyst_search_queue(conflicting_anomalies) == []
+
+
 def test_market_anomaly_queue_parses_false_instead_of_using_string_truthiness():
     import crypto_rsi_scanner.event_alpha.radar.market_anomaly_scanner as scanner
 
