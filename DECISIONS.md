@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Group recurring review ideas without collapsing timing evidence
+**Status:** accepted
+**Decision:** The human-readable review queue groups repeated `idea_id` values
+to expose recurrence, but the canonical timing identity remains the exact
+artifact-namespace/idea pair. Every generation-specific action, ledger event,
+and confirmed command remains separate. Grouping is presentation-only and must
+not deduplicate evidence, synthesize a human action, or alter the full JSON
+queue.
+**Why:** The current queue contains nine valid actions but only two recurring
+idea IDs across six and three generations. A flat action list hid that repeated
+work, while collapsing it would destroy the point-in-time publication and
+attention evidence needed for Protocol v2.
+**Revisit when:** Protocol-v2 preregistration seals an explicit episode-level
+human-review sampling rule. Preserve the immutable generation-specific timing
+records even if a later operator surface adds episode-level workflow controls.
+
 ## 2026-07-22 - Lead Protocol-v2 progress with decisions and blockers
 **Status:** accepted
 **Decision:** The normal `radar-research-protocol-v2-progress` target and the

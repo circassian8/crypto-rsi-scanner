@@ -144,6 +144,7 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
     )
     records = result.get("records")
     if type(records) is list:
+        lines.extend(_queue_recurrence_summary(records))
         for index, raw in enumerate(records, start=1):
             if not isinstance(raw, Mapping):
                 continue
@@ -151,12 +152,8 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
             for field in (
                 "review_status",
                 "radar_route",
-                "directional_bias",
                 "artifact_namespace",
                 "idea_id",
-                "idea_observed_at",
-                "idea_available_at",
-                "next_action",
                 "next_safe_command",
             ):
                 lines.append((f"{prefix}.{field}", raw.get(field)))
@@ -184,6 +181,93 @@ def _render_summary(command: str, result: Mapping[str, Any]) -> str:
         )
     )
     return "\n".join(f"{key}={_summary_value(value)}" for key, value in lines)
+
+
+def _queue_recurrence_summary(
+    records: list[object],
+) -> list[tuple[str, object]]:
+    """Group repeated idea ids for display without collapsing exact actions."""
+
+    groups: dict[str, dict[str, object]] = {}
+    valid_record_count = 0
+    for raw in records:
+        if not isinstance(raw, Mapping):
+            continue
+        valid_record_count += 1
+        idea_id = _summary_value(raw.get("idea_id"))
+        group = groups.setdefault(
+            idea_id,
+            {
+                "core_opportunity_ids": set(),
+                "routes": set(),
+                "review_statuses": set(),
+                "available_at": [],
+                "occurrence_count": 0,
+            },
+        )
+        group["occurrence_count"] = int(group["occurrence_count"]) + 1
+        for field, target in (
+            ("core_opportunity_id", "core_opportunity_ids"),
+            ("radar_route", "routes"),
+            ("review_status", "review_statuses"),
+        ):
+            value = raw.get(field)
+            if value is not None:
+                cast_set = group[target]
+                if isinstance(cast_set, set):
+                    cast_set.add(_summary_value(value))
+        available_at = raw.get("idea_available_at")
+        if available_at is not None:
+            cast_times = group["available_at"]
+            if isinstance(cast_times, list):
+                cast_times.append(_summary_value(available_at))
+
+    ordered = sorted(
+        groups.items(),
+        key=lambda item: (
+            min(item[1]["available_at"]) if item[1]["available_at"] else "",
+            item[0],
+        ),
+    )
+    lines: list[tuple[str, object]] = [
+        ("generation_specific_review_record_count", valid_record_count),
+        ("unique_idea_id_count", len(ordered)),
+        (
+            "recurring_idea_id_count",
+            sum(int(group["occurrence_count"]) > 1 for _, group in ordered),
+        ),
+        (
+            "review_scope",
+            "one_explicit_timing_action_per_generation_and_idea;recurrence_is_presentation_only",
+        ),
+    ]
+    for index, (idea_id, group) in enumerate(ordered, start=1):
+        prefix = f"idea_group[{index}]"
+        available = group["available_at"]
+        lines.extend(
+            (
+                (f"{prefix}.idea_id", idea_id),
+                (
+                    f"{prefix}.core_opportunity_ids",
+                    ",".join(sorted(group["core_opportunity_ids"])),
+                ),
+                (f"{prefix}.generation_count", group["occurrence_count"]),
+                (f"{prefix}.routes", ",".join(sorted(group["routes"]))),
+                (
+                    f"{prefix}.review_statuses",
+                    ",".join(sorted(group["review_statuses"])),
+                ),
+                (
+                    f"{prefix}.first_available_at",
+                    min(available) if available else None,
+                ),
+                (
+                    f"{prefix}.latest_available_at",
+                    max(available) if available else None,
+                ),
+            )
+        )
+    return lines
 
 
 def _summary_value(value: object) -> str:

@@ -418,6 +418,7 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
                 "directional_bias": "long",
                 "artifact_namespace": "radar_market_no_send_exact",
                 "idea_id": "iar:exact",
+                "core_opportunity_id": "agg:exact",
                 "idea_observed_at": "2026-07-20T11:00:00+00:00",
                 "idea_available_at": "2026-07-20T11:00:08+00:00",
                 "next_action": "record_first_view",
@@ -444,6 +445,12 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
     output = decision_review_timing_cli._render_summary("queue", queue)
 
     assert "action_required_count=1" in output
+    assert "unique_idea_id_count=1" in output
+    assert "recurring_idea_id_count=0" in output
+    assert "idea_group[1].idea_id=iar:exact" in output
+    assert "idea_group[1].core_opportunity_ids=agg:exact" in output
+    assert "idea_group[1].generation_count=1" in output
+    assert "recurrence_is_presentation_only" in output
     assert "record[1].artifact_namespace=radar_market_no_send_exact" in output
     assert "record[1].idea_id=iar:exact" in output
     assert "record[1].next_safe_command=CONFIRM=1 make" in output
@@ -452,6 +459,49 @@ def test_review_queue_summary_keeps_exact_actions_and_safety_visible() -> None:
     assert "safety.provider_calls=0" in output
     assert "safety.orders=0" in output
     assert "RADAR_REVIEW_TIMING_OUTPUT=json" in output
+
+
+def test_review_queue_summary_groups_recurrence_without_collapsing_actions() -> None:
+    records = [
+        {
+            "idea_id": "iar:repeat",
+            "core_opportunity_id": "agg:repeat",
+            "radar_route": "dashboard_watch",
+            "review_status": "not_viewed",
+            "idea_available_at": "2026-07-18T01:00:00+00:00",
+        },
+        {
+            "idea_id": "iar:repeat",
+            "core_opportunity_id": "agg:repeat",
+            "radar_route": "risk_watch",
+            "review_status": "in_review",
+            "idea_available_at": "2026-07-20T01:00:00+00:00",
+        },
+        {
+            "idea_id": "iar:single",
+            "core_opportunity_id": "agg:single",
+            "radar_route": "diagnostic",
+            "review_status": "not_viewed",
+            "idea_available_at": "2026-07-19T01:00:00+00:00",
+        },
+    ]
+
+    values = dict(decision_review_timing_cli._queue_recurrence_summary(records))
+
+    assert values["generation_specific_review_record_count"] == 3
+    assert values["unique_idea_id_count"] == 2
+    assert values["recurring_idea_id_count"] == 1
+    assert values["idea_group[1].idea_id"] == "iar:repeat"
+    assert values["idea_group[1].generation_count"] == 2
+    assert values["idea_group[1].routes"] == "dashboard_watch,risk_watch"
+    assert values["idea_group[1].review_statuses"] == "in_review,not_viewed"
+    assert values["idea_group[1].first_available_at"] == (
+        "2026-07-18T01:00:00+00:00"
+    )
+    assert values["idea_group[1].latest_available_at"] == (
+        "2026-07-20T01:00:00+00:00"
+    )
+    assert values["idea_group[2].idea_id"] == "iar:single"
 
 
 def test_queue_cli_uses_exact_generation_projection_not_full_campaign(

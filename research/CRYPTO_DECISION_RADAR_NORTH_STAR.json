@@ -1307,6 +1307,8 @@
       "queue_generation_projection_scope": "exact complete-generation counting and final-receipt fields only",
       "queue_historical_time_expiry": "generation:stale and doctor:stale may be accepted only after final receipt validation; every structural authority defect blocks",
       "queue_legacy_or_unpublished_behavior": "excluded counts only; never timing evidence",
+      "queue_summary_recurrence_grouping": "presentation only by idea_id; every namespace and idea action remains separate",
+      "queue_timing_identity": "artifact_namespace plus idea_id",
       "queue_rebuilds_full_campaign_report": false,
       "source_bindings": [
         "artifact namespace run revision and operator-state digest",

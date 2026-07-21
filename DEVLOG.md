@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Expose recurring ideas in the human-review queue · Codex
+**Why:** The exact review queue contained nine receipt-backed actions, but its
+flat rendering concealed that they represented only two recurring idea IDs.
+Operators need both the recurrence pattern and the immutable per-generation
+timing actions.
+**Changes:**
+- Added a presentation-only recurrence summary with generation-record, unique-
+  idea, and recurring-idea counts plus per-idea generation count, routes,
+  statuses, core identities, and first/latest availability clocks.
+- Kept every artifact-namespace/idea action and exact confirmed command in the
+  concise output; the canonical JSON payload, ledger identity, eligibility,
+  source revalidation, and write boundary are unchanged.
+- Documented the no-deduplication contract in the working agreement, North Star,
+  roadmap, and durable decisions.
+**Verify:** All 15 focused human-review timing tests passed in 0.56 seconds;
+the combined review/campaign/North-Star gate passed 40 tests in 0.78 seconds;
+compileall, JSON validation, architecture cleanliness, and diff checks passed.
+The 92-line real read-only queue reports 9 generation-specific records, 2
+unique recurring idea IDs split across 6 and 3 generations, and all 9 exact
+commands with zero provider calls and zero writes.
+**Notes/risks:** No human view was inferred or recorded. This is operator
+presentation only; routes, evidence, campaign truth, scores, thresholds,
+providers, artifacts, and authority are unchanged. Quantitative source-size
+findings remain advisory.
+
 ## 2026-07-22 — Make Protocol-v2 progress concise and actionable · Codex
 **Why:** The static progress target correctly retained the complete execution-
 cost and evidence contract, but its hundred-plus-line transcript obscured the

@@ -930,9 +930,13 @@ surprise campaign analytics. Equal-clock projection and comprehensive-report
 inputs must produce the same queue, and the projection explicitly reports
 `full_campaign_report_rebuilt=false`. The normal Make surfaces render a concise
 action view; `RADAR_REVIEW_TIMING_OUTPUT=json` preserves the full machine-
-readable payload from the same evaluation. A receipt-backed historical generation remains
-reviewable when ordinary generation/doctor staleness is its sole authority
-defect; any structural authority defect still fails closed.
+readable payload from the same evaluation. The human summary groups recurring
+`idea_id` values to make repeated work visible, but every artifact-
+namespace/idea pair remains a separate timing action with its exact confirmed
+command; the grouping is never evidence deduplication. A receipt-backed
+historical generation remains reviewable when ordinary generation/doctor
+staleness is its sole authority defect; any structural authority defect still
+fails closed.
 Dashboard GET/HEAD, phone access, health probes, previews, and notifications
 never count as human attention. `idea_observed_at` comes from the canonical
 Decision projection. Conservative provable `idea_available_at` is the exact
@@ -1412,7 +1416,8 @@ The remaining human decisions stay explicit:
   radar-review-timing-queue PYTHON=.venv/bin/python` to discover the exact
   receipt-backed ideas and their next safe commands. Queue discovery uses its
   exact v1 generation projection and does not rebuild unrelated campaign
-  analytics. Use
+  analytics. Its summary groups recurring idea IDs for readability while
+  retaining every generation-specific action and command. Use
   `RADAR_REVIEW_TIMING_OUTPUT=json` when the complete binding and digest payload
   is needed. Record only a real human action with `CONFIRM=1 make
   radar-review-timing-view

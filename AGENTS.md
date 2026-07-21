@@ -1064,7 +1064,11 @@ may be added later when a suitable environment already exists.
   evaluation clock, those projected inputs and the resulting queue must equal
   the comprehensive campaign report path, and the projection must state
   `full_campaign_report_rebuilt=false`. Legacy/unpublished ideas remain
-  explicit excluded counts. A historical snapshot may be reviewed after time
+  explicit excluded counts. The human summary groups recurring `idea_id`
+  values only to expose repeated operator work; every artifact-namespace/idea
+  pair remains a separate timing record and retains its exact confirmed
+  command. This presentation grouping never deduplicates evidence or writes a
+  review action. A historical snapshot may be reviewed after time
   expiry only when
   `generation:stale` and/or `doctor:stale` are its sole authority reasons;
   structural drift still fails closed. Only the explicit confirmed
