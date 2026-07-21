@@ -405,6 +405,11 @@ def _current_regime_market_rows(observed_at: str) -> list[dict[str, object]]:
                 "baseline_counted": True,
                 "observation_id": observation_id,
             },
+            "return_24h": float(rank) / 1000.0,
+            "return_unit": "fraction",
+            "market_feature_basis": {
+                "returns": "provider_derived_sparkline",
+            },
             "temporal_return_24h": float(rank) / 10.0,
             "return_units": {"temporal_return_24h": "percent_points"},
             "market_feature_evidence": {
@@ -504,6 +509,7 @@ def test_current_authority_regime_input_replay_binds_exact_source_and_names_gaps
     diagnostic = value["diagnostic"]
     assert diagnostic["eligible_input_count"] == 28
     assert diagnostic["missing_input_count"] == 2
+    assert diagnostic["missing_inputs_with_current_snapshot_return_count"] == 2
     assert [row["canonical_asset_id"] for row in diagnostic["missing_inputs"]] == [
         "pump-fun",
         "whitebit",
@@ -522,6 +528,8 @@ def test_current_authority_regime_input_replay_binds_exact_source_and_names_gaps
     assert "Eligible causal 24-hour inputs: `28/30`" in rendered
     assert "`pump-fun (PUMP), rank 16`" in rendered
     assert "`whitebit (WBT), rank 28`" in rendered
+    assert "current-snapshot 24-hour return: `2.8%`" in rendered.casefold()
+    assert "never a substitute for a retained temporal anchor" in rendered
     assert "historical backfill: `false`" in rendered
 
     source_path = namespace_dir / "event_market_no_send_market_rows.json"

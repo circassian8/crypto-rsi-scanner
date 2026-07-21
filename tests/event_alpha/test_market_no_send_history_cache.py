@@ -256,6 +256,18 @@ def test_control_market_regime_input_diagnostic_names_every_incomplete_row():
         "temporal_return_unit_invalid": 2,
         "temporal_return_value_missing_or_invalid": 2,
     }
+    assert diagnostic["missing_inputs_with_current_snapshot_return_count"] == 2
+    assert diagnostic["current_snapshot_return_24h_policy"] == (
+        "diagnostic_only_never_substitutes_for_retained_temporal_24h_anchor"
+    )
+    assert all(
+        row["current_snapshot_return_24h_available"] is True
+        and row["current_snapshot_return_24h_percent_points"] is not None
+        and row["current_snapshot_return_temporal_regime_eligible"] is False
+        and row["current_snapshot_return_exclusion_reason"]
+        == "current_snapshot_return_does_not_prove_retained_temporal_24h_anchor"
+        for row in diagnostic["missing_inputs"]
+    )
     assert diagnostic["bitcoin_input_ready"] is True
     assert diagnostic["all_inputs_ready"] is False
     assert diagnostic["retained_history_mutated"] is False
@@ -265,6 +277,15 @@ def test_control_market_regime_input_diagnostic_names_every_incomplete_row():
         diagnostic
     )
 
+    diagnostic["missing_inputs"][0][
+        "current_snapshot_return_temporal_regime_eligible"
+    ] = True
+    assert not market_no_send_features.control_market_regime_input_diagnostic_valid(
+        diagnostic
+    )
+    diagnostic["missing_inputs"][0][
+        "current_snapshot_return_temporal_regime_eligible"
+    ] = False
     diagnostic["missing_inputs"][0]["reasons"] = ["invented_reason"]
     assert not market_no_send_features.control_market_regime_input_diagnostic_valid(
         diagnostic

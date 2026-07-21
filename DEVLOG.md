@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Explain snapshot versus causal regime returns · Codex
+**Why:** The current campaign reported HBAR and GRAM as missing 24-hour regime
+inputs even though both rows visibly contained provider-derived 24-hour returns,
+making the strict causal blocker look like a pipeline defect.
+**Changes:**
+- Bumped the closed current-input diagnostic to schema v2. Every missing row now
+  states whether a valid current-snapshot return exists, its normalized
+  percent-point value and basis, and the exact reason it remains excluded.
+- Updated the campaign report renderer and North-Star contract without changing
+  the control-regime projection or promoting proxy/current-snapshot evidence.
+**Verify:** All 55 focused market-history, campaign, dashboard campaign-action,
+and North-Star tests passed. Rebuilding the real campaign report proves 28/30
+causal inputs while separately showing HBAR +4.019138% and GRAM +7.536888% via
+`provider_derived_sparkline`; both remain diagnostic-only and excluded.
+**Notes/risks:** This is evidence transparency, not a threshold or algorithm
+relaxation. No provider call, retained-history mutation, backfill, route, score,
+threshold, Decision input, Protocol-v2 eligibility, send, trade, order, paper
+trade, RSI row, or Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Make outcome recovery readiness decision-first · Codex
 **Why:** The current campaign has one exact recoverable DEXE outcome gap, but
 the default readiness command buried its sole blocker and safe action inside a

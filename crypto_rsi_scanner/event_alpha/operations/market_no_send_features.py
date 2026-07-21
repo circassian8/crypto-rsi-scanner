@@ -47,7 +47,7 @@ CONTROL_MARKET_REGIME_REASONS = frozenset((
 CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_ID = (
     "decision_radar.point_in_time_control_market_regime_input_diagnostic"
 )
-CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_VERSION = 1
+CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_SCHEMA_VERSION = 2
 CONTROL_MARKET_REGIME_INPUT_REASON_CODES = frozenset((
     "market_history_not_counted",
     "observation_identity_missing",
@@ -55,6 +55,13 @@ CONTROL_MARKET_REGIME_INPUT_REASON_CODES = frozenset((
     "temporal_return_value_missing_or_invalid",
     "temporal_return_unit_invalid",
     "temporal_return_evidence_invalid",
+))
+CURRENT_SNAPSHOT_RETURN_24H_POLICY = (
+    "diagnostic_only_never_substitutes_for_retained_temporal_24h_anchor"
+)
+CURRENT_SNAPSHOT_RETURN_24H_EXCLUSION_REASONS = frozenset((
+    "current_snapshot_return_does_not_prove_retained_temporal_24h_anchor",
+    "current_snapshot_return_unavailable_or_invalid",
 ))
 _CONTROL_MARKET_REGIME_KEYS = frozenset((
     "schema_id",
@@ -101,6 +108,8 @@ _CONTROL_MARKET_REGIME_INPUT_DIAGNOSTIC_KEYS = frozenset((
     "missing_input_count",
     "missing_inputs",
     "missing_input_reason_counts",
+    "missing_inputs_with_current_snapshot_return_count",
+    "current_snapshot_return_24h_policy",
     "bitcoin_input_ready",
     "all_inputs_ready",
     "replayed_control_market_regime",
@@ -1016,6 +1025,7 @@ def point_in_time_control_market_regime_input_diagnostic(
         ):
             reasons.append("temporal_return_evidence_invalid")
         if reasons:
+            current_snapshot_return = _current_snapshot_return_24h(row)
             missing_inputs.append({
                 "canonical_asset_id": asset_id,
                 "symbol": symbol,
@@ -1023,6 +1033,7 @@ def point_in_time_control_market_regime_input_diagnostic(
                     rank if type(rank) is int and rank > 0 else None
                 ),
                 "reasons": sorted(set(reasons)),
+                **current_snapshot_return,
             })
         else:
             eligible_asset_ids.append(asset_id)
@@ -1035,6 +1046,10 @@ def point_in_time_control_market_regime_input_diagnostic(
         reason
         for item in missing_inputs
         for reason in item["reasons"]
+    )
+    missing_with_current_snapshot_return = sum(
+        item["current_snapshot_return_24h_available"] is True
+        for item in missing_inputs
     )
     expected = replayed.get("universe_expected_count")
     limit = replayed.get("universe_limit")
@@ -1064,6 +1079,12 @@ def point_in_time_control_market_regime_input_diagnostic(
         "missing_input_count": len(missing_inputs),
         "missing_inputs": missing_inputs,
         "missing_input_reason_counts": dict(sorted(reason_counts.items())),
+        "missing_inputs_with_current_snapshot_return_count": (
+            missing_with_current_snapshot_return
+        ),
+        "current_snapshot_return_24h_policy": (
+            CURRENT_SNAPSHOT_RETURN_24H_POLICY
+        ),
         "bitcoin_input_ready": "bitcoin" in eligible_asset_ids,
         "all_inputs_ready": replayed.get("status") == "observed",
         "replayed_control_market_regime": replayed,
@@ -1079,6 +1100,53 @@ def point_in_time_control_market_regime_input_diagnostic(
     if not control_market_regime_input_diagnostic_valid(value):  # pragma: no cover
         raise AssertionError("control market regime input diagnostic invalid")
     return value
+
+
+def _current_snapshot_return_24h(row: Mapping[str, Any]) -> dict[str, Any]:
+    unit = event_market_units.return_unit_for_field(
+        row,
+        "return_24h",
+        default=event_market_units.RETURN_UNIT_FRACTION,
+    )
+    normalized = event_market_units.normalize_return_percent_points(
+        row.get("return_24h"),
+        unit,
+    )
+    available = bool(
+        unit in {
+            event_market_units.RETURN_UNIT_FRACTION,
+            event_market_units.RETURN_UNIT_PERCENT_POINTS,
+        }
+        and normalized is not None
+        and abs(normalized) <= 300.0
+    )
+    feature_basis = row.get("market_feature_basis")
+    if not isinstance(feature_basis, Mapping):
+        feature_basis = row.get("feature_basis")
+    raw_basis = (
+        feature_basis.get("returns")
+        if isinstance(feature_basis, Mapping)
+        else None
+    )
+    basis = (
+        raw_basis.strip()
+        if isinstance(raw_basis, str) and 0 < len(raw_basis.strip()) <= 160
+        else "unknown"
+    )
+    return {
+        "current_snapshot_return_24h_available": available,
+        "current_snapshot_return_24h_percent_points": (
+            normalized if available else None
+        ),
+        "current_snapshot_return_24h_unit": unit,
+        "current_snapshot_return_24h_basis": basis,
+        "current_snapshot_return_temporal_regime_eligible": False,
+        "current_snapshot_return_exclusion_reason": (
+            "current_snapshot_return_does_not_prove_retained_temporal_24h_anchor"
+            if available
+            else "current_snapshot_return_unavailable_or_invalid"
+        ),
+    }
 
 
 def control_market_regime_input_diagnostic_valid(value: object) -> bool:
@@ -1103,6 +1171,8 @@ def control_market_regime_input_diagnostic_valid(value: object) -> bool:
         or value.get("protocol_v2_evidence_eligible") is not False
         or value.get("provider_calls") != 0
         or value.get("research_only") is not True
+        or value.get("current_snapshot_return_24h_policy")
+        != CURRENT_SNAPSHOT_RETURN_24H_POLICY
     ):
         return False
     replayed = value.get("replayed_control_market_regime")
@@ -1113,6 +1183,9 @@ def control_market_regime_input_diagnostic_valid(value: object) -> bool:
     limit = value.get("universe_limit")
     eligible = value.get("eligible_input_count")
     missing_count = value.get("missing_input_count")
+    missing_with_current_snapshot_return = value.get(
+        "missing_inputs_with_current_snapshot_return_count"
+    )
     missing_inputs = value.get("missing_inputs")
     if not (
         _nonnegative_integer(row_count)
@@ -1120,6 +1193,8 @@ def control_market_regime_input_diagnostic_valid(value: object) -> bool:
         and _nonnegative_integer(limit)
         and _nonnegative_integer(eligible)
         and _nonnegative_integer(missing_count)
+        and _nonnegative_integer(missing_with_current_snapshot_return)
+        and missing_with_current_snapshot_return <= missing_count
         and eligible + missing_count == row_count
         and isinstance(missing_inputs, list)
         and len(missing_inputs) == missing_count
@@ -1129,6 +1204,7 @@ def control_market_regime_input_diagnostic_valid(value: object) -> bool:
     ):
         return False
     expected_reason_counts: Counter[str] = Counter()
+    expected_current_snapshot_return_count = 0
     missing_asset_ids: set[str] = set()
     for item in missing_inputs:
         if not isinstance(item, Mapping) or set(item) != {
@@ -1136,12 +1212,29 @@ def control_market_regime_input_diagnostic_valid(value: object) -> bool:
             "symbol",
             "point_in_time_volume_rank",
             "reasons",
+            "current_snapshot_return_24h_available",
+            "current_snapshot_return_24h_percent_points",
+            "current_snapshot_return_24h_unit",
+            "current_snapshot_return_24h_basis",
+            "current_snapshot_return_temporal_regime_eligible",
+            "current_snapshot_return_exclusion_reason",
         }:
             return False
         asset_id = item.get("canonical_asset_id")
         symbol = item.get("symbol")
         rank = item.get("point_in_time_volume_rank")
         reasons = item.get("reasons")
+        current_return_available = item.get(
+            "current_snapshot_return_24h_available"
+        )
+        current_return_value = finite_float(
+            item.get("current_snapshot_return_24h_percent_points")
+        )
+        current_return_unit = item.get("current_snapshot_return_24h_unit")
+        current_return_basis = item.get("current_snapshot_return_24h_basis")
+        current_return_exclusion = item.get(
+            "current_snapshot_return_exclusion_reason"
+        )
         if not (
             isinstance(asset_id, str)
             and 0 < len(asset_id) <= 160
@@ -1153,12 +1246,50 @@ def control_market_regime_input_diagnostic_valid(value: object) -> bool:
             and reasons
             and reasons == sorted(set(reasons))
             and all(reason in CONTROL_MARKET_REGIME_INPUT_REASON_CODES for reason in reasons)
+            and type(current_return_available) is bool
+            and current_return_unit in {
+                event_market_units.RETURN_UNIT_FRACTION,
+                event_market_units.RETURN_UNIT_PERCENT_POINTS,
+                event_market_units.RETURN_UNIT_UNKNOWN,
+            }
+            and isinstance(current_return_basis, str)
+            and 0 < len(current_return_basis) <= 160
+            and item.get("current_snapshot_return_temporal_regime_eligible")
+            is False
+            and current_return_exclusion
+            in CURRENT_SNAPSHOT_RETURN_24H_EXCLUSION_REASONS
+            and (
+                (
+                    current_return_available
+                    and current_return_value is not None
+                    and abs(current_return_value) <= 300.0
+                    and current_return_unit
+                    in {
+                        event_market_units.RETURN_UNIT_FRACTION,
+                        event_market_units.RETURN_UNIT_PERCENT_POINTS,
+                    }
+                    and current_return_exclusion
+                    == "current_snapshot_return_does_not_prove_retained_temporal_24h_anchor"
+                )
+                or (
+                    not current_return_available
+                    and item.get("current_snapshot_return_24h_percent_points") is None
+                    and current_return_exclusion
+                    == "current_snapshot_return_unavailable_or_invalid"
+                )
+            )
         ):
             return False
+        expected_current_snapshot_return_count += int(current_return_available)
         missing_asset_ids.add(asset_id)
         expected_reason_counts.update(reasons)
     if value.get("missing_input_reason_counts") != dict(
         sorted(expected_reason_counts.items())
+    ):
+        return False
+    if (
+        missing_with_current_snapshot_return
+        != expected_current_snapshot_return_count
     ):
         return False
     if value.get("status") == "ready":

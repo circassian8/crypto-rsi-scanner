@@ -333,6 +333,9 @@
           "selection_uses_outcomes": false
         },
         "current_authority_market_regime_input_diagnostic": {
+          "current_snapshot_return_24h_policy": "diagnostic_only_never_substitutes_for_retained_temporal_24h_anchor",
+          "current_snapshot_return_basis_and_normalized_value_visible": true,
+          "current_snapshot_return_may_promote_temporal_input": false,
           "current_authority_only": true,
           "historical_context_backfilled": false,
           "manifest_request_cache_digest_bound": true,
@@ -342,7 +345,8 @@
           "retained_history_mutated": false,
           "routing_eligible": false,
           "schema_id": "decision_radar.current_authority_control_market_regime_input",
-          "schema_version": 1
+          "schema_version": 1,
+          "nested_input_diagnostic_schema_version": 2
         },
         "point_in_time_universe_fields": [
           "point_in_time_universe_member",

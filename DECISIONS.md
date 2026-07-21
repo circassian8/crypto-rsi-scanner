@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Do not substitute snapshot returns for temporal regime evidence
+**Status:** accepted
+**Decision:** When the exact current-authority regime diagnostic finds an asset
+without retained causal `temporal_return_24h`, it may expose a separately valid
+current-snapshot `return_24h`, normalized unit, and source basis for diagnosis.
+That value remains explicitly ineligible for the temporal regime input and
+cannot be promoted, backfilled, or used by routing, scores, thresholds, or
+Protocol v2.
+**Why:** HBAR and GRAM currently have valid provider-sparkline 24-hour returns,
+but neither has a retained point-in-time anchor old enough to prove the causal
+24-hour interval. Calling both simply “missing” concealed that distinction;
+using the snapshot values would weaken a deliberately stricter evidence
+contract.
+**Revisit when:** A preregistered Protocol-v2 annex explicitly accepts an exact
+provider-return contract as regime evidence and proves its causal clock,
+methodology, identity, units, and holdout-safe use.
+
 ## 2026-07-22 - Lead outcome recovery readiness with the exact gap
 **Status:** accepted
 **Decision:** The normal `radar-outcome-price-recovery-readiness` Make surface

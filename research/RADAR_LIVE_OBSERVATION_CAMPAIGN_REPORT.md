@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T23:28:37.677645+00:00` from local artifacts only.
+Generated at `2026-07-21T23:46:58.312970+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -138,9 +138,12 @@ Research and decision support only. This report contains no trade recommendation
 - Exact source binding: `true` (`event_market_no_send_market_rows.json`, SHA-256 `4d0d91613e4ba9eeedb85be3d3a6c39425cf39855b3d608e5f9bbffa031690c6`)
 - Eligible causal 24-hour inputs: `28/30`
 - Missing current inputs: `2`
+- Missing rows that still have a current-snapshot 24-hour return: `2` (diagnostic only; never a substitute for a retained temporal anchor)
 - Read-only replay result: `unavailable` (`temporal_return_24h_incomplete`)
   - `hedera-hashgraph (HBAR), rank 28`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
+    - Current-snapshot 24-hour return: `4.019138%` via `provider_derived_sparkline`; visible for diagnosis but excluded because it does not prove the retained 24-hour anchor.
   - `the-open-network (GRAM), rank 30`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
+    - Current-snapshot 24-hour return: `7.536888%` via `provider_derived_sparkline`; visible for diagnosis but excluded because it does not prove the retained 24-hour anchor.
 - Retained history mutated by report: `false`; historical backfill: `false`.
 - Routing/policy/Protocol-v2 evidence eligibility: `false`; provider calls: `0`.
 

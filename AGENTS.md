@@ -310,7 +310,12 @@ may be added later when a suitable environment already exists.
   ranked universe with ready percent-point temporal evidence, binds the input
   observation set by digest, and is copied only to those retained rows. It is
   never copied into the Decision pipeline, inferred for incomplete input,
-  backfilled, or made routing/score/threshold/Protocol-v2 eligible. Readiness
+  backfilled, or made routing/score/threshold/Protocol-v2 eligible. The exact
+  current-authority diagnostic separately reports when a missing temporal row
+  still has a valid current-snapshot/provider-sparkline 24-hour return, its
+  normalized percent-point value and basis, and why that value cannot substitute
+  for a retained causal 24-hour anchor. It never promotes that diagnostic value.
+  Readiness
   coverage alone cannot select a control or assign a Protocol-v2 partition. When
   maintenance is disabled, cadence is eligible, and authority
   is within 90 minutes of expiry, Today and System Health show the remaining

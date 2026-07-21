@@ -856,6 +856,11 @@ def _current_control_regime_input_lines(value: Mapping[str, Any]) -> list[str]:
         f"- Eligible causal 24-hour inputs: `{eligible}/{expected}`",
         f"- Missing current inputs: `{_int(diagnostic.get('missing_input_count'))}`",
         (
+            "- Missing rows that still have a current-snapshot 24-hour return: "
+            f"`{_int(diagnostic.get('missing_inputs_with_current_snapshot_return_count'))}` "
+            "(diagnostic only; never a substitute for a retained temporal anchor)"
+        ),
+        (
             "- Read-only replay result: "
             f"`{_md(replayed.get('status')) or 'unavailable'}`"
             + (
@@ -877,6 +882,14 @@ def _current_control_regime_input_lines(value: Mapping[str, Any]) -> list[str]:
             for reason in row.get("reasons") or ()
         )
         lines.append(f"  - `{label}`: {reasons or 'input contract invalid'}")
+        if row.get("current_snapshot_return_24h_available") is True:
+            lines.append(
+                "    - Current-snapshot 24-hour return: "
+                f"`{_number(row.get('current_snapshot_return_24h_percent_points'))}%` "
+                f"via `{_md(row.get('current_snapshot_return_24h_basis'))}`; "
+                "visible for diagnosis but excluded because it does not prove "
+                "the retained 24-hour anchor."
+            )
     lines.extend([
         "- Retained history mutated by report: `false`; historical backfill: `false`.",
         "- Routing/policy/Protocol-v2 evidence eligibility: `false`; provider calls: `0`.",

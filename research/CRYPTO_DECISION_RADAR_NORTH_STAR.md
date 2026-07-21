@@ -857,7 +857,12 @@ the result is copied only to those retained-history rows; it is not exposed to
 Decision evaluation. The campaign report separately replays the exact current
 authority's manifest-bound normalized market-source bytes and reports eligible
 versus missing inputs, canonical asset/symbol/rank, and field-level failure
-reasons. This replay is diagnostic only: it does not mutate retained history,
+reasons. Diagnostic schema v2 also distinguishes a genuinely absent raw return
+from a current-snapshot/provider-sparkline 24-hour return that is present but
+excluded. It shows the normalized percent-point value and exact basis while
+stating that a current snapshot cannot prove the required retained temporal
+anchor. This replay is diagnostic only: it does not substitute that value,
+mutate retained history,
 backfill an unavailable regime, call a provider, or feed routing or policy.
 Campaign readiness reports exact historical coverage but performs no selection,
 outcome read, partition assignment, backfill, or policy change. It remains
