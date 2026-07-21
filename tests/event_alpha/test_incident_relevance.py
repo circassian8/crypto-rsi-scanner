@@ -81,6 +81,60 @@ def test_incident_policy_flags_require_semantic_truth():
     assert "causal=false" in lines
 
 
+def test_malformed_persisted_incident_relevance_is_quarantined():
+    import crypto_rsi_scanner.event_alpha.radar.incidents as incidents
+
+    for malformed in (
+        True,
+        1,
+        {"status": "active_incident"},
+        ["active_incident"],
+        "future_unknown_status",
+    ):
+        source = {
+            "incident_id": "incident:malformed-status",
+            "canonical_name": "Malformed persisted status",
+            "event_archetype": "unknown",
+            "incident_relevance_status": malformed,
+        }
+        projected = incidents._row_with_effective_relevance(source)  # noqa: SLF001
+
+        assert projected["incident_relevance_status"] == "diagnostic_only"
+        assert projected["incident_relevance_score"] == 0.0
+        assert projected["diagnostic_only"] is True
+        assert projected["diagnostic_hidden_by_default"] is True
+        assert "invalid_incident_relevance_status" in projected[
+            "incident_relevance_warnings"
+        ]
+        assert incidents._is_hidden_relevance(  # noqa: SLF001
+            source,
+            include_diagnostic=False,
+            include_raw=True,
+            include_external_context=True,
+        ) is True
+        assert incidents._is_operational_canonical_relevance(source) is False  # noqa: SLF001
+        assert incidents._should_persist_incident_row(  # noqa: SLF001
+            source,
+            store_diagnostic=False,
+            store_raw_observations=True,
+        ) is False
+        assert incidents._should_persist_incident_row(  # noqa: SLF001
+            source,
+            store_diagnostic=True,
+            store_raw_observations=False,
+        ) is True
+
+    canonical = incidents._row_with_effective_relevance(  # noqa: SLF001
+        {
+            "incident_id": "incident:canonical-status",
+            "incident_relevance_status": "  canonical_incident  ",
+            "qualified_link_count": 0,
+        }
+    )
+    assert canonical["incident_relevance_status"] == "canonical_incident"
+    assert canonical["diagnostic_hidden_by_default"] is False
+
+
 def test_incident_market_context_rejects_malformed_scores_and_preserves_raw_asset():
     from types import SimpleNamespace
 

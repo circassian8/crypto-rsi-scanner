@@ -36,6 +36,33 @@ _LINK_COUNT_FIELDS = (
     "sector_only_link_count",
 )
 
+_KNOWN_RELEVANCE_STATUSES = frozenset(
+    {
+        RELEVANCE_RAW_OBSERVATION,
+        RELEVANCE_INCIDENT_CANDIDATE,
+        RELEVANCE_CANONICAL_INCIDENT,
+        RELEVANCE_LINKED_INCIDENT,
+        RELEVANCE_ACTIVE_INCIDENT,
+        RELEVANCE_DIAGNOSTIC_ONLY,
+        RELEVANCE_REJECTED_INCIDENT,
+        RELEVANCE_EXTERNAL_CONTEXT_ONLY,
+    }
+)
+
+
+def _relevance_status_claim(row: Mapping[str, Any]) -> tuple[str, bool]:
+    """Return a closed persisted status and whether an explicit claim is invalid."""
+
+    if "incident_relevance_status" not in row or row.get(
+        "incident_relevance_status"
+    ) in (None, ""):
+        return "", False
+    raw = row.get("incident_relevance_status")
+    status = raw.strip() if isinstance(raw, str) else ""
+    if status in _KNOWN_RELEVANCE_STATUSES:
+        return status, False
+    return "", True
+
 
 def _nonnegative_count(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
@@ -194,7 +221,9 @@ def _should_persist_incident_row(
     store_diagnostic: bool,
     store_raw_observations: bool,
 ) -> bool:
-    status = str(row.get("incident_relevance_status") or "").strip()
+    status, invalid = _relevance_status_claim(row)
+    if invalid:
+        return bool(store_diagnostic)
     if status in _VISIBLE_RELEVANCE_STATUSES:
         return True
     if status in _RAW_RELEVANCE_STATUSES:
@@ -218,7 +247,9 @@ def _is_hidden_relevance(
     include_raw: bool,
     include_external_context: bool,
 ) -> bool:
-    status = str(row.get("incident_relevance_status") or "").strip()
+    status, invalid = _relevance_status_claim(row)
+    if invalid:
+        return not include_diagnostic
     if _is_strict_diagnostic_relevance(row):
         return not include_diagnostic
     if status == RELEVANCE_RAW_OBSERVATION:
@@ -227,18 +258,18 @@ def _is_hidden_relevance(
         return not include_external_context
     return False
 def _is_strict_diagnostic_relevance(row: Mapping[str, Any]) -> bool:
-    status = str(row.get("incident_relevance_status") or "").strip()
+    status, invalid = _relevance_status_claim(row)
     return _incident_flag_true(
         row.get("diagnostic_only")
-    ) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES
+    ) or invalid or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES
 def _is_raw_observation_relevance(row: Mapping[str, Any]) -> bool:
-    return str(row.get("incident_relevance_status") or "").strip() == RELEVANCE_RAW_OBSERVATION
+    return _relevance_status_claim(row)[0] == RELEVANCE_RAW_OBSERVATION
 def _is_external_context_relevance(row: Mapping[str, Any]) -> bool:
-    return str(row.get("incident_relevance_status") or "").strip() == RELEVANCE_EXTERNAL_CONTEXT_ONLY
+    return _relevance_status_claim(row)[0] == RELEVANCE_EXTERNAL_CONTEXT_ONLY
 def _status_hidden_by_default(status: str) -> bool:
     return status in _DIAGNOSTIC_RELEVANCE_STATUSES
 def _is_operational_canonical_relevance(row: Mapping[str, Any]) -> bool:
-    return str(row.get("incident_relevance_status") or "") in {
+    return _relevance_status_claim(row)[0] in {
         RELEVANCE_CANONICAL_INCIDENT,
         RELEVANCE_LINKED_INCIDENT,
         RELEVANCE_ACTIVE_INCIDENT,
@@ -311,8 +342,33 @@ def _is_sector_identity(*, symbol: str, coin_id: str) -> bool:
     }
 def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(row)
-    status = str(data.get("incident_relevance_status") or "").strip()
+    status, status_invalid = _relevance_status_claim(data)
+    if status_invalid:
+        _ensure_existing_link_quality(data)
+        data.update(
+            {
+                "incident_relevance_status": RELEVANCE_DIAGNOSTIC_ONLY,
+                "incident_relevance_score": 0.0,
+                "incident_relevance_reasons": (
+                    "invalid_incident_relevance_status",
+                ),
+                "incident_relevance_warnings": (
+                    "invalid_incident_relevance_status",
+                    "incident_hidden_from_default_report",
+                ),
+                "canonical_persistence_reason": (
+                    "invalid_incident_relevance_status"
+                ),
+                "diagnostic_only": True,
+                "raw_observation": False,
+                "external_context_only": False,
+                "external_context_hidden_by_default": False,
+                "diagnostic_hidden_by_default": True,
+            }
+        )
+        return data
     if status:
+        data["incident_relevance_status"] = status
         _ensure_existing_link_quality(data)
         if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and _nonnegative_count(data.get("qualified_link_count")) <= 0:
             status, reason = _downgraded_relevance_for_unqualified_links(data)

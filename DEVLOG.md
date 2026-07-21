@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Quarantine malformed incident relevance state · Codex
+**Why:** The incident compatibility projection coerced any nonempty persisted
+`incident_relevance_status` to text. A boolean, structured value, or unknown
+future string therefore bypassed relevance derivation, stayed visible by
+default, and could be retained even though it was not a valid lifecycle state.
+**Changes:** Incident relevance now accepts only the closed status vocabulary.
+Malformed explicit status is projected as `diagnostic_only`, scored zero,
+hidden by default, annotated with an explicit invalid-status reason/warning,
+and excluded from normal persistence unless diagnostic storage was explicitly
+enabled. Valid status text is trimmed and preserved; missing legacy status
+still uses the existing deterministic derivation.
+**Verify:** The new regression covers boolean, numeric, mapping, sequence, and
+unknown-string statuses plus canonical whitespace normalization. The incident,
+core-opportunity, and core-reconciliation suites passed (`41 passed`);
+`python3 -m compileall -q crypto_rsi_scanner tests`, the integrated-radar smoke,
+its strict doctor (zero blockers/warnings), dashboard fixture render, and `git
+diff --check` passed.
+**Notes/risks:** This is a fail-closed artifact/read-model correction, not a new
+route or taxonomy. It performs no provider call and changes no score formula,
+threshold, source authority, current dashboard authority, or historical bytes.
+No sends, trades, orders, paper trades, RSI writes, or Event Alpha
+`TRIGGERED_FADE` were created. Quantitative source-size limits remain advisory.
+
 ## 2026-07-21 — Record the fifty-seventh no-send market cycle · Codex
 **Why:** The hourly Decision Radar observation cadence became eligible while
 the existing CoinGecko authorization remained present. One bounded cycle was
