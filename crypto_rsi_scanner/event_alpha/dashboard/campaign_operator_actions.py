@@ -21,6 +21,7 @@ from ..artifacts.json_lines import loads_no_duplicate_keys
 from ..operations import (
     market_no_send_features,
     market_observation_campaign_episode_frontier,
+    market_observation_campaign_regime_audit,
 )
 from .secure_reader import _DashboardNamespaceReadError, open_anchored_namespace
 
@@ -212,6 +213,13 @@ def _project_campaign_actions(
     )
     if current_regime_input is not None:
         temporal_baseline["control_market_regime_input"] = current_regime_input
+    regime_generation_audit = _project_control_regime_generation_audit(
+        report.get("control_market_regime_generation_audit")
+    )
+    if regime_generation_audit is not None:
+        temporal_baseline[
+            "control_market_regime_generation_audit"
+        ] = regime_generation_audit
     if metrics["review_timing_action_required"] != review["action_required_count"]:
         raise ValueError("campaign_report_review_count_mismatch")
     if metrics["matured_outcomes"] != outcomes["matured_count"]:
@@ -528,6 +536,110 @@ def _project_current_control_regime_input(
         "replay_status": diagnostic["replayed_control_market_regime"]["status"],
         "replay_reason": diagnostic["replayed_control_market_regime"]["reason"],
         "replay_regime": diagnostic["replayed_control_market_regime"]["regime"],
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+
+
+def _project_control_regime_generation_audit(
+    value: Any,
+) -> dict[str, Any] | None:
+    if value in (None, {}):
+        return None
+    audit = _mapping(value, "control_market_regime_generation_audit")
+    errors = (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(audit)
+    )
+    if errors:
+        raise ValueError("campaign_control_regime_generation_audit_invalid")
+    latest = audit.get("latest_complete_generation")
+    latest_projection: dict[str, Any] | None = None
+    if isinstance(latest, Mapping):
+        latest_projection = {
+            "observed_at": _timestamp(
+                latest.get("observed_at"),
+                "regime_generation_latest_observed_at",
+            ),
+            "status": _identity(
+                latest.get("status"), "regime_generation_latest_status"
+            ),
+            "eligible_input_count": _count(
+                latest.get("eligible_input_count"),
+                "regime_generation_latest_eligible_count",
+            ),
+            "universe_expected_count": _count(
+                latest.get("universe_expected_count"),
+                "regime_generation_latest_expected_count",
+            ),
+            "missing_asset_ids": _identity_list(
+                latest.get("missing_asset_ids"),
+                "regime_generation_latest_missing_assets",
+            ),
+            "recent_entry_missing_asset_ids": _identity_list(
+                latest.get("recent_entry_missing_asset_ids"),
+                "regime_generation_latest_recent_missing_assets",
+            ),
+        }
+    missing_counts = _mapping(
+        audit.get("missing_asset_generation_counts"),
+        "regime_generation_missing_asset_counts",
+    )
+    projected_missing_counts = {
+        _identity(asset_id, "regime_generation_missing_asset_id"): _count(
+            count, "regime_generation_missing_asset_count"
+        )
+        for asset_id, count in sorted(missing_counts.items())
+    }
+    return {
+        "status": _identity(audit.get("status"), "regime_generation_status"),
+        "input_generation_count": _count(
+            audit.get("input_generation_count"),
+            "regime_generation_input_count",
+        ),
+        "verified_source_generation_count": _count(
+            audit.get("verified_source_generation_count"),
+            "regime_generation_verified_count",
+        ),
+        "complete_universe_generation_count": _count(
+            audit.get("complete_universe_generation_count"),
+            "regime_generation_complete_count",
+        ),
+        "ready_generation_count": _count(
+            audit.get("ready_generation_count"),
+            "regime_generation_ready_count",
+        ),
+        "incomplete_generation_count": _count(
+            audit.get("incomplete_generation_count"),
+            "regime_generation_incomplete_count",
+        ),
+        "transition_count": _count(
+            audit.get("transition_count"),
+            "regime_generation_transition_count",
+        ),
+        "universe_change_transition_count": _count(
+            audit.get("universe_change_transition_count"),
+            "regime_generation_change_count",
+        ),
+        "incomplete_with_recent_entry_count": _count(
+            audit.get("incomplete_with_recent_entry_count"),
+            "regime_generation_recent_entry_count",
+        ),
+        "incomplete_without_recent_entry_count": _count(
+            audit.get("incomplete_without_recent_entry_count"),
+            "regime_generation_without_recent_entry_count",
+        ),
+        "missing_asset_generation_counts": projected_missing_counts,
+        "missing_asset_distinct_count": _count(
+            audit.get("missing_asset_distinct_count"),
+            "regime_generation_missing_distinct_count",
+        ),
+        "missing_asset_counts_truncated": (
+            audit.get("missing_asset_counts_truncated") is True
+        ),
+        "latest_complete_generation": latest_projection,
+        "interpretation": audit["interpretation"],
         "provider_calls": 0,
         "writes": 0,
         "research_only": True,

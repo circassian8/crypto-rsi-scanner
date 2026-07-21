@@ -154,11 +154,99 @@ def render_campaign_page(
         )
         + current_authority
         + render_metric_grid(metrics)
+        + _control_regime_generation_history(snapshot)
         + _protocol_v2_episode_coverage(snapshot)
         + history
         + _maintenance_cycle_table(snapshot)
         + _campaign_metadata_disclosure(snapshot)
         + _maintenance_metadata_disclosure(snapshot)
+    )
+
+
+def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
+    state = snapshot.campaign_operator_actions
+    baseline = state.get("temporal_baseline")
+    raw = (
+        baseline.get("control_market_regime_generation_audit")
+        if state.get("status") == "ready" and isinstance(baseline, Mapping)
+        else None
+    )
+    if not isinstance(raw, Mapping):
+        return ""
+    latest = raw.get("latest_complete_generation")
+    latest = latest if isinstance(latest, Mapping) else {}
+    verified = display_count(raw.get("verified_source_generation_count"))
+    total = display_count(raw.get("input_generation_count"))
+    complete = display_count(raw.get("complete_universe_generation_count"))
+    ready = display_count(raw.get("ready_generation_count"))
+    incomplete = display_count(raw.get("incomplete_generation_count"))
+    transitions = display_count(raw.get("transition_count"))
+    changes = display_count(raw.get("universe_change_transition_count"))
+    recent = display_count(raw.get("incomplete_with_recent_entry_count"))
+    without_recent = display_count(
+        raw.get("incomplete_without_recent_entry_count")
+    )
+    latest_eligible = display_count(latest.get("eligible_input_count"))
+    latest_expected = display_count(latest.get("universe_expected_count"))
+    latest_missing = ", ".join(
+        str(item) for item in latest.get("missing_asset_ids") or ()
+    ) or "None"
+    latest_recent = ", ".join(
+        str(item)
+        for item in latest.get("recent_entry_missing_asset_ids") or ()
+    ) or "None"
+    values = (
+        ("Verified source envelopes", f"{verified} / {total}"),
+        ("Complete universes", complete),
+        ("Ready / incomplete", f"{ready} / {incomplete}"),
+        ("Comparable transitions", transitions),
+        ("Membership changes", changes),
+        ("Incomplete + recent entry", recent),
+        ("Incomplete without recent entry", without_recent),
+        ("Latest causal inputs", f"{latest_eligible} / {latest_expected}"),
+        ("Latest missing", latest_missing),
+        ("Latest recent-entry overlap", latest_recent),
+    )
+    missing_counts = raw.get("missing_asset_generation_counts")
+    missing_rows = []
+    if isinstance(missing_counts, Mapping):
+        missing_rows = sorted(
+            (
+                (str(asset_id), count)
+                for asset_id, count in missing_counts.items()
+                if type(count) is int and count > 0
+            ),
+            key=lambda item: (-item[1], item[0]),
+        )[:8]
+    missing_table = (
+        str(disclosure(
+            "Recurring missing inputs",
+            data_table(
+                ("Asset", "Incomplete generations"),
+                [
+                    (humanize_enum(asset_id), display_count(count))
+                    for asset_id, count in missing_rows
+                ],
+                caption="Bounded exact-generation missing-input frequency",
+                compact=True,
+            ),
+            summary=f"{len(missing_rows)} recurring asset{'s' if len(missing_rows) != 1 else ''}",
+            css_class="campaign-technical-disclosure",
+        ))
+        if missing_rows
+        else ""
+    )
+    body = (
+        '<div class="alert alert-info"><strong>Observed history, not a policy input.</strong> '
+        "This compares immutable generation envelopes. Recent membership entry is overlap, "
+        "not proof of causation; older anchor gaps remain separately visible.</div>"
+        + str(definition_list(values, css_class="definition-grid"))
+        + missing_table
+    )
+    return render_panel(
+        "Causal 24-hour input history",
+        body,
+        eyebrow="Exact generation evidence · no backfill",
     )
 
 

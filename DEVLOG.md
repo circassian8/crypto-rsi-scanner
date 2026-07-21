@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Surface regime-input history in the dashboard · Codex
+**Why:** The canonical campaign report now explains recurring causal 24-hour
+input gaps, but the dashboard still exposed only the latest 29/30 symptom. The
+operator should not need to open raw research JSON to distinguish recent
+membership overlap from other anchor gaps.
+**Changes:** The pointer-matched campaign-context loader validates the existing
+closed audit with its canonical validator, then copies only a bounded safe
+projection into dashboard state. Today appends the 58/58 source, 0/16 ready,
+15-transition / 4-change, and 12-versus-4 recent-entry split to the temporal
+baseline explanation. Campaign History adds a compact causal-input panel with
+latest readiness and an eight-row recurrence disclosure. Compatibility reports
+without the audit omit the panel; no dashboard GET/HEAD inspects environment,
+calls a provider, writes evidence, or recomputes historical features.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed; focused
+campaign/dashboard tests passed (`41 passed`); the broader dashboard group
+passed 413 tests in the sandbox, with its one loopback-server test blocked only
+by sandbox socket permissions and then passing on an exact permitted rerun.
+`make radar-dashboard-smoke PYTHON=python3`, `make radar-dashboard-ux-smoke
+PYTHON=python3`, and `make radar-dashboard-readiness PYTHON=python3` passed.
+The real revision-12 snapshot rendered all expected audit text from the exact
+current campaign report with zero calls/writes.
+**Notes/risks:** This is a presentation of canonical report truth, not another
+data source. It does not alter history, universe membership, cadence, regimes,
+scores, thresholds, routes, policy, authority, authorization, sends, trades,
+orders, paper trades, RSI rows, or Event Alpha `TRIGGERED_FADE`. File-size
+metrics remain advisory.
+
 ## 2026-07-21 — Audit exact-generation control-regime inputs · Codex
 **Why:** The latest top-30 universe was 29/30 ready for a causal 24-hour
 control-regime input, but current-only evidence could not show whether dynamic

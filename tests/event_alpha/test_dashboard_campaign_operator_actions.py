@@ -20,12 +20,14 @@ from crypto_rsi_scanner.event_alpha.dashboard.campaign_page import (
 )
 from crypto_rsi_scanner.event_alpha.dashboard.system_pages import render_health_page
 from crypto_rsi_scanner.event_alpha.dashboard.today_page import (
+    _control_regime_generation_audit_detail,
     _control_regime_input_detail,
     render_today_page,
 )
 from crypto_rsi_scanner.event_alpha.operations import (
     market_no_send_features,
     market_observation_campaign_episode_frontier,
+    market_observation_campaign_regime_audit,
 )
 from tests.event_alpha.test_decision_episode_scorecard import (
     _candidate,
@@ -67,7 +69,7 @@ def _episode_contracts() -> tuple[dict[str, object], dict[str, object]]:
     return scorecard, frontier
 
 
-def _current_regime_input() -> dict[str, object]:
+def _current_regime_rows() -> list[dict[str, object]]:
     rows = []
     for rank in range(1, 31):
         observation_id = f"regime-current-{rank}"
@@ -106,9 +108,15 @@ def _current_regime_input() -> dict[str, object]:
                 }
             },
         })
+    return rows
+
+
+def _current_regime_input() -> dict[str, object]:
     diagnostic = (
         market_no_send_features
-        .point_in_time_control_market_regime_input_diagnostic(rows)
+        .point_in_time_control_market_regime_input_diagnostic(
+            _current_regime_rows()
+        )
     )
     return {
         "schema_id": "decision_radar.current_authority_control_market_regime_input",
@@ -133,6 +141,23 @@ def _current_regime_input() -> dict[str, object]:
         "writes": 0,
         "research_only": True,
     }
+
+
+def _control_regime_generation_audit() -> dict[str, object]:
+    rows = _current_regime_rows()
+    return (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit([{
+            "artifact_namespace": "radar_market_no_send_current",
+            "run_id": "2026-07-14T10:00:00+00:00|no_key_live",
+            "observed_at": _GENERATED_AT,
+            "campaign_counted": True,
+            "_market_source_snapshot_rows": rows,
+            "_market_source_snapshot_sha256": "d" * 64,
+            "_market_source_snapshot_row_count": len(rows),
+            "_market_source_snapshot_verified": True,
+        }])
+    )
 
 
 def _campaign_report() -> dict[str, object]:
@@ -181,6 +206,9 @@ def _campaign_report() -> dict[str, object]:
                 ),
             }
         ],
+        "control_market_regime_generation_audit": (
+            _control_regime_generation_audit()
+        ),
         "baseline_maturity": {
             "next_eligible_observation_at": (
                 "2026-07-18T21:43:03.720770+00:00"
@@ -460,6 +488,18 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert regime_input["replay_regime"] == "risk_on"
     assert regime_input["source_snapshot_verified"] is True
     assert regime_input["provider_calls"] == regime_input["writes"] == 0
+    regime_history = result["temporal_baseline"][
+        "control_market_regime_generation_audit"
+    ]
+    assert regime_history["status"] == "ready"
+    assert regime_history["verified_source_generation_count"] == 1
+    assert regime_history["complete_universe_generation_count"] == 1
+    assert regime_history["ready_generation_count"] == 1
+    assert regime_history["incomplete_generation_count"] == 0
+    assert regime_history["latest_complete_generation"][
+        "eligible_input_count"
+    ] == 30
+    assert regime_history["provider_calls"] == regime_history["writes"] == 0
     assert result["temporal_baseline"][
         "next_cycle_point_in_time_eligible_asset_count"
     ] == 0
@@ -521,6 +561,35 @@ def test_today_detail_names_exact_current_regime_input_gaps() -> None:
     assert "pump-fun (PUMP), rank 16" in detail
     assert "whitebit (WBT), rank 28" in detail
     assert "does not backfill history or feed routing" in detail
+
+
+def test_today_detail_separates_regime_history_churn_from_other_gaps() -> None:
+    detail = _control_regime_generation_audit_detail({
+        "control_market_regime_generation_audit": {
+            "input_generation_count": 58,
+            "verified_source_generation_count": 58,
+            "complete_universe_generation_count": 16,
+            "ready_generation_count": 0,
+            "incomplete_generation_count": 16,
+            "transition_count": 15,
+            "universe_change_transition_count": 4,
+            "incomplete_with_recent_entry_count": 12,
+            "incomplete_without_recent_entry_count": 4,
+            "latest_complete_generation": {
+                "eligible_input_count": 29,
+                "universe_expected_count": 30,
+                "missing_asset_ids": ("hedera-hashgraph",),
+                "recent_entry_missing_asset_ids": ("hedera-hashgraph",),
+            },
+        }
+    })
+
+    assert "58/58 source envelopes verify" in detail
+    assert "0/16 complete universes" in detail
+    assert "membership changed 4 times" in detail
+    assert "12 incomplete cycles overlap" in detail
+    assert "4 do not" in detail
+    assert "descriptive overlap, not causal attribution" in detail
 
 
 def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
@@ -617,6 +686,13 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     _write_report(tmp_path, regime_policy_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
+    regime_history_drift = _campaign_report()
+    regime_history_drift["control_market_regime_generation_audit"][
+        "routing_eligible"
+    ] = True
+    _write_report(tmp_path, regime_history_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
     episode_coverage_drift = _campaign_report()
     episode_coverage_drift["protocol_v2_episode_coverage_frontier"][
         "episode_count"
@@ -635,6 +711,9 @@ def test_campaign_page_renders_complete_episode_coverage_taxonomy(
     html = render_campaign_page(snapshot, query={})
 
     assert "Protocol-v2 episode coverage" in html
+    assert "Causal 24-hour input history" in html
+    assert "Observed history, not a policy input" in html
+    assert "Verified source envelopes" in html
     assert "Frozen episodes cover 1/8 routes and 1/7 primary origins" in html
     assert "High-confidence idea" in html
     assert "Calendar / scheduled risk" in html
@@ -703,6 +782,25 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
             ),
             "current_exact_generation_status_counts": {"warming": 30},
             "feature_groups": _baseline_feature_groups(),
+            "control_market_regime_generation_audit": {
+                "input_generation_count": 58,
+                "verified_source_generation_count": 58,
+                "complete_universe_generation_count": 16,
+                "ready_generation_count": 0,
+                "incomplete_generation_count": 16,
+                "transition_count": 15,
+                "universe_change_transition_count": 4,
+                "incomplete_with_recent_entry_count": 12,
+                "incomplete_without_recent_entry_count": 4,
+                "latest_complete_generation": {
+                    "eligible_input_count": 29,
+                    "universe_expected_count": 30,
+                    "missing_asset_ids": ("hedera-hashgraph",),
+                    "recent_entry_missing_asset_ids": (
+                        "hedera-hashgraph",
+                    ),
+                },
+            },
         },
     }
     snapshot = replace(_snapshot(), campaign_operator_actions=root_projection)
@@ -725,6 +823,9 @@ def test_today_and_health_surface_campaign_actions_separate_from_current_truth()
     assert "Current exact-generation row readiness: Warming 30" in today
     assert "future same-asset point-in-time evaluation for 0/30" in today
     assert "not provider-call eligibility" in today
+    assert "Immutable-generation audit: 58/58 source envelopes verify" in today
+    assert "12 incomplete cycles overlap a recent observed entry" in today
+    assert "4 do not" in today
     assert "turnover 30/30 (21/8 samples)" in today
     assert "1h returns 0/30 (7/8 samples)" in today
     assert (

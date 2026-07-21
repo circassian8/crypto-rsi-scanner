@@ -570,6 +570,7 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
     if len(missing_ids) > 5:
         missing_summary += f", +{len(missing_ids) - 5} more"
     regime_input_detail = _control_regime_input_detail(baseline)
+    regime_history_detail = _control_regime_generation_audit_detail(baseline)
     return (
         "Current exact-generation row readiness: "
         + " · ".join(exact_status_parts)
@@ -582,6 +583,7 @@ def _temporal_baseline_constraint_detail(snapshot: DashboardSnapshot) -> str:
         + " · ".join(summaries)
         + ". "
         + regime_input_detail
+        + regime_history_detail
         + "This does not claim unknown future membership or feature values are already "
         "observed, and it is not provider-call eligibility."
     )
@@ -640,6 +642,74 @@ def _control_regime_input_detail(baseline: Mapping[str, Any]) -> str:
         f"Exact current control-regime replay: {eligible}/{expected} eligible causal "
         f"24-hour inputs; result {replay}.{missing_text} The read-only report does not "
         "backfill history or feed routing. "
+    )
+
+
+def _control_regime_generation_audit_detail(
+    baseline: Mapping[str, Any],
+) -> str:
+    value = baseline.get("control_market_regime_generation_audit")
+    if not isinstance(value, Mapping):
+        return ""
+    verified = _non_negative_int(value.get("verified_source_generation_count"))
+    total = _non_negative_int(value.get("input_generation_count"))
+    complete = _non_negative_int(
+        value.get("complete_universe_generation_count")
+    )
+    ready = _non_negative_int(value.get("ready_generation_count"))
+    incomplete = _non_negative_int(value.get("incomplete_generation_count"))
+    transitions = _non_negative_int(value.get("transition_count"))
+    changes = _non_negative_int(value.get("universe_change_transition_count"))
+    recent = _non_negative_int(
+        value.get("incomplete_with_recent_entry_count")
+    )
+    without_recent = _non_negative_int(
+        value.get("incomplete_without_recent_entry_count")
+    )
+    latest = value.get("latest_complete_generation")
+    if any(
+        item is None
+        for item in (
+            verified,
+            total,
+            complete,
+            ready,
+            incomplete,
+            transitions,
+            changes,
+            recent,
+            without_recent,
+        )
+    ) or verified > total or ready + incomplete > complete:
+        return ""
+    latest_text = ""
+    if isinstance(latest, Mapping):
+        eligible = _non_negative_int(latest.get("eligible_input_count"))
+        expected = _non_negative_int(latest.get("universe_expected_count"))
+        missing = latest.get("missing_asset_ids")
+        recent_missing = latest.get("recent_entry_missing_asset_ids")
+        if (
+            eligible is None
+            or expected is None
+            or eligible > expected
+            or not isinstance(missing, (list, tuple))
+            or not isinstance(recent_missing, (list, tuple))
+        ):
+            return ""
+        missing_text = ", ".join(str(item) for item in missing) or "none"
+        recent_text = ", ".join(str(item) for item in recent_missing) or "none"
+        latest_text = (
+            f" Latest exact cycle is {eligible}/{expected}; missing {missing_text}; "
+            f"recent-entry overlap {recent_text}."
+        )
+    return (
+        f"Immutable-generation audit: {verified}/{total} source envelopes verify; "
+        f"{ready}/{complete} complete universes have all causal 24-hour inputs "
+        f"({incomplete} incomplete). Across {transitions} comparable transitions, "
+        f"membership changed {changes} times; {recent} incomplete cycles overlap a "
+        f"recent observed entry and {without_recent} do not."
+        + latest_text
+        + " This is descriptive overlap, not causal attribution or routing input. "
     )
 
 
