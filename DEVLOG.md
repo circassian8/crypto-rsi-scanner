@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reconcile empirical RSI evidence with the closed Decision projection · Codex
+**Why:** The strict canonical RSI-reference guard and the empirical replay
+producer had drifted apart. Replay observations intentionally carry a richer,
+non-authoritative daily-RSI evidence object, but copying that object directly
+into the smaller Decision-v2 reference field caused every replay anomaly with
+RSI evidence to fail canonical projection.
+**Changes:** The replay boundary now retains the full source RSI observation on
+`replay_source_rsi_context_references` and maps only the exact, validated
+empirical observation shape into the canonical Decision reference. The mapping
+binds version, asset identity, timeframe, observation time, point-in-time
+freshness, and validity while leaving `rsi_context` empty, so the observation
+cannot create technical thesis authority or alter scores. Value, timestamp,
+shape, flag, and zero-adjustment mismatches pass through to the existing closed
+validator and fail rather than being discarded or repaired.
+**Verify:** The four replay failures exposed by the first broad run were
+reproduced and corrected. Focused replay integration/run/core tests passed
+(`18 passed`); all replay and Decision-surface tests passed (`122 passed`);
+the dashboard loopback concurrency regression passed on the host (`1 passed`).
+A clean host-level `make verify-fast PYTHON=python3` then passed all `3,706`
+tests plus alert rendering, the fixture backtest, and paper scoreboard in
+187.32 seconds. `python3 -m compileall -q crypto_rsi_scanner tests` and `git
+diff --check` passed.
+**Notes/risks:** No replay score, anomaly threshold, route, outcome, source
+authority, or production artifact changed. No provider call, send, trade,
+order, paper trade, normal RSI write, dashboard authority mutation, or Event
+Alpha `TRIGGERED_FADE` occurred. Quantitative source-file size remains advisory;
+schema, identity, time, safety, and evidence-binding checks remain enforced.
+
 ## 2026-07-21 — Make market anomaly dedupe fail closed · Codex
 **Why:** Repeating one identical market row produced duplicate snapshots,
 duplicate anomaly IDs, and duplicate catalyst-enrichment jobs. Conflicting

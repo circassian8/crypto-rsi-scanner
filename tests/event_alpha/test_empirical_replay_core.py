@@ -124,8 +124,19 @@ def test_daily_rsi_observation_survives_projection_without_decision_authority() 
     contextual = with_context.ideas[0]
     plain_projection = plain["decision_projection"]
     projection = contextual["decision_projection"]
-    assert contextual["rsi_context_references"] == [reference]
-    assert projection["rsi_context_references"] == [reference]
+    expected_reference = {
+        "context_version": "empirical_daily_rsi_observation_v1",
+        "symbol": "MOVE",
+        "coin_id": "move",
+        "setup_type": None,
+        "rsi_timeframe": "1d",
+        "observed_at": "2024-06-01T00:00:00+00:00",
+        "freshness_status": "historical_point_in_time",
+        "valid": True,
+    }
+    assert contextual["replay_source_rsi_context_references"] == [reference]
+    assert contextual["rsi_context_references"] == [expected_reference]
+    assert projection["rsi_context_references"] == [expected_reference]
     assert projection["rsi_context"] == {}
     for field in (
         "primary_thesis_origin",
@@ -148,6 +159,35 @@ def test_daily_rsi_observation_survives_projection_without_decision_authority() 
     assert with_context.trace_summary["normal_rsi_writes"] == 0
     assert with_context.trace_summary["event_alpha_paper_trades"] == 0
     assert with_context.trace_summary["event_alpha_triggered_fade"] == 0
+
+
+def test_malformed_empirical_rsi_observation_reference_fails_closed() -> None:
+    malformed = {
+        "context_type": "daily_rsi_observation",
+        "context_version": "empirical_daily_rsi_observation_v1",
+        "rsi_value": 67.0,
+        "rsi_timeframe": "1d",
+        "observed_at": "2024-06-01T00:00:00+00:00",
+        "data_basis": "historical_ohlcv",
+        "timing_basis": "point_in_time_completed_daily_bar",
+        "read_only": True,
+        "authoritative": False,
+        "technical_thesis_origin_allowed": False,
+        "score_adjustment_allowed": False,
+        "policy_adjustment_allowed": False,
+        "actionability_adjustment": 0.0,
+        "risk_adjustment": 0.0,
+        "research_only": True,
+    }
+    result = run_replay_kernel(
+        [_observation(rsi=68.0, rsi_context_references=[malformed])],
+        mode="medium",
+        artifact_namespace="rsi-context-invalid",
+        allowed_partitions=("validation",),
+    )
+
+    assert result.ideas == ()
+    assert result.trace_rows[0]["failure_stage"] == "canonical_projection_invalid"
 
 
 def test_replay_ignores_future_and_outcome_fields() -> None:

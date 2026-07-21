@@ -61,6 +61,23 @@ _PROJECTION_VALIDATION_ERROR_CODES = (
     "decision_contract_invalid_other",
     "canonical_projection_idempotence_failed",
 )
+_EMPIRICAL_RSI_OBSERVATION_REFERENCE_FIELDS = frozenset({
+    "actionability_adjustment",
+    "authoritative",
+    "context_type",
+    "context_version",
+    "data_basis",
+    "observed_at",
+    "policy_adjustment_allowed",
+    "read_only",
+    "research_only",
+    "risk_adjustment",
+    "rsi_timeframe",
+    "rsi_value",
+    "score_adjustment_allowed",
+    "technical_thesis_origin_allowed",
+    "timing_basis",
+})
 
 
 @dataclass(frozen=True)
@@ -422,10 +439,105 @@ def _candidate(
         "return_unit": "percent_points",
         "anomaly_generated": True,
     }
-    for field in ("rsi_context", "rsi_context_references"):
-        if row.get(field) not in (None, "", [], {}):
-            candidate[field] = row[field]
+    if row.get("rsi_context") not in (None, "", {}):
+        candidate["rsi_context"] = row["rsi_context"]
+    raw_rsi_references = row.get("rsi_context_references")
+    if raw_rsi_references not in (None, "", [], ()):
+        candidate["replay_source_rsi_context_references"] = raw_rsi_references
+        candidate["rsi_context_references"] = (
+            _canonical_replay_rsi_context_references(row)
+        )
     return candidate
+
+
+def _canonical_replay_rsi_context_references(
+    row: Mapping[str, Any],
+) -> object:
+    """Adapt validated replay observations to the closed Decision reference.
+
+    Empirical observation rows deliberately retain richer, non-authoritative
+    RSI evidence.  Decision-v2 projections use a smaller reference contract.
+    Keep the source object separately on the replay idea and map only the exact
+    known empirical shape; malformed or unknown shapes pass through so the
+    canonical projection validator rejects them rather than silently dropping
+    evidence.
+    """
+
+    raw_references = row.get("rsi_context_references")
+    if not isinstance(raw_references, (list, tuple)):
+        return raw_references
+    projected: list[object] = []
+    for raw_reference in raw_references:
+        if not isinstance(raw_reference, Mapping):
+            projected.append(raw_reference)
+            continue
+        reference = dict(raw_reference)
+        if not _empirical_rsi_observation_reference_valid(reference, row=row):
+            projected.append(reference)
+            continue
+        projected.append({
+            "context_version": reference["context_version"],
+            "symbol": str(row.get("symbol") or "").strip().upper() or None,
+            "coin_id": str(
+                row.get("canonical_asset_id") or row.get("symbol") or ""
+            ).strip().casefold() or None,
+            "setup_type": None,
+            "rsi_timeframe": reference["rsi_timeframe"],
+            "observed_at": reference["observed_at"],
+            "freshness_status": "historical_point_in_time",
+            "valid": True,
+        })
+    return projected
+
+
+def _empirical_rsi_observation_reference_valid(
+    reference: Mapping[str, Any],
+    *,
+    row: Mapping[str, Any],
+) -> bool:
+    if set(reference) != _EMPIRICAL_RSI_OBSERVATION_REFERENCE_FIELDS:
+        return False
+    if (
+        reference.get("context_type") != "daily_rsi_observation"
+        or reference.get("context_version")
+        != "empirical_daily_rsi_observation_v1"
+        or reference.get("data_basis") != "historical_ohlcv"
+        or reference.get("timing_basis")
+        != "point_in_time_completed_daily_bar"
+        or reference.get("read_only") is not True
+        or reference.get("authoritative") is not False
+        or reference.get("technical_thesis_origin_allowed") is not False
+        or reference.get("score_adjustment_allowed") is not False
+        or reference.get("policy_adjustment_allowed") is not False
+        or reference.get("research_only") is not True
+        or not isinstance(reference.get("rsi_timeframe"), str)
+        or not reference["rsi_timeframe"].strip()
+    ):
+        return False
+    for field in ("actionability_adjustment", "risk_adjustment"):
+        value = reference.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        if not math.isfinite(float(value)) or float(value) != 0.0:
+            return False
+    reference_rsi = reference.get("rsi_value")
+    row_rsi = row.get("rsi")
+    if (
+        isinstance(reference_rsi, bool)
+        or isinstance(row_rsi, bool)
+        or not isinstance(reference_rsi, (int, float))
+        or not isinstance(row_rsi, (int, float))
+        or not math.isfinite(float(reference_rsi))
+        or not 0.0 <= float(reference_rsi) <= 100.0
+        or float(reference_rsi) != float(row_rsi)
+    ):
+        return False
+    try:
+        return _required_utc(reference.get("observed_at")) == _required_utc(
+            row.get("observed_at")
+        )
+    except (TypeError, ValueError):
+        return False
 
 
 def partition_for_timestamp(value: datetime | str, protocol: Mapping[str, Any] | None = None) -> str:
