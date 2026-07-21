@@ -35,6 +35,7 @@ from crypto_rsi_scanner.event_alpha.operations.bybit_intraday_live import (
     build_bybit_intraday_live_readiness,
     capture_authoritative_bybit_intraday,
     collect_authoritative_bybit_intraday,
+    format_bybit_intraday_readiness_summary,
     main,
 )
 
@@ -187,6 +188,32 @@ def test_readiness_without_execution_capture_or_auth_is_zero_call_and_closed() -
     assert payload["provider_call_attempted"] is False
     assert payload["writes_performed"] is False
     assert payload["next_safe_command"] == READINESS_COMMAND
+
+    summary = format_bybit_intraday_readiness_summary(payload)
+    assert "report=decision_radar_bybit_intraday_readiness" in summary
+    assert "status=blocked" in summary
+    assert "runtime_provider_authorized=false" in summary
+    assert "source_execution_quality_capture_id=unavailable" in summary
+    assert "eligible_instruments=0" in summary
+    assert "provider_request_bound=0 (absolute=60)" in summary
+    assert "execution_quality_capture_unavailable" in summary
+    assert "provider_call_attempted:false" in summary
+    assert "writes_performed:false" in summary
+    assert "RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json" in summary
+
+
+def test_readiness_summary_fails_closed_on_request_count_drift() -> None:
+    payload = build_bybit_intraday_live_readiness(
+        artifact_base_dir="unused",
+        environ={},
+        now=NOW,
+        capture_loader=lambda _base: _capture(),
+        resolver=_resolver(),
+    )
+    payload["maximum_provider_requests_for_current_capture"] = 3
+
+    with pytest.raises(BybitIntradayLiveError, match="readiness_request_bound_mismatch"):
+        format_bybit_intraday_readiness_summary(payload)
 
 
 def test_current_execution_capture_still_requires_separate_intraday_auth() -> None:
@@ -487,6 +514,27 @@ def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv(LIVE_AUTH_ENV, "1")
+    assert main(["readiness", "--artifact-base", str(tmp_path)]) == 0
+    readiness_payload = json.loads(capsys.readouterr().out)
+    assert readiness_payload["status"] == "blocked"
+    assert readiness_payload["provider_call_attempted"] is False
+    assert readiness_payload["writes_performed"] is False
+
+    assert main(
+        [
+            "readiness",
+            "--artifact-base",
+            str(tmp_path),
+            "--output",
+            "summary",
+        ]
+    ) == 0
+    summary = capsys.readouterr().out
+    assert "status=blocked" in summary
+    assert "source_execution_quality_capture_id=unavailable" in summary
+    assert "provider_call_attempted:false" in summary
+    assert "writes_performed:false" in summary
+
     assert main(["collect", "--artifact-base", str(tmp_path)]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["reason"] == "explicit_collection_confirmation_required"
@@ -512,6 +560,7 @@ def test_cli_and_make_targets_keep_readiness_separate_from_confirmed_collection(
     confirmed_capture = dry_run("radar-intraday-bybit-capture", confirm=True)
     status = dry_run("radar-intraday-bybit-status")
     assert "bybit_intraday_live readiness" in readiness
+    assert "--output summary" in readiness
     assert "bybit_intraday_live collect" not in readiness
     assert "bybit_intraday_live collect" in collection
     assert "--confirm" not in collection

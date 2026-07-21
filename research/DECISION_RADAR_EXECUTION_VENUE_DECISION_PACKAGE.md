@@ -451,8 +451,11 @@ make radar-execution-quality-bybit-status PYTHON=.venv/bin/python
 
 All eight commands perform no network call, read no credential, and have no
 private-data or order operation. Static current truth remains available through
-`make radar-execution-quality-readiness PYTHON=.venv/bin/python`. Only an
-already-present `RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` permits the
+`make radar-execution-quality-readiness PYTHON=.venv/bin/python`. The explicit
+`RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json` override expands the normal bounded
+intraday-readiness summary into its full structured packet. Collection still
+requires an already-present
+`RSI_DECISION_RADAR_BYBIT_EXECUTION_QUALITY_LIVE=1` to permit the
 separate `radar-execution-quality-bybit-capture` target to cross the public
 provider boundary, and that target additionally requires `CONFIRM=1`; unsetting
 the flag disables capture. The `...-collect` target remains a stdout diagnostic

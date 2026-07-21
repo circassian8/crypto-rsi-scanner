@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-21 - Keep direct Bybit intraday readiness concise
+**Status:** accepted
+**Decision:** The normal `radar-intraday-bybit-readiness` Make target prints a
+strict bounded summary of its execution-quality dependency, separate runtime
+authorization, eligible instruments, request bounds, capture/publication state,
+RSI contract, operator action, and research-only safety. Full packet JSON remains
+available through `RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json`; direct Python
+CLI usage retains JSON as its compatibility default.
+**Why:** The nested capture, instrument, and bar arrays in the compatibility
+packet obscured the two current blockers and safe dependency order. The concise
+view makes that order readable without changing or hiding the closed packet.
+**Revisit when:** A machine consumer needs another structured projection;
+preserve JSON compatibility and fail closed on status, reasons, interval,
+instrument, or request-bound drift.
+
 ## 2026-07-21 - Keep Bybit execution readiness concise and current-authority-bound
 **Status:** accepted
 **Decision:** The normal `radar-execution-quality-bybit-readiness` Make target

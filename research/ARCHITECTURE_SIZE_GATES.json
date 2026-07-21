@@ -2210,7 +2210,7 @@
   ],
   "functions_over_limit_count": 33,
   "gate_status": "pass",
-  "generated_at": "2026-07-21T20:47:29.018816+00:00",
+  "generated_at": "2026-07-21T20:56:50.142279+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [

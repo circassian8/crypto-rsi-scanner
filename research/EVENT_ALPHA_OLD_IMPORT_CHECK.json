@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 4870,
+          "line": 4885,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 4870,
+          "line": 4885,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 16578,
+          "line": 16602,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-21T20:47:22.817035+00:00",
+  "generated_at": "2026-07-21T20:56:44.058293+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1268,
-  "input_fingerprint": "bc280b6861b6a9e960f4b5b6cb7989db110016dee505d2b46b419debadcd2001",
+  "input_fingerprint": "c8d64c3b75d7a85859239da99271b8006dd08114e210ab1793235ff5b5879d14",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "AGENTS.md:1784666651",
-    "DECISIONS.md:1784666813",
-    "DEVLOG.md:1784666813",
-    "Makefile:1784666607",
-    "ROADMAP.md:1784666813"
+    "AGENTS.md:1784667302",
+    "DECISIONS.md:1784667371",
+    "DEVLOG.md:1784667371",
+    "Makefile:1784667302",
+    "ROADMAP.md:1784667371"
   ],
-  "newest_source_mtime": 1784666839.5255804,
+  "newest_source_mtime": 1784667401.003263,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784666213.445644,
+  "report_mtime": 1784666842.8182678,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1268,
-    "input_fingerprint": "bc280b6861b6a9e960f4b5b6cb7989db110016dee505d2b46b419debadcd2001",
+    "input_fingerprint": "c8d64c3b75d7a85859239da99271b8006dd08114e210ab1793235ff5b5879d14",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784666651",
-      "DECISIONS.md:1784666813",
-      "DEVLOG.md:1784666813",
-      "Makefile:1784666607",
-      "ROADMAP.md:1784666813"
+      "AGENTS.md:1784667302",
+      "DECISIONS.md:1784667371",
+      "DEVLOG.md:1784667371",
+      "Makefile:1784667302",
+      "ROADMAP.md:1784667371"
     ],
-    "newest_source_mtime": 1784666839.5255804,
+    "newest_source_mtime": 1784667401.003263,
     "regex_compile_count": 124,
-    "report_mtime": 1784666213.445644,
-    "scan_duration_seconds": 2.7237,
+    "report_mtime": 1784666842.8182678,
+    "scan_duration_seconds": 2.6778,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2558,7 +2558,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.7237,
+  "scan_duration_seconds": 2.6778,
   "scanned_doc_files": 79,
   "scanned_source_files": 919,
   "scanned_test_files": 264,

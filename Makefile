@@ -113,6 +113,7 @@ RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
 RADAR_DAILY_OPS_OUTPUT ?= summary
 RADAR_BYBIT_EXECUTION_READINESS_OUTPUT ?= summary
+RADAR_BYBIT_INTRADAY_READINESS_OUTPUT ?= summary
 OFFICIAL_MACRO_OUTPUT_BASE ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/official_macro_calendar
 FED_FOMC_HTML ?=
 BLS_CALENDAR_ICS ?=
@@ -411,7 +412,7 @@ help:
 	@echo "  CONFIRM=1 make radar-derivatives-bybit-capture  Collect and seal exact venue-native derivatives responses"
 	@echo "  make radar-derivatives-bybit-status  Validate the latest immutable derivatives capture; no call/write"
 	@echo "  make radar-intraday-bybit-smoke  Normalize direct completed Bybit 1h/4h fixtures; no call/write"
-	@echo "  make radar-intraday-bybit-readiness  Check execution-capture and separate intraday authorization prerequisites; no call/write"
+	@echo "  make radar-intraday-bybit-readiness  Concise execution-capture and intraday authorization check; no call/write (RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json for full JSON)"
 	@echo "  CONFIRM=1 make radar-intraday-bybit-collect  Collect direct completed 1h/4h bars without persistence"
 	@echo "  CONFIRM=1 make radar-intraday-bybit-capture  Collect and seal exact direct 1h/4h responses"
 	@echo "  make radar-intraday-bybit-status  Validate the latest immutable direct-bar capture; no call/write"
@@ -1749,7 +1750,8 @@ radar-intraday-bybit-smoke:
 radar-intraday-bybit-readiness:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.bybit_intraday_live readiness \
-		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR)
+		--artifact-base $(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+		--output $(RADAR_BYBIT_INTRADAY_READINESS_OUTPUT)
 
 radar-intraday-bybit-collect:
 	env RSI_EVENT_ALERTS_ENABLED=0 \

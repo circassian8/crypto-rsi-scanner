@@ -1480,6 +1480,7 @@
     "intraday_freshness_policy": "each bar first proves that the exact latest completed candle remains inside its interval window and its provider response is no more than 15 seconds old at acquisition; the complete sequential set then re-evaluates every bar and provider clock at final response completion, preserves both states plus maximum provider age and minimum bar-recency remaining, and uses completion freshness for Protocol-v2 input-quality eligibility",
     "intraday_offline_contract_implemented": true,
     "intraday_readiness_command": "make radar-intraday-bybit-readiness PYTHON=.venv/bin/python",
+    "intraday_readiness_default_output": "summary; full structured packet via RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json",
     "intraday_smoke_command": "make radar-intraday-bybit-smoke PYTHON=.venv/bin/python",
     "intraday_status_command": "make radar-intraday-bybit-status PYTHON=.venv/bin/python",
     "intraday_review_export_selection": "latest complete pointer-selected capture only; fully revalidated from exact raw responses",

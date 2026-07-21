@@ -1382,7 +1382,9 @@ The remaining human decisions stay explicit:
   path exists.
 - Direct intraday: after one genuine current execution-quality capture exists,
   inspect `make radar-intraday-bybit-readiness PYTHON=.venv/bin/python` without
-  a call or write. Only separately present
+  a call or write. The normal target prints a bounded prerequisite summary; use
+  `RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json` for the full structured packet.
+  Only separately present
   `RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE=1` plus `CONFIRM=1 make
   radar-intraday-bybit-capture PYTHON=.venv/bin/python` may collect and seal
   exact 1h/4h responses. Disable the boundary by unsetting that flag. A complete

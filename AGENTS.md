@@ -801,7 +801,9 @@ may be added later when a suitable environment already exists.
 - **Direct Bybit 1h/4h readiness:**
   `make radar-intraday-bybit-smoke` proves the completed trade-price bar
   normalizer offline. `make radar-intraday-bybit-readiness` is no-network and
-  no-write; it requires a complete fresh execution-quality capture for the exact
+  no-write and prints a concise prerequisite summary by default; use
+  `RADAR_BYBIT_INTRADAY_READINESS_OUTPUT=json` for the full structured packet.
+  It requires a complete fresh execution-quality capture for the exact
   current Radar authority plus separately present
   `RSI_DECISION_RADAR_BYBIT_INTRADAY_LIVE=1`. `make
   radar-intraday-bybit-status` validates the latest immutable capture without a

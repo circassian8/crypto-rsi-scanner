@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11218,
+  "function_count": 11224,
   "function_line_limit": 150,
   "functions_over_150_lines": 33,
   "functions_over_limit": [
@@ -1800,7 +1800,7 @@
     }
   ],
   "functions_over_limit_count": 33,
-  "generated_at": "2026-07-21T20:47:32.956689+00:00",
+  "generated_at": "2026-07-21T20:56:53.995704+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],

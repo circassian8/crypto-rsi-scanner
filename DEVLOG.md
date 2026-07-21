@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Make direct Bybit intraday readiness concise · Codex
+**Why:** The safe readiness command expanded nested execution and intraday
+capture packets, hiding its actual dependency order: first obtain a genuine
+current execution-quality capture, then separately authorize direct bars.
+**Changes:**
+- Added a strict bounded summary that reconciles readiness status/reasons,
+  exact 1h/4h intervals, eligible instruments, current and absolute request
+  bounds, execution-capture identity, publication state, RSI method, operator
+  action, 403 policy, and all research-only safety fields.
+- Made the normal Make target use the summary, retained the complete JSON packet
+  behind an explicit output variable, and kept direct Python CLI JSON-compatible.
+- Documented the output contract in the working agreement, North Star, venue
+  decision package, roadmap, and durable decisions.
+**Verify:** Compileall and all 26 focused intraday live/capture/readiness tests
+passed. The real readiness summary reported zero eligible instruments and zero
+current requests against the 60-request ceiling, absent execution capture and
+authorization, no publication, and zero calls/writes/orders/sends/trades/paper/
+RSI/`TRIGGERED_FADE`. Explicit JSON mode, North Star JSON validation,
+architecture cleanliness, and diff checks passed; size findings remain advisory.
+**Notes/risks:** No provider call or artifact write occurred. The command remains
+blocked until the upstream execution-quality capture exists and separate
+intraday authorization is already present. No threshold, score, route, outcome,
+dashboard authority, or Protocol-v2 eligibility changed.
+
 ## 2026-07-21 — Make Bybit execution readiness concise · Codex
 **Why:** The normal readiness command printed a 448-line packet whose repeated
 asset projections buried the absent authorization, missing capture, exact
