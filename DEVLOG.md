@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Record the fifty-ninth no-send market cycle · Codex
+**Why:** The hourly observation boundary became eligible with existing explicit
+CoinGecko authorization. Advancing the genuine point-in-time stream is the
+highest-value action while execution quality, official context, outcome
+recovery, and human labels remain separately gated.
+**Changes:** Daily Operations made exactly one request: CoinGecko returned HTTP
+200 with 80 bounded rows in 1,490 ms and no retry; 30 top-liquid rows were
+selected. Strict publication created
+`radar_market_no_send_20260721t151439069082z_4566a576574c`, its immutable
+publication/operations receipts, and revision-12 authority bound to
+operator-state SHA-256
+`594ede62556a3bed57909211b9c671e10ede8bb1f93c905b1abcb5704e4f2c30` and
+pointer SHA-256
+`07a6d49d8ed181d15520d367821b3de17fc9b9e8864fe1b1acf8a690123599e8`.
+The owned dashboard restarted. Campaign truth is now 59 cycles / 1,770
+retained / 1,740 baseline-counted / 30 too-close observations, 31/36
+historically warm assets, and 510 prospective universe/liquidity rows. The
+current 30-row generation is healthy-empty with zero anomalies or ideas and
+28/30 fully warm current assets. The exact causal 24-hour input remains 29/30:
+HBAR is still a recent entry, so all 17 complete point-in-time universes remain
+honestly incomplete and no regime was fabricated. Causal shadow replay is now
+312 ready / 1,151 partial / 277 unavailable projections. The next boundary is
+`2026-07-21T16:14:41.396928+00:00`.
+**Verify:** `make radar-daily-ops-readiness PYTHON=python3` reported eligible
+with zero calls; `make radar-daily-ops-cycle PYTHON=python3` succeeded;
+publication strict doctor recorded `OK`, 0 blockers, and 0 warnings; `make
+radar-daily-ops-status PYTHON=python3` reconciled the terminal success and next
+cadence; `make radar-dashboard-readiness PYTHON=python3` passed; exact loopback
+`HEAD /` returned HTTP 200 with the new namespace, run, revision, and operator
+digest headers. The regenerated campaign report closes all stated counts.
+**Notes/risks:** Spread remains unavailable, calendar context remains
+unconfigured, Protocol-v2 partitions remain unsealed, and no threshold was
+lowered. No Telegram send, trade, order, paper trade, normal RSI write, or Event
+Alpha `TRIGGERED_FADE` occurred. Quantitative source-size limits remain
+advisory; security, artifact, provider, request, and resource bounds remain
+enforced.
+
 ## 2026-07-21 — Pair robust-z history with empirical-tail distributions · Codex
 **Why:** The causal shadow replay exposed very large MAD-scaled z-scores, but
 coverage alone did not show whether those values also occupied rare positions
