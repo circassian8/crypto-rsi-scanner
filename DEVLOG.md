@@ -17,6 +17,20 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reconcile active Protocol-v2 roadmap truth · Codex
+**Why:** The cycle-54 completion entry and campaign report were current, but the
+long-lived active Protocol-v2 and empirical-coverage rows still summarized
+cycle 53 and a three/seven-item review queue.
+**Changes:** The active roadmap now points to the exact cycle-54 namespace,
+operator digest, campaign/outcome/control-input/episode counts, next cadence
+boundary, and eight-item human-review queue. Blocked Bybit, outcome, source,
+partition, holdout, and annex decisions remain unchanged.
+**Verify:** Compared the row against the authoritative generation, publication
+and operations receipts, Daily Operations status, dashboard response headers,
+and regenerated campaign JSON; `git diff --check` passed.
+**Notes/risks:** Documentation only. No provider call, artifact mutation, policy
+change, send, trade, order, paper trade, RSI write, or `TRIGGERED_FADE`.
+
 ## 2026-07-21 — Record the fifty-fourth no-send market cycle · Codex
 **Why:** The persisted hourly cadence became eligible with current explicit
 CoinGecko authorization. One bounded observation advances genuine temporal,
