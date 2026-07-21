@@ -201,3 +201,51 @@ def test_nonfinite_liquidity_cannot_claim_high_liquidity_or_raise_priority():
     assert anomalies[0]["priority_components"]["liquidity_tier"] == 0.0
     assert anomalies[0]["priority_components"]["market_cap_turnover"] == 0.0
     json.dumps({"snapshots": snapshot_rows, "anomalies": anomalies}, allow_nan=False)
+
+
+def test_direct_liquidity_value_overrides_conflicting_coarse_tier():
+    from crypto_rsi_scanner.event_alpha.radar import market_anomaly_scanner
+
+    base = {
+        "coin_id": "liquidity-conflict",
+        "symbol": "LIQ",
+        "return_unit": "percent_points",
+        "return_4h": 10.0,
+        "return_24h": 20.0,
+        "relative_return_vs_btc_4h": 10.0,
+        "volume_zscore_24h": 3.0,
+        "freshness_status": "fresh",
+    }
+
+    _, thin = market_anomaly_scanner.scan_market_rows(
+        [{**base, "liquidity_usd": 10_000.0, "liquidity_tier": "large"}],
+        observed_at="2026-07-21T11:40:00Z",
+    )
+    assert thin[0]["anomaly_bucket"] == "needs_catalyst_search"
+    assert thin[0]["priority_components"]["liquidity_tier"] == -7.0
+
+    _, liquid = market_anomaly_scanner.scan_market_rows(
+        [{**base, "liquidity_usd": 10_000_000.0, "liquidity_tier": "thin"}],
+        observed_at="2026-07-21T11:40:00Z",
+    )
+    assert liquid[0]["anomaly_bucket"] == "high_liquidity_breakout"
+    assert liquid[0]["priority_components"]["liquidity_tier"] == 9.0
+
+    for invalid_liquidity in ({"borrowed": 10_000_000}, float("inf")):
+        _, malformed = market_anomaly_scanner.scan_market_rows(
+            [{
+                **base,
+                "liquidity_usd": invalid_liquidity,
+                "liquidity_tier": "large",
+            }],
+            observed_at="2026-07-21T11:40:00Z",
+        )
+        assert malformed[0]["anomaly_bucket"] == "needs_catalyst_search"
+        assert malformed[0]["priority_components"]["liquidity_tier"] == 0.0
+
+    _, tier_only = market_anomaly_scanner.scan_market_rows(
+        [{**base, "liquidity_tier": "large"}],
+        observed_at="2026-07-21T11:40:00Z",
+    )
+    assert tier_only[0]["anomaly_bucket"] == "high_liquidity_breakout"
+    assert tier_only[0]["priority_components"]["liquidity_tier"] == 10.0

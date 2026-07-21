@@ -1018,17 +1018,36 @@ def _high_liquidity(
     *,
     cfg: MarketAnomalyScannerConfig,
 ) -> bool:
-    tier = str(snapshot.get("liquidity_tier") or source_row.get("liquidity_tier") or "").casefold()
-    if tier in {"large", "large_cap", "high", "top", "blue_chip"}:
-        return True
     liquidity = _float(
         _canonical_or_source_value(snapshot, source_row, "liquidity_usd")
     )
-    return liquidity is not None and liquidity >= cfg.high_liquidity_usd
+    if liquidity is not None:
+        return liquidity >= cfg.high_liquidity_usd
+    if _selected_source_liquidity_is_invalid(source_row):
+        return False
+    tier = _text(
+        snapshot.get("liquidity_tier") or source_row.get("liquidity_tier")
+    ).casefold()
+    return tier in {"large", "large_cap", "high", "top", "blue_chip"}
 
 
 def _liquidity_score(snapshot: Mapping[str, Any], source_row: Mapping[str, Any]) -> float:
-    tier = str(snapshot.get("liquidity_tier") or source_row.get("liquidity_tier") or "").casefold()
+    liquidity = _float(
+        _canonical_or_source_value(snapshot, source_row, "liquidity_usd")
+    )
+    if liquidity is not None:
+        if liquidity >= 5_000_000:
+            return 9.0
+        if liquidity >= 1_000_000:
+            return 5.0
+        if liquidity >= 250_000:
+            return 1.0
+        return -7.0
+    if _selected_source_liquidity_is_invalid(source_row):
+        return 0.0
+    tier = _text(
+        snapshot.get("liquidity_tier") or source_row.get("liquidity_tier")
+    ).casefold()
     if tier in {"large", "large_cap", "high", "top", "blue_chip"}:
         return 10.0
     if tier in {"mid", "medium", "mid_cap"}:
@@ -1037,18 +1056,16 @@ def _liquidity_score(snapshot: Mapping[str, Any], source_row: Mapping[str, Any])
         return 2.0
     if tier in {"thin", "micro", "low"}:
         return -6.0
-    liquidity = _float(
-        _canonical_or_source_value(snapshot, source_row, "liquidity_usd")
+    return 0.0
+
+
+def _selected_source_liquidity_is_invalid(source_row: Mapping[str, Any]) -> bool:
+    raw = _first_present_value(
+        source_row,
+        "liquidity_usd",
+        "order_book_liquidity_usd",
     )
-    if liquidity is None:
-        return 0.0
-    if liquidity >= 5_000_000:
-        return 9.0
-    if liquidity >= 1_000_000:
-        return 5.0
-    if liquidity >= 250_000:
-        return 1.0
-    return -7.0
+    return raw is not None and _float(raw) is None
 
 
 def _event_age_score(event_age_hours: float | None) -> float:

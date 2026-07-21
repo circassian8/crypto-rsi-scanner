@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Prefer direct liquidity evidence over coarse tiers · Codex
+**Why:** A row with directly observed `$10,000` liquidity and a contradictory
+`liquidity_tier=large` was labeled `high_liquidity_breakout` and received a
+positive liquidity priority component. The high-liquidity bucket and priority
+also used different precedence for other tier/value combinations.
+**Changes:** Market-anomaly bucketing and priority now use the canonical finite
+dollar-liquidity value whenever present, then fall back to a typed coarse tier
+only when direct numeric evidence is absent. A supplied but malformed or
+non-finite liquidity value cannot fall through to an optimistic tier. Tier-only
+registry rows remain supported, and no numeric threshold, anomaly rule,
+Decision route, or liquidity proxy changed.
+**Verify:** The exact contradictory reproduction changed from
+`high_liquidity_breakout`, liquidity component `+10`, priority `86` to
+`needs_catalyst_search`, liquidity component `-7`, priority `62`. Focused
+precedence, non-finite, fixture, and registry regressions passed (`4 passed`);
+the wider market surfaces, alias precedence, numeric/unit integrity, anomaly
+report, no-send normalization, and Decision-v2 suites passed (`190 passed`).
+`make event-alpha-market-anomaly-smoke PYTHON=python3` retained 8 snapshots and
+the expected 5 fixture anomalies, with zero doctor blockers and only the two
+expected standalone missing source/readiness warnings. `python3 -m compileall
+-q crypto_rsi_scanner tests` and `git diff --check` passed.
+**Notes/risks:** Full `make verify` was not repeated because the exact
+liquidity, bucket, priority, normalization, Decision, registry, and matching
+smoke paths were exercised directly. No provider call, authority change, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+occurred. Quantitative source-file size remains advisory; artifact, security,
+provider, request, evidence, and resource bounds remain enforced.
+
 ## 2026-07-21 — Require typed evidence for catalyst knownness · Codex
 **Why:** The market-anomaly scanner treated `published_at` or `event_time`
 alone as a known catalyst and accepted any truthy structured `source_url(s)`.
