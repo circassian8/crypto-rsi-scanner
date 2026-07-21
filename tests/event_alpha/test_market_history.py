@@ -816,6 +816,86 @@ def test_market_history_rejects_structured_identity_instead_of_stringifying_it()
     }
 
 
+def test_market_history_rejects_malformed_lineage_before_baseline_retention():
+    text_fields = (
+        "provider",
+        "source",
+        "market_data_source",
+        "data_mode",
+        "provider_source_artifact",
+        "data_acquisition_mode",
+        "candidate_source_mode",
+        "provider_generation_id",
+        "provider_source_artifact_sha256",
+        "request_ledger_path",
+        "request_ledger_sha256",
+        "measurement_program",
+        "decision_radar_campaign_reason",
+        "contract_counted_status",
+        "no_send_status",
+    )
+    bool_fields = (
+        "provenance_contract_valid",
+        "burn_in_eligible",
+        "burn_in_counted",
+        "decision_radar_campaign_eligible",
+        "decision_radar_campaign_counted",
+        "research_only",
+    )
+
+    for field in text_fields:
+        malformed = _row("malformed-lineage", NOW, price=1, volume=10)
+        malformed[field] = {"borrowed": "coingecko"}
+        result = event_market_history.enrich_market_rows_with_history(
+            [malformed],
+            now=NOW,
+            config=_config(),
+        )
+        assert result.enriched_rows[0]["market_history_status"] == "rejected"
+        assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+            "invalid_lineage_claim"
+        )
+        assert result.retained_history == ()
+
+    for field in bool_fields:
+        malformed = _row("malformed-lineage", NOW, price=1, volume=10)
+        malformed[field] = "false"
+        result = event_market_history.enrich_market_rows_with_history(
+            [malformed],
+            now=NOW,
+            config=_config(),
+        )
+        assert result.enriched_rows[0]["market_history_status"] == "rejected"
+        assert result.enriched_rows[0]["market_history"]["rejection_reason"] == (
+            "invalid_lineage_claim"
+        )
+        assert result.retained_history == ()
+
+    valid = _row(
+        "valid-lineage",
+        NOW,
+        price=1,
+        volume=10,
+        provider_generation_id="generation-0",
+        burn_in_eligible=False,
+        burn_in_counted=False,
+        decision_radar_campaign_eligible=True,
+        decision_radar_campaign_counted=True,
+        provenance_contract_valid=True,
+    )
+    valid_result = event_market_history.enrich_market_rows_with_history(
+        [valid],
+        now=NOW,
+        config=_config(),
+    )
+    assert valid_result.enriched_rows[0]["market_history_status"] == "cold"
+    assert valid_result.retained_history[0]["provider_generation_id"] == (
+        "generation-0"
+    )
+    assert valid_result.retained_history[0]["burn_in_eligible"] is False
+    assert valid_result.retained_history[0]["decision_radar_campaign_counted"] is True
+
+
 def test_retained_market_identity_aliases_do_not_coerce_or_borrow_after_invalid_values():
     current = _row("safe-token", NOW, price=1, volume=10)
     current.update({

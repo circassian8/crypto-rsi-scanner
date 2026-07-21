@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-21 — Reject malformed temporal-baseline lineage · Codex
+**Why:** Rolling market history copied explicit lineage fields without a type
+contract. Structured provider metadata and boolean `data_mode`, for example,
+could be retained verbatim and later stringified into temporal-feature
+provenance, weakening the exact point-in-time evidence chain used by the live
+campaign and Protocol-v2 preparation.
+**Changes:** Market-history preparation now requires each supplied provider,
+mode, artifact, digest, ledger, program, and status lineage claim to be
+nonblank text, and each supplied eligibility/safety claim to be a real boolean.
+An invalid explicit claim rejects the observation as
+`invalid_lineage_claim` before retention or baseline warming. Valid false
+eligibility flags remain valid typed evidence; missing optional lineage remains
+compatible.
+**Verify:** Regressions cover every retained text and boolean lineage field and
+valid false controls. The complete market-history/no-send/campaign group passed
+(`210 passed`); `python3 -m compileall -q crypto_rsi_scanner tests`, the
+market-no-send smoke, its strict doctor (zero blockers/warnings), dashboard
+fixture render, authoritative-pointer status, and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` was not repeated because the latest
+3,766-test checkpoint is green and the entire affected operational family plus
+its end-to-end smoke was rerun. No live provider call occurred, the exact real
+dashboard authority remained unchanged, and no threshold, feature formula,
+route, or historical artifact was rewritten. No sends, trades, orders, paper
+trades, RSI writes, or Event Alpha `TRIGGERED_FADE` were created. Quantitative
+source-size limits remain advisory.
+
 ## 2026-07-21 — Quarantine malformed incident relevance state · Codex
 **Why:** The incident compatibility projection coerced any nonempty persisted
 `incident_relevance_status` to text. A boolean, structured value, or unknown

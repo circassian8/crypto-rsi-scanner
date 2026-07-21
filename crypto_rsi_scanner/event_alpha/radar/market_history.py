@@ -42,15 +42,19 @@ from crypto_rsi_scanner.event_alpha.radar.market_history_summary import (
 
 _WARM_FEATURE_STATUSES = {"ready", "constant_baseline", "warm"}
 
-_LINEAGE_FIELDS = (
+_LINEAGE_TEXT_FIELDS = (
     "provider", "source", "market_data_source", "data_mode", "provider_source_artifact",
     "data_acquisition_mode", "candidate_source_mode", "provider_generation_id",
     "provider_source_artifact_sha256", "request_ledger_path", "request_ledger_sha256",
-    "provenance_contract_valid", "burn_in_eligible", "burn_in_counted",
-    "measurement_program", "decision_radar_campaign_eligible",
-    "decision_radar_campaign_counted", "decision_radar_campaign_reason",
-    "contract_counted_status", "no_send_status", "research_only",
+    "measurement_program", "decision_radar_campaign_reason",
+    "contract_counted_status", "no_send_status",
 )
+_LINEAGE_BOOL_FIELDS = (
+    "provenance_contract_valid", "burn_in_eligible", "burn_in_counted",
+    "decision_radar_campaign_eligible", "decision_radar_campaign_counted",
+    "research_only",
+)
+_LINEAGE_FIELDS = (*_LINEAGE_TEXT_FIELDS, *_LINEAGE_BOOL_FIELDS)
 _POINT_IN_TIME_CONTEXT_FIELDS = (
     "point_in_time_universe_member",
     "point_in_time_volume_rank",
@@ -284,6 +288,8 @@ def _prepare_observation(
     asset_id, identity_error = _canonical_asset_identity(row)
     if not asset_id:
         return None, identity_error
+    if _lineage_claims_invalid(row):
+        return None, "invalid_lineage_claim"
     raw_time = row.get("provider_observed_at") or row.get("observed_at") or row.get("timestamp")
     observed_at, time_error = _parse_aware_time(raw_time)
     if observed_at is None:
@@ -294,6 +300,23 @@ def _prepare_observation(
         return None, "stale"
     observation = _observation_values(row, asset_id=asset_id, observed_at=observed_at)
     return _PreparedObservation(index, observation, asset_id, observed_at), ""
+
+
+def _lineage_claims_invalid(row: Mapping[str, Any]) -> bool:
+    """Reject explicit lineage that cannot remain typed through persistence."""
+
+    for field in _LINEAGE_TEXT_FIELDS:
+        if field not in row or row.get(field) in (None, ""):
+            continue
+        value = row.get(field)
+        if not isinstance(value, str) or not value.strip():
+            return True
+    return any(
+        field in row
+        and row.get(field) is not None
+        and type(row.get(field)) is not bool
+        for field in _LINEAGE_BOOL_FIELDS
+    )
 
 
 def _deduplicate_history(
