@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Fail closed on malformed anomaly-scanner policy · Codex
+**Why:** The broad market-anomaly engine accepted non-finite or semantically
+invalid configuration, and `max_assets=0` accidentally disabled its result cap.
+A malformed environment value must not weaken boundedness or silently distort
+classification.
+**Changes:**
+- Added one typed configuration validator to every public scan,
+  classification, catalyst-queue, report, and writing surface before row
+  iteration or publication.
+- Made the asset cap strictly positive, numeric thresholds finite and
+  sign/order consistent, and the catalyst-search deadline at least 30 minutes.
+  Removed the silent deadline clamp. Valid defaults and score formulas are
+  byte-for-byte unchanged.
+- Added adversarial coverage for zero/negative/boolean caps, strings, NaN,
+  infinity, threshold-order violations, wrong config types, exact minimum
+  deadlines, and the no-write failure boundary. Updated the North Star,
+  roadmap, working agreement, and durable decision.
+**Verify:** 204 focused market/anomaly/no-send/pipeline tests passed;
+`compileall`, the Event Alpha market-anomaly smoke, and the Decision Radar
+market-no-send smoke passed. Architecture cleanliness passed with source-size
+measurements advisory. Both smokes retained zero sends, trades, orders, paper
+trades, normal RSI writes, and Event Alpha `TRIGGERED_FADE` creation.
+**Notes/risks:** No valid threshold, classification order, priority component,
+route, provider authorization, or publication rule changed. Source-code size
+measurements remain advisory; runtime result boundedness remains a safety
+contract.
+
 ## 2026-07-22 — Reconcile campaign headline limitations with cadence truth · Codex
 **Why:** The closed cadence audit proved a genuine collection break, but the
 campaign-v2 conclusion still named only spread, proxy evidence, and baseline

@@ -196,7 +196,7 @@ def scan_market_rows(
     run_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Return snapshot rows and anomaly rows from cached/fixture market rows."""
-    cfg = cfg or MarketAnomalyScannerConfig()
+    cfg = _validated_scanner_config(cfg)
     rows = _enriched_market_rows(
         market_rows,
         asset_registry=asset_registry or (),
@@ -305,8 +305,7 @@ def scan_market_rows(
             if anomaly["market_anomaly_id"] not in conflicting_ids
         ]
     anomalies.sort(key=lambda item: float(item.get("priority") or 0.0), reverse=True)
-    if cfg.max_assets > 0:
-        anomalies = anomalies[: cfg.max_assets]
+    anomalies = anomalies[: cfg.max_assets]
     return snapshot_rows, anomalies
 
 
@@ -316,7 +315,7 @@ def classify_market_state(
     *,
     cfg: MarketAnomalyScannerConfig | None = None,
 ) -> str:
-    cfg = cfg or MarketAnomalyScannerConfig()
+    cfg = _validated_scanner_config(cfg)
     row = source_row or {}
     if (
         _unit_contract_blocks_classification(snapshot)
@@ -601,7 +600,7 @@ def build_catalyst_search_queue(
     run_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build deterministic catalyst-search queue rows from anomaly rows."""
-    cfg = cfg or MarketAnomalyScannerConfig()
+    cfg = _validated_scanner_config(cfg)
     eligible: list[tuple[Mapping[str, Any], str, str]] = []
     anomaly_id_counts: dict[str, int] = {}
     for anomaly in anomalies:
@@ -643,7 +642,7 @@ def build_catalyst_search_queue(
         )
         snapshot = anomaly.get("market_state_snapshot") if isinstance(anomaly.get("market_state_snapshot"), Mapping) else {}
         row_observed = _queue_observed_at(anomaly, snapshot, observed_at)
-        search_deadline = row_observed + timedelta(hours=max(0.5, float(cfg.search_deadline_hours)))
+        search_deadline = row_observed + timedelta(hours=cfg.search_deadline_hours)
         suggested_packs = _string_list(
             anomaly.get("suggested_source_packs_to_search") or anomaly.get("suggested_source_packs")
         )
@@ -903,6 +902,7 @@ def format_market_anomaly_report(
     cfg: MarketAnomalyScannerConfig | None = None,
     limit: int = 20,
 ) -> str:
+    validated_cfg = _validated_scanner_config(cfg)
     return market_anomaly_report.format_market_anomaly_report(
         anomalies,
         snapshots=snapshots,
@@ -910,7 +910,7 @@ def format_market_anomaly_report(
         snapshot_count=snapshot_count,
         profile=profile,
         artifact_namespace=artifact_namespace,
-        cfg=cfg or MarketAnomalyScannerConfig(),
+        cfg=validated_cfg,
         limit=limit,
     )
 
@@ -1439,6 +1439,88 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if math.isfinite(parsed) else None
+
+
+def _validated_scanner_config(
+    cfg: MarketAnomalyScannerConfig | None,
+) -> MarketAnomalyScannerConfig:
+    """Return one closed scanner configuration or fail before data processing.
+
+    The numeric defaults are policy, not a best-effort parsing surface.  In
+    particular, ``max_assets=0`` must never turn the bounded result set into an
+    unlimited one and non-finite thresholds must never make a route silently
+    unreachable.
+    """
+
+    value = MarketAnomalyScannerConfig() if cfg is None else cfg
+    if type(value) is not MarketAnomalyScannerConfig:
+        raise ValueError("market_anomaly_scanner_config_invalid:type")
+    if type(value.max_assets) is not int or value.max_assets <= 0:
+        raise ValueError("market_anomaly_scanner_config_invalid:max_assets")
+
+    positive_fields = (
+        "confirmed_return_4h",
+        "confirmed_return_24h",
+        "confirmed_volume_zscore",
+        "confirmed_relative_btc_4h",
+        "stealth_return_4h_min",
+        "stealth_return_4h_max",
+        "stealth_relative_btc_4h",
+        "stealth_volume_zscore_min",
+        "stealth_volume_zscore_max",
+        "late_momentum_return_24h",
+        "suspicious_return_24h",
+        "suspicious_liquidity_usd",
+        "suspicious_spread_bps",
+        "high_liquidity_usd",
+        "search_deadline_hours",
+    )
+    for field_name in positive_fields:
+        field_value = getattr(value, field_name)
+        if (
+            isinstance(field_value, bool)
+            or not isinstance(field_value, (int, float))
+            or not math.isfinite(float(field_value))
+            or float(field_value) <= 0.0
+        ):
+            raise ValueError(
+                f"market_anomaly_scanner_config_invalid:{field_name}"
+            )
+
+    negative_fields = (
+        "post_event_fade_return_4h",
+        "post_event_fade_return_24h",
+        "risk_off_return_24h",
+    )
+    for field_name in negative_fields:
+        field_value = getattr(value, field_name)
+        if (
+            isinstance(field_value, bool)
+            or not isinstance(field_value, (int, float))
+            or not math.isfinite(float(field_value))
+            or float(field_value) >= 0.0
+        ):
+            raise ValueError(
+                f"market_anomaly_scanner_config_invalid:{field_name}"
+            )
+
+    if value.stealth_return_4h_min >= value.stealth_return_4h_max:
+        raise ValueError(
+            "market_anomaly_scanner_config_invalid:stealth_return_range"
+        )
+    if value.stealth_volume_zscore_min > value.stealth_volume_zscore_max:
+        raise ValueError(
+            "market_anomaly_scanner_config_invalid:stealth_volume_zscore_range"
+        )
+    if value.suspicious_liquidity_usd > value.high_liquidity_usd:
+        raise ValueError(
+            "market_anomaly_scanner_config_invalid:liquidity_threshold_order"
+        )
+    if value.search_deadline_hours < 0.5:
+        raise ValueError(
+            "market_anomaly_scanner_config_invalid:search_deadline_hours"
+        )
+    return value
 
 
 def _truthy(value: object) -> bool:

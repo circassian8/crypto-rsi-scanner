@@ -1822,7 +1822,7 @@
       "violation_id": "class:crypto_rsi_scanner/storage_parts/watchlist.py:WatchlistMixin"
     }
   ],
-  "file_count": 1184,
+  "file_count": 1185,
   "file_line_limit": 1500,
   "files_over_limit": [
     {
@@ -1881,7 +1881,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1638,
+      "line_count": 1720,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
@@ -2238,7 +2238,7 @@
   ],
   "functions_over_limit_count": 35,
   "gate_status": "pass",
-  "generated_at": "2026-07-22T02:41:30.201536+00:00",
+  "generated_at": "2026-07-22T02:53:17.348683+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2292,14 +2292,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1715,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+      "line_count": 1720,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1638,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "line_count": 1715,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "source_kind": "production"
     },
     {
@@ -4406,7 +4406,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1638,
+      "line_count": 1720,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "severity": "advisory",
       "source_kind": "production",
@@ -5006,14 +5006,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1715,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+      "line_count": 1720,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1638,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "line_count": 1715,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "source_kind": "production"
     },
     {
@@ -5738,14 +5738,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1715,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+      "line_count": 1720,
+      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1638,
-      "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+      "line_count": 1715,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
       "source_kind": "production"
     },
     {
@@ -5952,13 +5952,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1715,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+        "line_count": 1720,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
         "threshold": 1200
       },
       {
-        "line_count": 1638,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+        "line_count": 1715,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1200
       },
       {
@@ -6179,13 +6179,13 @@
         "threshold": 1500
       },
       {
-        "line_count": 1715,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+        "line_count": 1720,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
         "threshold": 1500
       },
       {
-        "line_count": 1638,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+        "line_count": 1715,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1500
       },
       {
@@ -6421,7 +6421,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 1638,
+      "line_count": 1720,
       "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
       "severity": "advisory",
       "source_kind": "production",

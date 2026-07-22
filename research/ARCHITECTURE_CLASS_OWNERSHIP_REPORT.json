@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11304,
+  "function_count": 11305,
   "function_line_limit": 150,
   "functions_over_150_lines": 35,
   "functions_over_limit": [
@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T02:41:34.035455+00:00",
+  "generated_at": "2026-07-22T02:53:21.159881+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -4257,13 +4257,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1715,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+        "line_count": 1720,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
         "threshold": 1200
       },
       {
-        "line_count": 1638,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+        "line_count": 1715,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1200
       },
       {
@@ -4484,13 +4484,13 @@
         "threshold": 1500
       },
       {
-        "line_count": 1715,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+        "line_count": 1720,
+        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
         "threshold": 1500
       },
       {
-        "line_count": 1638,
-        "path": "crypto_rsi_scanner/event_alpha/radar/market_anomaly_scanner.py",
+        "line_count": 1715,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1500
       },
       {

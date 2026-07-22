@@ -427,6 +427,14 @@ counts and never implies that catalyst-, technical-, derivatives-, on-chain-,
 fundamental-, or macro-led ideas descended from zero market anomalies. Missing
 stage receipts are not inferred.
 
+The broad anomaly scanner's configuration is a closed input contract. Every
+public scan, classification, queue, report, and writing surface validates it
+before consuming rows or publishing bytes. `max_assets` must be a strictly
+positive integer—zero is invalid rather than an unbounded sentinel. Thresholds
+must be typed, finite, sign-correct, and internally ordered; catalyst-search
+deadlines must be at least 30 minutes. Configuration validation never tunes or
+changes the valid default classifier and priority policy.
+
 Today and System Health share one canonical seven-layer coverage projection for
 market, catalyst, calendar, derivatives, RSI, outcomes, and the exact provider
 request ledger. Each layer is healthy-nonempty, healthy-empty, not configured,

@@ -1631,7 +1631,12 @@ work.
   market snapshots from CoinGecko-style fixture/live rows, but raw reviewed
   event payloads win when both exist. The market anomaly scanner may create
   low-authority raw research events from top movers, volume/mcap spikes, or
-  volume z-scores. Under Crypto Radar Decision Model v2, a fresh canonical,
+  volume z-scores. Its public surfaces validate one exact typed configuration
+  before row iteration or artifact writes: `max_assets` is strictly positive
+  (zero never means unbounded), numeric thresholds are finite and sign/order
+  consistent, and the search deadline is at least 30 minutes. Invalid config
+  fails closed without changing valid default thresholds. Under Crypto Radar
+  Decision Model v2, a fresh canonical,
   liquid, adequately traded, non-duplicate market anomaly with meaningful
   relative/structure and volume evidence may enter an explicit research route
   without a known catalyst. Unknown catalyst lowers evidence confidence, raises

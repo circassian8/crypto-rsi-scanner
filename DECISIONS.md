@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Fail closed on malformed market-anomaly configuration
+**Status:** accepted
+**Decision:** Every public broad market-anomaly scanner surface validates one
+exact typed configuration before iterating market/anomaly rows or writing an
+artifact. `max_assets` is a strictly positive integer; zero is invalid and must
+never mean unbounded. Thresholds and search deadlines are finite, sign-correct,
+and internally ordered. Valid defaults and score formulas remain unchanged.
+**Why:** The scanner previously treated `max_assets=0` as an unlimited result
+set, accepted non-finite thresholds, and silently clamped an invalid search
+deadline. A malformed environment value could therefore weaken boundedness or
+make classifications silently unreachable instead of failing visibly.
+**Revisit when:** A deliberately versioned configuration contract changes a
+threshold domain. Keep validation before data iteration/publication, and do not
+use configuration acceptance as a route or threshold-tuning mechanism.
+
 ## 2026-07-22 - Measure complete-generation cadence without inferring anchor eligibility
 **Status:** accepted as read-only continuity diagnostic; no scheduling or policy authority
 **Decision:** Exact-generation audit schema v4 measures every adjacent complete,

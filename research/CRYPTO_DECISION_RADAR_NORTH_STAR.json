@@ -744,6 +744,15 @@
     ],
     "operator_cycle_target": "radar-daily-ops-cycle",
     "publication_owner": "decision_radar_daily_operations_v1_1",
+    "anomaly_scanner_configuration_contract": {
+      "validation_boundary": "before_row_iteration_or_artifact_write_on_every_public_surface",
+      "max_assets": "strict_positive_integer_zero_is_invalid_not_unbounded",
+      "numeric_thresholds": "typed_finite_sign_correct_and_internally_ordered",
+      "minimum_search_deadline_minutes": 30,
+      "invalid_configuration_action": "fail_closed",
+      "valid_default_thresholds_changed": false,
+      "routing_or_policy_authority": false
+    },
     "targets": [
       "radar-market-no-send-readiness",
       "radar-daily-ops-cycle",
