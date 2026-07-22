@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11320,
+  "function_count": 11321,
   "function_line_limit": 150,
   "functions_over_150_lines": 35,
   "functions_over_limit": [
@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T05:32:07.353207+00:00",
+  "generated_at": "2026-07-22T05:37:43.777188+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3298,15 +3298,15 @@
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1469,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_regime_audit.py",
+      "line_count": 1480,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1453,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "line_count": 1469,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_regime_audit.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -4304,13 +4304,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1469,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_regime_audit.py",
+        "line_count": 1480,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
         "threshold": 1200
       },
       {
-        "line_count": 1453,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+        "line_count": 1469,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_regime_audit.py",
         "threshold": 1200
       },
       {

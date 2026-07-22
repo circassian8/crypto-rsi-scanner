@@ -101,6 +101,10 @@ When multiple valid owners exist, scoring first restricts selection to owners
 that independently establish the final positive catalyst status. A stronger
 plausible-only row cannot donate authority or specificity to a separate row's
 confirmed status.
+Within the status-aligned set, “strongest” means the largest combined
+`source_authority` and `source_specificity` contribution under their existing
+Decision-v2 weights, not authority alone; deterministic component tie-breakers
+follow.
 Closed-attribution enrichment joins source details by exact URL plus declared
 source ID/content hash when available. Exact identity wins over row order; more
 than one URL-only legacy match is ambiguous and contributes no borrowed fields.

@@ -686,7 +686,10 @@ def _evidence_components(
     # final positive status; never bypass an available status-aligned owner.
     ranked_owners = status_aligned_owners or evidence_owners
     owner = (
-        max(ranked_owners, key=_evidence_owner_rank)
+        max(
+            ranked_owners,
+            key=lambda row: _evidence_owner_rank(row, catalyst=catalyst),
+        )
         if ranked_owners
         else ({} if attribution_controls else data)
     )
@@ -696,13 +699,11 @@ def _evidence_components(
         if ranked_owners
         else 0
     )
-    specificity = (
-        92.0
-        if catalyst == CatalystStatus.CONFIRMED.value
-        else 72.0 if accepted > 0 else 42.0
+    specificity = _evidence_source_specificity(
+        catalyst=catalyst,
+        accepted=accepted,
+        source_title=source_title,
     )
-    if not source_title:
-        specificity = min(specificity, 58.0)
     catalyst_clarity = {
         CatalystStatus.CONFIRMED.value: 96.0,
         CatalystStatus.PLAUSIBLE.value: 72.0,
@@ -736,14 +737,40 @@ def _evidence_components(
     }
 
 
-def _evidence_owner_rank(row: Mapping[str, Any]) -> tuple[float, int, int, int]:
+def _evidence_owner_rank(
+    row: Mapping[str, Any],
+    *,
+    catalyst: str,
+) -> tuple[float, float, float, int, int, int]:
     authority, source_url, source_title = _evidence_source_profile(row)
+    accepted = (_count(row.get("accepted_evidence_count")) or 0) > 0
+    specificity = _evidence_source_specificity(
+        catalyst=catalyst,
+        accepted=int(accepted),
+        source_title=source_title,
+    )
     return (
+        authority * 0.30 + specificity * 0.20,
         authority,
-        int((_count(row.get("accepted_evidence_count")) or 0) > 0),
+        specificity,
+        int(accepted),
         int(bool(source_title)),
         int(bool(source_url)),
     )
+
+
+def _evidence_source_specificity(
+    *,
+    catalyst: str,
+    accepted: int,
+    source_title: str,
+) -> float:
+    specificity = (
+        92.0
+        if catalyst == CatalystStatus.CONFIRMED.value
+        else 72.0 if accepted > 0 else 42.0
+    )
+    return min(specificity, 58.0) if not source_title else specificity
 
 
 def _evidence_source_profile(

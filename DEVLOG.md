@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Rank evidence owners by weighted contribution · Codex
+**Why:** Status-aligned owner selection still ranked authority before
+specificity. A sparse 96/58 official record beat a complete 94/92 official
+record even though the latter produced the higher evidence score under the
+model's already-declared weights.
+**Changes:**
+- Ranked valid status-aligned owners by their combined existing
+  `0.30 * source_authority + 0.20 * source_specificity` contribution.
+- Kept authority, specificity, accepted evidence, title, and URL presence as
+  deterministic tie-breakers and reused one specificity derivation for ranking
+  and final component output.
+- Added an order-independent regression proving the complete owner preserves
+  the existing 94.85 score instead of falling to the sparse owner's 88.65.
+- Updated the working agreement, North Star, roadmap, and durable decision.
+**Verify:** 258 focused Decision-v2, surface, consistency, route, attribution,
+CoreOpportunity, calendar, namespace, derivatives-freshness, evaluation-clock,
+and outcome-integrity tests passed. Python compilation and the integrated-radar
+smoke passed with 15 candidates, 12 Core rows/cards, strict doctor 0 blockers /
+0 warnings, and 14 dashboard fixture pages.
+**Notes/risks:** No component value, weight, threshold, route, artifact,
+provider, or research-only safety boundary changed. Full `make verify` was
+intentionally skipped because the focused scoring/ownership and end-to-end
+integration gates cover this bounded selection correction. Quantitative source
+sizes remain advisory; runtime identity, artifact, request, path, secret, and
+security bounds remain enforced.
+
 ## 2026-07-22 — Bind closed attribution enrichment to source identity · Codex
 **Why:** A valid closed catalyst attribution rejoined source strength, accepted
 count, and title using the first row with the same URL. Two different rows that

@@ -727,6 +727,52 @@ def test_confirmed_catalyst_scores_only_from_a_confirming_source_owner():
         )
 
 
+def test_strongest_evidence_owner_uses_the_weighted_source_component_pair():
+    sparse_high_authority = {
+        "_source_origin": "official_exchange",
+        "source_class": "official_exchange",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "source_url": "https://example.test/sparse-official",
+    }
+    complete_official = {
+        "_source_origin": "official_exchange",
+        "source_class": "official_exchange",
+        "source_strength": "unrecognized",
+        "accepted_evidence_count": 1,
+        "source_url": "https://example.test/complete-official",
+        "source_title": "Complete official notice",
+    }
+    sparse = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=(sparse_high_authority,),
+    )
+    complete = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=(complete_official,),
+    )
+
+    assert sparse.evidence_confidence_components["source_authority"] == 96.0
+    assert sparse.evidence_confidence_components["source_specificity"] == 58.0
+    assert complete.evidence_confidence_components["source_authority"] == 94.0
+    assert complete.evidence_confidence_components["source_specificity"] == 92.0
+    assert complete.evidence_confidence_score > sparse.evidence_confidence_score
+
+    for source_rows in (
+        (sparse_high_authority, complete_official),
+        (complete_official, sparse_high_authority),
+    ):
+        combined = decision_model.evaluate_radar_decision(
+            _market_led_candidate(),
+            source_rows=source_rows,
+        )
+
+        assert combined.evidence_confidence_components == (
+            complete.evidence_confidence_components
+        )
+        assert combined.evidence_confidence_score == complete.evidence_confidence_score
+
+
 def test_catalyst_text_disproof_requires_unnegated_field_local_components():
     false_disproofs = (
         {"title": "Unofficial denial rumor"},

@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Rank evidence owners by their weighted source contribution
+**Status:** accepted
+**Decision:** After restricting evidence owners to the rows that independently
+establish the final positive catalyst status, choose the owner with the largest
+combined `source_authority * 0.30 + source_specificity * 0.20` contribution.
+Use authority, specificity, accepted evidence, title, and URL presence only as
+deterministic tie-breakers. Keep the existing component values and weights.
+**Why:** Authority-first ranking selected a sparse 96-authority/58-specificity
+owner over a complete 94-authority/92-specificity owner even though the latter
+raised the model's evidence score from 88.65 to 94.85. “Strongest owner” did not
+match the scoring function it was supposed to support.
+**Revisit when:** Evidence weights are changed from independent empirical
+calibration or a schema-backed owner quality score replaces this derivation. Do
+not alter weights from owner-selection examples alone.
+
 ## 2026-07-22 - Join closed attribution to source details by identity
 **Status:** accepted
 **Decision:** Enrich a valid closed catalyst attribution from a source row only

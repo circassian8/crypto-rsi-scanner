@@ -2,7 +2,7 @@
 
 Research artifact only. This static gate classifies remaining migration-era naming and does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create `TRIGGERED_FADE`.
 
-- generated_at: `2026-07-22T05:31:54.009724+00:00`
+- generated_at: `2026-07-22T05:37:30.438224+00:00`
 - status: `OK`
 - legacy_occurrences: `2922`
 - legacy_named_files_remaining: `0`
