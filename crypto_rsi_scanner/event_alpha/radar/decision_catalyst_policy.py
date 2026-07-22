@@ -428,6 +428,13 @@ def _source_row_attribution_identity_match(
 ) -> bool | None:
     """Return exact match, mismatch, or legacy-unavailable identity state."""
 
+    if any(
+        field in source
+        and source.get(field) not in (None, "")
+        and not _typed_text(source.get(field))
+        for field in (*_ATTRIBUTION_SOURCE_ID_FIELDS, "source_content_hash")
+    ):
+        return False
     source_ids = {
         value
         for field in _ATTRIBUTION_SOURCE_ID_FIELDS
@@ -438,9 +445,18 @@ def _source_row_attribution_identity_match(
         for value in (_typed_text(source.get("source_content_hash")),)
         if value
     }
-    if source_ids or _typed_text(source.get("row_type")) or _typed_text(
-        source.get("_source_origin")
-    ):
+    source_row_typed = bool(
+        source_ids
+        or _typed_text(source.get("row_type"))
+        or _typed_text(source.get("_source_origin"))
+    )
+    if source_row_typed:
+        if (
+            "content_hash" in source
+            and source.get("content_hash") not in (None, "")
+            and not _typed_text(source.get("content_hash"))
+        ):
+            return False
         if content_hash := _typed_text(source.get("content_hash")):
             source_hashes.add(content_hash.casefold())
     attribution_id = _typed_text(attribution.get("source_id"))

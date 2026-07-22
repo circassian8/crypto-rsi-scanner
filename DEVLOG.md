@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Reject malformed attribution-join identities · Codex
+**Why:** The source-enrichment join treated a present non-text source ID as if
+identity were simply absent. A malformed same-URL shell could therefore enter
+legacy compatibility and lend 96/92 evidence components to a valid attribution.
+**Changes:**
+- Made malformed explicit source IDs and source hashes identity mismatches.
+- Kept genuinely absent legacy identity eligible for the existing single-URL
+  compatibility path, while generic candidate IDs/hashes remain outside source
+  identity.
+- Added a regression proving malformed identity cannot lend strength, title, or
+  accepted-count fields; the attribution retains its own 94/58 components.
+- Updated the working agreement, North Star, roadmap, and durable join decision.
+**Verify:** 259 focused Decision-v2, surface, consistency, route, attribution,
+CoreOpportunity, calendar, namespace, derivatives-freshness, evaluation-clock,
+and outcome-integrity tests passed. Python compilation and the integrated-radar
+smoke passed with 15 candidates, 12 Core rows/cards, strict doctor 0 blockers /
+0 warnings, and 14 dashboard fixture pages.
+**Notes/risks:** No score value, weight, threshold, route, artifact, provider,
+or research-only safety boundary changed. Full `make verify` was intentionally
+skipped because the focused identity/ownership and end-to-end integration gates
+cover this bounded fail-closed correction. Quantitative source sizes remain
+advisory; runtime identity, artifact, request, path, secret, and security bounds
+remain enforced.
+
 ## 2026-07-22 — Rank evidence owners by weighted contribution · Codex
 **Why:** Status-aligned owner selection still ranked authority before
 specificity. A sparse 96/58 official record beat a complete 94/92 official

@@ -96,7 +96,9 @@ authority alone does not override a materially more complete owner. A closed
 attribution may enrich itself from one exact-URL source row, preferring an exact
 declared source ID/content hash.
 Ambiguous identity or multiple URL-only legacy matches borrow no fields, so row
-order cannot change authority, specificity, title, or accepted-count truth.
+order cannot change authority, specificity, title, or accepted-count truth. A
+present malformed identity is an explicit mismatch and cannot masquerade as
+legacy identity absence.
 
 Historical thesis-origin compatibility is closed in the same way across all
 seven origins. Market, catalyst, technical, derivatives, on-chain, fundamental,

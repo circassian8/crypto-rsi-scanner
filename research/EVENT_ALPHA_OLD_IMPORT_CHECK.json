@@ -2224,7 +2224,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_clock",
-          "line": 5413,
+          "line": 5415,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2262,7 +2262,7 @@
         },
         {
           "detail": "crypto_rsi_scanner.event_models",
-          "line": 5413,
+          "line": 5415,
           "path": "DECISIONS.md",
           "reference_type": "text_reference",
           "snippet": "`crypto_rsi_scanner.event_clock` and `crypto_rsi_scanner.event_models` import"
@@ -2373,7 +2373,7 @@
       "text_references": [
         {
           "detail": "crypto_rsi_scanner.event_alpha_artifact_doctor",
-          "line": 17634,
+          "line": 17658,
           "path": "DEVLOG.md",
           "reference_type": "text_reference",
           "snippet": "**Notes/risks:** `crypto_rsi_scanner.event_alpha_artifact_doctor` remains"
@@ -2475,21 +2475,21 @@
     }
   ],
   "future_mtime_paths": [],
-  "generated_at": "2026-07-22T05:37:34.060954+00:00",
+  "generated_at": "2026-07-22T05:44:18.248920+00:00",
   "include_runtime_artifacts": false,
   "input_file_count": 1270,
-  "input_fingerprint": "8585cf9671cdc922cd168bf5113be25ad87068b8085ec9b2c2a1d3f32b36719a",
+  "input_fingerprint": "b2f64f2310b072a90d232ba1fb065f72eb9c5b05f2a6d3a2adba59e4276964a8",
   "input_fingerprint_match": false,
   "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
   "legacy_import_compatibility_test": "tests/event_alpha/test_no_old_event_alpha_imports.py",
   "newer_source_mtime_paths": [
-    "AGENTS.md:1784698570",
-    "DECISIONS.md:1784698570",
-    "DEVLOG.md:1784698643",
-    "ROADMAP.md:1784698570",
-    "crypto_rsi_scanner/event_alpha/radar/decision_model.py:1784698532"
+    "AGENTS.md:1784698967",
+    "DECISIONS.md:1784698967",
+    "DEVLOG.md:1784699033",
+    "ROADMAP.md:1784698967",
+    "crypto_rsi_scanner/event_alpha/radar/decision_catalyst_policy.py:1784698935"
   ],
-  "newest_source_mtime": 1784698651.0848012,
+  "newest_source_mtime": 1784699055.313988,
   "no_send_rehearsal": true,
   "normal_rsi_signal_rows_written": 0,
   "old_import_check_cache_status": "miss",
@@ -2501,7 +2501,7 @@
   "old_path_text_references": 64,
   "paper_trades_created": 0,
   "registry_entry_count": 0,
-  "report_mtime": 1784698317.6276476,
+  "report_mtime": 1784698654.0621269,
   "research_only": true,
   "row_type": "event_alpha_old_import_check",
   "scan_accounting": {
@@ -2510,21 +2510,21 @@
     "future_mtime_paths": [],
     "include_runtime_artifacts": false,
     "input_file_count": 1270,
-    "input_fingerprint": "8585cf9671cdc922cd168bf5113be25ad87068b8085ec9b2c2a1d3f32b36719a",
+    "input_fingerprint": "b2f64f2310b072a90d232ba1fb065f72eb9c5b05f2a6d3a2adba59e4276964a8",
     "input_fingerprint_match": false,
     "input_fingerprint_schema": "event_alpha_shim_scan_inputs_v1",
     "max_file_bytes": 1000000,
     "newer_source_mtime_paths": [
-      "AGENTS.md:1784698570",
-      "DECISIONS.md:1784698570",
-      "DEVLOG.md:1784698643",
-      "ROADMAP.md:1784698570",
-      "crypto_rsi_scanner/event_alpha/radar/decision_model.py:1784698532"
+      "AGENTS.md:1784698967",
+      "DECISIONS.md:1784698967",
+      "DEVLOG.md:1784699033",
+      "ROADMAP.md:1784698967",
+      "crypto_rsi_scanner/event_alpha/radar/decision_catalyst_policy.py:1784698935"
     ],
-    "newest_source_mtime": 1784698651.0848012,
+    "newest_source_mtime": 1784699055.313988,
     "regex_compile_count": 124,
-    "report_mtime": 1784698317.6276476,
-    "scan_duration_seconds": 2.6394,
+    "report_mtime": 1784698654.0621269,
+    "scan_duration_seconds": 2.6011,
     "scanned_artifact_files": 0,
     "scanned_doc_files": 79,
     "scanned_makefile_files": 1,
@@ -2558,7 +2558,7 @@
     "skipped_symlink_files": 0,
     "source_snapshot_cache_status": "miss"
   },
-  "scan_duration_seconds": 2.6394,
+  "scan_duration_seconds": 2.6011,
   "scanned_doc_files": 79,
   "scanned_source_files": 920,
   "scanned_test_files": 265,

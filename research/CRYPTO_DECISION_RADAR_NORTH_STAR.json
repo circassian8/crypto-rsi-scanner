@@ -778,7 +778,7 @@
     "compatibility_evidence_ownership": "row_local; source lane, accepted count, and public URL cannot be pooled across different rows",
     "decision_evidence_score_ownership": "source authority and specificity use one valid row-local owner that independently establishes the final positive catalyst status; a plausible-only row cannot donate components to confirmed status, and supplied invalid or non-causal attribution cannot fall back to historical official hints",
     "decision_evidence_owner_rank": "maximize the existing 0.30 source-authority plus 0.20 source-specificity contribution inside the status-aligned owner set, then use deterministic component tie-breakers; no weight change",
-    "closed_attribution_source_join": "exact public URL plus one unique declared source ID or content hash when available; one URL-only legacy match is compatible, while ambiguous matches borrow no fields and row order has no authority",
+    "closed_attribution_source_join": "exact public URL plus one unique declared source ID or content hash when available; one URL-only legacy match is compatible, while ambiguous or explicitly malformed identity matches borrow no fields and row order has no authority",
     "compatibility_lane_label_matching": "normalized component boundaries only; arbitrary substrings cannot raise catalyst status",
     "compatibility_text_disproof": "field-local unnegated normalized component sequences only; separate fields and immediate no/non/not/without negation cannot create disproof",
     "decision_evidence_official_class_matching": "trimmed and case-folded exact official_exchange or official_project only, shared by catalyst status and evidence scoring; prefixes and compounds receive unverified baseline authority points",

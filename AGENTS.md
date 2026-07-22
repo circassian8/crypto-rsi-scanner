@@ -108,6 +108,7 @@ follow.
 Closed-attribution enrichment joins source details by exact URL plus declared
 source ID/content hash when available. Exact identity wins over row order; more
 than one URL-only legacy match is ambiguous and contributes no borrowed fields.
+An explicit malformed identity is a mismatch, never legacy-missing identity.
 Historical text-only disproof phrases are field-local, component-boundary
 matched, and reject immediate `no`/`non`/`not`/`without` negation. Separate
 fields cannot assemble a disproof, and `unofficial denial` is not an

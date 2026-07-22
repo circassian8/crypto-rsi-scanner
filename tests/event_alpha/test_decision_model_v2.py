@@ -2062,6 +2062,50 @@ def test_closed_attribution_does_not_guess_between_url_only_source_rows():
     assert results[0].evidence_confidence_score == results[1].evidence_confidence_score
 
 
+def test_closed_attribution_does_not_treat_malformed_identity_as_legacy_missing():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    anomaly = {
+        "market_anomaly_id": "decision-model-v2-move",
+        "observed_at": "2026-06-15T16:00:00Z",
+    }
+    source = {
+        "raw_id": "sealed-source",
+        "provider": "official_exchange",
+        "source_url": "https://exchange.example/notices/malformed-identity",
+        "content_hash": "f" * 64,
+        "published_at": "2026-06-15T15:30:00Z",
+        "row_type": "official_listing_candidate",
+        "source_class": "official_exchange",
+        "main_frame_role": "main_catalyst",
+        "candidate_role": "direct_subject",
+        "impact_path_strength": "direct",
+    }
+    attribution = catalyst_attribution.assess_mapping_attribution(anomaly, source)
+    malformed_same_url = {
+        "raw_id": {"unexpected": "mapping"},
+        "source_url": source["source_url"],
+        "source_class": "official_exchange",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "source_title": "Malformed source shell",
+    }
+    row = _market_led_candidate(
+        market_anomaly_id=anomaly["market_anomaly_id"],
+        catalyst_attributions=[attribution],
+    )
+
+    result = decision_model.evaluate_radar_decision(
+        row,
+        source_rows=(malformed_same_url,),
+    )
+
+    assert result.catalyst_status == "confirmed"
+    assert result.evidence_confidence_components["source_authority"] == 94.0
+    assert result.evidence_confidence_components["source_specificity"] == 58.0
+    assert result.evidence_confidence_score == 88.05
+
+
 def test_invalid_supplied_catalyst_attribution_fails_closed():
     from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 

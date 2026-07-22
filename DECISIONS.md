@@ -39,6 +39,8 @@ match when those identifiers are available. Prefer one unique identity match
 regardless of row order. Preserve a single URL-only row as bounded historical
 compatibility, but treat multiple URL-only matches or multiple identity matches
 as ambiguous and borrow no source fields.
+An explicitly present malformed source ID/hash is a mismatch, not an absent
+legacy identifier, and therefore cannot enter URL-only compatibility.
 **Why:** URL-only first-match selection made the same attribution score at 84 or
 96 source-authority points depending on whether an unrelated same-URL news row
 or the exact official source appeared first. It could also borrow the wrong
