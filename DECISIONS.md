@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Match historical thesis origins on unnegated components
+**Status:** accepted
+**Decision:** Historical Decision-v2 source-label inference may contribute a
+market, catalyst, technical, derivatives, on-chain, fundamental, or macro
+origin only from a canonical normalized component sequence. Immediate
+`no`/`non`/`not`/`without` negation cancels the sequence. Embedded look-alikes
+such as `newsletter`, `unofficial_exchange`, `walletless`, and `tvless` do not
+contribute an origin. Canonical compound labels retain their existing mapping.
+**Why:** Arbitrary substring matching manufactured unrelated thesis origins,
+which could misstate the primary explanation and downstream cohort truth even
+when the candidate's actual evidence was only market-led.
+**Revisit when:** A versioned typed source-lane registry fully replaces
+historical text compatibility. Do not rewrite historical artifacts or use this
+rule to change score or route thresholds.
+
 ## 2026-07-22 - Re-derive catalyst status during final Decision reevaluation
 **Status:** accepted
 **Decision:** When `reevaluate_radar_decision_fields` receives a completed

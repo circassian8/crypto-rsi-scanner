@@ -70,6 +70,11 @@ matches such as `newsletter` -> `news`, `unofficial_exchange` ->
 `official_exchange`, or `unlockable` -> `unlock` must never raise catalyst
 status. Valid compound labels such as `broad_news`,
 `official_exchange_listing_pack`, and `project_blog_rss` remain recognized.
+Historical thesis-origin inference follows the same closed boundary rule across
+market, catalyst, technical, derivatives, on-chain, fundamental, and macro
+labels. Only unnegated normalized source-label components may contribute an
+origin; embedded or negated look-alikes such as `walletless`, `tvless`,
+`newsletter`, or `not_market_anomaly` must not manufacture one.
 That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the

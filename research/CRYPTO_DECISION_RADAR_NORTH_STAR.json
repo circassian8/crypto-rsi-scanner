@@ -1936,6 +1936,7 @@
     }
   },
   "origins": {
+    "compatibility_label_matching": "canonical unnegated normalized component sequences only; embedded or immediately negated look-alikes cannot contribute an origin",
     "contributing": [
       "market_led",
       "catalyst_led",

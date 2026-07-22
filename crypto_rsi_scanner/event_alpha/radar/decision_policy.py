@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import math
+import re
 from typing import Any, Iterable, Mapping
 
 from . import market_units
@@ -27,6 +28,84 @@ from .decision_models import (
 
 
 _ALLOWED_ORIGINS = {item.value for item in ThesisOrigin if item is not ThesisOrigin.MIXED}
+_SOURCE_COMPONENT_SPLIT = re.compile(r"[^a-z0-9]+")
+_ORIGIN_COMPONENT_TERMS = (
+    (
+        ThesisOrigin.ONCHAIN_LED.value,
+        (
+            "dex",
+            "onchain",
+            "on_chain",
+            "wallet",
+            "wallets",
+            "liquidity_pool",
+            "supply",
+            "supplies",
+        ),
+    ),
+    (
+        ThesisOrigin.DERIVATIVES_LED.value,
+        (
+            "derivative",
+            "derivatives",
+            "coinalyze",
+            "funding",
+            "open_interest",
+            "perpetual",
+            "perpetuals",
+        ),
+    ),
+    (
+        ThesisOrigin.FUNDAMENTAL_LED.value,
+        (
+            "protocol_fundamental",
+            "protocol_fundamentals",
+            "fundamental",
+            "fundamentals",
+            "protocol_revenue",
+            "protocol_fee",
+            "protocol_fees",
+            "tvl",
+        ),
+    ),
+    (
+        ThesisOrigin.TECHNICAL_LED.value,
+        ("technical", "rsi", "indicator", "indicators"),
+    ),
+    (
+        ThesisOrigin.MACRO_LED.value,
+        (
+            "macro",
+            "central_bank",
+            "inflation",
+            "employment",
+            "fomc",
+            "cpi",
+            "pce",
+            "gdp",
+        ),
+    ),
+    (
+        ThesisOrigin.CATALYST_LED.value,
+        (
+            "official_exchange",
+            "official_project",
+            "scheduled_catalyst",
+            "structured_calendar",
+            "structured_unlock",
+            "unlock",
+            "unlocks",
+            "news",
+            "regulatory",
+            "external_catalyst",
+            "prediction_market",
+        ),
+    ),
+    (
+        ThesisOrigin.MARKET_LED.value,
+        ("market_anomaly", "market_state", "price_volume", "breakout"),
+    ),
+)
 _ALLOWED_PHASES = {item.value for item in MarketPhase}
 _RETURN_FIELDS = frozenset(market_units.RETURN_KEYS)
 _MAX_NORMALIZED_RETURN_PERCENT_POINTS = 300.0
@@ -970,8 +1049,8 @@ def apply_validated_rsi_adjustments(
 
 
 def _origins_for_text(value: object) -> tuple[str, ...]:
-    text = str(value or "").strip().casefold().replace("-", "_")
-    if not text:
+    parts = _source_component_parts(value)
+    if not parts:
         return ()
     out: list[str] = []
 
@@ -979,35 +1058,46 @@ def _origins_for_text(value: object) -> tuple[str, ...]:
         if origin not in out:
             out.append(origin)
 
-    if any(term in text for term in ("dex", "onchain", "on_chain", "wallet", "liquidity_pool", "supply")):
-        add(ThesisOrigin.ONCHAIN_LED.value)
-    if any(term in text for term in ("derivative", "coinalyze", "funding", "open_interest", "perpetual")):
-        add(ThesisOrigin.DERIVATIVES_LED.value)
-    if any(term in text for term in ("protocol_fundamental", "fundamental", "protocol_revenue", "protocol_fee", "tvl")):
-        add(ThesisOrigin.FUNDAMENTAL_LED.value)
-    if any(term in text for term in ("technical", "rsi", "indicator")):
-        add(ThesisOrigin.TECHNICAL_LED.value)
-    if any(term in text for term in ("macro", "central_bank", "inflation", "employment", "fomc", "cpi", "pce", "gdp")):
-        add(ThesisOrigin.MACRO_LED.value)
-    if any(
-        term in text
-        for term in (
-            "official_exchange",
-            "official_project",
-            "scheduled_catalyst",
-            "structured_calendar",
-            "structured_unlock",
-            "unlock",
-            "news",
-            "regulatory",
-            "external_catalyst",
-            "prediction_market",
-        )
-    ):
-        add(ThesisOrigin.CATALYST_LED.value)
-    if any(term in text for term in ("market_anomaly", "market_state", "price_volume", "breakout")):
-        add(ThesisOrigin.MARKET_LED.value)
+    for origin, terms in _ORIGIN_COMPONENT_TERMS:
+        if _has_unnegated_source_components(parts, terms):
+            add(origin)
     return tuple(out)
+
+
+def _source_component_parts(value: object) -> tuple[str, ...]:
+    if not isinstance(value, str) or not value.strip():
+        return ()
+    return tuple(
+        part
+        for part in _SOURCE_COMPONENT_SPLIT.split(value.strip().casefold())
+        if part
+    )
+
+
+def _has_unnegated_source_components(
+    value_parts: tuple[str, ...],
+    terms: tuple[str, ...],
+) -> bool:
+    matches: list[tuple[int, int]] = []
+    for term in terms:
+        term_parts = _source_component_parts(term)
+        width = len(term_parts)
+        for index in range(len(value_parts) - width + 1):
+            if value_parts[index : index + width] == term_parts:
+                matches.append((index, index + width))
+
+    negated_matches = tuple(
+        (start, end)
+        for start, end in matches
+        if start and value_parts[start - 1] in {"no", "non", "not", "without"}
+    )
+    return any(
+        not any(
+            negated_start <= start and end <= negated_end
+            for negated_start, negated_end in negated_matches
+        )
+        for start, end in matches
+    )
 
 
 def _derive_market_phase(data: Mapping[str, Any]) -> str:
@@ -1029,7 +1119,7 @@ def _derive_market_phase(data: Mapping[str, Any]) -> str:
 
 def _has_market_thesis(data: Mapping[str, Any]) -> bool:
     return bool(_market_label(data) or any(
-        "market_anomaly" in str(value).casefold()
+        ThesisOrigin.MARKET_LED.value in _origins_for_text(value)
         for field in ("source_origin", "source_origins", "source_pack", "source_packs")
         for value in _texts(data.get(field))
     ))

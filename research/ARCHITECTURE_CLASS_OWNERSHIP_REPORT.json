@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11310,
+  "function_count": 11312,
   "function_line_limit": 150,
   "functions_over_150_lines": 35,
   "functions_over_limit": [
@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T03:34:15.125488+00:00",
+  "generated_at": "2026-07-22T03:49:22.891342+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3382,6 +3382,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1334,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1333,
       "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -4357,6 +4364,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1334,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1333,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/system_pages.py",
         "threshold": 1200
@@ -4409,11 +4421,6 @@
       {
         "line_count": 1244,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_validation_protocol_v2_progress.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1244,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
         "threshold": 1200
       },
       {

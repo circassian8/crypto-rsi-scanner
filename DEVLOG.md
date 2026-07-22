@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Close thesis-origin substring false positives · Codex
+**Why:** Historical Decision-v2 source-label inference searched arbitrary
+substrings. Labels such as `newsletter_archive`, `walletless_source`, and
+`not_market_anomaly` could therefore manufacture catalyst, on-chain, or market
+origins that the evidence did not support.
+**Changes:**
+- Replaced free substring origin inference with one closed normalized-component
+  vocabulary across market, catalyst, technical, derivatives, on-chain,
+  fundamental, and macro origins.
+- Rejected immediate `no`/`non`/`not`/`without` negation while preserving known
+  compound labels such as `broad_news`, `dex_pool`, `coinalyze_derivatives`,
+  `protocol_fundamentals_pack`, `rsi_indicators`, `fomc_calendar`, and
+  `market_anomaly_pack`.
+- Added paired false/valid regression cases and updated the North Star, roadmap,
+  working agreement, and durable decision.
+**Verify:** 235 focused Decision-v2, surface, consistency, catalyst,
+namespace-integration, Core-opportunity, scheduled-catalyst, empirical-policy,
+and replay tests passed. Python compilation, strict integrated smoke/doctor,
+dashboard fixture rendering, architecture cleanliness, JSON validation, and
+diff hygiene are run before publication.
+**Notes/risks:** No score formula, threshold, route, provider, source-authority
+contract, historical artifact, or research-only safety boundary changed.
+
 ## 2026-07-22 — Re-derive catalyst truth after evidence mutation · Codex
 **Why:** The final Decision-v2 reevaluation API accepted its prior derived
 `catalyst_status` as explicit fresh input. A confirmed candidate stayed

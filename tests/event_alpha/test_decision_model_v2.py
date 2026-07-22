@@ -2000,6 +2000,50 @@ def test_typed_origin_context_preserves_technical_onchain_and_fundamental_origin
     assert fundamental.decision_hard_blockers == ()
 
 
+def test_thesis_origin_labels_require_unnegated_component_boundaries():
+    false_origin_labels = (
+        "newsletter_archive",
+        "unofficial_exchange_archive",
+        "walletless_source",
+        "tvless_source",
+        "not_market_anomaly",
+        "not_protocol_fundamentals",
+        "without_structured_unlock",
+    )
+    for label in false_origin_labels:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                source_origin=label,
+                source_origins=[label],
+                source_pack="context_pack",
+            )
+        )
+
+        assert result.primary_thesis_origin == "market_led"
+        assert result.thesis_origins == ("market_led",)
+
+    valid_origin_labels = {
+        "dex_pool": "onchain_led",
+        "coinalyze_derivatives": "derivatives_led",
+        "protocol_fundamentals_pack": "fundamental_led",
+        "rsi_indicators": "technical_led",
+        "fomc_calendar": "macro_led",
+        "broad_news": "catalyst_led",
+        "market_anomaly_pack": "market_led",
+    }
+    for label, expected in valid_origin_labels.items():
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                source_origin=label,
+                source_origins=[label],
+                source_pack="context_pack",
+            )
+        )
+
+        assert result.primary_thesis_origin == expected
+        assert expected in result.thesis_origins
+
+
 def test_market_primary_with_confirmed_catalyst_contributor_can_be_high_confidence():
     source = {
         "_source_origin": "official_exchange",

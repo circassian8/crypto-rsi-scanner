@@ -70,6 +70,15 @@ evidence count or public URL from another row. A source-bound accepted count or
 public URL may retain compatibility confidence; unrelated evidence remains
 unknown.
 
+Historical thesis-origin compatibility is closed in the same way across all
+seven origins. Market, catalyst, technical, derivatives, on-chain, fundamental,
+and macro context may be inferred only from unnegated normalized source-label
+components. Embedded or immediately negated look-alikes such as `newsletter`,
+`unofficial_exchange`, `walletless`, `tvless`, and `not_market_anomaly` do not
+manufacture an origin. Canonical compound labels retain their existing mapping;
+this compatibility surface does not replace typed current evidence or rewrite
+historical rows.
+
 Historical text-only disproof compatibility is likewise conservative but
 literal: `source correction`, `official denial`, and `catalyst_disproven` must
 appear as unnegated normalized component sequences within one source field.
