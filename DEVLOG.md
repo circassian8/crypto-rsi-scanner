@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record the sixty-sixth no-send market cycle · Codex
+**Why:** The next hourly boundary became eligible while the already-present
+CoinGecko authorization remained active. One bounded observation was needed to
+continue warming the causal temporal baseline and refresh terminal campaign
+truth.
+**Changes:**
+- Ran exactly one authorized Daily Operations cycle. CoinGecko returned HTTP
+  200 with 80 rows in 1,474 ms and no retry; 30 top-liquid observations were
+  normalized into `radar_market_no_send_20260722t025639011651z_ef5d15846ec7`.
+- Published the strict-clean generation, restarted the exact owned loopback
+  dashboard, and retained immutable publication/operations receipts. The
+  generation is healthy-empty with zero anomalies, candidates, Core rows, or
+  cards; no threshold was lowered to manufacture an idea.
+- Rebuilt canonical campaign truth to 66 real cycles, 1,980 retained rows,
+  1,950 baseline-counted rows, 30 too-close rows, and 720 prospective context
+  rows. Exact current-universe baseline is 28/30 warm; causal 24-hour regime
+  input remains 0/30 because the measured collection gap still leaves no valid
+  anchor for this endpoint.
+**Verify:** Exact strict doctor passed with 0 blockers / 0 warnings. Dashboard
+readiness and authority status passed at revision 12; the exact 12-page smoke
+reported zero writes; loopback HEAD returned HTTP 200 with matching namespace,
+run, revision, and operator-state digest. Campaign rebuild made zero provider
+calls. Next eligibility is `2026-07-22T03:56:41.891373+00:00`.
+**Notes/risks:** The scheduler remains intentionally disabled, Bybit spread is
+still unavailable, and the campaign remains baseline-warming. Telegram sends,
+trades, orders, paper trades, normal RSI writes, and Event Alpha
+`TRIGGERED_FADE` creation are all zero.
+
 ## 2026-07-22 — Fail closed on malformed anomaly-scanner policy · Codex
 **Why:** The broad market-anomaly engine accepted non-finite or semantically
 invalid configuration, and `max_assets=0` accidentally disabled its result cap.
