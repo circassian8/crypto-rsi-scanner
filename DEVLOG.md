@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record no-send market cycle 65 · Codex
+**Why:** The already-authorized hourly collection boundary was overdue. A fresh
+point-in-time cycle advances the real temporal campaign and preserves terminal
+campaign truth without weakening the separate Bybit or Protocol-v2 gates.
+**Changes:**
+- Performed one bounded CoinGecko request: HTTP 200, 80 rows returned, 30
+  selected, 1,575 ms, zero retries. Published strict-clean namespace
+  `radar_market_no_send_20260722t015556623044z_a5e83847c1eb` at revision 12.
+- Advanced campaign truth to 65 cycles / 1,950 retained / 1,920 baseline-counted
+  / 30 too-close observations and 690 prospective context rows. The current
+  generation remains healthy-empty with zero anomalies and zero Decision ideas.
+- Preserved the genuine 24-hour coverage gap: all 30 current endpoints have no
+  causal anchor because the last common row is 857.708360 seconds before the
+  six-hour window and the first later row is 25,798.607395 seconds after the
+  target. No provider-snapshot return was substituted and no future eligibility
+  was inferred.
+**Verify:** The cycle's strict doctor passed with zero blockers/warnings; final
+publication and operations receipts validate; dashboard readiness and exact
+authority status pass; the no-provider campaign rebuild reconciles 65 cycles;
+fixture and exact-authority dashboard smokes pass.
+**Notes/risks:** The single authorized provider request is complete. Bybit
+execution/intraday/derivatives authorization remains absent and no Bybit call or
+403 bypass was attempted. Sends, trades, orders, paper trades, normal RSI writes,
+and Event Alpha `TRIGGERED_FADE` all remain zero.
+
 ## 2026-07-22 — Prove exact anchor gaps and restore campaign dashboard truth · Codex
 **Why:** Prospective membership age explains universe churn but cannot prove why
 a temporal return is missing. The operator report needed the exact production
