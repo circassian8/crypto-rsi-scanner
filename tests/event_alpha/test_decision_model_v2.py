@@ -690,6 +690,43 @@ def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
     assert bound_news.decision_hard_blockers == ()
 
 
+def test_confirmed_catalyst_scores_only_from_a_confirming_source_owner():
+    confirming_official = {
+        "_source_origin": "official_exchange",
+        "source_class": "official_exchange",
+        "accepted_evidence_count": 1,
+    }
+    stronger_but_plausible_news = {
+        "_source_origin": "news",
+        "source_class": "broad_news",
+        "source_strength": "strong",
+        "accepted_evidence_count": 1,
+        "source_url": "https://example.test/news-context",
+        "source_title": "News context",
+    }
+    official_only = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=(confirming_official,),
+    )
+
+    for source_rows in (
+        (confirming_official, stronger_but_plausible_news),
+        (stronger_but_plausible_news, confirming_official),
+    ):
+        combined = decision_model.evaluate_radar_decision(
+            _market_led_candidate(),
+            source_rows=source_rows,
+        )
+
+        assert combined.catalyst_status == "confirmed"
+        assert combined.evidence_confidence_components == (
+            official_only.evidence_confidence_components
+        )
+        assert combined.evidence_confidence_score == (
+            official_only.evidence_confidence_score
+        )
+
+
 def test_catalyst_text_disproof_requires_unnegated_field_local_components():
     false_disproofs = (
         {"title": "Unofficial denial rumor"},

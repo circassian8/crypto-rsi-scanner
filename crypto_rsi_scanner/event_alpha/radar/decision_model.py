@@ -675,15 +675,25 @@ def _evidence_components(
     evidence_owners, attribution_controls = (
         decision_catalyst_policy.evidence_owner_rows(data, sources)
     )
+    status_aligned_owners = tuple(
+        row
+        for row in evidence_owners
+        if decision_catalyst_policy.evidence_owner_catalyst_status(row)
+        == catalyst
+    )
+    # Historical explicit status claims can predate owner-level provenance.
+    # Preserve their prior deterministic selection only when no row proves the
+    # final positive status; never bypass an available status-aligned owner.
+    ranked_owners = status_aligned_owners or evidence_owners
     owner = (
-        max(evidence_owners, key=_evidence_owner_rank)
-        if evidence_owners
+        max(ranked_owners, key=_evidence_owner_rank)
+        if ranked_owners
         else ({} if attribution_controls else data)
     )
     authority, source_url, source_title = _evidence_source_profile(owner)
     accepted = (
         (_count(owner.get("accepted_evidence_count")) or 0)
-        if evidence_owners
+        if ranked_owners
         else 0
     )
     specificity = (

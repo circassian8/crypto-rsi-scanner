@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Keep evidence components aligned to the status-owning row
+**Status:** accepted
+**Decision:** When multiple source-owned catalyst records are valid, Decision-v2
+must first restrict evidence-component selection to rows that independently
+establish the final positive catalyst status, then deterministically choose the
+strongest owner in that set. A plausible-only row cannot supply authority or
+specificity to a separate row's confirmed status. If no status-aligned owner
+exists for a historical explicit status claim, retain the existing deterministic
+compatibility selection; do not combine fields across rows.
+**Why:** A weak but genuinely confirming official record could set
+`catalyst_status=confirmed`, while a stronger news-context record won the score
+rank. The resulting evidence score combined confirmation/clarity from one row
+with authority/specificity from another and exceeded either self-consistent
+source result.
+**Revisit when:** Canonical projections persist one schema-backed evidence-owner
+identifier and owner-level status. Do not change weights or thresholds from
+this ownership correction.
+
 ## 2026-07-22 - Normalize exact official labels the same way everywhere
 **Status:** accepted
 **Decision:** Exact historical official-source matching trims surrounding

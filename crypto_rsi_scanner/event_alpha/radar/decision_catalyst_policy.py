@@ -257,6 +257,29 @@ def evidence_owner_rows(
     return tuple(owners), False
 
 
+def evidence_owner_catalyst_status(row: Mapping[str, Any]) -> str:
+    """Return the positive catalyst status this source row proves by itself."""
+
+    accepted = (_count(row.get("accepted_evidence_count")) or 0) > 0
+    structured = _valid_structured_source_event(
+        row.get("official_exchange_event")
+    )
+    if _row_is_official_source(row) and (accepted or structured):
+        return CatalystStatus.CONFIRMED.value
+    lane_values = (
+        *_texts(row.get("_source_origin")),
+        *_texts(row.get("source_origin")),
+        *_texts(row.get("source_origins")),
+        *_texts(row.get("source_class")),
+        *_texts(row.get("source_pack")),
+    )
+    if _has_catalyst_source_lane(lane_values) and (
+        accepted or bool(catalyst_source_fields(row)[0])
+    ):
+        return CatalystStatus.PLAUSIBLE.value
+    return CatalystStatus.UNKNOWN.value
+
+
 def _catalyst_attribution_values(
     data: Mapping[str, Any],
     sources: tuple[Mapping[str, Any], ...],
@@ -574,4 +597,6 @@ __all__ = (
     "catalyst_source_evidence_invalid",
     "catalyst_source_fields",
     "catalyst_status",
+    "evidence_owner_catalyst_status",
+    "evidence_owner_rows",
 )

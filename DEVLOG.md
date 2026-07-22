@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Keep evidence scores on the catalyst-status owner · Codex
+**Why:** With multiple valid source rows, the model could derive confirmed
+catalyst status from a weak official owner but rank a stronger plausible-only
+news row for authority and specificity. The combined score then mixed evidence
+semantics across rows and exceeded either source's self-consistent result.
+**Changes:**
+- Classified each valid evidence owner by the positive catalyst status that row
+  independently establishes.
+- Restricted multi-owner ranking to rows aligned with the final positive
+  catalyst status before selecting the strongest deterministic owner. Existing
+  compatibility fallback remains fail-closed when no aligned owner exists.
+- Added an order-independent regression proving plausible news context cannot
+  donate components to a separate official confirmation, and documented the
+  closed ownership rule in collaboration and North Star artifacts.
+**Verify:** 255 focused Decision-v2, surface, consistency, route, attribution,
+CoreOpportunity, calendar, namespace, derivatives-freshness, evaluation-clock,
+and outcome-integrity tests passed. Python compilation and the integrated-radar
+smoke passed with 15 candidates, 12 Core rows/cards, strict doctor 0 blockers /
+0 warnings, and 14 dashboard fixture pages.
+**Notes/risks:** Evidence weights, thresholds, routes, source classes, stored
+artifacts, providers, and research-only safety boundaries are unchanged. Full
+`make verify` was intentionally skipped because the focused ownership and
+end-to-end integration gates cover this bounded correction. Quantitative source
+sizes remain advisory; runtime artifact, request, path, secret, and security
+bounds remain enforced.
+
 ## 2026-07-22 — Normalize exact official source labels consistently · Codex
 **Why:** Catalyst evidence scoring already trimmed and case-folded historical
 source labels, while catalyst confirmation compared the same typed values

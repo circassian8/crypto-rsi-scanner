@@ -86,7 +86,10 @@ its own class, strength, accepted count, URL, and title; an unrelated count
 cannot raise specificity. Once a closed catalyst-attribution contract is
 supplied, only a valid causal-eligible attribution may own these components.
 Invalid, retrospective, and context-only attributions remain visible context
-but receive no fallback official-source points.
+but receive no fallback official-source points. With multiple valid owners,
+selection first stays inside the rows that independently establish the final
+positive catalyst status; a plausible-only source cannot donate components to
+a different row's confirmed status.
 
 Historical thesis-origin compatibility is closed in the same way across all
 seven origins. Market, catalyst, technical, derivatives, on-chain, fundamental,
