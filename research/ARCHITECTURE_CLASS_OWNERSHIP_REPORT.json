@@ -1530,9 +1530,9 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11253,
+  "function_count": 11265,
   "function_line_limit": 150,
-  "functions_over_150_lines": 33,
+  "functions_over_150_lines": 34,
   "functions_over_limit": [
     {
       "function_name": "_validate_closed_projection",
@@ -1671,6 +1671,14 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py"
     },
     {
+      "function_name": "control_market_regime_input_diagnostic_valid",
+      "line_count": 165,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_features",
+      "public": true,
+      "qualname": "control_market_regime_input_diagnostic_valid",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py"
+    },
+    {
       "function_name": "build_campaign_report",
       "line_count": 165,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
@@ -1680,7 +1688,7 @@
     },
     {
       "function_name": "build_control_regime_generation_audit",
-      "line_count": 209,
+      "line_count": 217,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit",
       "public": true,
       "qualname": "build_control_regime_generation_audit",
@@ -1688,7 +1696,7 @@
     },
     {
       "function_name": "validate_control_regime_generation_audit",
-      "line_count": 158,
+      "line_count": 161,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit",
       "public": true,
       "qualname": "validate_control_regime_generation_audit",
@@ -1799,8 +1807,8 @@
       "source_path": "crypto_rsi_scanner/event_alpha/radar/watchlist/entries.py"
     }
   ],
-  "functions_over_limit_count": 33,
-  "generated_at": "2026-07-21T23:30:37.277267+00:00",
+  "functions_over_limit_count": 34,
+  "generated_at": "2026-07-22T00:32:08.330253+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3282,13 +3290,6 @@
       "status": "advisory_measurement"
     },
     {
-      "line_count": 1466,
-      "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
       "line_count": 1450,
       "path": "crypto_rsi_scanner/config.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3305,6 +3306,13 @@
     {
       "line_count": 1449,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_model_surfaces.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
+      "line_count": 1429,
+      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -3340,13 +3348,6 @@
     {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1386,
-      "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -3455,7 +3456,7 @@
       "source_path": "crypto_rsi_scanner/storage_parts/watchlist.py"
     }
   ],
-  "production_functions_over_limit": 33,
+  "production_functions_over_limit": 34,
   "production_functions_over_limit_rows": [
     {
       "function_name": "_validate_closed_projection",
@@ -3594,6 +3595,14 @@
       "source_path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py"
     },
     {
+      "function_name": "control_market_regime_input_diagnostic_valid",
+      "line_count": 165,
+      "module": "crypto_rsi_scanner.event_alpha.operations.market_no_send_features",
+      "public": true,
+      "qualname": "control_market_regime_input_diagnostic_valid",
+      "source_path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py"
+    },
+    {
       "function_name": "build_campaign_report",
       "line_count": 165,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
@@ -3603,7 +3612,7 @@
     },
     {
       "function_name": "build_control_regime_generation_audit",
-      "line_count": 209,
+      "line_count": 217,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit",
       "public": true,
       "qualname": "build_control_regime_generation_audit",
@@ -3611,7 +3620,7 @@
     },
     {
       "function_name": "validate_control_regime_generation_audit",
-      "line_count": 158,
+      "line_count": 161,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit",
       "public": true,
       "qualname": "validate_control_regime_generation_audit",
@@ -4176,14 +4185,14 @@
     "gate_values": {
       "class_exceptions_remaining": 3,
       "deleted_shims": 124,
-      "functions_over_150_lines": 33,
+      "functions_over_150_lines": 34,
       "nonessential_shims_remaining": 0,
       "old_path_docs_references": 0,
       "old_path_import_allowed_exceptions": 0,
       "old_path_internal_imports": 0,
       "old_path_test_imports": 0,
       "production_files_over_1200_lines": 43,
-      "production_files_over_1500_lines": 10,
+      "production_files_over_1500_lines": 11,
       "public_classes_not_in_own_module": 0,
       "public_compatibility_shims": 0,
       "shim_removal_blockers": 0
@@ -4207,7 +4216,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 2072,
+        "line_count": 2118,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
         "threshold": 1200
       },
@@ -4227,8 +4236,13 @@
         "threshold": 1200
       },
       {
-        "line_count": 1752,
+        "line_count": 1775,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1715,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1200
       },
       {
@@ -4237,8 +4251,8 @@
         "threshold": 1200
       },
       {
-        "line_count": 1584,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+        "line_count": 1539,
+        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1200
       },
       {
@@ -4262,11 +4276,6 @@
         "threshold": 1200
       },
       {
-        "line_count": 1466,
-        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
-        "threshold": 1200
-      },
-      {
         "line_count": 1450,
         "path": "crypto_rsi_scanner/config.py",
         "threshold": 1200
@@ -4279,6 +4288,11 @@
       {
         "line_count": 1449,
         "path": "crypto_rsi_scanner/event_alpha/radar/decision_model_surfaces.py",
+        "threshold": 1200
+      },
+      {
+        "line_count": 1429,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
         "threshold": 1200
       },
       {
@@ -4304,11 +4318,6 @@
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1386,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py",
         "threshold": 1200
       },
       {
@@ -4424,7 +4433,7 @@
         "threshold": 1500
       },
       {
-        "line_count": 2072,
+        "line_count": 2118,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_operator_actions.py",
         "threshold": 1500
       },
@@ -4444,8 +4453,13 @@
         "threshold": 1500
       },
       {
-        "line_count": 1752,
+        "line_count": 1775,
         "path": "crypto_rsi_scanner/event_alpha/dashboard/campaign_page.py",
+        "threshold": 1500
+      },
+      {
+        "line_count": 1715,
+        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
         "threshold": 1500
       },
       {
@@ -4454,8 +4468,8 @@
         "threshold": 1500
       },
       {
-        "line_count": 1584,
-        "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_features.py",
+        "line_count": 1539,
+        "path": "crypto_rsi_scanner/event_alpha/operations/official_macro_calendar.py",
         "threshold": 1500
       }
     ],
@@ -4479,14 +4493,14 @@
   "v3_gates": {
     "class_exceptions_remaining": 3,
     "deleted_shims": 124,
-    "functions_over_150_lines": 33,
+    "functions_over_150_lines": 34,
     "nonessential_shims_remaining": 0,
     "old_path_docs_references": 0,
     "old_path_import_allowed_exceptions": 0,
     "old_path_internal_imports": 0,
     "old_path_test_imports": 0,
     "production_files_over_1200_lines": 43,
-    "production_files_over_1500_lines": 10,
+    "production_files_over_1500_lines": 11,
     "public_classes_not_in_own_module": 0,
     "public_compatibility_shims": 0,
     "shim_removal_blockers": 0

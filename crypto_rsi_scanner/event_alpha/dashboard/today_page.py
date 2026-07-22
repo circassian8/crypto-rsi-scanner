@@ -702,6 +702,25 @@ def _control_regime_generation_audit_detail(
             f" Latest exact cycle is {eligible}/{expected}; missing {missing_text}; "
             f"recent-entry overlap {recent_text}."
         )
+        membership_rows = [
+            row
+            for row in latest.get("missing_input_membership_context") or ()
+            if isinstance(row, Mapping)
+        ]
+        if membership_rows:
+            membership_text = []
+            for row in membership_rows:
+                asset_id = str(row.get("canonical_asset_id") or "unknown")
+                if row.get("membership_start_known") is True:
+                    membership_text.append(
+                        f"{asset_id} has {format_duration(row.get('continuous_membership_age_seconds'))} "
+                        "of observed continuous prospective membership"
+                    )
+                else:
+                    membership_text.append(
+                        f"{asset_id} has no exact entry clock before the first complete prospective universe"
+                    )
+            latest_text += " " + "; ".join(membership_text) + "."
     return (
         f"Immutable-generation audit: {verified}/{total} source envelopes verify; "
         f"{ready}/{complete} complete universes have all causal 24-hour inputs "
@@ -709,7 +728,7 @@ def _control_regime_generation_audit_detail(
         f"membership changed {changes} times; {recent} incomplete cycles overlap a "
         f"recent observed entry and {without_recent} do not."
         + latest_text
-        + " This is descriptive overlap, not causal attribution or routing input. "
+        + " This is descriptive overlap, not causal attribution, anchor eligibility, or routing input; pre-contract rows are not backfilled into the membership clock. "
     )
 
 

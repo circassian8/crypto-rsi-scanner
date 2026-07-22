@@ -1465,6 +1465,49 @@ def _project_control_regime_generation_audit(
     latest = audit.get("latest_complete_generation")
     latest_projection: dict[str, Any] | None = None
     if isinstance(latest, Mapping):
+        membership_context = []
+        for index, raw_context in enumerate(
+            latest.get("missing_input_membership_context") or ()
+        ):
+            context = _mapping(
+                raw_context,
+                f"regime_generation_membership_context_{index}",
+            )
+            started_at = context.get("continuous_membership_started_at")
+            membership_context.append({
+                "canonical_asset_id": _identity(
+                    context.get("canonical_asset_id"),
+                    "regime_generation_membership_asset_id",
+                ),
+                "membership_start_known": (
+                    context.get("membership_start_known") is True
+                ),
+                "membership_start_basis": _identity(
+                    context.get("membership_start_basis"),
+                    "regime_generation_membership_start_basis",
+                ),
+                "continuous_membership_started_at": (
+                    _timestamp(
+                        started_at,
+                        "regime_generation_membership_started_at",
+                    )
+                    if started_at is not None
+                    else None
+                ),
+                "continuous_membership_age_seconds": (
+                    _count(
+                        context.get("continuous_membership_age_seconds"),
+                        "regime_generation_membership_age_seconds",
+                    )
+                    if context.get("continuous_membership_age_seconds")
+                    is not None
+                    else None
+                ),
+                "within_recent_membership_window": (
+                    context.get("within_recent_membership_window") is True
+                ),
+                "anchor_eligibility_inferred": False,
+            })
         latest_projection = {
             "observed_at": _timestamp(
                 latest.get("observed_at"),
@@ -1489,6 +1532,7 @@ def _project_control_regime_generation_audit(
                 latest.get("recent_entry_missing_asset_ids"),
                 "regime_generation_latest_recent_missing_assets",
             ),
+            "missing_input_membership_context": membership_context,
         }
     missing_counts = _mapping(
         audit.get("missing_asset_generation_counts"),
@@ -1548,6 +1592,8 @@ def _project_control_regime_generation_audit(
         ),
         "latest_complete_generation": latest_projection,
         "interpretation": audit["interpretation"],
+        "membership_clock_scope": audit["membership_clock_scope"],
+        "precontract_history_used_for_membership_clock": False,
         "provider_calls": 0,
         "writes": 0,
         "research_only": True,

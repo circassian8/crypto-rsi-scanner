@@ -64,6 +64,25 @@ contract.
 provider-return contract as regime evidence and proves its causal clock,
 methodology, identity, units, and holdout-safe use.
 
+## 2026-07-22 - Keep regime membership clocks prospective and non-authoritative
+**Status:** accepted as operator diagnostic; no anchor or policy authority
+**Decision:** Exact-generation regime audit schema v2 records the continuous
+membership start and elapsed time for each currently missing causal input only
+from complete prospective point-in-time universe envelopes. An asset present in
+the first complete envelope has an explicitly unknown start; an observed exit
+removes its clock and a later entry starts a new one. Pre-contract rows are not
+backfilled into this clock, and membership age must never be interpreted as
+proof that a valid temporal-return anchor exists.
+**Why:** HBAR entered the prospective top-30 set at 12:12 UTC, exited at 19:08,
+and re-entered at 20:09. The current 29/30 result is therefore explained by
+only 4.05 hours of continuous prospective membership at cycle 64, while its
+older raw observations remain correctly outside the prospective membership
+contract. Showing only “recent entry” concealed the reset and invited a false
+assumption that a snapshot return or old row could close the causal interval.
+**Revisit when:** A preregistered Protocol-v2 annex defines a different causal
+membership/anchor contract before holdout access. Never infer anchor eligibility
+from membership duration alone.
+
 ## 2026-07-22 - Lead outcome recovery readiness with the exact gap
 **Status:** accepted
 **Decision:** The normal `radar-outcome-price-recovery-readiness` Make surface

@@ -19,6 +19,7 @@ from .layer_coverage import DashboardLayerCoverage, dashboard_layer_coverage_by_
 from .models import DashboardSnapshot
 from .presentation import (
     UNAVAILABLE,
+    format_duration,
     format_number,
     format_percent,
     humanize_enum,
@@ -788,6 +789,9 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
         str(item)
         for item in latest.get("recent_entry_missing_asset_ids") or ()
     ) or "None"
+    membership_context = _regime_membership_context_label(
+        latest.get("missing_input_membership_context")
+    )
     values = (
         ("Verified source envelopes", f"{verified} / {total}"),
         ("Complete universes", complete),
@@ -799,6 +803,7 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
         ("Latest causal inputs", f"{latest_eligible} / {latest_expected}"),
         ("Latest missing", latest_missing),
         ("Latest recent-entry overlap", latest_recent),
+        ("Latest continuous membership", membership_context),
     )
     missing_counts = raw.get("missing_asset_generation_counts")
     missing_rows = []
@@ -832,7 +837,8 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
     body = (
         '<div class="alert alert-info"><strong>Observed history, not a policy input.</strong> '
         "This compares immutable generation envelopes. Recent membership entry is overlap, "
-        "not proof of causation; older anchor gaps remain separately visible.</div>"
+        "not proof of causation or anchor eligibility; pre-contract rows do not enter the "
+        "prospective membership clock.</div>"
         + str(definition_list(values, css_class="definition-grid"))
         + missing_table
     )
@@ -841,6 +847,23 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
         body,
         eyebrow="Exact generation evidence · no backfill",
     )
+
+
+def _regime_membership_context_label(value: Any) -> str:
+    rows = [dict(row) for row in value or () if isinstance(row, Mapping)]
+    if not rows:
+        return "None"
+    values = []
+    for row in rows:
+        asset_id = humanize_enum(row.get("canonical_asset_id"))
+        if row.get("membership_start_known") is True:
+            values.append(
+                f"{asset_id}: {format_duration(row.get('continuous_membership_age_seconds'))} "
+                f"since {row.get('continuous_membership_started_at')}"
+            )
+        else:
+            values.append(f"{asset_id}: start predates audited prospective window")
+    return "; ".join(values)
 
 
 def _protocol_v2_episode_coverage(snapshot: DashboardSnapshot) -> str:

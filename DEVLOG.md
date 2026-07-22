@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Explain causal gaps with prospective membership clocks · Codex
+**Why:** The latest campaign correctly showed HBAR as the only missing causal
+24-hour input, but “recent entry” did not expose its intervening exit/re-entry
+or explain why older pre-contract rows could not close the interval.
+**Changes:**
+- Upgraded the exact-generation audit to schema v2 with a closed per-missing-
+  asset membership start, elapsed seconds, recent-window state, and explicit
+  `anchor_eligibility_inferred=false`. First-envelope starts stay unknown and an
+  observed exit resets later membership.
+- Preserved the projection through campaign Markdown and the Today/Campaign
+  dashboard surfaces. Current truth now shows HBAR's 20:09 UTC re-entry and
+  14,564 seconds / 4.05 hours of continuous prospective membership at cycle 64.
+- Declared the clock prospective-only: pre-contract history is not used, and
+  duration grants no causal-anchor, route, score, regime, or Protocol-v2 status.
+**Verify:** Focused campaign/audit/dashboard projection tests passed; the real
+no-provider campaign rebuild emitted schema v2 and the exact HBAR context. All
+117 dashboard tests passed (116 in the restricted run plus the localhost-bind
+concurrency regression at the host boundary); fixture and exact-live dashboard
+smokes, UX smoke, readiness, compileall, JSON, diff, and architecture-cleanliness
+checks passed. File/function size observations remained advisory as intended.
+**Notes/risks:** No provider call, retained-history mutation, backfill, threshold,
+route, score, publication authority, trade, order, send, paper trade, RSI write,
+or Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Record no-send market cycle 64 · Codex
 **Why:** The hourly cadence became eligible with the existing CoinGecko
 authorization, so the next genuine point-in-time observation could safely warm

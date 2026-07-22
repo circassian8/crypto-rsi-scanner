@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-22T00:12:21.130325+00:00` from local artifacts only.
+Generated at `2026-07-22T00:27:56.881034+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -156,7 +156,9 @@ Research and decision support only. This report contains no trade recommendation
 - Incomplete cycles overlapping an observed entry within 24 hours: `18`; incomplete cycles without that overlap: `4`
 - Latest exact cycle: `2026-07-22T00:12:04.506884+00:00` — `29/30` eligible inputs; missing: `hedera-hashgraph`
 - Latest missing assets with a recent observed entry: `hedera-hashgraph`
+- Latest prospective membership clocks: `hedera-hashgraph since 2026-07-21T20:09:19.865650+00:00 (4.05h observed; anchor eligibility not inferred)`
 - Interpretation: membership overlap is descriptive, not causal attribution. Older anchor gaps and recent entries remain distinct; no universe, cadence, threshold, route, or regime policy changed.
+- Membership clock scope: `prospective complete point-in-time universes only`; pre-contract history used for that clock: `false`. Membership age does not itself prove anchor eligibility.
 - Historical backfill/retained-history mutation/provider calls: `false / false / 0`.
 - Routing/policy/Protocol-v2 evidence eligibility: `false`.
 

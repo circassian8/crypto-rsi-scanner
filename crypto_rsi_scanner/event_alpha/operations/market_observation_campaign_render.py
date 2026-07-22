@@ -784,6 +784,9 @@ def _control_regime_generation_audit_lines(
     eligible = _int(latest.get("eligible_input_count"))
     missing = _joined(latest.get("missing_asset_ids")) or "none"
     recent = _joined(latest.get("recent_entry_missing_asset_ids")) or "none"
+    membership_context = _membership_context_summary(
+        latest.get("missing_input_membership_context")
+    )
     lines = [
         f"- Status: `{_md(value.get('status')) or 'unavailable'}`",
         (
@@ -819,15 +822,42 @@ def _control_regime_generation_audit_lines(
             f"`{eligible}/{expected}` eligible inputs; missing: `{_md(missing)}`"
         ),
         f"- Latest missing assets with a recent observed entry: `{_md(recent)}`",
+        f"- Latest prospective membership clocks: `{_md(membership_context)}`",
         (
             "- Interpretation: membership overlap is descriptive, not causal "
             "attribution. Older anchor gaps and recent entries remain distinct; "
             "no universe, cadence, threshold, route, or regime policy changed."
         ),
+        (
+            "- Membership clock scope: `prospective complete point-in-time "
+            "universes only`; pre-contract history used for that clock: `false`. "
+            "Membership age does not itself prove anchor eligibility."
+        ),
         "- Historical backfill/retained-history mutation/provider calls: `false / false / 0`.",
         "- Routing/policy/Protocol-v2 evidence eligibility: `false`.",
     ]
     return lines
+
+
+def _membership_context_summary(value: Any) -> str:
+    rows = [dict(row) for row in value or () if isinstance(row, Mapping)]
+    if not rows:
+        return "none"
+    rendered = []
+    for row in rows:
+        asset_id = _text(row.get("canonical_asset_id")) or "unknown"
+        if row.get("membership_start_known") is True:
+            rendered.append(
+                f"{asset_id} since {_text(row.get('continuous_membership_started_at'))} "
+                f"({_hours(row.get('continuous_membership_age_seconds'))}h observed; "
+                "anchor eligibility not inferred)"
+            )
+        else:
+            rendered.append(
+                f"{asset_id} start unknown before first complete prospective universe; "
+                "anchor eligibility not inferred"
+            )
+    return "; ".join(rendered)
 
 
 def _current_control_regime_input_lines(value: Mapping[str, Any]) -> list[str]:

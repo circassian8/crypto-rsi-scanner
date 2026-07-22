@@ -965,9 +965,26 @@ def test_control_regime_generation_audit_separates_recent_entry_overlap():
     assert audit["incomplete_without_recent_entry_count"] == 0
     assert audit["recent_entry_missing_asset_event_count"] == 2
     assert audit["missing_asset_generation_counts"] == {"new-entry": 2}
+    assert audit["schema_version"] == 2
+    assert audit["membership_clock_scope"] == (
+        "prospective_complete_point_in_time_universes_only"
+    )
+    assert audit["precontract_history_used_for_membership_clock"] is False
     assert audit["latest_complete_generation"][
         "recent_entry_missing_asset_ids"
     ] == ["new-entry"]
+    membership = audit["latest_complete_generation"][
+        "missing_input_membership_context"
+    ]
+    assert membership == [{
+        "canonical_asset_id": "new-entry",
+        "membership_start_known": True,
+        "membership_start_basis": "observed_entry",
+        "continuous_membership_started_at": second_at,
+        "continuous_membership_age_seconds": 3_600,
+        "within_recent_membership_window": True,
+        "anchor_eligibility_inferred": False,
+    }]
     assert (
         market_observation_campaign_regime_audit
         .validate_control_regime_generation_audit(audit)
@@ -979,6 +996,55 @@ def test_control_regime_generation_audit_separates_recent_entry_overlap():
         market_observation_campaign_regime_audit
         .validate_control_regime_generation_audit(tampered)
     )
+
+    tampered = json.loads(json.dumps(audit))
+    tampered["latest_complete_generation"][
+        "missing_input_membership_context"
+    ][0]["continuous_membership_age_seconds"] = 3_601
+    assert "latest_membership_context_0_age_invalid" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(tampered)
+    )
+
+    tampered = json.loads(json.dumps(audit))
+    tampered["latest_complete_generation"][
+        "missing_input_membership_context"
+    ][0]["anchor_eligibility_inferred"] = True
+    assert "latest_membership_context_0_anchor_eligibility_invalid" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(tampered)
+    )
+
+
+def test_control_regime_generation_audit_does_not_invent_first_entry_clock():
+    observed_at = "2026-07-20T10:00:00+00:00"
+    rows = _ready_regime_market_rows(observed_at)
+    missing = rows[-1]
+    missing.pop("temporal_return_24h")
+    missing["return_units"].pop("temporal_return_24h")
+    missing["market_feature_evidence"].pop("temporal_return_24h")
+
+    audit = (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit([
+            _regime_audit_generation("generation-a", observed_at, rows),
+        ])
+    )
+
+    assert audit["latest_complete_generation"][
+        "missing_input_membership_context"
+    ] == [{
+        "canonical_asset_id": "asset-30",
+        "membership_start_known": False,
+        "membership_start_basis": "unknown_before_first_complete_generation",
+        "continuous_membership_started_at": None,
+        "continuous_membership_age_seconds": None,
+        "within_recent_membership_window": False,
+        "anchor_eligibility_inferred": False,
+    }]
+    assert audit["latest_complete_generation"][
+        "recent_entry_missing_asset_ids"
+    ] == []
 
 
 def test_final_receipts_reconcile_attempt_publication_operations_and_current(

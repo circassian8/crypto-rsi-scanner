@@ -565,6 +565,15 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert regime_history["latest_complete_generation"][
         "eligible_input_count"
     ] == 30
+    assert regime_history["latest_complete_generation"][
+        "missing_input_membership_context"
+    ] == []
+    assert regime_history["membership_clock_scope"] == (
+        "prospective_complete_point_in_time_universes_only"
+    )
+    assert regime_history[
+        "precontract_history_used_for_membership_clock"
+    ] is False
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
     assert shadow["schema_version"] == 7
@@ -719,6 +728,14 @@ def test_today_detail_separates_regime_history_churn_from_other_gaps() -> None:
                 "universe_expected_count": 30,
                 "missing_asset_ids": ("hedera-hashgraph",),
                 "recent_entry_missing_asset_ids": ("hedera-hashgraph",),
+                "missing_input_membership_context": ({
+                    "canonical_asset_id": "hedera-hashgraph",
+                    "membership_start_known": True,
+                    "continuous_membership_started_at": (
+                        "2026-07-21T20:09:19.865650+00:00"
+                    ),
+                    "continuous_membership_age_seconds": 14_564,
+                },),
             },
         }
     })
@@ -729,6 +746,8 @@ def test_today_detail_separates_regime_history_churn_from_other_gaps() -> None:
     assert "12 incomplete cycles overlap" in detail
     assert "4 do not" in detail
     assert "descriptive overlap, not causal attribution" in detail
+    assert "4 hr 2 min of observed continuous prospective membership" in detail
+    assert "pre-contract rows are not backfilled" in detail
 
 
 def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(

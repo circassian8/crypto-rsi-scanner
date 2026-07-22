@@ -1032,8 +1032,14 @@ may be added later when a suitable environment already exists.
   offline but never counts in the Decision campaign or replaces dashboard
   authority. `make radar-market-campaign-report` rebuilds the canonical
   Markdown/JSON campaign report from local artifacts without a provider call;
-  the live target also refreshes it after every success or failure. Decision
-  campaign generations, candidates, routes, feature maturity, and outcomes are
+  the live target also refreshes it after every success or failure. Its
+  exact-generation regime audit records missing-input membership clocks
+  only from complete prospective point-in-time universe envelopes. An observed
+  exit resets the clock, assets already present in the first complete envelope
+  retain an unknown start, and pre-contract rows are never backfilled. This
+  diagnostic may explain churn but never proves a temporal anchor, causation,
+  routing eligibility, or Protocol-v2 authority. Decision campaign generations,
+  candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
   Post-scan raw market evidence may carry the optional closed
   `event_alpha.shadow_temporal_surprise` v2 diagnostic. It preserves the v1

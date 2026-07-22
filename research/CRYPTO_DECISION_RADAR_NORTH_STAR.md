@@ -864,6 +864,15 @@ stating that a current snapshot cannot prove the required retained temporal
 anchor. This replay is diagnostic only: it does not substitute that value,
 mutate retained history,
 backfill an unavailable regime, call a provider, or feed routing or policy.
+The separate exact-generation audit uses a closed prospective membership clock
+for missing inputs. It records the last observed entry into consecutive complete
+point-in-time universes, resets that clock after an observed exit, and preserves
+an unknown start for assets already present in the first complete envelope.
+Pre-contract rows never enter this clock. The resulting age explains observed
+universe churn but does not itself prove temporal-anchor eligibility, causation,
+or a route/score/regime/Protocol-v2 input. At cycle 64, HBAR's current clock
+began only on its 20:09 UTC re-entry and therefore measured 4.05 hours, despite
+older non-prospective raw history.
 Campaign readiness reports exact historical coverage but performs no selection,
 outcome read, partition assignment, backfill, or policy change. It remains
 partial until a successful qualifying cycle has persisted that context and a

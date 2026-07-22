@@ -19,10 +19,13 @@ from . import market_no_send_features
 
 
 SCHEMA_ID = "decision_radar.control_market_regime_generation_audit"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 RECENT_CYCLE_LIMIT = 32
 RECENT_MEMBERSHIP_WINDOW_SECONDS = 24 * 60 * 60
 INTERPRETATION = "descriptive_membership_overlap_not_causal_attribution"
+MEMBERSHIP_CLOCK_SCOPE = (
+    "prospective_complete_point_in_time_universes_only"
+)
 
 _STATUSES = {"empty", "unavailable", "incomplete", "ready"}
 _CYCLE_STATUSES = {"ready", "incomplete", "unavailable"}
@@ -60,6 +63,8 @@ _AUDIT_KEYS = {
     "recent_cycle_summaries",
     "projection_digest",
     "interpretation",
+    "membership_clock_scope",
+    "precontract_history_used_for_membership_clock",
     "selection_uses_outcomes",
     "historical_context_backfilled",
     "retained_history_mutated",
@@ -87,6 +92,16 @@ _SUMMARY_KEYS = {
     "entered_asset_ids",
     "exited_asset_ids",
     "recent_entry_missing_asset_ids",
+    "missing_input_membership_context",
+}
+_MEMBERSHIP_CONTEXT_KEYS = {
+    "canonical_asset_id",
+    "membership_start_known",
+    "membership_start_basis",
+    "continuous_membership_started_at",
+    "continuous_membership_age_seconds",
+    "within_recent_membership_window",
+    "anchor_eligibility_inferred",
 }
 
 
@@ -169,14 +184,19 @@ def build_control_regime_generation_audit(
             and _identity(item.get("canonical_asset_id"))
         )
         missing_asset_counts.update(missing)
-        recent_missing = sorted(
-            asset_id
-            for asset_id in missing
-            if _within_recent_membership_window(
-                continuous_entry_times.get(asset_id),
-                observed_at,
+        membership_context = [
+            _missing_membership_context(
+                asset_id,
+                entered_at=continuous_entry_times.get(asset_id),
+                observed_at=observed_at,
             )
-        )
+            for asset_id in missing
+        ]
+        recent_missing = [
+            row["canonical_asset_id"]
+            for row in membership_context
+            if row["within_recent_membership_window"]
+        ]
         if cycle_status == "incomplete" and recent_missing:
             incomplete_with_recent += 1
         recent_missing_events += len(recent_missing)
@@ -205,6 +225,7 @@ def build_control_regime_generation_audit(
             "entered_asset_ids": entered,
             "exited_asset_ids": exited,
             "recent_entry_missing_asset_ids": recent_missing,
+            "missing_input_membership_context": membership_context,
         }
         complete_records.append(record)
         previous_assets = assets
@@ -285,6 +306,8 @@ def build_control_regime_generation_audit(
         "recent_cycle_summaries": [dict(row) for row in recent_records],
         "projection_digest": _sha256_json(complete_records),
         "interpretation": INTERPRETATION,
+        "membership_clock_scope": MEMBERSHIP_CLOCK_SCOPE,
+        "precontract_history_used_for_membership_clock": False,
         "selection_uses_outcomes": False,
         "historical_context_backfilled": False,
         "retained_history_mutated": False,
@@ -441,7 +464,10 @@ def validate_control_regime_generation_audit(value: object) -> list[str]:
         errors.append("projection_digest_invalid")
     if value.get("interpretation") != INTERPRETATION:
         errors.append("interpretation_invalid")
+    if value.get("membership_clock_scope") != MEMBERSHIP_CLOCK_SCOPE:
+        errors.append("membership_clock_scope_invalid")
     fixed = {
+        "precontract_history_used_for_membership_clock": False,
         "selection_uses_outcomes": False,
         "historical_context_backfilled": False,
         "retained_history_mutated": False,
@@ -506,6 +532,39 @@ def _within_recent_membership_window(
         return False
     seconds = (observed_at - entered_at).total_seconds()
     return 0 <= seconds < RECENT_MEMBERSHIP_WINDOW_SECONDS
+
+
+def _missing_membership_context(
+    asset_id: str,
+    *,
+    entered_at: datetime | None,
+    observed_at: datetime,
+) -> dict[str, Any]:
+    start_known = entered_at is not None
+    age_seconds = (
+        int((observed_at - entered_at).total_seconds())
+        if entered_at is not None
+        else None
+    )
+    return {
+        "canonical_asset_id": asset_id,
+        "membership_start_known": start_known,
+        "membership_start_basis": (
+            "observed_entry"
+            if start_known
+            else "unknown_before_first_complete_generation"
+        ),
+        "continuous_membership_started_at": (
+            entered_at.isoformat() if entered_at is not None else None
+        ),
+        "continuous_membership_age_seconds": age_seconds,
+        "within_recent_membership_window": (
+            start_known
+            and age_seconds is not None
+            and age_seconds < RECENT_MEMBERSHIP_WINDOW_SECONDS
+        ),
+        "anchor_eligibility_inferred": False,
+    }
 
 
 def _validate_summary(
@@ -581,6 +640,33 @@ def _validate_summary(
         and not set(recent_asset_ids).issubset(missing_asset_ids)
     ):
         errors.append(f"{label}_recent_missing_not_subset")
+    membership_context = value.get("missing_input_membership_context")
+    if not isinstance(membership_context, list) or len(membership_context) > 256:
+        errors.append(f"{label}_membership_context_invalid")
+        membership_context = []
+    else:
+        for index, context in enumerate(membership_context):
+            _validate_membership_context(
+                context,
+                observed_at=value.get("observed_at"),
+                label=f"{label}_membership_context_{index}",
+                errors=errors,
+            )
+    context_ids = [
+        item.get("canonical_asset_id")
+        for item in membership_context
+        if isinstance(item, Mapping)
+    ]
+    if isinstance(missing_asset_ids, list) and context_ids != missing_asset_ids:
+        errors.append(f"{label}_membership_context_assets_mismatch")
+    context_recent_ids = [
+        item.get("canonical_asset_id")
+        for item in membership_context
+        if isinstance(item, Mapping)
+        and item.get("within_recent_membership_window") is True
+    ]
+    if isinstance(recent_asset_ids, list) and context_recent_ids != recent_asset_ids:
+        errors.append(f"{label}_membership_context_recent_mismatch")
     if type(value.get("has_comparable_predecessor")) is not bool:
         errors.append(f"{label}_predecessor_flag_invalid")
     if type(value.get("universe_changed_since_previous")) is not bool:
@@ -596,6 +682,54 @@ def _validate_summary(
         value.get("recent_entry_missing_asset_ids"),
     )):
         errors.append(f"{label}_first_cycle_transition_invalid")
+
+
+def _validate_membership_context(
+    value: object,
+    *,
+    observed_at: object,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, Mapping) or set(value) != _MEMBERSHIP_CONTEXT_KEYS:
+        errors.append(f"{label}_keys_invalid")
+        return
+    if not _identity(value.get("canonical_asset_id")):
+        errors.append(f"{label}_asset_id_invalid")
+    start_known = value.get("membership_start_known")
+    if type(start_known) is not bool:
+        errors.append(f"{label}_start_known_invalid")
+        return
+    started_at = value.get("continuous_membership_started_at")
+    age_seconds = value.get("continuous_membership_age_seconds")
+    recent = value.get("within_recent_membership_window")
+    if type(recent) is not bool:
+        errors.append(f"{label}_recent_flag_invalid")
+    if value.get("anchor_eligibility_inferred") is not False:
+        errors.append(f"{label}_anchor_eligibility_invalid")
+    if start_known:
+        start = _parse_aware_utc(started_at)
+        observed = _parse_aware_utc(observed_at)
+        if value.get("membership_start_basis") != "observed_entry":
+            errors.append(f"{label}_start_basis_invalid")
+        if start is None or observed is None or start > observed:
+            errors.append(f"{label}_started_at_invalid")
+            return
+        expected_age = int((observed - start).total_seconds())
+        if type(age_seconds) is not int or age_seconds != expected_age:
+            errors.append(f"{label}_age_invalid")
+        expected_recent = expected_age < RECENT_MEMBERSHIP_WINDOW_SECONDS
+        if type(recent) is bool and recent != expected_recent:
+            errors.append(f"{label}_recent_flag_mismatch")
+        return
+    if value.get("membership_start_basis") != (
+        "unknown_before_first_complete_generation"
+    ):
+        errors.append(f"{label}_start_basis_invalid")
+    if started_at is not None or age_seconds is not None:
+        errors.append(f"{label}_unknown_start_values_invalid")
+    if recent is not False:
+        errors.append(f"{label}_unknown_start_recent_invalid")
 
 
 def _count_mapping(
@@ -667,6 +801,7 @@ def _sha256_json(value: object) -> str:
 
 __all__ = (
     "INTERPRETATION",
+    "MEMBERSHIP_CLOCK_SCOPE",
     "RECENT_CYCLE_LIMIT",
     "RECENT_MEMBERSHIP_WINDOW_SECONDS",
     "SCHEMA_ID",
