@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record the seventieth no-send market cycle · Codex
+**Why:** The hourly observation boundary became eligible while the project was
+continuing the evidence-first Protocol-v2 campaign. One current point-in-time
+sample was needed to extend the genuine temporal baseline without tuning or
+manufacturing an idea.
+**Changes:**
+- Performed one already-authorized, cadence-eligible CoinGecko no-send request:
+  HTTP 200, 80 bounded provider rows, 1,484 ms, and zero retries.
+- Published strict-clean namespace
+  `radar_market_no_send_20260722t065952988746z_9de5fa0cf3f1` with 30 exact
+  market observations and zero anomalies, candidates, Core rows, or cards.
+- Preserved immutable publication and operations receipts and exact revision-12
+  dashboard authority at operator-state SHA-256
+  `919a4fe317b548a62dee87074e32976f0b2ca990a2f507e782077cbe48ac377d`.
+- Refreshed campaign truth to 70 cycles / 2,100 retained / 2,070
+  baseline-counted / 30 too-close observations, including 840 prospective
+  point-in-time universe/liquidity rows. The current universe remains 28/30
+  warm; HBAR and TON remain non-warm.
+- Kept the current exact 24-hour control-regime inputs at honest 0/30 coverage:
+  the source-bound replay proves the retained cadence gap and does not reuse
+  snapshot returns or infer future eligibility.
+**Verify:** Daily Operations readiness made zero provider calls and reported the
+cycle eligible. The single cycle returned HTTP 200; status then proved terminal
+success and the next reservation at `2026-07-22T07:59:56.195273+00:00`.
+Strict publication doctor reports 0 blockers / 0 warnings. Dashboard readiness
+and authority passed, and loopback HEAD returned HTTP 200 with the exact
+namespace, run, revision, and operator-state headers. The refreshed campaign
+JSON files parse, and `git diff --check` passes.
+**Notes/risks:** This healthy-empty generation is evidence, not a reason to lower
+thresholds. Bybit remains separately unauthorized and 403-blocked; no bypass or
+retry was attempted. Telegram sends, trades, orders, paper trades, normal RSI
+writes, and Event Alpha `TRIGGERED_FADE` creation all remain zero. Source
+file/function/class sizes are advisory and were not used as blockers; runtime
+provider, artifact, path, payload, identity, and secret bounds remain enforced.
+
 ## 2026-07-22 — Keep attribution construction typed and presence-aware · Codex
 **Why:** The closed catalyst-attribution constructor used one generic `str()`
 helper for identity, provider, URL, hash, and semantic claims. Structured or
