@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Bind catalyst compatibility evidence to its source row · Codex
+**Why:** The historical Decision-v2 fallback combined `any(official source)`
+with the sum of accepted counts across an entire candidate family. Unrelated
+market evidence could therefore confirm an evidence-free official shell, and a
+market URL could make an empty news shell plausible.
+**Changes:**
+- Made official confirmation require official classification plus accepted or
+  structured evidence on the same row.
+- Made plausible compatibility require a catalyst-specific lane plus an
+  accepted count or valid public URL on that same row. Source-row URLs now stay
+  attached to their owning source instead of depending on a flattened candidate
+  copy.
+- Added paired regressions proving both cross-row leaks stay unknown while
+  source-bound official and news evidence retain confirmed/plausible status.
+  Updated the North Star, roadmap, working agreement, and durable decision.
+**Verify:** 166 focused Decision-v2, projection, attribution, evidence-count,
+and namespace-integration tests passed. Python compilation, the strict
+integrated smoke/doctor, architecture cleanliness, JSON validation, and diff
+hygiene are run before publication.
+**Notes/risks:** Modern integrated rows still use the closed temporal-semantic
+attribution contract. No threshold, score formula, route rule, source registry,
+provider boundary, historical row, or safety invariant changed.
+
 ## 2026-07-22 — Close catalyst source-lane substring upgrades · Codex
 **Why:** Decision-v2's historical compatibility heuristic searched source-lane
 labels by arbitrary substring. An unrelated label such as

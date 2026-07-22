@@ -775,6 +775,7 @@
   "catalyst_source_authority_policy": {
     "article_text_may_establish_authority": false,
     "canonical_classifier": "event_alpha.providers.source_registry",
+    "compatibility_evidence_ownership": "row_local; source lane, accepted count, and public URL cannot be pooled across different rows",
     "compatibility_lane_label_matching": "normalized component boundaries only; arbitrary substrings cannot raise catalyst status",
     "evidence_quality_reuses_registry_authority": true,
     "historical_artifacts_rewritten": false,

@@ -2,7 +2,7 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-22T03:13:53.759059+00:00`
+- generated_at: `2026-07-22T03:21:56.528802+00:00`
 - gate_status: `pass`
 - enforcement_status: `quantitative_limits_advisory_only`
 - blocking_scope: `non_size_module_ownership_only`
@@ -68,7 +68,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `file_over_1500_lines` | `file:crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py` | 2369 |
 | `file_over_1500_lines` | `file:tests/cli/test_make_targets.py` | 1573 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_burn_in_operations.py` | 1549 |
-| `file_over_1500_lines` | `file:tests/event_alpha/test_decision_model_v2.py` | 2213 |
+| `file_over_1500_lines` | `file:tests/event_alpha/test_decision_model_v2.py` | 2268 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_impact_hypotheses.py` | 1588 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_history.py` | 1660 |
 | `file_over_1500_lines` | `file:tests/event_alpha/test_market_no_send.py` | 1504 |
@@ -244,7 +244,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | path | lines |
 |---|---:|
 | `tests/event_alpha/test_market_observation_campaign.py` | 2327 |
-| `tests/event_alpha/test_decision_model_v2.py` | 2213 |
+| `tests/event_alpha/test_decision_model_v2.py` | 2268 |
 | `tests/event_alpha/test_market_surfaces.py` | 1984 |
 | `tests/event_alpha/test_market_shadow_surprise.py` | 1980 |
 | `tests/event_alpha/test_market_history.py` | 1660 |
@@ -302,7 +302,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/radar/market_shadow_surprise.py` | 2369 |
 | `tests/cli/test_make_targets.py` | 1573 |
 | `tests/event_alpha/test_burn_in_operations.py` | 1549 |
-| `tests/event_alpha/test_decision_model_v2.py` | 2213 |
+| `tests/event_alpha/test_decision_model_v2.py` | 2268 |
 | `tests/event_alpha/test_impact_hypotheses.py` | 1588 |
 | `tests/event_alpha/test_market_history.py` | 1660 |
 | `tests/event_alpha/test_market_no_send.py` | 1504 |

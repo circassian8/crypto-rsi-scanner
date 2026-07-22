@@ -70,6 +70,10 @@ matches such as `newsletter` -> `news`, `unofficial_exchange` ->
 `official_exchange`, or `unlockable` -> `unlock` must never raise catalyst
 status. Valid compound labels such as `broad_news`,
 `official_exchange_listing_pack`, and `project_blog_rss` remain recognized.
+That heuristic also keeps evidence ownership row-local: an official/news lane
+claim from one row may not borrow an accepted count or public URL from another
+row to become confirmed/plausible. Closed catalyst attribution remains the
+authority for current integrated candidates.
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.

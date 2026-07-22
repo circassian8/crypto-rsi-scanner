@@ -57,7 +57,6 @@ def catalyst_status(
     sources: tuple[Mapping[str, Any], ...],
 ) -> str:
     explicit = _typed_text(data.get("catalyst_status")).casefold()
-    source_url, _source_title = catalyst_source_fields(data)
     text = _row_text(data, sources)
     attributions, attribution_invalid, attribution_supplied = (
         _catalyst_attribution_values(data, sources)
@@ -87,47 +86,47 @@ def catalyst_status(
     if explicit in {item.value for item in CatalystStatus}:
         return explicit
     evidence_rows = (data, *sources)
-    official = any(
-        _valid_structured_source_event(row.get("official_exchange_event"))
-        or _typed_text(row.get("source_class"))
-        in {
-            "official_exchange",
-            "official_project",
-            "structured_calendar",
-            "structured_unlock",
-        }
-        or _typed_text(row.get("source_strength")) == "official_structured"
-        for row in evidence_rows
+    source_evidence = (
+        (
+            data,
+            (
+                *_texts(data.get("source_origin")),
+                *_texts(data.get("source_origins")),
+                *_texts(data.get("source_class")),
+                *_texts(data.get("source_pack")),
+            ),
+        ),
+        *(
+            (
+                row,
+                (
+                    str(row.get("_source_origin") or ""),
+                    str(row.get("source_class") or ""),
+                    str(row.get("source_pack") or ""),
+                ),
+            )
+            for row in sources
+        ),
     )
-    accepted = sum(
-        _count(row.get("accepted_evidence_count")) or 0
-        for row in evidence_rows
-    )
-    source_lane_values = (
-        *_texts(data.get("source_origin")),
-        *_texts(data.get("source_origins")),
-        *_texts(data.get("source_class")),
-        *_texts(data.get("source_pack")),
-        *(str(row.get("_source_origin") or "") for row in sources),
-        *(str(row.get("source_class") or "") for row in sources),
-        *(str(row.get("source_pack") or "") for row in sources),
-    )
-    catalyst_specific_source = any(
-        _source_lane_has_token(value, token)
-        for value in source_lane_values
-        for token in _CATALYST_SOURCE_LANE_TOKENS
-    )
-    if official and (
-        accepted > 0
-        or any(
-            _valid_structured_source_event(row.get("official_exchange_event"))
-            for row in evidence_rows
+    official_with_evidence = any(
+        _row_is_official_source(row)
+        and (
+            (_count(row.get("accepted_evidence_count")) or 0) > 0
+            or _valid_structured_source_event(row.get("official_exchange_event"))
         )
-    ):
+        for row in evidence_rows
+    )
+    catalyst_specific_with_evidence = any(
+        _has_catalyst_source_lane(lane_values)
+        and (
+            (_count(row.get("accepted_evidence_count")) or 0) > 0
+            or bool(catalyst_source_fields(row)[0])
+        )
+        for row, lane_values in source_evidence
+    )
+    if official_with_evidence:
         return CatalystStatus.CONFIRMED.value
-    if (accepted > 0 and catalyst_specific_source) or (
-        source_url and catalyst_specific_source
-    ):
+    if catalyst_specific_with_evidence:
         return CatalystStatus.PLAUSIBLE.value
     if _truthy(data.get("catalyst_not_required")):
         return CatalystStatus.NOT_REQUIRED.value
@@ -343,6 +342,28 @@ def _source_lane_has_token(value: str, token: str) -> bool:
             value_parts[index : index + width] == token_parts
             for index in range(len(value_parts) - width + 1)
         )
+    )
+
+
+def _has_catalyst_source_lane(values: tuple[str, ...]) -> bool:
+    return any(
+        _source_lane_has_token(value, token)
+        for value in values
+        for token in _CATALYST_SOURCE_LANE_TOKENS
+    )
+
+
+def _row_is_official_source(row: Mapping[str, Any]) -> bool:
+    return bool(
+        _valid_structured_source_event(row.get("official_exchange_event"))
+        or _typed_text(row.get("source_class"))
+        in {
+            "official_exchange",
+            "official_project",
+            "structured_calendar",
+            "structured_unlock",
+        }
+        or _typed_text(row.get("source_strength")) == "official_structured"
     )
 
 

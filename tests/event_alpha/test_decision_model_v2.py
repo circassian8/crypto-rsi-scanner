@@ -624,6 +624,61 @@ def test_catalyst_source_lane_labels_require_component_boundaries():
         assert result.decision_hard_blockers == ()
 
 
+def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
+    unrelated_accepted = decision_model.evaluate_radar_decision(
+        _market_led_candidate(accepted_evidence_count=1),
+        source_rows=(
+            {
+                "_source_origin": "official_exchange",
+                "source_class": "official_exchange",
+            },
+        ),
+    )
+    unrelated_url = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            latest_source_url="https://example.test/market-context",
+            latest_source_title="Market context",
+        ),
+        source_rows=(
+            {
+                "_source_origin": "news",
+                "source_class": "broad_news",
+            },
+        ),
+    )
+
+    assert unrelated_accepted.catalyst_status == "unknown"
+    assert unrelated_url.catalyst_status == "unknown"
+    assert unrelated_accepted.decision_hard_blockers == ()
+    assert unrelated_url.decision_hard_blockers == ()
+
+    bound_official = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=(
+            {
+                "_source_origin": "official_exchange",
+                "source_class": "official_exchange",
+                "accepted_evidence_count": 1,
+            },
+        ),
+    )
+    bound_news = decision_model.evaluate_radar_decision(
+        _market_led_candidate(),
+        source_rows=(
+            {
+                "_source_origin": "news",
+                "source_class": "broad_news",
+                "source_url": "https://example.test/catalyst",
+            },
+        ),
+    )
+
+    assert bound_official.catalyst_status == "confirmed"
+    assert bound_news.catalyst_status == "plausible"
+    assert bound_official.decision_hard_blockers == ()
+    assert bound_news.decision_hard_blockers == ()
+
+
 def test_malformed_catalyst_state_claims_cannot_be_ignored_by_fallback_policy():
     source_context = {
         "source_origin": "official_exchange",

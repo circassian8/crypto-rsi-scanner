@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Keep catalyst compatibility evidence row-local
+**Status:** accepted
+**Decision:** The historical Decision-v2 catalyst fallback may assign confirmed
+status only when official classification and accepted or structured evidence
+belong to the same evidence row. It may assign plausible status only when the
+catalyst-specific lane and an accepted count or valid public source URL belong
+to the same row. Evidence claims from separate rows must never be pooled.
+Closed catalyst attribution remains authoritative for current integrated rows.
+**Why:** The former family-wide `any(official)` plus `sum(accepted)` logic let
+unrelated market evidence lend confirmation to an evidence-free official shell;
+the same cross-row leak let a market-context URL make an empty news shell look
+plausible. Both cases overstate explanatory confidence.
+**Revisit when:** A versioned compatibility retirement removes fallback support.
+Do not loosen row ownership or rewrite historical artifacts.
+
 ## 2026-07-22 - Match catalyst compatibility labels on component boundaries
 **Status:** accepted
 **Decision:** The historical Decision-v2 catalyst compatibility heuristic may

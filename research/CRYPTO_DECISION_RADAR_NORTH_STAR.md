@@ -64,7 +64,11 @@ as `broad_news`, `official_exchange_listing_pack`, and `project_blog_rss` remain
 recognized; substrings inside unrelated labels such as `newsletter`,
 `unofficial_exchange`, `rssmirror`, or `unlockable` cannot upgrade an unknown
 catalyst to plausible. This compatibility rule does not grant canonical source
-authority or replace the attribution contract.
+authority or replace the attribution contract. Its evidence ownership is also
+row-local: an official/news classification on one row cannot borrow an accepted
+evidence count or public URL from another row. A source-bound accepted count or
+public URL may retain compatibility confidence; unrelated evidence remains
+unknown.
 
 LLM catalyst frames are proposals until deterministic validation binds them to
 exactly one matching raw source. Each accepted quote must be a normalized,
