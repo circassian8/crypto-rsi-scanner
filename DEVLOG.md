@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record no-send market cycle 64 · Codex
+**Why:** The hourly cadence became eligible with the existing CoinGecko
+authorization, so the next genuine point-in-time observation could safely warm
+the temporal baseline and advance the evidence-first campaign.
+**Changes:**
+- Made one bounded live-provider request: HTTP 200, 80 returned rows, 30 selected
+  observations, 1,273 ms, and zero retries. Published strict-clean namespace
+  `radar_market_no_send_20260722t001201754261z_ed1540eb0207` at revision 12.
+- Advanced campaign truth to 64 cycles / 1,920 retained / 1,890 baseline-counted
+  / 30 too-close observations and 660 prospective context rows. Current baseline
+  and causal regime readiness improved from 28/30 to 29/30; only HBAR remains
+  without a closed 24-hour anchor. No anomaly or Decision idea was manufactured.
+**Verify:** Exact strict doctor passed with zero blockers/warnings; final
+publication and operations receipts validate; dashboard readiness and authority
+status both pass for run `2026-07-22T00:12:04.506884+00:00|no_key_live`; the
+campaign report reconciles the new pointer and counts.
+**Notes/risks:** Next eligibility is
+`2026-07-22T01:12:04.506884+00:00`. Telegram sends, trades, orders, paper trades,
+normal RSI writes, and Event Alpha `TRIGGERED_FADE` all remain zero. Spread,
+calendar, Bybit, and Protocol-v2 evidence blockers were not weakened.
+
 ## 2026-07-22 — Make blind-label readiness decision-first · Codex
 **Why:** The source-independence workflow correctly remained blocked on missing
 genuine source-diverse cases, but its default JSON obscured that single next

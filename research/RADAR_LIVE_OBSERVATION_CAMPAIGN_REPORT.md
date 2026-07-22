@@ -1,20 +1,20 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-21T23:46:58.312970+00:00` from local artifacts only.
+Generated at `2026-07-22T00:12:21.130325+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
 
 - Status: `in_progress_baseline_warming`
-- Counted real/no-send cycles: `63`
-- Real market observations: `1890`
-- Baseline-counting observations: `1860`
+- Counted real/no-send cycles: `64`
+- Real market observations: `1920`
+- Baseline-counting observations: `1890`
 - Too-close observations: `30`
 - Real Decision candidates: `11`
 - Current ideas: `0`
 - Historical ideas: `11`
-- Direct feature evidence: `10449`
-- Proxy feature evidence: `2500`
+- Direct feature evidence: `10629`
+- Proxy feature evidence: `2530`
 - Pending outcomes: `3`
 - Matured outcomes: `7`
 - Explicit first-view records: `0`
@@ -34,9 +34,9 @@ Research and decision support only. This report contains no trade recommendation
 ## Authority and pointer
 
 - Pointer status: `authoritative`
-- Current authority namespace: `radar_market_no_send_20260721t231117895453z_3d8bbbdc0a7a`
-- Pointer target namespace: `radar_market_no_send_20260721t231117895453z_3d8bbbdc0a7a`
-- Exact run: `2026-07-21T23:11:20.518841+00:00|no_key_live`
+- Current authority namespace: `radar_market_no_send_20260722t001201754261z_ed1540eb0207`
+- Pointer target namespace: `radar_market_no_send_20260722t001201754261z_ed1540eb0207`
+- Exact run: `2026-07-22T00:12:04.506884+00:00|no_key_live`
 - Revision: `12`
 - Exact operator binding: `true`
 
@@ -101,7 +101,8 @@ Research and decision support only. This report contains no trade recommendation
 | radar_market_no_send_20260721t151439069082z_4566a576574c | 2026-07-21T15:14:41.396928+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
 | radar_market_no_send_20260721t200917360640z_3af0176a5eb1 | 2026-07-21T20:09:19.865650+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
 | radar_market_no_send_20260721t221025653895z_24552878d217 | 2026-07-21T22:10:28.235042+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
-| radar_market_no_send_20260721t231117895453z_3d8bbbdc0a7a | 2026-07-21T23:11:20.518841+00:00 | 0 | none | not_published | published | dashboard_restarted | true |
+| radar_market_no_send_20260721t231117895453z_3d8bbbdc0a7a | 2026-07-21T23:11:20.518841+00:00 | 0 | none | not_published | published | dashboard_restarted | false |
+| radar_market_no_send_20260722t001201754261z_ed1540eb0207 | 2026-07-22T00:12:04.506884+00:00 | 0 | none | not_published | published | dashboard_restarted | true |
 
 ### Complete but non-authoritative generations
 
@@ -122,41 +123,39 @@ Research and decision support only. This report contains no trade recommendation
 - Exact authority assets: `30`
 - Assets found in retained history: `30`
 - Missing current assets: `0`
-- Fully warm retained-history baselines: `28`
-- Current-universe retained observations: `1711`
-- Current-universe baseline-counted observations: `1686`
+- Fully warm retained-history baselines: `29`
+- Current-universe retained observations: `1799`
+- Current-universe baseline-counted observations: `1773`
 - Missing/unassessed asset IDs: `none`
-- Observed non-warm asset IDs: `hedera-hashgraph, the-open-network`
-- Retained history eligible for a future same-asset point-in-time evaluation: `28/30`
-- Existing history cadence boundary: `2026-07-22T00:11:20.518841+00:00`
+- Observed non-warm asset IDs: `hedera-hashgraph`
+- Retained history eligible for a future same-asset point-in-time evaluation: `29/30`
+- Existing history cadence boundary: `2026-07-22T01:12:04.506884+00:00`
 - Eligibility basis: `same_asset_retained_history_before_future_observation`
 - Provider-call eligibility: `not inferred`; Daily Operations readiness remains authoritative.
 
 ### Exact current control-regime input replay
 
 - Status: `incomplete`
-- Exact source binding: `true` (`event_market_no_send_market_rows.json`, SHA-256 `4d0d91613e4ba9eeedb85be3d3a6c39425cf39855b3d608e5f9bbffa031690c6`)
-- Eligible causal 24-hour inputs: `28/30`
-- Missing current inputs: `2`
-- Missing rows that still have a current-snapshot 24-hour return: `2` (diagnostic only; never a substitute for a retained temporal anchor)
+- Exact source binding: `true` (`event_market_no_send_market_rows.json`, SHA-256 `cabb99ed96bc0382503a35fa713b7de63d5394164261ad291cbee589f8fec6cb`)
+- Eligible causal 24-hour inputs: `29/30`
+- Missing current inputs: `1`
+- Missing rows that still have a current-snapshot 24-hour return: `1` (diagnostic only; never a substitute for a retained temporal anchor)
 - Read-only replay result: `unavailable` (`temporal_return_24h_incomplete`)
   - `hedera-hashgraph (HBAR), rank 28`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
-    - Current-snapshot 24-hour return: `4.019138%` via `provider_derived_sparkline`; visible for diagnosis but excluded because it does not prove the retained 24-hour anchor.
-  - `the-open-network (GRAM), rank 30`: causal 24-hour evidence reference is unavailable, causal 24-hour return unit is unavailable, causal 24-hour return is unavailable
-    - Current-snapshot 24-hour return: `7.536888%` via `provider_derived_sparkline`; visible for diagnosis but excluded because it does not prove the retained 24-hour anchor.
+    - Current-snapshot 24-hour return: `4.132412%` via `provider_derived_sparkline`; visible for diagnosis but excluded because it does not prove the retained 24-hour anchor.
 - Retained history mutated by report: `false`; historical backfill: `false`.
 - Routing/policy/Protocol-v2 evidence eligibility: `false`; provider calls: `0`.
 
 ### Exact-generation control-regime history
 
 - Status: `incomplete`
-- Verified immutable generation sources: `63/63`
-- Complete point-in-time universes audited: `21`
-- Causal 24-hour input results: `0 ready / 21 incomplete / 0 complete-but-unavailable`
-- Comparable universe transitions: `20`; membership changed in `7`
-- Incomplete cycles overlapping an observed entry within 24 hours: `17`; incomplete cycles without that overlap: `4`
-- Latest exact cycle: `2026-07-21T23:11:20.518841+00:00` — `28/30` eligible inputs; missing: `hedera-hashgraph, the-open-network`
-- Latest missing assets with a recent observed entry: `hedera-hashgraph, the-open-network`
+- Verified immutable generation sources: `64/64`
+- Complete point-in-time universes audited: `22`
+- Causal 24-hour input results: `0 ready / 22 incomplete / 0 complete-but-unavailable`
+- Comparable universe transitions: `21`; membership changed in `8`
+- Incomplete cycles overlapping an observed entry within 24 hours: `18`; incomplete cycles without that overlap: `4`
+- Latest exact cycle: `2026-07-22T00:12:04.506884+00:00` — `29/30` eligible inputs; missing: `hedera-hashgraph`
+- Latest missing assets with a recent observed entry: `hedera-hashgraph`
 - Interpretation: membership overlap is descriptive, not causal attribution. Older anchor gaps and recent entries remain distinct; no universe, cadence, threshold, route, or regime policy changed.
 - Historical backfill/retained-history mutation/provider calls: `false / false / 0`.
 - Routing/policy/Protocol-v2 evidence eligibility: `false`.
@@ -167,19 +166,19 @@ Retained-history maturity and latest point-in-time feature availability are sepa
 
 | Feature group | Warm | Warming | Cold | Other | Future same-asset eligible | Samples min-max / required | Elapsed min-max / required | Deficit assets | Status counts |
 |---|---:|---:|---:|---:|---:|---|---|---|---|
-| btc_eth_relative | 28 | 2 | 0 | 0 | 28 | 0-34 / 8 (2 below) | 0-91.37 / 31 h (2 below) | hedera-hashgraph [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)]; the-open-network [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | warm=28, warming=2 |
-| returns_1h | 29 | 1 | 0 | 0 | 29 | 1-35 / 8 (1 below) | 1.01-92.4 / 8 h (1 below) | the-open-network [warming; samples 1/8 (gap 7); coverage 1.01/8h (gap 6.99h)] | warm=29, warming=1 |
-| returns_24h | 28 | 0 | 2 | 0 | 28 | 0-40 / 8 (2 below) | 0-199.9 / 31 h (2 below) | hedera-hashgraph [cold; samples 0/8 (gap 8); coverage 0/31h (gap 31h)]; the-open-network [cold; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | cold=2, warm=28 |
-| returns_4h | 28 | 2 | 0 | 0 | 28 | 1-34 / 8 (2 below) | 4.04-91.37 / 11 h (1 below) | hedera-hashgraph [warming; samples 4/8 (gap 4); coverage 60.3/11h (gap 0h)]; the-open-network [warming; samples 1/8 (gap 7); coverage 4.04/11h (gap 6.96h)] | warm=28, warming=2 |
-| turnover | 29 | 1 | 0 | 0 | 29 | 3-62 / 8 (1 below) | 4.04-199.9 / 7 h (1 below) | the-open-network [warming; samples 3/8 (gap 5); coverage 4.04/7h (gap 2.96h)] | warm=29, warming=1 |
-| volatility | 28 | 2 | 0 | 0 | 28 | 0-34 / 8 (2 below) | 0-91.37 / 31 h (2 below) | hedera-hashgraph [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)]; the-open-network [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | warm=28, warming=2 |
-| volume | 29 | 1 | 0 | 0 | 29 | 3-62 / 8 (1 below) | 4.04-199.9 / 7 h (1 below) | the-open-network [warming; samples 3/8 (gap 5); coverage 4.04/7h (gap 2.96h)] | warm=29, warming=1 |
+| btc_eth_relative | 29 | 1 | 0 | 0 | 29 | 0-35 / 8 (1 below) | 0-92.39 / 31 h (1 below) | hedera-hashgraph [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | warm=29, warming=1 |
+| returns_1h | 30 | 0 | 0 | 0 | 30 | 9-36 / 8 (0 below) | 45.45-93.41 / 8 h (0 below) | none | warm=30 |
+| returns_24h | 29 | 0 | 1 | 0 | 29 | 0-41 / 8 (1 below) | 0-200.92 / 31 h (1 below) | hedera-hashgraph [cold; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | cold=1, warm=29 |
+| returns_4h | 29 | 1 | 0 | 0 | 29 | 5-35 / 8 (1 below) | 48.45-92.39 / 11 h (0 below) | hedera-hashgraph [warming; samples 5/8 (gap 3); coverage 64.34/11h (gap 0h)] | warm=29, warming=1 |
+| turnover | 30 | 0 | 0 | 0 | 30 | 19-63 / 8 (0 below) | 48.45-200.92 / 7 h (0 below) | none | warm=30 |
+| volatility | 29 | 1 | 0 | 0 | 29 | 0-35 / 8 (1 below) | 0-92.39 / 31 h (1 below) | hedera-hashgraph [warming; samples 0/8 (gap 8); coverage 0/31h (gap 31h)] | warm=29, warming=1 |
+| volume | 30 | 0 | 0 | 0 | 30 | 19-63 / 8 (0 below) | 48.45-200.92 / 7 h (0 below) | none | warm=30 |
 
 ### Retained campaign history
 
 - Status: `warming`
-- Retained observations: `1890`
-- Baseline-counted observations: `1860`
+- Retained observations: `1920`
+- Baseline-counted observations: `1890`
 - Too-close observations: `30`
 - Duplicate observations: `0`
 - Conflicting duplicate observations: `0`
@@ -191,23 +190,23 @@ Retained-history maturity and latest point-in-time feature availability are sepa
 
 | Feature group | Warm | Warming | Cold | Other | Samples min-max / required | Elapsed min-max / required | Status counts |
 |---|---:|---:|---:|---:|---|---|---|
-| btc_eth_relative | 32 | 2 | 3 | 0 | 0-34 / 8 (5 below) | 0-91.37 / 31 h (5 below) | cold=3, warm=32, warming=2 |
-| returns_1h | 33 | 1 | 3 | 0 | 0-35 / 8 (4 below) | 0-92.4 / 8 h (4 below) | cold=3, warm=33, warming=1 |
-| returns_24h | 32 | 0 | 5 | 0 | 0-40 / 8 (5 below) | 0-199.9 / 31 h (5 below) | cold=5, warm=32 |
-| returns_4h | 32 | 2 | 3 | 0 | 0-34 / 8 (5 below) | 0-91.37 / 11 h (4 below) | cold=3, warm=32, warming=2 |
-| turnover | 33 | 4 | 0 | 0 | 1-62 / 8 (4 below) | 0-199.9 / 7 h (2 below) | warm=33, warming=4 |
-| volatility | 32 | 2 | 3 | 0 | 0-34 / 8 (5 below) | 0-91.37 / 31 h (5 below) | cold=3, warm=32, warming=2 |
-| volume | 33 | 4 | 0 | 0 | 1-62 / 8 (4 below) | 0-199.9 / 7 h (2 below) | warm=33, warming=4 |
+| btc_eth_relative | 32 | 2 | 3 | 0 | 0-35 / 8 (5 below) | 0-92.39 / 31 h (5 below) | cold=3, warm=32, warming=2 |
+| returns_1h | 33 | 1 | 3 | 0 | 0-36 / 8 (4 below) | 0-93.41 / 8 h (4 below) | cold=3, warm=33, warming=1 |
+| returns_24h | 32 | 0 | 5 | 0 | 0-41 / 8 (5 below) | 0-200.92 / 31 h (5 below) | cold=5, warm=32 |
+| returns_4h | 32 | 2 | 3 | 0 | 0-35 / 8 (5 below) | 0-92.39 / 11 h (4 below) | cold=3, warm=32, warming=2 |
+| turnover | 33 | 4 | 0 | 0 | 1-63 / 8 (4 below) | 0-200.92 / 7 h (2 below) | warm=33, warming=4 |
+| volatility | 32 | 2 | 3 | 0 | 0-35 / 8 (5 below) | 0-92.39 / 31 h (5 below) | cold=3, warm=32, warming=2 |
+| volume | 33 | 4 | 0 | 0 | 1-63 / 8 (4 below) | 0-200.92 / 7 h (2 below) | warm=33, warming=4 |
 
 ### Prospective matched-control context
 
 - Status: `partial`
-- Baseline-counted rows assessed: `1860`
-- Complete point-in-time universe rows: `630/1860`
-- Complete matched-control context rows: `0/1860`
-- Control-liquidity coverage: `630/1860`
-- Market-regime coverage: `0/1860`
-- Protocol-partition coverage: `0/1860`
+- Baseline-counted rows assessed: `1890`
+- Complete point-in-time universe rows: `660/1890`
+- Complete matched-control context rows: `0/1890`
+- Control-liquidity coverage: `660/1890`
+- Market-regime coverage: `0/1890`
+- Protocol-partition coverage: `0/1890`
 - Selection performed: `false`; outcomes are not read by this projection.
 - Historical context backfilled: `false`; Protocol-v2 evidence eligible: `false`.
 
@@ -225,8 +224,8 @@ Retained-history maturity and latest point-in-time feature availability are sepa
 These rows remain unresolved because the exact retained price history does not currently prove a price inside the closed outcome window. No interpolation or automatic threshold change is permitted.
 
 - Price-history snapshot status: `observed`
-- Price-history rows: `1890`
-- Price-history SHA-256: `8d490a0d7ded8b67c43e0470a889fe0d1bf8db429b0e17a03f1f81239f27f969`
+- Price-history rows: `1920`
+- Price-history SHA-256: `a0b9786132b61287f8974a2b1bb12a0be49e03a7f44829ed292549112918b814`
 
 | Asset | Candidate observed | Outcome due | Price allowed through | First retained after due | Outside window | Evidence status |
 |---|---|---|---|---|---:|---|
@@ -261,14 +260,14 @@ Human review is counted only through explicit confirmed actions; dashboard GET/H
 This is a read-only replay of the shadow model over retained, cadence-counted observations. Each projection uses only strictly earlier same-asset history; it does not rewrite historical rows or change routes, scores, thresholds, or authority.
 - Audit status: `ready`
 - Shadow schema: `event_alpha.shadow_temporal_surprise` v`6`
-- Exact history rows: `1890`
-- Baseline-counted rows replayed: `1860`
+- Exact history rows: `1920`
+- Baseline-counted rows replayed: `1890`
 - Non-counted rows excluded: `30`
 - Input rejections: `0`
 - Evaluation errors: `0`
 - Assets replayed: `37`
-- Source-bound projection digest: `b146285b673c6831d0cf0a61e1880d9da41ed2af58c0f2a244fb92d149723100`
-- Causal-value projection digest: `b9962e23ae94bf8773a8fb47e62fed8334cee96119654fffd2de24dea5947244`
+- Source-bound projection digest: `e1affeb0fbb73e29ff36a7fdce9df25ddd92bec4778441f1cf1248bf88c4432e`
+- Causal-value projection digest: `616cdad8fb1d5ecc0ece3d0e7d842f75d99f48e7dec2af06497dd45d5e3f9f50`
 - An audit status of `ready` means every modeled feature has some ready evidence; it does not mean every projection is ready. The counts below remain authoritative.
 - Statistical independence claimed: `false`
 - Protocol-v2 evidence eligible: `false`
@@ -276,33 +275,33 @@ This is a read-only replay of the shadow model over retained, cadence-counted ob
 
 | Feature | Family | Ready / evaluated | Status counts | Sample range | Robust z p05 / median / p95 | Tail kind | Tail rank min / median / p95 | Minimum-tail observation |
 |---|---|---:|---|---:|---:|---|---:|---|
-| relative_return_vs_btc_1h | relative_return_btc | 752 / 1860 | current_unavailable=789, insufficient_history=257, not_applicable=62, ready=752 | 0–34 | -2.850463 / 0.0483 / 3.279336 | two_sided | 0.057143 / 0.457143 / 1 | aave @ 2026-07-21T23:11:20.518841+00:00 |
-| relative_return_vs_btc_24h | relative_return_btc | 845 / 1860 | current_unavailable=705, insufficient_history=248, not_applicable=62, ready=845 | 0–39 | -2.572701 / 0.080419 / 4.314208 | two_sided | 0.05 / 0.444444 / 1 | ethereum @ 2026-07-21T23:11:20.518841+00:00 |
-| relative_return_vs_btc_4h | relative_return_btc | 715 / 1860 | current_unavailable=830, insufficient_history=253, not_applicable=62, ready=715 | 0–33 | -2.6933 / 0.136577 / 3.234362 | two_sided | 0.058824 / 0.461538 / 1 | monero @ 2026-07-21T23:11:20.518841+00:00 |
-| relative_return_vs_eth_1h | relative_return_eth | 752 / 1860 | current_unavailable=789, insufficient_history=257, not_applicable=62, ready=752 | 0–34 | -2.470533 / 0.020599 / 3.085425 | two_sided | 0.057143 / 0.444444 / 1 | aave @ 2026-07-21T23:11:20.518841+00:00 |
-| relative_return_vs_eth_24h | relative_return_eth | 845 / 1860 | current_unavailable=705, insufficient_history=248, not_applicable=62, ready=845 | 0–39 | -2.583561 / 0.269482 / 4.261715 | two_sided | 0.05 / 0.424242 / 0.974082 | bitcoin @ 2026-07-21T23:11:20.518841+00:00 |
-| relative_return_vs_eth_4h | relative_return_eth | 715 / 1860 | current_unavailable=830, insufficient_history=253, not_applicable=62, ready=715 | 0–33 | -2.697067 / -0.04239 / 2.827977 | two_sided | 0.058824 / 0.454545 / 1 | monero @ 2026-07-21T23:11:20.518841+00:00 |
-| return_1h | direct_return | 735 / 1860 | current_unavailable=816, degenerate_scale=44, insufficient_history=265, ready=735 | 0–34 | -2.746914 / 0 / 3.500852 | two_sided | 0.060606 / 0.461538 / 1 | hyperliquid @ 2026-07-21T15:14:41.396928+00:00 |
-| return_24h | direct_return | 867 / 1860 | current_unavailable=727, degenerate_scale=10, insufficient_history=256, ready=867 | 0–39 | -2.699696 / 0.082565 / 4.294594 | two_sided | 0.05 / 0.4 / 0.967677 | aave @ 2026-07-21T23:11:20.518841+00:00 |
-| return_4h | direct_return | 727 / 1860 | current_unavailable=858, degenerate_scale=14, insufficient_history=261, ready=727 | 0–33 | -2.984064 / 0 / 3.006343 | two_sided | 0.058824 / 0.47619 / 1 | monero @ 2026-07-21T23:11:20.518841+00:00 |
-| turnover_24h | activity | 1578 / 1860 | degenerate_scale=8, insufficient_history=274, ready=1578 | 0–61 | -2.444595 / -0.081382 / 1.60489 | upper | 0.016129 / 0.543168 / 1 | monero @ 2026-07-21T23:11:20.518841+00:00 |
-| volume_24h | activity | 1571 / 1860 | degenerate_scale=15, insufficient_history=274, ready=1571 | 0–61 | -2.35945 / -0.093159 / 1.681477 | upper | 0.016129 / 0.545455 / 1 | monero @ 2026-07-21T23:11:20.518841+00:00 |
+| relative_return_vs_btc_1h | relative_return_btc | 780 / 1890 | current_unavailable=790, insufficient_history=257, not_applicable=63, ready=780 | 0–35 | -2.835797 / 0.071653 / 3.217857 | two_sided | 0.057143 / 0.468627 / 1 | aave @ 2026-07-21T23:11:20.518841+00:00 |
+| relative_return_vs_btc_24h | relative_return_btc | 873 / 1890 | current_unavailable=706, insufficient_history=248, not_applicable=63, ready=873 | 0–40 | -2.585058 / 0.074793 / 4.277372 | two_sided | 0.04878 / 0.444444 / 1 | litecoin @ 2026-07-22T00:12:04.506884+00:00 |
+| relative_return_vs_btc_4h | relative_return_btc | 743 / 1890 | current_unavailable=830, insufficient_history=254, not_applicable=63, ready=743 | 0–34 | -2.682416 / 0.136577 / 3.189971 | two_sided | 0.057143 / 0.461538 / 1 | monero @ 2026-07-22T00:12:04.506884+00:00 |
+| relative_return_vs_eth_1h | relative_return_eth | 780 / 1890 | current_unavailable=790, insufficient_history=257, not_applicable=63, ready=780 | 0–35 | -2.485726 / -0.024628 / 3.064708 | two_sided | 0.055556 / 0.444444 / 1 | binancecoin @ 2026-07-22T00:12:04.506884+00:00 |
+| relative_return_vs_eth_24h | relative_return_eth | 873 / 1890 | current_unavailable=706, insufficient_history=248, not_applicable=63, ready=873 | 0–40 | -2.582093 / 0.278821 / 4.228024 | two_sided | 0.04878 / 0.428571 / 0.973527 | monero @ 2026-07-22T00:12:04.506884+00:00 |
+| relative_return_vs_eth_4h | relative_return_eth | 743 / 1890 | current_unavailable=830, insufficient_history=254, not_applicable=63, ready=743 | 0–34 | -2.679189 / -0.061855 / 2.800743 | two_sided | 0.057143 / 0.461538 / 1 | monero @ 2026-07-22T00:12:04.506884+00:00 |
+| return_1h | direct_return | 764 / 1890 | current_unavailable=817, degenerate_scale=44, insufficient_history=265, ready=764 | 0–35 | -2.705197 / 0 / 3.476811 | two_sided | 0.055556 / 0.461538 / 1 | monero @ 2026-07-22T00:12:04.506884+00:00 |
+| return_24h | direct_return | 896 / 1890 | current_unavailable=728, degenerate_scale=10, insufficient_history=256, ready=896 | 0–40 | -2.670448 / 0.109882 / 4.193214 | two_sided | 0.04878 / 0.405128 / 0.964646 | aave @ 2026-07-22T00:12:04.506884+00:00 |
+| return_4h | direct_return | 756 / 1890 | current_unavailable=858, degenerate_scale=14, insufficient_history=262, ready=756 | 0–34 | -2.886274 / 0 / 3.000297 | two_sided | 0.057143 / 0.482759 / 1 | monero @ 2026-07-22T00:12:04.506884+00:00 |
+| turnover_24h | activity | 1608 / 1890 | degenerate_scale=8, insufficient_history=274, ready=1608 | 0–62 | -2.436168 / -0.055982 / 1.598354 | upper | 0.015873 / 0.531582 / 1 | monero @ 2026-07-22T00:12:04.506884+00:00 |
+| volume_24h | activity | 1601 / 1890 | degenerate_scale=15, insufficient_history=274, ready=1601 | 0–62 | -2.356211 / -0.058698 / 1.672019 | upper | 0.015873 / 0.53125 / 1 | monero @ 2026-07-22T00:12:04.506884+00:00 |
 
 Reference-set variation below is calculated only for projections meeting the model's existing nominal sample minimum. It is not an effective-sample-size estimate and applies no distinctness threshold.
 
 | Feature | Variation rows / evaluated | Distinct count min / median / max | Distinct ratio min / median / p95 | Largest-tie ratio median / p95 / max | Least-diverse reference set |
 |---|---:|---:|---:|---:|---|
-| relative_return_vs_btc_1h | 1114 / 1860 | 8 / 18 / 34 | 1 / 1 / 1 | 0.055556 / 0.111111 / 0.125 | aave @ 2026-07-18T23:44:46.248720+00:00; 8/8 distinct; largest tie 1/8 |
-| relative_return_vs_btc_24h | 857 / 1860 | 8 / 22 / 39 | 1 / 1 / 1 | 0.045455 / 0.111111 / 0.125 | aave @ 2026-07-19T09:53:48.732731+00:00; 8/8 distinct; largest tie 1/8 |
-| relative_return_vs_btc_4h | 1079 / 1860 | 8 / 19 / 33 | 1 / 1 / 1 | 0.052632 / 0.111111 / 0.125 | aave @ 2026-07-19T00:45:08.517863+00:00; 8/8 distinct; largest tie 1/8 |
-| relative_return_vs_eth_1h | 1114 / 1860 | 8 / 18 / 34 | 1 / 1 / 1 | 0.055556 / 0.111111 / 0.125 | aave @ 2026-07-18T23:44:46.248720+00:00; 8/8 distinct; largest tie 1/8 |
-| relative_return_vs_eth_24h | 857 / 1860 | 8 / 22 / 39 | 1 / 1 / 1 | 0.045455 / 0.111111 / 0.125 | aave @ 2026-07-19T09:53:48.732731+00:00; 8/8 distinct; largest tie 1/8 |
-| relative_return_vs_eth_4h | 1079 / 1860 | 8 / 19 / 33 | 1 / 1 / 1 | 0.052632 / 0.111111 / 0.125 | aave @ 2026-07-19T00:45:08.517863+00:00; 8/8 distinct; largest tie 1/8 |
-| return_1h | 1154 / 1860 | 2 / 17 / 34 | 0.157895 / 1 / 1 | 0.066667 / 0.57406 / 0.894737 | figure-heloc @ 2026-07-20T11:34:12.287768+00:00; 3/19 distinct; largest tie 17/19 |
-| return_24h | 889 / 1860 | 1 / 22 / 39 | 0.111111 / 1 / 1 | 0.055556 / 0.222222 / 1 | figure-heloc @ 2026-07-19T20:41:53.503177+00:00; 1/9 distinct; largest tie 9/9 |
-| return_4h | 1118 / 1860 | 4 / 19 / 33 | 0.227273 / 1 / 1 | 0.058824 / 0.263684 / 0.772727 | figure-heloc @ 2026-07-20T12:34:56.205337+00:00; 5/22 distinct; largest tie 17/22 |
-| turnover_24h | 1586 / 1860 | 1 / 32 / 61 | 0.125 / 1 / 1 | 0.03125 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
-| volume_24h | 1586 / 1860 | 1 / 32 / 61 | 0.125 / 1 / 1 | 0.03125 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
+| relative_return_vs_btc_1h | 1143 / 1890 | 8 / 18 / 35 | 1 / 1 / 1 | 0.055556 / 0.111111 / 0.125 | aave @ 2026-07-18T23:44:46.248720+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_btc_24h | 885 / 1890 | 8 / 23 / 40 | 1 / 1 / 1 | 0.043478 / 0.111111 / 0.125 | aave @ 2026-07-19T09:53:48.732731+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_btc_4h | 1107 / 1890 | 8 / 20 / 34 | 1 / 1 / 1 | 0.05 / 0.111111 / 0.125 | aave @ 2026-07-19T00:45:08.517863+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_eth_1h | 1143 / 1890 | 8 / 18 / 35 | 1 / 1 / 1 | 0.055556 / 0.111111 / 0.125 | aave @ 2026-07-18T23:44:46.248720+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_eth_24h | 885 / 1890 | 8 / 23 / 40 | 1 / 1 / 1 | 0.043478 / 0.111111 / 0.125 | aave @ 2026-07-19T09:53:48.732731+00:00; 8/8 distinct; largest tie 1/8 |
+| relative_return_vs_eth_4h | 1107 / 1890 | 8 / 20 / 34 | 1 / 1 / 1 | 0.05 / 0.111111 / 0.125 | aave @ 2026-07-19T00:45:08.517863+00:00; 8/8 distinct; largest tie 1/8 |
+| return_1h | 1184 / 1890 | 2 / 17 / 35 | 0.157895 / 1 / 1 | 0.0625 / 0.561458 / 0.894737 | figure-heloc @ 2026-07-20T11:34:12.287768+00:00; 3/19 distinct; largest tie 17/19 |
+| return_24h | 918 / 1890 | 1 / 22 / 40 | 0.111111 / 1 / 1 | 0.055556 / 0.222222 / 1 | figure-heloc @ 2026-07-19T20:41:53.503177+00:00; 1/9 distinct; largest tie 9/9 |
+| return_4h | 1147 / 1890 | 4 / 19 / 34 | 0.227273 / 1 / 1 | 0.058824 / 0.259211 / 0.772727 | figure-heloc @ 2026-07-20T12:34:56.205337+00:00; 5/22 distinct; largest tie 17/22 |
+| turnover_24h | 1616 / 1890 | 1 / 32.5 / 62 | 0.125 / 1 / 1 | 0.030777 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
+| volume_24h | 1616 / 1890 | 1 / 32.5 / 62 | 0.125 / 1 / 1 | 0.030777 / 0.111111 / 1 | figure-heloc @ 2026-07-18T16:12:24.285315+00:00; 1/8 distinct; largest tie 8/8 |
 
 #### Repeated reference sets by asset
 
@@ -314,85 +313,85 @@ The campaign contains 28 exact asset-feature pairs with at least one repeated sa
 | figure-heloc | turnover_24h | 28 / 28 | 0.125 / 0.260064 | 0.41886 / 1 | 28 / 0 / 0; 11 / 11 | n/a | coingecko=36 / live=36 / derived_provider_ratio=36 | 7/35 distinct; largest tie 11/35 @ 2026-07-20T12:34:56.205337+00:00 |
 | figure-heloc | volume_24h | 28 / 28 | 0.125 / 0.245 | 0.525287 / 1 | 28 / 0 / 0; 21 / 21 | n/a | coingecko=36 / live=36 / provider_observed=36 | 6/35 distinct; largest tie 21/35 @ 2026-07-20T12:34:56.205337+00:00 |
 | figure-heloc | return_1h | 22 / 22 | 0.157895 / 0.2 | 0.866667 / 0.894737 | 22 / 22 / 22; 10 / 10 | 0 / 0 / 0; 327.194744 / — / — | coingecko=36 / live=36 / provider_observed=36 | 3/19 distinct; largest tie 17/19 @ 2026-07-20T12:34:56.205337+00:00 |
-| pepe | return_1h | 40 / 40 | 0.222222 / 0.436508 | 0.563492 / 0.888889 | 40 / 40 / 40; 4 / 7 | 0 / 0 / 0; 327.194744 / — / — | coingecko=62 / live=62 / provider_observed=62 | 18/34 distinct; largest tie 15/34 @ 2026-07-21T23:11:20.518841+00:00 |
+| pepe | return_1h | 41 / 41 | 0.222222 / 0.444444 | 0.555556 / 0.888889 | 41 / 41 / 41; 4 / 7 | 0 / 0 / 0; 327.194744 / — / — | coingecko=63 / live=63 / provider_observed=63 | 19/35 distinct; largest tie 15/35 @ 2026-07-22T00:12:04.506884+00:00 |
 | figure-heloc | return_4h | 21 / 21 | 0.227273 / 0.294118 | 0.705882 / 0.772727 | 21 / 18 / 18; 12 / 12 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=36 / live=36 / provider_observed=36 | 5/22 distinct; largest tie 17/22 @ 2026-07-20T12:34:56.205337+00:00 |
-| near | return_1h | 40 / 40 | 0.307692 / 0.432749 | 0.527864 / 0.7 | 40 / 40 / 40; 5 / 5 | 0 / 0 / 0; 327.194744 / — / — | coingecko=62 / live=62 / provider_observed=62 | 18/34 distinct; largest tie 14/34 @ 2026-07-21T23:11:20.518841+00:00 |
+| near | return_1h | 41 / 41 | 0.307692 / 0.444444 | 0.526316 / 0.7 | 41 / 41 / 41; 5 / 5 | 0 / 0 / 0; 327.194744 / — / — | coingecko=63 / live=63 / provider_observed=63 | 18/35 distinct; largest tie 15/35 @ 2026-07-22T00:12:04.506884+00:00 |
 | shiba-inu | return_1h | 17 / 17 | 0.444444 / 0.545455 | 0.545455 / 0.666667 | 17 / 17 / 17; 3 / 3 | 0 / 0 / 0; 132.497885 / — / — | coingecko=35 / live=35 / provider_observed=35 | 10/17 distinct; largest tie 8/17 @ 2026-07-20T19:41:41.729110+00:00 |
-| pepe | return_4h | 39 / 39 | 0.454545 / 0.677419 | 0.212121 / 0.4 | 39 / 39 / 39; 2 / 2 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=62 / live=62 / provider_observed=62 | 22/33 distinct; largest tie 7/33 @ 2026-07-21T23:11:20.518841+00:00 |
-| near | return_4h | 39 / 39 | 0.52381 / 0.588235 | 0.25 / 0.4 | 38 / 39 / 38; 3 / 3 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=62 / live=62 / provider_observed=62 | 21/33 distinct; largest tie 7/33 @ 2026-07-21T23:11:20.518841+00:00 |
-| ripple | return_1h | 40 / 40 | 0.6 / 0.75431 | 0.294118 / 0.5 | 38 / 40 / 38; 2 / 2 | 0 / 0 / 0; 327.194744 / — / — | coingecko=62 / live=62 / provider_observed=62 | 25/34 distinct; largest tie 10/34 @ 2026-07-21T23:11:20.518841+00:00 |
-| near | return_24h | 32 / 32 | 0.6 / 0.678235 | 0.212862 / 0.375 | 32 / 20 / 20; 3 / 3 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 27/39 distinct; largest tie 5/39 @ 2026-07-21T23:11:20.518841+00:00 |
+| pepe | return_4h | 40 / 40 | 0.454545 / 0.676945 | 0.212121 / 0.4 | 40 / 40 / 40; 2 / 2 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=63 / live=63 / provider_observed=63 | 23/34 distinct; largest tie 7/34 @ 2026-07-22T00:12:04.506884+00:00 |
+| near | return_4h | 40 / 40 | 0.52381 / 0.588235 | 0.24569 / 0.4 | 39 / 40 / 39; 3 / 3 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=63 / live=63 / provider_observed=63 | 21/34 distinct; largest tie 8/34 @ 2026-07-22T00:12:04.506884+00:00 |
+| ripple | return_1h | 41 / 41 | 0.6 / 0.75 | 0.294118 / 0.5 | 39 / 41 / 39; 2 / 2 | 0 / 0 / 0; 327.194744 / — / — | coingecko=63 / live=63 / provider_observed=63 | 25/35 distinct; largest tie 11/35 @ 2026-07-22T00:12:04.506884+00:00 |
+| near | return_24h | 33 / 33 | 0.6 / 0.676471 | 0.208333 / 0.375 | 33 / 21 / 21; 3 / 3 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 27/40 distinct; largest tie 5/40 @ 2026-07-22T00:12:04.506884+00:00 |
 | shiba-inu | return_4h | 12 / 12 | 0.625 / 0.7 | 0.3 / 0.375 | 12 / 0 / 0; 2 / 2 | 0 / 0 / 0; 1921.745431 / — / — | coingecko=35 / live=35 / provider_observed=35 | 10/13 distinct; largest tie 3/13 @ 2026-07-20T19:41:41.729110+00:00 |
-| avalanche-2 | return_1h | 40 / 40 | 0.666667 / 0.735294 | 0.270468 / 0.444444 | 18 / 40 / 18; 1 / 1 | 0 / 0 / 0; 327.194744 / — / — | coingecko=62 / live=62 / provider_observed=62 | 25/34 distinct; largest tie 5/34 @ 2026-07-21T23:11:20.518841+00:00 |
-| pepe | return_24h | 32 / 32 | 0.678571 / 0.734314 | 0.118824 / 0.25 | 32 / 3 / 3; 2 / 2 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 29/39 distinct; largest tie 3/39 @ 2026-07-21T23:11:20.518841+00:00 |
-| ripple | return_4h | 39 / 39 | 0.722222 / 0.782609 | 0.190476 / 0.375 | 39 / 39 / 39; 2 / 2 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=62 / live=62 / provider_observed=62 | 25/33 distinct; largest tie 5/33 @ 2026-07-21T23:11:20.518841+00:00 |
-| uniswap | return_1h | 35 / 40 | 0.727273 / 0.787879 | 0.212862 / 0.294118 | 34 / 35 / 34; 2 / 3 | 0 / 0 / 0; 327.194744 / — / — | coingecko=62 / live=62 / provider_observed=62 | 26/34 distinct; largest tie 5/34 @ 2026-07-21T23:11:20.518841+00:00 |
-| chainlink | return_1h | 39 / 40 | 0.764706 / 0.811012 | 0.188988 / 0.235294 | 35 / 39 / 35; 1 / 1 | 0 / 0 / 0; 327.194744 / — / — | coingecko=62 / live=62 / provider_observed=62 | 27/34 distinct; largest tie 6/34 @ 2026-07-21T23:11:20.518841+00:00 |
+| avalanche-2 | return_1h | 41 / 41 | 0.666667 / 0.735294 | 0.263158 / 0.444444 | 19 / 41 / 19; 1 / 1 | 0 / 0 / 0; 327.194744 / — / — | coingecko=63 / live=63 / provider_observed=63 | 26/35 distinct; largest tie 5/35 @ 2026-07-22T00:12:04.506884+00:00 |
+| pepe | return_24h | 33 / 33 | 0.678571 / 0.735294 | 0.117647 / 0.25 | 33 / 4 / 4; 2 / 2 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 30/40 distinct; largest tie 3/40 @ 2026-07-22T00:12:04.506884+00:00 |
+| ripple | return_4h | 40 / 40 | 0.722222 / 0.781929 | 0.186147 / 0.375 | 40 / 40 / 40; 2 / 2 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=63 / live=63 / provider_observed=63 | 26/34 distinct; largest tie 5/34 @ 2026-07-22T00:12:04.506884+00:00 |
+| uniswap | return_1h | 36 / 41 | 0.727273 / 0.787879 | 0.208333 / 0.294118 | 35 / 36 / 35; 2 / 3 | 0 / 0 / 0; 327.194744 / — / — | coingecko=63 / live=63 / provider_observed=63 | 27/35 distinct; largest tie 5/35 @ 2026-07-22T00:12:04.506884+00:00 |
+| chainlink | return_1h | 40 / 41 | 0.764706 / 0.809524 | 0.190476 / 0.235294 | 36 / 40 / 36; 2 / 2 | 0 / 0 / 0; 327.194744 / — / — | coingecko=63 / live=63 / provider_observed=63 | 27/35 distinct; largest tie 7/35 @ 2026-07-22T00:12:04.506884+00:00 |
 | shiba-inu | return_24h | 11 / 11 | 0.777778 / 0.833333 | 0.25 / 0.333333 | 0 / 11 / 0; 1 / 2 | 8 / 0 / 0; 20655.915428 / — / — | coingecko=35 / live=35 / provider_observed=35 | 10/12 distinct; largest tie 3/12 @ 2026-07-20T19:41:41.729110+00:00 |
-| ripple | return_24h | 32 / 32 | 0.78125 / 0.861905 | 0.096006 / 0.25 | 32 / 0 / 0; 3 / 3 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 32/39 distinct; largest tie 3/39 @ 2026-07-21T23:11:20.518841+00:00 |
-| avalanche-2 | return_4h | 35 / 39 | 0.827586 / 0.913043 | 0.111111 / 0.166667 | 35 / 6 / 6; 1 / 1 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=62 / live=62 / provider_observed=62 | 28/33 distinct; largest tie 4/33 @ 2026-07-21T23:11:20.518841+00:00 |
-| uniswap | return_4h | 32 / 39 | 0.842105 / 0.888889 | 0.090909 / 0.142857 | 32 / 23 / 23; 2 / 2 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=62 / live=62 / provider_observed=62 | 29/33 distinct; largest tie 3/33 @ 2026-07-21T23:11:20.518841+00:00 |
-| avalanche-2 | return_24h | 32 / 32 | 0.875 / 0.9375 | 0.085145 / 0.25 | 32 / 0 / 0; 2 / 2 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 37/39 distinct; largest tie 2/39 @ 2026-07-21T23:11:20.518841+00:00 |
-| chainlink | return_24h | 32 / 32 | 0.875 / 0.916667 | 0.085145 / 0.25 | 32 / 0 / 0; 2 / 2 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 35/39 distinct; largest tie 2/39 @ 2026-07-21T23:11:20.518841+00:00 |
-| uniswap | return_24h | 32 / 32 | 0.875 / 0.936492 | 0.085145 / 0.25 | 32 / 0 / 0; 2 / 2 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 37/39 distinct; largest tie 2/39 @ 2026-07-21T23:11:20.518841+00:00 |
+| ripple | return_24h | 33 / 33 | 0.78125 / 0.857143 | 0.095238 / 0.25 | 33 / 0 / 0; 3 / 3 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 32/40 distinct; largest tie 3/40 @ 2026-07-22T00:12:04.506884+00:00 |
+| avalanche-2 | return_4h | 36 / 40 | 0.827586 / 0.913043 | 0.113248 / 0.166667 | 36 / 7 / 7; 1 / 1 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=63 / live=63 / provider_observed=63 | 29/34 distinct; largest tie 4/34 @ 2026-07-22T00:12:04.506884+00:00 |
+| uniswap | return_4h | 33 / 40 | 0.842105 / 0.886752 | 0.090909 / 0.142857 | 33 / 24 / 24; 2 / 2 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=63 / live=63 / provider_observed=63 | 30/34 distinct; largest tie 3/34 @ 2026-07-22T00:12:04.506884+00:00 |
+| avalanche-2 | return_24h | 33 / 33 | 0.875 / 0.9375 | 0.083333 / 0.25 | 33 / 0 / 0; 2 / 2 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 38/40 distinct; largest tie 2/40 @ 2026-07-22T00:12:04.506884+00:00 |
+| chainlink | return_24h | 33 / 33 | 0.875 / 0.916667 | 0.083333 / 0.25 | 33 / 0 / 0; 3 / 3 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 35/40 distinct; largest tie 3/40 @ 2026-07-22T00:12:04.506884+00:00 |
+| uniswap | return_24h | 33 / 33 | 0.875 / 0.9375 | 0.083333 / 0.25 | 33 / 0 / 0; 2 / 2 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 38/40 distinct; largest tie 2/40 @ 2026-07-22T00:12:04.506884+00:00 |
 | dexe | return_24h | 5 / 6 | 0.888889 / 0.909091 | 0.181818 / 0.222222 | 5 / 0 / 0; 2 / 2 | 5 / 0 / 0; 13961.061527 / — / — | coingecko=36 / live=36 / provider_observed=36 | 10/11 distinct; largest tie 2/11 @ 2026-07-21T11:07:27.472398+00:00 |
-| chainlink | return_4h | 31 / 39 | 0.933333 / 0.962963 | 0.086957 / 0.133333 | 31 / 0 / 0; 1 / 1 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=62 / live=62 / provider_observed=62 | 32/33 distinct; largest tie 2/33 @ 2026-07-21T23:11:20.518841+00:00 |
-| dogecoin | return_24h | 9 / 32 | 0.967742 / 1 | 0.055556 / 0.125 | 9 / 0 / 0; 2 / 2 | 31 / 0 / 0; 18958.792735 / — / — | coingecko=62 / live=62 / provider_observed=62 | 38/39 distinct; largest tie 2/39 @ 2026-07-21T23:11:20.518841+00:00 |
+| chainlink | return_4h | 32 / 40 | 0.933333 / 0.963624 | 0.085145 / 0.133333 | 32 / 0 / 0; 1 / 1 | 0 / 0 / 0; 3554.182587 / — / — | coingecko=63 / live=63 / provider_observed=63 | 33/34 distinct; largest tie 2/34 @ 2026-07-22T00:12:04.506884+00:00 |
+| dogecoin | return_24h | 10 / 33 | 0.967742 / 1 | 0.055556 / 0.125 | 10 / 0 / 0; 2 / 2 | 32 / 0 / 0; 18958.792735 / — / — | coingecko=63 / live=63 / provider_observed=63 | 39/40 distinct; largest tie 2/40 @ 2026-07-22T00:12:04.506884+00:00 |
 
 #### Rolling return-window overlap by asset
 
-The campaign contains 282 sample-eligible asset-return pairs. The 48 lowest unique-clock-coverage pairs are shown. Intervals are half-open from anchor through endpoint. Adjacent overlap, exact interval reuse, and union clock coverage are descriptive only: no effective sample size is estimated, no sample is reweighted or excluded, and no threshold, score, route, publication, or Protocol-v2 rule changes.
+The campaign contains 285 sample-eligible asset-return pairs. The 48 lowest unique-clock-coverage pairs are shown. Intervals are half-open from anchor through endpoint. Adjacent overlap, exact interval reuse, and union clock coverage are descriptive only: no effective sample size is estimated, no sample is reweighted or excluded, and no threshold, score, route, publication, or Protocol-v2 rule changes.
 
 | Asset | Return feature | Eligible sets | Asset overlap / exact reuse sets | Asset unique-clock ratio min / median / max | Asset max adjacent / total excess seconds | Benchmark overlap / exact reuse sets | Benchmark unique-clock ratio min / median / max | Exact minimum asset coverage reference |
 |---|---|---:|---:|---:|---:|---:|---:|---|
+| ondo-finance | relative_return_vs_btc_24h | 31 | 31 / 0 | 0.124647 / 0.153679 / 0.30285 | 101650.31433 / 3040711.663851 | 31 / 0 | 0.124647 / 0.153679 / 0.30285 | 0.124647; 38 intervals; 432984.292628/3473695.956479 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| ondo-finance | relative_return_vs_eth_24h | 31 | 31 / 0 | 0.124647 / 0.153679 / 0.30285 | 101650.31433 / 3040711.663851 | 31 / 0 | 0.124647 / 0.153679 / 0.30285 | 0.124647; 38 intervals; 432984.292628/3473695.956479 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| ondo-finance | return_24h | 31 | 31 / 0 | 0.124647 / 0.153679 / 0.30285 | 101650.31433 / 3040711.663851 | n/a | n/a | 0.124647; 38 intervals; 432984.292628/3473695.956479 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
 | figure-heloc | relative_return_vs_btc_24h | 11 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 89296.541224 / 1413226.280974 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 0.126293; 17 intervals; 192621.336304/1525197.725965 unique/total s @ 2026-07-20T11:34:12.287768+00:00 |
 | figure-heloc | relative_return_vs_eth_24h | 11 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 89296.541224 / 1413226.280974 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 0.126293; 17 intervals; 192621.336304/1525197.725965 unique/total s @ 2026-07-20T11:34:12.287768+00:00 |
 | figure-heloc | return_24h | 11 | 11 / 0 | 0.126293 / 0.147429 / 0.181491 | 89296.541224 / 1413226.280974 | n/a | n/a | 0.126293; 17 intervals; 192621.336304/1525197.725965 unique/total s @ 2026-07-20T11:34:12.287768+00:00 |
-| ondo-finance | relative_return_vs_btc_24h | 30 | 30 / 0 | 0.12722 / 0.156422 / 0.30285 | 101650.31433 / 2945385.157919 | 30 / 0 | 0.12722 / 0.156422 / 0.30285 | 0.12722; 37 intervals; 429332.008829/3374717.166748 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| ondo-finance | relative_return_vs_eth_24h | 30 | 30 / 0 | 0.12722 / 0.156422 / 0.30285 | 101650.31433 / 2945385.157919 | 30 / 0 | 0.12722 / 0.156422 / 0.30285 | 0.12722; 37 intervals; 429332.008829/3374717.166748 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| ondo-finance | return_24h | 30 | 30 / 0 | 0.12722 / 0.156422 / 0.30285 | 101650.31433 / 2945385.157919 | n/a | n/a | 0.12722; 37 intervals; 429332.008829/3374717.166748 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| pump-fun | relative_return_vs_btc_24h | 3 | 3 / 0 | 0.150683 / 0.159449 / 0.173877 | 92932.508277 / 768525.009718 | 3 / 0 | 0.150683 / 0.159449 / 0.173877 | 0.150683; 10 intervals; 136349.610998/904874.620716 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| pump-fun | relative_return_vs_eth_24h | 3 | 3 / 0 | 0.150683 / 0.159449 / 0.173877 | 92932.508277 / 768525.009718 | 3 / 0 | 0.150683 / 0.159449 / 0.173877 | 0.150683; 10 intervals; 136349.610998/904874.620716 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| pump-fun | return_24h | 3 | 3 / 0 | 0.150683 / 0.159449 / 0.173877 | 92932.508277 / 768525.009718 | n/a | n/a | 0.150683; 10 intervals; 136349.610998/904874.620716 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| aave | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| aave | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| aave | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| avalanche-2 | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| avalanche-2 | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| avalanche-2 | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| binancecoin | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| binancecoin | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| binancecoin | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bitcoin | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bitcoin | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bitcoin-cash | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bitcoin-cash | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bitcoin-cash | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bittensor | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bittensor | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| bittensor | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| cardano | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| cardano | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| cardano | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| chainlink | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| chainlink | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| chainlink | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| dogecoin | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| dogecoin | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| dogecoin | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| ethereum | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| ethereum | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| hyperliquid | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| hyperliquid | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| hyperliquid | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| litecoin | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| litecoin | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| litecoin | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| monero | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| monero | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| monero | return_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | n/a | n/a | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| near | relative_return_vs_btc_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
-| near | relative_return_vs_eth_24h | 32 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 101650.31433 / 3022516.478304 | 32 / 0 | 0.151782 / 0.200089 / 0.43531 | 0.151782; 39 intervals; 540857.147824/3563373.626128 unique/total s @ 2026-07-21T23:11:20.518841+00:00 |
+| pump-fun | relative_return_vs_btc_24h | 4 | 4 / 0 | 0.139464 / 0.155066 / 0.173877 | 95326.505932 / 863851.51565 | 4 / 0 | 0.139464 / 0.155066 / 0.173877 | 0.139464; 11 intervals; 140001.894797/1003853.410447 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| pump-fun | relative_return_vs_eth_24h | 4 | 4 / 0 | 0.139464 / 0.155066 / 0.173877 | 95326.505932 / 863851.51565 | 4 / 0 | 0.139464 / 0.155066 / 0.173877 | 0.139464; 11 intervals; 140001.894797/1003853.410447 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| pump-fun | return_24h | 4 | 4 / 0 | 0.139464 / 0.155066 / 0.173877 | 95326.505932 / 863851.51565 | n/a | n/a | 0.139464; 11 intervals; 140001.894797/1003853.410447 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| aave | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| aave | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| aave | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| avalanche-2 | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| avalanche-2 | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| avalanche-2 | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| binancecoin | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| binancecoin | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| binancecoin | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bitcoin | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bitcoin | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bitcoin-cash | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bitcoin-cash | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bitcoin-cash | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bittensor | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bittensor | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| bittensor | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| cardano | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| cardano | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| cardano | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| chainlink | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| chainlink | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| chainlink | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| dogecoin | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| dogecoin | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| dogecoin | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| ethereum | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| ethereum | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| hyperliquid | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| hyperliquid | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| hyperliquid | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| litecoin | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| litecoin | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| litecoin | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| monero | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| monero | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| monero | return_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | n/a | n/a | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| near | relative_return_vs_btc_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
+| near | relative_return_vs_eth_24h | 33 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 101650.31433 / 3117842.984236 | 33 / 0 | 0.148678 / 0.196676 / 0.43531 | 0.148678; 40 intervals; 544509.431623/3662352.415859 unique/total s @ 2026-07-22T00:12:04.506884+00:00 |
 
 ### Decision episodes
 
@@ -402,7 +401,7 @@ Repeated observations are grouped into fixed-start descriptive episodes; they ar
 - Outcome input status: `partial`
 - Structural membership status: `ready`
 - Outcome ledger status: `observed`
-- Candidate snapshots: `63`/`63` generations
+- Candidate snapshots: `64`/`64` generations
 - Eligible anomaly observations: `11`
 - Excluded observations: `0`
 - Primary 24h episodes: `4`
@@ -514,20 +513,20 @@ This expands the frozen-episode scorecard across every canonical Decision route 
 
 ## Data-quality limitations
 
-- **execution_quality_spread:** Trusted spread coverage is 0/1890. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.
-- **proxy_market_features:** The campaign retains 2500 proxy feature observations; proxy evidence remains explicitly quality-capped.
+- **execution_quality_spread:** Trusted spread coverage is 0/1920. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.
+- **proxy_market_features:** The campaign retains 2530 proxy feature observations; proxy evidence remains explicitly quality-capped.
 - **temporal_baseline_maturity:** The exact current authoritative universe is not feature/time-aware warm.
 
 ## Next observation
 
-- Next eligible time: `2026-07-22T00:11:20.518841+00:00`
+- Next eligible time: `2026-07-22T01:12:04.506884+00:00`
 - Eligible at report time: `false`
 - Exact next safe operator command: `make radar-daily-ops-readiness PYTHON=.venv/bin/python`
 - Authorization is rechecked at the provider boundary; this report never creates or changes it.
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 63 counted real/no-send cycles and 11 canonical ideas; 3 outcomes are pending and 7 outcomes are matured. Provider history contains 14 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 32/37 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 58 bound generations and current authority is radar_market_no_send_20260721t231117895453z_3d8bbbdc0a7a. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 64 counted real/no-send cycles and 11 canonical ideas; 3 outcomes are pending and 7 outcomes are matured. Provider history contains 14 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 32/37 warm retained assets; exact current-universe status is warming with 29/30 warm assets. Pointer history contains 59 bound generations and current authority is radar_market_no_send_20260722t001201754261z_ed1540eb0207. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.
