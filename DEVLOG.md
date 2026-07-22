@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Keep attribution construction typed and presence-aware · Codex
+**Why:** The closed catalyst-attribution constructor used one generic `str()`
+helper for identity, provider, URL, hash, and semantic claims. Structured or
+boolean values could become declared text, and naive type hardening could let a
+malformed explicit role borrow optimistic lower evidence.
+**Changes:**
+- Accept only real nonblank strings across constructor text aliases and stop at
+  a present malformed higher-authority claim instead of borrowing a lower one.
+- Preserve deterministic derived identity/hash behavior when typed evidence is
+  unavailable, while making malformed explicit semantic roles unvalidated and
+  non-causal rather than falling through to row-type inference.
+- Added one adversarial mapping regression covering anomaly/source IDs,
+  provider, URL, content hash, semantic/candidate roles, and impact strength;
+  updated the working agreement, North Star, roadmap, and durable decision.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_catalyst_attribution.py
+tests/event_alpha/test_catalyst_attribution_propagation.py
+tests/event_alpha/test_decision_model_v2.py
+tests/event_alpha/test_integrated_merge_policy.py
+tests/event_alpha/test_discovery_pipeline.py
+tests/event_alpha/test_catalyst_search.py` (166 passed); `python3 -m compileall
+-q crypto_rsi_scanner tests`; North-Star JSON/static test; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; strict artifact doctor (0
+blockers / 0 warnings).
+**Notes/risks:** This is a constructor-boundary hardening change; valid closed
+contracts, weights, thresholds, routes, source classes, and historical bytes
+remain unchanged. No provider call, send, trade, order, paper trade, normal RSI
+write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-22 — Keep catalyst anomaly identity typed and unambiguous · Codex
 **Why:** Decision-v2 stringified explicit anomaly IDs before comparing them to
 closed catalyst attribution. A mapping-valued ID could therefore be paired with

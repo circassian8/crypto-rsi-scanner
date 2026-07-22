@@ -105,6 +105,11 @@ The candidate side of that binding accepts only typed, nonblank anomaly IDs.
 a structured value, malformed observation-ID collection, or conflicting pair
 invalidates the supplied attribution set rather than being stringified or
 borrowing a lower identity alias.
+The attribution constructor applies the same presence-aware typed rule to
+anomaly/source IDs, provider, URL, content hash, semantic/candidate roles, and
+impact/cause fields. A malformed higher-authority text claim blocks lower alias
+borrowing; identity/hash may become deterministic derived evidence, while a
+malformed semantic role remains explicitly unvalidated and non-causal.
 Decision-v2 source-authority and source-specificity components use that same
 owner set. A flattened accepted count cannot raise specificity, a source-row
 owner must receive its own authority, and a supplied invalid or non-causal

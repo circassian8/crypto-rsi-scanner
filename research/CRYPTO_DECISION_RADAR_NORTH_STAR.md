@@ -183,6 +183,12 @@ non-text `market_anomaly_id` / `anomaly_raw_id` claims are never serialized into
 keys, and two present explicit aliases must agree. Malformed observation-ID
 collections or conflicting aliases reject the supplied causal set rather than
 falling through to a weaker candidate identity.
+Construction of the closed attribution is likewise typed and presence-aware
+for anomaly/source IDs, provider, URL, content hash, semantic/candidate roles,
+impact strength, and cause state. A malformed higher-authority field prevents
+lower-alias borrowing. Identity/hash may use their explicit deterministic
+derived forms, but a malformed semantic role is unvalidated and non-causal;
+structured input is never converted into authority-bearing text.
 
 The immutable `event_alpha.catalyst_attribution` v1 value binds anomaly/source
 identities, a digest over the exact anomaly asset/snapshot/state evidence,

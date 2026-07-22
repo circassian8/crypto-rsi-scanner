@@ -154,6 +154,51 @@ def test_missing_public_clock_fails_closed_and_records_derived_identity():
     assert "source_public_clock_missing" in value["reason_codes"]
 
 
+def test_mapping_constructor_never_stringifies_or_borrows_malformed_text_claims():
+    anomaly = _anomaly(
+        market_anomaly_id={"unexpected": "anomaly-id"},
+        anomaly_id="lower-anomaly-id-must-not-win",
+    )
+    source = _official_source(
+        raw_id={"unexpected": "source-id"},
+        source_event_id="lower-source-id-must-not-win",
+        provider={"unexpected": "provider"},
+        source_provider="official_exchange",
+        source_url={"unexpected": "url"},
+        latest_source_url="https://exchange.example/notices/lower-url",
+        content_hash={"unexpected": "hash"},
+        source_content_hash="b" * 64,
+        main_frame_role={"unexpected": "role"},
+        frame_role="main_catalyst",
+        candidate_role={"unexpected": "candidate-role"},
+        asset_role="direct_subject",
+        impact_path_strength={"unexpected": "impact"},
+        relationship_strength="direct",
+    )
+
+    value = catalyst_attribution.assess_mapping_attribution(anomaly, source)
+
+    assert value["anomaly_id"].startswith("derived:")
+    assert value["anomaly_id"] != "lower-anomaly-id-must-not-win"
+    assert value["source_id"].startswith("derived:")
+    assert value["source_id"] != "lower-source-id-must-not-win"
+    assert value["source_identity_kind"] == "derived"
+    assert value["source_provider"] == "unknown"
+    assert value["source_url"] is None
+    assert value["source_content_hash"] != source["source_content_hash"]
+    assert value["semantic_role"] == "unknown"
+    assert value["semantic_role_validated"] is False
+    assert value["candidate_role"] == "unknown"
+    assert value["impact_path_strength"] == "unknown"
+    assert value["causal_basis"] == "none"
+    assert value["causal_eligible"] is False
+    assert "anomaly_identity_derived" in value["reason_codes"]
+    assert "source_identity_derived" in value["reason_codes"]
+    assert "source_content_hash_derived" in value["reason_codes"]
+    assert "source_content_hash_normalized" not in value["reason_codes"]
+    assert catalyst_attribution.validate_contract(value) == []
+
+
 def test_contract_is_idempotent_and_digest_tampering_fails():
     value = catalyst_attribution.assess_mapping_attribution(
         _anomaly(), _official_source()

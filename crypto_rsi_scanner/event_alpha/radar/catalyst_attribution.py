@@ -694,9 +694,13 @@ def _source_frame(source: RawDiscoveredEvent) -> Mapping[str, Any]:
 
 
 def _semantic_role_value(source: Mapping[str, Any]) -> tuple[str, bool]:
-    role = _first_text(source, "main_frame_role", "frame_role", "semantic_role")
-    if role:
-        normalized = role.casefold()
+    for field in ("main_frame_role", "frame_role", "semantic_role"):
+        if field not in source or source.get(field) in (None, ""):
+            continue
+        role = source.get(field)
+        if type(role) is not str or not role.strip():
+            return catalyst_frames.ROLE_UNKNOWN, False
+        normalized = role.strip().casefold()
         return (
             (normalized, True)
             if normalized in SEMANTIC_ROLES
@@ -819,11 +823,12 @@ def _safe_source_url(value: str) -> tuple[str | None, str | None]:
 
 def _first_text(row: Mapping[str, Any], *fields: str) -> str:
     for field in fields:
+        if field not in row or row.get(field) in (None, ""):
+            continue
         value = row.get(field)
-        if value not in (None, ""):
-            text = str(value).strip()
-            if text:
-                return text
+        if type(value) is not str:
+            return ""
+        return value.strip()
     return ""
 
 

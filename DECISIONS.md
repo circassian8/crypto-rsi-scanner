@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Keep catalyst-attribution construction typed and presence-aware
+**Status:** accepted
+**Decision:** The closed catalyst-attribution constructor accepts only typed,
+nonblank text for anomaly/source identity, provider, URL, content hash,
+semantic/candidate roles, impact strength, cause state, and their aliases. A
+present malformed higher-authority claim blocks lower-alias borrowing. Missing
+or malformed identity/hash may use the existing deterministic derived form;
+malformed semantic-role evidence remains explicitly unvalidated and non-causal.
+**Why:** The generic constructor helper used `str()` on mappings, booleans, and
+numbers. It could manufacture declared IDs/provider labels from structured
+values, borrow a lower alias after future type hardening, or let an invalid
+explicit role fall through to optimistic row-type inference.
+**Revisit when:** Provider adapters emit schema-validated typed objects before
+attribution construction. Preserve the same fail-closed precedence and never
+restore arbitrary serialization.
+
 ## 2026-07-22 - Keep candidate anomaly identity typed and unambiguous
 **Status:** accepted
 **Decision:** Decision-v2 may bind a closed catalyst attribution only to typed,
