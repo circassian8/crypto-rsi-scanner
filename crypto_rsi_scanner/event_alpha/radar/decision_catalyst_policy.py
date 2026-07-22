@@ -23,6 +23,12 @@ _SOURCE_TITLE_FIELDS = (
     "title",
     "event_name",
 )
+_ATTRIBUTION_SOURCE_ID_FIELDS = (
+    "raw_id",
+    "source_event_id",
+    "official_exchange_event_id",
+    "event_id",
+)
 _STRUCTURED_SOURCE_FIELDS = (
     "official_exchange_event",
     "scheduled_catalyst_event",
@@ -393,10 +399,62 @@ def _attribution_evidence_owner(
     }
     attribution_url = catalyst_source_fields(attribution)[0]
     if attribution_url:
-        for source in source_rows:
-            if catalyst_source_fields(source)[0] == attribution_url:
-                return {**dict(source), **attribution_values}
+        url_matches = tuple(
+            source
+            for source in source_rows
+            if catalyst_source_fields(source)[0] == attribution_url
+        )
+        identity_matches = tuple(
+            source
+            for source in url_matches
+            if _source_row_attribution_identity_match(source, attribution) is True
+        )
+        if len(identity_matches) == 1:
+            return {**dict(identity_matches[0]), **attribution_values}
+        if not identity_matches:
+            compatibility_matches = tuple(
+                source
+                for source in url_matches
+                if _source_row_attribution_identity_match(source, attribution) is None
+            )
+            if len(compatibility_matches) == 1:
+                return {**dict(compatibility_matches[0]), **attribution_values}
     return dict(attribution_values)
+
+
+def _source_row_attribution_identity_match(
+    source: Mapping[str, Any],
+    attribution: Mapping[str, Any],
+) -> bool | None:
+    """Return exact match, mismatch, or legacy-unavailable identity state."""
+
+    source_ids = {
+        value
+        for field in _ATTRIBUTION_SOURCE_ID_FIELDS
+        if (value := _typed_text(source.get(field)))
+    }
+    source_hashes = {
+        value.casefold()
+        for value in (_typed_text(source.get("source_content_hash")),)
+        if value
+    }
+    if source_ids or _typed_text(source.get("row_type")) or _typed_text(
+        source.get("_source_origin")
+    ):
+        if content_hash := _typed_text(source.get("content_hash")):
+            source_hashes.add(content_hash.casefold())
+    attribution_id = _typed_text(attribution.get("source_id"))
+    attribution_hash = _typed_text(attribution.get("source_content_hash")).casefold()
+    compared = False
+    if source_ids:
+        compared = True
+        if attribution_id not in source_ids:
+            return False
+    if source_hashes:
+        compared = True
+        if attribution_hash not in source_hashes:
+            return False
+    return True if compared else None
 
 
 def _row_text_values(

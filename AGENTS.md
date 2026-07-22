@@ -101,6 +101,9 @@ When multiple valid owners exist, scoring first restricts selection to owners
 that independently establish the final positive catalyst status. A stronger
 plausible-only row cannot donate authority or specificity to a separate row's
 confirmed status.
+Closed-attribution enrichment joins source details by exact URL plus declared
+source ID/content hash when available. Exact identity wins over row order; more
+than one URL-only legacy match is ambiguous and contributes no borrowed fields.
 Historical text-only disproof phrases are field-local, component-boundary
 matched, and reject immediate `no`/`non`/`not`/`without` negation. Separate
 fields cannot assemble a disproof, and `unofficial denial` is not an

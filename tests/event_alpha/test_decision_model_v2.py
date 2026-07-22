@@ -1895,6 +1895,127 @@ def test_antecedent_official_source_can_confirm_catalyst_with_attribution():
     assert result.radar_route == "high_confidence_watch"
 
 
+def test_closed_attribution_joins_source_details_by_identity_not_row_order():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    anomaly = {
+        "market_anomaly_id": "decision-model-v2-move",
+        "observed_at": "2026-06-15T16:00:00Z",
+    }
+    attributed_source = {
+        "raw_id": "official-source",
+        "provider": "official_exchange",
+        "source_url": "https://exchange.example/notices/shared",
+        "content_hash": "c" * 64,
+        "published_at": "2026-06-15T15:30:00Z",
+        "row_type": "official_listing_candidate",
+        "source_class": "official_exchange",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "source_title": "Official listing notice",
+        "main_frame_role": "main_catalyst",
+        "candidate_role": "direct_subject",
+        "impact_path_strength": "direct",
+    }
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        anomaly,
+        attributed_source,
+    )
+    unrelated_same_url = {
+        "raw_id": "unrelated-source",
+        "provider": "news",
+        "source_url": attributed_source["source_url"],
+        "content_hash": "d" * 64,
+        "source_class": "broad_news",
+        "source_strength": "strong",
+        "accepted_evidence_count": 1,
+        "source_title": "News context",
+    }
+    row = _market_led_candidate(
+        market_anomaly_id=anomaly["market_anomaly_id"],
+        catalyst_attributions=[attribution],
+    )
+
+    results = tuple(
+        decision_model.evaluate_radar_decision(row, source_rows=source_rows)
+        for source_rows in (
+            (unrelated_same_url, attributed_source),
+            (attributed_source, unrelated_same_url),
+        )
+    )
+
+    assert all(result.catalyst_status == "confirmed" for result in results)
+    assert all(
+        result.evidence_confidence_components["source_authority"] == 96.0
+        for result in results
+    )
+    assert results[0].evidence_confidence_components == (
+        results[1].evidence_confidence_components
+    )
+    assert results[0].evidence_confidence_score == results[1].evidence_confidence_score
+
+
+def test_closed_attribution_does_not_guess_between_url_only_source_rows():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    anomaly = {
+        "market_anomaly_id": "decision-model-v2-move",
+        "observed_at": "2026-06-15T16:00:00Z",
+    }
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        anomaly,
+        {
+            "raw_id": "sealed-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/shared-legacy",
+            "content_hash": "e" * 64,
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+    legacy_official = {
+        "source_url": attribution["source_url"],
+        "source_class": "official_exchange",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "source_title": "Legacy official context",
+    }
+    legacy_news = {
+        "source_url": attribution["source_url"],
+        "source_class": "broad_news",
+        "source_strength": "strong",
+        "accepted_evidence_count": 1,
+        "source_title": "Legacy news context",
+    }
+    row = _market_led_candidate(
+        market_anomaly_id=anomaly["market_anomaly_id"],
+        catalyst_attributions=[attribution],
+    )
+
+    results = tuple(
+        decision_model.evaluate_radar_decision(row, source_rows=source_rows)
+        for source_rows in (
+            (legacy_official, legacy_news),
+            (legacy_news, legacy_official),
+        )
+    )
+
+    assert all(result.catalyst_status == "confirmed" for result in results)
+    assert all(
+        result.evidence_confidence_components["source_authority"] == 94.0
+        for result in results
+    )
+    assert all(
+        result.evidence_confidence_components["source_specificity"] == 58.0
+        for result in results
+    )
+    assert results[0].evidence_confidence_score == results[1].evidence_confidence_score
+
+
 def test_invalid_supplied_catalyst_attribution_fails_closed():
     from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 

@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Bind closed attribution enrichment to source identity · Codex
+**Why:** A valid closed catalyst attribution rejoined source strength, accepted
+count, and title using the first row with the same URL. Two different rows that
+shared a URL made source authority change from 84 to 96 solely with row order.
+**Changes:**
+- Prefer one exact public-URL plus declared source-ID/content-hash match when
+  enriching a closed attribution, independent of source-row order.
+- Preserve one identifier-free URL match for bounded historical compatibility,
+  while multiple URL-only or multiple identity matches borrow no fields.
+- Kept generic candidate IDs and content hashes from impersonating source
+  identity, and added exact-identity plus ambiguous-legacy order regressions.
+- Documented the join contract in the working agreement, North Star, roadmap,
+  and durable decisions.
+**Verify:** 257 focused Decision-v2, surface, consistency, route, attribution,
+CoreOpportunity, calendar, namespace, derivatives-freshness, evaluation-clock,
+and outcome-integrity tests passed. Python compilation and the integrated-radar
+smoke passed with 15 candidates, 12 Core rows/cards, strict doctor 0 blockers /
+0 warnings, and 14 dashboard fixture pages.
+**Notes/risks:** Evidence weights, thresholds, routes, stored artifacts,
+providers, and all research-only/no-side-effect boundaries are unchanged. Full
+`make verify` was intentionally skipped because the focused attribution,
+ownership, and end-to-end integration gates cover this bounded correction.
+Quantitative source sizes remain advisory; runtime identity, artifact, request,
+path, secret, and security bounds remain enforced.
+
 ## 2026-07-22 — Keep evidence scores on the catalyst-status owner · Codex
 **Why:** With multiple valid source rows, the model could derive confirmed
 catalyst status from a weak official owner but rank a stronger plausible-only

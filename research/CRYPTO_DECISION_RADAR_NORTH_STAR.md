@@ -89,7 +89,10 @@ Invalid, retrospective, and context-only attributions remain visible context
 but receive no fallback official-source points. With multiple valid owners,
 selection first stays inside the rows that independently establish the final
 positive catalyst status; a plausible-only source cannot donate components to
-a different row's confirmed status.
+a different row's confirmed status. A closed attribution may enrich itself from
+one exact-URL source row, preferring an exact declared source ID/content hash.
+Ambiguous identity or multiple URL-only legacy matches borrow no fields, so row
+order cannot change authority, specificity, title, or accepted-count truth.
 
 Historical thesis-origin compatibility is closed in the same way across all
 seven origins. Market, catalyst, technical, derivatives, on-chain, fundamental,

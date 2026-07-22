@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Join closed attribution to source details by identity
+**Status:** accepted
+**Decision:** Enrich a valid closed catalyst attribution from a source row only
+after exact public-URL equality and an exact declared source ID/content-hash
+match when those identifiers are available. Prefer one unique identity match
+regardless of row order. Preserve a single URL-only row as bounded historical
+compatibility, but treat multiple URL-only matches or multiple identity matches
+as ambiguous and borrow no source fields.
+**Why:** URL-only first-match selection made the same attribution score at 84 or
+96 source-authority points depending on whether an unrelated same-URL news row
+or the exact official source appeared first. It could also borrow the wrong
+title, strength, or accepted count.
+**Revisit when:** Every canonical attribution embeds the complete immutable
+source evidence projection and no join is required. Do not loosen identity
+matching to provider names, article text, or URL substrings.
+
 ## 2026-07-22 - Keep evidence components aligned to the status-owning row
 **Status:** accepted
 **Decision:** When multiple source-owned catalyst records are valid, Decision-v2
