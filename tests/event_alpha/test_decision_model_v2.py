@@ -1941,6 +1941,84 @@ def test_antecedent_official_source_can_confirm_catalyst_with_attribution():
     assert result.radar_route == "high_confidence_watch"
 
 
+def test_causal_attribution_cannot_cross_anomaly_observation_clocks():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+    from crypto_rsi_scanner.event_alpha.radar.decision_model_surfaces import (
+        decision_model_values,
+    )
+
+    anomaly = {
+        "market_anomaly_id": "decision-model-v2-move",
+        "observed_at": "2026-06-15T16:00:00Z",
+    }
+    attribution = catalyst_attribution.assess_mapping_attribution(
+        anomaly,
+        {
+            "raw_id": "clock-bound-official-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/clock-bound-move",
+            "content_hash": "9" * 64,
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "source_title": "Official clock-bound listing notice",
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+    source = _market_led_candidate(
+        market_anomaly_id=anomaly["market_anomaly_id"],
+        source_origin="official_exchange",
+        source_origins=["market_anomaly", "official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        latest_source_url="https://exchange.example/notices/clock-bound-move",
+        official_exchange_event={"event_type": "spot_listing"},
+        catalyst_attributions=[attribution],
+    )
+
+    exact = decision_model.evaluate_radar_decision(source)
+    equivalent_offset = decision_model.evaluate_radar_decision(
+        {**source, "observed_at": "2026-06-15T19:00:00+03:00"}
+    )
+    later = decision_model.evaluate_radar_decision(
+        {**source, "observed_at": "2026-06-15T17:00:00Z"}
+    )
+    reevaluated_later = decision_model.reevaluate_radar_decision_fields(
+        {
+            **source,
+            **exact.to_dict(),
+            "observed_at": "2026-06-15T17:00:00Z",
+        }
+    )
+    projected = decision_model_values({**source, **exact.to_dict()})
+    projected_again = decision_model_values(projected)
+    legacy_projection = deepcopy(projected)
+    legacy_projection.pop("anomaly_observed_at")
+    mismatched_projection = deepcopy(projected)
+    mismatched_projection["anomaly_observed_at"] = "2026-06-15T17:00:00Z"
+
+    assert attribution["causal_eligible"] is True
+    assert exact.catalyst_status == "confirmed"
+    assert equivalent_offset.catalyst_status == "confirmed"
+    assert later.catalyst_status == "unknown"
+    assert later.evidence_confidence_components["source_authority"] == 32.0
+    assert later.radar_route != "high_confidence_watch"
+    assert any("closed contract" in item for item in later.decision_warnings)
+    assert reevaluated_later["catalyst_status"] == "unknown"
+    assert reevaluated_later["radar_route"] != "high_confidence_watch"
+    assert projected["anomaly_observed_at"] == "2026-06-15T16:00:00+00:00"
+    assert projected["catalyst_attributions"] == [attribution]
+    assert projected_again == projected
+    assert decision_model_values(legacy_projection) == legacy_projection
+    assert decision_model_values(mismatched_projection) == {}
+
+
 def test_closed_attribution_joins_source_details_by_identity_not_row_order():
     from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 

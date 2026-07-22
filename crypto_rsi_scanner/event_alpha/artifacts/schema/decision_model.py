@@ -76,7 +76,8 @@ FIELDS = (
     "decision_projection_schema_version", "hard_blockers", "soft_penalties", "warnings",
     "why_now", "supporting_facts", "missing_information", "main_risks",
     "what_confirms", "what_invalidates", "calendar_evidence", "calendar_evidence_ids",
-    "rsi_context", "rsi_context_references", "observation_ids", "source_provider_lineage",
+    "rsi_context", "rsi_context_references", "observation_ids", "anomaly_observed_at",
+    "source_provider_lineage",
     "catalyst_attributions",
     "source_independence", "independent_source_count",
     "independent_corroboration_count", "source_content_cluster_count",
@@ -136,7 +137,7 @@ TYPES = {
     "provenance_contract_valid": "bool", "burn_in_eligible": "bool",
     "burn_in_counted": "bool", "burn_in_reason": "str", "feature_basis": "dict",
     "data_quality": "dict", "contract_counted_candidate": "bool",
-    "decision_evaluated_at": "str",
+    "anomaly_observed_at": "str", "decision_evaluated_at": "str",
     "decision_safety_invariants": "dict",
     "decision_projection": "dict",
 }
@@ -352,6 +353,11 @@ def _validate_closed_projection(row: Mapping[str, Any]) -> list[str]:
         errors.append("decision_projection_why_now_missing")
     if _aware_timestamp(row.get("decision_evaluated_at")) is None:
         errors.append("decision_projection_evaluation_timestamp_invalid")
+    if (
+        "anomaly_observed_at" in row
+        and _aware_timestamp(row.get("anomaly_observed_at")) is None
+    ):
+        errors.append("decision_projection_anomaly_observed_at_invalid")
     observation_ids = row.get("observation_ids")
     if _is_sequence(observation_ids):
         observation_id_values = tuple(observation_ids)
@@ -645,6 +651,9 @@ def _validate_projection_catalyst_attributions(
             if isinstance(value, str) and value.strip()
         }
     )
+    projection_anomaly_observed_at = _aware_timestamp(
+        row.get("anomaly_observed_at")
+    )
     for index, value in enumerate(values):
         if not isinstance(value, Mapping):
             errors.append(
@@ -664,6 +673,17 @@ def _validate_projection_catalyst_attributions(
         ):
             errors.append(
                 f"decision_projection_catalyst_attribution_{index}:anomaly_binding_mismatch"
+            )
+        attribution_observed_at = _aware_timestamp(
+            value.get("anomaly_observed_at")
+        )
+        if (
+            value.get("causal_eligible") is True
+            and projection_anomaly_observed_at is not None
+            and attribution_observed_at != projection_anomaly_observed_at
+        ):
+            errors.append(
+                f"decision_projection_catalyst_attribution_{index}:anomaly_clock_mismatch"
             )
         digest = str(
             value.get("attribution_digest") or value.get("digest") or ""

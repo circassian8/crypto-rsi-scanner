@@ -7,6 +7,7 @@ retrospective, and context-only evidence fails closed for causal confidence.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import math
 import re
 from typing import Any, Mapping
@@ -295,6 +296,7 @@ def _catalyst_attribution_values(
     values: list[Mapping[str, Any]] = []
     seen: set[str] = set()
     candidate_anomaly_ids = _candidate_anomaly_ids(data)
+    candidate_anomaly_observed_at = _candidate_anomaly_observed_at(data)
     for source in (data, *sources):
         if _truthy(source.get("catalyst_attribution_rejected")):
             supplied = True
@@ -330,6 +332,12 @@ def _catalyst_attribution_values(
             ):
                 invalid = True
                 continue
+            if row.get("causal_eligible") is True and not _causal_clock_matches(
+                row,
+                candidate_anomaly_observed_at,
+            ):
+                invalid = True
+                continue
             identity = str(row.get("attribution_digest") or row.get("digest") or "")
             if not identity:
                 invalid = True
@@ -358,6 +366,90 @@ def _candidate_anomaly_ids(data: Mapping[str, Any]) -> set[str]:
         str(data.get("observation_id") or ""),
     )
     return {value.strip() for value in values if value.strip()}
+
+
+def _candidate_anomaly_observed_at(
+    data: Mapping[str, Any],
+) -> datetime | None:
+    """Resolve the exact candidate clock used by the attribution builder."""
+
+    for owner, fields in (
+        (
+            data,
+            (
+                "observed_at",
+                "market_context_observed_at",
+                "published_at",
+                "fetched_at",
+                "anomaly_observed_at",
+            ),
+        ),
+        (
+            _mapping(data.get("market_state_snapshot")),
+            ("observed_at", "timestamp"),
+        ),
+    ):
+        for field in fields:
+            parsed = _parse_aware_time(owner.get(field))
+            if parsed is not None:
+                return parsed
+    return _closed_projection_causal_clock(data)
+
+
+def _closed_projection_causal_clock(
+    data: Mapping[str, Any],
+) -> datetime | None:
+    """Recover the clock from an older closed projection for idempotence.
+
+    Current projections persist ``anomaly_observed_at`` explicitly.  Earlier
+    closed projections already contain a digest-validated attribution but no
+    top-level copy of that clock; only those schema-marked projections may use
+    the unique causal attribution clock as their self-validating fallback.
+    """
+
+    for owner in (data, _mapping(data.get("decision_projection"))):
+        if (
+            not _typed_text(owner.get("decision_projection_schema_version"))
+            or not isinstance(owner.get("observation_ids"), (list, tuple))
+            or not owner.get("observation_ids")
+            or _parse_aware_time(owner.get("decision_evaluated_at")) is None
+            or not isinstance(owner.get("decision_safety_invariants"), Mapping)
+        ):
+            continue
+        raw_values: list[object] = []
+        single = owner.get("catalyst_attribution")
+        if single is not None:
+            raw_values.append(single)
+        multiple = owner.get("catalyst_attributions")
+        if isinstance(multiple, (list, tuple)):
+            raw_values.extend(multiple)
+        clocks = {
+            parsed
+            for value in raw_values
+            if isinstance(value, Mapping)
+            and value.get("causal_eligible") is True
+            and (parsed := _parse_aware_time(value.get("anomaly_observed_at")))
+            is not None
+        }
+        if len(clocks) == 1:
+            return next(iter(clocks))
+    return None
+
+
+def _causal_clock_matches(
+    attribution: Mapping[str, Any],
+    candidate_observed_at: datetime | None,
+) -> bool:
+    """Keep causal confidence bound to one point-in-time anomaly episode."""
+
+    attribution_observed_at = _parse_aware_time(
+        attribution.get("anomaly_observed_at")
+    )
+    return bool(
+        attribution_observed_at is not None
+        and candidate_observed_at is not None
+        and attribution_observed_at == candidate_observed_at
+    )
 
 
 def _source_evidence_rows(
@@ -623,6 +715,21 @@ def _valid_public_source_url(value: object) -> bool:
 
 def _typed_text(value: object) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _parse_aware_time(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 def _truthy(value: object) -> bool:

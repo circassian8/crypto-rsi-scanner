@@ -170,6 +170,14 @@ context-only; negated, corrective, denied, or ruled-out evidence remains
 disproof. A future scheduled event can be `scheduled_anticipation` only when
 its source was already public before or contemporaneous with the anomaly.
 Missing or timezone-naive clocks fail closed as unknown.
+The causal value is episode-specific: Decision-v2 must recheck both the exact
+anomaly ID and `anomaly_observed_at` against the current candidate. UTC-
+equivalent offsets are the same instant, but the same ID at another observation
+time is not reusable causal evidence. New canonical projections retain the
+anomaly clock so validation and rendering stay idempotent; a conflicting
+projected clock fails closed. Older schema-marked closed projections may recover
+only their one unique digest-validated causal clock for read compatibility and
+are not rewritten.
 
 The immutable `event_alpha.catalyst_attribution` v1 value binds anomaly/source
 identities, a digest over the exact anomaly asset/snapshot/state evidence,
@@ -229,7 +237,7 @@ The projection carries all data required to validate and render itself:
   information, main risks, confirmation conditions, and invalidation conditions;
 - minimal resolvable calendar evidence and explicit RSI-context references;
 - validated catalyst-attribution values tying every causal-confidence claim to
-  an exact source and anomaly;
+  an exact source, anomaly, and anomaly observation clock;
 - the validated source-independence contract, explicit assessed/unassessed/
   rejected status, bounded errors, and exact independent-unit/corroboration/
   content-cluster counts;

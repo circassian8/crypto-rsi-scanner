@@ -19,8 +19,11 @@
       "preview_lane_mismatch": "blocker"
     },
     "idempotent": true,
-    "projection_schema_version": "crypto_radar_decision_projection_v1",
+    "projection_schema_version": "crypto_radar_decision_projection_v2",
     "rendering_re_evaluates": false,
+    "conditional_context": {
+      "anomaly_observed_at": "persisted when a causal-eligible catalyst attribution is present"
+    },
     "required_context": [
       "calendar_evidence",
       "calendar_evidence_ids",
@@ -817,6 +820,10 @@
     "negated_corrective_ruled_out_use": "disproof",
     "scheduled_future_event": "may be scheduled_anticipation only when its source was already public",
     "missing_or_naive_clock": "unknown_and_not_causal",
+    "decision_episode_binding": "exact anomaly id plus exact aware anomaly_observed_at after UTC normalization",
+    "utc_equivalent_anomaly_clocks_match": true,
+    "cross_observation_reuse": "invalid_and_excluded_from_causal_confidence",
+    "canonical_projection_clock": "new projections persist anomaly_observed_at; conflicting clocks fail closed; older schema-marked projections recover only one unique digest-validated causal clock for idempotence",
     "source_url_credentials": "credential paths or userinfo rejected; all query and fragment data removed",
     "canonical_propagation": [
       "raw catalyst-search attachment",

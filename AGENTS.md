@@ -93,6 +93,13 @@ That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the
 authority for current integrated candidates.
+Causal-eligible attribution is also bound to the exact anomaly observation
+clock, not merely the anomaly ID. UTC-equivalent offsets identify the same
+instant; a different or missing current clock invalidates the supplied causal
+contract and cannot fall back to flattened official hints. Current canonical
+Decision projections persist `anomaly_observed_at`; older schema-marked closed
+projections may recover their one unique digest-validated causal clock only to
+remain idempotent and are never rewritten.
 Decision-v2 source-authority and source-specificity components use that same
 owner set. A flattened accepted count cannot raise specificity, a source-row
 owner must receive its own authority, and a supplied invalid or non-causal

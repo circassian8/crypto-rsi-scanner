@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Bind causal catalyst attribution to one anomaly clock · Codex
+**Why:** A closed attribution already digest-bound its source to one exact
+point-in-time anomaly, but Decision-v2 consumption rechecked only the anomaly
+ID. Reusing that ID on a later observation could therefore retain confirmed
+catalyst status and high-confidence evidence from the earlier episode.
+**Changes:**
+- Require each causal-eligible attribution's `anomaly_observed_at` to equal the
+  current candidate clock after UTC normalization; equivalent offsets remain
+  valid, while missing or different clocks invalidate the supplied causal set
+  and prevent flattened-hint fallback.
+- Persist `anomaly_observed_at` in new canonical projections, validate it
+  against causal attribution rows, preserve projection idempotence, and retain
+  read compatibility for older schema-marked projections with one unique
+  digest-validated causal clock.
+- Added regression coverage for exact, UTC-equivalent, later-episode,
+  reevaluation, projection-idempotence, legacy-read, and projection-tamper
+  cases; updated the working agreement, North Star, roadmap, and durable
+  decision. Refreshed the tracked architecture inventories; quantitative size
+  findings remain advisory only.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_catalyst_attribution.py
+tests/event_alpha/test_catalyst_attribution_propagation.py
+tests/event_alpha/test_decision_model_v2.py
+tests/event_alpha/test_decision_model_v2_surfaces.py
+tests/event_alpha/test_decision_model_v2_consistency.py
+tests/event_alpha/test_decision_model_v2_fixture_routes.py
+tests/event_alpha/test_source_independence_projection.py` (165 passed);
+North-Star/readiness focus (25 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; JSON validation; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; strict artifact doctor (0
+blockers / 0 warnings); `make architecture-cleanliness-check PYTHON=python3`;
+and host-loopback `make verify-fast PYTHON=python3` (3,913 passed plus alert,
+backtest, and paper-scoreboard smokes).
+**Notes/risks:** The first sandboxed `verify-fast` attempt passed 3,912 tests
+and failed only because the sandbox denied the dashboard test's ephemeral
+`127.0.0.1` bind. That exact test and the complete gate passed with normal
+loopback permission. No provider call, score/threshold/route change, send,
+trade, order, paper trade, normal RSI write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-22 — Record the sixty-ninth no-send market cycle · Codex
 **Why:** The hourly observation boundary became eligible while the project was
 continuing the evidence-first Protocol-v2 campaign. One current point-in-time

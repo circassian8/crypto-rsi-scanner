@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Bind causal catalyst evidence to the anomaly clock
+**Status:** accepted
+**Decision:** A causal-eligible `event_alpha.catalyst_attribution` is valid for
+Decision-v2 only when its `anomaly_observed_at` equals the current candidate's
+exact aware anomaly clock after UTC normalization. The same anomaly ID at a
+different observation time is a different episode and cannot reuse causal
+confirmation. Persist that clock in new canonical Decision projections, reject
+a conflicting projected clock, and keep older schema-marked projections
+idempotent by recovering only their one unique digest-validated causal clock.
+**Why:** The attribution digest bound a source to one point-in-time anomaly, but
+Decision consumption rechecked only the anomaly ID. Reusing the same ID one
+hour later therefore retained `confirmed` catalyst status and the same
+high-confidence evidence score, creating look-ahead/episode leakage.
+**Revisit when:** Canonical anomaly identity becomes a single immutable typed
+value copied through every surface. Never loosen this to date-only, nearest-
+clock, or same-ID matching.
+
 ## 2026-07-22 - Rank evidence owners by their weighted source contribution
 **Status:** accepted
 **Decision:** After restricting evidence owners to the rows that independently

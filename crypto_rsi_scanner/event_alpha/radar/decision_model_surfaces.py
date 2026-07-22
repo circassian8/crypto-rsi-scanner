@@ -92,6 +92,7 @@ DECISION_PROJECTION_FIELD_NAMES = (
     "rsi_context",
     "rsi_context_references",
     "observation_ids",
+    "anomaly_observed_at",
     "source_provider_lineage",
     "catalyst_attributions",
     "source_independence",
@@ -554,6 +555,9 @@ def _closed_projection_values(
     rsi_references = _rsi_context_references(source, rsi_context)
     source_independence = _source_independence_projection_values(source)
     market_reference = market_context_reference(source)
+    catalyst_attributions = list(
+        decision_catalyst_policy.attribution_values(source)
+    )
     closed = {
         "decision_projection_schema_version": (
             source.get("decision_projection_schema_version")
@@ -581,14 +585,23 @@ def _closed_projection_values(
         "rsi_context_references": rsi_references,
         "observation_ids": _observation_ids(source),
         "source_provider_lineage": _source_provider_lineage(source),
-        "catalyst_attributions": list(
-            decision_catalyst_policy.attribution_values(source)
-        ),
+        "catalyst_attributions": catalyst_attributions,
         **source_independence,
         "market_context_reference": market_reference,
         "decision_evaluated_at": _evaluation_timestamp(source),
         "decision_safety_invariants": _safety_invariants(source),
     }
+    causal_clocks = {
+        str(row.get("anomaly_observed_at") or "").strip()
+        for row in catalyst_attributions
+        if row.get("causal_eligible") is True
+        and str(row.get("anomaly_observed_at") or "").strip()
+    }
+    if len(causal_clocks) == 1 and (
+        "decision_projection_schema_version" not in source
+        or "anomaly_observed_at" in source
+    ):
+        closed["anomaly_observed_at"] = next(iter(causal_clocks))
     if "market_observation_identity_bound" in source:
         closed["market_observation_identity_bound"] = source.get(
             "market_observation_identity_bound"
