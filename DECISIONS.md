@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Re-derive catalyst status during final Decision reevaluation
+**Status:** accepted
+**Decision:** When `reevaluate_radar_decision_fields` receives a completed
+Decision-v2 result, its prior top-level `catalyst_status` is derived output and
+must be removed before fresh evaluation. The evaluator re-derives status from
+retained source rows and structured claims. Raw pre-evaluation compatibility
+inputs and closed projection reads retain their existing behavior; structured
+disproof still has precedence.
+**Why:** A confirmed candidate whose official evidence was later removed stayed
+confirmed because its old output fed back as explicit input. That violates the
+function's fresh-reevaluation contract and can create downstream drift.
+**Revisit when:** Decision results carry a separately bound input/output origin
+for every field. Never make closed rendering perform a hidden reevaluation.
+
 ## 2026-07-22 - Keep text-only catalyst disproof field-local and unnegated
 **Status:** accepted
 **Decision:** Historical text fallback may infer disproof only when one source

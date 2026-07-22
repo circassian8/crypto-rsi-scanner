@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T03:27:36.624386+00:00",
+  "generated_at": "2026-07-22T03:34:15.125488+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3340,6 +3340,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1393,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1392,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3356,13 +3363,6 @@
     {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1385,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -4327,6 +4327,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1393,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1392,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
@@ -4339,11 +4344,6 @@
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1385,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
         "threshold": 1200
       },
       {

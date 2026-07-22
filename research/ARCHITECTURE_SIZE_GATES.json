@@ -1911,7 +1911,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2304,
+      "line_count": 2345,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
@@ -2238,7 +2238,7 @@
   ],
   "functions_over_limit_count": 35,
   "gate_status": "pass",
-  "generated_at": "2026-07-22T03:27:32.850119+00:00",
+  "generated_at": "2026-07-22T03:34:11.318586+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2376,6 +2376,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1393,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
@@ -2390,12 +2396,6 @@
       "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1385,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
@@ -2486,14 +2486,14 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 2327,
-      "path": "tests/event_alpha/test_market_observation_campaign.py",
+      "line_count": 2345,
+      "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
     {
       "limit": 1500,
-      "line_count": 2304,
-      "path": "tests/event_alpha/test_decision_model_v2.py",
+      "line_count": 2327,
+      "path": "tests/event_alpha/test_market_observation_campaign.py",
       "source_kind": "test"
     },
     {
@@ -4247,6 +4247,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1393,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1392,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -4263,13 +4270,6 @@
     {
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1385,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -4451,7 +4451,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2304,
+      "line_count": 2345,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -5090,6 +5090,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1393,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1392,
       "path": "crypto_rsi_scanner/project_health/architecture_report.py",
       "source_kind": "production"
@@ -5104,12 +5110,6 @@
       "limit": 1500,
       "line_count": 1387,
       "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1385,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
@@ -5774,7 +5774,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 1385,
+      "line_count": 1393,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
@@ -6022,6 +6022,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1393,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1392,
         "path": "crypto_rsi_scanner/project_health/architecture_report.py",
         "threshold": 1200
@@ -6034,11 +6039,6 @@
       {
         "line_count": 1387,
         "path": "crypto_rsi_scanner/event_alpha/notifications/router.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1385,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
         "threshold": 1200
       },
       {
@@ -6466,7 +6466,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2304,
+      "line_count": 2345,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "severity": "advisory",
       "source_kind": "test",

@@ -78,6 +78,10 @@ Historical text-only disproof phrases are field-local, component-boundary
 matched, and reject immediate `no`/`non`/`not`/`without` negation. Separate
 fields cannot assemble a disproof, and `unofficial denial` is not an
 `official denial`. Explicit structured disproof remains authoritative.
+`reevaluate_radar_decision_fields` must also discard a prior Decision-v2
+result's derived `catalyst_status` and re-derive it from retained current source
+evidence. Evidence removal cannot leave stale confirmed/plausible truth. Closed
+projection reads remain idempotent and do not invoke reevaluation.
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.

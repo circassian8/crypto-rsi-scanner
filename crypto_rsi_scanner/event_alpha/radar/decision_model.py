@@ -342,7 +342,15 @@ def reevaluate_radar_decision_fields(
 ) -> dict[str, Any]:
     """Return a fresh v2 projection after final identity/quality mutations."""
 
-    return evaluate_radar_decision(candidate, source_rows=source_rows, cfg=cfg).to_dict()
+    source = dict(candidate)
+    if _typed_text(source.get("decision_model_version")) == DECISION_MODEL_VERSION:
+        # A prior evaluation's status is output, not fresh catalyst evidence.
+        # Re-derive it from the retained source fields/rows so evidence removal
+        # cannot leave a stale confirmed/plausible claim behind.  Explicit raw
+        # inputs without a completed Decision-v2 result retain compatibility;
+        # structured disproof fields still take precedence in the evaluator.
+        source.pop("catalyst_status", None)
+    return evaluate_radar_decision(source, source_rows=source_rows, cfg=cfg).to_dict()
 
 
 def _aggregate_scores(

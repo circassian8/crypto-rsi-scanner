@@ -1574,6 +1574,47 @@ def test_final_reevaluation_applies_catalyst_disproof_before_derived_status():
         assert source_corrected.radar_route != "high_confidence_watch"
 
 
+def test_final_reevaluation_rederives_stale_catalyst_status_after_evidence_loss():
+    source = _market_led_candidate(
+        source_origin="official_exchange",
+        source_origins=["official_exchange"],
+        source_pack="official_exchange_listing_pack",
+        source_class="official_exchange",
+        source_strength="official_structured",
+        accepted_evidence_count=1,
+        latest_source_url="https://example.invalid/listing",
+        latest_source_title="Official listing notice",
+        official_exchange_event={
+            "event_type": "spot_listing",
+            "source_url": "https://example.invalid/listing",
+            "title": "Official listing notice",
+        },
+    )
+    initial = {
+        **source,
+        **decision_model.evaluate_radar_decision(source).to_dict(),
+    }
+    corrected = {
+        **initial,
+        "source_origin": "market_anomaly",
+        "source_origins": ["market_anomaly"],
+        "source_pack": "market_anomaly_pack",
+        "source_class": "market_data",
+        "source_strength": "context_only",
+        "accepted_evidence_count": 0,
+        "latest_source_url": None,
+        "latest_source_title": None,
+        "official_exchange_event": None,
+    }
+
+    assert initial["catalyst_status"] == "confirmed"
+    reevaluated = decision_model.reevaluate_radar_decision_fields(corrected)
+
+    assert reevaluated["catalyst_status"] == "unknown"
+    assert reevaluated["radar_route"] != "high_confidence_watch"
+    assert "catalyst_unknown_soft_penalty" in reevaluated["decision_soft_penalties"]
+
+
 def test_retrospective_official_source_cannot_claim_catalyst_confirmation():
     from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 

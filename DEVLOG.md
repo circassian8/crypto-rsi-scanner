@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Re-derive catalyst truth after evidence mutation · Codex
+**Why:** The final Decision-v2 reevaluation API accepted its prior derived
+`catalyst_status` as explicit fresh input. A confirmed candidate stayed
+confirmed after its official event, source URL, and accepted evidence were
+removed.
+**Changes:**
+- Made final reevaluation discard only a completed Decision-v2 result's prior
+  derived catalyst status, then re-derive it from current retained source rows
+  and structured claims.
+- Added a regression proving evidence loss lowers confirmed to unknown and
+  restores the unknown-catalyst penalty. Existing structured-disproof and
+  closed-projection idempotence tests remain green.
+- Updated the North Star, roadmap, working agreement, and durable decision.
+**Verify:** 197 focused Decision-v2, projection, catalyst, namespace,
+empirical-policy-lab, and empirical-replay tests passed. Python compilation,
+strict integrated smoke/doctor, architecture cleanliness, JSON validation, and
+diff hygiene are run before publication.
+**Notes/risks:** Raw compatibility inputs without a completed Decision result
+are unchanged. No threshold, score formula, route policy, provider boundary,
+historical artifact, or safety invariant changed.
+
 ## 2026-07-22 — Close text-only catalyst false disproofs · Codex
 **Why:** The historical catalyst fallback joined multiple source fields and
 searched arbitrary substrings. It interpreted `unofficial denial` as an

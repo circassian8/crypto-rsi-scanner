@@ -78,6 +78,14 @@ not equal `official denial`, and immediate `no`/`non`/`not`/`without` negation
 prevents the fallback. Explicit structured disproof and closed attribution keep
 their existing authority.
 
+Final Decision-v2 reevaluation treats a prior model result's top-level
+`catalyst_status` as derived output, not fresh evidence. It removes that one
+derived field and re-derives status from the retained source rows and structured
+claims, so source-evidence loss cannot leave a stale confirmed/plausible result.
+Structured corrections still take precedence. This mutation-time rule is
+separate from closed projection reads, which stay idempotent and never trigger a
+material reevaluation.
+
 LLM catalyst frames are proposals until deterministic validation binds them to
 exactly one matching raw source. Each accepted quote must be a normalized,
 informative contiguous span inside one eligible field—title, body, or

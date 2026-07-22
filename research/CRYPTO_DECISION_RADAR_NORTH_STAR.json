@@ -778,6 +778,7 @@
     "compatibility_evidence_ownership": "row_local; source lane, accepted count, and public URL cannot be pooled across different rows",
     "compatibility_lane_label_matching": "normalized component boundaries only; arbitrary substrings cannot raise catalyst status",
     "compatibility_text_disproof": "field-local unnegated normalized component sequences only; separate fields and immediate no/non/not/without negation cannot create disproof",
+    "final_reevaluation_catalyst_status": "discard prior Decision-v2 derived status and rederive from retained current evidence; closed projection reads remain idempotent",
     "evidence_quality_reuses_registry_authority": true,
     "historical_artifacts_rewritten": false,
     "identity_inputs": [
