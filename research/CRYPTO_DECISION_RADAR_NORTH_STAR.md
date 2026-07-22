@@ -873,15 +873,27 @@ universe churn but does not itself prove temporal-anchor eligibility, causation,
 or a route/score/regime/Protocol-v2 input. At cycle 64, HBAR's current clock
 began only on its 20:09 UTC re-entry and therefore measured 4.05 hours, despite
 older non-prospective raw history.
-For the distinct anchor question, exact-generation audit schema v3 calls the
-same causal selector used by enrichment against one fingerprinted retained-
-history snapshot. It reports the 24-hour target, the 25%-of-horizon backward
-tolerance, exact candidate count, selected anchor or nearest excluded rows, and
-never predicts a future endpoint. At cycle 64, HBAR had zero observations in
-its 18:12-to-00:12 UTC causal window: the nearest earlier row was 18.45 hours
-before the window and the next row was 12.01 hours after the target. This
-source-bound gap, not the descriptive membership clock, is the exact reason the
-current temporal return is unavailable.
+For the distinct anchor question, schema v3 introduced and current exact-
+generation audit schema v4 retains a call to the same causal selector used by
+enrichment against one fingerprinted retained-history snapshot. It reports the
+24-hour target, the 25%-of-horizon backward tolerance, exact candidate count,
+selected anchor or nearest excluded rows, and never predicts a future endpoint.
+At cycle 64, HBAR had zero observations in its 18:12-to-00:12 UTC causal window:
+the nearest earlier row was 18.45 hours before the window and the next row was
+12.01 hours after the target. This source-bound gap, not the descriptive
+membership clock, is the exact reason the current temporal return is
+unavailable.
+
+Schema v4 also binds an ordered digest of every complete verified generation
+clock and measures adjacent intervals against the same canonical six-hour
+tolerance. It retains the latest and maximum interval plus at most 16 exact gap
+examples. The current report has 23 complete clocks and 22 adjacent intervals:
+21 are within tolerance and one lasted 48,256.315755 seconds (13.4 hours), from
+2026-07-20 19:41:41 UTC to 2026-07-21 09:05:58 UTC. This is descriptive
+collection-continuity risk, not per-asset anchor causation. It does not infer
+future eligibility, modify the one-hour scheduling contract, inspect outcomes,
+or affect routes, scores, policy, or Protocol-v2 evidence. Schema v3 remains
+readable.
 Campaign readiness reports exact historical coverage but performs no selection,
 outcome read, partition assignment, backfill, or policy change. It remains
 partial until a successful qualifying cycle has persisted that context and a

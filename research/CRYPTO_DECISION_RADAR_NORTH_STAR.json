@@ -1284,6 +1284,28 @@
       "schema_version": 1,
       "source_report": "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
     },
+    "control_regime_generation_audit": {
+      "anchor_causation_source": "separate exact per-asset canonical selector replay",
+      "cadence_gap_example_limit": 16,
+      "cadence_gap_schema_id": "decision_radar.control_regime_observation_cadence_gap_audit",
+      "cadence_gap_schema_version": 1,
+      "cadence_measurement_scope": "adjacent complete verified generation observation clocks",
+      "cadence_tolerance_source": "canonical 24-hour return anchor backward tolerance",
+      "current_schema_version": 4,
+      "decision_policy_eligible": false,
+      "future_endpoint_eligibility_inferred": false,
+      "historical_context_backfilled": false,
+      "legacy_readable_schema_versions": [
+        3
+      ],
+      "provider_calls": 0,
+      "protocol_v2_evidence_eligible": false,
+      "routing_eligible": false,
+      "scheduling_policy_changed": false,
+      "selection_uses_outcomes": false,
+      "source_clock_set_digest_bound": true,
+      "writes": 0
+    },
     "event_alpha_catalyst_burn_in": "separate_not_aggregated",
     "historical_market_provenance_adapter": "read_only",
     "measurement_program": "decision_radar_live_observation_campaign_v2",

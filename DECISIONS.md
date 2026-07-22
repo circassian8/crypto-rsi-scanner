@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Measure complete-generation cadence without inferring anchor eligibility
+**Status:** accepted as read-only continuity diagnostic; no scheduling or policy authority
+**Decision:** Exact-generation audit schema v4 measures every adjacent complete,
+verified generation clock against the canonical backward tolerance used by the
+24-hour causal-return selector. It binds the ordered clock set by digest, keeps
+the latest and maximum interval plus at most 16 exact gap examples, and renders
+the result in campaign and dashboard history. Schema v3 remains readable. This
+audit must never predict a future endpoint, substitute for per-asset anchor
+replay, change the one-hour collection cadence, inspect outcomes, or affect
+routes, scores, policy, or Protocol-v2 evidence eligibility.
+**Why:** Sixty-five campaign-counted cycles looked voluminous, but only 23 current-
+contract complete generation clocks exist and one adjacent interval lasted
+48,256.315755 seconds, exceeding the six-hour anchor tolerance by
+26,656.315755 seconds. Exposing that continuity break explains why accumulated
+row count alone is insufficient, while the separate exact selector replay still
+proves why each current asset lacks a valid causal anchor.
+**Revisit when:** A preregistered Protocol-v2 annex changes the return horizon or
+anchor tolerance before holdout access. Keep collection scheduling and causal
+per-asset selection as separate contracts.
+
 ## 2026-07-22 - Lead blind-label readiness with the next human action
 **Status:** accepted
 **Decision:** The normal source-independence OOS readiness Make target is a

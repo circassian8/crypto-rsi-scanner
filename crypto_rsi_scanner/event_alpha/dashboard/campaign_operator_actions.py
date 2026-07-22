@@ -1873,6 +1873,27 @@ def _project_control_regime_generation_audit(
             if isinstance(row, Mapping)
         ],
     }
+    raw_cadence_audit = audit.get("observation_cadence_gap_audit")
+    cadence_audit = None
+    if isinstance(raw_cadence_audit, Mapping):
+        cadence_audit = {
+            **raw_cadence_audit,
+            "latest_interval": (
+                dict(raw_cadence_audit["latest_interval"])
+                if isinstance(raw_cadence_audit.get("latest_interval"), Mapping)
+                else None
+            ),
+            "maximum_interval": (
+                dict(raw_cadence_audit["maximum_interval"])
+                if isinstance(raw_cadence_audit.get("maximum_interval"), Mapping)
+                else None
+            ),
+            "gap_examples": [
+                dict(row)
+                for row in raw_cadence_audit.get("gap_examples") or ()
+                if isinstance(row, Mapping)
+            ],
+        }
     return {
         "status": _identity(audit.get("status"), "regime_generation_status"),
         "input_generation_count": _count(
@@ -1924,6 +1945,7 @@ def _project_control_regime_generation_audit(
         "membership_clock_scope": audit["membership_clock_scope"],
         "precontract_history_used_for_membership_clock": False,
         "latest_missing_input_anchor_audit": anchor_audit,
+        "observation_cadence_gap_audit": cadence_audit,
         "provider_calls": 0,
         "writes": 0,
         "research_only": True,

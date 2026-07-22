@@ -728,28 +728,10 @@ def _control_regime_generation_audit_detail(
             for row in anchor_audit.get("diagnostics") or ()
             if isinstance(row, Mapping)
         ]
-        for row in anchor_rows:
-            if row.get("status") == "ready":
-                continue
-            asset_id = str(row.get("canonical_asset_id") or "unknown")
-            before = row.get("nearest_causal_before_window")
-            before_text = (
-                f"; nearest prior row was {format_duration(before.get('distance_seconds'))} before the window"
-                if isinstance(before, Mapping)
-                else ""
-            )
-            after = row.get("nearest_post_target_observation")
-            after_text = (
-                f"; nearest later row was {format_duration(after.get('distance_seconds'))} after the target"
-                if isinstance(after, Mapping)
-                else ""
-            )
-            latest_text += (
-                f" {asset_id} has no retained anchor in "
-                f"{row.get('anchor_window_start_at')} to "
-                f"{row.get('anchor_window_end_at')}{before_text}{after_text}; no future "
-                "eligibility is inferred."
-            )
+        latest_text += _anchor_gap_group_detail(anchor_rows)
+    cadence_text = _cadence_gap_detail(
+        value.get("observation_cadence_gap_audit")
+    )
     return (
         f"Immutable-generation audit: {verified}/{total} source envelopes verify; "
         f"{ready}/{complete} complete universes have all causal 24-hour inputs "
@@ -757,7 +739,83 @@ def _control_regime_generation_audit_detail(
         f"membership changed {changes} times; {recent} incomplete cycles overlap a "
         f"recent observed entry and {without_recent} do not."
         + latest_text
+        + cadence_text
         + " This is descriptive overlap, not causal attribution, anchor eligibility, or routing input; pre-contract rows are not backfilled into the membership clock. "
+    )
+
+
+def _anchor_gap_group_detail(rows: list[Mapping[str, Any]]) -> str:
+    groups: dict[tuple[Any, ...], list[str]] = {}
+    for row in rows:
+        if row.get("status") == "ready":
+            continue
+        before = row.get("nearest_causal_before_window")
+        after = row.get("nearest_post_target_observation")
+        key = (
+            row.get("anchor_window_start_at"),
+            row.get("anchor_window_end_at"),
+            before.get("distance_seconds") if isinstance(before, Mapping) else None,
+            after.get("distance_seconds") if isinstance(after, Mapping) else None,
+        )
+        groups.setdefault(key, []).append(
+            str(row.get("canonical_asset_id") or "unknown")
+        )
+    rendered = []
+    for (window_start, window_end, before_seconds, after_seconds), assets in groups.items():
+        identity = _bounded_asset_group_label(assets)
+        before_text = (
+            f"; nearest prior row was {format_duration(before_seconds)} before the window"
+            if before_seconds is not None
+            else ""
+        )
+        after_text = (
+            f"; nearest later row was {format_duration(after_seconds)} after the target"
+            if after_seconds is not None
+            else ""
+        )
+        rendered.append(
+            f" {identity} {'have' if len(assets) != 1 else 'has'} no retained anchor in "
+            f"{window_start} to {window_end}{before_text}{after_text}; no future "
+            "eligibility is inferred."
+        )
+    return "".join(rendered[:8]) + (
+        f" {len(rendered) - 8} additional exact anchor-gap groups are retained in the campaign report."
+        if len(rendered) > 8
+        else ""
+    )
+
+
+def _bounded_asset_group_label(assets: list[str]) -> str:
+    if len(assets) == 1:
+        return assets[0]
+    visible = ", ".join(assets[:4])
+    suffix = f", +{len(assets) - 4} more" if len(assets) > 4 else ""
+    return f"{len(assets)} assets ({visible}{suffix})"
+
+
+def _cadence_gap_detail(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    adjacent = _non_negative_int(value.get("adjacent_interval_count"))
+    gaps = _non_negative_int(
+        value.get("exceeding_anchor_tolerance_interval_count")
+    )
+    tolerance = _non_negative_int(value.get("anchor_tolerance_seconds"))
+    maximum = value.get("maximum_interval")
+    if adjacent is None or gaps is None or tolerance is None:
+        return ""
+    if adjacent == 0:
+        return " Complete-generation cadence has no adjacent interval yet."
+    maximum_text = ""
+    if isinstance(maximum, Mapping):
+        maximum_text = (
+            f"; the longest is {format_duration(maximum.get('interval_seconds'))} from "
+            f"{maximum.get('start_observed_at')} to {maximum.get('end_observed_at')}"
+        )
+    return (
+        f" Complete-generation cadence has {gaps}/{adjacent} intervals beyond the "
+        f"{format_duration(tolerance)} 24-hour-anchor tolerance{maximum_text}. "
+        "This is continuity risk only; exact per-asset anchor replay determines missing inputs."
     )
 
 

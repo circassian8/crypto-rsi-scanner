@@ -789,6 +789,10 @@ def _control_regime_generation_audit_lines(
     )
     anchor_audit = _mapping(value.get("latest_missing_input_anchor_audit"))
     anchor_summary = _anchor_audit_summary(anchor_audit)
+    cadence_gap_audit = _mapping(
+        value.get("observation_cadence_gap_audit")
+    )
+    cadence_gap_summary = _cadence_gap_audit_summary(cadence_gap_audit)
     lines = [
         f"- Status: `{_md(value.get('status')) or 'unavailable'}`",
         (
@@ -826,6 +830,7 @@ def _control_regime_generation_audit_lines(
         f"- Latest missing assets with a recent observed entry: `{_md(recent)}`",
         f"- Latest prospective membership clocks: `{_md(membership_context)}`",
         f"- Exact retained-history anchor replay: `{_md(anchor_summary)}`",
+        f"- Complete-generation cadence continuity: `{_md(cadence_gap_summary)}`",
         (
             "- Interpretation: membership overlap is descriptive, not causal "
             "attribution. Older anchor gaps and recent entries remain distinct; "
@@ -875,35 +880,92 @@ def _anchor_audit_summary(value: Mapping[str, Any]) -> str:
         return (
             f"{_text(value.get('status'))}: {_text(value.get('reason'))}"
         )
-    rendered = []
+    grouped: dict[tuple[Any, ...], list[str]] = {}
     for row in diagnostics:
         asset_id = _text(row.get("canonical_asset_id")) or "unknown"
         selected = _mapping(row.get("selected_anchor"))
         before = _mapping(row.get("nearest_causal_before_window"))
         after = _mapping(row.get("nearest_post_target_observation"))
         if row.get("status") == "ready":
+            grouped.setdefault((
+                "ready",
+                selected.get("observed_at"),
+                row.get("anchor_window_start_at"),
+                row.get("anchor_window_end_at"),
+            ), []).append(asset_id)
+            continue
+        grouped.setdefault((
+            "unavailable",
+            row.get("anchor_window_start_at"),
+            row.get("anchor_window_end_at"),
+            before.get("observed_at"),
+            before.get("distance_seconds"),
+            after.get("observed_at"),
+            after.get("distance_seconds"),
+        ), []).append(asset_id)
+    rendered = []
+    for key, assets in grouped.items():
+        identity = _anchor_asset_group_label(assets)
+        if key[0] == "ready":
+            _, selected_at, window_start, window_end = key
             rendered.append(
-                f"{asset_id}: selected {selected.get('observed_at')} within "
-                f"{row.get('anchor_window_start_at')}..{row.get('anchor_window_end_at')}"
+                f"{identity}: selected {selected_at} within {window_start}..{window_end}"
             )
             continue
-        detail = (
-            f"{asset_id}: no anchor in {row.get('anchor_window_start_at')}.."
-            f"{row.get('anchor_window_end_at')}"
-        )
-        if before:
+        (
+            _, window_start, window_end, before_at, before_seconds,
+            after_at, after_seconds,
+        ) = key
+        detail = f"{identity}: no anchor in {window_start}..{window_end}"
+        if before_at is not None:
             detail += (
-                f"; latest causal row {before.get('observed_at')} was "
-                f"{_elapsed_hours(before.get('distance_seconds'))}h before the window"
+                f"; latest causal row {before_at} was "
+                f"{_elapsed_hours(before_seconds)}h before the window"
             )
-        if after:
+        if after_at is not None:
             detail += (
-                f"; first post-target row {after.get('observed_at')} was "
-                f"{_elapsed_hours(after.get('distance_seconds'))}h after the target"
+                f"; first post-target row {after_at} was "
+                f"{_elapsed_hours(after_seconds)}h after the target"
             )
-        detail += "; future endpoint eligibility not inferred"
-        rendered.append(detail)
-    return "; ".join(rendered)
+        rendered.append(detail + "; future endpoint eligibility not inferred")
+    visible = rendered[:8]
+    if len(rendered) > 8:
+        visible.append(f"+{len(rendered) - 8} exact groups retained in JSON")
+    return "; ".join(visible)
+
+
+def _anchor_asset_group_label(assets: list[str]) -> str:
+    if len(assets) == 1:
+        return assets[0]
+    visible = ", ".join(assets[:4])
+    suffix = f", +{len(assets) - 4} more" if len(assets) > 4 else ""
+    return f"{len(assets)} assets ({visible}{suffix})"
+
+
+def _cadence_gap_audit_summary(value: Mapping[str, Any]) -> str:
+    if not value:
+        return "unavailable"
+    status = _text(value.get("status")) or "unavailable"
+    intervals = _int(value.get("adjacent_interval_count"))
+    gaps = _int(value.get("exceeding_anchor_tolerance_interval_count"))
+    tolerance = _int(value.get("anchor_tolerance_seconds"))
+    maximum = _mapping(value.get("maximum_interval"))
+    if status == "empty":
+        return "no complete generation clocks"
+    if status == "insufficient_history":
+        return "one complete generation; no adjacent interval yet"
+    maximum_text = (
+        f"maximum {_elapsed_hours(maximum.get('interval_seconds'))}h from "
+        f"{_text(maximum.get('start_observed_at'))} to "
+        f"{_text(maximum.get('end_observed_at'))}"
+        if maximum
+        else "maximum unavailable"
+    )
+    return (
+        f"{gaps}/{intervals} adjacent intervals exceed the "
+        f"{_hours(tolerance)}h 24-hour-anchor tolerance; {maximum_text}; "
+        "descriptive continuity risk only, not anchor causation or future eligibility"
+    )
 
 
 def _current_control_regime_input_lines(value: Mapping[str, Any]) -> list[str]:

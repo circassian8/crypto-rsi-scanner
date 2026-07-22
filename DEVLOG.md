@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Measure complete-generation cadence continuity · Codex
+**Why:** Accumulated cycle and row counts can look healthy while an actual
+collection gap removes every valid causal 24-hour anchor. Operators needed the
+continuity break surfaced separately from the exact per-asset selector replay.
+**Changes:**
+- Upgraded the exact-generation control-regime audit to schema v4 and added a
+  closed clock-digest-bound cadence projection over adjacent complete verified
+  generations. It uses the canonical 24-hour return-anchor tolerance, retains
+  latest/maximum intervals and at most 16 exact gaps, and keeps schema v3
+  readable.
+- Reconciled cadence counts and latest clock with the parent audit, preserved
+  zero-call/zero-write/no-outcome/no-policy safety, and exposed the canonical
+  anchor tolerance through the shared market-history selector.
+- Projected the result into campaign/Today dashboard views and grouped identical
+  per-asset anchor failures so the operator sees one coherent cause rather than
+  30 repetitive lines. Fixed the fractional-second Markdown duration path after
+  the real rebuild caught a false `0h` display.
+- Rebuilt canonical campaign and dashboard artifacts. The live report now shows
+  23 complete clocks / 22 intervals, with one 48,256.315755-second (13.4-hour)
+  gap exceeding the six-hour tolerance by 26,656.315755 seconds. The current
+  per-asset replay remains the causal authority; no future eligibility is
+  inferred.
+- Updated the North Star, working agreement, roadmap, durable decision, and
+  advisory architecture inventories. Source file/function/class sizes remain
+  non-blocking measurements; runtime evidence and security bounds remain
+  enforced.
+**Verify:** `compileall` passed; 116 focused market-history/campaign/projection
+tests and 80 dashboard tests passed; the no-provider campaign rebuild,
+dashboard readiness, exact-authority 12-page smoke, 14-page fixture smoke, and
+9-page UX smoke passed. Architecture cleanliness passed, all modified JSON
+parsed, and `git diff --check` passed. The dashboard test was rerun outside the
+sandbox only because its loopback concurrency case needs an ephemeral bind.
+**Notes/risks:** Full `verify-fast` was not repeated because the immediately
+preceding logical change passed 3,876 tests and this increment is a narrow,
+descriptive, policy-ineligible projection with complete focused coverage. No
+provider call, schedule change, threshold, score, route, outcome, send, trade,
+order, paper trade, RSI write, or Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Record no-send market cycle 65 · Codex
 **Why:** The already-authorized hourly collection boundary was overdue. A fresh
 point-in-time cycle advances the real temporal campaign and preserves terminal

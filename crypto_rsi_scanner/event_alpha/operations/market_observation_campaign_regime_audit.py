@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
@@ -20,7 +21,8 @@ from . import market_no_send_features
 
 
 SCHEMA_ID = "decision_radar.control_market_regime_generation_audit"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+LEGACY_SCHEMA_VERSION = 3
 RECENT_CYCLE_LIMIT = 32
 RECENT_MEMBERSHIP_WINDOW_SECONDS = 24 * 60 * 60
 INTERPRETATION = "descriptive_membership_overlap_not_causal_attribution"
@@ -30,7 +32,16 @@ MEMBERSHIP_CLOCK_SCOPE = (
 
 _STATUSES = {"empty", "unavailable", "incomplete", "ready"}
 _CYCLE_STATUSES = {"ready", "incomplete", "unavailable"}
-_AUDIT_KEYS = {
+CADENCE_GAP_AUDIT_SCHEMA_ID = (
+    "decision_radar.control_regime_observation_cadence_gap_audit"
+)
+CADENCE_GAP_AUDIT_SCHEMA_VERSION = 1
+CADENCE_GAP_EXAMPLE_LIMIT = 16
+CADENCE_GAP_INTERPRETATION = (
+    "descriptive_complete_generation_cadence_not_anchor_causation"
+)
+
+_AUDIT_KEYS_V3 = {
     "schema_id",
     "schema_version",
     "status",
@@ -77,6 +88,7 @@ _AUDIT_KEYS = {
     "writes",
     "research_only",
 }
+_AUDIT_KEYS = _AUDIT_KEYS_V3 | {"observation_cadence_gap_audit"}
 _SUMMARY_KEYS = {
     "artifact_namespace",
     "run_id",
@@ -132,6 +144,344 @@ _ANCHOR_AUDIT_STATUSES = {
     "unavailable",
     "inconsistent",
 }
+_CADENCE_GAP_AUDIT_KEYS = {
+    "schema_id",
+    "schema_version",
+    "status",
+    "complete_generation_count",
+    "adjacent_interval_count",
+    "return_horizon_hours",
+    "anchor_tolerance_seconds",
+    "within_anchor_tolerance_interval_count",
+    "exceeding_anchor_tolerance_interval_count",
+    "latest_interval",
+    "maximum_interval",
+    "gap_example_limit",
+    "gap_examples",
+    "gap_examples_truncated",
+    "source_generation_clock_sha256",
+    "source_scope",
+    "interpretation",
+    "future_endpoint_eligibility_inferred",
+    "selection_uses_outcomes",
+    "historical_context_backfilled",
+    "routing_eligible",
+    "decision_policy_eligible",
+    "protocol_v2_evidence_eligible",
+    "provider_calls",
+    "writes",
+    "research_only",
+}
+_CADENCE_INTERVAL_KEYS = {
+    "start_artifact_namespace",
+    "start_run_id",
+    "start_observed_at",
+    "end_artifact_namespace",
+    "end_run_id",
+    "end_observed_at",
+    "interval_seconds",
+    "exceeds_anchor_tolerance",
+    "excess_seconds",
+}
+_CADENCE_GAP_STATUSES = {
+    "empty",
+    "insufficient_history",
+    "within_anchor_tolerance",
+    "gaps_observed",
+}
+
+
+def build_observation_cadence_gap_audit(
+    complete_generations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Measure complete-generation clock gaps against the 24h anchor tolerance."""
+
+    clocks: list[dict[str, Any]] = []
+    for index, raw in enumerate(complete_generations):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"cadence generation {index} is not a mapping")
+        namespace = _identity(raw.get("artifact_namespace"))
+        run_id = _identity(raw.get("run_id"))
+        observed_at = _parse_aware_utc(raw.get("observed_at"))
+        if not namespace or not run_id or observed_at is None:
+            raise ValueError(f"cadence generation {index} identity is invalid")
+        clocks.append({
+            "artifact_namespace": namespace,
+            "run_id": run_id,
+            "observed_at": observed_at,
+        })
+    clocks.sort(key=lambda row: (
+        row["observed_at"],
+        row["artifact_namespace"],
+        row["run_id"],
+    ))
+    tolerance_seconds = int(
+        event_market_history.return_anchor_tolerance(hours=24).total_seconds()
+    )
+    intervals = [
+        _cadence_interval(start, end, tolerance_seconds=tolerance_seconds)
+        for start, end in zip(clocks, clocks[1:])
+    ]
+    gaps = [row for row in intervals if row["exceeds_anchor_tolerance"]]
+    bounded_gaps = gaps[-CADENCE_GAP_EXAMPLE_LIMIT:]
+    status = (
+        "empty"
+        if not clocks
+        else "insufficient_history"
+        if len(clocks) == 1
+        else "gaps_observed"
+        if gaps
+        else "within_anchor_tolerance"
+    )
+    source_clock_values = [
+        {
+            "artifact_namespace": row["artifact_namespace"],
+            "run_id": row["run_id"],
+            "observed_at": row["observed_at"].isoformat(),
+        }
+        for row in clocks
+    ]
+    value = {
+        "schema_id": CADENCE_GAP_AUDIT_SCHEMA_ID,
+        "schema_version": CADENCE_GAP_AUDIT_SCHEMA_VERSION,
+        "status": status,
+        "complete_generation_count": len(clocks),
+        "adjacent_interval_count": len(intervals),
+        "return_horizon_hours": 24,
+        "anchor_tolerance_seconds": tolerance_seconds,
+        "within_anchor_tolerance_interval_count": len(intervals) - len(gaps),
+        "exceeding_anchor_tolerance_interval_count": len(gaps),
+        "latest_interval": dict(intervals[-1]) if intervals else None,
+        "maximum_interval": (
+            dict(max(intervals, key=lambda row: row["interval_seconds"]))
+            if intervals
+            else None
+        ),
+        "gap_example_limit": CADENCE_GAP_EXAMPLE_LIMIT,
+        "gap_examples": [dict(row) for row in bounded_gaps],
+        "gap_examples_truncated": len(gaps) > len(bounded_gaps),
+        "source_generation_clock_sha256": _sha256_json(source_clock_values),
+        "source_scope": "complete_verified_generation_observation_clocks",
+        "interpretation": CADENCE_GAP_INTERPRETATION,
+        "future_endpoint_eligibility_inferred": False,
+        "selection_uses_outcomes": False,
+        "historical_context_backfilled": False,
+        "routing_eligible": False,
+        "decision_policy_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    errors = validate_observation_cadence_gap_audit(value)
+    if errors:  # pragma: no cover - builder and validator share the contract
+        raise AssertionError("observation cadence gap audit invalid: " + ";".join(errors))
+    return value
+
+
+def validate_observation_cadence_gap_audit(value: object) -> list[str]:
+    """Validate the bounded, policy-ineligible generation-clock projection."""
+
+    if not isinstance(value, Mapping):
+        return ["cadence_gap_audit_not_mapping"]
+    errors: list[str] = []
+    if set(value) != _CADENCE_GAP_AUDIT_KEYS:
+        errors.append("cadence_gap_audit_keys_invalid")
+    if value.get("schema_id") != CADENCE_GAP_AUDIT_SCHEMA_ID:
+        errors.append("cadence_gap_schema_id_invalid")
+    if value.get("schema_version") != CADENCE_GAP_AUDIT_SCHEMA_VERSION:
+        errors.append("cadence_gap_schema_version_invalid")
+    complete = value.get("complete_generation_count")
+    adjacent = value.get("adjacent_interval_count")
+    within = value.get("within_anchor_tolerance_interval_count")
+    exceeding = value.get("exceeding_anchor_tolerance_interval_count")
+    if any(type(item) is not int or item < 0 for item in (complete, adjacent, within, exceeding)):
+        errors.append("cadence_gap_count_invalid")
+    else:
+        if adjacent != max(0, complete - 1):
+            errors.append("cadence_gap_adjacent_count_invalid")
+        if within + exceeding != adjacent:
+            errors.append("cadence_gap_interval_count_not_closed")
+    expected_tolerance = int(
+        event_market_history.return_anchor_tolerance(hours=24).total_seconds()
+    )
+    if (
+        value.get("return_horizon_hours") != 24
+        or value.get("anchor_tolerance_seconds") != expected_tolerance
+    ):
+        errors.append("cadence_gap_anchor_policy_invalid")
+    if value.get("gap_example_limit") != CADENCE_GAP_EXAMPLE_LIMIT:
+        errors.append("cadence_gap_example_limit_invalid")
+    latest = value.get("latest_interval")
+    maximum = value.get("maximum_interval")
+    if type(adjacent) is int and adjacent == 0:
+        if latest is not None or maximum is not None:
+            errors.append("cadence_gap_empty_intervals_invalid")
+    else:
+        _validate_cadence_interval(
+            latest,
+            tolerance_seconds=expected_tolerance,
+            label="cadence_gap_latest",
+            errors=errors,
+        )
+        _validate_cadence_interval(
+            maximum,
+            tolerance_seconds=expected_tolerance,
+            label="cadence_gap_maximum",
+            errors=errors,
+        )
+        if (
+            isinstance(latest, Mapping)
+            and isinstance(maximum, Mapping)
+            and _finite_nonnegative(latest.get("interval_seconds"))
+            and _finite_nonnegative(maximum.get("interval_seconds"))
+            and maximum.get("interval_seconds") < latest.get("interval_seconds")
+        ):
+            errors.append("cadence_gap_maximum_interval_invalid")
+    examples = value.get("gap_examples")
+    if not isinstance(examples, list) or len(examples) > CADENCE_GAP_EXAMPLE_LIMIT:
+        errors.append("cadence_gap_examples_invalid")
+        examples = []
+    for index, row in enumerate(examples):
+        _validate_cadence_interval(
+            row,
+            tolerance_seconds=expected_tolerance,
+            label=f"cadence_gap_example_{index}",
+            errors=errors,
+        )
+        if isinstance(row, Mapping) and row.get("exceeds_anchor_tolerance") is not True:
+            errors.append(f"cadence_gap_example_{index}_not_gap")
+    example_times = [
+        _parse_aware_utc(row.get("end_observed_at"))
+        for row in examples
+        if isinstance(row, Mapping)
+    ]
+    if any(item is None for item in example_times) or example_times != sorted(example_times):
+        errors.append("cadence_gap_examples_order_invalid")
+    truncated = value.get("gap_examples_truncated")
+    if type(truncated) is not bool or type(exceeding) is not int:
+        errors.append("cadence_gap_examples_bound_invalid")
+    elif truncated:
+        if not (exceeding > CADENCE_GAP_EXAMPLE_LIMIT and len(examples) == CADENCE_GAP_EXAMPLE_LIMIT):
+            errors.append("cadence_gap_examples_bound_invalid")
+    elif len(examples) != exceeding:
+        errors.append("cadence_gap_examples_bound_invalid")
+    expected_status = (
+        "empty"
+        if complete == 0
+        else "insufficient_history"
+        if complete == 1
+        else "gaps_observed"
+        if type(exceeding) is int and exceeding > 0
+        else "within_anchor_tolerance"
+    )
+    if value.get("status") not in _CADENCE_GAP_STATUSES or value.get("status") != expected_status:
+        errors.append("cadence_gap_status_invalid")
+    if not _sha256(value.get("source_generation_clock_sha256")):
+        errors.append("cadence_gap_source_digest_invalid")
+    fixed = {
+        "source_scope": "complete_verified_generation_observation_clocks",
+        "interpretation": CADENCE_GAP_INTERPRETATION,
+        "future_endpoint_eligibility_inferred": False,
+        "selection_uses_outcomes": False,
+        "historical_context_backfilled": False,
+        "routing_eligible": False,
+        "decision_policy_eligible": False,
+        "protocol_v2_evidence_eligible": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    for field, expected in fixed.items():
+        if type(value.get(field)) is not type(expected) or value.get(field) != expected:
+            errors.append(f"cadence_gap_{field}_invalid")
+    if type(exceeding) is int and isinstance(maximum, Mapping):
+        if maximum.get("exceeds_anchor_tolerance") is not (exceeding > 0):
+            errors.append("cadence_gap_maximum_status_invalid")
+    return sorted(set(errors))
+
+
+def _cadence_interval(
+    start: Mapping[str, Any],
+    end: Mapping[str, Any],
+    *,
+    tolerance_seconds: int,
+) -> dict[str, Any]:
+    interval_seconds = _rounded_seconds(
+        (end["observed_at"] - start["observed_at"]).total_seconds()
+    )
+    exceeds = interval_seconds > tolerance_seconds
+    return {
+        "start_artifact_namespace": start["artifact_namespace"],
+        "start_run_id": start["run_id"],
+        "start_observed_at": start["observed_at"].isoformat(),
+        "end_artifact_namespace": end["artifact_namespace"],
+        "end_run_id": end["run_id"],
+        "end_observed_at": end["observed_at"].isoformat(),
+        "interval_seconds": interval_seconds,
+        "exceeds_anchor_tolerance": exceeds,
+        "excess_seconds": _rounded_seconds(
+            max(0.0, interval_seconds - tolerance_seconds)
+        ),
+    }
+
+
+def _validate_cadence_interval(
+    value: object,
+    *,
+    tolerance_seconds: int,
+    label: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, Mapping) or set(value) != _CADENCE_INTERVAL_KEYS:
+        errors.append(f"{label}_keys_invalid")
+        return
+    if not all(
+        _identity(value.get(field))
+        for field in (
+            "start_artifact_namespace",
+            "start_run_id",
+            "end_artifact_namespace",
+            "end_run_id",
+        )
+    ):
+        errors.append(f"{label}_identity_invalid")
+    start = _parse_aware_utc(value.get("start_observed_at"))
+    end = _parse_aware_utc(value.get("end_observed_at"))
+    seconds = value.get("interval_seconds")
+    excess = value.get("excess_seconds")
+    if (
+        start is None
+        or end is None
+        or end < start
+        or not _finite_nonnegative(seconds)
+        or not _finite_nonnegative(excess)
+    ):
+        errors.append(f"{label}_clock_invalid")
+        return
+    expected_seconds = _rounded_seconds((end - start).total_seconds())
+    expected_exceeds = expected_seconds > tolerance_seconds
+    expected_excess = _rounded_seconds(max(0.0, expected_seconds - tolerance_seconds))
+    if (
+        seconds != expected_seconds
+        or value.get("exceeds_anchor_tolerance") is not expected_exceeds
+        or excess != expected_excess
+    ):
+        errors.append(f"{label}_derivation_invalid")
+
+
+def _finite_nonnegative(value: object) -> bool:
+    return bool(
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+        and float(value) >= 0
+    )
+
+
+def _rounded_seconds(value: float) -> float:
+    rounded = round(float(value), 6)
+    return 0.0 if rounded == 0 else rounded
 
 
 def build_control_regime_generation_audit(
@@ -290,6 +640,7 @@ def build_control_regime_generation_audit(
         latest_complete_source_rows,
         retained_history_snapshot,
     )
+    cadence_gap_audit = build_observation_cadence_gap_audit(complete_records)
     value = {
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
@@ -347,6 +698,7 @@ def build_control_regime_generation_audit(
         "membership_clock_scope": MEMBERSHIP_CLOCK_SCOPE,
         "precontract_history_used_for_membership_clock": False,
         "latest_missing_input_anchor_audit": latest_anchor_audit,
+        "observation_cadence_gap_audit": cadence_gap_audit,
         "selection_uses_outcomes": False,
         "historical_context_backfilled": False,
         "retained_history_mutated": False,
@@ -369,11 +721,19 @@ def validate_control_regime_generation_audit(value: object) -> list[str]:
     if not isinstance(value, Mapping):
         return ["audit_not_mapping"]
     errors: list[str] = []
-    if set(value) != _AUDIT_KEYS:
+    version = value.get("schema_version")
+    expected_keys = (
+        _AUDIT_KEYS
+        if version == SCHEMA_VERSION
+        else _AUDIT_KEYS_V3
+        if version == LEGACY_SCHEMA_VERSION
+        else _AUDIT_KEYS
+    )
+    if set(value) != expected_keys:
         errors.append("audit_keys_invalid")
     if value.get("schema_id") != SCHEMA_ID:
         errors.append("schema_id_invalid")
-    if value.get("schema_version") != SCHEMA_VERSION:
+    if version not in {LEGACY_SCHEMA_VERSION, SCHEMA_VERSION}:
         errors.append("schema_version_invalid")
     if value.get("status") not in _STATUSES:
         errors.append("status_invalid")
@@ -510,6 +870,29 @@ def validate_control_regime_generation_audit(value: object) -> list[str]:
         latest=value.get("latest_complete_generation"),
         errors=errors,
     )
+    if version == SCHEMA_VERSION:
+        cadence_audit = value.get("observation_cadence_gap_audit")
+        errors.extend(validate_observation_cadence_gap_audit(cadence_audit))
+        if (
+            isinstance(cadence_audit, Mapping)
+            and cadence_audit.get("complete_generation_count")
+            != counts.get("complete_universe_generation_count")
+        ):
+            errors.append("cadence_gap_complete_generation_count_mismatch")
+        if (
+            isinstance(cadence_audit, Mapping)
+            and cadence_audit.get("adjacent_interval_count")
+            != counts.get("transition_count")
+        ):
+            errors.append("cadence_gap_transition_count_mismatch")
+        if (
+            isinstance(cadence_audit, Mapping)
+            and counts.get("complete_universe_generation_count", 0) > 1
+            and isinstance(cadence_audit.get("latest_interval"), Mapping)
+            and cadence_audit["latest_interval"].get("end_observed_at")
+            != value.get("last_complete_observed_at")
+        ):
+            errors.append("cadence_gap_latest_clock_mismatch")
     fixed = {
         "precontract_history_used_for_membership_clock": False,
         "selection_uses_outcomes": False,
@@ -1068,12 +1451,19 @@ def _sha256_json(value: object) -> str:
 
 
 __all__ = (
+    "CADENCE_GAP_AUDIT_SCHEMA_ID",
+    "CADENCE_GAP_AUDIT_SCHEMA_VERSION",
+    "CADENCE_GAP_EXAMPLE_LIMIT",
+    "CADENCE_GAP_INTERPRETATION",
     "INTERPRETATION",
+    "LEGACY_SCHEMA_VERSION",
     "MEMBERSHIP_CLOCK_SCOPE",
     "RECENT_CYCLE_LIMIT",
     "RECENT_MEMBERSHIP_WINDOW_SECONDS",
     "SCHEMA_ID",
     "SCHEMA_VERSION",
     "build_control_regime_generation_audit",
+    "build_observation_cadence_gap_audit",
     "validate_control_regime_generation_audit",
+    "validate_observation_cadence_gap_audit",
 )

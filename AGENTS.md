@@ -1042,7 +1042,14 @@ may be added later when a suitable environment already exists.
   anchor audit must call the canonical return selector over the exact one-read
   retained-history snapshot and show the target, backward-tolerance window,
   candidates, and nearest excluded observations. It never predicts a future
-  endpoint or grants policy/Protocol-v2 eligibility. Decision campaign generations,
+  endpoint or grants policy/Protocol-v2 eligibility. Exact-generation audit
+  schema v4 also measures adjacent complete verified generation clocks against
+  that canonical 24-hour anchor tolerance. It retains a bounded exact gap list,
+  latest/maximum interval, and clock digest so collection volume cannot conceal
+  a continuity break. This is descriptive continuity risk only: the per-asset
+  selector replay remains the causal explanation, and the cadence audit never
+  predicts eligibility or changes scheduling, routing, policy, or Protocol-v2
+  evidence status. Schema v3 remains readable. Decision campaign generations,
   candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
   Post-scan raw market evidence may carry the optional closed

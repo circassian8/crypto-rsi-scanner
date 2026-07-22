@@ -965,7 +965,7 @@ def test_control_regime_generation_audit_separates_recent_entry_overlap():
     assert audit["incomplete_without_recent_entry_count"] == 0
     assert audit["recent_entry_missing_asset_event_count"] == 2
     assert audit["missing_asset_generation_counts"] == {"new-entry": 2}
-    assert audit["schema_version"] == 3
+    assert audit["schema_version"] == 4
     assert audit["membership_clock_scope"] == (
         "prospective_complete_point_in_time_universes_only"
     )
@@ -976,6 +976,17 @@ def test_control_regime_generation_audit_separates_recent_entry_overlap():
     assert audit["latest_missing_input_anchor_audit"]["reason"] == (
         "retained_history_unavailable"
     )
+    cadence = audit["observation_cadence_gap_audit"]
+    assert cadence["status"] == "within_anchor_tolerance"
+    assert cadence["complete_generation_count"] == 3
+    assert cadence["adjacent_interval_count"] == 2
+    assert cadence["anchor_tolerance_seconds"] == 21_600
+    assert cadence["within_anchor_tolerance_interval_count"] == 2
+    assert cadence["exceeding_anchor_tolerance_interval_count"] == 0
+    assert cadence["latest_interval"]["interval_seconds"] == 3_600.0
+    assert cadence["maximum_interval"]["interval_seconds"] == 3_600.0
+    assert cadence["gap_examples"] == []
+    assert cadence["future_endpoint_eligibility_inferred"] is False
     assert audit["latest_complete_generation"][
         "recent_entry_missing_asset_ids"
     ] == ["new-entry"]
@@ -1019,6 +1030,131 @@ def test_control_regime_generation_audit_separates_recent_entry_overlap():
     assert "latest_membership_context_0_anchor_eligibility_invalid" in (
         market_observation_campaign_regime_audit
         .validate_control_regime_generation_audit(tampered)
+    )
+
+
+def test_control_regime_generation_audit_measures_exact_cadence_gap() -> None:
+    first_at = "2026-07-20T19:41:41.729110+00:00"
+    second_at = "2026-07-21T09:05:58.044865+00:00"
+    third_at = "2026-07-21T10:05:58.044865+00:00"
+    audit = (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit([
+            _regime_audit_generation(
+                "cadence-generation-a",
+                first_at,
+                _ready_regime_market_rows(first_at),
+            ),
+            _regime_audit_generation(
+                "cadence-generation-b",
+                second_at,
+                _ready_regime_market_rows(second_at),
+            ),
+            _regime_audit_generation(
+                "cadence-generation-c",
+                third_at,
+                _ready_regime_market_rows(third_at),
+            ),
+        ])
+    )
+
+    cadence = audit["observation_cadence_gap_audit"]
+    assert cadence["status"] == "gaps_observed"
+    assert cadence["complete_generation_count"] == 3
+    assert cadence["adjacent_interval_count"] == 2
+    assert cadence["within_anchor_tolerance_interval_count"] == 1
+    assert cadence["exceeding_anchor_tolerance_interval_count"] == 1
+    assert cadence["latest_interval"]["interval_seconds"] == 3_600.0
+    assert cadence["latest_interval"]["exceeds_anchor_tolerance"] is False
+    assert cadence["maximum_interval"] == cadence["gap_examples"][0]
+    assert cadence["maximum_interval"]["start_observed_at"] == first_at
+    assert cadence["maximum_interval"]["end_observed_at"] == second_at
+    assert cadence["maximum_interval"]["interval_seconds"] == 48_256.315755
+    assert cadence["maximum_interval"]["excess_seconds"] == 26_656.315755
+    assert cadence["gap_examples_truncated"] is False
+    assert cadence["future_endpoint_eligibility_inferred"] is False
+    cadence_summary = (
+        market_observation_campaign_render._cadence_gap_audit_summary(cadence)
+    )
+    assert "1/2 adjacent intervals exceed" in cadence_summary
+    assert "maximum 13.4h" in cadence_summary
+    assert "continuity risk only" in cadence_summary
+    assert (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(audit)
+    ) == []
+
+    tampered = json.loads(json.dumps(audit))
+    tampered["observation_cadence_gap_audit"]["gap_examples"][0][
+        "excess_seconds"
+    ] += 1
+    assert "cadence_gap_example_0_derivation_invalid" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(tampered)
+    )
+
+    tampered = json.loads(json.dumps(audit))
+    tampered["observation_cadence_gap_audit"][
+        "future_endpoint_eligibility_inferred"
+    ] = True
+    assert "cadence_gap_future_endpoint_eligibility_inferred_invalid" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(tampered)
+    )
+
+
+def test_observation_cadence_gap_audit_closes_empty_and_single_clock() -> None:
+    empty = (
+        market_observation_campaign_regime_audit
+        .build_observation_cadence_gap_audit([])
+    )
+    assert empty["status"] == "empty"
+    assert empty["complete_generation_count"] == 0
+    assert empty["latest_interval"] is None
+    assert empty["maximum_interval"] is None
+
+    observed_at = "2026-07-20T19:41:41.729110+00:00"
+    single = (
+        market_observation_campaign_regime_audit
+        .build_observation_cadence_gap_audit([{
+            "artifact_namespace": "single-generation",
+            "run_id": f"{observed_at}|no_key_live",
+            "observed_at": observed_at,
+        }])
+    )
+    assert single["status"] == "insufficient_history"
+    assert single["complete_generation_count"] == 1
+    assert single["adjacent_interval_count"] == 0
+    assert single["gap_examples"] == []
+
+
+def test_control_regime_generation_audit_keeps_schema_v3_readable() -> None:
+    observed_at = "2026-07-20T19:41:41.729110+00:00"
+    current = (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit([
+            _regime_audit_generation(
+                "legacy-generation",
+                observed_at,
+                _ready_regime_market_rows(observed_at),
+            )
+        ])
+    )
+    legacy = json.loads(json.dumps(current))
+    legacy["schema_version"] = 3
+    legacy.pop("observation_cadence_gap_audit")
+
+    assert (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(legacy)
+    ) == []
+
+    drifted = json.loads(json.dumps(current))
+    drifted["observation_cadence_gap_audit"]["complete_generation_count"] = 2
+    drifted["observation_cadence_gap_audit"]["adjacent_interval_count"] = 1
+    assert "cadence_gap_complete_generation_count_mismatch" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(drifted)
     )
 
 

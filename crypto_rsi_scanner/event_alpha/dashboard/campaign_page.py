@@ -809,6 +809,9 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
     anchor_context = _regime_anchor_context_label(
         raw.get("latest_missing_input_anchor_audit")
     )
+    cadence_context = _regime_cadence_context_label(
+        raw.get("observation_cadence_gap_audit")
+    )
     values = (
         ("Verified source envelopes", f"{verified} / {total}"),
         ("Complete universes", complete),
@@ -822,6 +825,7 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
         ("Latest recent-entry overlap", latest_recent),
         ("Latest continuous membership", membership_context),
         ("Latest anchor-window replay", anchor_context),
+        ("Complete-generation cadence", cadence_context),
     )
     missing_counts = raw.get("missing_asset_generation_counts")
     missing_rows = []
@@ -894,7 +898,7 @@ def _regime_anchor_context_label(value: Any) -> str:
     ]
     if not diagnostics:
         return humanize_enum(value.get("reason"))
-    values = []
+    grouped: dict[tuple[Any, ...], list[str]] = {}
     for row in diagnostics:
         asset_id = humanize_enum(row.get("canonical_asset_id"))
         if row.get("status") == "ready":
@@ -904,25 +908,73 @@ def _regime_anchor_context_label(value: Any) -> str:
                 if isinstance(selected, Mapping)
                 else UNAVAILABLE
             )
-            values.append(f"{asset_id}: selected {selected_at}")
+            grouped.setdefault(("ready", selected_at), []).append(asset_id)
             continue
         before = row.get("nearest_causal_before_window")
+        after = row.get("nearest_post_target_observation")
+        grouped.setdefault((
+            "unavailable",
+            row.get("anchor_window_start_at"),
+            row.get("anchor_window_end_at"),
+            before.get("distance_seconds") if isinstance(before, Mapping) else None,
+            after.get("distance_seconds") if isinstance(after, Mapping) else None,
+        ), []).append(asset_id)
+    values = []
+    for key, assets in grouped.items():
+        identity = _campaign_asset_group_label(assets)
+        if key[0] == "ready":
+            values.append(f"{identity}: selected {key[1]}")
+            continue
+        _, window_start, window_end, before_seconds, after_seconds = key
         before_text = (
-            f"; prior row {format_duration(before.get('distance_seconds'))} before window"
-            if isinstance(before, Mapping)
+            f"; prior row {format_duration(before_seconds)} before window"
+            if before_seconds is not None
             else ""
         )
-        after = row.get("nearest_post_target_observation")
         after_text = (
-            f"; next row {format_duration(after.get('distance_seconds'))} after target"
-            if isinstance(after, Mapping)
+            f"; next row {format_duration(after_seconds)} after target"
+            if after_seconds is not None
             else ""
         )
         values.append(
-            f"{asset_id}: no anchor in {row.get('anchor_window_start_at')} to "
-            f"{row.get('anchor_window_end_at')}{before_text}{after_text}"
+            f"{identity}: no anchor in {window_start} to "
+            f"{window_end}{before_text}{after_text}"
         )
-    return "; ".join(values)
+    visible = values[:8]
+    if len(values) > 8:
+        visible.append(f"+{len(values) - 8} exact groups in the source report")
+    return "; ".join(visible)
+
+
+def _campaign_asset_group_label(assets: list[str]) -> str:
+    if len(assets) == 1:
+        return assets[0]
+    visible = ", ".join(assets[:4])
+    suffix = f", +{len(assets) - 4} more" if len(assets) > 4 else ""
+    return f"{len(assets)} assets ({visible}{suffix})"
+
+
+def _regime_cadence_context_label(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return UNAVAILABLE
+    adjacent = value.get("adjacent_interval_count")
+    gaps = value.get("exceeding_anchor_tolerance_interval_count")
+    tolerance = value.get("anchor_tolerance_seconds")
+    if not all(type(item) is int and item >= 0 for item in (adjacent, gaps, tolerance)):
+        return UNAVAILABLE
+    if adjacent == 0:
+        return "No adjacent complete-generation interval yet"
+    maximum = value.get("maximum_interval")
+    maximum_text = (
+        f"; longest {format_duration(maximum.get('interval_seconds'))} from "
+        f"{maximum.get('start_observed_at')} to {maximum.get('end_observed_at')}"
+        if isinstance(maximum, Mapping)
+        else ""
+    )
+    return (
+        f"{gaps}/{adjacent} intervals exceed the {format_duration(tolerance)} "
+        f"24-hour-anchor tolerance{maximum_text}; continuity risk only"
+    )
 
 
 def _protocol_v2_episode_coverage(snapshot: DashboardSnapshot) -> str:

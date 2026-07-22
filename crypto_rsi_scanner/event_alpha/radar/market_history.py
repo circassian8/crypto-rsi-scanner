@@ -1599,10 +1599,7 @@ def _return_sample_for_endpoint(
     if endpoint_price is None or endpoint_price <= 0:
         return None
     target = endpoint_time - timedelta(hours=hours)
-    tolerance = max(
-        cfg.min_anchor_tolerance,
-        timedelta(hours=hours * cfg.anchor_tolerance_ratio),
-    )
+    tolerance = return_anchor_tolerance(hours=hours, config=cfg)
     anchors = [
         item
         for item in observations
@@ -1620,6 +1617,22 @@ def _return_sample_for_endpoint(
         value=_rounded((endpoint_price / anchor_price - 1.0) * 100.0),
         endpoint=endpoint,
         anchor=anchor,
+    )
+
+
+def return_anchor_tolerance(
+    *,
+    hours: int,
+    config: MarketHistoryConfig | None = None,
+) -> timedelta:
+    """Return the canonical backward anchor tolerance for one horizon."""
+
+    if type(hours) is not int or hours <= 0:
+        raise ValueError("hours must be a positive integer")
+    cfg = config or MarketHistoryConfig()
+    return max(
+        cfg.min_anchor_tolerance,
+        timedelta(hours=hours * cfg.anchor_tolerance_ratio),
     )
 
 
@@ -1641,10 +1654,7 @@ def return_anchor_selection_diagnostic(
     if not asset_id or endpoint_price is None or endpoint_price <= 0:
         raise ValueError("endpoint must have valid identity, time, and price")
     target = endpoint_time - timedelta(hours=hours)
-    tolerance = max(
-        cfg.min_anchor_tolerance,
-        timedelta(hours=hours * cfg.anchor_tolerance_ratio),
-    )
+    tolerance = return_anchor_tolerance(hours=hours, config=cfg)
     window_start = target - tolerance
     causal_rows: list[Mapping[str, Any]] = []
     for row in observations:

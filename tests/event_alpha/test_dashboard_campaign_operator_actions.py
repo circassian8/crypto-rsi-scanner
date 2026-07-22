@@ -607,6 +607,12 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert regime_history["latest_missing_input_anchor_audit"]["reason"] == (
         "latest_generation_has_all_inputs"
     )
+    cadence = regime_history["observation_cadence_gap_audit"]
+    assert cadence["status"] == "insufficient_history"
+    assert cadence["complete_generation_count"] == 1
+    assert cadence["adjacent_interval_count"] == 0
+    assert cadence["future_endpoint_eligibility_inferred"] is False
+    assert cadence["provider_calls"] == cadence["writes"] == 0
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
     assert shadow["schema_version"] == 7
@@ -699,6 +705,25 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
         "coverage_deficit_seconds": 43_450,
     }
     assert "/private/" not in repr(result)
+
+
+def test_campaign_operator_actions_keep_regime_audit_v3_readable(
+    tmp_path: Path,
+) -> None:
+    report = _campaign_report()
+    audit = report["control_market_regime_generation_audit"]
+    assert isinstance(audit, dict)
+    audit["schema_version"] = 3
+    audit.pop("observation_cadence_gap_audit")
+    _write_report(tmp_path, report)
+
+    result = _load(tmp_path)
+
+    assert result["status"] == "ready"
+    regime_history = result["temporal_baseline"][
+        "control_market_regime_generation_audit"
+    ]
+    assert regime_history["observation_cadence_gap_audit"] is None
 
 
 def test_bounded_projection_keeps_oversized_full_campaign_evidence_available(
@@ -860,6 +885,54 @@ def test_today_detail_separates_regime_history_churn_from_other_gaps() -> None:
     assert "no future eligibility is inferred" in detail
 
 
+def test_today_detail_groups_common_anchor_gaps_and_shows_cadence_risk() -> None:
+    diagnostics = tuple({
+        "canonical_asset_id": f"asset-{index:02d}",
+        "status": "unavailable",
+        "anchor_window_start_at": "2026-07-20T19:55:59.437470+00:00",
+        "anchor_window_end_at": "2026-07-21T01:55:59.437470+00:00",
+        "nearest_causal_before_window": {"distance_seconds": 857.708360},
+        "nearest_post_target_observation": {"distance_seconds": 25_798.607395},
+    } for index in range(30))
+    detail = _control_regime_generation_audit_detail({
+        "control_market_regime_generation_audit": {
+            "input_generation_count": 65,
+            "verified_source_generation_count": 65,
+            "complete_universe_generation_count": 65,
+            "ready_generation_count": 16,
+            "incomplete_generation_count": 49,
+            "transition_count": 64,
+            "universe_change_transition_count": 8,
+            "incomplete_with_recent_entry_count": 12,
+            "incomplete_without_recent_entry_count": 37,
+            "latest_complete_generation": {
+                "eligible_input_count": 0,
+                "universe_expected_count": 30,
+                "missing_asset_ids": tuple(f"asset-{index:02d}" for index in range(30)),
+                "recent_entry_missing_asset_ids": (),
+                "missing_input_membership_context": (),
+            },
+            "latest_missing_input_anchor_audit": {"diagnostics": diagnostics},
+            "observation_cadence_gap_audit": {
+                "adjacent_interval_count": 64,
+                "exceeding_anchor_tolerance_interval_count": 1,
+                "anchor_tolerance_seconds": 21_600,
+                "maximum_interval": {
+                    "interval_seconds": 48_256.315755,
+                    "start_observed_at": "2026-07-20T19:41:41.729110+00:00",
+                    "end_observed_at": "2026-07-21T09:05:58.044865+00:00",
+                },
+            },
+        }
+    })
+
+    assert "30 assets (asset-00, asset-01, asset-02, asset-03, +26 more)" in detail
+    assert detail.count("have no retained anchor") == 1
+    assert "1/64 intervals beyond" in detail
+    assert "13 hr 24 min" in detail
+    assert "continuity risk only" in detail
+
+
 def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
     tmp_path: Path,
 ) -> None:
@@ -959,6 +1032,13 @@ def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(
         "routing_eligible"
     ] = True
     _write_report(tmp_path, regime_history_drift)
+    assert _load(tmp_path)["status"] == "unavailable"
+
+    cadence_history_drift = _campaign_report()
+    cadence_history_drift["control_market_regime_generation_audit"][
+        "observation_cadence_gap_audit"
+    ]["future_endpoint_eligibility_inferred"] = True
+    _write_report(tmp_path, cadence_history_drift)
     assert _load(tmp_path)["status"] == "unavailable"
 
     episode_coverage_drift = _campaign_report()

@@ -102,6 +102,9 @@ def test_return_anchor_selection_diagnostic_matches_causal_enrichment():
         [anchor, endpoint],
         hours=24,
     )
+    assert event_market_history.return_anchor_tolerance(
+        hours=24
+    ).total_seconds() == 21_600
     enriched = event_market_history.enrich_market_rows_with_history(
         [endpoint],
         [anchor],
