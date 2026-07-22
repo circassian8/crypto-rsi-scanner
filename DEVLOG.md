@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Keep catalyst anomaly identity typed and unambiguous · Codex
+**Why:** Decision-v2 stringified explicit anomaly IDs before comparing them to
+closed catalyst attribution. A mapping-valued ID could therefore be paired with
+an internally valid attribution using the mapping's text representation and
+incorrectly retain confirmed/high-confidence catalyst truth.
+**Changes:**
+- Accept only typed, nonblank `market_anomaly_id` / `anomaly_raw_id` values;
+  require both aliases to agree when both are present, and fail closed on
+  malformed explicit observation-ID collections instead of borrowing a lower
+  candidate identity.
+- Added a direct regression reproducing the structured-ID bypass plus a
+  conflicting-alias case. Both now remain unknown-catalyst, use the unverified
+  source-authority baseline, and cannot enter `high_confidence_watch`.
+- Updated the working agreement, North Star, roadmap, and durable decision. No
+  source class, component value, weight, threshold, route rule, or stored
+  historical artifact changed.
+**Verify:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/event_alpha/test_decision_model_v2.py
+tests/event_alpha/test_decision_model_v2_surfaces.py
+tests/event_alpha/test_catalyst_attribution.py
+tests/event_alpha/test_catalyst_attribution_propagation.py
+tests/event_alpha/test_integrated_merge_policy.py` (147 passed); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make
+event-alpha-integrated-radar-smoke PYTHON=python3`; strict artifact doctor (0
+blockers / 0 warnings).
+**Notes/risks:** Full `verify-fast` was not repeated for this bounded parser
+follow-up because the immediately preceding logical change passed the complete
+3,913-test gate; the affected model/attribution/merge surfaces and integrated
+doctor are green. No provider call, send, trade, order, paper trade, normal RSI
+write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-22 — Bind causal catalyst attribution to one anomaly clock · Codex
 **Why:** A closed attribution already digest-bound its source to one exact
 point-in-time anomaly, but Decision-v2 consumption rechecked only the anomaly

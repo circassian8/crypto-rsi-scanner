@@ -821,6 +821,7 @@
     "scheduled_future_event": "may be scheduled_anticipation only when its source was already public",
     "missing_or_naive_clock": "unknown_and_not_causal",
     "decision_episode_binding": "exact anomaly id plus exact aware anomaly_observed_at after UTC normalization",
+    "candidate_anomaly_identity": "typed nonblank explicit ids only; market_anomaly_id and anomaly_raw_id must agree when both are present; malformed observation-id collections cannot borrow fallback identity",
     "utc_equivalent_anomaly_clocks_match": true,
     "cross_observation_reuse": "invalid_and_excluded_from_causal_confidence",
     "canonical_projection_clock": "new projections persist anomaly_observed_at; conflicting clocks fail closed; older schema-marked projections recover only one unique digest-validated causal clock for idempotence",

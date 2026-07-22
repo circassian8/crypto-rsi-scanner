@@ -100,6 +100,11 @@ contract and cannot fall back to flattened official hints. Current canonical
 Decision projections persist `anomaly_observed_at`; older schema-marked closed
 projections may recover their one unique digest-validated causal clock only to
 remain idempotent and are never rewritten.
+The candidate side of that binding accepts only typed, nonblank anomaly IDs.
+`market_anomaly_id` and `anomaly_raw_id`, when both present, must agree exactly;
+a structured value, malformed observation-ID collection, or conflicting pair
+invalidates the supplied attribution set rather than being stringified or
+borrowing a lower identity alias.
 Decision-v2 source-authority and source-specificity components use that same
 owner set. A flattened accepted count cannot raise specificity, a source-row
 owner must receive its own authority, and a supplied invalid or non-causal

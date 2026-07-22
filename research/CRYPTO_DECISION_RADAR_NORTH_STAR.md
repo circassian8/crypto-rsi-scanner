@@ -178,6 +178,11 @@ anomaly clock so validation and rendering stay idempotent; a conflicting
 projected clock fails closed. Older schema-marked closed projections may recover
 only their one unique digest-validated causal clock for read compatibility and
 are not rewritten.
+Candidate anomaly identity is typed and presence-aware. Structured or otherwise
+non-text `market_anomaly_id` / `anomaly_raw_id` claims are never serialized into
+keys, and two present explicit aliases must agree. Malformed observation-ID
+collections or conflicting aliases reject the supplied causal set rather than
+falling through to a weaker candidate identity.
 
 The immutable `event_alpha.catalyst_attribution` v1 value binds anomaly/source
 identities, a digest over the exact anomaly asset/snapshot/state evidence,

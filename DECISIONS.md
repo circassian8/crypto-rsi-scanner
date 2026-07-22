@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Keep candidate anomaly identity typed and unambiguous
+**Status:** accepted
+**Decision:** Decision-v2 may bind a closed catalyst attribution only to typed,
+nonblank candidate anomaly IDs. If both `market_anomaly_id` and
+`anomaly_raw_id` are present they must resolve to the same exact value.
+Malformed structured IDs, malformed explicit observation-ID collections, and
+conflicting explicit anomaly IDs invalidate the supplied attribution set; they
+cannot be stringified or borrow a fallback candidate ID.
+**Why:** A mapping-valued `market_anomaly_id` was converted with `str()`. A
+crafted but internally valid attribution whose text ID matched that mapping's
+representation then produced `confirmed / high_confidence_watch` with no hard
+blocker, even though the candidate had no valid anomaly identity.
+**Revisit when:** A single immutable typed anomaly-identity value replaces all
+aliases. Never add permissive object serialization or fuzzy identity matching.
+
 ## 2026-07-22 - Bind causal catalyst evidence to the anomaly clock
 **Status:** accepted
 **Decision:** A causal-eligible `event_alpha.catalyst_attribution` is valid for

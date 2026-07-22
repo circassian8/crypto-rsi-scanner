@@ -2019,6 +2019,87 @@ def test_causal_attribution_cannot_cross_anomaly_observation_clocks():
     assert decision_model_values(mismatched_projection) == {}
 
 
+def test_causal_attribution_requires_typed_unambiguous_candidate_anomaly_id():
+    from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
+
+    malformed_id = {"unexpected": "anomaly-id"}
+    malformed_attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": str(malformed_id),
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "raw_id": "typed-id-official-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/typed-id",
+            "content_hash": "8" * 64,
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "source_title": "Official typed-identity notice",
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+    valid_attribution = catalyst_attribution.assess_mapping_attribution(
+        {
+            "market_anomaly_id": "decision-model-v2-move",
+            "observed_at": "2026-06-15T16:00:00Z",
+        },
+        {
+            "raw_id": "conflicting-id-official-source",
+            "provider": "official_exchange",
+            "source_url": "https://exchange.example/notices/conflicting-id",
+            "content_hash": "7" * 64,
+            "published_at": "2026-06-15T15:30:00Z",
+            "row_type": "official_listing_candidate",
+            "source_class": "official_exchange",
+            "source_strength": "official_structured",
+            "accepted_evidence_count": 1,
+            "source_title": "Official conflicting-identity notice",
+            "main_frame_role": "main_catalyst",
+            "candidate_role": "direct_subject",
+            "impact_path_strength": "direct",
+        },
+    )
+
+    common = {
+        "source_origin": "official_exchange",
+        "source_origins": ["market_anomaly", "official_exchange"],
+        "source_pack": "official_exchange_listing_pack",
+        "source_class": "official_exchange",
+        "source_strength": "official_structured",
+        "accepted_evidence_count": 1,
+        "official_exchange_event": {"event_type": "spot_listing"},
+    }
+    malformed = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            **common,
+            market_anomaly_id=malformed_id,
+            latest_source_url="https://exchange.example/notices/typed-id",
+            catalyst_attributions=[malformed_attribution],
+        )
+    )
+    conflicting = decision_model.evaluate_radar_decision(
+        _market_led_candidate(
+            **common,
+            market_anomaly_id="decision-model-v2-move",
+            anomaly_raw_id="another-anomaly-episode",
+            latest_source_url="https://exchange.example/notices/conflicting-id",
+            catalyst_attributions=[valid_attribution],
+        )
+    )
+
+    for result in (malformed, conflicting):
+        assert result.catalyst_status == "unknown"
+        assert result.evidence_confidence_components["source_authority"] == 32.0
+        assert result.radar_route != "high_confidence_watch"
+        assert any("closed contract" in item for item in result.decision_warnings)
+
+
 def test_closed_attribution_joins_source_details_by_identity_not_row_order():
     from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 

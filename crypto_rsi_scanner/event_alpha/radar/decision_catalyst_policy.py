@@ -350,22 +350,44 @@ def _catalyst_attribution_values(
 
 
 def _candidate_anomaly_ids(data: Mapping[str, Any]) -> set[str]:
-    explicit = {
-        str(value).strip()
-        for field in ("market_anomaly_id", "anomaly_raw_id")
-        for value in (data.get(field),)
-        if str(value or "").strip()
-    }
-    if explicit:
-        return explicit
+    explicit: list[str] = []
+    explicit_supplied = False
+    for field in ("market_anomaly_id", "anomaly_raw_id"):
+        if field not in data or data.get(field) in (None, ""):
+            continue
+        explicit_supplied = True
+        value = _typed_text(data.get(field))
+        if not value:
+            return set()
+        explicit.append(value)
+    if explicit_supplied:
+        values = set(explicit)
+        return values if len(values) == 1 else set()
+
     projection = _mapping(data.get("decision_projection"))
-    values = (
-        *_texts(data.get("observation_ids")),
-        *_texts(projection.get("observation_ids")),
-        str(data.get("candidate_id") or ""),
-        str(data.get("observation_id") or ""),
-    )
-    return {value.strip() for value in values if value.strip()}
+    values: list[str] = []
+    for owner in (data, projection):
+        if "observation_ids" in owner and owner.get("observation_ids") not in (
+            None,
+            "",
+            [],
+            (),
+        ):
+            raw_ids = owner.get("observation_ids")
+            if not isinstance(raw_ids, (list, tuple)):
+                return set()
+            typed_ids = [_typed_text(value) for value in raw_ids]
+            if not typed_ids or any(not value for value in typed_ids):
+                return set()
+            values.extend(typed_ids)
+    for field in ("candidate_id", "observation_id"):
+        if field not in data or data.get(field) in (None, ""):
+            continue
+        value = _typed_text(data.get(field))
+        if not value:
+            return set()
+        values.append(value)
+    return set(values)
 
 
 def _candidate_anomaly_observed_at(
