@@ -74,6 +74,10 @@ That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the
 authority for current integrated candidates.
+Historical text-only disproof phrases are field-local, component-boundary
+matched, and reject immediate `no`/`non`/`not`/`without` negation. Separate
+fields cannot assemble a disproof, and `unofficial denial` is not an
+`official denial`. Explicit structured disproof remains authoritative.
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.

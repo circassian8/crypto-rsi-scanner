@@ -57,7 +57,7 @@ def catalyst_status(
     sources: tuple[Mapping[str, Any], ...],
 ) -> str:
     explicit = _typed_text(data.get("catalyst_status")).casefold()
-    text = _row_text(data, sources)
+    text_values = _row_text_values(data, sources)
     attributions, attribution_invalid, attribution_supplied = (
         _catalyst_attribution_values(data, sources)
     )
@@ -70,7 +70,8 @@ def catalyst_status(
         for row in attributions
     )
     if structured_disproof or any(
-        term in text
+        _text_has_unnegated_components(value, term)
+        for value in text_values
         for term in ("source correction", "official denial", "catalyst_disproven")
     ):
         return CatalystStatus.DISPROVEN.value
@@ -306,10 +307,10 @@ def _candidate_anomaly_ids(data: Mapping[str, Any]) -> set[str]:
     return {value.strip() for value in values if value.strip()}
 
 
-def _row_text(
+def _row_text_values(
     data: Mapping[str, Any],
     sources: tuple[Mapping[str, Any], ...],
-) -> str:
+) -> tuple[str, ...]:
     values: list[str] = []
     for row in (data, *sources):
         for key in (
@@ -323,18 +324,14 @@ def _row_text(
             "warnings",
         ):
             values.extend(_texts(row.get(key)))
-    return " ".join(values).casefold()
+    return tuple(values)
 
 
 def _source_lane_has_token(value: str, token: str) -> bool:
     """Match a canonical lane token on normalized component boundaries."""
 
-    value_parts = tuple(
-        part for part in _SOURCE_LANE_SPLIT.split(value.casefold()) if part
-    )
-    token_parts = tuple(
-        part for part in _SOURCE_LANE_SPLIT.split(token.casefold()) if part
-    )
+    value_parts = _component_parts(value)
+    token_parts = _component_parts(token)
     width = len(token_parts)
     return bool(
         width
@@ -342,6 +339,27 @@ def _source_lane_has_token(value: str, token: str) -> bool:
             value_parts[index : index + width] == token_parts
             for index in range(len(value_parts) - width + 1)
         )
+    )
+
+
+def _text_has_unnegated_components(value: str, phrase: str) -> bool:
+    value_parts = _component_parts(value)
+    phrase_parts = _component_parts(phrase)
+    width = len(phrase_parts)
+    if not width:
+        return False
+    for index in range(len(value_parts) - width + 1):
+        if value_parts[index : index + width] != phrase_parts:
+            continue
+        if index and value_parts[index - 1] in {"no", "non", "not", "without"}:
+            continue
+        return True
+    return False
+
+
+def _component_parts(value: str) -> tuple[str, ...]:
+    return tuple(
+        part for part in _SOURCE_LANE_SPLIT.split(value.casefold()) if part
     )
 
 

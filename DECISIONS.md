@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Keep text-only catalyst disproof field-local and unnegated
+**Status:** accepted
+**Decision:** Historical text fallback may infer disproof only when one source
+field contains an unnegated component-boundary sequence for `source correction`,
+`official denial`, or `catalyst_disproven`. Separate fields may not assemble the
+phrase; `unofficial denial` is not `official denial`; and immediate
+`no`/`non`/`not`/`without` negation cancels the fallback. Structured disproof
+and closed catalyst attribution retain precedence.
+**Why:** Arbitrary substring and joined-field matching created deterministic
+false disproofs from look-alike or negated text, understating catalyst truth in
+the canonical projection even though no structured correction existed.
+**Revisit when:** Text fallback is retired or replaced by a versioned semantic
+contract. Do not weaken explicit structured disproof.
+
 ## 2026-07-22 - Keep catalyst compatibility evidence row-local
 **Status:** accepted
 **Decision:** The historical Decision-v2 catalyst fallback may assign confirmed

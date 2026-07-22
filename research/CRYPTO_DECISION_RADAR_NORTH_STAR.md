@@ -70,6 +70,14 @@ evidence count or public URL from another row. A source-bound accepted count or
 public URL may retain compatibility confidence; unrelated evidence remains
 unknown.
 
+Historical text-only disproof compatibility is likewise conservative but
+literal: `source correction`, `official denial`, and `catalyst_disproven` must
+appear as unnegated normalized component sequences within one source field.
+Text from separate fields cannot assemble a disproof, `unofficial denial` does
+not equal `official denial`, and immediate `no`/`non`/`not`/`without` negation
+prevents the fallback. Explicit structured disproof and closed attribution keep
+their existing authority.
+
 LLM catalyst frames are proposals until deterministic validation binds them to
 exactly one matching raw source. Each accepted quote must be a normalized,
 informative contiguous span inside one eligible field—title, body, or

@@ -679,6 +679,42 @@ def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
     assert bound_news.decision_hard_blockers == ()
 
 
+def test_catalyst_text_disproof_requires_unnegated_field_local_components():
+    false_disproofs = (
+        {"title": "Unofficial denial rumor"},
+        {"reason_codes": ["not_catalyst_disproven"]},
+        {"title": "official", "warnings": ["denial"]},
+    )
+    for fields in false_disproofs:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                source_class="broad_news",
+                source_url="https://example.test/context",
+                **fields,
+            )
+        )
+
+        assert result.catalyst_status == "plausible"
+        assert result.decision_hard_blockers == ()
+
+    real_disproofs = (
+        {"title": "Official denial issued"},
+        {"event_name": "Source correction issued"},
+        {"reason_codes": ["catalyst_disproven"]},
+    )
+    for fields in real_disproofs:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                source_class="broad_news",
+                source_url="https://example.test/context",
+                **fields,
+            )
+        )
+
+        assert result.catalyst_status == "disproven"
+        assert result.radar_route != "high_confidence_watch"
+
+
 def test_malformed_catalyst_state_claims_cannot_be_ignored_by_fallback_policy():
     source_context = {
         "source_origin": "official_exchange",

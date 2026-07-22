@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Close text-only catalyst false disproofs · Codex
+**Why:** The historical catalyst fallback joined multiple source fields and
+searched arbitrary substrings. It interpreted `unofficial denial` as an
+official denial, could assemble `official` + `denial` across separate fields,
+and accepted negated codes such as `not_catalyst_disproven`.
+**Changes:**
+- Evaluated fallback disproof phrases within each source field using normalized
+  component boundaries instead of one concatenated substring surface.
+- Rejected immediate `no`/`non`/`not`/`without` negation while preserving exact
+  unnegated `source correction`, `official denial`, and
+  `catalyst_disproven` compatibility phrases.
+- Added paired false/real disproof regressions and documented the contract in
+  the North Star, roadmap, working agreement, and durable decision.
+**Verify:** 167 focused Decision-v2, projection, attribution, evidence-count,
+and namespace-integration tests passed. Python compilation, strict integrated
+smoke/doctor, architecture cleanliness, JSON validation, and diff hygiene are
+run before publication.
+**Notes/risks:** Explicit `catalyst_disproven`, `cause_status=ruled_out`, closed
+attribution disproof, scores, thresholds, routes, providers, historical rows,
+and safety boundaries are unchanged.
+
 ## 2026-07-22 — Bind catalyst compatibility evidence to its source row · Codex
 **Why:** The historical Decision-v2 fallback combined `any(official source)`
 with the sum of accepted counts across an entire candidate family. Unrelated
