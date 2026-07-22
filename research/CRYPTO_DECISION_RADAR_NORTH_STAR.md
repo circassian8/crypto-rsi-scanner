@@ -57,6 +57,15 @@ class appears in that pack's declared validator set. Historical bytes are not
 rewritten; current re-evaluation fails closed and records
 `source_authority_unverified`.
 
+For historical Decision-v2 rows that predate the closed catalyst-attribution
+contract, the compatibility heuristic recognizes catalyst-specific source-lane
+labels only on normalized component boundaries. Compound canonical labels such
+as `broad_news`, `official_exchange_listing_pack`, and `project_blog_rss` remain
+recognized; substrings inside unrelated labels such as `newsletter`,
+`unofficial_exchange`, `rssmirror`, or `unlockable` cannot upgrade an unknown
+catalyst to plausible. This compatibility rule does not grant canonical source
+authority or replace the attribution contract.
+
 LLM catalyst frames are proposals until deterministic validation binds them to
 exactly one matching raw source. Each accepted quote must be a normalized,
 informative contiguous span inside one eligible field—title, body, or

@@ -8,6 +8,7 @@ retrospective, and context-only evidence fails closed for causal confidence.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
@@ -31,6 +32,23 @@ _CATALYST_BOOLEAN_FIELDS = (
     "catalyst_disproven",
     "catalyst_not_required",
     "catalyst_attribution_rejected",
+)
+_SOURCE_LANE_SPLIT = re.compile(r"[^a-z0-9]+")
+_CATALYST_SOURCE_LANE_TOKENS = (
+    "official_exchange",
+    "official_project",
+    "scheduled_catalyst",
+    "structured_calendar",
+    "structured_unlock",
+    "unlock",
+    "news",
+    "cryptopanic",
+    "gdelt",
+    "rss",
+    "project_blog",
+    "regulatory",
+    "external_catalyst",
+    "prediction_market",
 )
 
 
@@ -85,35 +103,19 @@ def catalyst_status(
         _count(row.get("accepted_evidence_count")) or 0
         for row in evidence_rows
     )
-    source_lane_text = " ".join(
-        (
-            *_texts(data.get("source_origin")),
-            *_texts(data.get("source_origins")),
-            *_texts(data.get("source_class")),
-            *_texts(data.get("source_pack")),
-            *(str(row.get("_source_origin") or "") for row in sources),
-            *(str(row.get("source_class") or "") for row in sources),
-            *(str(row.get("source_pack") or "") for row in sources),
-        )
-    ).casefold()
+    source_lane_values = (
+        *_texts(data.get("source_origin")),
+        *_texts(data.get("source_origins")),
+        *_texts(data.get("source_class")),
+        *_texts(data.get("source_pack")),
+        *(str(row.get("_source_origin") or "") for row in sources),
+        *(str(row.get("source_class") or "") for row in sources),
+        *(str(row.get("source_pack") or "") for row in sources),
+    )
     catalyst_specific_source = any(
-        token in source_lane_text
-        for token in (
-            "official_exchange",
-            "official_project",
-            "scheduled_catalyst",
-            "structured_calendar",
-            "structured_unlock",
-            "unlock",
-            "news",
-            "cryptopanic",
-            "gdelt",
-            "rss",
-            "project_blog",
-            "regulatory",
-            "external_catalyst",
-            "prediction_market",
-        )
+        _source_lane_has_token(value, token)
+        for value in source_lane_values
+        for token in _CATALYST_SOURCE_LANE_TOKENS
     )
     if official and (
         accepted > 0
@@ -323,6 +325,25 @@ def _row_text(
         ):
             values.extend(_texts(row.get(key)))
     return " ".join(values).casefold()
+
+
+def _source_lane_has_token(value: str, token: str) -> bool:
+    """Match a canonical lane token on normalized component boundaries."""
+
+    value_parts = tuple(
+        part for part in _SOURCE_LANE_SPLIT.split(value.casefold()) if part
+    )
+    token_parts = tuple(
+        part for part in _SOURCE_LANE_SPLIT.split(token.casefold()) if part
+    )
+    width = len(token_parts)
+    return bool(
+        width
+        and any(
+            value_parts[index : index + width] == token_parts
+            for index in range(len(value_parts) - width + 1)
+        )
+    )
 
 
 def _count(value: object) -> int | None:

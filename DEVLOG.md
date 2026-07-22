@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Close catalyst source-lane substring upgrades · Codex
+**Why:** Decision-v2's historical compatibility heuristic searched source-lane
+labels by arbitrary substring. An unrelated label such as
+`newsletter_archive` or `unofficial_exchange_archive`, combined with any public
+URL, could therefore overstate an unknown catalyst as plausible.
+**Changes:**
+- Replaced free substring matching with normalized component-boundary matching
+  for the closed catalyst-specific lane vocabulary.
+- Preserved canonical compound labels such as `broad_news`,
+  `official_exchange_listing_pack`, `project_blog_rss`, and `source_news` while
+  rejecting `newsletter`, `cryptonewsletter`, `unofficial_exchange`,
+  `rssmirror`, and `unlockable` look-alikes.
+- Added focused regressions and documented the compatibility boundary in the
+  North Star, roadmap, working agreement, and durable decisions. Closed
+  catalyst attribution and source-authority contracts remain unchanged.
+**Verify:** 137 focused Decision-v2, projection, consistency, catalyst-
+attribution, propagation, and evidence-count tests passed. Python compilation,
+the integrated Decision Radar smoke/doctor, architecture cleanliness, JSON
+validation, and diff hygiene are run before publication.
+**Notes/risks:** No score, threshold, route, provider authorization, source
+registry, historical artifact, or side-effect boundary changed. Unknown
+catalyst remains a soft Decision Radar penalty rather than a universal gate.
+
 ## 2026-07-22 — Record the sixty-sixth no-send market cycle · Codex
 **Why:** The next hourly boundary became eligible while the already-present
 CoinGecko authorization remained active. One bounded observation was needed to

@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Match catalyst compatibility labels on component boundaries
+**Status:** accepted
+**Decision:** The historical Decision-v2 catalyst compatibility heuristic may
+recognize canonical source-lane tokens only as complete normalized components,
+including contiguous multi-component labels such as `official_exchange` or
+`project_blog`. Arbitrary substrings such as `news` inside `newsletter`,
+`official_exchange` inside `unofficial_exchange`, `rss` inside `rssmirror`, or
+`unlock` inside `unlockable` cannot raise catalyst status. This rule does not
+replace the canonical source registry or closed catalyst-attribution contract.
+**Why:** The former substring search could turn an ordinary public URL plus an
+unrelated label into a plausible catalyst, overstating explanatory confidence
+in the canonical trader-facing projection. Component matching preserves all
+known canonical compound labels without granting authority to look-alikes.
+**Revisit when:** A versioned source-lane registry replaces the compatibility
+heuristic. Keep unknown labels fail-closed and do not rewrite historical rows.
+
 ## 2026-07-22 - Fail closed on malformed market-anomaly configuration
 **Status:** accepted
 **Decision:** Every public broad market-anomaly scanner surface validates one

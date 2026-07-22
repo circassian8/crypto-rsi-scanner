@@ -64,6 +64,12 @@ Event Alpha product work should now align with
 `research/EVENT_ALPHA_RADAR_NORTH_STAR.md` / `.json`: the measurable radar
 architecture, lane definitions, source activation order, and 30-day no-send
 burn-in contract.
+Decision-v2's historical catalyst compatibility heuristic matches canonical
+source-lane labels only on normalized component boundaries. Arbitrary substring
+matches such as `newsletter` -> `news`, `unofficial_exchange` ->
+`official_exchange`, or `unlockable` -> `unlock` must never raise catalyst
+status. Valid compound labels such as `broad_news`,
+`official_exchange_listing_pack`, and `project_blog_rss` remain recognized.
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.

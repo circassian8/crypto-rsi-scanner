@@ -1911,7 +1911,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2173,
+      "line_count": 2213,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
@@ -2238,7 +2238,7 @@
   ],
   "functions_over_limit_count": 35,
   "gate_status": "pass",
-  "generated_at": "2026-07-22T02:53:17.348683+00:00",
+  "generated_at": "2026-07-22T03:13:53.759059+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2492,7 +2492,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2173,
+      "line_count": 2213,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
@@ -4451,7 +4451,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2173,
+      "line_count": 2213,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -6466,7 +6466,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2173,
+      "line_count": 2213,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "severity": "advisory",
       "source_kind": "test",

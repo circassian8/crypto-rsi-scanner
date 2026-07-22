@@ -584,6 +584,46 @@ def test_malformed_catalyst_source_evidence_cannot_raise_confidence():
     assert "catalyst_source_evidence_invalid" not in valid.decision_hard_blockers
 
 
+def test_catalyst_source_lane_labels_require_component_boundaries():
+    false_positive_labels = (
+        "newsletter_archive",
+        "cryptonewsletter",
+        "unofficial_exchange_archive",
+        "rssmirror",
+        "unlockable_archive",
+    )
+    for source_class in false_positive_labels:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                source_class=source_class,
+                latest_source_url="https://example.test/context",
+                latest_source_title="Context only",
+            )
+        )
+
+        assert result.catalyst_status == "unknown"
+        assert result.radar_actionable is True
+        assert result.decision_hard_blockers == ()
+
+    valid_labels = (
+        {"source_class": "broad_news"},
+        {"source_pack": "official_exchange_listing_pack"},
+        {"source_pack": "project_blog_rss"},
+        {"source_origin": "source_news"},
+    )
+    for source_fields in valid_labels:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                **source_fields,
+                latest_source_url="https://example.test/catalyst",
+                latest_source_title="Catalyst context",
+            )
+        )
+
+        assert result.catalyst_status == "plausible"
+        assert result.decision_hard_blockers == ()
+
+
 def test_malformed_catalyst_state_claims_cannot_be_ignored_by_fallback_policy():
     source_context = {
         "source_origin": "official_exchange",
