@@ -965,11 +965,17 @@ def test_control_regime_generation_audit_separates_recent_entry_overlap():
     assert audit["incomplete_without_recent_entry_count"] == 0
     assert audit["recent_entry_missing_asset_event_count"] == 2
     assert audit["missing_asset_generation_counts"] == {"new-entry": 2}
-    assert audit["schema_version"] == 2
+    assert audit["schema_version"] == 3
     assert audit["membership_clock_scope"] == (
         "prospective_complete_point_in_time_universes_only"
     )
     assert audit["precontract_history_used_for_membership_clock"] is False
+    assert audit["latest_missing_input_anchor_audit"]["status"] == (
+        "unavailable"
+    )
+    assert audit["latest_missing_input_anchor_audit"]["reason"] == (
+        "retained_history_unavailable"
+    )
     assert audit["latest_complete_generation"][
         "recent_entry_missing_asset_ids"
     ] == ["new-entry"]
@@ -1045,6 +1051,84 @@ def test_control_regime_generation_audit_does_not_invent_first_entry_clock():
     assert audit["latest_complete_generation"][
         "recent_entry_missing_asset_ids"
     ] == []
+
+
+def test_control_regime_generation_audit_explains_latest_anchor_window():
+    observed_at = "2026-07-22T00:12:04.506884+00:00"
+    rows = _ready_regime_market_rows(observed_at)
+    missing = rows[-1]
+    missing["price"] = 110.0
+    missing.pop("temporal_return_24h")
+    missing["return_units"].pop("temporal_return_24h")
+    missing["market_feature_evidence"].pop("temporal_return_24h")
+    asset_id = missing["canonical_asset_id"]
+    endpoint_id = missing["market_history"]["observation_id"]
+    history_rows = [
+        {
+            "canonical_asset_id": asset_id,
+            "observation_id": "anchor-too-old",
+            "observed_at": "2026-07-19T23:45:20.832390+00:00",
+            "price": 99.0,
+        },
+        {
+            "canonical_asset_id": asset_id,
+            "observation_id": "post-target-observation",
+            "observed_at": "2026-07-21T12:12:41.339533+00:00",
+            "price": 105.0,
+        },
+        {
+            "canonical_asset_id": asset_id,
+            "observation_id": endpoint_id,
+            "observed_at": observed_at,
+            "price": 110.0,
+        },
+    ]
+    audit = (
+        market_observation_campaign_regime_audit
+        .build_control_regime_generation_audit(
+            [_regime_audit_generation("generation-a", observed_at, rows)],
+            retained_history_snapshot={
+                "status": "observed",
+                "artifact": "event_market_history.jsonl",
+                "sha256": "a" * 64,
+                "size_bytes": 1_024,
+                "row_count": len(history_rows),
+                "binding_source": "campaign_market_history_exact_bytes",
+                "rows": history_rows,
+            },
+        )
+    )
+
+    anchor_audit = audit["latest_missing_input_anchor_audit"]
+    assert anchor_audit["status"] == "observed"
+    assert anchor_audit["reason"] == "anchor_windows_replayed"
+    assert anchor_audit["missing_input_count"] == 1
+    assert anchor_audit["all_missing_inputs_explained"] is True
+    diagnostic = anchor_audit["diagnostics"][0]
+    assert diagnostic["canonical_asset_id"] == asset_id
+    assert diagnostic["status"] == "unavailable"
+    assert diagnostic["reason"] == "latest_causal_anchor_before_window"
+    assert diagnostic["target_at"] == "2026-07-21T00:12:04.506884+00:00"
+    assert diagnostic["anchor_window_start_at"] == (
+        "2026-07-20T18:12:04.506884+00:00"
+    )
+    assert diagnostic["candidate_anchor_count"] == 0
+    assert diagnostic["nearest_causal_before_window"]["observation_id"] == (
+        "anchor-too-old"
+    )
+    assert diagnostic["nearest_post_target_observation"]["observation_id"] == (
+        "post-target-observation"
+    )
+    assert diagnostic["future_endpoint_eligibility_inferred"] is False
+
+    tampered = json.loads(json.dumps(audit))
+    tampered["latest_missing_input_anchor_audit"]["diagnostics"][0][
+        "future_endpoint_eligibility_inferred"
+    ] = True
+    assert "anchor_audit_diagnostic_invalid" in (
+        market_observation_campaign_regime_audit
+        .validate_control_regime_generation_audit(tampered)
+    )
 
 
 def test_final_receipts_reconcile_attempt_publication_operations_and_current(
@@ -1490,11 +1574,35 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     base.mkdir()
     output.mkdir()
     _fixture(base)
-    monkeypatch.setattr(campaign.market_no_send_history_cache, "cache_readiness", _readiness)
+    readiness = _readiness()
+    source_group = readiness["current_universe_maturity"][
+        "baseline_feature_readiness"
+    ]["volume"]
+    readiness["current_universe_maturity"][
+        "baseline_feature_readiness"
+    ] = {
+        name: json.loads(json.dumps(source_group))
+        for name in (
+            "btc_eth_relative",
+            "returns_1h",
+            "returns_24h",
+            "returns_4h",
+            "turnover",
+            "volatility",
+            "volume",
+        )
+    }
+    monkeypatch.setattr(
+        campaign.market_no_send_history_cache,
+        "cache_readiness",
+        lambda *_args, **_kwargs: readiness,
+    )
+    current_authority = _dashboard_authority()
+    current_authority.snapshot.generation_authority_checked_at = _EVALUATED
     monkeypatch.setattr(
         campaign.dashboard_readiness,
         "resolve_authoritative_dashboard",
-        _dashboard_authority,
+        lambda *_args, **_kwargs: current_authority,
     )
 
     status = market_no_send_cli.main([
@@ -1509,8 +1617,21 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     assert "provider_calls=0" in stdout
     json_path = output / campaign.CAMPAIGN_REPORT_JSON_FILENAME
     markdown_path = output / campaign.CAMPAIGN_REPORT_MD_FILENAME
+    dashboard_path = (
+        output / "RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json"
+    )
     first_json = json_path.read_bytes()
     first_markdown = markdown_path.read_bytes()
+    first_dashboard = dashboard_path.read_bytes()
+    assert b"\n  \"" not in first_json
+    dashboard_projection = json.loads(first_dashboard)
+    assert dashboard_projection["source_report_sha256"] == hashlib.sha256(
+        first_json
+    ).hexdigest()
+    assert dashboard_projection["source_report_size_bytes"] == len(first_json)
+    assert dashboard_projection["projection"]["shadow_temporal_surprise"][
+        "asset_variation_projection_status"
+    ] == "summary_only_full_evidence_in_source_report"
     assert b"secret-token" not in first_json
     assert b"must-not-leak" not in first_json
     assert b"no trade recommendation" in first_markdown.lower()
@@ -1539,7 +1660,50 @@ def test_campaign_cli_writes_exact_reports_without_copying_request_secrets(
     ]) == 0
     capsys.readouterr()
     assert json_path.read_bytes() == first_json
+    assert dashboard_path.read_bytes() == first_dashboard
     assert markdown_path.read_bytes() == first_markdown
+
+
+def test_campaign_writer_removes_stale_dashboard_projection_without_authority(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    base = tmp_path / "artifacts"
+    output = tmp_path / "research"
+    base.mkdir()
+    output.mkdir()
+    _fixture(base)
+    stale_projection = (
+        output / "RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json"
+    )
+    stale_projection.write_text('{"stale":true}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        campaign.market_no_send_history_cache,
+        "cache_readiness",
+        _readiness,
+    )
+
+    def rejected_authority(*_args, **_kwargs):
+        raise campaign.dashboard_readiness.DashboardReadinessError(
+            "generation:stale"
+        )
+
+    monkeypatch.setattr(
+        campaign.dashboard_readiness,
+        "resolve_authoritative_dashboard",
+        rejected_authority,
+    )
+
+    json_path, markdown_path, report = campaign.write_campaign_report(
+        base,
+        output,
+        evaluated_at=_EVALUATED,
+    )
+
+    assert json_path.is_file()
+    assert markdown_path.is_file()
+    assert report["pointer"]["status"] == "invalid_or_untrusted"
+    assert stale_projection.exists() is False
 
 
 def test_campaign_make_target_is_read_only_and_does_not_enable_authorization():

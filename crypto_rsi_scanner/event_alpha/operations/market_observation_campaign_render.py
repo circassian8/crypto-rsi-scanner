@@ -787,6 +787,8 @@ def _control_regime_generation_audit_lines(
     membership_context = _membership_context_summary(
         latest.get("missing_input_membership_context")
     )
+    anchor_audit = _mapping(value.get("latest_missing_input_anchor_audit"))
+    anchor_summary = _anchor_audit_summary(anchor_audit)
     lines = [
         f"- Status: `{_md(value.get('status')) or 'unavailable'}`",
         (
@@ -823,6 +825,7 @@ def _control_regime_generation_audit_lines(
         ),
         f"- Latest missing assets with a recent observed entry: `{_md(recent)}`",
         f"- Latest prospective membership clocks: `{_md(membership_context)}`",
+        f"- Exact retained-history anchor replay: `{_md(anchor_summary)}`",
         (
             "- Interpretation: membership overlap is descriptive, not causal "
             "attribution. Older anchor gaps and recent entries remain distinct; "
@@ -857,6 +860,49 @@ def _membership_context_summary(value: Any) -> str:
                 f"{asset_id} start unknown before first complete prospective universe; "
                 "anchor eligibility not inferred"
             )
+    return "; ".join(rendered)
+
+
+def _anchor_audit_summary(value: Mapping[str, Any]) -> str:
+    if not value:
+        return "unavailable"
+    diagnostics = [
+        dict(row)
+        for row in value.get("diagnostics") or ()
+        if isinstance(row, Mapping)
+    ]
+    if not diagnostics:
+        return (
+            f"{_text(value.get('status'))}: {_text(value.get('reason'))}"
+        )
+    rendered = []
+    for row in diagnostics:
+        asset_id = _text(row.get("canonical_asset_id")) or "unknown"
+        selected = _mapping(row.get("selected_anchor"))
+        before = _mapping(row.get("nearest_causal_before_window"))
+        after = _mapping(row.get("nearest_post_target_observation"))
+        if row.get("status") == "ready":
+            rendered.append(
+                f"{asset_id}: selected {selected.get('observed_at')} within "
+                f"{row.get('anchor_window_start_at')}..{row.get('anchor_window_end_at')}"
+            )
+            continue
+        detail = (
+            f"{asset_id}: no anchor in {row.get('anchor_window_start_at')}.."
+            f"{row.get('anchor_window_end_at')}"
+        )
+        if before:
+            detail += (
+                f"; latest causal row {before.get('observed_at')} was "
+                f"{_elapsed_hours(before.get('distance_seconds'))}h before the window"
+            )
+        if after:
+            detail += (
+                f"; first post-target row {after.get('observed_at')} was "
+                f"{_elapsed_hours(after.get('distance_seconds'))}h after the target"
+            )
+        detail += "; future endpoint eligibility not inferred"
+        rendered.append(detail)
     return "; ".join(rendered)
 
 
@@ -1298,6 +1344,15 @@ def _hours(value: Any) -> str:
     seconds = _int(value)
     hours = seconds / 3_600
     return f"{hours:.2f}".rstrip("0").rstrip(".")
+
+
+def _elapsed_hours(value: Any) -> str:
+    if isinstance(value, bool) or type(value) not in (int, float):
+        return "0"
+    seconds = float(value)
+    if not math.isfinite(seconds) or seconds < 0:
+        return "0"
+    return f"{seconds / 3_600:.2f}".rstrip("0").rstrip(".")
 
 
 def _generation_table(value: Any) -> list[str]:

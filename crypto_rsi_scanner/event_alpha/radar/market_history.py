@@ -44,6 +44,42 @@ from crypto_rsi_scanner.event_alpha.radar.market_history_summary import (
 
 _WARM_FEATURE_STATUSES = {"ready", "constant_baseline", "warm"}
 
+RETURN_ANCHOR_DIAGNOSTIC_SCHEMA = (
+    "decision_radar.temporal_return_anchor_selection_diagnostic"
+)
+RETURN_ANCHOR_DIAGNOSTIC_VERSION = 1
+_RETURN_ANCHOR_DIAGNOSTIC_KEYS = {
+    "schema_id",
+    "schema_version",
+    "status",
+    "reason",
+    "canonical_asset_id",
+    "endpoint_observation_id",
+    "endpoint_observed_at",
+    "horizon_hours",
+    "target_at",
+    "anchor_tolerance_seconds",
+    "anchor_window_start_at",
+    "anchor_window_end_at",
+    "same_asset_causal_price_observation_count",
+    "candidate_anchor_count",
+    "selected_anchor",
+    "selected_return_percent_points",
+    "nearest_causal_before_window",
+    "nearest_post_target_observation",
+    "selection_policy",
+    "future_endpoint_eligibility_inferred",
+    "provider_calls",
+    "writes",
+    "research_only",
+}
+_ANCHOR_REFERENCE_KEYS = {"observation_id", "observed_at"}
+_DISTANCE_REFERENCE_KEYS = {
+    "observation_id",
+    "observed_at",
+    "distance_seconds",
+}
+
 _LINEAGE_TEXT_FIELDS = (
     "provider", "source", "market_data_source", "data_mode", "provider_source_artifact",
     "data_acquisition_mode", "candidate_source_mode", "provider_generation_id",
@@ -1585,6 +1621,301 @@ def _return_sample_for_endpoint(
         endpoint=endpoint,
         anchor=anchor,
     )
+
+
+def return_anchor_selection_diagnostic(
+    endpoint: Mapping[str, Any],
+    observations: Sequence[Mapping[str, Any]],
+    *,
+    hours: int,
+    config: MarketHistoryConfig | None = None,
+) -> dict[str, Any]:
+    """Explain the exact causal anchor window without changing enrichment."""
+
+    cfg = config or MarketHistoryConfig()
+    if type(hours) is not int or hours <= 0:
+        raise ValueError("hours must be a positive integer")
+    asset_id = _canonical_asset_id(endpoint)
+    endpoint_time = _observation_time(endpoint)
+    endpoint_price = _number(endpoint.get("price"))
+    if not asset_id or endpoint_price is None or endpoint_price <= 0:
+        raise ValueError("endpoint must have valid identity, time, and price")
+    target = endpoint_time - timedelta(hours=hours)
+    tolerance = max(
+        cfg.min_anchor_tolerance,
+        timedelta(hours=hours * cfg.anchor_tolerance_ratio),
+    )
+    window_start = target - tolerance
+    causal_rows: list[Mapping[str, Any]] = []
+    for row in observations:
+        if not isinstance(row, Mapping) or _canonical_asset_id(row) != asset_id:
+            continue
+        observed_at, _error = _parse_aware_time(row.get("observed_at"))
+        price = _number(row.get("price"))
+        if (
+            observed_at is None
+            or observed_at > endpoint_time
+            or price is None
+            or price <= 0
+        ):
+            continue
+        causal_rows.append(row)
+    causal_rows.sort(key=_observation_sort_key)
+    candidates = [
+        row
+        for row in causal_rows
+        if window_start <= _observation_time(row) <= target
+    ]
+    latest_causal = max(
+        (
+            row
+            for row in causal_rows
+            if _observation_time(row) <= target
+        ),
+        key=_observation_sort_key,
+        default=None,
+    )
+    nearest_post_target = min(
+        (
+            row
+            for row in causal_rows
+            if target < _observation_time(row) <= endpoint_time
+        ),
+        key=_observation_sort_key,
+        default=None,
+    )
+    sample = _return_sample_for_endpoint(
+        endpoint,
+        causal_rows,
+        hours=hours,
+        cfg=cfg,
+    )
+    selected_anchor = sample.anchor if sample is not None else None
+    reason = (
+        "selected_causal_anchor"
+        if sample is not None
+        else "latest_causal_anchor_before_window"
+        if latest_causal is not None
+        and _observation_time(latest_causal) < window_start
+        else "only_post_target_observations"
+        if nearest_post_target is not None
+        else "no_causal_anchor_observation"
+    )
+    value = {
+        "schema_id": RETURN_ANCHOR_DIAGNOSTIC_SCHEMA,
+        "schema_version": RETURN_ANCHOR_DIAGNOSTIC_VERSION,
+        "status": "ready" if sample is not None else "unavailable",
+        "reason": reason,
+        "canonical_asset_id": asset_id,
+        "endpoint_observation_id": _observation_reference_id(endpoint),
+        "endpoint_observed_at": _iso(endpoint_time),
+        "horizon_hours": hours,
+        "target_at": _iso(target),
+        "anchor_tolerance_seconds": int(tolerance.total_seconds()),
+        "anchor_window_start_at": _iso(window_start),
+        "anchor_window_end_at": _iso(target),
+        "same_asset_causal_price_observation_count": len(causal_rows),
+        "candidate_anchor_count": len(candidates),
+        "selected_anchor": (
+            _anchor_reference(selected_anchor)
+            if selected_anchor is not None
+            else None
+        ),
+        "selected_return_percent_points": (
+            sample.value if sample is not None else None
+        ),
+        "nearest_causal_before_window": (
+            _distance_reference(
+                latest_causal,
+                seconds=(window_start - _observation_time(latest_causal)).total_seconds(),
+            )
+            if latest_causal is not None
+            and _observation_time(latest_causal) < window_start
+            else None
+        ),
+        "nearest_post_target_observation": (
+            _distance_reference(
+                nearest_post_target,
+                seconds=(_observation_time(nearest_post_target) - target).total_seconds(),
+            )
+            if nearest_post_target is not None
+            else None
+        ),
+        "selection_policy": (
+            "latest_positive_price_observation_at_or_before_target_within_"
+            "backward_tolerance"
+        ),
+        "future_endpoint_eligibility_inferred": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    if not return_anchor_selection_diagnostic_valid(value):
+        raise AssertionError("return anchor selection diagnostic invalid")
+    return value
+
+
+def return_anchor_selection_diagnostic_valid(value: object) -> bool:
+    """Validate the closed, observation-only anchor explanation."""
+
+    if not isinstance(value, Mapping) or set(value) != _RETURN_ANCHOR_DIAGNOSTIC_KEYS:
+        return False
+    endpoint = _parse_aware_time(value.get("endpoint_observed_at"))[0]
+    target = _parse_aware_time(value.get("target_at"))[0]
+    window_start = _parse_aware_time(value.get("anchor_window_start_at"))[0]
+    window_end = _parse_aware_time(value.get("anchor_window_end_at"))[0]
+    horizon = value.get("horizon_hours")
+    tolerance = value.get("anchor_tolerance_seconds")
+    status = value.get("status")
+    reason = value.get("reason")
+    selected = value.get("selected_anchor")
+    latest_before = value.get("nearest_causal_before_window")
+    post_target = value.get("nearest_post_target_observation")
+    if (
+        value.get("schema_id") != RETURN_ANCHOR_DIAGNOSTIC_SCHEMA
+        or value.get("schema_version") != RETURN_ANCHOR_DIAGNOSTIC_VERSION
+        or status not in {"ready", "unavailable"}
+        or reason not in {
+            "selected_causal_anchor",
+            "latest_causal_anchor_before_window",
+            "only_post_target_observations",
+            "no_causal_anchor_observation",
+        }
+        or not _canonical_asset_id(value)
+        or not _bounded_optional_observation_id(value.get("endpoint_observation_id"))
+        or endpoint is None
+        or target is None
+        or window_start is None
+        or window_end is None
+        or type(horizon) is not int
+        or horizon <= 0
+        or type(tolerance) is not int
+        or tolerance < 0
+        or target != endpoint - timedelta(hours=horizon)
+        or window_end != target
+        or window_start != target - timedelta(seconds=tolerance)
+        or type(value.get("same_asset_causal_price_observation_count")) is not int
+        or value.get("same_asset_causal_price_observation_count") < 0
+        or type(value.get("candidate_anchor_count")) is not int
+        or value.get("candidate_anchor_count") < 0
+        or value.get("candidate_anchor_count")
+        > value.get("same_asset_causal_price_observation_count")
+        or value.get("selection_policy")
+        != "latest_positive_price_observation_at_or_before_target_within_backward_tolerance"
+        or value.get("future_endpoint_eligibility_inferred") is not False
+        or value.get("provider_calls") != 0
+        or value.get("writes") != 0
+        or value.get("research_only") is not True
+    ):
+        return False
+    if status == "ready":
+        if (
+            reason != "selected_causal_anchor"
+            or value.get("candidate_anchor_count") < 1
+            or not _valid_anchor_reference(selected, start=window_start, end=target)
+            or _number(value.get("selected_return_percent_points")) is None
+        ):
+            return False
+    elif selected is not None or value.get("selected_return_percent_points") is not None:
+        return False
+    elif value.get("candidate_anchor_count") != 0:
+        return False
+    if not _valid_distance_reference(
+        latest_before,
+        boundary=window_start,
+        before=True,
+    ):
+        return False
+    if not _valid_distance_reference(
+        post_target,
+        boundary=target,
+        before=False,
+    ):
+        return False
+    expected_reason = (
+        "selected_causal_anchor"
+        if status == "ready"
+        else "latest_causal_anchor_before_window"
+        if latest_before is not None
+        else "only_post_target_observations"
+        if post_target is not None
+        else "no_causal_anchor_observation"
+    )
+    return reason == expected_reason
+
+
+def _anchor_reference(value: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "observation_id": _observation_reference_id(value),
+        "observed_at": _iso(_observation_time(value)),
+    }
+
+
+def _distance_reference(
+    value: Mapping[str, Any],
+    *,
+    seconds: float,
+) -> dict[str, Any]:
+    return {
+        **_anchor_reference(value),
+        "distance_seconds": _rounded(seconds),
+    }
+
+
+def _observation_reference_id(value: Mapping[str, Any]) -> str | None:
+    direct = value.get("observation_id")
+    if _bounded_observation_id(direct):
+        return str(direct)
+    enrichment = value.get("market_history")
+    nested = enrichment.get("observation_id") if isinstance(enrichment, Mapping) else None
+    return str(nested) if _bounded_observation_id(nested) else None
+
+
+def _bounded_optional_observation_id(value: object) -> bool:
+    return value is None or _bounded_observation_id(value)
+
+
+def _valid_anchor_reference(
+    value: object,
+    *,
+    start: datetime,
+    end: datetime,
+) -> bool:
+    if not isinstance(value, Mapping) or set(value) != _ANCHOR_REFERENCE_KEYS:
+        return False
+    observed_at = _parse_aware_time(value.get("observed_at"))[0]
+    return bool(
+        _bounded_optional_observation_id(value.get("observation_id"))
+        and observed_at is not None
+        and start <= observed_at <= end
+    )
+
+
+def _valid_distance_reference(
+    value: object,
+    *,
+    boundary: datetime,
+    before: bool,
+) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, Mapping) or set(value) != _DISTANCE_REFERENCE_KEYS:
+        return False
+    observed_at = _parse_aware_time(value.get("observed_at"))[0]
+    distance = _number(value.get("distance_seconds"))
+    if (
+        not _bounded_optional_observation_id(value.get("observation_id"))
+        or observed_at is None
+        or distance is None
+        or distance < 0
+    ):
+        return False
+    expected = (
+        (boundary - observed_at).total_seconds()
+        if before
+        else (observed_at - boundary).total_seconds()
+    )
+    return before == (observed_at < boundary) and distance == _rounded(expected)
 
 
 def _aligned_observation(

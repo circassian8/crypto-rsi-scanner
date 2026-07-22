@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Prove exact anchor gaps and restore campaign dashboard truth · Codex
+**Why:** Prospective membership age explains universe churn but cannot prove why
+a temporal return is missing. The operator report needed the exact production
+anchor-selection window and retained observations, not a causal inference from
+membership timing.
+**Changes:**
+- Added a closed read-only diagnostic around the canonical return selector. It
+  binds endpoint/target/window, tolerance, candidates, selected anchor or the
+  nearest excluded causal/post-target rows, and refuses future eligibility.
+- Upgraded exact-generation audit to schema v3 and bound its latest missing-
+  input replay to the one-read retained-history artifact/digest. Campaign
+  Markdown and Today/Campaign dashboard projections preserve the result.
+- Fixed the real campaign dashboard disappearing after the complete report grew
+  beyond its bounded parser. The full report remains complete canonical evidence
+  in deterministic compact JSON; a separate 43 KB projection is bound to its
+  exact digest/size and current namespace/run/revision/operator identity, while
+  one held descriptor stream-verifies the 7.35 MB source before rendering.
+- Kept all 37 detailed per-asset shadow traces in the full report and added a
+  visible bounded-projection notice instead of deleting evidence. No-authority
+  report refresh removes a stale owned projection and remains successful.
+- Proved HBAR had no row in its 2026-07-20 18:12 through 2026-07-21 00:12 UTC
+  anchor window: the nearest causal row was 18.45h too old and the first later
+  row was 12.01h after the target. Corrected membership documentation to remain
+  explicitly descriptive rather than causal.
+**Verify:** 111 focused selector/audit/campaign/projection tests, 9 Protocol-v2
+progress tests, 79 dashboard tests, and the export parent-symlink security
+regression passed. `compileall`, the real no-provider campaign rebuild,
+dashboard readiness plus fixture/UX/exact-live smokes, and architecture
+cleanliness passed. `make verify-fast PYTHON=python3` passed 3,876 tests in
+186.47 seconds; the isolated standalone compatibility runner passed 1,528/1,528.
+JSON validation and `git diff --check` passed before commit. Source-size counts
+remained advisory; runtime evidence bounds remained fail-closed.
+**Notes/risks:** No provider call, history mutation, backfill, future prediction,
+threshold, route, score, publication authority, send, trade, order, paper trade,
+RSI write, or Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Explain causal gaps with prospective membership clocks · Codex
 **Why:** The latest campaign correctly showed HBAR as the only missing causal
 24-hour input, but “recent entry” did not expose its intervening exit/re-entry

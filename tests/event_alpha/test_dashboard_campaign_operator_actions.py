@@ -9,7 +9,10 @@ import json
 from pathlib import Path
 
 from crypto_rsi_scanner.event_alpha.dashboard.campaign_operator_actions import (
+    CAMPAIGN_DASHBOARD_PROJECTION_FILENAME,
+    MAX_CAMPAIGN_DASHBOARD_PROJECTION_BYTES,
     MAX_CAMPAIGN_REPORT_BYTES,
+    build_campaign_dashboard_projection,
     load_campaign_operator_actions,
 )
 from crypto_rsi_scanner.event_alpha.dashboard.operator_work_queue import (
@@ -498,6 +501,30 @@ def _write_report(root: Path, report: dict[str, object]) -> None:
     )
 
 
+def _write_dashboard_projection(
+    root: Path,
+    report: dict[str, object],
+    *,
+    pad_source_to: int = 0,
+) -> bytes:
+    root.mkdir(parents=True, exist_ok=True)
+    source_path = root / "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
+    source = json.dumps(report, sort_keys=True).encode("utf-8")
+    if len(source) < pad_source_to:
+        source += b" " * (pad_source_to - len(source))
+    source_path.write_bytes(source)
+    projection = build_campaign_dashboard_projection(
+        report,
+        source_report_sha256=hashlib.sha256(source).hexdigest(),
+        source_report_size_bytes=len(source),
+    )
+    encoded = (
+        json.dumps(projection, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    (root / CAMPAIGN_DASHBOARD_PROJECTION_FILENAME).write_bytes(encoded)
+    return encoded
+
+
 def _load(root: Path) -> dict[str, object]:
     return load_campaign_operator_actions(
         root,
@@ -574,6 +601,12 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert regime_history[
         "precontract_history_used_for_membership_clock"
     ] is False
+    assert regime_history["latest_missing_input_anchor_audit"]["status"] == (
+        "not_required"
+    )
+    assert regime_history["latest_missing_input_anchor_audit"]["reason"] == (
+        "latest_generation_has_all_inputs"
+    )
     assert regime_history["provider_calls"] == regime_history["writes"] == 0
     shadow = result["shadow_temporal_surprise"]
     assert shadow["schema_version"] == 7
@@ -668,6 +701,61 @@ def test_campaign_operator_actions_projects_exact_safe_human_work(tmp_path: Path
     assert "/private/" not in repr(result)
 
 
+def test_bounded_projection_keeps_oversized_full_campaign_evidence_available(
+    tmp_path: Path,
+) -> None:
+    report = _campaign_report()
+    projection_bytes = _write_dashboard_projection(
+        tmp_path,
+        report,
+        pad_source_to=MAX_CAMPAIGN_REPORT_BYTES + 1,
+    )
+
+    result = _load(tmp_path)
+
+    assert result["status"] == "ready"
+    assert result["report_size_bytes"] == MAX_CAMPAIGN_REPORT_BYTES + 1
+    assert len(projection_bytes) < MAX_CAMPAIGN_DASHBOARD_PROJECTION_BYTES
+    assert result["dashboard_projection_size_bytes"] == len(projection_bytes)
+    shadow = result["shadow_temporal_surprise"]
+    assert shadow["asset_variation_projection_status"] == (
+        "summary_only_full_evidence_in_source_report"
+    )
+    assert shadow["asset_variation_summary_count"] == 3
+    assert shadow["asset_variation_summaries"] == []
+    html = render_campaign_page(
+        replace(_snapshot(), campaign_operator_actions=result),
+        query={},
+    )
+    assert "Bounded dashboard projection" in html
+    assert "3 asset-level trace summaries" in html
+
+    source_path = tmp_path / "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
+    source_path.write_bytes(source_path.read_bytes() + b" ")
+    drifted = _load(tmp_path)
+    assert drifted["status"] == "unavailable"
+    assert drifted["reason"] == (
+        "campaign_dashboard_projection_contract_invalid"
+    )
+
+
+def test_bounded_projection_never_follows_source_report_symlink(
+    tmp_path: Path,
+) -> None:
+    report = _campaign_report()
+    _write_dashboard_projection(tmp_path, report)
+    source_path = tmp_path / "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
+    replacement = tmp_path / "replacement-report.json"
+    replacement.write_text("{}\n", encoding="utf-8")
+    source_path.unlink()
+    source_path.symlink_to(replacement)
+
+    result = _load(tmp_path)
+
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "campaign_source_report_fingerprint_failed"
+
+
 def test_today_detail_names_exact_current_regime_input_gaps() -> None:
     value = {
         "status": "incomplete",
@@ -737,6 +825,24 @@ def test_today_detail_separates_regime_history_churn_from_other_gaps() -> None:
                     "continuous_membership_age_seconds": 14_564,
                 },),
             },
+            "latest_missing_input_anchor_audit": {
+                "diagnostics": ({
+                    "canonical_asset_id": "hedera-hashgraph",
+                    "status": "unavailable",
+                    "anchor_window_start_at": (
+                        "2026-07-20T18:12:04.506884+00:00"
+                    ),
+                    "anchor_window_end_at": (
+                        "2026-07-21T00:12:04.506884+00:00"
+                    ),
+                    "nearest_causal_before_window": {
+                        "distance_seconds": 66_403.674494,
+                    },
+                    "nearest_post_target_observation": {
+                        "distance_seconds": 43_236.832649,
+                    },
+                },),
+            },
         }
     })
 
@@ -748,6 +854,10 @@ def test_today_detail_separates_regime_history_churn_from_other_gaps() -> None:
     assert "descriptive overlap, not causal attribution" in detail
     assert "4 hr 2 min of observed continuous prospective membership" in detail
     assert "pre-contract rows are not backfilled" in detail
+    assert "has no retained anchor" in detail
+    assert "18 hr 26 min before the window" in detail
+    assert "12 hr after the target" in detail
+    assert "no future eligibility is inferred" in detail
 
 
 def test_campaign_operator_actions_fail_closed_on_pointer_or_command_drift(

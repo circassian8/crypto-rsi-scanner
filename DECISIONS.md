@@ -74,14 +74,55 @@ removes its clock and a later entry starts a new one. Pre-contract rows are not
 backfilled into this clock, and membership age must never be interpreted as
 proof that a valid temporal-return anchor exists.
 **Why:** HBAR entered the prospective top-30 set at 12:12 UTC, exited at 19:08,
-and re-entered at 20:09. The current 29/30 result is therefore explained by
-only 4.05 hours of continuous prospective membership at cycle 64, while its
-older raw observations remain correctly outside the prospective membership
-contract. Showing only “recent entry” concealed the reset and invited a false
-assumption that a snapshot return or old row could close the causal interval.
+and re-entered at 20:09. Its 4.05-hour continuous membership clock at cycle 64
+explains the observed universe churn, but deliberately does not claim why the
+24-hour anchor is absent. Showing only “recent entry” concealed the reset and
+invited a false assumption that a snapshot return or old row could close the
+causal interval.
 **Revisit when:** A preregistered Protocol-v2 annex defines a different causal
 membership/anchor contract before holdout access. Never infer anchor eligibility
 from membership duration alone.
+
+## 2026-07-22 - Explain missing temporal returns with the exact causal anchor window
+**Status:** accepted as read-only diagnostic; no future or policy authority
+**Decision:** For each missing 24-hour input in the latest complete generation,
+replay the exact production anchor-selection rule over the one-read,
+fingerprinted retained-history snapshot. Bind the endpoint, target, six-hour
+backward-tolerance window, candidate count, selected anchor or nearest excluded
+causal row, and nearest post-target row. The replay must use the same core
+selector as enrichment, mutate nothing, and set
+`future_endpoint_eligibility_inferred=false`.
+**Why:** At cycle 64, HBAR's causal target was 2026-07-21 00:12 UTC and its valid
+anchor window began at 2026-07-20 18:12 UTC. Its latest at-or-before-target row
+was 18.45 hours before that window; its next row was 12.01 hours after the
+target. This proves a real causal-window gap without incorrectly attributing it
+to top-30 membership age or predicting when a future endpoint will qualify.
+**Revisit when:** The preregistered return horizon/tolerance policy changes. The
+diagnostic must continue to call the canonical selector and remain source-bound,
+read-only, outcome-blind, and ineligible for routing or Protocol v2.
+
+## 2026-07-22 - Serve campaign truth through a source-bound dashboard projection
+**Status:** accepted
+**Decision:** Keep the complete campaign JSON as canonical audit evidence and
+serialize it deterministically in compact form. When exact dashboard authority
+exists, derive a separate closed dashboard projection bound to the source
+report SHA-256/byte count and the exact namespace, run, revision, and operator-
+state digest. The dashboard may parse only that small projection after
+descriptor-anchored streaming verification of the complete source report.
+Aggregate shadow evidence remains visible; detailed per-asset trace summaries
+remain complete in the source report and their omitted count must be explicit.
+When authority is absent, campaign refresh still completes and removes any stale
+owned projection.
+**Why:** The complete pretty-printed report reached 11.9 MB and crossed the
+dashboard's bounded 8 MB parse contract, which hid valid campaign actions and
+history. Compact canonical JSON is 7.35 MB today, but formatting alone would
+only defer recurrence. The 43 KB source-bound projection restores operator truth
+without deleting evidence or turning an unbounded audit document into a request-
+time parse dependency.
+**Revisit when:** A versioned retention or incremental campaign-report contract
+replaces the complete document. Preserve immutable evidence and exact bindings.
+Runtime artifact/request limits remain security controls and are distinct from
+the already-advisory source-file/function line counts.
 
 ## 2026-07-22 - Lead outcome recovery readiness with the exact gap
 **Status:** accepted

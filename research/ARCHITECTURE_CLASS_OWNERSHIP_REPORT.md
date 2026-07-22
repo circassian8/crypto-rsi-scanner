@@ -2,12 +2,12 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-22T00:32:08.330253+00:00`
+- generated_at: `2026-07-22T01:51:05.456317+00:00`
 - public_class_count: `518`
 - classes_over_limit_count: `3`
-- functions_over_limit_count: `34`
+- functions_over_limit_count: `35`
 - production_classes_over_limit: `3`
-- production_functions_over_limit: `34`
+- production_functions_over_limit: `35`
 - accepted_class_exceptions_count: `3`
 - remaining_class_ownership_debt_count: `0`
 - v3_gate_status: `pass`
@@ -15,7 +15,7 @@ Static source inventory only. This report does not call providers, send Telegram
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `34`
+- functions_over_150_lines: `35`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
 - multi_public_class_modules_count: `84`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 11 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 34 | advisory |
+| `functions_over_150_lines` | 35 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -95,10 +95,10 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_outcomes.py` | 1492 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/execution_quality_readiness.py` | 1485 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/daily_operations.py` | 1484 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
+| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py` | 1484 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/config.py` | 1450 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_research_reports.py` | 1449 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/radar/decision_model_surfaces.py` | 1449 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
-| `crypto_rsi_scanner/event_alpha/operations/market_observation_campaign_render.py` | 1429 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py` | 1410 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py` | 1397 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
 | `crypto_rsi_scanner/project_health/architecture_report.py` | 1392 | advisory_measurement | Revisit only when cohesion, defects, or review evidence justify a split. |
@@ -317,6 +317,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.artifacts.schema.market_shadow_surprise` | `_validate_return_feature_consistency` | 183 | false |
 | `crypto_rsi_scanner.event_alpha.artifacts.schema.market_shadow_surprise` | `_validate_input_trace` | 166 | false |
 | `crypto_rsi_scanner.event_alpha.dashboard.campaign_operator_actions` | `_project_shadow_surprise_feature` | 161 | false |
+| `crypto_rsi_scanner.event_alpha.dashboard.campaign_operator_actions` | `_project_control_regime_generation_audit` | 161 | false |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_cost_residual` | `model_bybit_residual_execution_cost_sensitivity_scenario` | 195 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_fee` | `model_bybit_visible_book_taker_fee_scenario` | 166 | true |
 | `crypto_rsi_scanner.event_alpha.operations.bybit_execution_funding` | `model_bybit_funding_settlement_scenario` | 169 | true |
@@ -330,9 +331,9 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.operations.execution_quality_readiness` | `_impact_cost_lines` | 246 | false |
 | `crypto_rsi_scanner.event_alpha.operations.market_no_send_features` | `point_in_time_control_market_regime` | 170 | true |
 | `crypto_rsi_scanner.event_alpha.operations.market_no_send_features` | `control_market_regime_input_diagnostic_valid` | 165 | true |
-| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign` | `build_campaign_report` | 165 | true |
-| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit` | `build_control_regime_generation_audit` | 217 | true |
-| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit` | `validate_control_regime_generation_audit` | 161 | true |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign` | `build_campaign_report` | 168 | true |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit` | `build_control_regime_generation_audit` | 227 | true |
+| `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_regime_audit` | `validate_control_regime_generation_audit` | 166 | true |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_render` | `format_campaign_report` | 154 | true |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_render` | `_shadow_surprise_audit_section` | 154 | false |
 | `crypto_rsi_scanner.event_alpha.operations.market_observation_campaign_shadow_surprise` | `build_campaign_shadow_surprise_audit` | 209 | true |

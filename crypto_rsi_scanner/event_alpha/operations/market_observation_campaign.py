@@ -9,6 +9,7 @@ campaign measurements rather than Event Alpha catalyst burn-in evidence.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -223,7 +224,10 @@ def build_campaign_report(
     )
     control_regime_generation_audit = (
         market_observation_campaign_regime_audit
-        .build_control_regime_generation_audit(counted_generations)
+        .build_control_regime_generation_audit(
+            counted_generations,
+            retained_history_snapshot=history_snapshot,
+        )
     )
     metrics = _campaign_metrics(counted_generations, outcome_metrics, baseline)
     metrics.update(_review_metric_values(review_timing, review_queue))
@@ -458,17 +462,67 @@ def write_campaign_report(
     )
     report = build_campaign_report(artifact_base_dir, evaluated_at=evaluated)
     _validate_shadow_campaign_contracts(report)
+    report_bytes = (
+        json.dumps(
+            report,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    from ..dashboard import campaign_operator_actions
+
+    dashboard_projection = None
+    if _campaign_dashboard_projection_required(report):
+        dashboard_projection = (
+            campaign_operator_actions.build_campaign_dashboard_projection(
+                report,
+                source_report_sha256=hashlib.sha256(report_bytes).hexdigest(),
+                source_report_size_bytes=len(report_bytes),
+            )
+        )
+    dashboard_projection_bytes = (
+        (
+            json.dumps(
+                dashboard_projection,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        if dashboard_projection is not None
+        else None
+    )
     destination = _validated_existing_directory(output_dir, label="campaign output")
     json_path = destination / CAMPAIGN_REPORT_JSON_FILENAME
     markdown_path = destination / CAMPAIGN_REPORT_MD_FILENAME
-    _write_atomic(
-        json_path,
-        (json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode(
-            "utf-8"
-        ),
+    dashboard_projection_path = (
+        destination
+        / campaign_operator_actions.CAMPAIGN_DASHBOARD_PROJECTION_FILENAME
     )
+    _write_atomic(json_path, report_bytes)
     _write_atomic(markdown_path, format_campaign_report(report).encode("utf-8"))
+    if dashboard_projection_bytes is None:
+        _remove_report_target(dashboard_projection_path)
+    else:
+        _write_atomic(dashboard_projection_path, dashboard_projection_bytes)
     return json_path, markdown_path, report
+
+
+def _campaign_dashboard_projection_required(report: Mapping[str, Any]) -> bool:
+    pointer = report.get("pointer")
+    return bool(
+        isinstance(pointer, Mapping)
+        and pointer.get("status") == "authoritative"
+        and pointer.get("generation_authority_status") == "authoritative"
+        and pointer.get("readiness_validation") == "passed"
+        and pointer.get("exact_operator_binding") is True
+        and pointer.get("readiness_error") is None
+    )
 
 
 def format_campaign_report(report: Mapping[str, Any]) -> str:
@@ -1743,6 +1797,28 @@ def _write_atomic(path: Path, data: bytes) -> None:
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _remove_report_target(path: Path) -> None:
+    """Remove only an owned regular projection and durably record absence."""
+
+    try:
+        existing = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise MarketNoSendError("campaign report target is unreadable") from exc
+    if not stat.S_ISREG(existing.st_mode):
+        raise MarketNoSendError("campaign report target is not a regular file")
+    try:
+        path.unlink()
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError as exc:
+        raise MarketNoSendError("campaign report removal failed") from exc
 
 
 def _generation_sort_key(row: Mapping[str, Any]) -> tuple[str, str, str]:

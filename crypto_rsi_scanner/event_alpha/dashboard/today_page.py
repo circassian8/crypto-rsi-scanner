@@ -721,6 +721,35 @@ def _control_regime_generation_audit_detail(
                         f"{asset_id} has no exact entry clock before the first complete prospective universe"
                     )
             latest_text += " " + "; ".join(membership_text) + "."
+    anchor_audit = value.get("latest_missing_input_anchor_audit")
+    if isinstance(anchor_audit, Mapping):
+        anchor_rows = [
+            row
+            for row in anchor_audit.get("diagnostics") or ()
+            if isinstance(row, Mapping)
+        ]
+        for row in anchor_rows:
+            if row.get("status") == "ready":
+                continue
+            asset_id = str(row.get("canonical_asset_id") or "unknown")
+            before = row.get("nearest_causal_before_window")
+            before_text = (
+                f"; nearest prior row was {format_duration(before.get('distance_seconds'))} before the window"
+                if isinstance(before, Mapping)
+                else ""
+            )
+            after = row.get("nearest_post_target_observation")
+            after_text = (
+                f"; nearest later row was {format_duration(after.get('distance_seconds'))} after the target"
+                if isinstance(after, Mapping)
+                else ""
+            )
+            latest_text += (
+                f" {asset_id} has no retained anchor in "
+                f"{row.get('anchor_window_start_at')} to "
+                f"{row.get('anchor_window_end_at')}{before_text}{after_text}; no future "
+                "eligibility is inferred."
+            )
     return (
         f"Immutable-generation audit: {verified}/{total} source envelopes verify; "
         f"{ready}/{complete} complete universes have all causal 24-hour inputs "

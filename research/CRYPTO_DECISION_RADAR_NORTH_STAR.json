@@ -1266,13 +1266,32 @@
   },
   "market_observation_campaign": {
     "artifact_inputs_only": true,
+    "dashboard_projection": {
+      "artifact": "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json",
+      "availability": "emitted_only_for_exact_current_dashboard_authority; stale owned projection removed otherwise",
+      "bindings": [
+        "complete source report SHA-256 and byte count",
+        "artifact namespace",
+        "run id",
+        "revision",
+        "operator-state digest",
+        "projection digest"
+      ],
+      "detailed_asset_trace_policy": "complete in source report; omitted count explicit in bounded dashboard projection",
+      "full_report_verification": "one descriptor-held streaming SHA-256 before projection use",
+      "runtime_bounds_are_source_size_policy": false,
+      "schema_id": "decision_radar.campaign_dashboard_projection",
+      "schema_version": 1,
+      "source_report": "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
+    },
     "event_alpha_catalyst_burn_in": "separate_not_aggregated",
     "historical_market_provenance_adapter": "read_only",
     "measurement_program": "decision_radar_live_observation_campaign_v2",
     "provider_calls_made_by_report": 0,
     "report_artifacts": [
       "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json",
-      "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md"
+      "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.md",
+      "research/RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json"
     ],
     "report_schema_version": "decision_radar_live_observation_campaign_report_v2",
     "report_target": "radar-market-campaign-report",

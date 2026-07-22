@@ -12,6 +12,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 import hashlib
+import json
 import math
 from pathlib import Path
 import re
@@ -28,9 +29,47 @@ from .secure_reader import _DashboardNamespaceReadError, open_anchored_namespace
 
 
 MAX_CAMPAIGN_REPORT_BYTES = 8 * 1024 * 1024
+MAX_CAMPAIGN_DASHBOARD_PROJECTION_BYTES = 2 * 1024 * 1024
+MAX_CAMPAIGN_SOURCE_REPORT_FINGERPRINT_BYTES = 64 * 1024 * 1024
 MAX_REVIEW_RECORDS = 64
 MAX_OUTCOME_GAPS = 20
 CAMPAIGN_REPORT_JSON_FILENAME = "RADAR_LIVE_OBSERVATION_CAMPAIGN_REPORT.json"
+CAMPAIGN_DASHBOARD_PROJECTION_FILENAME = (
+    "RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json"
+)
+CAMPAIGN_DASHBOARD_PROJECTION_SCHEMA = (
+    "decision_radar.campaign_dashboard_projection"
+)
+CAMPAIGN_DASHBOARD_PROJECTION_VERSION = 1
+_CAMPAIGN_DASHBOARD_PROJECTION_KEYS = {
+    "schema_id",
+    "schema_version",
+    "source_report_artifact",
+    "source_report_sha256",
+    "source_report_size_bytes",
+    "source_report_generated_at",
+    "artifact_namespace",
+    "run_id",
+    "revision",
+    "operator_state_sha256",
+    "projection",
+    "projection_sha256",
+    "provider_calls",
+    "writes",
+    "research_only",
+}
+_CAMPAIGN_ACTION_PROJECTION_KEYS = {
+    "report_generated_at",
+    "campaign_status",
+    "campaign_metrics",
+    "human_review",
+    "outcome_recovery",
+    "episode_coverage",
+    "shadow_temporal_surprise",
+    "execution_quality",
+    "temporal_baseline",
+    "pointer",
+}
 
 _REPORT_SCHEMA = "decision_radar_live_observation_campaign_report_v2"
 _REPORT_ROW_TYPE = "decision_radar_live_observation_campaign_report"
@@ -89,6 +128,92 @@ _CURRENT_REGIME_INPUT_KEYS = {
 }
 
 
+def build_campaign_dashboard_projection(
+    report: Mapping[str, Any],
+    *,
+    source_report_sha256: str,
+    source_report_size_bytes: int,
+) -> dict[str, Any]:
+    """Build the bounded dashboard projection from one validated full report."""
+
+    pointer = _mapping(report.get("pointer"), "pointer")
+    namespace = _identity(
+        pointer.get("artifact_namespace"),
+        "projection_artifact_namespace",
+    )
+    run_id = _identity(pointer.get("run_id"), "projection_run_id")
+    revision = _count(pointer.get("revision"), "projection_revision")
+    if not re.fullmatch(r"[0-9a-f]{64}", source_report_sha256):
+        raise ValueError("projection_source_report_sha256_invalid")
+    if type(source_report_size_bytes) is not int or source_report_size_bytes <= 0:
+        raise ValueError("projection_source_report_size_invalid")
+    current_rows = [
+        _mapping(row, "projection_authoritative_generation")
+        for row in report.get("authoritative_generations") or ()
+        if isinstance(row, Mapping)
+        and _mapping(row.get("publication"), "projection_publication").get(
+            "currently_authoritative"
+        ) is True
+    ]
+    if len(current_rows) != 1:
+        raise ValueError("projection_current_generation_invalid")
+    operator_digest = _identity(
+        _mapping(
+            current_rows[0].get(
+                "current_authority_control_market_regime_input"
+            ),
+            "projection_current_regime_input",
+        ).get("operator_state_sha256"),
+        "projection_operator_state_sha256",
+    )
+    raw_counts = _mapping(
+        _mapping(
+            current_rows[0].get("data_quality"),
+            "projection_data_quality",
+        ).get("baseline_status_counts"),
+        "projection_baseline_status_counts",
+    )
+    synthetic_market_rows = tuple(
+        {"temporal_baseline_status": status}
+        for status, count in sorted(raw_counts.items())
+        for _index in range(_count(count, "projection_baseline_status_count"))
+    )
+    projection = _project_campaign_actions(
+        report,
+        artifact_namespace=namespace,
+        run_id=run_id,
+        revision=revision,
+        current_market_observations=synthetic_market_rows,
+        operator_state_sha256=operator_digest,
+    )
+    shadow_projection = dict(projection["shadow_temporal_surprise"])
+    shadow_projection["asset_variation_summaries"] = ()
+    shadow_projection["asset_variation_projection_status"] = (
+        "summary_only_full_evidence_in_source_report"
+    )
+    projection["shadow_temporal_surprise"] = shadow_projection
+    value = {
+        "schema_id": CAMPAIGN_DASHBOARD_PROJECTION_SCHEMA,
+        "schema_version": CAMPAIGN_DASHBOARD_PROJECTION_VERSION,
+        "source_report_artifact": CAMPAIGN_REPORT_JSON_FILENAME,
+        "source_report_sha256": source_report_sha256,
+        "source_report_size_bytes": source_report_size_bytes,
+        "source_report_generated_at": projection["report_generated_at"],
+        "artifact_namespace": namespace,
+        "run_id": run_id,
+        "revision": revision,
+        "operator_state_sha256": operator_digest,
+        "projection": projection,
+        "projection_sha256": _sha256_json(projection),
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    if not _campaign_dashboard_projection_valid(value):
+        raise ValueError("campaign_dashboard_projection_invalid")
+    return value
+
+
 def load_campaign_operator_actions(
     research_root: str | Path | None,
     *,
@@ -105,12 +230,75 @@ def load_campaign_operator_actions(
     root = Path(research_root).expanduser()
     try:
         with open_anchored_namespace(root) as reader:
-            data, read_error = reader.read_bytes(
-                CAMPAIGN_REPORT_JSON_FILENAME,
-                max_bytes=MAX_CAMPAIGN_REPORT_BYTES,
+            projection_data, projection_error = reader.read_bytes(
+                CAMPAIGN_DASHBOARD_PROJECTION_FILENAME,
+                max_bytes=MAX_CAMPAIGN_DASHBOARD_PROJECTION_BYTES,
             )
+            source_fingerprint = None
+            source_fingerprint_error = None
+            data = None
+            read_error = None
+            if projection_error == "artifact_missing":
+                data, read_error = reader.read_bytes(
+                    CAMPAIGN_REPORT_JSON_FILENAME,
+                    max_bytes=MAX_CAMPAIGN_REPORT_BYTES,
+                )
+            elif projection_error is None:
+                source_fingerprint, source_fingerprint_error = (
+                    reader.fingerprint_file(
+                        CAMPAIGN_REPORT_JSON_FILENAME,
+                        max_bytes=(
+                            MAX_CAMPAIGN_SOURCE_REPORT_FINGERPRINT_BYTES
+                        ),
+                    )
+                )
     except _DashboardNamespaceReadError:
         return _unavailable("campaign_report_root_unavailable_or_unsafe")
+    if projection_error not in (None, "artifact_missing"):
+        return _unavailable("campaign_dashboard_projection_unsafe_or_unreadable")
+    if projection_data is not None:
+        if source_fingerprint_error or source_fingerprint is None:
+            return _unavailable("campaign_source_report_fingerprint_failed")
+        try:
+            envelope = loads_no_duplicate_keys(projection_data.decode("utf-8"))
+            if not _campaign_dashboard_projection_valid(envelope):
+                raise ValueError("campaign_dashboard_projection_invalid")
+            if any((
+                envelope.get("source_report_sha256")
+                != source_fingerprint.get("sha256"),
+                envelope.get("source_report_size_bytes")
+                != source_fingerprint.get("size_bytes"),
+                envelope.get("artifact_namespace") != artifact_namespace,
+                envelope.get("run_id") != run_id,
+                envelope.get("revision") != revision,
+                (
+                    operator_state_sha256 is not None
+                    and envelope.get("operator_state_sha256")
+                    != operator_state_sha256
+                ),
+            )):
+                raise ValueError("campaign_dashboard_projection_binding_mismatch")
+            projection = _validated_prebuilt_projection(
+                envelope.get("projection"),
+                current_market_observations=current_market_observations,
+            )
+        except (KeyError, TypeError, UnicodeError, ValueError):
+            return _unavailable("campaign_dashboard_projection_contract_invalid")
+        return {
+            **projection,
+            "status": "ready",
+            "authority": "pointer_matched_campaign_context",
+            "report_sha256": envelope["source_report_sha256"],
+            "report_size_bytes": envelope["source_report_size_bytes"],
+            "maximum_report_size_bytes": (
+                MAX_CAMPAIGN_SOURCE_REPORT_FINGERPRINT_BYTES
+            ),
+            "dashboard_projection_sha256": envelope["projection_sha256"],
+            "dashboard_projection_size_bytes": len(projection_data),
+            "provider_calls": 0,
+            "writes": 0,
+            "research_only": True,
+        }
     if read_error == "artifact_missing":
         return _unavailable("campaign_report_missing")
     if read_error == "artifact_too_large":
@@ -142,6 +330,133 @@ def load_campaign_operator_actions(
         "writes": 0,
         "research_only": True,
     }
+
+
+def _campaign_dashboard_projection_valid(value: object) -> bool:
+    if not isinstance(value, Mapping) or set(value) != (
+        _CAMPAIGN_DASHBOARD_PROJECTION_KEYS
+    ):
+        return False
+    projection = value.get("projection")
+    pointer = (
+        projection.get("pointer") if isinstance(projection, Mapping) else None
+    )
+    temporal = (
+        projection.get("temporal_baseline")
+        if isinstance(projection, Mapping)
+        else None
+    )
+    shadow = (
+        projection.get("shadow_temporal_surprise")
+        if isinstance(projection, Mapping)
+        else None
+    )
+    return bool(
+        value.get("schema_id") == CAMPAIGN_DASHBOARD_PROJECTION_SCHEMA
+        and value.get("schema_version")
+        == CAMPAIGN_DASHBOARD_PROJECTION_VERSION
+        and value.get("source_report_artifact")
+        == CAMPAIGN_REPORT_JSON_FILENAME
+        and isinstance(value.get("source_report_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", value.get("source_report_sha256"))
+        and type(value.get("source_report_size_bytes")) is int
+        and value.get("source_report_size_bytes") > 0
+        and _timestamp_or_none(value.get("source_report_generated_at"))
+        and _identity_or_none(value.get("artifact_namespace"))
+        and _identity_or_none(value.get("run_id"))
+        and type(value.get("revision")) is int
+        and value.get("revision") >= 1
+        and isinstance(value.get("operator_state_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", value.get("operator_state_sha256"))
+        and isinstance(projection, Mapping)
+        and set(projection) == _CAMPAIGN_ACTION_PROJECTION_KEYS
+        and value.get("projection_sha256") == _sha256_json(projection)
+        and isinstance(pointer, Mapping)
+        and pointer.get("artifact_namespace") == value.get("artifact_namespace")
+        and pointer.get("run_id") == value.get("run_id")
+        and pointer.get("revision") == value.get("revision")
+        and projection.get("report_generated_at")
+        == value.get("source_report_generated_at")
+        and isinstance(temporal, Mapping)
+        and isinstance(
+            temporal.get("current_exact_generation_status_counts"),
+            Mapping,
+        )
+        and isinstance(shadow, Mapping)
+        and shadow.get("asset_variation_projection_status") in {
+            "complete",
+            "summary_only_full_evidence_in_source_report",
+        }
+        and type(shadow.get("asset_variation_summary_count")) is int
+        and shadow.get("asset_variation_summary_count") >= 0
+        and isinstance(shadow.get("asset_variation_summaries"), (list, tuple))
+        and (
+            len(shadow.get("asset_variation_summaries"))
+            == shadow.get("asset_variation_summary_count")
+            if shadow.get("asset_variation_projection_status") == "complete"
+            else len(shadow.get("asset_variation_summaries")) == 0
+        )
+        and shadow.get("routing_eligible") is False
+        and shadow.get("score_adjustment_eligible") is False
+        and shadow.get("threshold_change_eligible") is False
+        and shadow.get("protocol_v2_evidence_eligible") is False
+        and shadow.get("provider_calls") == 0
+        and shadow.get("writes") == 0
+        and shadow.get("research_only") is True
+        and value.get("provider_calls") == 0
+        and value.get("writes") == 0
+        and value.get("research_only") is True
+    )
+
+
+def _validated_prebuilt_projection(
+    value: object,
+    *,
+    current_market_observations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    projection = _mapping(value, "campaign_dashboard_projection")
+    if set(projection) != _CAMPAIGN_ACTION_PROJECTION_KEYS:
+        raise ValueError("campaign_dashboard_projection_keys_invalid")
+    temporal = _mapping(
+        projection.get("temporal_baseline"),
+        "campaign_dashboard_temporal_baseline",
+    )
+    expected_counts = _mapping(
+        temporal.get("current_exact_generation_status_counts"),
+        "campaign_dashboard_current_exact_counts",
+    )
+    loaded_counts: Counter[str] = Counter()
+    for row in current_market_observations:
+        status = str(
+            _mapping(row, "loaded_market_observation").get(
+                "temporal_baseline_status"
+            )
+            or "not_evaluated"
+        ).strip().casefold()
+        loaded_counts[
+            _identity(
+                status or "not_evaluated",
+                "loaded_generation_baseline_status",
+            )
+        ] += 1
+    if not loaded_counts or dict(sorted(loaded_counts.items())) != expected_counts:
+        raise ValueError("campaign_dashboard_current_baseline_mismatch")
+    return dict(projection)
+
+
+def _timestamp_or_none(value: object) -> bool:
+    try:
+        _timestamp(value, "campaign_dashboard_projection_timestamp")
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _identity_or_none(value: object) -> bool:
+    try:
+        return bool(_identity(value, "campaign_dashboard_projection_identity"))
+    except (TypeError, ValueError):
+        return False
 
 
 def _project_campaign_actions(
@@ -330,6 +645,8 @@ def _project_shadow_surprise_audit(
             audit_schema_version >= 7
         ),
         "asset_variation_summaries": projected_asset_variation,
+        "asset_variation_summary_count": len(projected_asset_variation),
+        "asset_variation_projection_status": "complete",
         "source_bound_projection_digest": _identity(
             audit.get("source_bound_projection_digest"),
             "shadow_source_bound_digest",
@@ -1544,6 +1861,18 @@ def _project_control_regime_generation_audit(
         )
         for asset_id, count in sorted(missing_counts.items())
     }
+    raw_anchor_audit = _mapping(
+        audit.get("latest_missing_input_anchor_audit"),
+        "regime_generation_anchor_audit",
+    )
+    anchor_audit = {
+        **raw_anchor_audit,
+        "diagnostics": [
+            dict(row)
+            for row in raw_anchor_audit.get("diagnostics") or ()
+            if isinstance(row, Mapping)
+        ],
+    }
     return {
         "status": _identity(audit.get("status"), "regime_generation_status"),
         "input_generation_count": _count(
@@ -1594,6 +1923,7 @@ def _project_control_regime_generation_audit(
         "interpretation": audit["interpretation"],
         "membership_clock_scope": audit["membership_clock_scope"],
         "precontract_history_used_for_membership_clock": False,
+        "latest_missing_input_anchor_audit": anchor_audit,
         "provider_calls": 0,
         "writes": 0,
         "research_only": True,
@@ -2112,7 +2442,21 @@ def _timestamp(value: Any, label: str) -> str:
     return parsed.isoformat()
 
 
+def _sha256_json(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
 __all__ = (
+    "CAMPAIGN_DASHBOARD_PROJECTION_FILENAME",
     "MAX_CAMPAIGN_REPORT_BYTES",
+    "build_campaign_dashboard_projection",
     "load_campaign_operator_actions",
 )

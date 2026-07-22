@@ -47,6 +47,16 @@ class AnchoredNamespaceReader:
     ) -> tuple[bytes | None, str | None]:
         return _read_relative_bytes(self, relative, max_bytes=max_bytes)
 
+    def fingerprint_file(
+        self,
+        relative: str | Path,
+        *,
+        max_bytes: int | None = None,
+    ) -> tuple[dict[str, object] | None, str | None]:
+        """Hash one held regular file without retaining its payload in memory."""
+
+        return _fingerprint_relative_file(self, relative, max_bytes=max_bytes)
+
     def fingerprint_directory(
         self,
         relative: str | Path,
@@ -131,6 +141,38 @@ def _read_relative_bytes(
         data, read_error = _read_file_at(parent_fd, parts[-1], max_bytes=max_bytes)
         reader.assert_current()
         return data, read_error
+    except OSError:
+        return None, "artifact_changed_during_read"
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def _fingerprint_relative_file(
+    reader: AnchoredNamespaceReader,
+    relative: str | Path,
+    *,
+    max_bytes: int | None,
+) -> tuple[dict[str, object] | None, str | None]:
+    parts, path_error = _relative_parts(relative)
+    if path_error:
+        return None, path_error
+    parent_fd: int | None = None
+    try:
+        reader.assert_current()
+        parent_fd, parent_error = _open_relative_parent(
+            reader.namespace_fd,
+            parts[:-1],
+        )
+        if parent_error or parent_fd is None:
+            return None, parent_error
+        fingerprint, read_error = _hash_file_at(
+            parent_fd,
+            parts[-1],
+            max_bytes=max_bytes,
+        )
+        reader.assert_current()
+        return fingerprint, read_error
     except OSError:
         return None, "artifact_changed_during_read"
     finally:
@@ -438,6 +480,56 @@ def _read_file_at(
         ):
             return None, "artifact_changed_during_read"
         return data, None
+    except FileNotFoundError:
+        return None, "artifact_missing"
+    except OSError:
+        return None, "artifact_unreadable_or_symlink"
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _hash_file_at(
+    parent_fd: int,
+    leaf: str,
+    *,
+    max_bytes: int | None,
+) -> tuple[dict[str, object] | None, str | None]:
+    descriptor: int | None = None
+    try:
+        before = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        if stat.S_ISLNK(before.st_mode):
+            return None, "artifact_symlink_not_allowed"
+        if not stat.S_ISREG(before.st_mode):
+            return None, "artifact_kind_mismatch"
+        if max_bytes is not None and (max_bytes < 0 or before.st_size > max_bytes):
+            return None, "artifact_too_large"
+        descriptor = os.open(leaf, _file_flags(), dir_fd=parent_fd)
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or not _same_snapshot(before, opened):
+            return None, "artifact_changed_during_read"
+        digest = hashlib.sha256()
+        total_size = 0
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+            total_size += len(chunk)
+            if max_bytes is not None and total_size > max_bytes:
+                return None, "artifact_too_large"
+        after_fd = os.fstat(descriptor)
+        after_path = os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            not _same_snapshot(opened, after_fd)
+            or not _same_snapshot(opened, after_path)
+            or total_size != after_fd.st_size
+        ):
+            return None, "artifact_changed_during_read"
+        return {
+            "sha256": digest.hexdigest(),
+            "size_bytes": total_size,
+        }, None
     except FileNotFoundError:
         return None, "artifact_missing"
     except OSError:

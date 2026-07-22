@@ -254,6 +254,7 @@ def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
             compact=True,
         ))
         + _shadow_variation_table(feature_coverage, snapshot=snapshot)
+        + _shadow_projection_scope_notice(raw)
         + _shadow_asset_variation_table(raw, snapshot=snapshot)
         + _shadow_interval_overlap_table(raw, snapshot=snapshot)
     )
@@ -261,6 +262,19 @@ def _shadow_surprise_distributions(snapshot: DashboardSnapshot) -> str:
         "Shadow anomaly distributions",
         body,
         eyebrow="Causal replay · copied from canonical campaign truth",
+    )
+
+
+def _shadow_projection_scope_notice(raw: Mapping[str, Any]) -> str:
+    if raw.get("asset_variation_projection_status") != (
+        "summary_only_full_evidence_in_source_report"
+    ):
+        return ""
+    return (
+        '<div class="alert alert-info"><strong>Bounded dashboard projection.</strong> '
+        f"Aggregate shadow evidence is current; {escape_html(display_count(raw.get('asset_variation_summary_count')))} "
+        "asset-level trace summaries remain fingerprint-bound in the full campaign report "
+        "and are intentionally omitted from this read-only page.</div>"
     )
 
 
@@ -792,6 +806,9 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
     membership_context = _regime_membership_context_label(
         latest.get("missing_input_membership_context")
     )
+    anchor_context = _regime_anchor_context_label(
+        raw.get("latest_missing_input_anchor_audit")
+    )
     values = (
         ("Verified source envelopes", f"{verified} / {total}"),
         ("Complete universes", complete),
@@ -804,6 +821,7 @@ def _control_regime_generation_history(snapshot: DashboardSnapshot) -> str:
         ("Latest missing", latest_missing),
         ("Latest recent-entry overlap", latest_recent),
         ("Latest continuous membership", membership_context),
+        ("Latest anchor-window replay", anchor_context),
     )
     missing_counts = raw.get("missing_asset_generation_counts")
     missing_rows = []
@@ -863,6 +881,47 @@ def _regime_membership_context_label(value: Any) -> str:
             )
         else:
             values.append(f"{asset_id}: start predates audited prospective window")
+    return "; ".join(values)
+
+
+def _regime_anchor_context_label(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return UNAVAILABLE
+    diagnostics = [
+        dict(row)
+        for row in value.get("diagnostics") or ()
+        if isinstance(row, Mapping)
+    ]
+    if not diagnostics:
+        return humanize_enum(value.get("reason"))
+    values = []
+    for row in diagnostics:
+        asset_id = humanize_enum(row.get("canonical_asset_id"))
+        if row.get("status") == "ready":
+            selected = row.get("selected_anchor")
+            selected_at = (
+                selected.get("observed_at")
+                if isinstance(selected, Mapping)
+                else UNAVAILABLE
+            )
+            values.append(f"{asset_id}: selected {selected_at}")
+            continue
+        before = row.get("nearest_causal_before_window")
+        before_text = (
+            f"; prior row {format_duration(before.get('distance_seconds'))} before window"
+            if isinstance(before, Mapping)
+            else ""
+        )
+        after = row.get("nearest_post_target_observation")
+        after_text = (
+            f"; next row {format_duration(after.get('distance_seconds'))} after target"
+            if isinstance(after, Mapping)
+            else ""
+        )
+        values.append(
+            f"{asset_id}: no anchor in {row.get('anchor_window_start_at')} to "
+            f"{row.get('anchor_window_end_at')}{before_text}{after_text}"
+        )
     return "; ".join(values)
 
 

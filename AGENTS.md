@@ -1038,7 +1038,11 @@ may be added later when a suitable environment already exists.
   exit resets the clock, assets already present in the first complete envelope
   retain an unknown start, and pre-contract rows are never backfilled. This
   diagnostic may explain churn but never proves a temporal anchor, causation,
-  routing eligibility, or Protocol-v2 authority. Decision campaign generations,
+  routing eligibility, or Protocol-v2 authority. The separate latest-generation
+  anchor audit must call the canonical return selector over the exact one-read
+  retained-history snapshot and show the target, backward-tolerance window,
+  candidates, and nearest excluded observations. It never predicts a future
+  endpoint or grants policy/Protocol-v2 eligibility. Decision campaign generations,
   candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
   Post-scan raw market evidence may carry the optional closed
@@ -1065,6 +1069,19 @@ may be added later when a suitable environment already exists.
   ready evidence, not that every projection is ready. The replay makes no
   provider call or write, claims no statistical independence, and remains
   routing/score/threshold/publication/Protocol-v2-ineligible.
+  The complete campaign JSON remains the canonical audit source and is written
+  in deterministic compact form. When exact dashboard authority exists, the
+  writer also emits
+  `research/RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json`: a bounded closed
+  projection bound to the full report SHA-256/byte count plus exact namespace,
+  run, revision, and operator-state digest. Dashboard reads hold one directory
+  descriptor, parse only that small projection, and stream-hash the full report
+  before use. Aggregate shadow evidence remains visible; detailed per-asset
+  trace summaries stay complete in the fingerprint-bound source report and the
+  dashboard names their omitted count. Without exact authority, report refresh
+  still succeeds and removes any stale owned projection. These runtime artifact
+  bounds are security/resource controls, not source-file/function size gates;
+  quantitative source sizes remain advisory.
   Human review timing uses the separate append-only shared campaign ledger
   `radar_market_history_cache/event_decision_radar_review_timing_events.jsonl`.
   `make radar-review-timing-status` is read-only/no-network and reports only

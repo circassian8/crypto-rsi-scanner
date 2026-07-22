@@ -81,6 +81,136 @@ def _three_asset_history(hours: int = 10) -> list[dict]:
     return rows
 
 
+def test_return_anchor_selection_diagnostic_matches_causal_enrichment():
+    endpoint = _row(
+        "anchor-token",
+        NOW,
+        price=110.0,
+        volume=2_000.0,
+        observation_id="anchor-endpoint",
+    )
+    anchor = _row(
+        "anchor-token",
+        NOW - timedelta(hours=25),
+        price=100.0,
+        volume=1_500.0,
+        observation_id="anchor-selected",
+    )
+
+    diagnostic = event_market_history.return_anchor_selection_diagnostic(
+        endpoint,
+        [anchor, endpoint],
+        hours=24,
+    )
+    enriched = event_market_history.enrich_market_rows_with_history(
+        [endpoint],
+        [anchor],
+        now=NOW,
+    ).enriched_rows[0]
+
+    assert diagnostic["status"] == "ready"
+    assert diagnostic["reason"] == "selected_causal_anchor"
+    assert diagnostic["anchor_window_start_at"] == (
+        NOW - timedelta(hours=30)
+    ).isoformat()
+    assert diagnostic["anchor_window_end_at"] == (
+        NOW - timedelta(hours=24)
+    ).isoformat()
+    assert diagnostic["candidate_anchor_count"] == 1
+    assert diagnostic["selected_anchor"] == {
+        "observation_id": "anchor-selected",
+        "observed_at": (NOW - timedelta(hours=25)).isoformat(),
+    }
+    assert diagnostic["selected_return_percent_points"] == 10.0
+    assert diagnostic["selected_return_percent_points"] == enriched[
+        "temporal_return_24h"
+    ]
+    assert event_market_history.return_anchor_selection_diagnostic_valid(
+        diagnostic
+    ) is True
+
+    tampered = copy.deepcopy(diagnostic)
+    tampered["future_endpoint_eligibility_inferred"] = True
+    assert event_market_history.return_anchor_selection_diagnostic_valid(
+        tampered
+    ) is False
+
+
+def test_return_anchor_selection_diagnostic_explains_causal_window_gap():
+    endpoint = _row(
+        "gap-token",
+        NOW,
+        price=110.0,
+        volume=2_000.0,
+        observation_id="gap-endpoint",
+    )
+    before_window = _row(
+        "gap-token",
+        NOW - timedelta(hours=31),
+        price=99.0,
+        volume=1_400.0,
+        observation_id="gap-before-window",
+    )
+    after_target = _row(
+        "gap-token",
+        NOW - timedelta(hours=12),
+        price=105.0,
+        volume=1_800.0,
+        observation_id="gap-after-target",
+    )
+
+    diagnostic = event_market_history.return_anchor_selection_diagnostic(
+        endpoint,
+        [before_window, after_target, endpoint],
+        hours=24,
+    )
+
+    assert diagnostic["status"] == "unavailable"
+    assert diagnostic["reason"] == "latest_causal_anchor_before_window"
+    assert diagnostic["candidate_anchor_count"] == 0
+    assert diagnostic["selected_anchor"] is None
+    assert diagnostic["nearest_causal_before_window"] == {
+        "observation_id": "gap-before-window",
+        "observed_at": (NOW - timedelta(hours=31)).isoformat(),
+        "distance_seconds": 3_600.0,
+    }
+    assert diagnostic["nearest_post_target_observation"] == {
+        "observation_id": "gap-after-target",
+        "observed_at": (NOW - timedelta(hours=12)).isoformat(),
+        "distance_seconds": 43_200.0,
+    }
+    assert diagnostic["future_endpoint_eligibility_inferred"] is False
+    assert event_market_history.return_anchor_selection_diagnostic_valid(
+        diagnostic
+    ) is True
+
+
+def test_return_anchor_selection_diagnostic_closes_empty_history() -> None:
+    endpoint = _row(
+        "new-token",
+        NOW,
+        price=110.0,
+        volume=2_000.0,
+        observation_id="new-endpoint",
+    )
+
+    diagnostic = event_market_history.return_anchor_selection_diagnostic(
+        endpoint,
+        [],
+        hours=24,
+    )
+
+    assert diagnostic["status"] == "unavailable"
+    assert diagnostic["reason"] == "no_causal_anchor_observation"
+    assert diagnostic["same_asset_causal_price_observation_count"] == 0
+    assert diagnostic["candidate_anchor_count"] == 0
+    assert diagnostic["nearest_causal_before_window"] is None
+    assert diagnostic["nearest_post_target_observation"] is None
+    assert event_market_history.return_anchor_selection_diagnostic_valid(
+        diagnostic
+    ) is True
+
+
 def test_market_history_enriches_temporal_features_and_preserves_lineage_and_basis():
     current = _row(
         "MOVE-TOKEN",

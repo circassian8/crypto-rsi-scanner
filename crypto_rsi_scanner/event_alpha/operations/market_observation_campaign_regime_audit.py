@@ -15,11 +15,12 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from typing import Any
 
+from ..radar import market_history as event_market_history
 from . import market_no_send_features
 
 
 SCHEMA_ID = "decision_radar.control_market_regime_generation_audit"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 RECENT_CYCLE_LIMIT = 32
 RECENT_MEMBERSHIP_WINDOW_SECONDS = 24 * 60 * 60
 INTERPRETATION = "descriptive_membership_overlap_not_causal_attribution"
@@ -65,6 +66,7 @@ _AUDIT_KEYS = {
     "interpretation",
     "membership_clock_scope",
     "precontract_history_used_for_membership_clock",
+    "latest_missing_input_anchor_audit",
     "selection_uses_outcomes",
     "historical_context_backfilled",
     "retained_history_mutated",
@@ -103,10 +105,39 @@ _MEMBERSHIP_CONTEXT_KEYS = {
     "within_recent_membership_window",
     "anchor_eligibility_inferred",
 }
+_ANCHOR_AUDIT_KEYS = {
+    "status",
+    "reason",
+    "generation_observed_at",
+    "horizon_hours",
+    "retained_history_status",
+    "retained_history_artifact",
+    "retained_history_sha256",
+    "retained_history_size_bytes",
+    "retained_history_row_count",
+    "retained_history_binding_source",
+    "missing_input_count",
+    "diagnostics",
+    "all_missing_inputs_explained",
+    "source_scope",
+    "future_endpoint_eligibility_inferred",
+    "retained_history_mutated",
+    "provider_calls",
+    "writes",
+    "research_only",
+}
+_ANCHOR_AUDIT_STATUSES = {
+    "observed",
+    "not_required",
+    "unavailable",
+    "inconsistent",
+}
 
 
 def build_control_regime_generation_audit(
     generations: Sequence[Mapping[str, Any]],
+    *,
+    retained_history_snapshot: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Summarize exact, already-enriched generation inputs without mutation."""
 
@@ -131,6 +162,7 @@ def build_control_regime_generation_audit(
     exited_events = 0
     incomplete_with_recent = 0
     recent_missing_events = 0
+    latest_complete_source_rows: list[dict[str, Any]] = []
 
     for generation in ordered:
         snapshot = _verified_snapshot(generation)
@@ -228,6 +260,7 @@ def build_control_regime_generation_audit(
             "missing_input_membership_context": membership_context,
         }
         complete_records.append(record)
+        latest_complete_source_rows = [dict(row) for row in rows]
         previous_assets = assets
 
     ready_records = [row for row in complete_records if row["status"] == "ready"]
@@ -252,6 +285,11 @@ def build_control_regime_generation_audit(
         key=lambda item: (-item[1], item[0]),
     )
     bounded_missing_asset_items = missing_asset_items[:256]
+    latest_anchor_audit = _latest_missing_input_anchor_audit(
+        complete_records[-1] if complete_records else None,
+        latest_complete_source_rows,
+        retained_history_snapshot,
+    )
     value = {
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
@@ -308,6 +346,7 @@ def build_control_regime_generation_audit(
         "interpretation": INTERPRETATION,
         "membership_clock_scope": MEMBERSHIP_CLOCK_SCOPE,
         "precontract_history_used_for_membership_clock": False,
+        "latest_missing_input_anchor_audit": latest_anchor_audit,
         "selection_uses_outcomes": False,
         "historical_context_backfilled": False,
         "retained_history_mutated": False,
@@ -466,6 +505,11 @@ def validate_control_regime_generation_audit(value: object) -> list[str]:
         errors.append("interpretation_invalid")
     if value.get("membership_clock_scope") != MEMBERSHIP_CLOCK_SCOPE:
         errors.append("membership_clock_scope_invalid")
+    _validate_anchor_audit(
+        value.get("latest_missing_input_anchor_audit"),
+        latest=value.get("latest_complete_generation"),
+        errors=errors,
+    )
     fixed = {
         "precontract_history_used_for_membership_clock": False,
         "selection_uses_outcomes": False,
@@ -565,6 +609,230 @@ def _missing_membership_context(
         ),
         "anchor_eligibility_inferred": False,
     }
+
+
+def _latest_missing_input_anchor_audit(
+    latest: Mapping[str, Any] | None,
+    latest_source_rows: Sequence[Mapping[str, Any]],
+    retained_history_snapshot: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    snapshot = (
+        dict(retained_history_snapshot)
+        if isinstance(retained_history_snapshot, Mapping)
+        else {}
+    )
+    history_status = snapshot.get("status")
+    history_rows = snapshot.get("rows")
+    history_observed = bool(
+        history_status in {"observed", "observed_empty"}
+        and isinstance(history_rows, (list, tuple))
+        and all(isinstance(row, Mapping) for row in history_rows)
+    )
+    missing = (
+        list(latest.get("missing_asset_ids") or ())
+        if isinstance(latest, Mapping)
+        else []
+    )
+    status = "unavailable"
+    reason = "no_complete_generation"
+    diagnostics: list[dict[str, Any]] = []
+    if latest is not None and not missing:
+        status = "not_required"
+        reason = "latest_generation_has_all_inputs"
+    elif latest is not None and not history_observed:
+        reason = "retained_history_unavailable"
+    elif latest is not None:
+        endpoints = {
+            _identity(row.get("canonical_asset_id")): row
+            for row in latest_source_rows
+            if isinstance(row, Mapping)
+            and _identity(row.get("canonical_asset_id")) in set(missing)
+        }
+        if set(endpoints) != set(missing):
+            reason = "missing_generation_endpoint_row"
+        else:
+            for asset_id in missing:
+                diagnostic = (
+                    event_market_history.return_anchor_selection_diagnostic(
+                        endpoints[asset_id],
+                        list(history_rows),
+                        hours=24,
+                    )
+                )
+                diagnostics.append(diagnostic)
+            inconsistent = any(
+                row.get("status") == "ready" for row in diagnostics
+            )
+            status = "inconsistent" if inconsistent else "observed"
+            reason = (
+                "source_missing_but_anchor_replay_ready"
+                if inconsistent
+                else "anchor_windows_replayed"
+            )
+    value = {
+        "status": status,
+        "reason": reason,
+        "generation_observed_at": (
+            latest.get("observed_at") if isinstance(latest, Mapping) else None
+        ),
+        "horizon_hours": 24,
+        "retained_history_status": (
+            history_status if isinstance(history_status, str) else "unavailable"
+        ),
+        "retained_history_artifact": snapshot.get("artifact"),
+        "retained_history_sha256": snapshot.get("sha256"),
+        "retained_history_size_bytes": snapshot.get("size_bytes"),
+        "retained_history_row_count": _nonnegative_int(
+            snapshot.get("row_count")
+        ),
+        "retained_history_binding_source": snapshot.get("binding_source"),
+        "missing_input_count": len(missing),
+        "diagnostics": diagnostics,
+        "all_missing_inputs_explained": len(diagnostics) == len(missing),
+        "source_scope": (
+            "latest_generation_endpoints_plus_exact_current_retained_history"
+        ),
+        "future_endpoint_eligibility_inferred": False,
+        "retained_history_mutated": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    return value
+
+
+def _validate_anchor_audit(
+    value: object,
+    *,
+    latest: object,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, Mapping) or set(value) != _ANCHOR_AUDIT_KEYS:
+        errors.append("anchor_audit_keys_invalid")
+        return
+    status = value.get("status")
+    diagnostics = value.get("diagnostics")
+    missing_count = value.get("missing_input_count")
+    latest_mapping = latest if isinstance(latest, Mapping) else None
+    if status not in _ANCHOR_AUDIT_STATUSES:
+        errors.append("anchor_audit_status_invalid")
+    if value.get("reason") not in {
+        "no_complete_generation",
+        "latest_generation_has_all_inputs",
+        "retained_history_unavailable",
+        "missing_generation_endpoint_row",
+        "anchor_windows_replayed",
+        "source_missing_but_anchor_replay_ready",
+    }:
+        errors.append("anchor_audit_reason_invalid")
+    if value.get("horizon_hours") != 24:
+        errors.append("anchor_audit_horizon_invalid")
+    if type(missing_count) is not int or missing_count < 0:
+        errors.append("anchor_audit_missing_count_invalid")
+        missing_count = 0
+    expected_missing = (
+        latest_mapping.get("missing_input_count") if latest_mapping else 0
+    )
+    if missing_count != expected_missing:
+        errors.append("anchor_audit_missing_count_mismatch")
+    if latest_mapping is None:
+        if value.get("generation_observed_at") is not None:
+            errors.append("anchor_audit_generation_time_invalid")
+    elif value.get("generation_observed_at") != latest_mapping.get("observed_at"):
+        errors.append("anchor_audit_generation_time_mismatch")
+    if not isinstance(diagnostics, list) or len(diagnostics) > 256:
+        errors.append("anchor_audit_diagnostics_invalid")
+        diagnostics = []
+    elif not all(
+        event_market_history.return_anchor_selection_diagnostic_valid(row)
+        for row in diagnostics
+    ):
+        errors.append("anchor_audit_diagnostic_invalid")
+    diagnostic_assets = [
+        row.get("canonical_asset_id")
+        for row in diagnostics
+        if isinstance(row, Mapping)
+    ]
+    expected_assets = (
+        latest_mapping.get("missing_asset_ids") if latest_mapping else []
+    )
+    if diagnostics and diagnostic_assets != expected_assets:
+        errors.append("anchor_audit_assets_mismatch")
+    explained = len(diagnostics) == missing_count
+    if value.get("all_missing_inputs_explained") is not explained:
+        errors.append("anchor_audit_explained_flag_invalid")
+    if status in {"observed", "inconsistent"} and not explained:
+        errors.append("anchor_audit_observed_incomplete")
+    if status == "observed" and any(
+        row.get("status") != "unavailable"
+        for row in diagnostics
+        if isinstance(row, Mapping)
+    ):
+        errors.append("anchor_audit_observed_status_mismatch")
+    if status == "inconsistent" and not any(
+        row.get("status") == "ready"
+        for row in diagnostics
+        if isinstance(row, Mapping)
+    ):
+        errors.append("anchor_audit_inconsistent_status_mismatch")
+    history_status = value.get("retained_history_status")
+    history_sha = value.get("retained_history_sha256")
+    history_size = value.get("retained_history_size_bytes")
+    history_rows = value.get("retained_history_row_count")
+    if history_status not in {
+        "observed",
+        "observed_empty",
+        "missing",
+        "unavailable",
+    }:
+        errors.append("anchor_audit_history_status_invalid")
+    if type(history_rows) is not int or history_rows < 0:
+        errors.append("anchor_audit_history_row_count_invalid")
+    if history_status in {"observed", "observed_empty"}:
+        if (
+            value.get("retained_history_artifact") != "event_market_history.jsonl"
+            or value.get("retained_history_binding_source")
+            != "campaign_market_history_exact_bytes"
+            or not _sha256(history_sha)
+            or type(history_size) is not int
+            or history_size < 0
+            or (history_status == "observed_empty") != (history_rows == 0)
+        ):
+            errors.append("anchor_audit_history_binding_invalid")
+    elif history_sha is not None or history_size is not None:
+        errors.append("anchor_audit_unavailable_history_binding_invalid")
+    fixed = {
+        "source_scope": (
+            "latest_generation_endpoints_plus_exact_current_retained_history"
+        ),
+        "future_endpoint_eligibility_inferred": False,
+        "retained_history_mutated": False,
+        "provider_calls": 0,
+        "writes": 0,
+        "research_only": True,
+    }
+    for field, expected in fixed.items():
+        if type(value.get(field)) is not type(expected) or value.get(field) != expected:
+            errors.append(f"anchor_audit_{field}_invalid")
+    expected_status, expected_reason = (
+        ("unavailable", "no_complete_generation")
+        if latest_mapping is None
+        else ("not_required", "latest_generation_has_all_inputs")
+        if missing_count == 0
+        else ("unavailable", "retained_history_unavailable")
+        if history_status not in {"observed", "observed_empty"}
+        else ("unavailable", "missing_generation_endpoint_row")
+        if not explained
+        else ("inconsistent", "source_missing_but_anchor_replay_ready")
+        if any(
+            row.get("status") == "ready"
+            for row in diagnostics
+            if isinstance(row, Mapping)
+        )
+        else ("observed", "anchor_windows_replayed")
+    )
+    if status != expected_status or value.get("reason") != expected_reason:
+        errors.append("anchor_audit_status_derivation_mismatch")
 
 
 def _validate_summary(

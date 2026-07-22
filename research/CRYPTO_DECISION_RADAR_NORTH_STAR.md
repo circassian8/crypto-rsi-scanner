@@ -873,6 +873,15 @@ universe churn but does not itself prove temporal-anchor eligibility, causation,
 or a route/score/regime/Protocol-v2 input. At cycle 64, HBAR's current clock
 began only on its 20:09 UTC re-entry and therefore measured 4.05 hours, despite
 older non-prospective raw history.
+For the distinct anchor question, exact-generation audit schema v3 calls the
+same causal selector used by enrichment against one fingerprinted retained-
+history snapshot. It reports the 24-hour target, the 25%-of-horizon backward
+tolerance, exact candidate count, selected anchor or nearest excluded rows, and
+never predicts a future endpoint. At cycle 64, HBAR had zero observations in
+its 18:12-to-00:12 UTC causal window: the nearest earlier row was 18.45 hours
+before the window and the next row was 12.01 hours after the target. This
+source-bound gap, not the descriptive membership clock, is the exact reason the
+current temporal return is unavailable.
 Campaign readiness reports exact historical coverage but performs no selection,
 outcome read, partition assignment, backfill, or policy change. It remains
 partial until a successful qualifying cycle has persisted that context and a
@@ -927,6 +936,17 @@ unpublished final state; legacy `audit_status` is only a compatibility alias for
 `publication_status`, not a second authority claim.
 Its Decision campaign totals remain explicitly separate from Event Alpha
 catalyst burn-in.
+The full campaign JSON remains complete canonical audit evidence and uses
+deterministic compact serialization. Under exact current authority the writer
+also creates `research/RADAR_LIVE_OBSERVATION_CAMPAIGN_DASHBOARD.json`, a closed
+bounded projection tied to the full report SHA-256/byte count and exact
+namespace/run/revision/operator-state digest. Dashboard requests parse the small
+projection only after one descriptor-held streaming fingerprint of the complete
+source. Aggregate shadow results remain current; detailed per-asset trace
+summaries remain in the full report and the dashboard states their omitted
+count. No-authority report refresh removes a stale projection but still
+publishes terminal campaign truth. Runtime artifact bounds remain fail-closed
+resource/security controls; source file and function sizes are advisory.
 
 Human review latency is a separate explicit-action measurement, never a web
 analytics side effect. The shared append-only ledger is
