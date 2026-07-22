@@ -367,9 +367,13 @@ may be added later when a suitable environment already exists.
 - **Source-independence OOS review:** use the
   `event-alpha-source-independence-oos-readiness`, `...-export`, `...-validate`,
   and `...-report` targets to prepare and freeze `development`/`review`/`test` by
-  `event_copy_family_id`. Exact source or normalized-content reuse across
-  partitions is invalid, pending labels return non-success, and reports remain
-  descriptive. Readiness is observational: it may validate explicit local
+  `event_copy_family_id`. The readiness Make target defaults to a concise stage
+  and next-action summary; set
+  `SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT=json` for the complete payload.
+  Direct Python CLI use remains JSON by default. Exact source or
+  normalized-content reuse across partitions is invalid, pending labels return
+  non-success, and reports remain descriptive. Readiness is observational: it
+  may validate explicit local
   inputs/corpus/template/reviews, but writes nothing, calls no provider, creates
   no label, and never displays per-case split assignments or algorithm
   predictions. Build genuine source-diverse pairs first; fixtures are not

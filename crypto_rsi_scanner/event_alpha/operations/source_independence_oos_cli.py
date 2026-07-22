@@ -20,6 +20,90 @@ from .source_independence_oos import (
 from .source_independence_oos_readiness import build_readiness_report
 
 
+READINESS_JSON_COMMAND = (
+    "make event-alpha-source-independence-oos-readiness "
+    "SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT=json PYTHON=.venv/bin/python"
+)
+
+
+def format_readiness_summary(result: dict[str, object]) -> str:
+    """Render the current human-evidence decision without exposing case rows."""
+
+    configured = _mapping(result.get("configured"))
+    case_input = _mapping(result.get("case_input"))
+    corpus = _mapping(result.get("frozen_corpus"))
+    template = _mapping(result.get("immutable_template"))
+    reviews = _mapping(result.get("operator_reviews"))
+    report = _mapping(result.get("descriptive_report_readiness"))
+    blind = _mapping(result.get("blind_review_contract"))
+    lines: list[tuple[str, object]] = [
+        ("report", "event_alpha_source_independence_oos_readiness"),
+        ("status", result.get("status")),
+        ("readiness_digest", result.get("readiness_digest")),
+        ("case_input_configured", configured.get("case_input")),
+        ("case_input_status", case_input.get("status")),
+        ("case_input_count", case_input.get("case_count")),
+        ("split_salt_configured", configured.get("split_salt")),
+        ("frozen_corpus_configured", configured.get("frozen_corpus")),
+        ("frozen_corpus_status", corpus.get("status")),
+        ("frozen_case_count", corpus.get("case_count")),
+        ("immutable_template_configured", configured.get("immutable_template")),
+        ("immutable_template_status", template.get("status")),
+        ("template_pending_rows", template.get("pending_rows")),
+        ("operator_reviews_configured", configured.get("operator_reviews")),
+        ("operator_reviews_status", reviews.get("status")),
+        ("reviewed_rows", reviews.get("valid_reviewed_rows")),
+        ("pending_rows", reviews.get("pending_rows")),
+        ("descriptive_report_status", report.get("status")),
+        (
+            "reviewed_oos_coverage_complete",
+            report.get("reviewed_oos_coverage_complete"),
+        ),
+        ("policy_conclusion", report.get("policy_conclusion")),
+        ("errors", result.get("errors")),
+        ("next_action", result.get("next_action")),
+        ("next_safe_command", result.get("next_safe_command")),
+        ("label_from", blind.get("label_from")),
+        ("do_not_label_from", blind.get("do_not_label_from")),
+        ("expected_provider_activity", result.get("expected_provider_activity")),
+        ("provider_calls", result.get("provider_calls")),
+        ("writes", result.get("writes")),
+        ("route_changes", result.get("route_changes")),
+        ("threshold_changes", result.get("threshold_changes")),
+        ("policy_changes", result.get("policy_changes")),
+        (
+            "automatic_policy_application",
+            result.get("automatic_policy_application"),
+        ),
+        (
+            "protocol_v2_evidence_eligible",
+            result.get("protocol_v2_evidence_eligible"),
+        ),
+        ("research_only", result.get("research_only")),
+        ("full_json_command", READINESS_JSON_COMMAND),
+    ]
+    return "\n".join(
+        f"{key}={_summary_value(value)}"
+        for key, value in lines
+    )
+
+
+def _mapping(value: object) -> dict[str, object]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _summary_value(value: object) -> str:
+    if value is None:
+        return "none"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (list, tuple)):
+        return ",".join(_summary_value(item) for item in value) or "none"
+    return str(value).replace("\r", " ").replace("\n", " ").strip() or "none"
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -34,6 +118,7 @@ def _parser() -> argparse.ArgumentParser:
     readiness.add_argument("--template")
     readiness.add_argument("--reviews")
     readiness.add_argument("--split-salt-configured", action="store_true")
+    readiness.add_argument("--output", choices=("json", "summary"), default="json")
     export = commands.add_parser("export")
     export.add_argument("--input", required=True)
     export.add_argument("--corpus-out", required=True)
@@ -62,7 +147,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 reviews_path=args.reviews,
                 split_salt_configured=args.split_salt_configured,
             )
-            sys.stdout.write(format_json(result))
+            if args.output == "summary":
+                sys.stdout.write(format_readiness_summary(result) + "\n")
+            else:
+                sys.stdout.write(format_json(result))
             return 2 if result["status"] == "invalid" else 0
         if args.command == "export":
             result = export_workflow(
@@ -96,4 +184,4 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-__all__ = ("main",)
+__all__ = ("format_readiness_summary", "main")

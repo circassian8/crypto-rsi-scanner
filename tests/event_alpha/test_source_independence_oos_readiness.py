@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from crypto_rsi_scanner.event_alpha.operations import source_independence_oos as oos
@@ -8,6 +9,9 @@ from crypto_rsi_scanner.event_alpha.operations import source_independence_oos_cl
 from crypto_rsi_scanner.event_alpha.operations import (
     source_independence_oos_readiness as readiness,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _source(
@@ -247,3 +251,34 @@ def test_readiness_cli_is_observational_and_returns_zero_for_missing_human_input
     assert output["provider_calls"] == 0
     assert output["writes"] == 0
     assert tuple(tmp_path.iterdir()) == before
+
+    result = source_independence_oos_cli.main(["readiness", "--output", "summary"])
+
+    summary = capsys.readouterr().out
+    assert result == 0
+    assert "report=event_alpha_source_independence_oos_readiness" in summary
+    assert "status=case_input_required" in summary
+    assert "next_action=prepare_source_diverse_case_input" in summary
+    assert "label_from=immutable_template_copy_only" in summary
+    assert "provider_calls=0" in summary
+    assert "writes=0" in summary
+    assert "threshold_changes=0" in summary
+    assert "protocol_v2_evidence_eligible=false" in summary
+    assert "SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT=json" in summary
+    assert tuple(tmp_path.iterdir()) == before
+
+
+def test_readiness_make_target_defaults_to_summary() -> None:
+    command = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-source-independence-oos-readiness",
+            "PYTHON=python3",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+    )
+
+    assert "source_independence_oos readiness" in command
+    assert "--output summary" in command

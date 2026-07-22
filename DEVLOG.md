@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Make blind-label readiness decision-first · Codex
+**Why:** The source-independence workflow correctly remained blocked on missing
+genuine source-diverse cases, but its default JSON obscured that single next
+human action and the current state of each later frozen-review stage.
+**Changes:**
+- Added a concise Make-default summary with stage configuration/status/counts,
+  descriptive coverage, exact next action, blind-label boundary, and explicit
+  zero provider/write/route/threshold/policy changes.
+- Preserved the complete machine payload with
+  `SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT=json`; direct Python stays JSON by
+  default and no case rows, split assignments, or predictions enter the summary.
+**Verify:** All 18 focused source-independence and Protocol-v2 progress tests
+passed, compileall/diff checks passed, and the real no-input readiness reported
+`case_input_required`, zero calls/writes/changes, and the genuine-pair action.
+**Notes/risks:** No corpus, template, review, label, threshold, route, policy,
+provider, notification, trade, paper trade, RSI row, or Event Alpha
+`TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Make official-calendar readiness decision-first · Codex
 **Why:** Official macro readiness already preserved correct source-level truth,
 but its default Make surface dumped a large JSON object and buried the actual

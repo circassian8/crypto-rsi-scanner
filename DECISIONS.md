@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Lead blind-label readiness with the next human action
+**Status:** accepted
+**Decision:** The normal source-independence OOS readiness Make target is a
+bounded stage summary. It shows configured inputs, frozen corpus/template/review
+status and counts, descriptive-report coverage, the exact next action, the
+blind-label boundary, and zero-I/O/no-policy safety. The complete payload remains
+available through `SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT=json`; direct Python
+CLI usage stays JSON by default.
+**Why:** The current workflow has one blocker—genuine source-diverse case input
+does not exist—but the former full JSON view buried that action among static
+contracts. A concise view makes the human evidence task explicit without
+revealing cases, partitions, predictions, or fabricating labels.
+**Revisit when:** The frozen workflow gains a new genuine stage. Keep the summary
+derived from the canonical readiness payload and preserve its full JSON form.
+
 ## 2026-07-22 - Lead official-calendar readiness with per-source truth
 **Status:** accepted
 **Decision:** The normal `radar-calendar-official-readiness` Make surface is a

@@ -24,6 +24,7 @@ SOURCE_INDEPENDENCE_OOS_TEMPLATE ?=
 SOURCE_INDEPENDENCE_OOS_REVIEWS ?=
 SOURCE_INDEPENDENCE_OOS_SPLIT_SALT ?=
 SOURCE_INDEPENDENCE_OOS_SPLIT_VERSION ?= source_independence_oos_split_v3
+SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT ?= summary
 EVENT_FADE_SAMPLE_OUT ?= /tmp/event_fade_validation_sample.jsonl
 EVENT_FADE_SAMPLE_IN ?= $(EVENT_FADE_SAMPLE_OUT)
 EVENT_FADE_SAMPLE_FRESH ?= $(EVENT_FADE_SAMPLE_OUT)
@@ -320,7 +321,7 @@ help:
 	@echo "  make event-llm-extract-eval  Run offline LLM raw-extraction eval fixtures"
 	@echo "  make event-alpha-eval  Run offline Event Alpha route/feedback eval fixtures"
 	@echo "  make event-alpha-source-independence-oos-export  Export frozen development/review/test labels; no providers or threshold/routing changes"
-	@echo "  make event-alpha-source-independence-oos-readiness  Inspect frozen corpus and blind-label progress; no providers/writes"
+	@echo "  make event-alpha-source-independence-oos-readiness  Concise frozen-corpus/blind-label progress; no providers/writes (SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT=json for full JSON)"
 	@echo "  make event-alpha-source-independence-oos-validate  Read-only reviewed-label/provenance validation; no providers"
 	@echo "  make event-alpha-source-independence-oos-report  Read-only split metrics; no providers or threshold/routing changes"
 	@echo "  make event-alpha-source-independence-storage-report ARTIFACT_NAMESPACE=...  Measure reference/store/export bytes read-only"
@@ -1115,7 +1116,8 @@ event-alpha-source-independence-oos-readiness:
 		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_CORPUS)),--corpus "$(SOURCE_INDEPENDENCE_OOS_CORPUS)",) \
 		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_TEMPLATE)),--template "$(SOURCE_INDEPENDENCE_OOS_TEMPLATE)",) \
 		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_REVIEWS)),--reviews "$(SOURCE_INDEPENDENCE_OOS_REVIEWS)",) \
-		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_SPLIT_SALT)),--split-salt-configured,)
+		$(if $(strip $(SOURCE_INDEPENDENCE_OOS_SPLIT_SALT)),--split-salt-configured,) \
+		--output $(SOURCE_INDEPENDENCE_OOS_READINESS_OUTPUT)
 
 event-alpha-source-independence-oos-export:
 	@test -n "$(SOURCE_INDEPENDENCE_OOS_INPUT)" || { echo "SOURCE_INDEPENDENCE_OOS_INPUT is required" >&2; exit 2; }
