@@ -1191,12 +1191,55 @@ def test_evidence_authority_requires_an_exact_official_source_class():
             unknown.evidence_confidence_components["source_authority"]
         )
 
-    for source_class in ("official_exchange", "official_project"):
+    for source_class in (
+        "official_exchange",
+        "official_project",
+        " Official_Exchange ",
+        "OFFICIAL_PROJECT",
+    ):
         result = decision_model.evaluate_radar_decision(
             _market_led_candidate(source_class=source_class, **common)
         )
 
         assert result.evidence_confidence_components["source_authority"] == 94.0
+
+
+def test_official_catalyst_source_labels_use_the_same_exact_normalization():
+    common = {
+        "source_origin": "official_exchange",
+        "accepted_evidence_count": 1,
+        "latest_source_url": "https://example.test/official-notice",
+        "latest_source_title": "Official notice",
+    }
+    exact_class = decision_model.evaluate_radar_decision(
+        _market_led_candidate(source_class="official_exchange", **common)
+    )
+    normalized_class = decision_model.evaluate_radar_decision(
+        _market_led_candidate(source_class=" Official_Exchange ", **common)
+    )
+    exact_strength = decision_model.evaluate_radar_decision(
+        _market_led_candidate(source_strength="official_structured", **common)
+    )
+    normalized_strength = decision_model.evaluate_radar_decision(
+        _market_led_candidate(source_strength=" OFFICIAL_STRUCTURED ", **common)
+    )
+
+    assert (
+        normalized_class.catalyst_status
+        == exact_class.catalyst_status
+        == "confirmed"
+    )
+    assert normalized_class.evidence_confidence_components == (
+        exact_class.evidence_confidence_components
+    )
+    assert (
+        normalized_strength.catalyst_status
+        == exact_strength.catalyst_status
+        == "confirmed"
+    )
+    assert normalized_strength.evidence_confidence_components == (
+        exact_strength.evidence_confidence_components
+    )
 
 
 def test_new_routes_and_origin_lanes_are_independently_configurable():

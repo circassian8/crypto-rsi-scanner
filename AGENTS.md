@@ -86,6 +86,9 @@ fallback only to exact normalized `official_exchange` and `official_project`
 source classes. Prefix look-alikes such as `officially_fake`, `officialish`, or
 `official_exchange_archive` may retain separately justified catalyst-lane
 compatibility, but they must not receive official source-authority points.
+Exact normalization means typed text with surrounding whitespace removed and
+Unicode case-folding applied; catalyst confirmation and evidence scoring must
+apply that same rule.
 That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the

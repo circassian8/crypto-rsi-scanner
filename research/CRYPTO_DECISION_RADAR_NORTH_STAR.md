@@ -62,7 +62,9 @@ official-class fallback only to exact normalized `official_exchange` and
 `official_project` source classes. Prefix or compound look-alikes such as
 `officially_fake`, `officialish`, and `official_exchange_archive` retain the
 unverified authority baseline. Catalyst-lane plausibility remains a separate
-compatibility question and cannot manufacture official evidence points.
+compatibility question and cannot manufacture official evidence points. Exact
+normalization trims outer whitespace and case-folds typed text; catalyst status
+and evidence scoring apply the same normalization.
 
 For historical Decision-v2 rows that predate the closed catalyst-attribution
 contract, the compatibility heuristic recognizes catalyst-specific source-lane

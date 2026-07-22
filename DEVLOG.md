@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Normalize exact official source labels consistently · Codex
+**Why:** Catalyst evidence scoring already trimmed and case-folded historical
+source labels, while catalyst confirmation compared the same typed values
+case-sensitively. The same official evidence could therefore receive official
+authority points yet fall from confirmed to plausible solely because of casing
+or surrounding whitespace.
+**Changes:**
+- Applied one exact trim-and-casefold rule to historical `source_class` and
+  `source_strength` confirmation, matching the existing evidence-component
+  normalization without accepting prefixes, suffixes, or embedded look-alikes.
+- Added regressions proving normalized `official_exchange`, `official_project`,
+  and `official_structured` values preserve both confirmed catalyst status and
+  identical evidence components.
+- Updated the working agreement, North Star, roadmap, and durable decision with
+  the closed normalization contract.
+**Verify:** 291 focused Decision-v2, catalyst, surface, consistency,
+derivatives, calendar, namespace, Core-opportunity, empirical-policy, replay,
+and integrity tests passed. Python compilation and the integrated-radar smoke
+passed with 15 candidates, 12 Core rows/cards, strict doctor 0 blockers / 0
+warnings, and 14 dashboard fixture pages.
+**Notes/risks:** No source class set, evidence weight, threshold, route,
+provider, artifact, or research-only safety boundary changed. Full `make verify`
+was intentionally skipped because the focused model/catalyst/integration gates
+cover this bounded normalization fix. Quantitative source sizes remain advisory;
+runtime artifact, request, path, secret, and security bounds remain enforced.
+
 ## 2026-07-22 — Record the sixty-eighth no-send market cycle · Codex
 **Why:** The hourly cadence became eligible while explicit CoinGecko
 authorization remained present. One bounded observation was due to continue

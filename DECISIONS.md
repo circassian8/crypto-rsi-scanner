@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Normalize exact official labels the same way everywhere
+**Status:** accepted
+**Decision:** Exact historical official-source matching trims surrounding
+whitespace and case-folds typed text before comparing the complete value.
+Catalyst confirmation and evidence-component authority must share this rule for
+`official_exchange`, `official_project`, structured source classes, and
+`official_structured` strength. Prefixes, suffixes, compounds, and embedded
+look-alikes remain ineligible unless a separate compatibility rule applies.
+**Why:** Evidence scoring already normalized casing while catalyst confirmation
+did not. The same official row was confirmed in lowercase but only plausible in
+uppercase or with surrounding whitespace, so its status and component score
+described different source identities.
+**Revisit when:** Typed source enums replace historical text compatibility. Do
+not broaden the exact value set or accept substring matches.
+
 ## 2026-07-22 - Score catalyst evidence from its owning source row
 **Status:** accepted
 **Decision:** Decision-v2 `source_authority` and `source_specificity` components

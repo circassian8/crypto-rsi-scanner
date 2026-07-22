@@ -443,14 +443,14 @@ def _has_catalyst_source_lane(values: tuple[str, ...]) -> bool:
 def _row_is_official_source(row: Mapping[str, Any]) -> bool:
     return bool(
         _valid_structured_source_event(row.get("official_exchange_event"))
-        or _typed_text(row.get("source_class"))
+        or _typed_text(row.get("source_class")).casefold()
         in {
             "official_exchange",
             "official_project",
             "structured_calendar",
             "structured_unlock",
         }
-        or _typed_text(row.get("source_strength")) == "official_structured"
+        or _typed_text(row.get("source_strength")).casefold() == "official_structured"
     )
 
 
