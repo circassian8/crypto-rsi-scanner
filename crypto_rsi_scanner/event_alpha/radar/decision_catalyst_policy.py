@@ -87,28 +87,7 @@ def catalyst_status(
     if explicit in {item.value for item in CatalystStatus}:
         return explicit
     evidence_rows = (data, *sources)
-    source_evidence = (
-        (
-            data,
-            (
-                *_texts(data.get("source_origin")),
-                *_texts(data.get("source_origins")),
-                *_texts(data.get("source_class")),
-                *_texts(data.get("source_pack")),
-            ),
-        ),
-        *(
-            (
-                row,
-                (
-                    str(row.get("_source_origin") or ""),
-                    str(row.get("source_class") or ""),
-                    str(row.get("source_pack") or ""),
-                ),
-            )
-            for row in sources
-        ),
-    )
+    source_evidence = _source_evidence_rows(data, sources)
     official_with_evidence = any(
         _row_is_official_source(row)
         and (
@@ -233,6 +212,51 @@ def attribution_values(
     return tuple(dict(row) for row in values)
 
 
+def evidence_owner_rows(
+    data: Mapping[str, Any],
+    sources: tuple[Mapping[str, Any], ...] = (),
+) -> tuple[tuple[dict[str, Any], ...], bool]:
+    """Return source-owned catalyst evidence and closed-contract authority.
+
+    The boolean is true when a supplied catalyst-attribution contract controls
+    the result.  In that case invalid or non-causal attributions deliberately
+    return no owners instead of falling back to historical flattened hints.
+    """
+
+    attributions, attribution_invalid, attribution_supplied = (
+        _catalyst_attribution_values(data, sources)
+    )
+    source_rows = (data, *sources)
+    if attribution_supplied:
+        if attribution_invalid:
+            return (), True
+        return (
+            tuple(
+                _attribution_evidence_owner(row, source_rows)
+                for row in attributions
+                if row.get("causal_eligible") is True
+            ),
+            True,
+        )
+
+    owners: list[dict[str, Any]] = []
+    for row, lane_values in _source_evidence_rows(data, sources):
+        accepted = (_count(row.get("accepted_evidence_count")) or 0) > 0
+        structured = _valid_structured_source_event(
+            row.get("official_exchange_event")
+        )
+        has_public_url = bool(catalyst_source_fields(row)[0])
+        if (
+            (_row_is_official_source(row) and (accepted or structured))
+            or (
+                _has_catalyst_source_lane(lane_values)
+                and (accepted or has_public_url)
+            )
+        ):
+            owners.append(dict(row))
+    return tuple(owners), False
+
+
 def _catalyst_attribution_values(
     data: Mapping[str, Any],
     sources: tuple[Mapping[str, Any], ...],
@@ -305,6 +329,51 @@ def _candidate_anomaly_ids(data: Mapping[str, Any]) -> set[str]:
         str(data.get("observation_id") or ""),
     )
     return {value.strip() for value in values if value.strip()}
+
+
+def _source_evidence_rows(
+    data: Mapping[str, Any],
+    sources: tuple[Mapping[str, Any], ...],
+) -> tuple[tuple[Mapping[str, Any], tuple[str, ...]], ...]:
+    return (
+        (
+            data,
+            (
+                *_texts(data.get("source_origin")),
+                *_texts(data.get("source_origins")),
+                *_texts(data.get("source_class")),
+                *_texts(data.get("source_pack")),
+            ),
+        ),
+        *(
+            (
+                row,
+                (
+                    str(row.get("_source_origin") or ""),
+                    str(row.get("source_class") or ""),
+                    str(row.get("source_pack") or ""),
+                ),
+            )
+            for row in sources
+        ),
+    )
+
+
+def _attribution_evidence_owner(
+    attribution: Mapping[str, Any],
+    source_rows: tuple[Mapping[str, Any], ...],
+) -> dict[str, Any]:
+    attribution_values = {
+        key: value
+        for key, value in attribution.items()
+        if value not in (None, "")
+    }
+    attribution_url = catalyst_source_fields(attribution)[0]
+    if attribution_url:
+        for source in source_rows:
+            if catalyst_source_fields(source)[0] == attribution_url:
+                return {**dict(source), **attribution_values}
+    return dict(attribution_values)
 
 
 def _row_text_values(

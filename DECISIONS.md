@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Score catalyst evidence from its owning source row
+**Status:** accepted
+**Decision:** Decision-v2 `source_authority` and `source_specificity` components
+must use the same source-owned evidence set that determines catalyst status.
+For a supplied closed attribution contract, only valid causal-eligible
+attributions control scoring; invalid, retrospective, and context-only claims
+cannot fall back to flattened historical official hints. For historical
+compatibility, a catalyst lane, accepted count or public URL, source class,
+strength, and title must remain on one row. Choose the strongest valid owner
+deterministically. When no catalyst owner exists, an unrelated accepted count
+does not raise specificity.
+**Why:** Catalyst status had become row-local, but its evidence components still
+read only the flattened candidate. An unrelated market count could raise
+specificity, while a genuinely bound official `source_rows` record confirmed
+the catalyst yet remained scored at the unverified authority baseline. The
+score and status therefore described different evidence.
+**Revisit when:** A schema-backed evidence-owner identifier replaces historical
+row selection. Do not change weights or thresholds from this ownership fix, and
+do not let retrospective context become causal confidence.
+
 ## 2026-07-22 - Re-derive expiry during final Decision reevaluation
 **Status:** accepted
 **Decision:** When `reevaluate_radar_decision_fields` receives a completed

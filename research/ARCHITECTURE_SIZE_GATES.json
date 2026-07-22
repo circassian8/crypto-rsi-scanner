@@ -1911,7 +1911,7 @@
     },
     {
       "limit": 1500,
-      "line_count": 2555,
+      "line_count": 2571,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
@@ -2238,7 +2238,7 @@
   ],
   "functions_over_limit_count": 35,
   "gate_status": "pass",
-  "generated_at": "2026-07-22T04:33:36.911827+00:00",
+  "generated_at": "2026-07-22T04:48:17.877203+00:00",
   "historical_row_type_alias": "refactor_size_gate_report",
   "largest_api_files": [],
   "largest_production_files": [
@@ -2364,6 +2364,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1443,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1416,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
       "source_kind": "production"
@@ -2372,12 +2378,6 @@
       "limit": 1500,
       "line_count": 1410,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1402,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
@@ -2486,7 +2486,7 @@
   "largest_test_files": [
     {
       "limit": 1500,
-      "line_count": 2555,
+      "line_count": 2571,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "source_kind": "test"
     },
@@ -4233,6 +4233,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1443,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1416,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -4242,13 +4249,6 @@
     {
       "line_count": 1410,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1402,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -4458,7 +4458,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2555,
+      "line_count": 2571,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "severity": "advisory",
       "source_kind": "test",
@@ -5085,6 +5085,12 @@
     },
     {
       "limit": 1500,
+      "line_count": 1443,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "source_kind": "production"
+    },
+    {
+      "limit": 1500,
       "line_count": 1416,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
       "source_kind": "production"
@@ -5093,12 +5099,6 @@
       "limit": 1500,
       "line_count": 1410,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-      "source_kind": "production"
-    },
-    {
-      "limit": 1500,
-      "line_count": 1402,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
@@ -5781,14 +5781,14 @@
     },
     {
       "limit": 1500,
-      "line_count": 1416,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+      "line_count": 1443,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "source_kind": "production"
     },
     {
       "limit": 1500,
-      "line_count": 1402,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+      "line_count": 1416,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
       "source_kind": "production"
     },
     {
@@ -6019,6 +6019,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1443,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1416,
         "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
         "threshold": 1200
@@ -6026,11 +6031,6 @@
       {
         "line_count": 1410,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1402,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
         "threshold": 1200
       },
       {
@@ -6473,7 +6473,7 @@
     {
       "category": "file_over_1500_lines",
       "limit": 1500,
-      "line_count": 2555,
+      "line_count": 2571,
       "path": "tests/event_alpha/test_decision_model_v2.py",
       "severity": "advisory",
       "source_kind": "test",

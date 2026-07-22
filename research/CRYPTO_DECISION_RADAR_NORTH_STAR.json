@@ -776,6 +776,7 @@
     "article_text_may_establish_authority": false,
     "canonical_classifier": "event_alpha.providers.source_registry",
     "compatibility_evidence_ownership": "row_local; source lane, accepted count, and public URL cannot be pooled across different rows",
+    "decision_evidence_score_ownership": "source authority and specificity use the same valid row-local catalyst owner; supplied invalid or non-causal attribution cannot fall back to historical official hints",
     "compatibility_lane_label_matching": "normalized component boundaries only; arbitrary substrings cannot raise catalyst status",
     "compatibility_text_disproof": "field-local unnegated normalized component sequences only; separate fields and immediate no/non/not/without negation cannot create disproof",
     "decision_evidence_official_class_matching": "exact normalized official_exchange or official_project only; prefixes and compounds receive unverified baseline authority points",

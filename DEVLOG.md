@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Bind Decision evidence scores to source owners · Codex
+**Why:** Catalyst status used row-local evidence ownership, but
+`source_authority` and `source_specificity` still read only the flattened
+candidate. An unrelated market accepted-count raised specificity, while a
+genuinely bound official source row confirmed the catalyst yet retained the
+unverified authority score.
+**Changes:**
+- Exposed one deterministic catalyst evidence-owner projection shared by status
+  and scoring. Historical compatibility keeps lane, accepted count/public URL,
+  source class/strength, and title on one row.
+- Made a supplied closed attribution contract authoritative for scoring: only
+  valid causal-eligible attributions may own evidence components. Invalid,
+  retrospective, and context-only claims cannot regain official points through
+  flattened fallback fields.
+- Scored the strongest valid owner deterministically, while preventing an
+  unrelated flattened accepted count from raising specificity. Added paired
+  cross-row, source-row, causal, retrospective, and invalid-attribution
+  regressions.
+- Updated the North Star, roadmap, working agreement, durable decision, and
+  generated project-health reports.
+**Verify:** 290 focused Decision-v2, surface, consistency, catalyst,
+derivatives, calendar, namespace, Core-opportunity, empirical-policy, replay,
+and integrity tests passed. Python compilation, strict integrated smoke/doctor
+(15 candidates, 12 Core rows/cards, 0 blockers/warnings), 14-page dashboard
+fixture rendering, architecture cleanliness, JSON validation, and diff hygiene
+passed.
+**Notes/risks:** Evidence weights, thresholds, route rules, source activation,
+historical bytes, providers, and all research-only/no-side-effect boundaries
+remain unchanged. Full `make verify` was intentionally skipped because the
+focused model/catalyst/integration gates cover this bounded ownership fix.
+
 ## 2026-07-22 — Re-derive expiry after final Decision mutations · Codex
 **Why:** Final Decision-v2 reevaluation recalculated market phase, horizon,
 urgency, and chase risk but fed the prior result's derived `expires_at` back as

@@ -77,6 +77,15 @@ evidence count or public URL from another row. A source-bound accepted count or
 public URL may retain compatibility confidence; unrelated evidence remains
 unknown.
 
+Decision-v2 evidence-confidence components use the same closed ownership.
+`source_authority` and `source_specificity` are derived from one valid catalyst
+evidence owner rather than the flattened family. A bound source-row owner keeps
+its own class, strength, accepted count, URL, and title; an unrelated count
+cannot raise specificity. Once a closed catalyst-attribution contract is
+supplied, only a valid causal-eligible attribution may own these components.
+Invalid, retrospective, and context-only attributions remain visible context
+but receive no fallback official-source points.
+
 Historical thesis-origin compatibility is closed in the same way across all
 seven origins. Market, catalyst, technical, derivatives, on-chain, fundamental,
 and macro context may be inferred only from unnegated normalized source-label

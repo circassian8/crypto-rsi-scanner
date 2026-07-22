@@ -625,6 +625,7 @@ def test_catalyst_source_lane_labels_require_component_boundaries():
 
 
 def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
+    baseline = decision_model.evaluate_radar_decision(_market_led_candidate())
     unrelated_accepted = decision_model.evaluate_radar_decision(
         _market_led_candidate(accepted_evidence_count=1),
         source_rows=(
@@ -649,6 +650,12 @@ def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
 
     assert unrelated_accepted.catalyst_status == "unknown"
     assert unrelated_url.catalyst_status == "unknown"
+    assert unrelated_accepted.evidence_confidence_components == (
+        baseline.evidence_confidence_components
+    )
+    assert unrelated_url.evidence_confidence_components == (
+        baseline.evidence_confidence_components
+    )
     assert unrelated_accepted.decision_hard_blockers == ()
     assert unrelated_url.decision_hard_blockers == ()
 
@@ -659,6 +666,8 @@ def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
                 "_source_origin": "official_exchange",
                 "source_class": "official_exchange",
                 "accepted_evidence_count": 1,
+                "source_url": "https://example.test/official-catalyst",
+                "source_title": "Official catalyst notice",
             },
         ),
     )
@@ -675,6 +684,8 @@ def test_catalyst_compatibility_does_not_combine_evidence_across_rows():
 
     assert bound_official.catalyst_status == "confirmed"
     assert bound_news.catalyst_status == "plausible"
+    assert bound_official.evidence_confidence_components["source_authority"] == 94.0
+    assert bound_official.evidence_confidence_components["source_specificity"] == 92.0
     assert bound_official.decision_hard_blockers == ()
     assert bound_news.decision_hard_blockers == ()
 
@@ -1751,6 +1762,8 @@ def test_retrospective_official_source_cannot_claim_catalyst_confirmation():
 
     assert attribution["evidence_use"] == "retrospective_context"
     assert result.catalyst_status == "unknown"
+    assert result.evidence_confidence_components["source_authority"] == 32.0
+    assert result.evidence_confidence_components["source_specificity"] == 42.0
     assert result.confidence_band == "actionable"
     assert result.radar_route == "actionable_watch"
     assert result.radar_route != "high_confidence_watch"
@@ -1796,6 +1809,8 @@ def test_antecedent_official_source_can_confirm_catalyst_with_attribution():
 
     assert attribution["causal_eligible"] is True
     assert result.catalyst_status == "confirmed"
+    assert result.evidence_confidence_components["source_authority"] == 96.0
+    assert result.evidence_confidence_components["source_specificity"] == 58.0
     assert result.confidence_band == "high_confidence"
     assert result.radar_route == "high_confidence_watch"
 
@@ -1833,6 +1848,7 @@ def test_invalid_supplied_catalyst_attribution_fails_closed():
     result = decision_model.evaluate_radar_decision(row)
 
     assert result.catalyst_status == "unknown"
+    assert result.evidence_confidence_components["source_authority"] == 32.0
     assert result.radar_route != "high_confidence_watch"
     assert any("closed contract" in item for item in result.decision_warnings)
 

@@ -185,7 +185,8 @@ def _evaluate_radar_decision(
         evidence_confidence,
         risk,
     ) = _score_candidate(
-        data=data, market=market, origin=primary_origin, catalyst=catalyst,
+        data=data, market=market, sources=sources, origin=primary_origin,
+        catalyst=catalyst,
         timing=timing, tradability=tradability, spread=spread, missing=missing,
         blockers=blockers, cfg=cfg, rsi_actionability_delta=rsi_actionability_delta,
         rsi_risk_delta=rsi_risk_delta, rsi_reasons=rsi_reasons,
@@ -257,7 +258,8 @@ def _evaluate_radar_decision(
 
 def _score_candidate(
     *,
-    data: Mapping[str, Any], market: Mapping[str, Any], origin: str,
+    data: Mapping[str, Any], market: Mapping[str, Any],
+    sources: tuple[Mapping[str, Any], ...], origin: str,
     catalyst: str, timing: str, tradability: str, spread: str,
     missing: tuple[str, ...], blockers: tuple[str, ...], cfg: RadarDecisionConfig,
     rsi_actionability_delta: float, rsi_risk_delta: float,
@@ -269,7 +271,12 @@ def _score_candidate(
     action_components = _actionability_components(
         data, market, catalyst=catalyst, timing=timing, cfg=cfg,
     )
-    evidence_components = _evidence_components(data, market, catalyst=catalyst)
+    evidence_components = _evidence_components(
+        data,
+        market,
+        sources=sources,
+        catalyst=catalyst,
+    )
     risk_components = _risk_components(
         data, market, catalyst=catalyst, timing=timing, missing=missing,
         blockers=blockers, cfg=cfg,
@@ -662,25 +669,28 @@ def _evidence_components(
     data: Mapping[str, Any],
     market: Mapping[str, Any],
     *,
+    sources: tuple[Mapping[str, Any], ...],
     catalyst: str,
 ) -> dict[str, float]:
-    source_strength = _typed_text(data.get("source_strength")).casefold()
-    source_class = _typed_text(data.get("source_class")).casefold()
-    authority = {
-        "official_structured": 96.0,
-        "strong": 84.0,
-        "medium": 68.0,
-        "tagged_context": 55.0,
-        "weak": 38.0,
-    }.get(
-        source_strength,
-        94.0 if source_class in _OFFICIAL_EVIDENCE_SOURCE_CLASSES else 32.0,
+    evidence_owners, attribution_controls = (
+        decision_catalyst_policy.evidence_owner_rows(data, sources)
     )
-    source_url, source_title = _catalyst_source_fields(data)
-    if not source_url:
-        authority = min(authority, 62.0)
-    accepted = _count(data.get("accepted_evidence_count")) or 0
-    specificity = 92.0 if catalyst == CatalystStatus.CONFIRMED.value else 72.0 if accepted > 0 else 42.0
+    owner = (
+        max(evidence_owners, key=_evidence_owner_rank)
+        if evidence_owners
+        else ({} if attribution_controls else data)
+    )
+    authority, source_url, source_title = _evidence_source_profile(owner)
+    accepted = (
+        (_count(owner.get("accepted_evidence_count")) or 0)
+        if evidence_owners
+        else 0
+    )
+    specificity = (
+        92.0
+        if catalyst == CatalystStatus.CONFIRMED.value
+        else 72.0 if accepted > 0 else 42.0
+    )
     if not source_title:
         specificity = min(specificity, 58.0)
     catalyst_clarity = {
@@ -714,6 +724,37 @@ def _evidence_components(
         "asset_identity": identity,
         "market_data_quality": market_quality,
     }
+
+
+def _evidence_owner_rank(row: Mapping[str, Any]) -> tuple[float, int, int, int]:
+    authority, source_url, source_title = _evidence_source_profile(row)
+    return (
+        authority,
+        int((_count(row.get("accepted_evidence_count")) or 0) > 0),
+        int(bool(source_title)),
+        int(bool(source_url)),
+    )
+
+
+def _evidence_source_profile(
+    row: Mapping[str, Any],
+) -> tuple[float, str, str]:
+    source_strength = _typed_text(row.get("source_strength")).casefold()
+    source_class = _typed_text(row.get("source_class")).casefold()
+    authority = {
+        "official_structured": 96.0,
+        "strong": 84.0,
+        "medium": 68.0,
+        "tagged_context": 55.0,
+        "weak": 38.0,
+    }.get(
+        source_strength,
+        94.0 if source_class in _OFFICIAL_EVIDENCE_SOURCE_CLASSES else 32.0,
+    )
+    source_url, source_title = _catalyst_source_fields(row)
+    if not source_url:
+        authority = min(authority, 62.0)
+    return authority, source_url, source_title
 
 
 def _risk_components(

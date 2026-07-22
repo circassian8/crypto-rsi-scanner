@@ -90,6 +90,10 @@ That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the
 authority for current integrated candidates.
+Decision-v2 source-authority and source-specificity components use that same
+owner set. A flattened accepted count cannot raise specificity, a source-row
+owner must receive its own authority, and a supplied invalid or non-causal
+closed attribution cannot fall back to historical official hints for points.
 Historical text-only disproof phrases are field-local, component-boundary
 matched, and reject immediate `no`/`non`/`not`/`without` negation. Separate
 fields cannot assemble a disproof, and `unofficial denial` is not an
