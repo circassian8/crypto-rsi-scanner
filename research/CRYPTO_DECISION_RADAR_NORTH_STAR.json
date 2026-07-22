@@ -1848,8 +1848,10 @@
       "authorization_boundary": "acquire requires already-present RSI_DECISION_RADAR_MACRO_CALENDAR_LIVE=1; BLS also needs an honest contact",
       "current_status": "not_authorized",
       "expected_provider_activity": "readiness none; authorized acquire at most one request per configured source",
+      "full_readiness_json_command": "make radar-calendar-official-readiness RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json PYTHON=.venv/bin/python",
       "implication": "calendar remains not configured unless genuine local source exports are imported",
       "next_safe_command": "make radar-calendar-official-readiness PYTHON=.venv/bin/python",
+      "readiness_default_view": "concise per-source operator summary",
       "rollback_disable_command": "none; the program never creates authorization or installs a service"
     },
     "structured_unlock_subscription_and_capture": {

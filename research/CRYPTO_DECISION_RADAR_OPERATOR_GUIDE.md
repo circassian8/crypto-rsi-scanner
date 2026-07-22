@@ -310,7 +310,10 @@ An empty live calendar must name its coverage state. `Not configured` means the
 generation did not inspect a real calendar source; it does not mean there are no
 events. The official producer supports Fed FOMC, BLS CPI/employment, and BEA
 PCE/GDP. Readiness is no-call; live acquisition requires the pre-existing
-calendar authorization and honest BLS contact. Local import accepts any explicit
+calendar authorization and honest BLS contact. The normal Make readiness view
+is concise and source-by-source; add
+`RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json` for the full machine payload.
+Local import accepts any explicit
 non-empty subset of genuine operator-downloaded Fed, BLS, and BEA files plus
 their real acquisition timestamp. Omit unavailable source variables rather than
 using an empty or fixture path. The resulting snapshot is `partial` and names

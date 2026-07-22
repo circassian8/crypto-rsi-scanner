@@ -379,6 +379,9 @@ may be added later when a suitable environment already exists.
   workflow without enough independent labels and explicit human approval.
 - **Official Decision Radar macro calendar:** use
   `radar-calendar-official-readiness` before the guarded Fed/BLS/BEA producer.
+  The Make target defaults to a concise per-source operator summary; use
+  `RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json` for the complete machine
+  payload. Direct Python CLI use remains JSON by default for compatibility.
   Live acquisition is off by default and needs the already-present calendar
   authorization; BLS additionally needs an honest contact. It performs at most
   one request per configured source and never follows redirects. Each source is

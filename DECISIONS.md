@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Lead official-calendar readiness with per-source truth
+**Status:** accepted
+**Decision:** The normal `radar-calendar-official-readiness` Make surface is a
+bounded operator summary. It must show current authorization and BLS contact,
+latest attempt/success, each Fed/BEA/BLS source's eligibility and request bound,
+partial/local-import support, reasons, exact safe actions, authorization and
+rollback boundaries, and zero-call/write safety. The complete payload remains
+available through `RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json`; direct Python
+CLI usage stays JSON by default.
+**Why:** The prior large JSON payload was correct but obscured the actionable
+truth: live acquisition is unauthorized, BLS also lacks contact, all three
+sources are individually visible, and a genuine partial local import remains
+possible without network access.
+**Revisit when:** The source set or authorization boundary changes. Derive the
+summary from the canonical readiness object and preserve the full JSON contract.
+
 ## 2026-07-22 - Do not substitute snapshot returns for temporal regime evidence
 **Status:** accepted
 **Decision:** When the exact current-authority regime diagnostic finds an asset

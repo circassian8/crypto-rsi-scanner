@@ -27,6 +27,7 @@ from crypto_rsi_scanner.event_alpha.operations.official_macro_calendar import (
     import_official_macro_calendar,
     main as official_macro_main,
     official_macro_calendar_readiness,
+    format_official_macro_calendar_readiness_summary,
     resolve_latest_official_macro_snapshot,
 )
 
@@ -165,6 +166,63 @@ def test_readiness_is_read_only_and_reports_missing_explicit_authorization(
         "BLS_CALENDAR_ICS_is_optional" in item
         for item in result.local_import_requirements
     )
+    assert not base.exists()
+
+
+def test_readiness_summary_leads_with_exact_operator_actions(tmp_path: Path) -> None:
+    result = official_macro_calendar_readiness(
+        environ={},
+        output_base=tmp_path.resolve() / "calendar",
+    )
+
+    rendered = format_official_macro_calendar_readiness_summary(result)
+
+    assert "report=decision_radar_official_macro_calendar_readiness" in rendered
+    assert "status=blocked" in rendered
+    assert "live_acquisition_authorized=false" in rendered
+    assert "bls_contact_configured=false" in rendered
+    assert "source[federal_reserve].request_eligible=false" in rendered
+    assert "source[bea].request_eligible=false" in rendered
+    assert "source[bls].reason=live_authorization_and_bls_contact_missing" in rendered
+    assert "next_safe_command=make radar-calendar-official-readiness" in rendered
+    assert "local_import_command=" in rendered
+    assert "readiness_never_calls" in rendered
+    assert "provider_call_attempted=false" in rendered
+    assert "provider_call_count=0" in rendered
+    assert "writes_performed=false" in rendered
+    assert "RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json" in rendered
+
+
+def test_readiness_cli_keeps_json_default_and_supports_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    base = tmp_path.resolve() / "calendar"
+    monkeypatch.delenv(OFFICIAL_MACRO_LIVE_AUTH_ENV, raising=False)
+    monkeypatch.delenv(OFFICIAL_MACRO_CONTACT_ENV, raising=False)
+
+    assert official_macro_main([
+        "readiness",
+        "--output-base",
+        str(base),
+    ]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "blocked"
+    assert payload["provider_call_count"] == 0
+    assert payload["writes_performed"] is False
+
+    assert official_macro_main([
+        "readiness",
+        "--output-base",
+        str(base),
+        "--output",
+        "summary",
+    ]) == 2
+    summary = capsys.readouterr().out
+    assert "status=blocked" in summary
+    assert "provider_call_count=0" in summary
+    assert "writes_performed=false" in summary
     assert not base.exists()
 
 
@@ -983,6 +1041,7 @@ def test_official_calendar_make_targets_preserve_explicit_import_contract() -> N
     )
 
     assert "official_macro_calendar readiness" in readiness
+    assert "--output summary" in readiness
     assert "official_macro_calendar acquire" in acquisition
     assert "--observed-at" not in acquisition
     assert missing_time.returncode != 0

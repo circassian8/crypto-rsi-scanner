@@ -1379,7 +1379,9 @@ The remaining human decisions stay explicit:
   radar-daily-ops-install PYTHON=.venv/bin/python`; roll back with confirmed
   `radar-daily-ops-uninstall`.
 - Official calendar: inspect with `make radar-calendar-official-readiness
-  PYTHON=.venv/bin/python` (no provider call or write). Acquisition remains
+  PYTHON=.venv/bin/python` (concise, no provider call or write); add
+  `RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json` for the complete machine view.
+  Acquisition remains
   blocked without the already-present live authorization; BLS is skipped as
   `missing_configuration` without an honest contact. An authorized acquire may
   call each configured Fed/BLS/BEA source at most once and never creates or

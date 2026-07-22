@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Make official-calendar readiness decision-first · Codex
+**Why:** Official macro readiness already preserved correct source-level truth,
+but its default Make surface dumped a large JSON object and buried the actual
+authorization, BLS configuration, and partial-import decisions.
+**Changes:**
+- Added a bounded per-source summary as the Make default, including current
+  eligibility/request bounds, latest attempt/success, safe actions, local-import
+  alternative, authorization boundary, and zero-call/write safety.
+- Preserved full JSON with
+  `RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json` and kept direct Python CLI output
+  JSON by default for compatibility. Updated operator/North-Star guidance.
+**Verify:** All 28 focused official-calendar tests passed, compileall and diff
+checks passed, and the real no-authorization readiness printed the concise
+blocked state with three ineligible sources, zero calls, and zero writes.
+**Notes/risks:** No environment value, authorization, provider call, calendar
+artifact, pointer, event, direction, route, send, trade, order, paper trade, RSI
+row, or Event Alpha `TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Explain snapshot versus causal regime returns · Codex
 **Why:** The current campaign reported HBAR and GRAM as missing 24-hour regime
 inputs even though both rows visibly contained provider-derived 24-hour returns,

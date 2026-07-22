@@ -116,6 +116,7 @@ RADAR_BYBIT_EXECUTION_READINESS_OUTPUT ?= summary
 RADAR_BYBIT_INTRADAY_READINESS_OUTPUT ?= summary
 RADAR_BYBIT_DERIVATIVES_READINESS_OUTPUT ?= summary
 RADAR_OUTCOME_RECOVERY_READINESS_OUTPUT ?= summary
+RADAR_OFFICIAL_MACRO_READINESS_OUTPUT ?= summary
 OFFICIAL_MACRO_OUTPUT_BASE ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/official_macro_calendar
 FED_FOMC_HTML ?=
 BLS_CALENDAR_ICS ?=
@@ -384,7 +385,7 @@ help:
 	@echo "  CONFIRM=1 make radar-daily-ops-install   Install the guarded local maintenance LaunchAgent"
 	@echo "  CONFIRM=1 make radar-daily-ops-uninstall Remove only the exact owned maintenance LaunchAgent"
 	@echo "  make radar-calendar-preview       Print the fixture-backed unified calendar, no writes/sends"
-	@echo "  make radar-calendar-official-readiness  Inspect Fed/BLS/BEA acquisition authorization; no call/write"
+	@echo "  make radar-calendar-official-readiness  Concise Fed/BLS/BEA authorization and coverage readiness; no call/write (RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json for full JSON)"
 	@echo "  make radar-calendar-official-acquire    Make one explicitly authorized official-calendar attempt"
 	@echo "  make radar-calendar-official-import-local FED_FOMC_HTML=... BLS_CALENDAR_ICS=... BEA_RELEASE_DATES_JSON=... OFFICIAL_MACRO_OBSERVED_AT=..."
 	@echo "  make radar-announcements-kucoin-smoke  Validate the closed KuCoin synthetic response contract; no call/write"
@@ -1610,7 +1611,8 @@ radar-calendar-preview:
 
 radar-calendar-official-readiness:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.official_macro_calendar readiness \
-		--output-base $(OFFICIAL_MACRO_OUTPUT_BASE)
+		--output-base $(OFFICIAL_MACRO_OUTPUT_BASE) \
+		--output $(RADAR_OFFICIAL_MACRO_READINESS_OUTPUT)
 
 radar-calendar-official-acquire:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.operations.official_macro_calendar acquire \

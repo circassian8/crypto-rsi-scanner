@@ -103,6 +103,10 @@ _OBSERVED_SOURCE_STATUSES = frozenset({"observed", "no_results"})
 
 _CONTACT_RE = re.compile(r"^[^\s@]{1,120}@[^\s@]{1,120}\.[^\s@]{2,40}$")
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+OFFICIAL_MACRO_READINESS_JSON_COMMAND = (
+    "make radar-calendar-official-readiness "
+    "RADAR_OFFICIAL_MACRO_READINESS_OUTPUT=json PYTHON=.venv/bin/python"
+)
 
 
 @dataclass(frozen=True)
@@ -270,6 +274,57 @@ def official_macro_calendar_readiness(
         rollback_disable_command=(
             "none_required_program_never_mutates_authorization_or_installs_a_service"
         ),
+    )
+
+
+def format_official_macro_calendar_readiness_summary(
+    result: OfficialMacroReadiness,
+) -> str:
+    """Render bounded operator truth from one already-built readiness result."""
+
+    lines: list[tuple[str, object]] = [
+        ("report", "decision_radar_official_macro_calendar_readiness"),
+        ("status", result.status),
+        ("ready", result.ready),
+        ("current_status", result.current_status),
+        ("live_acquisition_authorized", result.live_acquisition_authorized),
+        ("bls_contact_configured", result.contact_configured),
+        ("latest_attempt_status", result.latest_attempt_status),
+        ("latest_success_status", result.latest_success_status),
+    ]
+    for row in result.source_readiness:
+        prefix = f"source[{row.source}]"
+        lines.extend((
+            (f"{prefix}.availability", row.availability),
+            (f"{prefix}.request_eligible", row.request_eligible),
+            (
+                f"{prefix}.maximum_provider_calls_if_acquire",
+                row.maximum_provider_calls_if_acquire,
+            ),
+            (f"{prefix}.reason", row.reason_code),
+        ))
+    lines.extend((
+        ("live_partial_snapshot_eligible", result.live_partial_snapshot_eligible),
+        (
+            "local_import_partial_snapshot_supported",
+            result.local_import_partial_snapshot_supported,
+        ),
+        ("reasons", result.reason_codes),
+        ("implications", result.implications),
+        ("next_safe_command", result.next_safe_command),
+        ("local_import_command", result.local_import_command),
+        ("authorization_boundary", result.authorization_boundary),
+        ("expected_provider_activity", result.expected_provider_activity),
+        ("rollback_disable_command", result.rollback_disable_command),
+        ("provider_call_attempted", result.provider_call_attempted),
+        ("provider_call_count", result.provider_call_count),
+        ("writes_performed", result.writes_performed),
+        ("research_only", result.research_only),
+        ("full_json_command", OFFICIAL_MACRO_READINESS_JSON_COMMAND),
+    ))
+    return "\n".join(
+        f"{key}={_summary_value(value)}"
+        for key, value in lines
     )
 
 
@@ -1385,6 +1440,18 @@ def _valid_contact(value: Any) -> bool:
     return _CONTACT_RE.fullmatch(str(value or "").strip()) is not None
 
 
+def _summary_value(value: object) -> str:
+    if value is None:
+        return "none"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (list, tuple)):
+        return ",".join(_summary_value(item) for item in value) or "none"
+    return str(value).replace("\r", " ").replace("\n", " ").strip() or "none"
+
+
 def _json_bytes(payload: Mapping[str, Any]) -> bytes:
     return (json.dumps(dict(payload), indent=2, sort_keys=True) + "\n").encode("utf-8")
 
@@ -1405,6 +1472,7 @@ def _parser() -> argparse.ArgumentParser:
     readiness.add_argument(
         "--output-base", default=str(DEFAULT_OFFICIAL_MACRO_BASE)
     )
+    readiness.add_argument("--output", choices=("json", "summary"), default="json")
     acquire = commands.add_parser("acquire")
     acquire.add_argument("--output-base", default=str(DEFAULT_OFFICIAL_MACRO_BASE))
     local_import = commands.add_parser("import-local")
@@ -1437,8 +1505,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             observed_at=args.observed_at,
         )
         status_ok = result.usable
-    json.dump(result.to_dict(), sys.stdout, indent=2, sort_keys=True)
-    sys.stdout.write("\n")
+    if args.command == "readiness" and args.output == "summary":
+        assert isinstance(result, OfficialMacroReadiness)
+        print(format_official_macro_calendar_readiness_summary(result))
+    else:
+        json.dump(result.to_dict(), sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
     return 0 if status_ok else 2
 
 
@@ -1458,6 +1530,7 @@ __all__ = (
     "OfficialMacroOperationResult",
     "OfficialMacroReadiness",
     "OfficialMacroSourceReadiness",
+    "format_official_macro_calendar_readiness_summary",
     "OfficialMacroSourceSpec",
     "acquire_official_macro_calendar",
     "import_official_macro_calendar",
