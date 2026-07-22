@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Record the sixty-eighth no-send market cycle · Codex
+**Why:** The hourly cadence became eligible while explicit CoinGecko
+authorization remained present. One bounded observation was due to continue
+warming the causal temporal baseline and refresh terminal campaign truth.
+**Changes:**
+- Ran exactly one authorized Daily Operations cycle. CoinGecko returned HTTP
+  200 with 80 rows in 1,476 ms and no retry; 30 top-liquid observations were
+  retained under
+  `radar_market_no_send_20260722t045759037356z_ae92265ad813`.
+- Published immutable final publication and dashboard-operations receipts after
+  strict doctor success, then revalidated revision-12 authority, the exact
+  namespace/run/operator digest, and loopback HTTP 200 identity.
+- Refreshed campaign truth to 68 real cycles, 2,040 retained observations,
+  2,010 baseline-counted observations, 30 too-close observations, and 780
+  prospective universe-context rows. The generation is honestly healthy-empty:
+  zero anomalies and zero Decision ideas. The current universe remains 28/30
+  baseline-warm; all 30 current 24-hour temporal inputs remain unavailable
+  while the target stays inside the already-recorded cadence gap.
+**Verify:** Exact dashboard readiness and authority passed; the immutable
+publication receipt records strict doctor `OK` with 0 blockers / 0 warnings;
+loopback HEAD returned HTTP 200 with namespace
+`radar_market_no_send_20260722t045759037356z_ae92265ad813`, run
+`2026-07-22T04:58:02.080786+00:00|no_key_live`, revision 12, and operator-state
+SHA-256 `dc1bbbec100dc7c0cd871c80d774d4ad7e2c345003b640ffe0cd3a50f0b95bc2`.
+Daily Operations status records the next eligible boundary at
+`2026-07-22T05:58:02.080786+00:00`.
+**Notes/risks:** The campaign still has zero spread, market-regime, and
+Protocol-v2 partition coverage. No Telegram send, trade, order, paper trade,
+normal RSI write, Event Alpha `TRIGGERED_FADE`, authorization mutation, retry,
+or threshold/route change occurred.
+
 ## 2026-07-22 — Bind Decision evidence scores to source owners · Codex
 **Why:** Catalyst status used row-local evidence ownership, but
 `source_authority` and `source_specificity` still read only the flattened
