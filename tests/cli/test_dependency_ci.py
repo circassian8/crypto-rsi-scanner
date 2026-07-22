@@ -1,4 +1,4 @@
-"""Dependency reproducibility and cross-version CI policy tests."""
+"""Dependency reproducibility and single-runtime CI policy tests."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def test_dependency_lock_and_make_targets_are_reproducible():
     assert "-r requirements.txt" in audit_dry
 
 
-def test_github_actions_use_hash_lock_and_python_parity_without_live_paths():
+def test_github_actions_use_hash_lock_and_single_python_runtime_without_live_paths():
     verify_text = (REPO_ROOT / ".github" / "workflows" / "verify.yml").read_text(encoding="utf-8")
     smoke_text = (REPO_ROOT / ".github" / "workflows" / "event-alpha-smoke.yml").read_text(encoding="utf-8")
     text = (verify_text + "\n" + smoke_text).casefold()
@@ -67,18 +67,22 @@ def test_github_actions_use_hash_lock_and_python_parity_without_live_paths():
     assert "\n  pull_request:" not in smoke_text
     assert "permissions:\n  contents: read" in verify_text
     assert "permissions:\n  contents: read" in smoke_text
-    assert 'python-version: ["3.11", "3.13"]' in verify_text
-    assert 'python-version: ["3.11", "3.13"]' in smoke_text
-    assert "python-version: ${{ matrix.python-version }}" in verify_text
-    assert "python-version: ${{ matrix.python-version }}" in smoke_text
-    assert "fail-fast: false" in verify_text
+    assert verify_text.count('python-version: "3.13"') == 2
+    assert smoke_text.count('python-version: "3.13"') == 1
+    assert "matrix.python-version" not in verify_text
+    assert "matrix.python-version" not in smoke_text
+    assert 'python-version: ["3.11", "3.13"]' not in verify_text
+    assert 'python-version: ["3.11", "3.13"]' not in smoke_text
+    assert "fail-fast:" not in verify_text
+    assert "fail-fast:" not in smoke_text
     assert "needs: dependency-audit" in verify_text
-    assert "name: Dependency audit (Python ${{ matrix.python-version }})" in verify_text
-    assert verify_text.count('python-version: ["3.11", "3.13"]') == 2
+    assert "name: Dependency audit (Python 3.13)" in verify_text
+    assert "name: Verify (Python 3.13)" in verify_text
+    assert "name: Event Alpha Smoke (Python 3.13)" in smoke_text
     assert "make dependency-lock-check UV=uv" in verify_text
     assert "make dependency-audit PYTHON=python3" in verify_text
     assert "uv==0.11.28 pip-audit==2.10.1" in verify_text
-    assert "if: matrix.python-version == '3.13'" in verify_text
+    assert "if: matrix.python-version == '3.13'" not in verify_text
     assert verify_text.count("make verify PYTHON=python3") == 1
     assert verify_text.count("--require-hashes -r requirements.txt") == 1
     assert smoke_text.count("--require-hashes -r requirements.txt") == 1

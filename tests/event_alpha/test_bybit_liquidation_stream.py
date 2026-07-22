@@ -6,6 +6,7 @@ from copy import deepcopy
 from dataclasses import replace
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -214,14 +215,17 @@ def test_fixture_smoke_and_make_target_are_offline_and_non_mutating(
     completed = subprocess.run(
         [
             "make",
+            "--no-print-directory",
             "radar-derivatives-bybit-liquidation-smoke",
             "PYTHON=python3",
         ],
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,
+        env={**os.environ, "MAKEFLAGS": "w", "MAKELEVEL": "1"},
         text=True,
     )
+    assert "Leaving directory" not in completed.stdout
     rendered = json.loads(completed.stdout[completed.stdout.index("{") :])
     assert rendered["status"] == "ok"
     assert rendered["provider_calls"] == 0

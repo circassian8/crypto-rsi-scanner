@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Use Python 3.13 as the sole supported runtime
+**Status:** accepted
+**Decision:** Python 3.13 is the sole supported operator and GitHub CI runtime.
+Run dependency audit, lock verification, full verification, architecture
+health, and manual Event Alpha smoke once on 3.13. Keep Linux source-only CI as
+platform compatibility coverage, but do not imply support for other Python
+versions. The universal hash-pinned lock may retain compatibility marker
+branches; those branches do not constitute a support claim.
+**Why:** This is a personal project operated only by its owner on macOS with
+Python 3.13. The 3.11 matrix doubled CI jobs, runtime, and failure email noise
+without serving an actual operator environment. Linux 3.13 CI still catches
+useful platform differences, including recursive GNU Make output behavior.
+**Revisit when:** A second real operator runtime exists, a dependency requires a
+different Python version, or a concrete portability consumer justifies a
+second continuously verified version.
+
 ## 2026-07-22 - Keep catalyst-attribution construction typed and presence-aware
 **Status:** accepted
 **Decision:** The closed catalyst-attribution constructor accepts only typed,
@@ -2949,7 +2965,8 @@ different primary venue/instrument, or the complete Protocol-v2 annex is ready
 to freeze the exact instrument set and data/cost rules before holdout access.
 
 ## 2026-07-17 - Support macOS operator releases and keep Linux artifact archives optional
-**Status:** accepted
+**Status:** superseded
+**Superseded by:** 2026-07-22 - Use Python 3.13 as the sole supported runtime.
 **Decision:** Use this release support matrix: macOS normal checkout is
 supported and verified; macOS source-with-artifacts archive is supported and
 verified; Linux normal checkout is supported and verified in CI on Python 3.11
@@ -4841,7 +4858,8 @@ withdrawn or compromised, or a new supported runtime requires another reviewed
 release upgrade.
 
 ## 2026-07-10 - Hash-lock dependencies and verify Python 3.11/3.13 equally
-**Status:** accepted
+**Status:** superseded
+**Superseded by:** 2026-07-22 - Use Python 3.13 as the sole supported runtime.
 **Decision:** `requirements.in` is the human-edited direct dependency source;
 the generated `requirements.txt` is the universal Python 3.11+ installation
 lock and every resolved distribution must be exact-versioned and SHA-256

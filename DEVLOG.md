@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Consolidate CI on Python 3.13 and fix GNU Make output · Codex
+**Why:** This personal project has one real operator runtime, Python 3.13. The
+3.11 matrix doubled GitHub jobs and failure-email noise, while both versions
+were failing one test because GNU Make appended a directory diagnostic after
+otherwise valid JSON.
+**Changes:**
+- Replaced the 3.11/3.13 matrices with one Python 3.13 dependency-audit job,
+  one Python 3.13 full-verification job, and one Python 3.13 manual Event Alpha
+  smoke job. Lock, audit, architecture, and no-live-path gates remain intact.
+- Made the Bybit liquidation Make-target regression invoke nested GNU Make with
+  `--no-print-directory`, force recursive-Make flags in the test environment,
+  and assert that no directory trailer reaches the JSON parser.
+- Updated the CI contract regression and current support policy. Python 3.13 is
+  the sole supported runtime; Linux 3.13 remains source-only platform coverage,
+  and the universal lock's inactive marker branches are not support claims.
+**Verify:** Reproduced the original `JSONDecodeError: Extra data` locally with
+`MAKELEVEL=1 MAKEFLAGS=w`; the same forced environment now passes (1 test).
+Focused dependency-policy and Bybit-liquidation suites pass 20/20; both workflow
+YAML documents parse. Full `make verify PYTHON=python3` passes 1,547/1,547
+standalone tests, 3,915 pytest tests, alert rendering, fixture backtest, and the
+paper scoreboard. `git diff --check` passes.
+**Notes/risks:** Historical failed GitHub runs remain accurate audit records.
+The next push starts only the two automatic 3.13 jobs. No provider call, send,
+trade, order, paper trade, normal RSI write, or Event Alpha `TRIGGERED_FADE`
+creation was added.
+
 ## 2026-07-22 — Record the seventieth no-send market cycle · Codex
 **Why:** The hourly observation boundary became eligible while the project was
 continuing the evidence-first Protocol-v2 campaign. One current point-in-time

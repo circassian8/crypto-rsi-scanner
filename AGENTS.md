@@ -166,20 +166,22 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 
 | environment | support status | verification status |
 |---|---|---|
-| macOS normal checkout | supported | verified |
-| macOS source-with-artifacts archive | supported | verified |
-| Linux normal checkout | supported | verified in CI on Python 3.11 and 3.13 |
+| macOS normal checkout | supported | verified on Python 3.13 |
+| macOS source-with-artifacts archive | supported | verified on Python 3.13 |
+| Linux normal checkout | compatibility coverage | verified in CI on Python 3.13 |
 | Linux source-with-artifacts archive | optional portability coverage | currently unverified; not release-blocking and not Linux-certified |
 
-The personal production/operator environment is macOS. Do not install a VM or
+The personal production/operator environment is macOS with Python 3.13. Other
+Python versions are unverified and unsupported. Do not install a VM or
 container runtime, transfer the review archive, or change the host solely to
-obtain the optional Linux artifact-bearing observation. Linux source-only CI
-remains a required compatibility gate; exact Linux artifact-bearing verification
-may be added later when a suitable environment already exists.
+obtain the optional Linux artifact-bearing observation. Linux source-only CI on
+Python 3.13 remains a required compatibility gate; exact Linux artifact-bearing
+verification may be added later when a suitable environment already exists.
 
-- **Python:** `.venv/bin/python` (3.13 default via `.python-version`); supported
-  CI/runtime compatibility is Python 3.11 and 3.13. Direct dependency intent is
-  in `requirements.in`; `requirements.txt` is the generated universal,
+- **Python:** `.venv/bin/python` (3.13 via `.python-version`) is the sole
+  supported operator and CI runtime. Other Python versions are unverified and
+  unsupported. Direct dependency intent is in `requirements.in`;
+  `requirements.txt` is the generated cross-platform Python 3.13-verified,
   SHA-256-pinned install set (including `pytest` and `pytest-xdist`). Do not edit
   the lock by hand. Use `make dependency-tools`, `make lock-dependencies`
   (`UPGRADE=1` only for an intentional refresh), and `make dependency-verify`.
