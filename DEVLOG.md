@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Close Decision classification substring upgrades · Codex
+**Why:** Four remaining Decision-v2 compatibility surfaces searched arbitrary
+substrings. Negated or look-alike labels could create a long/risk bias,
+exhaustion/breakout phase, suspicious-liquidity blocker, or source/control
+blocker with no matching evidence.
+**Changes:**
+- Reused one field-local normalized-component matcher for directional bias,
+  market phase, suspicious-illiquidity, source/control blocking, and the
+  intraday risk-state fallback.
+- Made immediate negation suppress complete canonical compounds, including
+  overlapping forms such as `not_structured_unlock` and
+  `not_crowding_exhaustion`; embedded forms such as `unlockable`,
+  `breakoutish`, `quote_assetless`, and `theme_or_sectorless` no longer match.
+- Preserved canonical breakout, risk-off, fade, exhaustion, extended,
+  acceleration, emerging, low-liquidity, and source/control labels plus their
+  existing priority order. Added paired false/valid regressions and updated the
+  North Star, roadmap, working agreement, and durable decision.
+**Verify:** 260 focused Decision-v2, surface, consistency, derivatives,
+calendar, catalyst, namespace, Core-opportunity, empirical-policy, and replay
+tests passed. Python compilation, strict integrated smoke/doctor, dashboard
+fixture rendering, architecture cleanliness, JSON validation, and diff hygiene
+are run before publication.
+**Notes/risks:** This changes current reevaluation of malformed historical text
+only. No score formula, threshold, route policy, provider boundary, stored
+artifact, or research-only safety invariant changed.
+
 ## 2026-07-22 — Record the sixty-seventh no-send market cycle · Codex
 **Why:** The hourly cadence became eligible while explicit CoinGecko
 authorization remained present. One bounded observation was due to keep warming

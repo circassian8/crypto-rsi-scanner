@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Classify Decision compatibility labels by unnegated components
+**Status:** accepted
+**Decision:** Historical Decision-v2 directional-bias, market-phase,
+suspicious-illiquidity, and source/control compatibility may recognize only
+closed normalized component sequences within one typed field. Immediate
+negation and embedded look-alikes do not create policy state. Canonical labels
+retain the existing fade-before-risk-before-long and exhaustion-through-
+emerging phase precedence.
+**Why:** Arbitrary substring matching made `not_confirmed_breakout` long,
+`unlockable_growth` risky, `not_blowoff` exhausted,
+`newsletter_breakoutish` a breakout, and `not_suspicious_illiquid` blocked.
+Those are deterministic false classifications that can alter risk, timing,
+actionability, and operator routing without supporting evidence.
+**Revisit when:** Typed enums fully replace historical text compatibility. Keep
+unknown labels neutral/active and do not use this rule to tune thresholds or
+rewrite historical artifacts.
+
 ## 2026-07-22 - Match historical thesis origins on unnegated components
 **Status:** accepted
 **Decision:** Historical Decision-v2 source-label inference may contribute a

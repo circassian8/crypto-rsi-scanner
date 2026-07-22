@@ -1530,7 +1530,7 @@
       "reason": "Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade."
     }
   ],
-  "function_count": 11312,
+  "function_count": 11313,
   "function_line_limit": 150,
   "functions_over_150_lines": 35,
   "functions_over_limit": [
@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T03:49:22.891342+00:00",
+  "generated_at": "2026-07-22T04:09:01.273031+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3333,6 +3333,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1402,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1397,
       "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3377,13 +3384,6 @@
     {
       "line_count": 1337,
       "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1334,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
       "status": "advisory_measurement"
@@ -4329,6 +4329,11 @@
         "threshold": 1200
       },
       {
+        "line_count": 1402,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1397,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_no_send_calendar.py",
         "threshold": 1200
@@ -4361,11 +4366,6 @@
       {
         "line_count": 1337,
         "path": "crypto_rsi_scanner/event_alpha/operations/decision_review_timing.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1334,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
         "threshold": 1200
       },
       {

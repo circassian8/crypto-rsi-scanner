@@ -1142,8 +1142,8 @@ def _derivatives_freshness(
 
 
 def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
-    text = " ".join(
-        _typed_text(data.get(key))
+    values = tuple(
+        data.get(key)
         for key in (
             "opportunity_type",
             "candidate_role",
@@ -1152,15 +1152,15 @@ def _is_source_noise_or_control(data: Mapping[str, Any]) -> bool:
             "effective_playbook_type",
             "diagnostics_reason",
         )
-    ).casefold()
-    return any(
-        term in text
-        for term in (
+    )
+    return decision_policy.has_unnegated_component_terms(
+        values,
+        (
             "source_noise",
             "ambiguous_control",
             "theme_or_sector",
             "quote_asset",
-        )
+        ),
     )
 
 

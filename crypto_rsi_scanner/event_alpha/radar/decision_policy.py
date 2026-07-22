@@ -28,7 +28,8 @@ from .decision_models import (
 
 
 _ALLOWED_ORIGINS = {item.value for item in ThesisOrigin if item is not ThesisOrigin.MIXED}
-_SOURCE_COMPONENT_SPLIT = re.compile(r"[^a-z0-9]+")
+_COMPONENT_SPLIT = re.compile(r"[^a-z0-9]+")
+_COMPONENT_NEGATIONS = frozenset({"no", "non", "not", "without"})
 _ORIGIN_COMPONENT_TERMS = (
     (
         ThesisOrigin.ONCHAIN_LED.value,
@@ -93,6 +94,9 @@ _ORIGIN_COMPONENT_TERMS = (
             "scheduled_catalyst",
             "structured_calendar",
             "structured_unlock",
+            "token_unlock",
+            "cliff_unlock",
+            "vesting_unlock",
             "unlock",
             "unlocks",
             "news",
@@ -104,6 +108,69 @@ _ORIGIN_COMPONENT_TERMS = (
     (
         ThesisOrigin.MARKET_LED.value,
         ("market_anomaly", "market_state", "price_volume", "breakout"),
+    ),
+)
+_DIRECTIONAL_BIAS_COMPONENT_TERMS = (
+    (
+        DirectionalBias.FADE_SHORT_REVIEW.value,
+        ("post_event_fade", "blowoff", "late_momentum", "fade_short"),
+    ),
+    (
+        DirectionalBias.RISK.value,
+        (
+            "risk_off",
+            "selloff",
+            "risk_only",
+            "structured_unlock",
+            "token_unlock",
+            "cliff_unlock",
+            "vesting_unlock",
+            "unlock",
+            "delisting",
+            "exploit",
+        ),
+    ),
+    (
+        DirectionalBias.LONG.value,
+        (
+            "confirmed_breakout",
+            "high_liquidity_breakout",
+            "stealth_accumulation",
+            "early_long",
+            "confirmed_long",
+        ),
+    ),
+)
+_SUSPICIOUS_ILLIQUID_COMPONENT_TERMS = (
+    "low_liquidity_suspicious",
+    "suspicious_illiquid",
+    "suspicious_low_liquidity",
+)
+_MARKET_PHASE_COMPONENT_TERMS = (
+    (
+        MarketPhase.EXHAUSTION.value,
+        (
+            "blowoff",
+            "crowding_exhaustion",
+            "exhaust",
+            "exhausted",
+            "exhaustion",
+            "post_event_fade",
+        ),
+    ),
+    (MarketPhase.EXTENDED.value, ("late_momentum", "extended", "overextended")),
+    (
+        MarketPhase.REVERSAL.value,
+        ("risk_off", "selloff", "reversal", "breakdown"),
+    ),
+    (MarketPhase.ACCELERATION.value, ("acceleration",)),
+    (
+        MarketPhase.BREAKOUT.value,
+        ("confirmed_breakout", "high_liquidity_breakout", "breakout"),
+    ),
+    (
+        MarketPhase.EMERGING.value,
+        ("stealth_accumulation", "emerging", "early", "no_reaction"),
     ),
 )
 _ALLOWED_PHASES = {item.value for item in MarketPhase}
@@ -345,16 +412,14 @@ def market_snapshot_invalid(data: Mapping[str, Any]) -> bool:
 def directional_bias(data: Mapping[str, Any]) -> str:
     """Derive directional research bias without using calendar context."""
 
-    state = " ".join(_market_classification_values(data))
-    opportunity_type = _typed_text(data.get("opportunity_type"))
-    impact_path_type = _typed_text(data.get("impact_path_type"))
-    text = f"{state} {opportunity_type} {impact_path_type}".casefold()
-    if any(term in text for term in ("post_event_fade", "blowoff", "late_momentum", "fade_short")):
-        return DirectionalBias.FADE_SHORT_REVIEW.value
-    if any(term in text for term in ("risk_off", "selloff", "risk_only", "unlock", "delisting", "exploit")):
-        return DirectionalBias.RISK.value
-    if any(term in text for term in ("confirmed_breakout", "high_liquidity_breakout", "stealth_accumulation", "early_long", "confirmed_long")):
-        return DirectionalBias.LONG.value
+    values = (
+        *_market_classification_values(data),
+        data.get("opportunity_type"),
+        data.get("impact_path_type"),
+    )
+    for bias, terms in _DIRECTIONAL_BIAS_COMPONENT_TERMS:
+        if has_unnegated_component_terms(values, terms):
+            return bias
     return DirectionalBias.NEUTRAL.value
 
 
@@ -369,16 +434,16 @@ def configured_route(route: str, reason: str, *, enabled: bool) -> tuple[str, st
 def is_suspicious_illiquid(data: Mapping[str, Any]) -> bool:
     """Return true for deterministic suspicious-low-liquidity classifications."""
 
-    text = " ".join(
-        _typed_text(data.get(key))
+    values = tuple(
+        data.get(key)
         for key in (
             "market_anomaly_bucket", "anomaly_bucket", "market_anomaly_type", "anomaly_type",
             "market_state_class", "dex_onchain_classification", "diagnostics_reason",
         )
-    ).casefold()
-    return any(
-        term in text
-        for term in ("low_liquidity_suspicious", "suspicious_illiquid", "suspicious_low_liquidity")
+    )
+    return has_unnegated_component_terms(
+        values,
+        _SUSPICIOUS_ILLIQUID_COMPONENT_TERMS,
     )
 
 
@@ -669,7 +734,7 @@ def timing_profile(data: Mapping[str, Any], market: Mapping[str, Any]) -> Timing
         MarketPhase.EXTENDED.value,
         MarketPhase.EXHAUSTION.value,
         MarketPhase.REVERSAL.value,
-    } or any(term in state for term in ("selloff", "risk_off")):
+    } or has_unnegated_component_terms((state,), ("selloff", "risk_off")):
         horizon = PreferredHorizon.INTRADAY.value
     elif phase == MarketPhase.EMERGING.value:
         horizon = PreferredHorizon.THREE_TO_SEVEN_DAYS.value
@@ -1049,7 +1114,7 @@ def apply_validated_rsi_adjustments(
 
 
 def _origins_for_text(value: object) -> tuple[str, ...]:
-    parts = _source_component_parts(value)
+    parts = _component_parts(value)
     if not parts:
         return ()
     out: list[str] = []
@@ -1059,28 +1124,40 @@ def _origins_for_text(value: object) -> tuple[str, ...]:
             out.append(origin)
 
     for origin, terms in _ORIGIN_COMPONENT_TERMS:
-        if _has_unnegated_source_components(parts, terms):
+        if _has_unnegated_components(parts, terms):
             add(origin)
     return tuple(out)
 
 
-def _source_component_parts(value: object) -> tuple[str, ...]:
+def has_unnegated_component_terms(
+    values: Iterable[object],
+    terms: tuple[str, ...],
+) -> bool:
+    """Match closed normalized labels without substring or negation upgrades."""
+
+    return any(
+        _has_unnegated_components(_component_parts(value), terms)
+        for value in values
+    )
+
+
+def _component_parts(value: object) -> tuple[str, ...]:
     if not isinstance(value, str) or not value.strip():
         return ()
     return tuple(
         part
-        for part in _SOURCE_COMPONENT_SPLIT.split(value.strip().casefold())
+        for part in _COMPONENT_SPLIT.split(value.strip().casefold())
         if part
     )
 
 
-def _has_unnegated_source_components(
+def _has_unnegated_components(
     value_parts: tuple[str, ...],
     terms: tuple[str, ...],
 ) -> bool:
     matches: list[tuple[int, int]] = []
     for term in terms:
-        term_parts = _source_component_parts(term)
+        term_parts = _component_parts(term)
         width = len(term_parts)
         for index in range(len(value_parts) - width + 1):
             if value_parts[index : index + width] == term_parts:
@@ -1089,7 +1166,7 @@ def _has_unnegated_source_components(
     negated_matches = tuple(
         (start, end)
         for start, end in matches
-        if start and value_parts[start - 1] in {"no", "non", "not", "without"}
+        if start and value_parts[start - 1] in _COMPONENT_NEGATIONS
     )
     return any(
         not any(
@@ -1101,19 +1178,10 @@ def _has_unnegated_source_components(
 
 
 def _derive_market_phase(data: Mapping[str, Any]) -> str:
-    text = " ".join(_market_classification_values(data)).casefold()
-    if any(term in text for term in ("blowoff", "exhaust", "post_event_fade")):
-        return MarketPhase.EXHAUSTION.value
-    if any(term in text for term in ("late_momentum", "extended")):
-        return MarketPhase.EXTENDED.value
-    if any(term in text for term in ("risk_off", "selloff", "reversal", "breakdown")):
-        return MarketPhase.REVERSAL.value
-    if "acceleration" in text:
-        return MarketPhase.ACCELERATION.value
-    if any(term in text for term in ("confirmed_breakout", "high_liquidity_breakout", "breakout")):
-        return MarketPhase.BREAKOUT.value
-    if any(term in text for term in ("stealth_accumulation", "emerging", "early", "no_reaction")):
-        return MarketPhase.EMERGING.value
+    values = _market_classification_values(data)
+    for phase, terms in _MARKET_PHASE_COMPONENT_TERMS:
+        if has_unnegated_component_terms(values, terms):
+            return phase
     return MarketPhase.ACTIVE.value
 
 

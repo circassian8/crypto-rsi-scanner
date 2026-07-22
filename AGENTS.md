@@ -75,6 +75,12 @@ market, catalyst, technical, derivatives, on-chain, fundamental, and macro
 labels. Only unnegated normalized source-label components may contribute an
 origin; embedded or negated look-alikes such as `walletless`, `tvless`,
 `newsletter`, or `not_market_anomaly` must not manufacture one.
+Historical Decision-v2 classification compatibility uses the same unnegated
+component rule for directional bias, market phase, suspicious-illiquidity, and
+source/control blockers. Labels such as `not_confirmed_breakout`,
+`unlockable`, `not_blowoff`, `breakoutish`, `not_suspicious_illiquid`, and
+`quote_assetless` must not create policy state; canonical compound labels and
+their existing precedence remain unchanged.
 That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the

@@ -1935,6 +1935,18 @@
       ]
     }
   },
+  "decision_classification_label_policy": {
+    "historical_artifacts_rewritten": false,
+    "matching": "field-local closed unnegated normalized component sequences only; embedded and negated look-alikes cannot create policy state",
+    "priority_order_preserved": true,
+    "surfaces": [
+      "directional_bias",
+      "market_phase",
+      "suspicious_illiquidity",
+      "source_or_control_blocker"
+    ],
+    "unknown_label_fallback": "neutral_bias_active_phase_no_text_only_blocker"
+  },
   "origins": {
     "compatibility_label_matching": "canonical unnegated normalized component sequences only; embedded or immediately negated look-alikes cannot contribute an origin",
     "contributing": [

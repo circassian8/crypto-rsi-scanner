@@ -79,6 +79,15 @@ manufacture an origin. Canonical compound labels retain their existing mapping;
 this compatibility surface does not replace typed current evidence or rewrite
 historical rows.
 
+Directional-bias, market-phase, suspicious-illiquidity, and source/control
+compatibility use the same field-local rule. Only closed unnegated normalized
+component sequences can create policy state. Embedded or negated look-alikes
+such as `not_confirmed_breakout`, `unlockable`, `not_blowoff`, `breakoutish`,
+`not_suspicious_illiquid`, and `quote_assetless` remain neutral rather than
+changing timing, risk, blockers, or route eligibility. Canonical labels retain
+their existing priority order, and unknown labels fail closed to neutral/active
+compatibility state.
+
 Historical text-only disproof compatibility is likewise conservative but
 literal: `source correction`, `official denial`, and `catalyst_disproven` must
 appear as unnegated normalized component sequences within one source field.

@@ -2044,6 +2044,75 @@ def test_thesis_origin_labels_require_unnegated_component_boundaries():
         assert expected in result.thesis_origins
 
 
+def test_decision_classification_labels_require_unnegated_component_boundaries():
+    false_market_labels = (
+        "not_confirmed_breakout",
+        "unlockable_growth",
+        "not_structured_unlock",
+        "not_blowoff",
+        "not_crowding_exhaustion",
+        "newsletter_breakoutish",
+    )
+    for label in false_market_labels:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                market_state_class=label,
+                market_anomaly_bucket="neutral_state",
+            )
+        )
+
+        assert result.directional_bias == "neutral"
+        assert result.market_phase == "active"
+
+    false_control_labels = (
+        {"diagnostics_reason": "not_suspicious_illiquid"},
+        {"diagnostics_reason": "not_source_noise"},
+        {"candidate_role": "quote_assetless"},
+        {"playbook_type": "theme_or_sectorless"},
+    )
+    for fields in false_control_labels:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(**fields)
+        )
+
+        assert "suspicious_illiquid_move" not in result.decision_hard_blockers
+        assert "source_noise_or_control" not in result.decision_hard_blockers
+        assert result.radar_actionable is True
+
+
+def test_decision_classification_component_matching_preserves_canonical_labels():
+    phase_cases = {
+        "confirmed_breakout": ("long", "breakout"),
+        "risk_off_sell_pressure": ("risk", "reversal"),
+        "blowoff_crowded": ("fade_short_review", "exhaustion"),
+        "crowding_exhaustion": ("neutral", "exhaustion"),
+        "overextended": ("neutral", "extended"),
+        "acceleration": ("neutral", "acceleration"),
+        "stealth_accumulation": ("long", "emerging"),
+        "no_reaction": ("neutral", "emerging"),
+    }
+    for label, (expected_bias, expected_phase) in phase_cases.items():
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(
+                market_state_class=label,
+                market_anomaly_bucket="neutral_state",
+            )
+        )
+
+        assert result.directional_bias == expected_bias
+        assert result.market_phase == expected_phase
+
+    suspicious = decision_model.evaluate_radar_decision(
+        _market_led_candidate(diagnostics_reason="suspicious_illiquid_market")
+    )
+    source_control = decision_model.evaluate_radar_decision(
+        _market_led_candidate(candidate_role="source_noise")
+    )
+
+    assert "suspicious_illiquid_move" in suspicious.decision_hard_blockers
+    assert "source_noise_or_control" in source_control.decision_hard_blockers
+
+
 def test_market_primary_with_confirmed_catalyst_contributor_can_be_high_confidence():
     source = {
         "_source_origin": "official_exchange",
