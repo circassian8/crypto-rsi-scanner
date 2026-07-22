@@ -244,7 +244,10 @@ def build_campaign_report(
         baseline,
         evaluated=evaluated,
     )
-    limitations = _data_quality_limitations(metrics)
+    limitations = _data_quality_limitations(
+        metrics,
+        regime_audit=control_regime_generation_audit,
+    )
     status = _campaign_status(metrics, baseline)
     pointer_history = _pointer_history(authoritative, pointer_state)
     conclusion = _campaign_conclusion(
@@ -1421,7 +1424,11 @@ def _outcome_rank(row: Mapping[str, Any]) -> tuple[int, str]:
     return rank, _text(row.get("outcome_evaluated_at"))
 
 
-def _data_quality_limitations(metrics: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _data_quality_limitations(
+    metrics: Mapping[str, Any],
+    *,
+    regime_audit: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     limitations: list[dict[str, Any]] = []
     selected = _int(metrics.get("selected_market_row_count"))
     spread = _int(metrics.get("spread_available_count"))
@@ -1471,6 +1478,52 @@ def _data_quality_limitations(metrics: Mapping[str, Any]) -> list[dict[str, Any]
             ),
             "current_universe_status": current_baseline_status or "unavailable",
             "retained_history_status": retained_baseline_status or "unknown",
+        })
+    cadence = (
+        regime_audit.get("observation_cadence_gap_audit")
+        if isinstance(regime_audit, Mapping)
+        else None
+    )
+    if isinstance(cadence, Mapping) and cadence.get("status") == "gaps_observed":
+        adjacent = _int(cadence.get("adjacent_interval_count"))
+        gaps = _int(cadence.get("exceeding_anchor_tolerance_interval_count"))
+        tolerance = _int(cadence.get("anchor_tolerance_seconds"))
+        maximum = _mapping(cadence.get("maximum_interval"))
+        limitations.append({
+            "category": "observation_cadence_continuity",
+            "detail": (
+                f"Complete verified generation cadence has {gaps}/{adjacent} adjacent "
+                f"intervals beyond the canonical {tolerance}-second 24-hour-anchor "
+                f"tolerance; the maximum interval is {maximum.get('interval_seconds')} "
+                f"seconds from {_text(maximum.get('start_observed_at'))} to "
+                f"{_text(maximum.get('end_observed_at'))}. This is collection-continuity "
+                "risk only; exact per-asset anchor replay remains causal and no future "
+                "eligibility is inferred."
+            ),
+            "complete_generation_count": _int(
+                cadence.get("complete_generation_count")
+            ),
+            "adjacent_interval_count": adjacent,
+            "within_anchor_tolerance_interval_count": _int(
+                cadence.get("within_anchor_tolerance_interval_count")
+            ),
+            "exceeding_anchor_tolerance_interval_count": gaps,
+            "anchor_tolerance_seconds": tolerance,
+            "maximum_interval": dict(maximum),
+            "source_generation_clock_sha256": _text(
+                cadence.get("source_generation_clock_sha256")
+            ),
+            "next_safe_command": (
+                "make radar-daily-ops-readiness PYTHON=.venv/bin/python"
+            ),
+            "scheduling_policy_changed": False,
+            "future_endpoint_eligibility_inferred": False,
+            "routing_eligible": False,
+            "decision_policy_eligible": False,
+            "protocol_v2_evidence_eligible": False,
+            "provider_calls": 0,
+            "writes": 0,
+            "research_only": True,
         })
     return limitations
 

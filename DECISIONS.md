@@ -22,7 +22,10 @@ decision, rationale, and revisit condition.
 verified generation clock against the canonical backward tolerance used by the
 24-hour causal-return selector. It binds the ordered clock set by digest, keeps
 the latest and maximum interval plus at most 16 exact gap examples, and renders
-the result in campaign and dashboard history. Schema v3 remains readable. This
+the result in campaign and dashboard history. While any verified gap exists,
+the canonical campaign limitation list and conclusion include the explicit
+`observation_cadence_continuity` category, without displacing execution-quality
+spread as the highest-value missing input. Schema v3 remains readable. This
 audit must never predict a future endpoint, substitute for per-asset anchor
 replay, change the one-hour collection cadence, inspect outcomes, or affect
 routes, scores, policy, or Protocol-v2 evidence eligibility.

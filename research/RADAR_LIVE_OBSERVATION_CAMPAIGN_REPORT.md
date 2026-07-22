@@ -1,6 +1,6 @@
 # Decision Radar live observation campaign v2
 
-Generated at `2026-07-22T02:21:52.231127+00:00` from local artifacts only.
+Generated at `2026-07-22T02:39:34.215472+00:00` from local artifacts only.
 Research and decision support only. This report contains no trade recommendation.
 
 ## Campaign measurement
@@ -579,6 +579,7 @@ This expands the frozen-episode scorecard across every canonical Decision route 
 - **execution_quality_spread:** Trusted spread coverage is 0/1950. Bybit USDT-linear perpetuals are the selected execution surface; coverage remains unavailable until a separately authorized immutable public-market capture succeeds and is bound into the campaign.
 - **proxy_market_features:** The campaign retains 2562 proxy feature observations; proxy evidence remains explicitly quality-capped.
 - **temporal_baseline_maturity:** The exact current authoritative universe is not feature/time-aware warm.
+- **observation_cadence_continuity:** Complete verified generation cadence has 1/22 adjacent intervals beyond the canonical 21600-second 24-hour-anchor tolerance; the maximum interval is 48256.315755 seconds from 2026-07-20T19:41:41.729110+00:00 to 2026-07-21T09:05:58.044865+00:00. This is collection-continuity risk only; exact per-asset anchor replay remains causal and no future eligibility is inferred.
 
 ## Next observation
 
@@ -589,7 +590,7 @@ This expands the frozen-episode scorecard across every canonical Decision route 
 
 ## Campaign-v2 conclusion
 
-Decision Radar campaign v2 has 65 counted real/no-send cycles and 11 canonical ideas; 3 outcomes are pending and 7 outcomes are matured. Provider history contains 14 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 32/37 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 60 bound generations and current authority is radar_market_no_send_20260722t015556623044z_a5e83847c1eb. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity; highest-value missing input is execution_quality_spread.
+Decision Radar campaign v2 has 65 counted real/no-send cycles and 11 canonical ideas; 3 outcomes are pending and 7 outcomes are matured. Provider history contains 14 provider failures and 1 blocked/preflight attempt. Baseline status is warming with 32/37 warm retained assets; exact current-universe status is warming with 28/30 warm assets. Pointer history contains 60 bound generations and current authority is radar_market_no_send_20260722t015556623044z_a5e83847c1eb. Data-quality limitation categories are execution_quality_spread, proxy_market_features, temporal_baseline_maturity, observation_cadence_continuity; highest-value missing input is execution_quality_spread.
 
 Bybit USDT-linear perpetuals are the selected execution surface; no spread or depth evidence is treated as available until a separately authorized immutable capture succeeds.
 No trade is recommended. No automatic threshold or route change is authorized.

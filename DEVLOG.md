@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Reconcile campaign headline limitations with cadence truth · Codex
+**Why:** The closed cadence audit proved a genuine collection break, but the
+campaign-v2 conclusion still named only spread, proxy evidence, and baseline
+maturity. Canonical headline truth must not omit a verified limitation already
+present in its own report.
+**Changes:**
+- Derived an `observation_cadence_continuity` limitation whenever the canonical
+  audit status is `gaps_observed`, carrying exact clock digest, counts,
+  tolerance, maximum interval, safe readiness command, and no-policy safety.
+- Rebuilt the real campaign report and source-bound dashboard projection. The
+  conclusion now lists the continuity category while correctly retaining Bybit
+  execution-quality spread as the highest-value missing input.
+- Updated the North Star, working agreement, roadmap, and durable cadence
+  decision. No size measurement was treated as a development blocker.
+**Verify:** 46 focused campaign/projection tests passed; the no-provider campaign
+rebuild reproduced 23 complete clocks / 22 intervals / one 13.4-hour gap with
+the new limitation. `compileall`, exact dashboard readiness/smoke, architecture
+cleanliness, JSON validation, and `git diff --check` passed.
+**Notes/risks:** Full `verify-fast` remains unnecessary immediately after the
+preceding 3,876-test green gate and focused cadence/dashboard coverage. No
+provider call, scheduling change, future inference, route, score, threshold,
+outcome, send, trade, order, paper trade, RSI write, or Event Alpha
+`TRIGGERED_FADE` changed.
+
 ## 2026-07-22 — Measure complete-generation cadence continuity · Codex
 **Why:** Accumulated cycle and row counts can look healthy while an actual
 collection gap removes every valid causal 24-hour anchor. Operators needed the

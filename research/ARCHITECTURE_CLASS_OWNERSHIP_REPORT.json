@@ -1688,7 +1688,7 @@
     },
     {
       "function_name": "build_campaign_report",
-      "line_count": 168,
+      "line_count": 171,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
       "public": true,
       "qualname": "build_campaign_report",
@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T02:31:44.867175+00:00",
+  "generated_at": "2026-07-22T02:41:34.035455+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3620,7 +3620,7 @@
     },
     {
       "function_name": "build_campaign_report",
-      "line_count": 168,
+      "line_count": 171,
       "module": "crypto_rsi_scanner.event_alpha.operations.market_observation_campaign",
       "public": true,
       "qualname": "build_campaign_report",
@@ -4242,7 +4242,7 @@
         "threshold": 1200
       },
       {
-        "line_count": 1933,
+        "line_count": 1986,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1200
       },
@@ -4469,7 +4469,7 @@
         "threshold": 1500
       },
       {
-        "line_count": 1933,
+        "line_count": 1986,
         "path": "crypto_rsi_scanner/event_alpha/operations/market_observation_campaign.py",
         "threshold": 1500
       },

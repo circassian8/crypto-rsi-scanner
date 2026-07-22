@@ -893,7 +893,11 @@ examples. The current report has 23 complete clocks and 22 adjacent intervals:
 collection-continuity risk, not per-asset anchor causation. It does not infer
 future eligibility, modify the one-hour scheduling contract, inspect outcomes,
 or affect routes, scores, policy, or Protocol-v2 evidence. Schema v3 remains
-readable.
+readable. While the canonical audit status is `gaps_observed`, the campaign's
+headline data-quality list and conclusion also carry the exact
+`observation_cadence_continuity` limitation. It is derived from the audit,
+cannot be manually suppressed, and does not displace trusted Bybit execution-
+quality spread as the highest-value missing input.
 Campaign readiness reports exact historical coverage but performs no selection,
 outcome read, partition assignment, backfill, or policy change. It remains
 partial until a successful qualifying cycle has persisted that context and a

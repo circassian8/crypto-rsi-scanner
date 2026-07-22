@@ -1049,7 +1049,11 @@ may be added later when a suitable environment already exists.
   a continuity break. This is descriptive continuity risk only: the per-asset
   selector replay remains the causal explanation, and the cadence audit never
   predicts eligibility or changes scheduling, routing, policy, or Protocol-v2
-  evidence status. Schema v3 remains readable. Decision campaign generations,
+  evidence status. When the audit records a real gap, the canonical campaign
+  `data_quality_limitations` and conclusion must include
+  `observation_cadence_continuity`; the limitation disappears only when the
+  canonical audit no longer reports a gap, never through manual suppression.
+  Schema v3 remains readable. Decision campaign generations,
   candidates, routes, feature maturity, and outcomes are
   never aggregated into Event Alpha Catalyst Radar's separate 30-day burn-in.
   Post-scan raw market evidence may carry the optional closed

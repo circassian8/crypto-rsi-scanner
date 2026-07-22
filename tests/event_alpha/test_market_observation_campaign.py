@@ -1079,6 +1079,27 @@ def test_control_regime_generation_audit_measures_exact_cadence_gap() -> None:
     assert "1/2 adjacent intervals exceed" in cadence_summary
     assert "maximum 13.4h" in cadence_summary
     assert "continuity risk only" in cadence_summary
+    limitations = campaign._data_quality_limitations(
+        {
+            "selected_market_row_count": 1,
+            "spread_available_count": 1,
+            "proxy_feature_count": 0,
+            "current_universe_baseline_status": "warm",
+            "baseline_status": "warm",
+        },
+        regime_audit=audit,
+    )
+    assert len(limitations) == 1
+    cadence_limitation = limitations[0]
+    assert cadence_limitation["category"] == "observation_cadence_continuity"
+    assert cadence_limitation["complete_generation_count"] == 3
+    assert cadence_limitation["adjacent_interval_count"] == 2
+    assert cadence_limitation["exceeding_anchor_tolerance_interval_count"] == 1
+    assert cadence_limitation["anchor_tolerance_seconds"] == 21_600
+    assert cadence_limitation["maximum_interval"] == cadence["maximum_interval"]
+    assert cadence_limitation["future_endpoint_eligibility_inferred"] is False
+    assert cadence_limitation["scheduling_policy_changed"] is False
+    assert cadence_limitation["provider_calls"] == cadence_limitation["writes"] == 0
     assert (
         market_observation_campaign_regime_audit
         .validate_control_regime_generation_audit(audit)
