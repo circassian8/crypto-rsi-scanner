@@ -348,12 +348,14 @@ def reevaluate_radar_decision_fields(
 
     source = dict(candidate)
     if _typed_text(source.get("decision_model_version")) == DECISION_MODEL_VERSION:
-        # A prior evaluation's status is output, not fresh catalyst evidence.
-        # Re-derive it from the retained source fields/rows so evidence removal
-        # cannot leave a stale confirmed/plausible claim behind.  Explicit raw
-        # inputs without a completed Decision-v2 result retain compatibility;
+        # A prior evaluation's status and expiry are outputs, not fresh inputs.
+        # Re-derive them from retained source/timing context so evidence or
+        # market-phase mutation cannot leave stale truth behind.  A separately
+        # bound calendar_expiry_cap remains an explicit scheduled-risk input.
+        # Raw inputs without a completed Decision-v2 result retain compatibility;
         # structured disproof fields still take precedence in the evaluator.
         source.pop("catalyst_status", None)
+        source.pop("expires_at", None)
     return evaluate_radar_decision(source, source_rows=source_rows, cfg=cfg).to_dict()
 
 

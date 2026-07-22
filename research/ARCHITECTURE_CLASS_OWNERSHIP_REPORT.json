@@ -1816,7 +1816,7 @@
     }
   ],
   "functions_over_limit_count": 35,
-  "generated_at": "2026-07-22T04:15:59.652988+00:00",
+  "generated_at": "2026-07-22T04:33:40.744850+00:00",
   "historical_row_type_alias": "refactor_class_ownership_report",
   "largest_api_files": [],
   "modules_with_multiple_public_classes": [],
@@ -3326,6 +3326,13 @@
       "status": "advisory_measurement"
     },
     {
+      "line_count": 1416,
+      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+      "reason": "Historical line-count reference retained for trend visibility only.",
+      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
+      "status": "advisory_measurement"
+    },
+    {
       "line_count": 1410,
       "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
@@ -3334,13 +3341,6 @@
     },
     {
       "line_count": 1402,
-      "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
-      "reason": "Historical line-count reference retained for trend visibility only.",
-      "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
-      "status": "advisory_measurement"
-    },
-    {
-      "line_count": 1400,
       "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
       "reason": "Historical line-count reference retained for trend visibility only.",
       "revisit_condition": "Revisit only when cohesion, defects, or review evidence justify a split.",
@@ -4324,17 +4324,17 @@
         "threshold": 1200
       },
       {
+        "line_count": 1416,
+        "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
+        "threshold": 1200
+      },
+      {
         "line_count": 1410,
         "path": "crypto_rsi_scanner/event_alpha/operations/empirical_replay_analysis.py",
         "threshold": 1200
       },
       {
         "line_count": 1402,
-        "path": "crypto_rsi_scanner/event_alpha/radar/decision_policy.py",
-        "threshold": 1200
-      },
-      {
-        "line_count": 1400,
         "path": "crypto_rsi_scanner/event_alpha/radar/decision_model.py",
         "threshold": 1200
       },

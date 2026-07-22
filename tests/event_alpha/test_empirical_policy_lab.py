@@ -94,9 +94,11 @@ def _daily_clones(base, *, count: int, start: datetime, partition: str, value=0.
         )
         expires_at = observed + (original_expiry - original_observed)
         idea["observed_at"] = observed.isoformat()
+        idea["decision_evaluated_at"] = observed.isoformat()
         idea["expires_at"] = expires_at.isoformat()
         idea["decision_projection"] = {
             **idea["decision_projection"],
+            "decision_evaluated_at": observed.isoformat(),
             "expires_at": expires_at.isoformat(),
         }
         idea["replay_partition"] = partition

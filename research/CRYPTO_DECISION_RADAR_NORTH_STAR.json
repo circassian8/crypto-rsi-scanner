@@ -780,6 +780,7 @@
     "compatibility_text_disproof": "field-local unnegated normalized component sequences only; separate fields and immediate no/non/not/without negation cannot create disproof",
     "decision_evidence_official_class_matching": "exact normalized official_exchange or official_project only; prefixes and compounds receive unverified baseline authority points",
     "final_reevaluation_catalyst_status": "discard prior Decision-v2 derived status and rederive from retained current evidence; closed projection reads remain idempotent",
+    "final_reevaluation_expiry": "discard prior Decision-v2 derived expires_at, rederive from current phase and coherent evaluation clock, then apply a separately bound calendar_expiry_cap as an upper bound; malformed raw claims fail closed",
     "evidence_quality_reuses_registry_authority": true,
     "historical_artifacts_rewritten": false,
     "identity_inputs": [

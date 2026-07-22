@@ -98,6 +98,11 @@ fields cannot assemble a disproof, and `unofficial denial` is not an
 result's derived `catalyst_status` and re-derive it from retained current source
 evidence. Evidence removal cannot leave stale confirmed/plausible truth. Closed
 projection reads remain idempotent and do not invoke reevaluation.
+The same final-reevaluation boundary treats a completed result's `expires_at`
+as derived output. Market-phase or evaluation-clock changes must re-derive it;
+only the separately bound `calendar_expiry_cap` may constrain the new expiry.
+Malformed raw expiry/cap inputs fail closed, and empirical point-in-time clones
+must move their observation and evaluation clocks together.
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.

@@ -1647,6 +1647,71 @@ def test_final_reevaluation_rederives_stale_catalyst_status_after_evidence_loss(
     assert "catalyst_unknown_soft_penalty" in reevaluated["decision_soft_penalties"]
 
 
+def test_final_reevaluation_rederives_expiry_after_market_phase_mutation():
+    source = _market_led_candidate(observed_at="2026-06-15T16:00:00Z")
+    initial = {
+        **source,
+        **decision_model.evaluate_radar_decision(source).to_dict(),
+    }
+    mutated_source = {
+        **source,
+        "market_state_class": "stealth_accumulation",
+        "market_anomaly_bucket": "neutral_state",
+    }
+    mutated = {
+        **initial,
+        "market_state_class": "stealth_accumulation",
+        "market_anomaly_bucket": "neutral_state",
+    }
+
+    reevaluated = decision_model.reevaluate_radar_decision_fields(mutated)
+    fresh = decision_model.evaluate_radar_decision(mutated_source).to_dict()
+
+    assert initial["expires_at"] == "2026-06-16T16:00:00Z"
+    assert fresh["expires_at"] == "2026-06-18T16:00:00Z"
+    assert reevaluated["expires_at"] == fresh["expires_at"]
+    assert reevaluated["market_phase"] == fresh["market_phase"] == "emerging"
+    assert reevaluated["preferred_horizon"] == fresh["preferred_horizon"]
+
+
+def test_final_reevaluation_preserves_a_bound_calendar_expiry_cap():
+    source = _market_led_candidate(
+        observed_at="2026-06-15T16:00:00Z",
+        nearby_calendar_events=[{
+            "event_id": "fomc-window",
+            "scheduled_at": "2026-06-15T20:00:00Z",
+        }],
+        calendar_expiry_cap="2026-06-15T19:00:00Z",
+        expires_at="2026-06-15T19:00:00Z",
+    )
+    initial = {
+        **source,
+        **decision_model.evaluate_radar_decision(source).to_dict(),
+    }
+
+    reevaluated = decision_model.reevaluate_radar_decision_fields({
+        **initial,
+        "market_state_class": "stealth_accumulation",
+        "market_anomaly_bucket": "neutral_state",
+    })
+
+    assert reevaluated["market_phase"] == "emerging"
+    assert reevaluated["expires_at"] == "2026-06-15T19:00:00Z"
+    assert reevaluated["radar_route"] == "calendar_risk"
+
+
+def test_malformed_calendar_expiry_cap_fails_closed():
+    result = decision_model.evaluate_radar_decision(
+        _market_led_candidate(calendar_expiry_cap="not-a-timestamp")
+    )
+
+    assert result.expires_at is None
+    assert result.radar_actionable is False
+    assert result.radar_route == "diagnostic"
+    assert "decision_timing_context_invalid" in result.decision_hard_blockers
+    assert "idea_expiry_invalid" in result.decision_hard_blockers
+
+
 def test_retrospective_official_source_cannot_claim_catalyst_confirmation():
     from crypto_rsi_scanner.event_alpha.radar import catalyst_attribution
 

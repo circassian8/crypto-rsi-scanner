@@ -111,6 +111,15 @@ Structured corrections still take precedence. This mutation-time rule is
 separate from closed projection reads, which stay idempotent and never trigger a
 material reevaluation.
 
+The same mutation-time boundary treats a completed result's `expires_at` as
+derived output. A changed market phase or coherent evaluation clock re-derives
+the phase TTL instead of feeding the prior expiry back into the model. A
+separately bound `calendar_expiry_cap` remains an explicit scheduled-risk upper
+bound. Malformed raw expiry or cap claims fail closed, while frozen empirical
+point-in-time copies move their observation and evaluation clocks together.
+Closed projection reads still copy their already-validated expiry without a
+hidden reevaluation.
+
 LLM catalyst frames are proposals until deterministic validation binds them to
 exactly one matching raw source. Each accepted quote must be a normalized,
 informative contiguous span inside one eligible field—title, body, or

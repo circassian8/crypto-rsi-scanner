@@ -748,7 +748,12 @@ def timing_profile(data: Mapping[str, Any], market: Mapping[str, Any]) -> Timing
     )
     explicit_expiry_present = data.get("expires_at") not in (None, "")
     explicit_expiry = _parse_aware_timestamp(data.get("expires_at"))
-    expiry_invalid = explicit_expiry_present and explicit_expiry is None
+    calendar_cap_present = data.get("calendar_expiry_cap") not in (None, "")
+    calendar_cap = _parse_aware_timestamp(data.get("calendar_expiry_cap"))
+    expiry_invalid = (
+        (explicit_expiry_present and explicit_expiry is None)
+        or (calendar_cap_present and calendar_cap is None)
+    )
     expiry = explicit_expiry
     if expiry is None and anchor is not None and not expiry_invalid:
         ttl_hours = {
@@ -761,6 +766,8 @@ def timing_profile(data: Mapping[str, Any], market: Mapping[str, Any]) -> Timing
             MarketPhase.REVERSAL.value: 8,
         }[phase]
         expiry = anchor + timedelta(hours=ttl_hours)
+    if calendar_cap is not None and (expiry is None or calendar_cap < expiry):
+        expiry = calendar_cap
     expired = _typed_text(data.get("expiry_status")).casefold() == "expired"
     market_freshness = _typed_text(market.get("freshness_status")).casefold()
     expired = expired or market_freshness == "expired"
@@ -878,6 +885,13 @@ def timing_context_invalid(
         "expiry_status" in data
         and data.get("expiry_status") not in (None, "")
         and not _typed_text(data.get("expiry_status"))
+    ):
+        return True
+    if any(
+        field in data
+        and data.get(field) not in (None, "")
+        and _parse_aware_timestamp(data.get(field)) is None
+        for field in ("expires_at", "calendar_expiry_cap")
     ):
         return True
     return any(

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Re-derive expiry during final Decision reevaluation
+**Status:** accepted
+**Decision:** When `reevaluate_radar_decision_fields` receives a completed
+Decision-v2 result, its prior top-level `expires_at` is derived output and must
+not become a fresh timing input. Recompute expiry from the current market phase
+and coherent evaluation clock. Preserve only a separately bound
+`calendar_expiry_cap`, applying it as an upper bound. Raw pre-evaluation expiry
+compatibility remains supported, and malformed explicit expiry or calendar-cap
+claims fail closed.
+**Why:** A material phase mutation recalculated phase, horizon, urgency, and
+chase risk while silently retaining the old phase's expiry. That produced an
+internally contradictory canonical result and could distort operator lifetime
+or shadow-policy comparisons. Point-in-time empirical clones must move their
+observation and evaluation clocks together rather than relying on stale output.
+**Revisit when:** Every timing input and derived output has a separately bound
+schema origin. Never preserve a prior derived expiry merely to make a synthetic
+fixture pass, and never make closed rendering reevaluate a projection.
+
 ## 2026-07-22 - Grant official evidence points only to exact source classes
 **Status:** accepted
 **Decision:** Decision-v2's historical evidence-confidence fallback may assign

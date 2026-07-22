@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Re-derive expiry after final Decision mutations · Codex
+**Why:** Final Decision-v2 reevaluation recalculated market phase, horizon,
+urgency, and chase risk but fed the prior result's derived `expires_at` back as
+an explicit input. A phase change could therefore retain an obsolete TTL and
+produce internally contradictory operator truth.
+**Changes:**
+- Made completed-result reevaluation discard the prior derived expiry and
+  recompute it from the current phase and coherent evaluation clock.
+- Added a separately typed `calendar_expiry_cap` upper bound, with malformed
+  raw expiry or cap claims failing closed, so scheduled-risk shortening
+  survives material reevaluation without preserving stale output.
+- Added phase-mutation, calendar-cap, and malformed-cap regressions. Corrected
+  empirical point-in-time clones to move `decision_evaluated_at` with
+  `observed_at`, preserving the frozen sample without relying on stale expiry.
+- Updated the North Star, roadmap, working agreement, durable decision, and
+  generated project-health reports.
+**Verify:** 290 focused Decision-v2, surface, consistency, catalyst,
+derivatives, calendar, namespace, Core-opportunity, empirical-policy, replay,
+and integrity tests passed. Python compilation, strict integrated smoke/doctor
+(15 candidates, 12 Core rows/cards, 0 blockers/warnings), 14-page dashboard
+fixture rendering, architecture cleanliness, JSON validation, and diff hygiene
+passed.
+**Notes/risks:** Raw pre-evaluation explicit expiry compatibility remains. No
+score, threshold, route policy, provider call, historical artifact rewrite,
+send, trade, order, paper trade, normal RSI write, or Event Alpha
+`TRIGGERED_FADE` changed. Full `make verify` was intentionally skipped because
+the focused model/empirical/integration gates cover this bounded correction.
+
 ## 2026-07-22 — Close official-class prefix score inflation · Codex
 **Why:** Decision-v2 evidence confidence treated any `source_class` beginning
 with `official` as a 94/100 authority fallback. Arbitrary labels such as
