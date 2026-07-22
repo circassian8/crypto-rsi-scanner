@@ -1156,6 +1156,38 @@ def test_actionability_is_not_implicitly_blocked_by_low_evidence_confidence():
     assert result.radar_actionable is True
 
 
+def test_evidence_authority_requires_an_exact_official_source_class():
+    common = {
+        "source_strength": "unrecognized",
+        "latest_source_url": "https://example.com/research/item",
+        "latest_source_title": "Research context",
+    }
+    unknown = decision_model.evaluate_radar_decision(
+        _market_led_candidate(source_class="unknown", **common)
+    )
+    lookalikes = (
+        "officially_fake",
+        "officialish",
+        "official_exchange_archive",
+        "official_project_mirror",
+    )
+    for source_class in lookalikes:
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(source_class=source_class, **common)
+        )
+
+        assert result.evidence_confidence_components["source_authority"] == (
+            unknown.evidence_confidence_components["source_authority"]
+        )
+
+    for source_class in ("official_exchange", "official_project"):
+        result = decision_model.evaluate_radar_decision(
+            _market_led_candidate(source_class=source_class, **common)
+        )
+
+        assert result.evidence_confidence_components["source_authority"] == 94.0
+
+
 def test_new_routes_and_origin_lanes_are_independently_configurable():
     late = _market_led_candidate(
         market_state_class="late_momentum",

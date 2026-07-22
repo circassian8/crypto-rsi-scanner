@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-22 - Grant official evidence points only to exact source classes
+**Status:** accepted
+**Decision:** Decision-v2's historical evidence-confidence fallback may assign
+official source-authority points from `source_class` only when the normalized
+value is exactly `official_exchange` or `official_project`. A prefix or compound
+look-alike receives the unverified baseline unless an independently recognized
+`source_strength` contract applies. Catalyst-lane compatibility and canonical
+registry/attribution authority remain separate decisions.
+**Why:** `startswith("official")` gave `officially_fake`, `officialish`, and
+other arbitrary caller labels 94/100 authority points, materially raising
+evidence confidence despite no canonical official identity.
+**Revisit when:** Historical scoring consumes only closed source-registry
+assessments. Do not broaden the exact class set from article wording or source
+hints.
+
 ## 2026-07-22 - Classify Decision compatibility labels by unnegated components
 **Status:** accepted
 **Decision:** Historical Decision-v2 directional-bias, market-phase,

@@ -57,6 +57,13 @@ class appears in that pack's declared validator set. Historical bytes are not
 rewritten; current re-evaluation fails closed and records
 `source_authority_unverified`.
 
+Decision-v2 evidence-confidence compatibility grants its historical
+official-class fallback only to exact normalized `official_exchange` and
+`official_project` source classes. Prefix or compound look-alikes such as
+`officially_fake`, `officialish`, and `official_exchange_archive` retain the
+unverified authority baseline. Catalyst-lane plausibility remains a separate
+compatibility question and cannot manufacture official evidence points.
+
 For historical Decision-v2 rows that predate the closed catalyst-attribution
 contract, the compatibility heuristic recognizes catalyst-specific source-lane
 labels only on normalized component boundaries. Compound canonical labels such

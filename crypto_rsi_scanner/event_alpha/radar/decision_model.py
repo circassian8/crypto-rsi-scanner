@@ -66,6 +66,10 @@ _ALLOWED_CROWDING_CLASSES = {
     "missing",
     "unavailable",
 }
+_OFFICIAL_EVIDENCE_SOURCE_CLASSES = frozenset({
+    "official_exchange",
+    "official_project",
+})
 _BOOLEAN_CONTROL_FIELDS = (
     "is_theme_or_sector",
     "is_quote_asset",
@@ -658,15 +662,18 @@ def _evidence_components(
     *,
     catalyst: str,
 ) -> dict[str, float]:
-    source_strength = str(data.get("source_strength") or "").casefold()
-    source_class = str(data.get("source_class") or "").casefold()
+    source_strength = _typed_text(data.get("source_strength")).casefold()
+    source_class = _typed_text(data.get("source_class")).casefold()
     authority = {
         "official_structured": 96.0,
         "strong": 84.0,
         "medium": 68.0,
         "tagged_context": 55.0,
         "weak": 38.0,
-    }.get(source_strength, 94.0 if source_class.startswith("official") else 32.0)
+    }.get(
+        source_strength,
+        94.0 if source_class in _OFFICIAL_EVIDENCE_SOURCE_CLASSES else 32.0,
+    )
     source_url, source_title = _catalyst_source_fields(data)
     if not source_url:
         authority = min(authority, 62.0)

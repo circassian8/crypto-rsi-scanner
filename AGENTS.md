@@ -81,6 +81,11 @@ source/control blockers. Labels such as `not_confirmed_breakout`,
 `unlockable`, `not_blowoff`, `breakoutish`, `not_suspicious_illiquid`, and
 `quote_assetless` must not create policy state; canonical compound labels and
 their existing precedence remain unchanged.
+Decision-v2 evidence-confidence scoring grants the historical official-class
+fallback only to exact normalized `official_exchange` and `official_project`
+source classes. Prefix look-alikes such as `officially_fake`, `officialish`, or
+`official_exchange_archive` may retain separately justified catalyst-lane
+compatibility, but they must not receive official source-authority points.
 That heuristic also keeps evidence ownership row-local: an official/news lane
 claim from one row may not borrow an accepted count or public URL from another
 row to become confirmed/plausible. Closed catalyst attribution remains the

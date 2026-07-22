@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-22 — Close official-class prefix score inflation · Codex
+**Why:** Decision-v2 evidence confidence treated any `source_class` beginning
+with `official` as a 94/100 authority fallback. Arbitrary labels such as
+`officially_fake` and `officialish` therefore scored like canonical official
+sources.
+**Changes:**
+- Restricted the fallback to exact normalized `official_exchange` and
+  `official_project` classes; all other unrecognized classes receive the
+  existing 32/100 baseline.
+- Kept exact `source_strength` mappings, catalyst-lane compatibility, and the
+  canonical source-registry/attribution authority contract separate and
+  unchanged.
+- Added paired look-alike/exact-class regressions and updated the North Star,
+  roadmap, working agreement, and durable decision.
+**Verify:** 261 focused Decision-v2, surface, consistency, derivatives,
+calendar, catalyst, namespace, Core-opportunity, empirical-policy, and replay
+tests passed. Python compilation, strict integrated smoke/doctor, dashboard
+fixture rendering, architecture cleanliness, JSON validation, and diff hygiene
+are run before publication.
+**Notes/risks:** An `official_exchange_archive` label may still be plausible
+historical catalyst-lane context when it owns a public URL, but it receives no
+official source-authority score. No thresholds, route rules, providers,
+historical artifacts, or safety boundaries changed.
+
 ## 2026-07-22 — Close Decision classification substring upgrades · Codex
 **Why:** Four remaining Decision-v2 compatibility surfaces searched arbitrary
 substrings. Negated or look-alike labels could create a long/risk bias,
