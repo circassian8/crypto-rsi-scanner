@@ -1,0 +1,120 @@
+{
+  "schema_version": "lean_crypto_radar_product_contract_v1",
+  "status": "active_product_rebuild",
+  "product": "Lean Crypto Radar V1",
+  "default_operator_product": true,
+  "implementation_state": {
+    "bybit_universe_and_store_foundation": "implemented",
+    "scan_and_idea_detection": "in_progress",
+    "dashboard": "pending",
+    "telegram_preview": "pending",
+    "calendar_and_outcomes": "pending"
+  },
+  "venue": "bybit",
+  "instrument_type": "usdt_perpetual",
+  "universe": {
+    "top_liquid_limit": 200,
+    "liquidity_rank_basis": "coingecko_total_volume_usd_24h_desc_after_shared_hygiene",
+    "requires_confirmed_active_bybit_instrument": true,
+    "manual_watchlist_enabled": true,
+    "unverified_watchlist_policy": "visible_blocked_unverified"
+  },
+  "cadence_minutes": {
+    "default": 20,
+    "minimum": 15,
+    "maximum": 30
+  },
+  "surfaces": {
+    "dashboard_priority": "primary_equal",
+    "telegram_priority": "primary_equal",
+    "dashboard_page_limit": 6,
+    "telegram_default": "no_send"
+  },
+  "idea_types": [
+    "market_breakout_long",
+    "relative_strength_long",
+    "pullback_or_mean_reversion",
+    "rapid_market_anomaly",
+    "exhaustion_or_fade_review",
+    "selloff_or_risk_warning",
+    "calendar_risk",
+    "dashboard_watch",
+    "diagnostic"
+  ],
+  "routes": [
+    "urgent_review",
+    "watchlist",
+    "daily_digest",
+    "dashboard_only",
+    "risk_calendar",
+    "diagnostic_hidden"
+  ],
+  "scores": [
+    "actionability",
+    "confidence",
+    "risk",
+    "urgency"
+  ],
+  "urgent_notification_policy": {
+    "hard_daily_cap": null,
+    "visible_family_dedupe": true,
+    "cooldown_for_unchanged_updates": true,
+    "material_change_required_for_repeat": true,
+    "market_wide_grouping": true
+  },
+  "catalyst_policy": {
+    "known_catalyst_required": false,
+    "unknown_catalyst_effect": [
+      "lower_explanation_confidence",
+      "raise_risk_or_manipulation_warning"
+    ],
+    "event_alpha_role": "optional_catalyst_context"
+  },
+  "runtime_store": {
+    "type": "sqlite",
+    "database_count": 1,
+    "allowed_domains": [
+      "bybit_instruments",
+      "manual_watchlist",
+      "market_snapshots",
+      "rolling_baselines",
+      "ideas",
+      "outcomes",
+      "calendar_events",
+      "notification_state",
+      "system_health",
+      "optional_feedback"
+    ],
+    "forbidden_domains": [
+      "orders",
+      "positions",
+      "portfolio",
+      "account_data",
+      "paper_trades"
+    ]
+  },
+  "safety": {
+    "research_only": true,
+    "live_trading": false,
+    "orders": false,
+    "execution": false,
+    "paper_trading": false,
+    "normal_rsi_writes": false,
+    "event_alpha_triggered_fade_creation": false,
+    "telegram_send_by_default": false,
+    "provider_calls_require_existing_explicit_authorization": true,
+    "application_may_create_or_persist_authorization": false,
+    "fabricated_missing_data": false
+  },
+  "mothballed_from_default_path": [
+    "event_alpha_full_pipeline",
+    "decision_radar_artifact_authority",
+    "empirical_protocol_workflows"
+  ],
+  "retained_as_optional_or_research": [
+    "event_alpha_catalyst_context",
+    "decision_radar",
+    "empirical_lab",
+    "legacy_rsi_scanner"
+  ]
+}

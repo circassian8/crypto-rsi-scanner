@@ -2,24 +2,24 @@
 
 Static source inventory only. This report does not call providers, send Telegram messages, trade, paper trade, write RSI signal rows, or create TRIGGERED_FADE.
 
-- generated_at: `2026-07-22T06:37:09.838201+00:00`
-- public_class_count: `518`
-- classes_over_limit_count: `3`
-- functions_over_limit_count: `35`
-- production_classes_over_limit: `3`
-- production_functions_over_limit: `35`
+- generated_at: `2026-07-23T02:04:00.985319+00:00`
+- public_class_count: `525`
+- classes_over_limit_count: `5`
+- functions_over_limit_count: `36`
+- production_classes_over_limit: `5`
+- production_functions_over_limit: `36`
 - accepted_class_exceptions_count: `3`
-- remaining_class_ownership_debt_count: `0`
+- remaining_class_ownership_debt_count: `2`
 - v3_gate_status: `pass`
 - v3_auto_accept_ready: `True`
 - v3_blockers: `[]`
 - public_classes_not_in_own_module: `0`
 - class_exceptions_remaining: `3`
-- functions_over_150_lines: `35`
+- functions_over_150_lines: `36`
 - modules_with_multiple_public_classes_count: `0`
 - modules_with_multiple_public_classes_status: `pass`
-- multi_public_class_modules_count: `84`
-- accepted_model_bundles_count: `83`
+- multi_public_class_modules_count: `85`
+- accepted_model_bundles_count: `84`
 - unresolved_multi_class_modules_count: `0`
 - api_decomposition_gate_status: `advisory`
 - api_classes_over_limit: `0`
@@ -48,7 +48,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `production_files_over_1500_lines` | 12 | advisory |
 | `public_classes_not_in_own_module` | 0 | blocker |
 | `class_exceptions_remaining` | 3 | advisory |
-| `functions_over_150_lines` | 35 | advisory |
+| `functions_over_150_lines` | 36 | advisory |
 | `old_path_docs_references` | 0 | blocker_unless_policy_scoped |
 | `old_path_import_allowed_exceptions` | 0 | informational |
 
@@ -200,6 +200,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.shims` | 2 | 17 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_core.models` | 7 | 17 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_providers.base` | 2 | 5 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.lean_radar.models` | 3 | 90 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.llm_providers.base` | 5 | 7 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.llm_providers.fixture` | 4 | 54 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.ops` | 5 | 12 | true | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
@@ -295,6 +296,7 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_core.models` | 7 | 17 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.event_fade` | 11 | 25 | module_exception | Intentionally outside Event Alpha. Split only in a dedicated behavior-freeze pass because TRIGGERED_FADE ownership must remain confined to event_fade.py plus proxy_fade. |
 | `crypto_rsi_scanner.event_providers.base` | 2 | 5 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
+| `crypto_rsi_scanner.lean_radar.models` | 3 | 90 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.llm_providers.base` | 5 | 7 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.llm_providers.fixture` | 4 | 54 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
 | `crypto_rsi_scanner.ops` | 5 | 12 | accepted_model_bundle | Small public DTO/enum/protocol/result bundle kept together as one stable import contract; all classes remain below the class-size limit. |
@@ -305,6 +307,8 @@ Static source inventory only. This report does not call providers, send Telegram
 
 | module | class | lines | public | accepted | exception |
 |---|---|---:|---:|---:|---|
+| `crypto_rsi_scanner.lean_radar.models` | `LeanIdea` | 90 | true | false |  |
+| `crypto_rsi_scanner.lean_radar.store` | `LeanRadarStore` | 284 | true | false |  |
 | `crypto_rsi_scanner.storage_parts.migrations` | `MigrationsMixin` | 88 | true | true | SQLite migration ownership is intentionally centralized to avoid untested schema drift. |
 | `crypto_rsi_scanner.storage_parts.signals` | `SignalsMixin` | 129 | true | true | Signal persistence methods share schema assumptions, row serialization, and outcome lookup behavior. |
 | `crypto_rsi_scanner.storage_parts.watchlist` | `WatchlistMixin` | 89 | true | true | Watchlist persistence methods are stable DB helpers and only slightly exceed the advisory limit. |
@@ -348,3 +352,4 @@ Static source inventory only. This report does not call providers, send Telegram
 | `crypto_rsi_scanner.event_alpha.radar.market_state` | `snapshot_from_market_row` | 175 | true |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_hypothesis_latest_score_components` | 153 | false |
 | `crypto_rsi_scanner.event_alpha.radar.watchlist.entries` | `_entry_from_row` | 160 | false |
+| `crypto_rsi_scanner.lean_radar.universe` | `build_universe` | 173 | true |

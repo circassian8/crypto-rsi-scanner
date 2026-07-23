@@ -148,15 +148,45 @@ When a choice should prevent future relitigation, add or update `DECISIONS.md`.
 
 ## Project in one paragraph
 
-A top-100 crypto multi-timeframe **RSI overextension scanner** plus a
-research-only **Crypto Radar** for human trader assistance. Each day it pulls
-the top coins from CoinGecko, computes Wilder RSI (daily/4H/weekly) plus context
-(z-score, volume, divergence, BTC correlation, trend regime), classifies each
-signal into a **setup type** (mean_reversion / dip_buy / trend_continuation /
-breakdown_risk), scores conviction, **gates it by the BTC market regime**, and
-sends tiered alerts to Telegram. It self-grades past signals, paper-trades them,
-and a separate `backtest.py` validates strategy ideas on years of history.
-**Deployed live** on the owner's Mac via launchd (daily scan + always-on bot).
+The default product direction is **Lean Crypto Radar**: a small, research-only
+personal radar for liquid Bybit USDT perpetuals, with market-led ideas, a
+six-page dashboard, guarded Telegram attention routing, one SQLite runtime, and
+no trading or paper trading. The existing top-100 multi-timeframe RSI scanner,
+Event Alpha Catalyst Radar, Decision Radar, and Empirical Lab remain available
+as legacy/research infrastructure. Lean Radar may reuse their focused pure
+helpers, but it does not run through the full Event Alpha pipeline and does not
+require a known catalyst to surface a liquid, timely market-led review item.
+
+### Lean Crypto Radar V1 product boundary
+
+- Intended venue/instrument: active Bybit USDT-linear perpetuals only.
+- Universe: top 200 assets by CoinGecko 24-hour USD volume after shared hygiene,
+  intersected with a confirmed Bybit catalog, plus manual watchlist assets that
+  pass the same check. Unverified watchlist entries remain visibly blocked.
+- Cadence: 15–30 minutes, default 20.
+- Dashboard and Telegram are equal-priority operator surfaces. Telegram remains
+  no-send by default and any send keeps the existing explicit guards.
+- The only main scores are actionability, confidence, risk, and urgency; they
+  are not win probabilities. There are at most ten idea types and six primary
+  dashboard pages.
+- Unknown catalyst is a soft confidence/risk limitation, not a universal gate.
+  Event Alpha is optional Catalyst Context beside the lean path.
+- One ignored SQLite runtime may hold universe, snapshots, baselines, ideas,
+  outcomes, calendar, notification, and health state. It must contain no orders,
+  positions, portfolio, account data, or paper trades.
+- No arbitrary urgent-alert count cap. Keep visible-family dedupe, unchanged-
+  update cooldown, material-change checks, and market-wide grouping.
+- Shorts are presented only as exhaustion/fade review, never as execution
+  instructions.
+- Do not add a lean feature unless it appears in the dashboard, Telegram
+  preview, outcomes, health, or operator docs. Do not create a new artifact or
+  evidence framework for this product.
+
+The durable product contract is
+`research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,
+the implemented lean commands are the default product path; unimplemented
+surfaces must remain honestly pending rather than delegating through Event
+Alpha and calling that Lean Radar complete.
 
 ---
 

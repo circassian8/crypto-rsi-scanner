@@ -121,6 +121,7 @@ ACCEPTED_MODEL_BUNDLE_MODULES = {
     "crypto_rsi_scanner.event_providers.base",
     "crypto_rsi_scanner.llm_providers.base",
     "crypto_rsi_scanner.llm_providers.fixture",
+    "crypto_rsi_scanner.lean_radar.models",
     "crypto_rsi_scanner.ops",
     "crypto_rsi_scanner.project_health.class_ownership",
     "crypto_rsi_scanner.signal_registry",

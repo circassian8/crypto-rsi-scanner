@@ -1,0 +1,106 @@
+# Lean Crypto Radar V1 Product Contract
+
+Status: active product rebuild. The universe/store foundation is implemented;
+the scan, dashboard, Telegram preview, calendar, and outcome slices remain in
+progress.
+
+## Product
+
+Lean Crypto Radar is the default personal operator product. It is a practical,
+research-only radar for Bybit USDT perpetuals. It answers what is moving,
+whether it is actually available on the intended venue, whether the move is
+liquid and timely, what confirms or invalidates it, and what data is missing.
+The human operator makes every trading decision.
+
+Event Alpha remains available as optional Catalyst Context. Decision Radar and
+the Empirical Lab remain research infrastructure. Neither is a required gate
+for a market-led Lean Radar idea.
+
+## Fixed V1 choices
+
+- Venue: Bybit.
+- Instrument: active, non-prelisting, USDT-quoted and USDT-settled linear
+  perpetuals.
+- Detection input: CoinGecko/public market data is acceptable.
+- Universe: top 200 assets ranked by 24-hour USD volume after shared hygiene,
+  intersected with a confirmed Bybit instrument catalog, plus a manual
+  watchlist subject to the same instrument check.
+- Cadence: operator-configurable from 15 to 30 minutes; default 20 minutes.
+- Surfaces: dashboard and Telegram have equal product priority.
+- Runtime state: one small ignored SQLite database.
+- Urgent alerts: no daily count cap. Visible-family dedupe, unchanged-update
+  cooldown, material-change checks, and market-wide grouping prevent spam.
+- Shorts: always phrased as exhaustion/fade review, never instructions.
+- Catalyst: useful context, never a universal requirement.
+
+## Idea types, routes, and scores
+
+The nine V1 idea types are `market_breakout_long`, `relative_strength_long`,
+`pullback_or_mean_reversion`, `rapid_market_anomaly`,
+`exhaustion_or_fade_review`, `selloff_or_risk_warning`, `calendar_risk`,
+`dashboard_watch`, and `diagnostic`.
+
+The six routes are `urgent_review`, `watchlist`, `daily_digest`,
+`dashboard_only`, `risk_calendar`, and `diagnostic_hidden`.
+
+The only main scores are actionability, confidence, risk, and urgency. They are
+operator-priority summaries on a 0–100 scale, not win probabilities.
+
+## Hard gates and soft limitations
+
+Hard gates are unresolved identity, no confirmed Bybit USDT perpetual, stale or
+insufficient market data, invalid units, insufficient liquidity, known extreme
+spread, control/stable/theme rows, duplicate cooldown, and unsafe provider,
+path, or secret state.
+
+Unknown catalyst, missing official/second source, unavailable derivatives,
+on-chain, spread, macro, or LLM context are soft limitations. Missing spread
+caps confidence and urgency and normally prevents the strongest urgent route;
+it does not hide a useful watchlist/dashboard idea.
+
+## Runtime store
+
+The single SQLite database may hold the Bybit catalog, manual watchlist, market
+snapshots and baselines, ideas, outcomes, calendar events, notification state,
+and health. It contains no orders, positions, portfolio, account data, or paper
+trades. The database and WAL/SHM files are ignored from git and review exports.
+
+## Safety
+
+- Research and decision support only.
+- No live trading, orders, execution, positions, portfolio, or account data.
+- No paper trading from Lean Radar or Event Alpha.
+- No normal RSI signal writes from Lean Radar or Event Alpha.
+- No Event Alpha-created `TRIGGERED_FADE`; that remains exclusive to
+  `event_fade.py` plus `proxy_fade`.
+- No Telegram sends by default; sending requires the existing explicit guards.
+- No provider call without an already-present explicit authorization flag.
+- The application never creates, changes, infers, or persists authorization.
+- Missing data remains missing; proxy data is labeled; catalysts, spreads,
+  depth, liquidity, anomalies, labels, and outcomes are never fabricated.
+
+## Default workflow
+
+```sh
+make lean-radar-readiness PYTHON=.venv/bin/python
+make lean-radar-bybit-universe-readiness PYTHON=.venv/bin/python
+CONFIRM=1 make lean-radar-bybit-universe-import \
+  LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json \
+  PYTHON=.venv/bin/python
+make lean-radar-universe \
+  LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
+  PYTHON=.venv/bin/python
+```
+
+Readiness is observational and makes no provider call or database write. The
+catalog import is a confirmed local operation and rejects checked-in fixture,
+test, mock, or replay paths. Until the remaining vertical slices land, the
+legacy Decision Radar commands remain available for research operations.
+
+## Deliberately not included
+
+There is no execution engine, order manager, portfolio/account integration,
+automatic threshold tuning, LLM critical path, universal catalyst gate,
+arbitrary urgent-alert cap, or new artifact/provenance framework. Existing
+Event Alpha and empirical code remains intact but is outside the default Lean
+Radar path.

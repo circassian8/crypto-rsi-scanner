@@ -16,6 +16,44 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Make Lean Crypto Radar the default operator product
+**Status:** accepted
+**Decision:** Build the default operator path in the small
+`crypto_rsi_scanner.lean_radar` package instead of extending the full Event
+Alpha/Decision-Radar artifact pipeline. Use Bybit USDT-linear perpetuals, a top
+200 24-hour-volume-ranked CoinGecko universe after shared hygiene, and manual
+watchlist entries subject to the same exact active-instrument check. Use one
+ignored SQLite runtime for universe, snapshots/baselines, ideas, outcomes,
+calendar, notification state, and health; never add order, position, portfolio,
+account, or paper-trade state. Dashboard and Telegram have equal product
+priority, with Telegram no-send by default. Keep at most nine V1 idea types,
+six routes, four main scores, and six primary dashboard pages. Unknown catalyst
+is a soft confidence/risk limitation, not a market-idea gate. There is no hard
+urgent-alert count cap; family dedupe, cooldown, material-change checks, and
+market-wide grouping control repetition. Present bearish cases only as
+exhaustion/fade review. Event Alpha remains optional Catalyst Context; Decision
+Radar and the Empirical Lab remain available research infrastructure.
+
+The initial universe implementation may confirm availability only from one
+complete current/imported Bybit public catalog row that is active,
+non-prelisting, `LinearPerpetual`, USDT-quoted, and USDT-settled, with usable
+tick/lot minimums. The CoinGecko symbol must be unique in the considered market
+set and exactly match the catalog `baseCoin`; ambiguity or an absent catalog row
+stays blocked/unverified. A future human-reviewed alias may support multiplier
+contracts, but the application must never guess one. A genuine local import is
+confirmation-gated, rejects fixture/test/mock/replay paths, and makes no provider
+call. The prior top-30 Bybit choice remains the frozen Protocol-v2 research
+universe rule only; it does not override the separate Lean V1 top-200 product
+policy.
+**Why:** The prior product became too broad and evidence-contract-centered for
+one human operator. A small venue-constrained market radar can surface timely,
+liquid situations without requiring exact catalyst proof, while retaining the
+safety and missing-data honesty already learned by the project.
+**Revisit when:** Real operator use shows that a specific lean boundary prevents
+a useful screen or alert, or observed outcomes justify a separately reviewed
+score/setup change. Do not reintroduce the full Event Alpha gate, automatic
+trading, automatic tuning, or a new evidence framework by default.
+
 ## 2026-07-22 - Use Python 3.13 as the sole supported runtime
 **Status:** accepted
 **Decision:** Python 3.13 is the sole supported operator and GitHub CI runtime.

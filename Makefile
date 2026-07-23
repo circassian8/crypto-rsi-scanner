@@ -1,5 +1,5 @@
 PYTHON ?= .venv/bin/python
-PYTEST_PATHS ?= tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
+PYTEST_PATHS ?= tests/lean_radar tests/event_alpha tests/rsi tests/cli tests/test_indicators.py
 PYTEST_SAFE_ENV = PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 PYTEST_DURATIONS ?= 50
 PYTEST_FILE_TIMING_JSON ?= .pytest_cache/test_file_timing_report.json
@@ -109,6 +109,13 @@ RADAR_MARKET_NO_SEND_SMOKE_NAMESPACE ?= radar_market_no_send_smoke
 RADAR_MARKET_NO_SEND_TOP_N ?= 30
 RADAR_MARKET_NO_SEND_FETCH_LIMIT ?=
 RADAR_MARKET_NO_SEND_FETCH_ARG = $(if $(strip $(RADAR_MARKET_NO_SEND_FETCH_LIMIT)),--fetch-limit $(RADAR_MARKET_NO_SEND_FETCH_LIMIT),)
+LEAN_RADAR_DB_PATH ?= $(abspath lean_radar.db)
+LEAN_RADAR_BYBIT_CATALOG ?=
+LEAN_RADAR_MARKET_ROWS ?=
+LEAN_RADAR_WATCHLIST_ASSET_ID ?=
+LEAN_RADAR_WATCHLIST_SYMBOL ?=
+LEAN_RADAR_WATCHLIST_NOTE ?=
+LEAN_RADAR_MARKET_ROWS_ARG = $(if $(strip $(LEAN_RADAR_MARKET_ROWS)),--markets $(abspath $(LEAN_RADAR_MARKET_ROWS)),)
 RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
@@ -258,6 +265,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
+.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add
 
 help:
 	@echo "Targets:"
@@ -284,6 +292,11 @@ help:
 	@echo "  make test-pytest-durations  Run safe pytest with slowest-test timings"
 	@echo "  make test-pytest-parallel  Run safe pytest with xdist when installed; set PYTEST_WORKERS=N"
 	@echo "  make smoke-alerts  Render representative alerts without sending"
+	@echo "  make lean-radar-readiness  Show default Lean Radar setup state; no provider call/write"
+	@echo "  make lean-radar-bybit-universe-readiness  Inspect the confirmed local Bybit USDT-perpetual catalog"
+	@echo "  CONFIRM=1 make lean-radar-bybit-universe-import LEAN_RADAR_BYBIT_CATALOG=/absolute/path/file.json  Import one genuine local catalog"
+	@echo "  make lean-radar-universe LEAN_RADAR_MARKET_ROWS=/absolute/path/markets.json  Intersect top-liquid assets and watchlist with confirmed Bybit perps"
+	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
 	@echo "  make radar-research-protocol-check  Validate the frozen Decision Radar empirical protocol without providers or writes"
@@ -1347,6 +1360,40 @@ event-alpha-market-anomaly-smoke:
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
 	@echo "Market-anomaly smoke artifacts under event_fade_cache/$(PROFILE)/."
+
+lean-radar-readiness:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) readiness
+
+lean-radar-bybit-universe-readiness:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) bybit-readiness
+
+lean-radar-bybit-universe-import:
+	@test "$(CONFIRM)" = "1" || { echo "Refusing Bybit catalog import without CONFIRM=1" >&2; exit 2; }
+	@test -n "$(LEAN_RADAR_BYBIT_CATALOG)" || { echo "LEAN_RADAR_BYBIT_CATALOG is required" >&2; exit 2; }
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) bybit-import \
+		--catalog $(abspath $(LEAN_RADAR_BYBIT_CATALOG)) --confirm
+
+lean-radar-universe:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) universe $(LEAN_RADAR_MARKET_ROWS_ARG)
+
+lean-radar-watchlist-add:
+	@test "$(CONFIRM)" = "1" || { echo "Refusing watchlist mutation without CONFIRM=1" >&2; exit 2; }
+	@test -n "$(LEAN_RADAR_WATCHLIST_ASSET_ID)" || { echo "LEAN_RADAR_WATCHLIST_ASSET_ID is required" >&2; exit 2; }
+	@test -n "$(LEAN_RADAR_WATCHLIST_SYMBOL)" || { echo "LEAN_RADAR_WATCHLIST_SYMBOL is required" >&2; exit 2; }
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) watchlist-add \
+		--canonical-asset-id $(LEAN_RADAR_WATCHLIST_ASSET_ID) \
+		--symbol $(LEAN_RADAR_WATCHLIST_SYMBOL) \
+		--note "$(LEAN_RADAR_WATCHLIST_NOTE)" --confirm
 
 radar-dashboard:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \

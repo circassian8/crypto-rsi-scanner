@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Start Lean Crypto Radar with a strict universe and one runtime store · Codex
+**Why:** The operator deliberately simplified the product direction. The useful
+default should be a small Bybit-perpetual market radar, not another extension of
+Event Alpha, Decision-v2 artifact authority, or catalyst proof.
+**Changes:**
+- Added the independent `crypto_rsi_scanner/lean_radar/` package with the fixed
+  top-200/15–30-minute configuration, the nine idea types, six routes, four-score
+  `LeanIdea`, and explicit research-only Bybit USDT-perpetual identity.
+- Added a strict complete Bybit public-catalog normalizer and confirmation-gated
+  genuine local import. It keeps only active, non-prelisting, USDT-quoted and
+  settled linear perpetuals with usable tick/lot minimums; rejects fixture,
+  test, mock, and replay paths for genuine import; makes no provider call; and
+  stores only the normalized public fields plus source time/mode/hash.
+- Added the top-200 24-hour-volume-ranked CoinGecko/shared-hygiene intersection
+  plus manual watchlist validation. Exact unique market symbol must match the
+  catalog base coin; ambiguous, missing, or non-Bybit watchlist entries stay
+  visible as blocked/unverified rather than becoming tradable.
+- Added one ignored SQLite runtime schema for instruments, watchlist, market
+  snapshots, ideas, outcomes, calendar, notification state, and health. It has
+  no orders, positions, portfolio, account, execution, or paper-trade tables;
+  observational readiness does not create the database.
+- Added the first operator Make targets for readiness, catalog readiness/import,
+  universe projection, and manual-watchlist addition. Added the Lean tests to
+  the standard pytest path and registered only the compact value-object module
+  as an accepted model bundle; quantitative size findings remain advisory while
+  module ownership stays enforced.
+- Added the Markdown/JSON product contract, made Lean Radar the documented
+  default path, parked the evidence-first Protocol-v2 rows as research
+  infrastructure, and updated the working agreement, roadmap, README, and
+  durable decisions.
+**Verify:** `tests/lean_radar` passes 13/13; Python compileall passes; the product
+contract parses; readiness/catalog-readiness/universe Make commands were run
+against a missing temporary database without creating it; a confirmed temporary
+genuine-copy import produced two confirmed instruments and the fixture market
+intersection produced two active plus one blocked asset. `make
+architecture-cleanliness-check PYTHON=.venv/bin/python` passes, including
+non-size ownership/import/naming gates and advisory size inventory. `git diff
+--check` passes.
+**Notes/risks:** This is the foundation slice, not a completed V1. The scan,
+feature/setup/scoring path, calendar/outcomes/health behavior, six-page
+dashboard, and Telegram preview/readiness still need implementation. No live
+provider call, Telegram send, trade, order, paper trade, normal RSI write, or
+Event Alpha `TRIGGERED_FADE` occurred.
+
 ## 2026-07-22 — Consolidate CI on Python 3.13 and fix GNU Make output · Codex
 **Why:** This personal project has one real operator runtime, Python 3.13. The
 3.11 matrix doubled GitHub jobs and failure-email noise, while both versions

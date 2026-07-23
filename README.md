@@ -1,8 +1,43 @@
 # crypto-rsi-scanner
 
-Research-oriented crypto RSI scanner and human-decided Event Alpha Crypto Radar.
+Research-oriented RSI scanner plus the default **Lean Crypto Radar** for a
+human operator reviewing Bybit USDT-perpetual opportunities.
 
-## Local Crypto Radar dashboard
+## Lean Crypto Radar (default product path)
+
+Lean Radar is the active product rebuild: one small SQLite runtime, a strict
+confirmed-Bybit universe, market-led setups that do not require a catalyst, and
+equal-priority dashboard and Telegram surfaces. Event Alpha remains available
+as optional Catalyst Context; Decision Radar and the Empirical Lab remain
+research infrastructure rather than the default operator gate.
+
+The first implemented slice imports a genuine locally supplied Bybit public
+instrument catalog and intersects it with the top 200 CoinGecko assets ranked
+by 24-hour volume plus the manual watchlist. A watchlist entry that has no exact
+active Bybit USDT perpetual remains visibly blocked/unverified. These commands
+make no provider call or Telegram send:
+
+```sh
+make lean-radar-readiness PYTHON=.venv/bin/python
+make lean-radar-bybit-universe-readiness PYTHON=.venv/bin/python
+CONFIRM=1 make lean-radar-bybit-universe-import \
+  LEAN_RADAR_BYBIT_CATALOG=/absolute/path/to/instruments-info.json \
+  PYTHON=.venv/bin/python
+make lean-radar-universe \
+  LEAN_RADAR_MARKET_ROWS=/absolute/path/to/coingecko-markets.json \
+  PYTHON=.venv/bin/python
+```
+
+The import rejects checked-in fixture/test/mock/replay paths and never infers
+authorization. The runtime database is ignored from git and contains no order,
+position, portfolio, account, or paper-trading tables. See the
+[Lean Radar product contract](research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md).
+
+The scan, six-page dashboard, Telegram preview/readiness, calendar overlay, and
+outcome maturation are the next vertical slices. Until they land, the existing
+Decision Radar dashboard remains available as a research/compatibility surface.
+
+## Existing Decision Radar dashboard (research/compatibility)
 
 `make radar-dashboard` serves the current Crypto Decision Radar operator
 generation at `http://127.0.0.1:8765/`. The seven-page terminal covers Today,
