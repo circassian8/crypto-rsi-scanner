@@ -214,6 +214,17 @@ require a known catalyst to surface a liquid, timely market-led review item.
   invalid runtime state fails closed. The dashboard remains loopback-only and
   does not inherit legacy publication/pointer authority or phone-access state.
   `make lean-radar-dashboard-smoke` uses only a disposable fixture database.
+- `make lean-radar-telegram-preview` is a read-only/no-send projection of the
+  same canonical ideas; `make lean-radar-telegram-readiness` reports only
+  secret-safe configuration booleans/counts. There is no urgent daily cap.
+  Stable visible families, an eight-point material-score threshold,
+  route-specific unchanged-update cooldowns, and market-wide groups of at most
+  four items prevent spam without dropping distinct due items. Dedupe state is
+  written only after full delivery success. Real delivery is a separate command
+  requiring genuine/non-fixture due inputs, existing Telegram configuration,
+  `RSI_EVENT_ALERTS_ENABLED=1`, and `CONFIRM=1`; no scan, dashboard, preview,
+  readiness, health, calendar, or outcome command invokes it. Never persist or
+  render token or recipient values.
 
 The durable product contract is
 `research/LEAN_CRYPTO_RADAR_PRODUCT_CONTRACT.md` / `.json`. During the rebuild,

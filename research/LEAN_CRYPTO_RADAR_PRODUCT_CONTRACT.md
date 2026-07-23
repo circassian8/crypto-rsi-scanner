@@ -2,7 +2,9 @@
 
 Status: active product rebuild. The universe/store, market-scan, context-only
 calendar, automatic outcomes, bounded system health, and six-page read-only
-dashboard are implemented; Telegram preview remains in progress.
+dashboard are implemented. Telegram preview, dedupe, readiness, and explicitly
+guarded delivery are also implemented; default workflow/release closure remains
+in progress.
 
 ## Product
 
@@ -137,6 +139,34 @@ closed with one safe local health command. The server is concurrent and
 loopback-only on `127.0.0.1:8766` during coexistence with the legacy dashboard;
 phone/public access is not enabled by this slice.
 
+## Implemented Telegram contract
+
+Telegram is a concise projection of the same persisted Lean ideas; it does not
+re-score or reclassify them. The four message types are urgent review,
+watchlist update, daily digest, and risk/calendar. Each idea block includes its
+symbol, human idea/bias wording, four scores, catalyst status, timing/phase, why
+now, main risk, confirmation, invalidation, dashboard detail link, and the
+research-only human-decision disclaimer. Fade candidates always say fade or
+exhaustion review and never give an execution instruction. Upcoming calendar
+events are included as context-only risk and create no direction.
+
+`lean-radar-telegram-preview` is read-only, writes no dedupe state, calls no
+provider, and sends nothing. `lean-radar-telegram-readiness` exposes only
+secret-safe booleans and recipient count; it never prints tokens or recipient
+identities. There is no urgent daily cap. Stable visible families, a fixed
+eight-point material score delta, route-specific cooldowns, and market-wide
+groups of at most four items prevent repeated spam while retaining every
+distinct due item across as many messages as needed. State is consumed only
+after full mocked/real sender success; failures remain due. One expiring local
+SQLite lease prevents overlapping send commands.
+
+Real delivery is a separate command and requires all of: a non-fixture
+live-no-send or genuine-imported source, current due messages, existing
+Telegram token/recipient configuration, `RSI_EVENT_ALERTS_ENABLED=1`, and
+`CONFIRM=1`. The application never sets those values. The command records only
+safe delivery counts and material-family state, never token or recipient
+values. It calls no market provider and remains research-only.
+
 ## Hard gates and soft limitations
 
 Hard gates are unresolved identity, no confirmed Bybit USDT perpetual, stale or
@@ -186,7 +216,19 @@ make lean-radar-calendar-readiness PYTHON=.venv/bin/python
 make lean-radar-outcomes PYTHON=.venv/bin/python
 make lean-radar-health PYTHON=.venv/bin/python
 make lean-radar-dashboard PYTHON=.venv/bin/python
+make lean-radar-telegram-preview PYTHON=.venv/bin/python
+make lean-radar-telegram-readiness PYTHON=.venv/bin/python
 ```
+
+After inspecting preview/readiness, the separate optional real-send boundary is:
+
+```sh
+RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 \
+  make lean-radar-telegram-send PYTHON=.venv/bin/python
+```
+
+That command is never invoked by scanning, dashboard reads, preview, readiness,
+health, outcomes, or calendar work.
 
 The live scan command respects the already-present CoinGecko authorization and
 returns non-success before a provider call when authorization, catalog, or
@@ -211,8 +253,8 @@ provider call, send, or model-policy change. The dashboard is a read-only
 loopback view; `make lean-radar-dashboard-smoke` renders all six primary pages
 against one disposable fixture database without touching operator state. The
 catalog import and genuine market-snapshot import reject checked-in fixture,
-test, mock, or replay paths. Until the remaining vertical slices land, the
-legacy Decision Radar commands remain available for research operations.
+test, mock, or replay paths. The legacy Decision Radar commands remain
+available for research operations but are outside this default path.
 
 ## Deliberately not included
 

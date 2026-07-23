@@ -117,6 +117,7 @@ LEAN_RADAR_MARKET_MODE ?= live_no_send
 LEAN_RADAR_MARKET_OBSERVED_AT ?=
 LEAN_RADAR_OUTCOMES_EVALUATED_AT ?=
 LEAN_RADAR_HEALTH_EVALUATED_AT ?=
+LEAN_RADAR_TELEGRAM_EVALUATED_AT ?=
 LEAN_RADAR_DASHBOARD_HOST ?= 127.0.0.1
 LEAN_RADAR_DASHBOARD_PORT ?= 8766
 LEAN_RADAR_WATCHLIST_ASSET_ID ?=
@@ -126,6 +127,7 @@ LEAN_RADAR_MARKET_ROWS_ARG = $(if $(strip $(LEAN_RADAR_MARKET_ROWS)),--markets $
 LEAN_RADAR_MARKET_OBSERVED_AT_ARG = $(if $(strip $(LEAN_RADAR_MARKET_OBSERVED_AT)),--observed-at $(LEAN_RADAR_MARKET_OBSERVED_AT),)
 LEAN_RADAR_OUTCOMES_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_OUTCOMES_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_OUTCOMES_EVALUATED_AT),)
 LEAN_RADAR_HEALTH_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_HEALTH_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_HEALTH_EVALUATED_AT),)
+LEAN_RADAR_TELEGRAM_EVALUATED_AT_ARG = $(if $(strip $(LEAN_RADAR_TELEGRAM_EVALUATED_AT)),--evaluated-at $(LEAN_RADAR_TELEGRAM_EVALUATED_AT),)
 RADAR_MARKET_NO_SEND_PYTHON = $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 RADAR_MARKET_NO_SEND_MAIN = $(abspath main.py)
 RADAR_DAILY_OPS_INTERVAL_SECONDS ?= 300
@@ -275,7 +277,7 @@ EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVE
 .PHONY: radar-announcements-kucoin-capture-smoke radar-announcements-kucoin-uta-capture-smoke
 .PHONY: radar-announcements-bitget-smoke radar-announcements-bitget-capture-smoke radar-announcements-bitget-readiness
 .PHONY: radar-unlock-tokenomist-v5-smoke radar-unlock-tokenomist-v5-capture-smoke radar-unlock-tokenomist-v5-readiness
-.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke
+.PHONY: lean-radar-readiness lean-radar-bybit-universe-readiness lean-radar-bybit-universe-import lean-radar-universe lean-radar-watchlist-add lean-radar-scan lean-radar-calendar-readiness lean-radar-calendar-import lean-radar-outcomes lean-radar-health lean-radar-dashboard lean-radar-dashboard-smoke lean-radar-telegram-preview lean-radar-telegram-readiness lean-radar-telegram-send
 
 help:
 	@echo "Targets:"
@@ -313,6 +315,9 @@ help:
 	@echo "  make lean-radar-health  Refresh bounded operator health; no provider call or send"
 	@echo "  make lean-radar-dashboard  Serve the six-page read-only Lean dashboard on loopback"
 	@echo "  make lean-radar-dashboard-smoke  Render every Lean dashboard page offline"
+	@echo "  make lean-radar-telegram-preview  Render due Lean Telegram messages without sending or writing"
+	@echo "  make lean-radar-telegram-readiness  Inspect secret-safe preview and guarded-send readiness"
+	@echo "  RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make lean-radar-telegram-send  Explicit guarded delivery of currently due messages"
 	@echo "  CONFIRM=1 make lean-radar-watchlist-add LEAN_RADAR_WATCHLIST_ASSET_ID=... LEAN_RADAR_WATCHLIST_SYMBOL=...  Add one blocked-until-verified watchlist asset"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
@@ -1451,6 +1456,21 @@ lean-radar-dashboard:
 lean-radar-dashboard-smoke:
 	env RSI_EVENT_ALERTS_ENABLED=0 \
 	$(PYTHON) -m crypto_rsi_scanner.lean_radar.dashboard --smoke
+
+lean-radar-telegram-preview:
+	env RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) telegram-preview $(LEAN_RADAR_TELEGRAM_EVALUATED_AT_ARG)
+
+lean-radar-telegram-readiness:
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) telegram-readiness $(LEAN_RADAR_TELEGRAM_EVALUATED_AT_ARG)
+
+lean-radar-telegram-send:
+	@test "$(CONFIRM)" = "1" || { echo "Refusing Lean Radar Telegram send without CONFIRM=1" >&2; exit 2; }
+	@test "$${RSI_EVENT_ALERTS_ENABLED:-0}" = "1" || { echo "Refusing Lean Radar Telegram send without RSI_EVENT_ALERTS_ENABLED=1" >&2; exit 2; }
+	$(PYTHON) -m crypto_rsi_scanner.lean_radar \
+		--db $(LEAN_RADAR_DB_PATH) telegram-send --confirm $(LEAN_RADAR_TELEGRAM_EVALUATED_AT_ARG)
 
 radar-dashboard:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha.dashboard \

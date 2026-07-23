@@ -9,6 +9,7 @@ from .config import LeanRadarSettings
 from .market_data import LIVE_AUTH_ENV, live_provider_authorized
 from .safety import SAFETY_COUNTERS
 from .store import LeanRadarStore, LeanRadarStoreError
+from .telegram import LeanTelegramError, telegram_readiness
 
 
 def refresh_system_health(
@@ -63,6 +64,25 @@ def refresh_system_health(
         errors.append("Calendar state could not be validated")
     scan = store.last_scan_status()
     outcomes = store.health_status("outcomes")
+    last_telegram = store.health_status("telegram")
+    try:
+        telegram = telegram_readiness(
+            store,
+            environ=environ,
+            evaluated_at=now,
+        )
+    except LeanTelegramError:
+        telegram = {
+            "status": "unavailable_invalid",
+            "preview_ready": False,
+            "preview_message_count": 0,
+            "send_guard_enabled": False,
+            "telegram_token_present": False,
+            "telegram_recipient_configured": False,
+            "current_send_eligibility": "blocked",
+            "send_blockers": ["Telegram state could not be validated"],
+        }
+        errors.append("Telegram state could not be validated")
     last_scan_at = _text_time(scan, "observed_at") if scan else None
     next_scan_at = _text_time(scan, "next_scan_at") if scan else None
     freshness, age_seconds = _freshness(
@@ -138,8 +158,33 @@ def refresh_system_health(
                 outcomes.get("unresolved_count", 0) if outcomes else 0
             ),
         },
+        "telegram": {
+            "status": telegram.get("status"),
+            "preview_ready": telegram.get("preview_ready", False),
+            "preview_message_count": telegram.get("preview_message_count", 0),
+            "send_guard_enabled": telegram.get("send_guard_enabled", False),
+            "token_present": telegram.get("telegram_token_present", False),
+            "recipient_configured": telegram.get(
+                "telegram_recipient_configured", False
+            ),
+            "current_send_eligibility": telegram.get(
+                "current_send_eligibility", "blocked"
+            ),
+            "last_send_status": (
+                last_telegram.get("status") if last_telegram else "not_run"
+            ),
+            "last_send_checked_at": (
+                last_telegram.get("checked_at") if last_telegram else None
+            ),
+        },
         "no_send": True,
-        "telegram_mode": "disabled_no_send",
+        "telegram_mode": (
+            "guarded_send_ready"
+            if telegram.get("current_send_eligibility") == "eligible"
+            else "preview_only"
+            if telegram.get("preview_ready")
+            else "setup_required"
+        ),
         "provider_call_attempted": False,
         "telegram_send_attempted": False,
         "errors": errors,
@@ -149,7 +194,14 @@ def refresh_system_health(
             cadence_eligible=cadence_eligible,
         ),
         "research_only": True,
-        **SAFETY_COUNTERS,
+        **{
+            **SAFETY_COUNTERS,
+            "telegram_sends": (
+                int(last_telegram.get("telegram_sends", 0))
+                if last_telegram
+                else 0
+            ),
+        },
     }
     store.record_health("operator", payload)
     return payload

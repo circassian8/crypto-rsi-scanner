@@ -17,6 +17,51 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-23 — Add first-class guarded Lean Telegram routing · Codex
+**Why:** The dashboard gives depth, but the product also needs a concise
+attention surface that cannot drift from canonical ideas, spam unchanged moves,
+consume state on failed delivery, or expose Telegram configuration.
+**Changes:**
+- Added read-only Telegram planning for urgent review, watchlist update, daily
+  digest, and risk/calendar messages. Each idea includes human setup/bias
+  wording, the four scores, catalyst/timing context, why now, main risk,
+  confirms/invalidates, dashboard detail link, and research-only disclaimer.
+  Calendar rows remain explicitly context-only; fade candidates never become
+  short instructions.
+- Added stable visible families, eight-point material-score change detection,
+  categorical/text material changes, route-specific unchanged-update
+  cooldowns, and market-wide grouping. Groups contain at most four items to fit
+  Telegram, but there is no message/day cap and every distinct due item is
+  reconciled exactly once into the plan.
+- Added SQLite notification-state reads/writes and one expiring send lease.
+  Preview/readiness never write. Dedupe is consumed only after full sender
+  success; failed delivery stays due. Bounded state refuses truncation and
+  malformed locks fail closed.
+- Added secret-safe readiness and a separate guarded delivery command. Actual
+  delivery requires genuine/non-fixture inputs, existing token and recipient
+  configuration, `RSI_EVENT_ALERTS_ENABLED=1`, and `CONFIRM=1`. Results retain
+  only booleans/counts and error class; no token, recipient identity, or raw
+  exception text enters output or SQLite.
+- Integrated preview/current-send/last-send truth into persisted operator
+  health and the dashboard System Health page. Added Make/CLI targets and
+  updated the product contract, durable decision, working agreement, and
+  roadmap.
+**Verify:** All 71 Lean Radar tests pass with external pytest plugins disabled.
+They cover read-only preview, required human message content, fade wording,
+calendar context, safe missing runtime, configuration redaction, cooldown and
+material-change behavior, stable family transitions, 13 distinct urgent items
+without a cap, bounded grouping, explicit send guards, fixture blocking,
+success-only dedupe, failed-delivery retryability, credential-bearing dashboard
+URL rejection, corrupt state/lock fail-closed behavior, owned expiring lock behavior,
+health/dashboard integration, and Make command guards. Both real operator
+preview/readiness targets returned safe setup guidance against the absent
+default DB without creating it. Dashboard smoke, compileall, JSON validation,
+diff checks, and architecture cleanliness also pass.
+**Notes/risks:** Delivery tests use injected in-memory senders; no real Telegram
+request occurred. Cooldowns and the eight-point threshold are transparent V1
+anti-spam policy, not calibrated trading logic. No provider call, trade, order,
+paper trade, RSI write, or `TRIGGERED_FADE` occurred.
+
 ## 2026-07-23 — Ship the six-page Lean Radar dashboard · Codex
 **Why:** Lean Radar needed a coherent operator surface over its new SQLite
 runtime. The page also had to make fixture/import/live provenance impossible to

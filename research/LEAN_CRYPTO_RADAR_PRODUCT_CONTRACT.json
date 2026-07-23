@@ -7,7 +7,7 @@
     "bybit_universe_and_store_foundation": "implemented",
     "scan_and_idea_detection": "implemented",
     "dashboard": "implemented",
-    "telegram_preview": "pending",
+    "telegram_preview": "implemented",
     "calendar": "implemented",
     "outcomes": "implemented",
     "system_health": "implemented"
@@ -113,6 +113,8 @@
       "current_provider_call_eligibility",
       "no_send",
       "telegram_mode",
+      "telegram_preview_and_send_readiness",
+      "last_telegram_delivery",
       "bounded_errors",
       "next_safe_command"
     ],
@@ -148,6 +150,34 @@
         "imported_snapshot",
         "fixture"
       ]
+    },
+    "telegram": {
+      "message_types": [
+        "urgent_review",
+        "watchlist_update",
+        "daily_digest",
+        "risk_calendar"
+      ],
+      "projection_of_canonical_ideas": true,
+      "preview_read_only": true,
+      "preview_provider_calls": false,
+      "preview_database_writes": false,
+      "preview_sends": false,
+      "visible_family_dedupe": true,
+      "material_score_delta": 8.0,
+      "maximum_group_items": 4,
+      "hard_daily_urgent_cap": null,
+      "market_wide_grouping": true,
+      "state_consumed_only_after_full_delivery_success": true,
+      "overlapping_send_lease": "sqlite_expiring_local_lease",
+      "send_requires": [
+        "non_fixture_trusted_due_items",
+        "existing_telegram_configuration",
+        "RSI_EVENT_ALERTS_ENABLED=1",
+        "CONFIRM=1"
+      ],
+      "stores_token_or_recipient_values": false,
+      "market_provider_calls": false
     },
     "telegram_default": "no_send"
   },

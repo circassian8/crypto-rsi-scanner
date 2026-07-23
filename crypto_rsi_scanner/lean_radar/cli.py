@@ -17,6 +17,14 @@ from .market_data import MarketDataError, live_provider_authorized
 from .outcomes import LeanOutcomeError, refresh_outcomes
 from .scan import run_scan, scan_readiness
 from .store import LeanRadarStore, LeanRadarStoreError
+from .telegram import (
+    LeanTelegramError,
+    build_telegram_plan,
+    render_telegram_preview,
+    render_telegram_readiness,
+    send_telegram_plan,
+    telegram_readiness,
+)
 from .universe import LeanUniverseError, build_universe, load_market_rows
 
 
@@ -37,6 +45,13 @@ def _parser() -> argparse.ArgumentParser:
     outcomes.add_argument("--evaluated-at", type=_time)
     health = subparsers.add_parser("health")
     health.add_argument("--evaluated-at", type=_time)
+    telegram_preview = subparsers.add_parser("telegram-preview")
+    telegram_preview.add_argument("--evaluated-at", type=_time)
+    telegram_readiness_parser = subparsers.add_parser("telegram-readiness")
+    telegram_readiness_parser.add_argument("--evaluated-at", type=_time)
+    telegram_send = subparsers.add_parser("telegram-send")
+    telegram_send.add_argument("--evaluated-at", type=_time)
+    telegram_send.add_argument("--confirm", action="store_true")
 
     importer = subparsers.add_parser("bybit-import")
     importer.add_argument("--catalog", type=Path, required=True)
@@ -70,6 +85,17 @@ def run(argv: Sequence[str] | None = None) -> tuple[int, dict[str, object]]:
     args = _parser().parse_args(argv)
     settings = load_settings()
     store = LeanRadarStore(args.db or settings.db_path)
+    if args.command == "telegram-preview":
+        return 0, build_telegram_plan(store, evaluated_at=args.evaluated_at)
+    if args.command == "telegram-readiness":
+        return 0, telegram_readiness(store, evaluated_at=args.evaluated_at)
+    if args.command == "telegram-send":
+        payload = send_telegram_plan(
+            store,
+            confirm=args.confirm,
+            evaluated_at=args.evaluated_at,
+        )
+        return (0 if payload["status"] in {"complete", "no_due_messages"} else 2), payload
     if args.command == "outcomes":
         payload = refresh_outcomes(store, evaluated_at=args.evaluated_at)
         payload["next_safe_command"] = (
@@ -345,8 +371,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             forwarded.extend(("--markets", str(args.markets)))
         if args.observed_at:
             forwarded.extend(("--observed-at", args.observed_at.isoformat()))
-    elif args.command in {"outcomes", "health"} and args.evaluated_at:
+    elif args.command in {
+        "outcomes",
+        "health",
+        "telegram-preview",
+        "telegram-readiness",
+        "telegram-send",
+    } and args.evaluated_at:
         forwarded.extend(("--evaluated-at", args.evaluated_at.isoformat()))
+    if args.command == "telegram-send" and args.confirm:
+        forwarded.append("--confirm")
     try:
         code, payload = run(forwarded)
     except (
@@ -355,6 +389,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         LeanOutcomeError,
         LeanRadarConfigError,
         LeanRadarStoreError,
+        LeanTelegramError,
         LeanUniverseError,
         MarketDataError,
     ) as exc:
@@ -366,11 +401,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             "telegram_send_attempted": False,
             "research_only": True,
         }
-    print(
-        json.dumps(payload, indent=2, sort_keys=True)
-        if args.json
-        else render_summary(payload)
-    )
+    if args.json:
+        output = json.dumps(payload, indent=2, sort_keys=True)
+    elif args.command == "telegram-preview":
+        output = render_telegram_preview(payload)
+    elif args.command == "telegram-readiness":
+        output = render_telegram_readiness(payload)
+    else:
+        output = render_summary(payload)
+    print(output)
     return code
 
 

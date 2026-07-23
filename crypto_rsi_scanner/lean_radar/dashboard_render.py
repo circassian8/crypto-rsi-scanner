@@ -485,6 +485,19 @@ def _health(state: _LeanDashboardState) -> str:
                 _human(str(outcomes.get("status", "not run"))),
                 f"{outcomes.get('matured_count', 0)} matured · {outcomes.get('unresolved_count', 0)} unresolved",
             ),
+            _health_card(
+                "Telegram",
+                _human(str(health.get("telegram_mode", "not run"))),
+                (
+                    f"{_nested(health, 'telegram', 'preview_message_count', default=0)} "
+                    "preview messages · no send on page load"
+                ),
+            ),
+            _health_card(
+                "Next scan",
+                _when(health.get("next_scan_at"), state.loaded_at),
+                f"Cadence {health.get('cadence_minutes', '—')} minutes",
+            ),
         )
     ) + "</div>"
     action = health.get("next_safe_command")
@@ -511,14 +524,14 @@ def _health(state: _LeanDashboardState) -> str:
         "Safety boundary",
         '<div class="safety-grid">'
         + "".join(
-            f'<span><b>0</b>{escape(label)}</span>'
-            for label in (
-                "Telegram sends",
-                "Trades",
-                "Orders",
-                "Paper trades",
-                "RSI writes",
-                "Triggered fades",
+            f'<span><b>{escape(str(health.get(key, 0)))}</b>{escape(label)}</span>'
+            for key, label in (
+                ("telegram_sends", "Telegram sends"),
+                ("trades_created", "Trades"),
+                ("orders_created", "Orders"),
+                ("paper_trades_created", "Paper trades"),
+                ("normal_rsi_signal_rows_written", "RSI writes"),
+                ("triggered_fade_created", "Triggered fades"),
             )
         )
         + "</div>",

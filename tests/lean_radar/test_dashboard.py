@@ -147,6 +147,21 @@ def test_dashboard_loader_returns_closed_bounded_runtime_truth(tmp_path: Path) -
     assert state.health_status is not None
     assert state.health_status["current_authorization_status"] == "present"
     assert state.health_status["last_provider_call_attempted"] is False
+    assert state.health_status["telegram_mode"] == "preview_only"
+
+
+def test_system_health_surfaces_telegram_preview_without_claiming_delivery(
+    tmp_path: Path,
+) -> None:
+    body = LeanRadarDashboardApp(_store(tmp_path)).response(
+        method="GET",
+        path="/health",
+    ).body.decode("utf-8")
+
+    assert "Telegram" in body
+    assert "Preview only" in body
+    assert "preview messages · no send on page load" in body
+    assert "Telegram sends</span>" in body
 
 
 def test_dashboard_server_refuses_non_loopback_binding(tmp_path: Path) -> None:

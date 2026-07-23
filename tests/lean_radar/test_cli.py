@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -160,4 +161,93 @@ def test_make_outcomes_and_health_are_safe_without_runtime_state(tmp_path: Path)
     assert "Status: setup_required" in health.stdout
     assert "Research only · no send · no trading" in outcomes.stdout
     assert "Research only · no send · no trading" in health.stdout
+    assert not database.exists()
+
+
+def test_make_telegram_preview_and_readiness_are_no_send_no_write(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[2]
+    database = tmp_path / "missing-telegram-runtime.db"
+    common = (
+        f"PYTHON={sys.executable}",
+        f"LEAN_RADAR_DB_PATH={database}",
+        "LEAN_RADAR_TELEGRAM_EVALUATED_AT=2026-07-23T12:00:00Z",
+    )
+
+    preview = subprocess.run(
+        ("make", "lean-radar-telegram-preview", *common),
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    readiness = subprocess.run(
+        ("make", "lean-radar-telegram-readiness", *common),
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+            "RSI_EVENT_ALERTS_ENABLED": "0",
+        },
+    )
+
+    assert "Status: setup_required" in preview.stdout
+    assert "No send attempted." in preview.stdout
+    assert "Status: setup_required" in readiness.stdout
+    assert "no provider call · no send" in readiness.stdout
+    assert not database.exists()
+
+
+def test_make_telegram_send_requires_both_explicit_guards(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    database = tmp_path / "never-created.db"
+
+    unconfirmed = subprocess.run(
+        (
+            "make",
+            "lean-radar-telegram-send",
+            f"PYTHON={sys.executable}",
+            f"LEAN_RADAR_DB_PATH={database}",
+        ),
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+            "RSI_EVENT_ALERTS_ENABLED": "0",
+        },
+    )
+    no_environment_guard = subprocess.run(
+        (
+            "make",
+            "lean-radar-telegram-send",
+            "CONFIRM=1",
+            f"PYTHON={sys.executable}",
+            f"LEAN_RADAR_DB_PATH={database}",
+        ),
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": os.environ.get("HOME", ""),
+            "RSI_EVENT_ALERTS_ENABLED": "0",
+        },
+    )
+
+    assert unconfirmed.returncode != 0
+    assert "without CONFIRM=1" in unconfirmed.stderr
+    assert no_environment_guard.returncode != 0
+    assert "without RSI_EVENT_ALERTS_ENABLED=1" in no_environment_guard.stderr
     assert not database.exists()

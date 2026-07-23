@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-23 - Consume Lean notification state only after delivery
+**Status:** accepted
+**Decision:** Telegram is a presentation of persisted canonical Lean ideas, not
+a separate evaluator. Keep exactly urgent review, watchlist update, daily
+digest, and risk/calendar message types. Use stable asset/setup-family keys,
+an eight-point score change or categorical/text change as material, and
+route-specific cooldowns only for otherwise unchanged updates. Group broad
+market moves in bounded messages while emitting as many messages as necessary;
+there is no daily urgent cap and no distinct due item may disappear in grouping.
+Calendar messages remain context-only, and bearish wording remains fade,
+exhaustion, or risk review.
+
+Preview and readiness are read-only and no-send. Persist a family's dedupe
+state only after the sender reports complete delivery; a failed attempt remains
+due. Serialize explicit send commands with one expiring SQLite lease. Real
+delivery requires trusted non-fixture due inputs, existing token/recipient
+configuration, `RSI_EVENT_ALERTS_ENABLED=1`, and `CONFIRM=1`. Store and render
+only configuration booleans/counts and delivery counts, never token or recipient
+values. No other Lean command may invoke delivery.
+**Why:** Telegram must be useful enough to route attention without becoming a
+second source of product truth or losing urgent ideas to arbitrary quotas.
+Success-only state prevents a failed no-delivery attempt from suppressing the
+next real opportunity.
+**Revisit when:** Real delivery history shows repeated nuisance updates or a
+single message consistently exceeds Telegram's limit. Change cooldowns or
+material thresholds prospectively from that evidence, never to manufacture or
+hide current ideas.
+
 ## 2026-07-23 - Keep the Lean dashboard closed over runtime truth
 **Status:** accepted
 **Decision:** Serve Lean Radar from the single SQLite runtime through exactly

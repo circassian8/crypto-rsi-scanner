@@ -11,6 +11,7 @@ import sqlite3
 import stat
 from typing import Iterator, Mapping, Sequence
 from urllib.parse import quote
+from uuid import uuid4
 
 from .models import (
     IDEA_OUTCOME_STATES,
@@ -575,6 +576,214 @@ class LeanRadarStore:
             for row in rows
             if isinstance((payload := json.loads(row["payload_json"])), dict)
         )
+
+    def notification_states(self) -> dict[str, dict[str, object]]:
+        """Return bounded, secret-free delivery state keyed by visible family."""
+
+        if not self.path.exists():
+            return {}
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT visible_family, last_notified_at, last_material_digest,
+                       payload_json
+                FROM notification_state
+                ORDER BY visible_family LIMIT 1001
+                """
+            ).fetchall()
+        if len(rows) > 1000:
+            raise LeanRadarStoreError("notification state exceeds the bounded runtime")
+        states: dict[str, dict[str, object]] = {}
+        for row in rows:
+            family = row["visible_family"]
+            notified_at = row["last_notified_at"]
+            material_digest = row["last_material_digest"]
+            payload = json.loads(row["payload_json"])
+            if (
+                not isinstance(family, str)
+                or not family
+                or not isinstance(payload, dict)
+                or payload.get("visible_family") != family
+                or payload.get("schema_version") != "lean_notification_state_v1"
+                or not isinstance(notified_at, str)
+                or payload.get("last_notified_at") != notified_at
+                or not isinstance(material_digest, str)
+                or len(material_digest) != 64
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in material_digest
+                )
+                or payload.get("material_digest") != material_digest
+                or not isinstance(payload.get("material_snapshot"), dict)
+            ):
+                raise LeanRadarStoreError("stored notification state is invalid")
+            states[family] = {
+                **payload,
+                "last_notified_at": notified_at,
+                "last_material_digest": material_digest,
+            }
+        return states
+
+    def record_notification_deliveries(
+        self,
+        updates: Sequence[Mapping[str, object]],
+        *,
+        delivered_at: datetime,
+    ) -> None:
+        """Record only fully delivered visible families in one transaction."""
+
+        if delivered_at.tzinfo is None:
+            raise LeanRadarStoreError("notification delivery time must be timezone-aware")
+        when = delivered_at.astimezone(timezone.utc).isoformat()
+        rows: list[tuple[str, str, str, str]] = []
+        seen: set[str] = set()
+        for update in updates:
+            family = update.get("visible_family")
+            digest = update.get("material_digest")
+            snapshot = update.get("material_snapshot")
+            message_type = update.get("message_type")
+            if (
+                not isinstance(family, str)
+                or not family
+                or len(family) > 160
+                or family in seen
+                or not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+                or not isinstance(snapshot, Mapping)
+                or not isinstance(message_type, str)
+            ):
+                raise LeanRadarStoreError("notification delivery state is invalid")
+            seen.add(family)
+            payload = {
+                "schema_version": "lean_notification_state_v1",
+                "visible_family": family,
+                "message_type": message_type,
+                "material_digest": digest,
+                "material_snapshot": dict(snapshot),
+                "last_delivery_status": "delivered",
+                "last_notified_at": when,
+                "research_only": True,
+            }
+            rows.append(
+                (
+                    family,
+                    when,
+                    digest,
+                    json.dumps(
+                        payload,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ),
+                )
+            )
+        if not rows:
+            return
+        with self.connect(write=True) as connection:
+            connection.executemany(
+                """
+                INSERT INTO notification_state (
+                    visible_family, last_notified_at,
+                    last_material_digest, payload_json
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(visible_family) DO UPDATE SET
+                    last_notified_at = excluded.last_notified_at,
+                    last_material_digest = excluded.last_material_digest,
+                    payload_json = excluded.payload_json
+                """,
+                rows,
+            )
+            connection.commit()
+
+    def acquire_notification_send_lock(
+        self,
+        *,
+        acquired_at: datetime,
+        lease_seconds: int = 600,
+    ) -> str | None:
+        """Claim one expiring local send lease; never stores recipient data."""
+
+        if acquired_at.tzinfo is None or not 30 <= lease_seconds <= 3600:
+            raise LeanRadarStoreError("notification send lease is invalid")
+        now = acquired_at.astimezone(timezone.utc)
+        owner = uuid4().hex
+        expires = datetime.fromtimestamp(
+            now.timestamp() + lease_seconds,
+            tz=timezone.utc,
+        )
+        with self.connect(write=True) as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT value FROM meta WHERE key = 'lean_telegram_send_lock'"
+                ).fetchone()
+                if row is not None:
+                    try:
+                        current = json.loads(row["value"])
+                        active_until = datetime.fromisoformat(
+                            str(current.get("expires_at", "")).replace("Z", "+00:00")
+                        )
+                    except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                        connection.rollback()
+                        raise LeanRadarStoreError(
+                            "notification send lock is invalid"
+                        ) from exc
+                    if active_until.tzinfo is None:
+                        connection.rollback()
+                        raise LeanRadarStoreError(
+                            "notification send lock is invalid"
+                        )
+                    if active_until > now:
+                        connection.rollback()
+                        return None
+                value = json.dumps(
+                    {
+                        "owner": owner,
+                        "acquired_at": now.isoformat(),
+                        "expires_at": expires.isoformat(),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                connection.execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                    ("lean_telegram_send_lock", value),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return owner
+
+    def release_notification_send_lock(self, owner: str) -> bool:
+        if not isinstance(owner, str) or len(owner) != 32:
+            raise LeanRadarStoreError("notification send lock owner is invalid")
+        with self.connect(write=True) as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT value FROM meta WHERE key = 'lean_telegram_send_lock'"
+                ).fetchone()
+                if row is None:
+                    connection.rollback()
+                    return False
+                try:
+                    value = json.loads(row["value"])
+                except json.JSONDecodeError:
+                    connection.rollback()
+                    return False
+                if not isinstance(value, dict) or value.get("owner") != owner:
+                    connection.rollback()
+                    return False
+                connection.execute(
+                    "DELETE FROM meta WHERE key = 'lean_telegram_send_lock'"
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return True
 
     def snapshot_window(
         self,

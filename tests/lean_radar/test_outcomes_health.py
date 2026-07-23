@@ -274,7 +274,9 @@ def test_system_health_separates_current_authorization_from_last_call(
     assert report["last_provider_call_succeeded"] is True
     assert report["data_freshness"] == "fresh"
     assert report["provider_call_attempted"] is False
-    assert report["telegram_mode"] == "disabled_no_send"
+    assert report["telegram_mode"] == "preview_only"
+    assert report["telegram"]["preview_ready"] is True
+    assert report["telegram"]["current_send_eligibility"] == "blocked"
     assert store.health_status("operator") == report
 
 
